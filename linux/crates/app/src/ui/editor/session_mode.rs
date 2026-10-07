@@ -435,10 +435,10 @@ impl SqlEditor {
         ) {
             return;
         }
-        if let Some(session) = self.session.take() {
-            if result.is_err() {
-                self.retired_session_connection_id = Some((session.connection_id, session.id));
-            }
+        if let Some(session) = self.session.take()
+            && result.is_err()
+        {
+            self.retired_session_connection_id = Some((session.connection_id, session.id));
         }
         self.ending_session_id = None;
         self.session_button.set_label(&session_label(false));

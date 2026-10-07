@@ -1,55 +1,45 @@
 # B4 task board: transport and sessions
 
-Base commit: `aeac107a4`, branch `linux`, reviewed 2026-10-03. The local source
-includes the MySQL batch/result fixes integrated in `de5831eb1`, indexed in the
-[evidence manifest](evidence/mysql-atomic-results-2026-10-03/manifest.json).
+Base scope: `aeac107a4`, branch `linux`, reviewed 2026-10-03. The active B4
+integration branch is `b4/i5-reconciled`; its tip advances as work lands. Use each
+evidence manifest for the exact source revision and use Git for the current branch tip.
+The local source includes MySQL batch/result fixes indexed in the [evidence manifest]
+(evidence/mysql-atomic-results-2026-10-03/manifest.json).
 The [sprint](bookie-0.2-sprint.md) owns release order; [ADR 0008](decisions/0008-connection-and-session-ownership.md)
-owns the decisions. B4 remains open. Implementation, local execution, hosted
+owns the decisions. The local integration branch is `b4/i5-reconciled`; use the
+current Git tip for its revision because this board is updated independently of
+source commits. B4 remains open. Implementation, local execution, hosted
 execution and installed acceptance are separate states.
 
-## B4 continuation status (October 3)
+## B4 continuation checkpoint (October 3; historical integration snapshot)
 
 | Task | Integrated source | Remaining acceptance |
 | --- | --- | --- |
 | A1–A5, B1–B5, C1–C5, D1–D8, G1/G2/G4, H1–H4 | Prior implementation and regressions retained | Recheck affected cases on the frozen candidate; A5's consumer is F9 |
 | E1/E2, G3, F1/F2/F3 | Merged in #13–#18 | No reimplementation; native/shared policy, verified cache and close-route acceptance at candidate SHA |
 | F5 | Merged as `4b7814f5e` (#19) | Installed retirement/toggle flow |
-| F4/F9 | Merged as `573435766` (#20) | Monitor consumes tunnel closure and swaps live identity; native reconnect and installed stale-session acceptance |
-| F6 | Merged as `d1434438e` and follow-up `6e2c5687a` (#22/#23) | GUI defaults to refusal and installs the built-in prompter; decline/accept fixtures exist. Native two-hop success, second-hop key-change refusal, and in-flight cancellation while the second-hop trust prompt is pending passed locally on `f3a1765` via `bash scripts/test-ssh.sh`; installed trust flow remains a candidate gate. See [SSH multi-hop evidence](evidence/ssh-multihop-2026-10-07/manifest.json) |
+| F4/F9 | Merged as `573435766` (#20) | Monitor consumes tunnel closure and swaps live identity; native reconnect and [release-binary GTK stale-session evidence](evidence/ssh-reconnect-session-gtk-2026-10-07/manifest.json) passed; distribution-package/native Wayland acceptance remains |
+| F6 | Merged as `d1434438e` and follow-up `6e2c5687a` (#22/#23) | GUI defaults to refusal and installs the built-in prompter. Native two-hop success, second-hop key-change refusal, and in-flight cancellation while the second-hop trust prompt is pending passed locally on `f3a1765` via `bash scripts/test-ssh.sh`; the [combined release-binary GTK run](evidence/ssh-gtk-multihop-2026-10-07/manifest.json) passes all five default PostgreSQL release GTK scenarios, including two-hop success, second-hop decline, changed-key refusal, audit refusal, and saved mTLS. The two-hop success, decline and changed-key flows each record exactly one terminal audit outcome. Package-installed/native Wayland, frozen-candidate and hosted acceptance remain |
 | F8 | GUI generation split merged as `6346a431c` (#24); daemon generations merged as `09c5351a3` | Policy, GUI and daemon scope uncertainty per connection generation while sharing journal failure. Agentd regressions cover isolation, replacement, late cancellation and shared journal failure; frozen-candidate and installed restart acceptance remain |
 
-Source integration above was checked locally. No fresh hosted result is inferred
-from a merge. Historical local/hosted reports and original packets are preserved
-in [B4 history](archive/b4-history.md); missing worktree/cache paths remain unavailable
-evidence. Fresh audit results are in [the release audit](archive/release-audit-2026-10-03.md).
+This table is the October 3 integration snapshot with later evidence links added
+where useful. The current merged state is summarized below; merges do not imply
+fresh hosted results. Historical reports and original packets are preserved in
+[B4 history](archive/b4-history.md); missing worktree/cache paths remain
+unavailable evidence. The broad release audit is dated
+[October 3](archive/release-audit-2026-10-03.md).
 
-## C6 tunneled TLS local fixture evidence (October 7)
+## Latest merged slices (checked 2026-10-07)
 
-PR #150 merged the TLS-only MySQL and SQL Server fixtures behind an SSH bastion
-restricted to those two services. The ignored per-engine cases exercise
-BookiE's built-in SSH forwarding and preserve the original service identity for
-TLS verification. Local `bash scripts/test-driver-tls.sh` passed all 43 tests
-on merged HEAD `11672cbe6`, including 11 MySQL and 9 SQL Server cases. Both
-drivers execute a native query through the tunnel with a valid CA and hostname,
-reject an unrelated CA, reject wrong and local-dial identities, and clean up the
-local forward. MySQL refuses plaintext on its TLS-only endpoint; SQL Server's
-native `encrypt_option` proves the server forces encrypted sessions.
+| Task | Merge | Local evidence | Hosted state at last check |
+| --- | --- | --- | --- |
+| C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
+| G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
 
-The PR #150 hosted Build run did not execute the TLS fixture: preflight failed
-because the ignored-test inventory was stale, and the regression gate correctly
-rejected the dependent skipped jobs. PR #151's hosted harness then found two
-follow-up defects: its new G5 case was misclassified by the inventory generator,
-and `known-issues.md` retained duplicate B4-1 through B4-4 rows. PR #153 merged
-those fixes and moved SSH host-key generation from the bastion image build to
-container startup after SonarCloud reported image-build generation. The
-follow-up establishes the hosted fixture and inventory checks; C6 still needs a
-successful hosted execution of the fixture itself and frozen-candidate
-acceptance.
-
-The tests exercise BookiE's built-in SSH route; the OpenSSH route and installed
-acceptance remain unproven. The fixture correction also replaces ineffective
-SQL Server TLS environment variables with the documented `mssql-conf` TLS
-settings.
+PRs #153–#155 have since merged into `fork/linux`; current fetched baseline is
+`a7d8039af`. They repair hosted fixture/inventory wiring, add a PostgreSQL enum
+array consumer case, and reconcile the sprint and known-issues status. Those
+merges do not close the remaining B4 candidate, hosted, or installed gates.
 
 ## Remaining tasks
 
@@ -59,29 +49,80 @@ additional privacy, value and evidence tasks without duplicating this board.
 
 | ID | Small task and required assertion | Local layers |
 | --- | --- | --- |
-| G5 | Exercise the actual daemon provider through system OpenSSH: unattended unknown key declines without learning; pretrusted host reaches a guarded query | `ssh`, `postgres-release` |
-| F8-headless | Extend headless acceptance for late cancellation after replacement and journal-failure propagation across cached and replacement generations | `security-policy`, agentd units, `postgres-release` |
-| I2 | Selecting system OpenSSH inside Flatpak refuses explicitly before subprocess/driver dispatch; no backend switch. Add a deterministic sandbox-context regression | `harness`, transport units |
-| I5 | Record tunnel setup and host-key refusal through the approved audit contract; success/denial/cancel/error each has one safe terminal outcome | `security-policy`, `ssh`, `postgres-release` |
-| F7 | Isolated GTK Session → BEGIN → transaction label → toggle-off confirmation; Cancel retains session, rollback settles before closing; register selector once | `widgets`, `postgres-release`; `ui` if the safety flow changes |
-| I3 | Reconcile route/auth/TLS evidence after C6/G5/I2; exact engine/backend/SHA/selector, unsupported and unrun combinations explicit | Documentation links and evidence inventory |
-| B4-atomic-batch / B4-rollback-error | MySQL source and native regressions complete locally: non-DML batches are refused before dispatch, failed rollback reports unknown outcome, and a trigger-to-MyISAM side effect is shown to survive InnoDB rollback with an accurate UI warning. PostgreSQL native rollback-failure acceptance and broader engine/side-effect coverage remain open | [Retained MySQL evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); frozen candidate acceptance remains |
-| B4-MySQL-engine-atomicity | **Narrow contract tested locally:** failed InnoDB DML rolls back InnoDB rows, but an AFTER INSERT trigger's MyISAM write survives; the UI warns that non-transactional writes may remain. Other storage engines and side-effect patterns still need scoped proof | [Native trigger regression and evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); broader candidate acceptance remains |
+| I2 | **Implemented and locally tested.** Explicit saved system OpenSSH selection refuses at route resolution inside Flatpak before SSH credential resolution or driver dispatch; there is no automatic backend switch. The deterministic regression also verifies built-in SSH remains selectable inside the sandbox and system OpenSSH remains selectable outside it. Flatpak package/runtime acceptance remains separate | `quick` (includes sandbox tests) |
+| I5 | **Local implementation and backend fixture coverage complete.** The shared transport boundary emits one terminal event per SSH attempt. Saved GUI opens/reconnects, connect-dialog submit/test, and daemon opens attach principal/connection identity and cancellation. Built-in and system OpenSSH real fixtures cover unknown and changed host keys; system OpenSSH also covers trusted success. Unit tests cover cancellation, audit-write failure/fail-closed behavior, and legacy journal compatibility. GTK refusal, accepted-query, and closed-port setup-failure scenarios each assert exactly one durable transport outcome. See [GTK refusal evidence](evidence/b4-gtk-ssh-audit-2026-10-07/manifest.json), [GTK success evidence](evidence/ssh-gtk-trust-accept-2026-10-07/manifest.json), and [GTK setup-failure evidence](evidence/ssh-gtk-setup-failure-2026-10-07/manifest.json). Frozen-candidate, hosted, and installed acceptance remain open | `security-policy`, `ssh`, `postgres-release` |
+| F7 | **Local implementation, unit/widget, and PostgreSQL GTK flow verified.** Toggle-off confirmation keeps Session active; Cancel retains the same open transaction; explicit `ROLLBACK` finishes before session close and leaves no rows persisted | `widgets`, `postgres-release`, and `TABLEPRO_GTK_SCENARIO=postgres_session_transaction_confirmation_cancels_or_rolls_back bash scripts/test-gtk-postgres.sh` passed locally; candidate/hosted/installed acceptance remains |
+| B4-atomic-batch / B4-rollback-error | MySQL source and native regressions complete locally: non-DML batches are refused before dispatch, failed rollback reports unknown outcome, and transactional InnoDB trigger rows roll back while MyISAM, MEMORY, CSV and ARCHIVE trigger writes survive. Failed batches also leave InnoDB AUTO_INCREMENT allocation advanced; UPDATE and DELETE batch failures restore InnoDB parent/trigger rows while MyISAM trigger effects survive. The seven-test ignored MySQL atomicity group passed locally on 2026-10-07; the expanded UPDATE/DELETE regression passed again on the current worktree. The UI warns that non-transactional writes may remain. PostgreSQL native tests terminate the active backend and prove `TransactionRollbackFailed`, rolled-back table data, and surviving identity/trigger sequence increments. Broader side-effect coverage and frozen-candidate acceptance remain open | [Retained MySQL evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); [three-engine MySQL trigger evidence](evidence/mysql-csv-trigger-rollback-2026-10-07/manifest.json); [expanded MySQL engine and counter evidence](evidence/mysql-rollback-engine-effects-2026-10-07/manifest.json); [ARCHIVE MySQL regression](evidence/mysql-archive-rollback-effects-2026-10-07/manifest.json); [UPDATE/DELETE and seven-test group evidence](evidence/mysql-update-delete-rollback-effects-2026-10-07/manifest.json); [PostgreSQL rollback-failure evidence](evidence/postgres-rollback-failure-results-2026-10-07/manifest.json); [PostgreSQL sequence side-effect evidence](evidence/postgres-rollback-sequence-side-effect-2026-10-07/manifest.json); [current B4 worktree rerun](evidence/postgres-rollback-current-branch-2026-10-07/manifest.json) |
+| B4-MySQL-engine-atomicity | **Scoped contract tested locally:** failed InnoDB DML rolls back parent and InnoDB trigger rows, while MyISAM, MEMORY, CSV and ARCHIVE INSERT-trigger writes survive; MyISAM UPDATE and DELETE trigger writes also survive failed batches. An InnoDB AUTO_INCREMENT allocation is not restored. The UI warns that non-transactional writes may remain. Other engines and side-effect patterns still need scoped proof | [Original MyISAM evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); [MyISAM and MEMORY regression](evidence/mysql-nontransactional-trigger-engines-2026-10-07/manifest.json); [CSV regression](evidence/mysql-csv-trigger-rollback-2026-10-07/manifest.json); [expanded MySQL engine and counter evidence](evidence/mysql-rollback-engine-effects-2026-10-07/manifest.json); [ARCHIVE regression](evidence/mysql-archive-rollback-effects-2026-10-07/manifest.json); [UPDATE/DELETE regression including transactional trigger rollback](evidence/mysql-update-delete-rollback-effects-2026-10-07/manifest.json); broader candidate acceptance remains |
 | I1 | In the Debian phase, build/install executable `tablepro-askpass` in debhelper rules and make validator reject its absence; inspect the rules-built package | `packaging-contracts`, Debian package build |
 
 ## In-progress local slices
 
 | ID | Current implementation and validation | Remaining |
 | --- | --- | --- |
-| B4-22 | ADR [0010](decisions/0010-administrative-action-audit.md) defines privacy-bounded administrative audit events; code records durable intent/outcome around confirmed bundle export/import and gates side effects on intent durability. Focused interrupted-intent recovery, fail-closed and paired-event checks pass; affected crate suite passed (903 passed, 45 ignored). [GTK export evidence](evidence/b4-bundle-export-audit-2026-10-07/manifest.json) verifies the export UI and sanitized durable pair | GTK import, frozen-candidate and hosted acceptance remain |
+| B4-22 | ADR [0010](decisions/0010-administrative-action-audit.md) defines privacy-bounded administrative audit events; code records durable intent/outcome around confirmed bundle export/import and gates side effects on intent durability. Failed passphrase attempts retain the parsed bundle and reopen the passphrase prompt without requiring another file selection. Focused interrupted-intent recovery, fail-closed and paired-event checks pass; affected crate suite passed (903 passed, 45 ignored). [GTK export evidence](evidence/b4-bundle-export-audit-2026-10-07/manifest.json) and [GTK import evidence](evidence/b4-bundle-import-audit-2026-10-07/manifest.json) verify plaintext flows; [installed-path GTK evidence](evidence/b4-bundle-audit-installed-2026-10-07/manifest.json) covers both plaintext scenarios; [encrypted GTK round-trip evidence](evidence/b4-encrypted-bundle-gtk-2026-10-07/manifest.json) covers retry, unlock, credential replacement and audit redaction on a rebuilt release binary | Frozen-candidate, hosted, and distribution-package/native Wayland acceptance remain |
 
 ## Completed local slices
 
 | ID | Local evidence | Scope remaining |
 | --- | --- | --- |
-| G5 | `bash scripts/test-postgres-release.sh` on the BookiE `b4/g5-daemon-openssh` worktree, 2026-10-07: actual agentd provider refuses an unattended unknown system OpenSSH key without writing it, then reaches a guarded PostgreSQL query with a pretrusted key. The command also passed the existing PostgreSQL release integration suite | Re-run on the frozen B3+B4 candidate SHA; hosted and installed acceptance remain separate |
+| I3 | [Route, authentication and TLS matrix](#i3-route-authentication-and-tls-evidence-2026-10-07) records exact engine/backend, SHA/selector, unsupported and unrun combinations after C6/G5/I2 | Source evidence matrix complete; frozen candidate, hosted checks and installed acceptance remain separate |
+| G5 | PR #151 merged at ` a7d8039af`; before merge, `bash scripts/test-postgres-release.sh` on the rebased branch verified that the actual agentd provider refused an unattended unknown system OpenSSH key without writing it, then reached a guarded PostgreSQL query with a pretrusted key. The PostgreSQL release integration suite passed; `audit_isolation_tests` passed separately (4 tests) | Frozen B3+B4 candidate SHA, completion of hosted checks, and installed acceptance remain separate |
+| C6-MySQL / C6-SQLServer | C6 source commit `0ecb5bc4f`; rerun on the assembled B4 branch with `bash scripts/test-driver-tls.sh` on 2026-10-07: all 43 TLS tests passed, including 11 MySQL and 9 SQL Server tests. Both tunneled engines execute a query with valid CA/hostname verification, reject an untrusted CA and wrong/local service identities; MySQL proves no plaintext fallback and SQL Server checks `encrypt_option` plus tunnel cleanup | Built-in SSH forwarding only; system OpenSSH, frozen-candidate, hosted and installed acceptance remain separate |
+| I2 | `tablepro-transport::tests::saved_system_openssh_refuses_deterministically_in_flatpak_without_fallback`: injectable sandbox context proves the selected OpenSSH route refuses before password-keyring resolution; explicit built-in route still constructs, and native OpenSSH route remains supported. The `quick` layer passed locally on `b4/i5-reconciled` (2026-10-07) and includes the sandbox tier | Flatpak package/runtime acceptance remains separate |
 | F8-headless | `agentd::audit_isolation_tests`: connection A uncertainty leaves B writable; replacement recovers; cancellation of an old write after replacement does not poison the new generation; outcome journal failure blocks other sessions and replacement generations | Re-run on the frozen B3+B4 candidate SHA; hosted and installed restart acceptance remain separate |
-| C6-MySQL / C6-SQLServer | Commit `0ecb5bc4f`; `bash scripts/test-driver-tls.sh` passed all 43 tests on 2026-10-07, including MySQL 11 and SQL Server 9. Both engine fixtures execute queries through built-in SSH forwarding with valid TLS identity and refuse invalid CA/hostname cases without plaintext fallback | Re-run on frozen candidate SHA; hosted results, system OpenSSH route and installed acceptance remain separate |
+| I5 | `security-policy`, `ssh`, and `postgres-release` passed on `b4/i5-reconciled` (2026-10-07). PostgreSQL release fixtures assert one journal event each for built-in unknown/mismatched-key refusal and system OpenSSH unknown/mismatched-key refusal, plus one connected event for pretrusted system OpenSSH. Transport units cover cancellation, audit sink failure (no connection returned; governed writes disabled), and legacy journal deserialization. Agent credentials are hashed before persistence. GTK saved/open, reconnect, connect-dialog submit, and test-connection call sites pass the audit context into the same transport boundary. The targeted GTK setup-failure scenario also proves a closed SSH port produces exactly one durable `connection_failed` outcome; see [evidence](evidence/ssh-gtk-setup-failure-2026-10-07/manifest.json). | Frozen candidate SHA, hosted CI, and installed acceptance |
+| F7 | The rollback action sends `ROLLBACK`, awaits its result, then closes the dedicated session; Session stays active and controls stay disabled until both steps finish. Unit coverage gates delayed rollback/close and close-after-rollback-error; isolated GTK dialog coverage checks Cancel, Roll Back and Commit semantics. The `widgets` layer passed 13 selectors, `postgres-release` passed, and the full app library suite passed (537 passed, 39 ignored). The focused PostgreSQL 17 GTK flow passed: Cancel kept the same transaction open, later writes remained uncommitted, and Roll Back closed the session with zero persisted rows. See [GTK session evidence](evidence/gtk-postgres-session-confirmation-2026-10-07/manifest.json) | Re-run on the frozen B3+B4 candidate; hosted CI and installed acceptance remain |
+| B4-16 | [Release-binary GTK evidence](evidence/ssh-reconnect-session-gtk-2026-10-07/manifest.json): Toxiproxy cuts the saved SSH route during an editor transaction; the transaction remains absent, a stale-session write is refused, and after recovery a new Session successfully runs `SELECT 42` | Distribution-package/native Wayland, frozen-candidate and hosted acceptance remain |
+| B4-21 | [SQL Server Kerberos evidence](evidence/mssql-kerberos-2026-10-07/manifest.json): the driver used a valid AD ticket over VerifyFull TLS, queried `SYSTEM_USER` as `DOMAIN1\bookiekerb`, and refused an unregistered SPN. The fixture uses pinned SQL Server and Samba AD DC container digests and removes generated keytabs by default | Real Windows AD interoperability and frozen-candidate/hosted acceptance remain separate |
+| B4-12 | [Native PostgreSQL evidence](evidence/postgres-rollback-failure-results-2026-10-07/manifest.json) plus [identity-sequence side-effect evidence](evidence/postgres-rollback-sequence-side-effect-2026-10-07/manifest.json): `a_batch_reports_rollback_failure_after_postgres_terminates_its_backend` runs on PostgreSQL 16 in Docker. A monitor terminates the backend during statement 1; the driver reports `TransactionRollbackFailed`, the parent and trigger rows are absent, and identity/trigger sequence allocations remain advanced. [Current B4 worktree rerun](evidence/postgres-rollback-current-branch-2026-10-07/manifest.json) and [trigger-effects rerun](evidence/postgres-rollback-trigger-effects-2026-10-07/manifest.json) passed | Frozen-candidate SHA, broader side-effect patterns and hosted acceptance remain |
+| B4-18 | Candidate `SERVER VERSION`, `LIST TABLES`, and `LIST VIEWS` reads for saved connect and connect-dialog submit now use `CandidateGuardFactory`; Test Connection table listing uses the same guard. `candidate_catalog_reads_use_the_durable_policy_audit_journal` verifies intent/outcome entries; `candidate_metadata_read_refuses_when_its_audit_intent_cannot_be_written` verifies fail-closed behavior. Both passed in `cargo test -p tablepro-app --lib candidate_ -- --nocapture` | Local app tests only; frozen-candidate, hosted, and installed acceptance remain |
+| B4-19 | The vendored PostgreSQL SCRAM client rejects server nonces that fail to extend the client nonce or contain non-ASCII/non-printable bytes, before deriving a proof. A local wire fixture sends an echoed nonce, a non-ASCII suffix, and 100,001 iterations; all three cases reject before a client proof is sent. `cargo test -p tablepro-driver-postgres --lib` passed (54 tests) | Local driver tests only; frozen-candidate and hosted acceptance remain |
+
+### I5 sanitized event shape and coverage
+
+```json
+{
+  "phase": "outcome",
+  "principal": { "kind": "agent", "token": "sha256:<short digest>" },
+  "connection_id": "<attempt connection UUID>",
+  "driver_id": "postgres",
+  "operation_class": "administrative",
+  "redacted_sql": "[NOT_APPLICABLE]",
+  "decision_rule": "transport_attempt",
+  "terminal_status": "denied",
+  "error_category": "authentication",
+  "error": "ssh_host_key_or_authentication_refused",
+  "transport_attempt": {
+    "client": "system_open_ssh",
+    "outcome": "host_key_refused"
+  }
+}
+```
+
+| Caller / SSH client | Local evidence |
+| --- | --- |
+| GUI saved connect / reconnect / connect-dialog submit and test | Explicit audit context and cancellation token reach the shared transport attempt wrapper; app target compiles. GTK runtime event capture is not separately exercised |
+| Daemon / system OpenSSH | PostgreSQL release fixture asserts unknown-key refusal, changed-key refusal, and trusted connection outcomes from the durable journal; exactly one transport event per attempt |
+| Shared transport / built-in SSH | PostgreSQL release fixture asserts unknown-key and changed-key outcomes with exactly one terminal event per attempt |
+| Shared transport / failure paths | Unit coverage asserts one cancelled terminal event, sanitized agent principal, and audit-write failure returns no connection and disables governed writes |
+
+### I3 route, authentication and TLS evidence (2026-10-07)
+
+| Engine / caller | Source SHA and selector | Route and authentication evidence | TLS evidence | Scope not established |
+| --- | --- | --- | --- | --- |
+| MySQL | `0ecb5bc4f`; `verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query`, `verify_full_through_ssh_rejects_an_untrusted_authority`, `verify_full_through_ssh_rejects_a_wrong_or_local_identity` | Built-in SSH local socket forward to an unpublished fixture; SSH uses a fixture key and the database uses the fixture username/password | `driver-tls` suite: valid VerifyFull query; untrusted CA and wrong/local service identity refused; TLS-only endpoint rejects plaintext and driver does not retry without TLS | System OpenSSH route; other MySQL authentication plugins; frozen-candidate/hosted/installed runs |
+| SQL Server | `0ecb5bc4f`; same three `verify_full_through_ssh_*` selectors as MySQL | Built-in SSH TCP forward to an unpublished fixture; SSH uses a fixture key and the database uses the fixture username/password | `driver-tls` suite: valid VerifyFull query; untrusted CA and wrong/local service identity refused; server `encrypt_option` confirms encryption and dropping the tunnel closes the forward | System OpenSSH route; Kerberos; frozen-candidate/hosted/installed runs |
+| PostgreSQL / built-in SSH | `e66ff814e`; `the_shared_transport_verifies_the_database_hostname_through_the_bastion` | Shared transport uses built-in SSH and fixture key to reach PostgreSQL; PostgreSQL uses fixture username/password | `postgres-release` asserts VerifyFull against the database hostname through the bastion and rejects use of the local TCP-forward address as TLS identity | System OpenSSH TLS verification is not separately asserted by the G5 selector; frozen-candidate/hosted/installed runs |
+| PostgreSQL / agentd system OpenSSH | `37f984c56` / `c739f5afa`; `agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust` | Actual daemon refuses the unknown SSH host key without learning it, then a pretrusted key reaches a guarded PostgreSQL query; PostgreSQL uses fixture username/password | The G5 saved connection requests VerifyFull, but the acceptance assertion is host-key refusal/trust and guarded query, not a separate TLS-negative matrix | Built-in/system OpenSSH TLS equivalence; frozen-candidate/hosted/installed runs |
+| Saved system OpenSSH in Flatpak | `c2399c730`; `saved_system_openssh_refuses_deterministically_in_flatpak_without_fallback` | Deterministic route-resolution test refuses before credential lookup or driver dispatch, with no automatic fallback; built-in SSH remains selectable | Not a TLS integration test | Installed Flatpak runtime acceptance |
+
+The assembled source `0b544ac18` passed `bash scripts/test-driver-tls.sh` (43
+tests) after integrating C6. The selector and driver configuration stay in the engine
+fixtures and tests; this matrix records only claims established by those tests.
+Other TLS-tested engines (ClickHouse, MongoDB and Redis) have direct TLS fixture
+coverage, but no SSH-forwarding coverage is claimed here. Do not treat this
+matrix as frozen-candidate, hosted, or installed acceptance.
 
 Headless panic retirement is covered by `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy`;
 include it in the combined G5/F8 candidate acceptance.
@@ -94,7 +135,7 @@ behavior stays in the dedicated keyring tier.
 
 1. Continue B3's bounded cases and evidence reconciliation. B3 completion
    precedes closing B4 acceptance; independent review/preparation may proceed.
-2. Finish C6, G5, headless F8, I2, I5 and F7; update I3 with actual results.
+2. C6 and G5 are merged; retain their local evidence and resolve hosted check results. Finish headless F8 candidate acceptance, I2/I5/F7, and keep the completed I3 source matrix aligned with integration.
 3. Freeze an accepted B3+B4 source SHA and run affected `full security-policy
    drivers tls postgres-release widgets ui packaging-contracts`; include keyring
    and optional-feature checks where affected. Avoid repeated overlapping suites.

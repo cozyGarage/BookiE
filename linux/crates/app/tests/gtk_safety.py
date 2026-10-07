@@ -30,6 +30,8 @@ POSTGRES_MTLS_CONNECTION_NAME = "PostgreSQL mTLS"
 POSTGRES_MTLS_CONNECTION_ID = "02a95df6-b1bb-419d-9a15-8d484ba729c3"
 POSTGRES_SSH_AUDIT_CONNECTION_NAME = "PostgreSQL SSH audit refusal"
 POSTGRES_SSH_AUDIT_CONNECTION_ID = "1c971938-9732-433e-a9bf-ae64e94794da"
+POSTGRES_SSH_SETUP_FAILURE_CONNECTION_NAME = "PostgreSQL SSH setup failure"
+POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID = "ee8f8451-05cf-4c21-8c7f-f37c8c96e251"
 WAIT_SECONDS = 15
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
@@ -454,7 +456,9 @@ def set_text_by_name(name, text, timeout=WAIT_SECONDS):
     while time.monotonic() < deadline:
         for application in desktop_applications():
             for node in descendants(application):
-                if node_name(node) != name or node_role(node) != pyatspi.ROLE_TEXT:
+                if node_name(node) != name or node_role(node) not in {
+                    pyatspi.ROLE_TEXT, pyatspi.ROLE_PASSWORD_TEXT,
+                }:
                     continue
                 try:
                     editable = node.queryEditableText()
@@ -466,11 +470,11 @@ def set_text_by_name(name, text, timeout=WAIT_SECONDS):
     raise AssertionError(f"no editable text control named {name!r}:\n{accessible_snapshot()}")
 
 
-def set_visible_editable_within(anchor_name, anchor_role, text):
+def set_visible_editable_within(anchor_name, anchor_role, text, action_name="Save"):
     deadline = time.monotonic() + WAIT_SECONDS
     while time.monotonic() < deadline:
         anchor = find_node(name=anchor_name, role=anchor_role)
-        if anchor is not None and find_within(anchor, name="Save", role=pyatspi.ROLE_PUSH_BUTTON):
+        if anchor is not None and find_within(anchor, name=action_name, role=pyatspi.ROLE_PUSH_BUTTON):
             for node in descendants(anchor):
                 try:
                     extents = node.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
@@ -652,6 +656,28 @@ def write_fixture(base, audit_available=True, environment="prod"):
             )
     postgres_ssh_audit_port = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PORT")
     if postgres_ssh_audit_port:
+        ssh_audit = {
+            "host": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_HOST", "127.0.0.1"),
+            "port": int(postgres_ssh_audit_port),
+            "username": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_USER", "tunnel"),
+            "auth": {
+                "kind": "private_key",
+                "path": os.environ["TABLEPRO_GTK_POSTGRES_SSH_AUDIT_KEY"],
+                "has_passphrase": False,
+            },
+        }
+        second_hop = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST")
+        if second_hop:
+            ssh_audit["jump"] = {
+                "host": second_hop,
+                "port": int(os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT", "22")),
+                "username": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_USER", "tunnel"),
+                "auth": {
+                    "kind": "private_key",
+                    "path": os.environ["TABLEPRO_GTK_POSTGRES_SSH_AUDIT_KEY"],
+                    "has_passphrase": False,
+                },
+            }
         connections["connections"].append(
             {
                 "id": POSTGRES_SSH_AUDIT_CONNECTION_ID,
@@ -666,19 +692,10 @@ def write_fixture(base, audit_available=True, environment="prod"):
                 "tls_root_cert": os.environ["TABLEPRO_GTK_POSTGRES_SSH_AUDIT_CA"],
                 "tls_client_cert": None,
                 "tls_client_key": None,
-                "read_only": True,
+                "read_only": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_READ_ONLY", "true").lower() != "false",
                 "auth_mode": "password",
                 "environment": environment,
-                "ssh": {
-                    "host": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_HOST", "127.0.0.1"),
-                    "port": int(postgres_ssh_audit_port),
-                    "username": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_USER", "tunnel"),
-                    "auth": {
-                        "kind": "private_key",
-                        "path": os.environ["TABLEPRO_GTK_POSTGRES_SSH_AUDIT_KEY"],
-                        "has_passphrase": False,
-                    },
-                },
+                "ssh": ssh_audit,
             }
         )
         password = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PASSWORD")
@@ -692,6 +709,29 @@ def write_fixture(base, audit_available=True, environment="prod"):
                     "com.tablepro.linux.Password",
                     "connection-id",
                     POSTGRES_SSH_AUDIT_CONNECTION_ID,
+                    "kind",
+                    "db_password",
+                ],
+                input=password,
+                text=True,
+                check=True,
+                capture_output=True,
+            )
+        setup_failure = json.loads(json.dumps(connections["connections"][-1]))
+        setup_failure["id"] = POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID
+        setup_failure["name"] = POSTGRES_SSH_SETUP_FAILURE_CONNECTION_NAME
+        setup_failure["ssh"]["port"] = 1
+        connections["connections"].append(setup_failure)
+        if password:
+            subprocess.run(
+                [
+                    "secret-tool",
+                    "store",
+                    "--label=BookiE GTK PostgreSQL SSH setup failure fixture",
+                    "xdg:schema",
+                    "com.tablepro.linux.Password",
+                    "connection-id",
+                    POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID,
                     "kind",
                     "db_password",
                 ],
@@ -989,6 +1029,210 @@ def bundle_export_records_sanitized_audit_outcome(_database, base):
     assert all(str(export_path) not in json.dumps(event) for event in events), (
         "the audit record must not contain the exported file path"
     )
+
+
+def bundle_import_records_sanitized_audit_outcome(_database, base):
+    import_path = base / "home" / "review-only.bookie-connections"
+    incoming_id = "c6f8f3a4-c7d5-4a39-80e1-2cb50308a8bb"
+    bundle = {
+        "format": "tablepro.connection-bundle",
+        "version": 1,
+        "producer": "BookiE GTK fixture",
+        "exported_at": "2026-10-07T00:00:00Z",
+        "payload": {
+            "kind": "plaintext",
+            "body": {
+                "connections": [{
+                    "id": incoming_id,
+                    "name": "Imported SQLite Review",
+                    "driver_id": "sqlite",
+                    "host": "",
+                    "port": 0,
+                    "database": str(base / "imported.sqlite"),
+                    "username": "",
+                    "tls_mode": "disabled",
+                    "read_only": False,
+                    "auth_mode": "password",
+                    "environment": "local",
+                }],
+                "organization": {},
+                "secrets": [],
+            },
+        },
+    }
+    import_path.write_text(json.dumps(bundle), encoding="utf-8")
+
+    invoke_accessible_action("win.disconnect")
+    invoke_accessible_action("welcome.import-bundle")
+    chooser = wait_for_node(name="Import connections", role=FILE_CHOOSER_ROLES)
+    if shutil.which("xdotool"):
+        subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+l"], check=True)
+        time.sleep(0.2)
+        subprocess.run(
+            ["xdotool", "type", "--clearmodifiers", "--delay", "10", str(import_path)],
+            check=True,
+        )
+        subprocess.run(["xdotool", "key", "Return"], check=True)
+    else:
+        press_x11_key("l", ("Control_L",))
+        time.sleep(0.2)
+        press_x11_text(str(import_path))
+    press_x11_key("Return")
+    invoke(wait_within(chooser, name="Open", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Imported SQLite Review")
+
+    config_path = base / "config" / storage_dir_name() / "connections.json"
+    current_connections = json.loads(config_path.read_text(encoding="utf-8"))["connections"]
+    assert all(record["id"] != incoming_id for record in current_connections), (
+        "opening the preview must not save its connection before confirmation"
+    )
+    journal_path = base / "data" / storage_dir_name() / "audit.jsonl"
+    if journal_path.exists():
+        records = [json.loads(line) for line in journal_path.read_text(encoding="utf-8").splitlines()]
+        assert all(
+            record["event"].get("decision_rule") != "connection_bundle_import"
+            for record in records
+        ), "opening the preview must not start its audited operation before confirmation"
+
+    invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
+
+    deadline = time.monotonic() + WAIT_SECONDS
+    imported = None
+    while time.monotonic() < deadline:
+        records = json.loads(config_path.read_text(encoding="utf-8"))["connections"]
+        imported = next((record for record in records if record["id"] == incoming_id), None)
+        if imported is not None:
+            break
+        time.sleep(POLL_SECONDS)
+    assert imported is not None, "confirmed bundle connection was not saved"
+    assert imported["name"] == "Imported SQLite Review"
+    assert any(record["name"] == CONNECTION_NAME for record in records), "import removed an unmentioned local connection"
+
+    deadline = time.monotonic() + WAIT_SECONDS
+    events = []
+    while time.monotonic() < deadline:
+        if journal_path.exists():
+            records = [json.loads(line) for line in journal_path.read_text(encoding="utf-8").splitlines()]
+            events = [
+                record["event"] for record in records
+                if record["event"].get("decision_rule") == "connection_bundle_import"
+            ]
+            if len(events) == 2:
+                break
+        time.sleep(POLL_SECONDS)
+
+    assert len(events) == 2, f"expected one import intent and outcome, got {events!r}"
+    assert [event["phase"] for event in events] == ["intent", "outcome"]
+    assert events[0]["operation_id"] == events[1]["operation_id"]
+    assert [event["terminal_status"] for event in events] == ["pending", "succeeded"]
+    assert all(event["administrative_action"]["affected_count"] == 1 for event in events)
+    assert all(event["connection_id"] == "00000000-0000-0000-0000-000000000000" for event in events)
+    assert all(event["connection_name"] == "local_settings" for event in events)
+    serialized_events = json.dumps(events)
+    assert str(import_path) not in serialized_events, "the audit record must not contain the imported file path"
+    assert "Imported SQLite Review" not in serialized_events, "the audit record must not contain the imported connection name"
+
+
+def encrypted_bundle_round_trip_restores_credentials(_database, base):
+    bundle_path = base / "home" / "encrypted-review.bundle"
+    passphrase = "fixture bundle passphrase"
+    exported_secret = "fixture exported database secret"
+    changed_secret = "fixture replacement database secret"
+    attributes = [
+        "xdg:schema", "com.tablepro.linux.Password",
+        "connection-id", "d4f5e246-c40a-4a30-90f2-39e93e94d920",
+        "kind", "db_password",
+    ]
+
+    def store_secret(value):
+        subprocess.run(
+            ["secret-tool", "store", "--label=BookiE encrypted bundle GTK fixture", *attributes],
+            input=value, text=True, check=True, capture_output=True,
+        )
+
+    def load_secret():
+        return subprocess.run(
+            ["secret-tool", "lookup", *attributes],
+            text=True, check=True, capture_output=True,
+        ).stdout.rstrip("\n")
+
+    store_secret(exported_secret)
+    invoke_accessible_action("win.disconnect")
+    invoke_accessible_action("welcome.export-bundle")
+    set_text_by_name("Passphrase (optional)", passphrase)
+    invoke(wait_for_node(name="Choose File…", role=pyatspi.ROLE_PUSH_BUTTON))
+    chooser = wait_for_node(name="Export connections", role=FILE_CHOOSER_ROLES)
+    set_visible_editable_within("Export connections", FILE_CHOOSER_ROLES, str(bundle_path))
+    invoke(wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline and not bundle_path.exists():
+        time.sleep(POLL_SECONDS)
+    assert bundle_path.exists(), "encrypted connection bundle export was not created"
+    encoded_bundle = bundle_path.read_text(encoding="utf-8")
+    assert exported_secret not in encoded_bundle, "exported credential appeared in bundle plaintext"
+    assert passphrase not in encoded_bundle, "bundle passphrase appeared in bundle plaintext"
+
+    subprocess.run(["secret-tool", "clear", *attributes], check=True, capture_output=True)
+    store_secret(changed_secret)
+
+    def open_import_dialog():
+        invoke_accessible_action("welcome.import-bundle")
+        chooser = wait_for_node(name="Import connections", role=FILE_CHOOSER_ROLES)
+        if shutil.which("xdotool"):
+            subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+l"], check=True)
+            time.sleep(0.2)
+            subprocess.run(["xdotool", "type", "--clearmodifiers", "--delay", "10", str(bundle_path)], check=True)
+            subprocess.run(["xdotool", "key", "Return"], check=True)
+        else:
+            press_x11_key("l", ("Control_L",))
+            time.sleep(0.2)
+            press_x11_text(str(bundle_path))
+        press_x11_key("Return")
+        invoke(wait_within(chooser, name="Open", role=pyatspi.ROLE_PUSH_BUTTON))
+
+    open_import_dialog()
+    wait_for_node(name="Passphrase", role=pyatspi.ROLE_PASSWORD_TEXT)
+    set_text_by_name("Passphrase", "incorrect passphrase")
+    invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node_containing("wrong", timeout=WAIT_SECONDS)
+    wait_for_node(name="Imported SQLite Review", present=False)
+
+    wait_for_node(name="Passphrase", role=pyatspi.ROLE_PASSWORD_TEXT)
+    set_text_by_name("Passphrase", passphrase)
+    invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Safety SQLite")
+    replace = wait_for_node(name="Replace saved passwords", role=pyatspi.ROLE_SWITCH)
+    extents = replace.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
+    invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
+
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        if load_secret() == exported_secret:
+            break
+        time.sleep(POLL_SECONDS)
+    assert load_secret() == exported_secret, "confirmed encrypted import did not restore the bundled database credential"
+
+    journal_path = base / "data" / storage_dir_name() / "audit.jsonl"
+    deadline = time.monotonic() + WAIT_SECONDS
+    events = []
+    while time.monotonic() < deadline:
+        if journal_path.exists():
+            records = [json.loads(line) for line in journal_path.read_text(encoding="utf-8").splitlines()]
+            events = [record["event"] for record in records if record["event"].get("decision_rule") in {
+                "connection_bundle_export", "connection_bundle_import"
+            }]
+            if len(events) == 4:
+                break
+        time.sleep(POLL_SECONDS)
+    assert len(events) == 4, f"expected encrypted export and import audit intent/outcome pairs, got {events!r}"
+    assert [event["phase"] for event in events] == ["intent", "outcome", "intent", "outcome"]
+    assert [event["terminal_status"] for event in events] == ["pending", "succeeded", "pending", "succeeded"]
+    serialized_events = json.dumps(events)
+    assert str(bundle_path) not in serialized_events, "bundle audit records must not contain the file path"
+    assert exported_secret not in serialized_events and changed_secret not in serialized_events
+    assert passphrase not in serialized_events, "bundle audit records must not contain the passphrase"
 
 
 def choose_export_format(label, keys):
@@ -1541,6 +1785,8 @@ def main():
         approve_once_prompts_again,
         audit_failure_denies,
         bundle_export_records_sanitized_audit_outcome,
+        bundle_import_records_sanitized_audit_outcome,
+        encrypted_bundle_round_trip_restores_credentials,
         named_parameter_binds_a_value,
         favorite_round_trips_through_open_quickly,
         successful_switch_keeps_database_ownership,

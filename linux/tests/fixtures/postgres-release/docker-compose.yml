@@ -50,6 +50,18 @@ services:
     networks:
       - fixture
 
+  relay:
+    build:
+      context: .
+      dockerfile: relay/Dockerfile
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 22"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - fixture
+
   toxiproxy:
     image: ghcr.io/shopify/toxiproxy:2.12.0
     command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]

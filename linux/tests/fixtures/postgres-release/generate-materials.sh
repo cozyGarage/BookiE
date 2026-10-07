@@ -12,7 +12,8 @@ fi
 if [[ -f "$MATERIALS/server.crt" && -f "$MATERIALS/client_ed25519_key" \
   && -f "$MATERIALS/client.crt" && -f "$MATERIALS/client.key" \
   && -f "$MATERIALS/rotated-client.crt" && -f "$MATERIALS/rotated-client.key" \
-  && -f "$MATERIALS/wrong-client.crt" && -f "$MATERIALS/wrong-client.key" ]]; then
+  && -f "$MATERIALS/wrong-client.crt" && -f "$MATERIALS/wrong-client.key" \
+  && -f "$MATERIALS/ssh_relay_host_ed25519_key" ]]; then
   echo "fixture materials already present in $MATERIALS"
   exit 0
 fi
@@ -77,6 +78,7 @@ chmod 600 server.key ca.key other-ca.key client.key rotated-client.key wrong-cli
 chmod 644 server.crt ca.crt other-ca.crt client.crt rotated-client.crt wrong-client.crt
 
 ssh-keygen -q -t ed25519 -N "" -C "tablepro-fixture-host" -f ssh_host_ed25519_key
+ssh-keygen -q -t ed25519 -N "" -C "tablepro-fixture-relay" -f ssh_relay_host_ed25519_key
 ssh-keygen -q -t ed25519 -N "" -C "tablepro-fixture-client" -f client_ed25519_key
 
 echo "wrote fixture materials to $MATERIALS"
