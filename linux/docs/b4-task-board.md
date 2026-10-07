@@ -59,6 +59,34 @@ checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json) retains
 the earlier candidate evidence. These runs do not establish frozen-candidate
 or installed acceptance; those gates remain open.
 
+## Frozen-candidate acceptance update (2026-10-08)
+
+Candidate SHA `0d22bfe9ddd9d1c66478fa55b751e3a887a992ca` had a clean tracked
+worktree. Local layers passed for `full`, `security-policy`, `tls`,
+`postgres-release`, `mssql-kerberos`, `ssh`, and `ui`. The broad `drivers`
+layer timed out at 30 minutes after its relevant MySQL atomicity group and
+all 216 PostgreSQL integration tests passed; the layer as a whole is not
+reported green. The Arch packaging contract passed; the Debian validator was
+blocked because `dpkg-deb` is absent. Exact reports and logs are in the
+[frozen-candidate evidence bundle](evidence/b4-frozen-candidate-2026-10-07/summary.md).
+
+| B4 item | Candidate result | Remaining acceptance |
+| --- | --- | --- |
+| B4-7 | Security policy, native SSH, PostgreSQL GTK audit/refusal/setup flows passed | Hosted checks; distribution package on native Wayland |
+| B4-9 | TLS, PostgreSQL release, and SQL Server Kerberos candidate layers passed | Hosted route/auth/TLS matrix; distribution package on native Wayland |
+| B4-11 | All nine MySQL atomicity cases passed, including nontransactional engines and trigger side effects | Hosted candidate run |
+| B4-12 | PostgreSQL backend-termination rollback-failure selector passed; transactional rows roll back while both sequences advance | Hosted candidate run |
+| B4-16 | Tunnel-loss, stale-session retirement, and reconnection GTK scenario passed | Hosted checks; distribution package on native Wayland |
+| B4-17 | Native 22-test SSH layer and staged-installed-binary two-hop GTK trust/decline/changed-key flows passed | Hosted checks; distribution package on native Wayland |
+| B4-21 | Local Samba AD fixture passed VerifyFull Kerberos query and bad-SPN refusal | Real Windows AD interoperability; hosted/package acceptance |
+| B4-22 | All 50 UI scenarios passed, including export/import audit and encrypted bundle round-trip | Hosted checks; distribution package on native Wayland |
+| UI-1b | Per-hop secrets proposal reviewed; form edit refusal remains correct | Implement storage, migration, transport/cache identity, bundles, and GTK editor as one compatible feature |
+
+The staged `target/installed/usr/bin/tablepro` run is still a local Xvfb test;
+it does not count as a distribution package installed into the live Wayland
+session. Hosted checks for the documentation PR and any installed acceptance
+must be recorded separately. This checkpoint does not close B4.
+
 ## Remaining tasks
 
 Each row is a bounded task; implement engines and route variants separately.

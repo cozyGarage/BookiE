@@ -1,0 +1,506 @@
+==> SQL and document/key-value driver integration
+   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/core)
+   Compiling sqlx-mysql v0.9.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/vendor/sqlx-mysql)
+   Compiling sqlx-postgres v0.9.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/vendor/sqlx-postgres)
+   Compiling redis v1.7.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/vendor/redis)
+   Compiling mongodb v3.9.1 (/tmp/bookie-b4-candidate-2026-10-07/linux/vendor/mongodb)
+   Compiling tablepro-driver-mssql v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/mssql)
+   Compiling tablepro-driver-clickhouse v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/clickhouse)
+   Compiling sqlx v0.9.0
+   Compiling tablepro-driver-postgres v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/postgres)
+   Compiling tablepro-driver-mysql v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/mysql)
+   Compiling tablepro-driver-redis v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/redis)
+   Compiling tablepro-driver-mongodb v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/mongodb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 29.55s
+     Running tests/integration.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/integration-983bf6fc366c8ec4)
+
+running 35 tests
+test a_cancelled_query_is_killed_on_the_server_and_the_client_stays_usable ... ok
+test a_column_comment_round_trips_and_an_uncommented_column_reads_as_none ... ok
+test a_lost_clickhouse_server_is_reported_as_disconnected ... ok
+test an_unavailable_clickhouse_server_is_classified_as_connection_refused ... ok
+test bad_sql_returns_query_error ... ok
+test binary_sql_exports_round_trip_null_empty_and_every_byte ... ok
+test connect_list_tables_and_pk_detection ... ok
+test copied_in_clause_keeps_backslash_payload_as_data ... ok
+test database_listing::list_databases_returns_user_databases_and_hides_system_ones ... ok
+test datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal ... ok
+test decimal_and_nonfinite_results_are_not_rounded_or_changed_to_null ... ok
+test decimal_results_keep_the_declared_scale_including_trailing_zeroes ... ok
+test disconnection::graceful_server_stop_during_row_stream_returns_an_error_not_partial_rows ... ok
+test disconnection::server_loss_during_row_stream_fails_the_whole_query_as_disconnected ... ok
+test enum_values::value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv ... ok
+test full_row_update_applies ... ok
+test inline_edit_update_applies ... ok
+test literals_with_quotes_and_placeholders_round_trip ... ok
+test nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers ... ok
+test pagination_and_truncated_flag ... ok
+test parameterised_types_decode_to_typed_values ... ok
+test query_truncates_when_result_memory_budget_is_exceeded ... ok
+test temporal::second_precision_datetime64_beyond_nanosecond_limit_round_trips ... ok
+test temporal_parameters_keep_fractional_seconds ... ok
+test temporal_sql_exports_keep_fractional_seconds ... ok
+test the_driver_declares_server_side_cancellation ... ok
+test value_contract_ambiguous_datetime64_local_time_is_refused ... ok
+test value_contract_datetime64_named_timezone_preserves_the_instant ... ok
+test value_contract_datetime64_precision_0_through_9_is_exact ... ok
+test value_contract_nonexistent_datetime64_input_matches_server_normalization ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_roundtrip_common_types ... ok
+test views_appear_in_the_table_list ... ok
+test wide_integer_binding_and_sql_export_preserve_exact_server_values ... ok
+test wide_integer_grid_edits_preserve_exact_values_and_row_identity ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 173.64s
+
+     Running tests/integration.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/integration-00a5f2237634c7b8)
+
+running 38 tests
+test a_cancelled_mongodb_read_leaves_the_client_usable ... ok
+test a_dropped_collection_stops_being_listed ... ok
+test a_filtered_delete_removes_only_the_matching_documents ... ok
+test a_lost_mongodb_server_is_reported_as_disconnected ... ok
+test an_aggregate_pipeline_groups_documents ... ok
+test an_inserted_document_is_listed_browsed_and_found ... ok
+test an_unavailable_mongodb_server_is_classified_as_connection_refused ... ok
+test an_unsupported_statement_is_refused_rather_than_silently_ignored ... ok
+test browsing_a_missing_collection_is_empty_rather_than_an_error ... ok
+test census_cancellation::cancelling_a_blocked_mongodb_metadata_census_leaves_the_client_usable ... ok
+test census_cost::value_contract_mongodb_census_scan_cost_profile ... ok
+test collection_scan_finds_mixed_values_beyond_sample_and_page ... ok
+test connection_loss_during_cursor_get_more_fails_the_whole_query ... ok
+test database_listing::list_databases_returns_databases_with_data_and_hides_internal_ones ... ok
+test decimal128_csv_round_trip_through_typed_grid_edit_keeps_native_bson ... ok
+test hostile_scram::mongodb_scram_rejects_hostile_server_challenges_before_sending_proof ... ok
+test mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_metadata ... ok
+test mixed_string_decimal128_exports_preserve_bson_kind ... ok
+test negative_decimal128_csv_formula_marker_round_trips_as_native_decimal128 ... ok
+test nested_filters::nested_json_and_mql_filters_match_dotted_fields_and_array_elements ... ok
+test query_budget_contract::find_and_aggregate_mark_results_truncated_at_the_shared_byte_budget ... ok
+test run_find_late_type_contract::run_find_marks_a_page_mixed_when_a_bson_type_changes_after_census ... ok
+test stale_grid_delete_contract::value_contract_stale_grid_delete_preserves_concurrent_document_change ... ok
+test stale_grid_delete_contract::value_contract_stale_grid_delete_preserves_field_added_after_materialization ... ok
+test stale_grid_edit_contract::value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_change ... ok
+test value_contracts::a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson ... ok
+test value_contracts::nested_bson_special_values_keep_exact_extended_json_types ... ok
+test value_contracts::value_contract_binary_subtypes_survive_native_grid_edits ... ok
+test value_contracts::value_contract_db_pointer_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_generic_binary_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_javascript_code_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_mongodb_missing_fields_remain_distinct_from_bson_null ... ok
+test value_contracts::value_contract_object_id_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_preserves_numbers_and_text_through_json_commands ... ok
+test value_contracts::value_contract_server_generated_bson_column_survives_grid_edit ... ok
+test value_contracts::value_contract_undefined_grid_edit_preserves_native_bson ... ok
+test value_contracts::xlsx_nested_cell_requires_its_own_date_and_binary_markers ... ok
+test wrong_mongodb_credentials_are_classified_as_auth_failed ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.48s
+
+     Running tests/integration.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/integration-a8c2cfe783e88823)
+
+running 39 tests
+test a_column_comment_round_trips_from_its_extended_property ... ok
+test a_completed_controlled_statement_leaves_the_connection_usable ... ok
+test a_lost_sql_server_is_reported_as_disconnected ... ok
+test a_result_cut_at_the_row_limit_still_finishes_the_batch ... ok
+test a_session_keeps_temp_tables_and_its_transaction_between_statements ... ok
+test alter_column_default_round_trips ... ok
+test alter_column_keeps_its_collation ... ok
+test an_interrupted_session_statement_retires_the_session_but_not_the_shared_connection ... ok
+test an_interrupted_statement_retires_the_connection_instead_of_stranding_it ... ok
+test an_unavailable_sql_server_is_classified_as_connection_refused ... ok
+test bad_sql_returns_query_error ... ok
+test binary_sql_exports_round_trip_null_empty_and_every_byte ... ok
+test connect_list_tables_pk_and_identity ... ok
+test ddl_batch_commits_and_rolls_back_as_a_unit ... ok
+test disconnection::a_disconnected_session_is_retired_after_server_loss ... ok
+test disconnection::database_listing::list_databases_returns_user_databases_and_hides_system_databases ... ok
+test empty_result_set_still_reports_columns ... ok
+test foreign_key_actions_round_trip ... ok
+test grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys ... ok
+test index_columns_exclude_included_columns ... ok
+test inexact_legacy_datetime_uses_exact_text_and_supported_temporals_round_trip ... ok
+test pagination_and_truncated_flag ... ok
+test result_sets::a_result_cut_at_the_memory_budget_reports_truncation_and_drains_the_batch ... ok
+test result_sets::all_result_sets_keep_order_and_metadata_when_the_first_is_empty ... ok
+test result_sets::an_error_raised_after_the_first_result_set_is_reported ... ok
+test result_sets::one_result_budget_is_shared_across_later_sql_server_sets ... ok
+test server_loss_during_multi_result_stream_rejects_the_whole_query ... ok
+test server_owned_columns::value_contract_server_owned_columns_and_identity_copy_inserts_use_defaults ... ok
+test sql_exports_preserve_unicode_and_boolean_values ... ok
+test sql_variant_result_is_refused_without_panicking_or_reusing_the_connection ... ok
+test temporal_boundaries::value_contract_supported_temporal_calendar_edges_match_native_text_and_bind_exactly ... ok
+test the_driver_does_not_claim_server_side_cancellation ... ok
+test value_contract_all_legacy_datetime_ticks_round_trip_through_parameters ... ok
+test value_contract_datetimeoffset_keeps_its_offset_through_results_parameters_and_exports ... ok
+test value_contract_legacy_datetime_fallback_matches_session_batch_and_native_text ... ok
+test value_contract_money_values_are_refused_but_server_nulls_remain_null ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_contract_smalldatetime_rounding_matches_server_text ... ok
+test value_roundtrip_representative_types ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 274.94s
+
+     Running tests/integration.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/integration-06ce0ab1a642733d)
+
+running 72 tests
+test a_bigint_unsigned_value_past_i64_max_keeps_its_digits ... ok
+test a_cancelled_query_is_killed_on_the_server_and_the_pool_stays_usable ... ok
+test a_cancelled_session_query_is_killed_on_the_server_and_the_session_stays_usable ... ok
+test a_column_collation_survives_a_nullability_change ... ok
+test a_column_comment_round_trips_and_an_uncommented_column_reads_as_none ... ok
+test a_copied_insert_survives_a_value_that_could_escape_its_literal ... ok
+test a_decimal_value_past_rust_decimals_range_keeps_its_digits ... ok
+test a_disconnected_session_is_retired_without_affecting_the_shared_pool ... ok
+test a_mariadb_default_is_reported_as_its_clause_without_quoting_it_twice ... ok
+test a_nullability_change_keeps_no_default_null_empty_and_literal_defaults_apart ... ok
+test a_restarted_mysql_server_restores_the_existing_pool ... ok
+test a_session_detects_backend_loss_before_the_next_statement ... ok
+test a_session_keeps_variables_temp_tables_and_its_transaction_between_statements ... ok
+test a_timed_out_write_is_killed_on_the_server_and_reports_a_timeout ... ok
+test a_value_the_driver_cannot_decode_is_reported_rather_than_shown_as_null ... ok
+test an_unavailable_mysql_server_is_classified_as_connection_refused ... ok
+test backend_loss_during_row_stream_fails_the_whole_query_as_disconnected ... ok
+test bad_sql_returns_query_error ... ok
+test binary_sql_exports_round_trip_null_empty_and_every_byte ... ok
+test connect_list_tables_and_pk_detection ... ok
+test database_listing::list_databases_returns_user_databases_and_hides_system_schemas ... ok
+test decimal_results_preserve_all_fractional_digits ... ok
+test enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes ... ok
+test enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mysql_sql_modes ... ok
+test enum_sql_mode_contract::value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null ... ok
+test enum_sql_mode_contract::value_contract_mysql_and_mariadb_collated_enum_inputs_preserve_canonical_labels ... ok
+test grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys ... ok
+test mysql_atomic::a_failed_mysql_dml_batch_confirms_rollback_and_preserves_neighbor_rows ... ok
+test mysql_atomic::a_lost_connection_during_a_batch_reports_rollback_failure ... ok
+test mysql_atomic::empty_query_results_preserve_mysql_projection_metadata ... ok
+test mysql_atomic::implicit_commit_batch_is_refused_before_mysql_dispatch ... ok
+test mysql_atomic::mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects ... ok
+test mysql_atomic::mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigger_effects ... ok
+test mysql_atomic::mysql_batch_rollback_preserves_trigger_session_variable_effects ... ok
+test mysql_atomic::mysql_transaction_queries_are_bounded_and_mark_truncation ... ok
+test mysql_atomic::mysql_transaction_queries_obey_result_byte_budget_and_remain_usable ... ok
+test mysql_column_comment_backslash_literals_depend_on_sql_mode ... ok
+test mysql_identity_copy_contract::mysql_copy_as_insert_preserves_auto_increment_id_and_next_value ... ok
+test mysql_identity_copy_contract::mysql_sql_copy_export_preserves_auto_increment_ids_and_next_value ... ok
+test pagination_and_truncated_flag ... ok
+test server_terminated_query_reports_disconnection_and_pool_recovers ... ok
+test the_driver_declares_server_side_cancellation ... ok
+test timezone_contract::mariadb_session_non_utc_time_zone_refuses_timestamp_instant ... ok
+test timezone_contract::session_non_utc_time_zone_refuses_mysql_timestamp_instant ... ok
+test unsigned_subtraction::mariadb_unsigned_subtraction_obeys_session_mode_and_signed_boundaries ... ok
+test unsigned_subtraction::mysql_unsigned_subtraction_obeys_session_mode_and_signed_boundaries ... ok
+test value_contract_wide_decimal_csv_bound_and_literal_round_trips_preserve_all_digits ... ok
+test value_contracts::mariadb_datetime_and_timestamp_fractional_precision_matrix_respects_round_mode ... ok
+test value_contracts::mariadb_datetime_fractional_half_millisecond_boundary_respects_round_mode ... ok
+test value_contracts::mariadb_datetime_fractional_storage_respects_round_mode_for_binds_and_literals ... ok
+test value_contracts::mariadb_strict_zero_date_modes_refuse_invalid_dates_without_writing ... ok
+test value_contracts::mariadb_time_fractional_half_millisecond_boundary_respects_round_mode ... ok
+test value_contracts::mariadb_time_fractional_precision_matrix_respects_round_mode ... ok
+test value_contracts::mariadb_time_fractional_storage_respects_round_mode_for_binds_and_literals ... ok
+test value_contracts::mariadb_timestamp_fractional_half_millisecond_boundary_respects_round_mode ... ok
+test value_contracts::mariadb_timestamp_fractional_storage_respects_round_mode_for_binds_and_literals ... ok
+test value_contracts::mysql_datetime_and_timestamp_fractional_precision_matrix_respects_truncate_mode ... ok
+test value_contracts::mysql_datetime_fractional_half_millisecond_boundary_respects_truncate_mode ... ok
+test value_contracts::mysql_datetime_fractional_storage_respects_truncate_mode_for_binds_and_literals ... ok
+test value_contracts::mysql_time_fractional_half_millisecond_boundary_respects_truncate_mode ... ok
+test value_contracts::mysql_time_fractional_precision_matrix_respects_truncate_mode ... ok
+test value_contracts::mysql_time_fractional_storage_respects_truncate_mode_for_binds_and_literals ... ok
+test value_contracts::mysql_timestamp_fractional_half_millisecond_boundary_respects_truncate_mode ... ok
+test value_contracts::mysql_timestamp_fractional_storage_respects_truncate_mode_for_binds_and_literals ... ok
+test value_contracts::native_time_zero_date_and_year_values_survive_reads_parameters_and_exports ... ok
+test value_contracts::strict_zero_date_modes_refuse_invalid_dates_without_writing ... ok
+test value_contracts::value_contract_bit_enum_set_and_geometry_survive_reads_parameters_and_exports ... ok
+test value_contracts::value_contract_mariadb_text_exports_survive_with_and_without_backslash_escapes ... ok
+test value_contracts::value_contract_mysql_pad_char_mode_keeps_fixed_width_text_through_csv_and_writes ... ok
+test value_contracts::value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_contracts::value_contract_text_exports_survive_with_and_without_backslash_escapes ... ok
+test value_roundtrip_all_types ... ok
+
+test result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 756.13s
+
+     Running tests/integration.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/integration-61ba927d2e1c2f28)
+
+running 216 tests
+test a_bare_begin_does_not_leave_a_pooled_session_inside_a_transaction ... ok
+test a_cancelled_session_statement_stops_on_the_server_and_keeps_the_session ... ok
+test a_column_collation_is_read_and_survives_a_type_change ... ok
+test a_column_comment_round_trips_and_a_table_comment_does_not_leak_into_it ... ok
+test a_controlled_unbounded_query_returns_the_capped_rows_instead_of_timing_out ... ok
+test a_session_keeps_settings_temp_tables_and_its_transaction_between_statements ... ok
+test a_session_stays_usable_after_a_capped_result ... ok
+test activity_duration_types_decode_as_text ... ok
+test an_unavailable_postgres_server_is_classified_as_connection_refused ... ok
+test an_unbounded_query_is_cut_at_the_cap_and_the_server_stops_producing ... ok
+test array_contract::value_contract_array_grid_edit_preserves_array_elements ... ok
+test array_contract::value_contract_bit_arrays_roundtrip_wire_and_csv ... ok
+test array_contract::value_contract_boolean_array_file_exports_preserve_values_for_calc_reimport ... ok
+test array_contract::value_contract_builtin_array_families_survive_typed_csv_insert ... ok
+test array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist ... ok
+test array_contract::value_contract_citext_array_decodes_and_rebinds_exact_values ... ok
+test array_contract::value_contract_custom_enum_array_accepts_maximum_utf8_label_length ... ok
+test array_contract::value_contract_custom_enum_array_agg_distinct_filter_preserves_native_order_and_nulls ... ok
+test array_contract::value_contract_custom_enum_array_agg_keeps_target_type_under_shadowed_search_path ... ok
+test array_contract::value_contract_custom_enum_array_agg_preserves_order_and_nulls ... ok
+test array_contract::value_contract_custom_enum_array_csv_import_preserves_labels_and_siblings ... ok
+test array_contract::value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape ... ok
+test array_contract::value_contract_custom_enum_array_csv_import_uses_target_type_under_shadowed_search_path ... ok
+test array_contract::value_contract_custom_enum_array_file_exports_preserve_labels ... ok
+test array_contract::value_contract_custom_enum_array_grid_edit_preserves_labels_and_siblings ... ok
+test array_contract::value_contract_custom_enum_array_multidimensional_lower_bounds_export_as_spreadsheet_text ... ok
+test array_contract::value_contract_custom_enum_array_preserves_boundary_whitespace_labels ... ok
+test array_contract::value_contract_custom_enum_array_projection_preserves_literal_null_and_sql_null ... ok
+test array_contract::value_contract_custom_enum_array_six_dimension_limit_round_trips ... ok
+test array_contract::value_contract_custom_enum_array_slices_preserve_shape_and_rebind ... ok
+test array_contract::value_contract_custom_enum_array_three_dimensions_round_trip_native_wire_bytes ... ok
+test array_contract::value_contract_date_array_csv_and_sql_replay_preserve_sql_dmy_style ... ok
+test array_contract::value_contract_date_array_file_exports_preserve_boundaries_for_calc_reimport ... ok
+test array_contract::value_contract_enum_drop_and_recreate_refreshes_a_warm_session_type_oid ... ok
+test array_contract::value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path ... ok
+test array_contract::value_contract_enum_min_max_keep_target_type_and_order_under_shadowed_search_path ... ok
+test array_contract::value_contract_enum_range_bounds_preserve_inclusive_and_null_boundaries_under_shadowed_search_path ... ok
+test array_contract::value_contract_enum_range_observes_added_label_order_in_same_session ... ok
+test array_contract::value_contract_enum_range_observes_renamed_label_in_same_session ... ok
+test array_contract::value_contract_enum_range_refreshes_labels_changed_by_another_session ... ok
+test array_contract::value_contract_enum_range_uses_qualified_type_under_shadowed_search_path ... ok
+test array_contract::value_contract_enum_type_rename_and_schema_move_refresh_other_session_metadata ... ok
+test array_contract::value_contract_enum_type_rename_and_schema_move_refresh_session_metadata ... ok
+test array_contract::value_contract_float4_array_file_exports_preserve_values_for_calc_reimport ... ok
+test array_contract::value_contract_float8_array_file_exports_preserve_bits ... ok
+test array_contract::value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values ... ok
+test array_contract::value_contract_inet_and_cidr_array_bindings_and_keyed_edits_preserve_native_bytes ... ok
+test array_contract::value_contract_int8_array_file_exports_preserve_precision_for_calc_reimport ... ok
+test array_contract::value_contract_integer_arrays_file_exports_preserve_bounds_for_calc_reimport ... ok
+test array_contract::value_contract_interval_array_csv_and_sql_replay_survive_intervalstyle_change ... ok
+test array_contract::value_contract_interval_array_file_exports_preserve_values_under_intervalstyle ... ok
+test array_contract::value_contract_json_array_elements_are_explicitly_unsupported ... ok
+test array_contract::value_contract_json_text_array_is_explicitly_unsupported ... ok
+test array_contract::value_contract_macaddr8_array_binding_and_keyed_edit_preserve_native_bytes ... ok
+test array_contract::value_contract_macaddr_array_binding_and_keyed_edit_preserve_native_bytes ... ok
+test array_contract::value_contract_numeric_array_file_exports_preserve_exact_text ... ok
+test array_contract::value_contract_numeric_array_grid_edit_preserves_elements ... ok
+test array_contract::value_contract_pg_lsn_array_result_bind_keyed_edit_and_csv_are_exact ... ok
+test array_contract::value_contract_text_array_file_exports_preserve_text_and_escape_markup ... ok
+test array_contract::value_contract_time_array_file_exports_preserve_boundaries_for_calc_reimport ... ok
+test array_contract::value_contract_timestamp_array_file_consumers_preserve_values_across_dmy_datestyle ... ok
+test array_contract::value_contract_timestamp_array_file_exports_preserve_boundaries_for_calc_reimport ... ok
+test array_contract::value_contract_timestamptz_array_file_exports_preserve_instants ... ok
+test array_contract::value_contract_timestamptz_array_file_exports_preserve_instants_under_non_utc_session ... ok
+test array_contract::value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reimport ... ok
+test array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles ... ok
+test array_contract::value_contract_uuid_array_file_exports_preserve_values_for_calc_reimport ... ok
+test array_contract::value_contract_xml_array_file_exports_preserve_native_text ... ok
+test bad_sql_returns_query_error ... ok
+test binary_array_file_export_contract::value_contract_bytea_array_escape_output_rebinds_across_output_settings ... ok
+test binary_array_file_export_contract::value_contract_bytea_array_file_exports_preserve_binary_elements ... ok
+test binary_sql_exports_round_trip_null_empty_and_every_byte ... ok
+test catalog_objects_are_listed_per_kind_and_filtered_by_schema ... ok
+test connect_list_tables_and_pk_detection ... ok
+test custom_array_contract::value_contract_custom_composite_array_refusal_preserves_rows ... ok
+test custom_array_contract::value_contract_geometric_array_refusals_preserve_target_and_sibling_rows ... ok
+test custom_array_contract::value_contract_money_array_refusal_preserves_target_and_sibling_rows ... ok
+test custom_array_contract::value_contract_point_array_refusal_preserves_target_and_sibling_rows ... ok
+test database_listing::list_databases_returns_connectable_user_databases_only ... ok
+test date_contract::value_contract_bc_dates_survive_default_csv_import ... ok
+test disconnection::a_disconnected_session_is_retired_without_affecting_the_shared_pool ... ok
+test disconnection::a_restarted_postgres_server_restores_the_existing_pool ... ok
+test disconnection::backend_loss_during_row_stream_fails_the_whole_query_as_disconnected ... ok
+test disconnection::controlled_cancel_stops_server_query_and_keeps_pool_usable ... ok
+test disconnection::controlled_parameterized_cancel_stops_server_query_and_keeps_pool_usable ... ok
+test disconnection::controlled_timeout_stops_server_query_and_keeps_pool_usable ... ok
+test disconnection::controlled_transaction_cancel_allows_rollback ... ok
+test disconnection::dropped_transaction_discards_uncommitted_session ... ok
+test disconnection::server_terminated_query_reports_disconnection_and_pool_recovers ... ok
+test domain_array_family_contract::value_contract_domain_arrays_over_text_numeric_and_timestamptz_use_base_types ... ok
+test domain_array_file_export_contract::value_contract_domain_enum_array_file_exports_preserve_values_and_native_type ... ok
+test domain_array_type_contract::value_contract_domain_over_array_preserves_native_values_and_wire_bytes ... ok
+test domain_bytea_array_contract::value_contract_domain_over_bytea_array_preserves_binary_values_and_wire_bytes ... ok
+test domain_contract::value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path ... ok
+test domain_contract::value_contract_domain_enum_array_csv_import_uses_target_type_under_shadowed_search_path ... ok
+test domain_contract::value_contract_domain_enum_array_functions_infer_first_array_parameter_under_shadowed_path ... ok
+test domain_contract::value_contract_domain_enum_array_position_infers_scalar_parameter_and_matches_null ... ok
+test domain_contract::value_contract_domain_enum_array_remove_infers_scalar_parameter_type ... ok
+test domain_contract::value_contract_domain_enum_array_replace_infers_both_scalar_parameters ... ok
+test domain_contract::value_contract_domain_enum_array_replace_keeps_both_parameters_under_shadowed_path ... ok
+test domain_contract::value_contract_domain_enum_array_unnest_requires_qualified_cast_under_shadowed_path ... ok
+test domain_contract::value_contract_domain_over_enum_any_all_infer_array_parameter_type_under_shadowed_path ... ok
+test domain_contract::value_contract_domain_over_enum_array_append_prepend_keep_target_under_shadowed_path ... ok
+test domain_contract::value_contract_domain_over_enum_array_cat_infers_array_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_array_equality_infers_parameter_and_bounds ... ok
+test domain_contract::value_contract_domain_over_enum_array_functions_infer_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_array_operators_infer_parameter_type_in_both_positions ... ok
+test domain_contract::value_contract_domain_over_enum_array_positions_infers_scalar_parameter_and_matches_null ... ok
+test domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null ... ok
+test domain_contract::value_contract_domain_over_enum_assignment_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_coalesce_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_csv_round_trip_preserves_values_and_type ... ok
+test domain_contract::value_contract_domain_over_enum_file_formats_preserve_values_and_refuse_empty_xlsx ... ok
+test domain_contract::value_contract_domain_over_enum_filters_preserve_values_and_type ... ok
+test domain_contract::value_contract_domain_over_enum_nullif_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_parameters_preserve_native_type ... ok
+test domain_contract::value_contract_domain_over_enum_projection_preserves_labels_and_null ... ok
+test domain_contract::value_contract_domain_over_enum_query_comparison_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_sql_file_replay_preserves_values_and_type ... ok
+test domain_contract::value_contract_enum_array_fill_preserves_type_bounds_and_nulls_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_array_generate_subscripts_requires_qualified_cast_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_array_shape_functions_preserve_bounds_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_array_to_string_preserves_labels_and_nulls_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_multi_array_unnest_pads_nulls_under_shadowed_path ... ok
+test domain_contract::value_contract_five_domain_levels_over_enum_preserve_metadata_and_values ... ok
+test domain_contract::value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed_values ... ok
+test domain_contract::value_contract_three_level_domain_over_enum_infers_parameters_and_decodes ... ok
+test domain_depth_boundary_contract::value_contract_domain_over_enum_257_levels_preserve_schema_aware_values ... ok
+test domain_depth_boundary_contract::value_contract_domain_over_enum_259_levels_preserve_schema_aware_values ... ok
+test domain_depth_boundary_contract::value_contract_inferred_enum_array_parameter_respects_domain_depth_boundary ... ok
+test domain_uuid_array_contract::value_contract_domain_over_uuid_array_preserves_values_and_wire_bytes ... ok
+test enum_contract::value_contract_custom_enum_csv_import_uses_target_schema_under_shadowed_search_path ... ok
+test enum_contract::value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null ... ok
+test enum_contract::value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_backslashes ... ok
+test enum_contract::value_contract_custom_enum_filters_preserve_labels_and_sql_null ... ok
+test enum_contract::value_contract_custom_enum_json_and_file_exports_preserve_empty_literal_null_and_sql_null ... ok
+test enum_contract::value_contract_custom_enum_keyed_edit_preserves_label_and_siblings ... ok
+test enum_contract::value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema ... ok
+test enum_contract::value_contract_custom_enum_order_uses_declared_catalog_order ... ok
+test enum_contract::value_contract_custom_enum_parameters_infer_native_type_for_query_and_write ... ok
+test enum_contract::value_contract_custom_enum_preserves_maximum_multibyte_label_bytes ... ok
+test enum_contract::value_contract_custom_enum_projection_preserves_labels_and_null ... ok
+test enum_contract::value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter ... ok
+test enum_contract::value_contract_custom_enum_refuses_labels_over_byte_limit ... ok
+test enum_contract::value_contract_custom_enum_sql_file_export_restores_labels_and_native_type ... ok
+test enum_contract::value_contract_custom_enum_sql_file_replay_preserves_backslash_across_string_modes ... ok
+test enum_contract::value_contract_custom_enum_unicode_csv_import_preserves_native_type_and_nulls ... ok
+test enum_contract::value_contract_domain_enum_parameters_resolve_shadowed_schema_type ... ok
+test enum_contract::value_contract_enum_null_label_and_sql_null_write_as_distinct_values ... ok
+test enum_contract::value_contract_scalar_enum_labels_preserve_exact_text ... ok
+test enum_file_export_contract::value_contract_custom_enum_csv_file_export_import_preserves_empty_and_null ... ok
+test enum_file_export_contract::value_contract_custom_enum_html_file_export_preserves_labels_null_and_escapes_markup ... ok
+test enum_file_export_contract::value_contract_custom_enum_markdown_file_export_preserves_labels_null_and_cell_text ... ok
+test enum_file_export_contract::value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely ... ok
+test enum_file_export_contract::value_contract_custom_enum_xml_file_export_preserves_labels_null_and_escapes_markup ... ok
+test enum_parameter_context_contract::value_contract_enum_parameters_in_coalesce_array_append_and_nullif ... ok
+test enum_parameter_context_contract::value_contract_enum_parameters_in_union_and_values_keep_native_type ... ok
+test enum_parameter_context_contract::value_contract_enum_parameters_resolve_target_under_shadowed_search_path ... ok
+test enum_parameter_context_contract::value_contract_enum_set_operations_keep_target_type_under_shadowed_search_path ... ok
+test enum_role_context_contract::value_contract_enum_parameter_stays_with_target_type_after_role_and_local_search_path ... ok
+test enum_role_context_contract::value_contract_enum_parameter_stays_with_target_type_after_role_login ... ok
+test enum_type_privilege_contract::value_contract_enum_values_remain_queryable_without_type_usage ... ok
+test fetched_defaults_keep_no_default_null_empty_and_literal_apart_and_reapply_exactly ... ok
+test formatting_preserves_server_results_for_significant_whitespace ... ok
+test grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys ... ok
+test identity_copy_contract::value_contract_postgres_copy_insert_regenerates_identity_values ... ok
+test indexes_report_expression_keys_predicates_and_leave_out_included_columns ... ok
+test non_null_decode_failures_are_not_returned_as_null ... ok
+test open_sessions_do_not_take_connections_from_the_shared_pool ... ok
+test pagination_and_truncated_flag ... ok
+test query_budget_contract::a_byte_capped_query_aborts_its_transaction_until_rollback_then_reuses_the_connection ... ok
+test query_budget_contract::a_query_truncated_at_the_shared_byte_budget_preserves_order_and_pool_reuse ... ok
+test quoted_enum_identifier_contract::value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names_and_hidden_role_path ... ok
+test quoted_enum_identifier_contract::value_contract_mixed_case_enum_identifiers_survive_local_shadowed_search_path ... ok
+test quoted_enum_identifier_contract::value_contract_postgres_enum_identifiers_at_catalog_byte_limit_preserve_typed_edits ... ok
+test quoted_enum_identifier_contract::value_contract_quoted_enum_identifiers_preserve_metadata_and_typed_writes ... ok
+test quoted_enum_identifier_contract::value_contract_quoted_enum_identifiers_resist_shadowed_search_path ... ok
+test quoted_enum_identifier_contract::value_contract_unicode_enum_identifiers_survive_metadata_and_typed_writes ... ok
+test range_array_contract::value_contract_range_array_refusal_preserves_target_and_sibling_rows ... ok
+test rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend ... ok
+test the_session_reports_the_application_name_it_was_given ... ok
+test unsupported_builtin_array_contract::value_contract_json_array_refusal_preserves_target_and_sibling_rows ... ok
+test unsupported_builtin_array_contract::value_contract_text_search_array_refusal_preserves_target_and_sibling_rows ... ok
+test value_contract_numeric_digits_scale_and_special_values_survive_decoding ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_contract_result_delivery_keeps_zero_row_metadata_duplicate_names_and_order ... ok
+test value_contracts::value_contract_arrays_preserve_elements_dimensions_and_exports ... ok
+test value_contracts::value_contract_builtin_range_families_are_refused_without_losing_native_text ... ok
+test value_contracts::value_contract_citext_preserves_label_and_case_insensitive_comparison ... ok
+test value_contracts::value_contract_composite_result_is_explicitly_unsupported ... ok
+test value_contracts::value_contract_dates_preserve_eras_large_years_and_instants ... ok
+test value_contracts::value_contract_geometric_types_keep_native_oracles_when_projection_is_refused ... ok
+test value_contracts::value_contract_inet_and_cidr_preserve_ipv6_prefix_semantics ... ok
+test value_contracts::value_contract_int4multirange_is_explicitly_undecodable ... ok
+test value_contracts::value_contract_int4range_is_explicitly_unsupported ... ok
+test value_contracts::value_contract_intervals_preserve_independent_fields_in_every_style ... ok
+test value_contracts::value_contract_jsonb_domain_keeps_json_null_distinct_from_sql_null ... ok
+test value_contracts::value_contract_macaddr8_preserves_eui64_text_across_consumers ... ok
+test value_contracts::value_contract_macaddr_preserves_exact_text_across_consumers ... ok
+test value_contracts::value_contract_pg_lsn_maximum_preserves_text_and_wire_identity ... ok
+test value_contracts::value_contract_postgres_money_is_refused_with_exact_server_oracle ... ok
+test value_contracts::value_contract_remaining_builtin_multiranges_are_undecodable_with_native_oracles ... ok
+test value_contracts::value_contract_temporal_infinities_remain_distinct_from_null ... ok
+test value_contracts::value_contract_times_preserve_midnight_fraction_and_offset ... ok
+test value_contracts::value_contract_tstzrange_is_explicitly_unsupported ... ok
+test value_contracts::value_contract_uuid_domain_preserves_uuid_across_consumers ... ok
+test value_contracts::value_contract_varbit_preserves_leading_zero_bits_across_consumers ... ok
+test value_contracts::value_contract_vectors_keep_space_separated_elements_through_exports ... ok
+test value_contracts::value_contract_wide_numeric_csv_round_trips_through_native_insert_plan ... ok
+test value_roundtrip_all_types ... ok
+test wide_numeric_contract::value_contract_max_precision_numeric_grid_edit_preserves_exact_value ... ok
+test wide_numeric_contract::value_contract_numeric_domain_preserves_wide_value_across_consumers ... ok
+test wide_numeric_contract::value_contract_numeric_special_grid_edits_match_server_text ... ok
+test wide_numeric_contract::value_contract_rust_decimal_capacity_edges_round_trip_through_postgres ... ok
+test wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value ... ok
+
+test result: ok. 216 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 463.57s
+
+     Running tests/integration.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/integration-848679afdf1e051b)
+
+running 8 tests
+test a_lost_redis_server_is_reported_as_disconnected ... ok
+test an_unavailable_redis_server_is_classified_as_connection_refused ... ok
+test browsing_another_database_does_not_leak_into_later_queries ... ok
+test connection_loss_while_building_a_browse_page_fails_the_whole_page ... ok
+test value_contract_preserves_integer_and_text_command_arguments ... ok
+test value_contract_redis_stream_commands_are_refused_without_consuming_the_connection ... ok
+test value_contract_resp3_attribute_wire_frame_survives_the_request_response_connection ... ok
+test value_contract_resp3_hash_map_preserves_binary_fields_and_values ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.89s
+
+   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/core)
+   Compiling sqlx-postgres v0.9.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/vendor/sqlx-postgres)
+   Compiling tablepro-ssh v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/ssh)
+   Compiling mongodb v3.9.1 (/tmp/bookie-b4-candidate-2026-10-07/linux/vendor/mongodb)
+   Compiling tablepro-policy v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/policy)
+   Compiling sqlx v0.9.0
+   Compiling tablepro-driver-postgres v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/postgres)
+   Compiling tablepro-storage v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/storage)
+   Compiling tablepro-mcp v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/mcp)
+   Compiling tablepro-driver-mongodb v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/mongodb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.65s
+     Running tests/mongodb_extended_json.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/mongodb_extended_json-2652acd25c7ec44e)
+
+running 1 test
+test mongodb_extended_json_survives_the_mcp_query_tool_round_trip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.16s
+
+   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/core)
+   Compiling sqlx-postgres v0.9.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/vendor/sqlx-postgres)
+   Compiling tablepro-driver-mssql v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/mssql)
+   Compiling tablepro-policy v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/policy)
+   Compiling sqlx v0.9.0
+   Compiling tablepro-driver-postgres v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.63s
+     Running tests/session_postgres.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/session_postgres-c71150d48af3a0ca)
+
+running 3 tests
+test a_commit_failing_on_a_deferred_constraint_closes_the_batch ... ok
+test a_commit_on_a_server_aborted_postgres_transaction_is_audited_as_rolled_back ... ok
+test closing_a_session_with_an_open_transaction_rolls_it_back_on_real_postgres ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.69s
+
+   Compiling tablepro-policy v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/policy)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.15s
+     Running tests/session_mssql.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/session_mssql-5afd128b107928ea)
+
+running 1 test
+test sql_server_batches_with_mutations_are_classified_and_denied_before_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.68s
+
+==> PostgreSQL Unix-socket integration
+   Compiling sqlx-postgres v0.9.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/vendor/sqlx-postgres)
+   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/core)
+   Compiling sqlx v0.9.0
+   Compiling tablepro-driver-postgres v0.1.0 (/tmp/bookie-b4-candidate-2026-10-07/linux/crates/drivers/postgres)

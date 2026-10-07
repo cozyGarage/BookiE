@@ -30,6 +30,9 @@ workflow lint and both Flatpak builds passed; driver integration was still
 running at the last observation. See the manifest for exact statuses and
 hashes. Fresh hosted validation is required on the final follow-up commit.
 
-Installed Arch/Omarchy/Hyprland Wayland acceptance, upgrade/rollback,
-Debian/GNOME Wayland acceptance, B3 completion and frozen-candidate acceptance
-are not established here. This evidence does not close B4 or qualify a release.
+This PR #159 checkpoint predates the later frozen candidate. It did not
+establish installed Arch/Omarchy/Hyprland Wayland acceptance, upgrade/rollback,
+Debian/GNOME Wayland acceptance or B3 completion. The later frozen-candidate
+results are recorded in the [2026-10-08 evidence bundle](../b4-frozen-candidate-2026-10-07/summary.md).
+Hosted candidate checks and installed acceptance remain open; this historical
+checkpoint does not close B4 or qualify a release.

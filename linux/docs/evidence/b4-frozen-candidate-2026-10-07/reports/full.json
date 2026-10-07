@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "commit": "0d22bfe9ddd9d1c66478fa55b751e3a887a992ca",
+  "working_tree": "",
+  "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "started_utc": "2026-10-07T21:45:08.636262+00:00",
+  "status": "passed",
+  "layers": {
+    "full": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/ci-local.sh",
+            "full"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "full-1.log",
+          "exit_code": 0,
+          "seconds": 230.243
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-07T21:48:58.880213+00:00"
+}
