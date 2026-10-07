@@ -377,6 +377,73 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     assert_bytea_array_grid_edit(connection).await;
     assert_uuid_array_grid_edit(connection).await;
     assert_timestamptz_array_grid_edit(connection).await;
+    assert_oid_array_grid_edit(connection).await;
+}
+
+async fn assert_oid_array_grid_edit(connection: &dyn Connection) {
+    connection
+        .execute("CREATE TABLE oid_array_grid_edit (id integer PRIMARY KEY, value oid[], sibling text NOT NULL)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO oid_array_grid_edit VALUES \
+             (1, ARRAY[1::oid], 'target sibling'), (2, ARRAY[7::oid], 'sibling row')",
+        )
+        .await
+        .unwrap();
+    let mut rows = connection
+        .query("SELECT * FROM oid_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
+    rows.columns[id_index].primary_key = true;
+    let sibling_wire_before = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM oid_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "oid_array_grid_edit",
+        &rows.columns,
+        &[(value_index, Value::Text("{0,4294967295,NULL}".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update_sql.contains("$1::text::pg_catalog.oid[]"), "{update_sql}");
+    assert_eq!(
+        connection
+            .execute_in_transaction(&[(update_sql, update_params)])
+            .await
+            .unwrap(),
+        vec![1]
+    );
+    let native = connection
+        .query(
+            "SELECT pg_typeof(value)::text, value::text, encode(array_send(value), 'hex'), sibling \
+             FROM oid_array_grid_edit WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    let oracle = connection
+        .query(
+            "SELECT pg_typeof(expected)::text, expected::text, encode(array_send(expected), 'hex'), 'target sibling' \
+             FROM (SELECT ARRAY[0::oid, 4294967295::oid, NULL]::oid[] AS expected) source",
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows, oracle.rows);
+    assert_eq!(native.rows[0][0], Value::Text("oid[]".into()));
+    let sibling = connection
+        .query("SELECT encode(array_send(value), 'hex'), sibling FROM oid_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap();
+    assert_eq!(sibling.rows[0][1], Value::Text("sibling row".into()));
+    assert_eq!(sibling.rows[0][0], sibling_wire_before);
 }
 
 async fn assert_bool_array_grid_edit(connection: &dyn Connection) {
