@@ -360,8 +360,10 @@ Submicro values use exact text binding because the pinned DuckDB Rust value
 binding truncates nanosecond temporal values to microseconds. Expressions that
 cast that exact text to `TIMESTAMP_NS` are now checked with interval arithmetic:
 DuckDB returns a `TIMESTAMP` rounded to microseconds, matching its native literal
-expression. `TIME_NS` plus interval remains a native binder refusal. Both
-outcomes are asserted in
+expression. `epoch_ns()` on the same cast preserves the full pre-epoch value
+(`-876543211`), independently proving the bound text retained nanoseconds
+before arithmetic rounded. `TIME_NS` plus interval remains a native binder
+refusal. These outcomes are asserted in
 `value_contract_submicro_text_parameters_keep_precision_after_explicit_casts`
 (`crates/drivers/duckdb/tests/support/submicro_parameter_expression.rs`; see the [PR validation comment](https://github.com/cozyGarage/BookiE/pull/128#issuecomment-6029090575)). Other
 expression contexts and native sub-microsecond parameter bindings remain open;
