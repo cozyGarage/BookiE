@@ -69,6 +69,7 @@ run_integration() {
     -- --include-ignored --test-threads=1
   cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
   cargo test --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
+  cargo test --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
   echo "==> PostgreSQL Unix-socket integration"
   ./scripts/test-postgres-socket.sh
   bash ./scripts/test-ssh.sh
