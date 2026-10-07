@@ -2,8 +2,8 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-07; each new case links to its source-fingerprinted
-evidence packet, and this summary is not itself runtime evidence.
+and acceptance. Updated 2026-10-07; new cases link to their source tests and PR
+validation comments, while this summary is not itself runtime evidence.
 
 ## Current evidence and next targets
 
@@ -72,7 +72,7 @@ custom array families and their consumers remain open. The unlisted built-in
 `money[]` refusal also now covers populated values, SQL NULL elements, native
 text/JSON/wire snapshots, literal/bind refusal and target/sibling preservation
 (`value_contract_money_array_refusal_preserves_target_and_sibling_rows` in
-`crates/drivers/postgres/tests/support/custom_array_contract.rs`).
+`crates/drivers/postgres/tests/support/custom_array_contract.rs`; see the [PR validation comment](https://github.com/cozyGarage/BookiE/pull/126#issuecomment-6028902397)).
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
