@@ -37,6 +37,7 @@
 - SQLite `length()` results over STRICT `ANY` preserve INTEGER versus SQL NULL through typed CSV restore, including Unicode character counts and BLOB byte counts with embedded NUL.
 - ClickHouse nested `Map → Array → Tuple → UInt128` values gain native JSON/CSV oracles, exact XLSX text cells, and explicit type-less write refusals that preserve the stored row.
 - DuckDB `TIME_NS` and `TIMESTAMP_NS` preserve all nine fractional digits on parameterized INSERT and UPDATE, including SQL NULL and untouched sibling values.
+- DuckDB `TIMESTAMP_NS` expression tests verify the native `TIMESTAMP` result and microsecond rounding after interval arithmetic on an exact text-bound nanosecond input.
 - Test in the connection form shows its result at the top of the form until you change a field, instead of a notice that disappears.
 - The editor find bar has Match case and Regular expression toggles.
 - A Switch database button in the window header lists the databases the account can open on PostgreSQL, MySQL, SQL Server, ClickHouse and MongoDB, reconnects to the one you pick and remembers it for that saved connection.
