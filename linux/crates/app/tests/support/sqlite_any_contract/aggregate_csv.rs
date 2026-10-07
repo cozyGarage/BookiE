@@ -749,6 +749,35 @@ async fn sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls() 
     assert_eq!(json[1]["result"], r#"{"nil":null}"#);
     assert_eq!(json[2]["result"], "{}");
 
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("sqlite-json-object-any.xlsx");
+    tablepro_core::export::write_result_file(
+        &workbook_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(workbook_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet)
+        .unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/sharedStrings.xml").unwrap(), &mut shared_strings)
+        .unwrap();
+    for row in 2..=4 {
+        assert!(sheet.contains(&format!("<c r=\"B{row}\" t=\"s\">")), "{sheet}");
+    }
+    assert!(shared_strings.contains(r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#));
+    assert!(shared_strings.contains(r#"{"nil":null}"#));
+    assert!(shared_strings.contains("{}"));
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
