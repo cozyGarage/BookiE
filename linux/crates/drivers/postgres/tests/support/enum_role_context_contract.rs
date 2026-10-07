@@ -411,6 +411,210 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_role_and_loc
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_quoted_enum_keyed_edit_survives_role_and_shadowed_local_search_path() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let target_schema = "Enum Role Target";
+    let type_name = "State \"Kind";
+    let target_schema_sql = "\"Enum Role Target\"";
+    let shadow_schema_sql = "\"Enum Role Shadow\"";
+    let type_sql = "\"State \"\"Kind\"";
+    let target_type_sql = format!("{target_schema_sql}.{type_sql}");
+    connection
+        .execute(&format!("CREATE SCHEMA {target_schema_sql}"))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!("CREATE SCHEMA {shadow_schema_sql}"))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {target_type_sql} AS ENUM ('target-only', 'common')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {shadow_schema_sql}.{type_sql} AS ENUM ('shadow-only', 'common')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TABLE {target_schema_sql}.rows \
+             (id INT PRIMARY KEY, state {target_type_sql}, sibling TEXT NOT NULL)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "INSERT INTO {target_schema_sql}.rows VALUES \
+             (1, 'common', 'target sibling'), (2, NULL, 'untouched sibling')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE ROLE enum_role_quoted_contract NOLOGIN")
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "GRANT USAGE ON SCHEMA {target_schema_sql}, {shadow_schema_sql} \
+             TO enum_role_quoted_contract"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "GRANT USAGE ON TYPE {target_type_sql}, {shadow_schema_sql}.{type_sql} \
+             TO enum_role_quoted_contract"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "GRANT SELECT, UPDATE ON {target_schema_sql}.rows TO enum_role_quoted_contract"
+        ))
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(Some(target_schema), "rows").await.unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: target_schema.into(),
+            name: type_name.into(),
+        })
+    );
+    let edit = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some(target_schema),
+        "rows",
+        &columns,
+        &[(1, Value::Text("target-only".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(edit.0.contains(&format!("::text::{target_type_sql}")), "{}", edit.0);
+
+    let mut session = connection.open_session().await.unwrap();
+    let control = crate::no_timeout();
+    session
+        .query_params_controlled("SET ROLE enum_role_quoted_contract", &[], &control)
+        .await
+        .unwrap();
+    session.query_params_controlled("BEGIN", &[], &control).await.unwrap();
+    session
+        .query_params_controlled(
+            &format!("SET LOCAL search_path TO {shadow_schema_sql}, public"),
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        session
+            .query_params_controlled(
+                "SELECT current_user = 'enum_role_quoted_contract', \
+                        NOT ('Enum Role Target' = ANY(current_schemas(false))), \
+                        'Enum Role Shadow' = ANY(current_schemas(false))",
+                &[],
+                &control,
+            )
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Bool(true), Value::Bool(true), Value::Bool(true)]]
+    );
+
+    let updated = session
+        .query_params_controlled(
+            &format!("{} RETURNING id, state::text, pg_typeof(state)::text, sibling", edit.0),
+            &edit.1,
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        updated.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("target-only".into()),
+            Value::Text(target_type_sql.clone()),
+            Value::Text("target sibling".into()),
+        ]]
+    );
+
+    session
+        .query_params_controlled("SAVEPOINT reject_shadow_label", &[], &control)
+        .await
+        .unwrap();
+    let invalid_edit = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some(target_schema),
+        "rows",
+        &columns,
+        &[(1, Value::Text("shadow-only".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    let invalid = session
+        .query_params_controlled(&format!("{} RETURNING id", invalid_edit.0), &invalid_edit.1, &control)
+        .await
+        .expect_err("a label declared only by the shadow enum must be refused");
+    let native_invalid = connection
+        .query(&format!("SELECT 'shadow-only'::{target_type_sql}"))
+        .await
+        .expect_err("the native target enum must refuse the shadow-only label");
+    let error_code = |error: &tablepro_core::DriverError| match error {
+        tablepro_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
+        _ => None,
+    };
+    assert!(
+        error_code(&invalid).as_deref() == Some("22P02"),
+        "expected native invalid-enum-label SQLSTATE 22P02, got {invalid:?}"
+    );
+    assert_eq!(error_code(&invalid), error_code(&native_invalid));
+    session
+        .query_params_controlled("ROLLBACK TO SAVEPOINT reject_shadow_label", &[], &control)
+        .await
+        .unwrap();
+    session.query_params_controlled("COMMIT", &[], &control).await.unwrap();
+    session
+        .query_params_controlled("RESET ROLE", &[], &control)
+        .await
+        .unwrap();
+    session.close().await.unwrap();
+
+    let native = connection
+        .query(&format!(
+            "SELECT id, state::text, pg_typeof(state)::text, sibling \
+             FROM {target_schema_sql}.rows ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        native.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("target-only".into()),
+                Value::Text(target_type_sql.clone()),
+                Value::Text("target sibling".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Null,
+                Value::Text(target_type_sql.clone()),
+                Value::Text("untouched sibling".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_parameter_stays_with_target_type_after_role_login() {
     let (_container, options) = start_pg().await;
     let admin = connect(options.clone()).await;

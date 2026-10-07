@@ -4,6 +4,7 @@
 
 ### Added
 
+- PostgreSQL enum grid-edit coverage combines mixed-case quoted identifiers with restricted roles and a shadowed transaction-local `search_path`, including invalid-label and SQL NULL sibling checks.
 - PostgreSQL release profiling now compares the buffer-all collector with the streaming decoder on one-million-row results: median elapsed fell 20.4% and process peak RSS fell 58.3% under the same compiler, dependencies, and database fixture.
 - MongoDB nested array filter coverage now compares `$elemMatch` results against native MongoDB and proves separate array elements cannot jointly satisfy its predicates across JSON-filter and MQL paths.
 - MySQL failed-batch rollback tests now cover UPDATE and DELETE trigger effects across MyISAM, MEMORY, CSV, and ARCHIVE alongside InnoDB rollback.
