@@ -130,7 +130,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-2 | Mutation: core and package survivors untriaged; portable evidence | OPEN | B3-P6 | sandbox |
 | TEST-3 | ~~No line-coverage number~~ | DONE | 2026-10-07 on the runner: `cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --lib --bins` reports 58.1% of lines (47,493 of 112,706 uncovered), 58.7% of functions. Unit tier only: driver integration, GTK and installed tiers are not counted. Examples: storage `connections.rs` 94%, `secrets.rs` 55%, ssh `supervisor.rs` 0% | manual |
 | TEST-3b | Coverage is measured by hand, with no trend or floor | OPEN | The nightly Forgejo workflow runs `cargo llvm-cov` and fails below `coverage-floor.txt` (57). Not yet run on the schedule; trend storage still missing | sandbox |
-| TEST-4 | Full driver, TLS and SSH matrix not rerun on one candidate tree | OPEN | Run on the runner; see below | driver-docker |
+| TEST-4 | ~~Full driver, TLS and SSH matrix not rerun on one candidate tree~~ | DONE | 2026-10-07 on commit `400643944`: `scripts/ci-local.sh integration` on the runner reported 16 checks passed, 0 failed (PostgreSQL, MySQL, SQL Server, ClickHouse, MongoDB, SQLite, SSH and socket fixtures). The same tree's GitHub run on PR #124 passed all 16 jobs, including driver-tls, postgres-release, driver integration and the installed GTK smoke | driver-docker |
 | TEST-5 | Hosted DuckDB container ownership fix not confirmed | UNVERIFIED | | manual |
 | TEST-6 | 117 unchecked items in [manual verification](manual-verification-0.2-features.md) | OPEN | Automate what GTK automation can reach | gtk-installed |
 | TEST-7 | No bundle export and import round trip between two real profiles | OPEN | | gtk-installed |
