@@ -11,7 +11,7 @@ for base in "${images[@]}"; do
   tag="bookie-floor-${base//[:\/]/-}"
   echo "== $base"
   docker build -q -t "$tag" --build-arg "BASE=$base" scripts/distro-floor >/dev/null
-  docker run --rm -v "$PWD:/src:ro" -v "${tag}-target:/target" -e CARGO_TARGET_DIR=/target "$tag" bash -ceu '
+  docker run --rm -v "$PWD:/src:ro" -v "${tag}-target:/target" -v "${tag}-cargo:/opt/cargo/registry" -v "${tag}-git:/opt/cargo/git" -e CARGO_TARGET_DIR=/target "$tag" bash -ceu '
     apt-get update -qq
     apt-get install -y -qq --no-install-recommends desktop-file-utils >/dev/null
     rm -rf /work && mkdir /work && cp -a /src/. /work/
