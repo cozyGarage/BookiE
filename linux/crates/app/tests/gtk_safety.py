@@ -490,14 +490,20 @@ def set_visible_editable_within(anchor_name, anchor_role, text, action_name="Sav
 
 
 def show_file_chooser_location(chooser):
-    for node in descendants(chooser):
-        try:
-            actions = node.queryAction()
-        except Exception:
-            continue
-        for index in range(actions.nActions):
-            if actions.getName(index) == "show_location" and actions.doAction(index):
-                return
+    # The chooser window may be visible before its inner GTK widget has
+    # registered its AT-SPI action. Wait briefly for it, then use the standard
+    # shortcut on builds that omit the action entirely.
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        for node in descendants(chooser):
+            try:
+                actions = node.queryAction()
+            except Exception:
+                continue
+            for index in range(actions.nActions):
+                if actions.getName(index) == "show_location" and actions.doAction(index):
+                    return
+        time.sleep(POLL_SECONDS)
     press_x11_key("l", ("Control_L",))
 
 
