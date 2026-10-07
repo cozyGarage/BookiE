@@ -1,79 +1,33 @@
 # BookiE 0.2 active sprint
 
-Approved 2026-09-16. Consolidated 2026-10-03 from source/document checkpoint
-`0cf70382e`; status reconciled against `aeac107a4`. Delivery branch: `linux`; source version 0.1.5; target 0.2.0.
-Implementation is authorized; no 0.2 release is approved.
-During consolidation, `573435766` merged F4/F9 and `8c0f17494` updated the B4 board;
-they are preserved in this checkout. The history files retain the earlier `0cf70382e` snapshot.
+Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
+0.2.0. Implementation is authorized; no 0.2 release is approved.
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `38f67484d` on `linux` (PR #193).
-Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding, grid edits
-and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures for MySQL
-and SQL Server; #151 adds the daemon system-OpenSSH trust flow and headless
-audit-generation regressions. Earlier merges #138–#145 cover result budgets,
-PostgreSQL enum/array cases and the GTK AT-SPI row-action wait. PR #153
-reconciles hosted preflight/harness findings and SSH fixture setup; #154 and
-#156 add PostgreSQL enum-array slice and range-array coverage. PR #157 adds B4
-SSH audit, rollback-failure and Kerberos cases; #159 reconciles its hosted CI
-findings. PRs #158 and #160 add text-search and JSON array refusal contracts;
-#164 covers all six built-in range arrays; #166 adds seven geometric array
-families. PRs #161 and #162 fix PostgreSQL release GTK dependencies and the
-safety fixture setup. PR #165 hardens GTK SSH trust role detection and the
-two-hop tunnel-loss setup. PR #163 fixes the SSH trust-prompt timeout and
-merged; PR #170 then preserved the remaining handshake deadline after the
-trust decision. PR #169 implements the U2 default-copy policy: PostgreSQL and
-SQL Server generate fresh identity values, while MySQL preserves explicit
-auto-increment values. PR #171 removes an unused fixture import exposed by the
-first hosted preflight. PR #172 reconciles sprint evidence after #171. PR #173
-ends built-in and system-OpenSSH handshakes when the host-key decision is
-declined or the trust dialog is closed; PR #175 adds Escape dismissal. The
-merged #173 Linux run exposed two follow-up regressions: GTK signal ordering
-could send a close-as-decline before the explicit trust response, and the
-installed Debian file chooser lacks the AT-SPI `show_location` action. PR #176
-defers close-as-decline to the GLib idle loop, uses Ctrl+L when that chooser
-action is absent, and adds native MySQL SQL-export and Copy-as-INSERT identity
-contracts. The focused PostgreSQL two-hop trust scenario, local quick CI and the
-complete Debian testing floor run (app library, GTK widgets and installed GTK
-safety suite) pass on the integrated source. The Debian run uses Xvfb; it does
-not replace GNOME/Wayland acceptance. These fixes close the #173 regressions but
-do not qualify B3 or the release. See PR #176 for command-level evidence.
-Since #176, #177 adds font preference, keyboard history navigation and a
-two-profile bundle test; #178 hardens the GTK file-chooser accessibility wait;
-#179 reconciles sprint status; #180 splits PR and merge CI tiers; #181 and #182
-refresh B4 bundle-audit evidence and correct the B4 SSH-audit coverage record;
-#183 adds loaded-row search and MSSQL maximum-value/restart coverage. The exact
-local bundle flows are linked from the [B4 board](b4-task-board.md); PR #184
-reconciles the sprint baseline, and PR #185 fixes the bundle chooser interaction
-and GTK connection-list rebuild after the prior audit run exposed a GTK critical.
-The export, plaintext import and encrypted retry/credential round-trip selectors
-pass locally on `3a3d742fe` with GTK criticals configured as fatal. PR #185's
-hosted checks were still in progress at this checkpoint. Installed and
-frozen-candidate evidence remains distinct from these local runs. Since #185,
-#186 adds MySQL/MariaDB unsigned-subtraction mode contracts; #187 records the
-B4 bundle rerun; #188 adds PostgreSQL server-side cancellation at the query cap;
-#189 covers MariaDB non-UTC TIMESTAMP refusal; #190 and #191 reconcile the
-known-issues ledger and ignored-test inventory; #192 records the native Wayland
-guest setup and remaining blockers; and #193 adds PostgreSQL byte-cap
-cancellation, transaction abort/rollback and connection-reuse coverage. These
-merges advance specific contracts but do not close B3 or qualify the release.
-Case details and evidence belong in the [B3
-board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence
-index](value-contracts.md), test sources and relevant PR comments. B3 remains
-open: the broader engine/type/consumer/configuration matrix, mutation triage and
-installed grid acceptance still need work. The scoped XLSX writer mutation run
-caught 41/41 mutants; broad core/package coverage remains open. These changes
-do not qualify the release.
+Integrated baseline: `16cf6c941` on `linux` (PR #249). The recent B3 merges
+cover SQL Server server-owned values and mutation batches (#224–#225), multiple
+result sets (#228), MongoDB census cost/cancellation and nested filters
+(#229, #231, #234, #247), ClickHouse enum values (#242), and PostgreSQL quoted
+enum edits under a restricted role and shadowed local `search_path` (#249).
+PR #236 reconciles the SQL Server matrix; #248 adds MySQL update/delete effect
+coverage across engines. These are focused cases, not milestone closure.
+
+B3 remains open for the broader engine/type/consumer/configuration matrix,
+mutation triage and installed grid acceptance. B4 still needs the remaining
+privacy, daemon retirement, headless ownership and transport/session acceptance.
+B7 still needs a frozen candidate, installed Arch/Wayland and Debian/GNOME
+acceptance, upgrade/rollback and soak. Case-level evidence belongs on the
+[B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md) and [value
+evidence index](value-contracts.md); do not infer a lane pass or release
+qualification from these merged scenarios.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
 files and fixtures; a lane pass does not close a milestone.
 
-Case-level progress belongs on the [B3 work board](type-contract-strategy.md);
-source-pinned results live in the [value evidence index](value-contracts.md)
-and its linked manifests. This sprint keeps milestone order and acceptance
-status, not a second dated log of completed scenarios.
+This sprint keeps milestone order and acceptance status; source-pinned case
+results live in the B3 board and value evidence index.
 
 ## Technical decisions
 
@@ -98,7 +52,7 @@ this existing-eight-driver stabilization scope.
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
 | B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. U2 identity-copy behavior is implemented and covered for PostgreSQL, SQL Server and MySQL policy; enum text/NULL inference and native-type mismatch refusals have PostgreSQL coverage. The broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance remain open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
-| B4 transport/sessions | C6/G5, SSH audit, rollback-failure, Kerberos, GTK trust-flow and prompt-timeout fixes are merged through #170. | [Current B4 board](b4-task-board.md): frozen B3+B4 candidate, hosted/installed acceptance, privacy and headless ownership acceptance remain open |
+| B4 transport/sessions | SSH audit, rollback-failure, Kerberos, GTK trust-flow, prompt-timeout and cross-engine DML regressions are merged. | [Current B4 board](b4-task-board.md): frozen B3+B4 candidate, hosted/installed acceptance, privacy and headless ownership acceptance remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
 | B7 qualification | Open | Frozen SHA, affected automated gates, both installed desktop targets and retry-free soak; publication separate |
