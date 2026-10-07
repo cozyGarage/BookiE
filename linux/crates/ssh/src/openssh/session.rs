@@ -16,7 +16,7 @@ use tokio_util::sync::{CancellationToken, WaitForCancellationFutureOwned};
 use super::argv::{ControlOp, master_args};
 use super::askpass_bridge::AskpassBridge;
 use super::error::{protocol, spawn_failure, unsafe_dir};
-use super::stderr_classify::{ClassifyContext, classify};
+use super::stderr_classify::{ClassifyContext, DeclinedHostKey, classify};
 use super::supervisor::{ForwardCancel, Supervisor, run_control};
 use super::{OpenSshConfig, OpenSshError, OpenSshRuntime, OpenSshTimeouts, Prompter, TimeoutPhase, lock};
 
@@ -107,7 +107,7 @@ impl OpenSshSession {
         let listener = bind_askpass(master_dir.path(), &control)?;
         let mut master = spawn_master(config, context, master_dir, control)?;
         let mut bridge = AskpassBridge::new(context.runtime.owner_uid(), config, prompter);
-        let outcome = handshake(&mut master, &listener, &mut bridge, context, &cancel).await;
+        let outcome = handshake(&mut master, &listener, &mut bridge, config, context, &cancel).await;
         drop(listener);
         remove_askpass_socket(master.master_dir.path()).await;
         match outcome {
@@ -300,6 +300,7 @@ async fn handshake(
     master: &mut Master,
     listener: &UnixListener,
     bridge: &mut AskpassBridge,
+    config: &OpenSshConfig,
     context: &OpenSshContext,
     cancel: &CancellationToken,
 ) -> Handshake {
@@ -330,12 +331,27 @@ async fn handshake(
                         }
                     }
                 }
+                if let Some(error) = declined_host_key_error(
+                    config.destination.host(),
+                    bridge.declined_host_key(),
+                ) {
+                    return Handshake::Failed(error);
+                }
                 deadline.resume();
             }
             () = tokio::time::sleep_until(deadline.deadline()) => return Handshake::Failed(handshake_timeout()),
         }
     }
     confirm_master(master, context, cancel, deadline.deadline()).await
+}
+
+fn declined_host_key_error(host: &str, declined: Option<&DeclinedHostKey>) -> Option<OpenSshError> {
+    declined.map(|declined| OpenSshError::HostKeyUnknown {
+        host: host.to_owned(),
+        algorithm: declined.algorithm.clone(),
+        fingerprint: declined.fingerprint.clone(),
+        declined: true,
+    })
 }
 
 async fn confirm_master(
@@ -427,6 +443,25 @@ pub(crate) fn remove_dir_now(dir: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_declined_host_key_ends_the_master_handshake_as_a_refusal() {
+        let declined = DeclinedHostKey {
+            algorithm: "ED25519".to_owned(),
+            fingerprint: "SHA256:abc".to_owned(),
+        };
+
+        assert_eq!(
+            declined_host_key_error("bastion.example", Some(&declined)),
+            Some(OpenSshError::HostKeyUnknown {
+                host: "bastion.example".to_owned(),
+                algorithm: "ED25519".to_owned(),
+                fingerprint: "SHA256:abc".to_owned(),
+                declined: true,
+            })
+        );
+        assert_eq!(declined_host_key_error("bastion.example", None), None);
+    }
 
     #[tokio::test(start_paused = true)]
     async fn the_handshake_deadline_is_paused_while_prompting() {

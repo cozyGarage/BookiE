@@ -1,13 +1,14 @@
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub(super) enum HostKeyPromptEvent {
     WaitingForUser,
-    UserResponded,
+    UserResponded { declined_fingerprint: Option<String> },
 }
 
 pub(super) enum HandshakeWaitError<E> {
     Timeout,
+    HostKeyDeclined(String),
     Handshake(E),
 }
 
@@ -34,9 +35,13 @@ where
                     remaining = deadline_at.saturating_duration_since(tokio::time::Instant::now());
                     waiting_for_user = true;
                 }
-                HostKeyPromptEvent::UserResponded => {
+                HostKeyPromptEvent::UserResponded { declined_fingerprint } => {
                     if waiting_for_user {
                         waiting_for_user = false;
+                        if let Some(fingerprint) = declined_fingerprint {
+                            tracing::warn!(%fingerprint, "SSH host key declined; ending handshake");
+                            return Err(HandshakeWaitError::HostKeyDeclined(fingerprint));
+                        }
                         deadline_at = tokio::time::Instant::now() + remaining;
                         deadline.as_mut().reset(deadline_at);
                     }
@@ -46,5 +51,29 @@ where
             result = &mut handshake => return result.map_err(HandshakeWaitError::Handshake),
             _ = &mut deadline, if !waiting_for_user => return Err(HandshakeWaitError::Timeout),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn declining_a_prompt_ends_a_pending_ssh_handshake_immediately() {
+        let (events, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let handshake = async move {
+            events.send(HostKeyPromptEvent::WaitingForUser).unwrap();
+            events
+                .send(HostKeyPromptEvent::UserResponded {
+                    declined_fingerprint: Some("SHA256:declined".to_owned()),
+                })
+                .unwrap();
+            std::future::pending::<Result<(), ()>>().await
+        };
+
+        assert!(matches!(
+            wait_for_handshake(handshake, receiver, Duration::from_secs(10)).await,
+            Err(HandshakeWaitError::HostKeyDeclined(fingerprint)) if fingerprint == "SHA256:declined"
+        ));
     }
 }

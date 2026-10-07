@@ -547,6 +547,9 @@ async fn connect_and_auth(
         Err(HandshakeWaitError::Handshake(e)) => {
             return Err(map_connect_error(e, &cfg.host, cfg.port, &known_hosts_path, &outcome));
         }
+        Err(HandshakeWaitError::HostKeyDeclined(fingerprint)) => {
+            return Err(unknown_host_key(&cfg.host, cfg.port, fingerprint, &known_hosts_path));
+        }
         Err(HandshakeWaitError::Timeout) => return Err(timeout_error("ssh handshake", cfg, CONNECT_TIMEOUT)),
     };
 
@@ -827,7 +830,11 @@ mod tests {
         let handshake = async move {
             events.send(HostKeyPromptEvent::WaitingForUser).unwrap();
             wait_for_reply.await.unwrap();
-            events.send(HostKeyPromptEvent::UserResponded).unwrap();
+            events
+                .send(HostKeyPromptEvent::UserResponded {
+                    declined_fingerprint: None,
+                })
+                .unwrap();
             Ok::<_, ()>("connected")
         };
 
@@ -848,7 +855,11 @@ mod tests {
         let handshake = async move {
             events.send(HostKeyPromptEvent::WaitingForUser).unwrap();
             wait_for_reply.await.unwrap();
-            events.send(HostKeyPromptEvent::UserResponded).unwrap();
+            events
+                .send(HostKeyPromptEvent::UserResponded {
+                    declined_fingerprint: None,
+                })
+                .unwrap();
             tokio::time::sleep(Duration::from_secs(11)).await;
             Ok::<_, ()>("connected")
         };
@@ -873,7 +884,11 @@ mod tests {
             events.send(HostKeyPromptEvent::WaitingForUser).unwrap();
             prompt_started.send(()).unwrap();
             wait_for_reply.await.unwrap();
-            events.send(HostKeyPromptEvent::UserResponded).unwrap();
+            events
+                .send(HostKeyPromptEvent::UserResponded {
+                    declined_fingerprint: None,
+                })
+                .unwrap();
             tokio::time::sleep(Duration::from_secs(3)).await;
             Ok::<_, ()>("connected")
         };

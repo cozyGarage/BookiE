@@ -53,14 +53,23 @@ pub(super) async fn verify_or_prompt(
             };
             let _ = prompt_events.send(HostKeyPromptEvent::WaitingForUser);
             let answer = prompter.answer(&prompt).await;
-            let _ = prompt_events.send(HostKeyPromptEvent::UserResponded);
-            if matches!(answer, PromptAnswer::Accept) {
+            let outcome = if matches!(answer, PromptAnswer::Accept) {
                 record_known_host(host, port, key, known_hosts, fingerprint)
             } else {
                 HostKeyOutcome::Unknown {
                     fingerprint: fingerprint.to_string(),
                 }
-            }
+            };
+            let declined_fingerprint = match &outcome {
+                HostKeyOutcome::Unknown { fingerprint } => Some(fingerprint.clone()),
+                _ => None,
+            };
+            tracing::warn!(
+                declined = declined_fingerprint.is_some(),
+                "SSH host key prompt answered"
+            );
+            let _ = prompt_events.send(HostKeyPromptEvent::UserResponded { declined_fingerprint });
+            outcome
         }
         Err(outcome) => outcome,
     }
