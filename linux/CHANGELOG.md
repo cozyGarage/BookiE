@@ -77,6 +77,7 @@
 
 ### Fixed
 
+- GTK installed-flow smoke re-queries rows while AT-SPI makes their named actions available, avoiding a transient accessibility-tree race.
 - Saving an edited cell or deleting a row in a PostgreSQL, MySQL, SQL Server, SQLite or DuckDB table no longer asks for a manual write approval every time; the write is already limited to one row per statement.
 - MongoDB stale grid deletes now compare the document's full top-level field set as well as materialized values, so a field added after the read prevents deleting that changed document.
 
