@@ -2,6 +2,7 @@ import ctypes
 import json
 import os
 import time
+from pathlib import Path
 
 
 class XWindowAttributes(ctypes.Structure):
@@ -66,6 +67,7 @@ def x11_click(window_x, window_y, button=3, clicks=1):
 
 def scenarios(ui):
     pyatspi = ui.pyatspi
+    ssh_trust_prompt_roles = (pyatspi.ROLE_ALERT, pyatspi.ROLE_FRAME)
 
     def wait_for_adw_dialog(name, present=True):
         if os.environ.get("TABLEPRO_GTK_OLD_ADW") == "1":
@@ -149,6 +151,35 @@ def scenarios(ui):
         assert stored_notes(database) == [(1, "gamma"), (2, "beta")], stored_notes(database)
         ui.wait_for_node(name="1 unsaved change", present=False)
 
+    def postgres_session_transaction_confirmation_cancels_or_rolls_back(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        psql("DROP TABLE IF EXISTS public.session_rollback_probe; CREATE TABLE public.session_rollback_probe (id integer PRIMARY KEY)")
+
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        session_toggle = ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.invoke(session_toggle)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.run_sql("INSERT INTO session_rollback_probe(id) VALUES (1)")
+        ui.wait_for_node_containing("done in")
+        assert psql("SELECT COUNT(*) FROM public.session_rollback_probe") == "0"
+        ui.invoke(ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="End the session with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        toggle = ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.run_sql("INSERT INTO session_rollback_probe(id) VALUES (2)")
+        ui.wait_for_node_containing("done in")
+        assert psql("SELECT COUNT(*) FROM public.session_rollback_probe") == "0"
+
+        ui.invoke(toggle)
+        ui.wait_for_node(name="End the session with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.wait_for_node(name="Session rolled back")
+        assert psql("SELECT COUNT(*) FROM public.session_rollback_probe") == "0"
+
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
@@ -201,6 +232,20 @@ def scenarios(ui):
             assert ui.find_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON) is None
         finally:
             server.close()
+
+        # A cancelled candidate must not take ownership of the workspace or
+        # prevent a subsequent saved-connection switch from using its own DB.
+        ui.invoke(ui.wait_for_node(name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Connect to PostgreSQL", present=False)
+        ui.open_saved_connection(ui.CONNECTION_B_NAME)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.run_sql("INSERT INTO safety_items(id) VALUES (55)")
+        database_b = base / "safety-b.sqlite"
+        ui.wait_for_database_count(database_b, 1)
+        assert ui.database_ids(database) == [], "cancelled connection changed the original database"
+        assert ui.database_ids(database_b) == [55], "switch after cancellation used the wrong database"
 
     def app_memory_kb():
         import glob
@@ -521,11 +566,265 @@ def scenarios(ui):
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("name", present=False)
 
+    def postgres_saved_mtls_connection_authenticates_and_queries(database, base):
+        ui.open_saved_connection(ui.POSTGRES_MTLS_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_MTLS_CONNECTION_NAME} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.run_sql("SELECT count(*) AS row_count FROM release_items")
+        ui.wait_for_node(name="3", role=pyatspi.ROLE_LABEL)
+
+    def postgres_ssh_unknown_host_key_decline_is_durably_audited(database, base):
+        name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
+        connection_id = ui.POSTGRES_SSH_AUDIT_CONNECTION_ID
+        ui.open_saved_connection(name)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
+        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+        ui.wait_for_node(name="Connection failed")
+
+        journal = base / "data" / ui.storage_dir_name() / "audit.jsonl"
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        records = []
+        while time.monotonic() < deadline:
+            if journal.exists():
+                records = [json.loads(line)["event"] for line in journal.read_text().splitlines() if line.strip()]
+                attempts = [event for event in records if event.get("transport_attempt")]
+                if attempts:
+                    break
+            time.sleep(ui.POLL_SECONDS)
+        attempts = [event for event in records if event.get("transport_attempt")]
+        assert len(attempts) == 1, f"expected one durable SSH outcome, found {attempts!r}"
+        event = attempts[0]
+        assert event["connection_id"] == connection_id, event
+        assert event["phase"] == "outcome", event
+        assert event["terminal_status"] == "denied", event
+        assert event["transport_attempt"] == {"client": "builtin_ssh", "outcome": "host_key_refused"}, event
+
+        known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
+        assert not known_hosts.exists() or not known_hosts.read_text().strip(), (
+            "declining the host key must not learn it"
+        )
+
+    def trust_postgres_ssh_chain():
+        prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
+        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.invoke(ui.wait_within(prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+        jump_host = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST")
+        if jump_host:
+            jump_port = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT", "22")
+            second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
+            ui.wait_for_node_containing(f"{jump_host}:{jump_port}")
+            ui.invoke(ui.wait_within(second_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+
+    def postgres_ssh_unknown_host_key_accepts_and_queries(database, base):
+        name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
+        ui.open_saved_connection(name)
+        trust_postgres_ssh_chain()
+        ui.wait_for_frame_containing(f"{name} — BookiE")
+
+        known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and (not known_hosts.exists() or not known_hosts.read_text().strip()):
+            time.sleep(ui.POLL_SECONDS)
+        assert known_hosts.exists() and known_hosts.read_text().strip(), (
+            "accepting the host key must persist it in the isolated known_hosts file"
+        )
+        if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST"):
+            assert len([line for line in known_hosts.read_text().splitlines() if line.strip()]) == 2, (
+                "the full jump chain must persist both accepted host keys"
+            )
+
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.run_sql("SELECT count(*) AS row_count FROM release_items")
+        ui.wait_for_node(name="3", role=pyatspi.ROLE_LABEL)
+
+        journal = base / "data" / ui.storage_dir_name() / "audit.jsonl"
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        attempts = []
+        while time.monotonic() < deadline:
+            if journal.exists():
+                records = [json.loads(line)["event"] for line in journal.read_text().splitlines() if line.strip()]
+                attempts = [event for event in records if event.get("transport_attempt")]
+                if attempts:
+                    break
+            time.sleep(ui.POLL_SECONDS)
+        assert len(attempts) == 1, f"expected one terminal SSH audit event for the complete chain: {attempts!r}"
+        assert attempts[0]["connection_id"] == ui.POSTGRES_SSH_AUDIT_CONNECTION_ID
+        assert attempts[0]["transport_attempt"] == {"client": "builtin_ssh", "outcome": "connected"}
+
+    def postgres_ssh_multihop_trusts_both_hops_and_queries(database, base):
+        assert os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST") == "relay", (
+            "the two-hop release fixture must configure its relay jump host"
+        )
+        postgres_ssh_unknown_host_key_accepts_and_queries(database, base)
+
+    def postgres_ssh_second_hop_decline_does_not_learn_key(database, base):
+        name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
+        ui.open_saved_connection(name)
+        first_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
+        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.invoke(ui.wait_within(first_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+
+        second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
+        ui.wait_for_node_containing("relay:22")
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+        ui.wait_for_node(name="Connection failed")
+
+        known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
+        assert known_hosts.exists(), "first-hop trust should persist before the second-hop decision"
+        learned = [line for line in known_hosts.read_text().splitlines() if line.strip()]
+        assert len(learned) == 1, f"declining the second hop must not persist its key: {learned!r}"
+
+        journal = base / "data" / ui.storage_dir_name() / "audit.jsonl"
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        attempts = []
+        while time.monotonic() < deadline:
+            if journal.exists():
+                records = [json.loads(line)["event"] for line in journal.read_text().splitlines() if line.strip()]
+                attempts = [event for event in records if event.get("transport_attempt")]
+                if attempts:
+                    break
+            time.sleep(ui.POLL_SECONDS)
+        assert len(attempts) == 1, f"expected one terminal SSH refusal event, got {attempts!r}"
+        event = attempts[0]
+        assert event["connection_id"] == ui.POSTGRES_SSH_AUDIT_CONNECTION_ID, event
+        assert event["terminal_status"] == "denied", event
+        assert event["transport_attempt"] == {"client": "builtin_ssh", "outcome": "host_key_refused"}, event
+
+    def postgres_ssh_changed_second_hop_key_is_refused(database, base):
+        name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
+        known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
+        known_hosts.parent.mkdir(parents=True, exist_ok=True)
+        wrong_host_key = Path(os.environ["TABLEPRO_FIXTURE_MATERIALS"]) / "ssh_host_ed25519_key.pub"
+        key_parts = wrong_host_key.read_text(encoding="utf-8").split()
+        assert len(key_parts) >= 2, "the release fixture must provide the bastion host public key"
+        relay_record = f"relay {key_parts[0]} {key_parts[1]} fixture-wrong-relay-key\n"
+        known_hosts.write_text(relay_record, encoding="utf-8")
+
+        ui.open_saved_connection(name)
+        first_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
+        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.invoke(ui.wait_within(first_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+        ui.wait_for_node(name="Connection failed")
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+        ui.wait_for_node_containing("changed")
+
+        records_in_file = [line for line in known_hosts.read_text().splitlines() if line.strip()]
+        assert len(records_in_file) == 2, f"the changed relay key must not overwrite either record: {records_in_file!r}"
+        assert records_in_file[0] == relay_record.strip(), "the pre-trusted wrong relay key must remain unchanged"
+
+        journal = base / "data" / ui.storage_dir_name() / "audit.jsonl"
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        attempts = []
+        while time.monotonic() < deadline:
+            if journal.exists():
+                records = [json.loads(line)["event"] for line in journal.read_text().splitlines() if line.strip()]
+                attempts = [event for event in records if event.get("transport_attempt")]
+                if attempts:
+                    break
+            time.sleep(ui.POLL_SECONDS)
+        assert len(attempts) == 1, f"expected one terminal host-key-change event, got {attempts!r}"
+        event = attempts[0]
+        assert event["connection_id"] == ui.POSTGRES_SSH_AUDIT_CONNECTION_ID, event
+        assert event["terminal_status"] == "denied", event
+        assert event["transport_attempt"] == {"client": "builtin_ssh", "outcome": "host_key_changed"}, event
+
+    def postgres_ssh_setup_failure_is_durably_audited(database, base):
+        ui.open_saved_connection(ui.POSTGRES_SSH_SETUP_FAILURE_CONNECTION_NAME)
+        ui.wait_for_node(name="Connection failed")
+
+        journal = base / "data" / ui.storage_dir_name() / "audit.jsonl"
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        attempts = []
+        while time.monotonic() < deadline:
+            if journal.exists():
+                records = [json.loads(line)["event"] for line in journal.read_text().splitlines() if line.strip()]
+                attempts = [
+                    event for event in records
+                    if event.get("decision_rule") == "transport_attempt"
+                    and event.get("connection_id") == ui.POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID
+                ]
+                if attempts:
+                    break
+            time.sleep(ui.POLL_SECONDS)
+        assert len(attempts) == 1, f"expected one durable SSH setup failure outcome, found {attempts!r}"
+        event = attempts[0]
+        assert event["phase"] == "outcome", event
+        assert event["terminal_status"] == "failed", event
+        assert event["transport_attempt"] == {"client": "builtin_ssh", "outcome": "connection_failed"}, event
+
+    def postgres_ssh_tunnel_loss_retires_session_and_reconnects(database, base):
+        import urllib.request
+
+        def set_bastion_enabled(enabled):
+            request = urllib.request.Request(
+                "http://127.0.0.1:8474/proxies/bastion",
+                data=json.dumps({"enabled": enabled}).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=5) as response:
+                assert response.status == 200, f"Toxiproxy returned {response.status}"
+
+        psql(
+            "DROP TABLE IF EXISTS public.session_tunnel_loss_probe; "
+            "CREATE TABLE public.session_tunnel_loss_probe (id integer PRIMARY KEY)"
+        )
+        name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
+        ui.open_saved_connection(name)
+        trust_postgres_ssh_chain()
+        ui.wait_for_frame_containing(f"{name} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.run_sql("INSERT INTO session_tunnel_loss_probe VALUES (1)")
+        ui.run_sql("SELECT id FROM session_tunnel_loss_probe WHERE id = 1")
+        ui.wait_for_node(name="1", role=pyatspi.ROLE_LABEL)
+        assert psql("SELECT count(*) FROM public.session_tunnel_loss_probe") == "0"
+
+        set_bastion_enabled(False)
+        try:
+            ui.wait_for_node_containing("Connection lost — reconnecting")
+        finally:
+            set_bastion_enabled(True)
+        # The monitor uses a five-second initial backoff. Allow that bounded
+        # attempt to finish; then the stale-session and replacement-session
+        # assertions below provide the observable recovery proof.
+        time.sleep(6)
+
+        # The old dedicated session must be retired even though the saved
+        # connection has already reconnected. A write through that stale
+        # session must not reach PostgreSQL.
+        ui.run_sql("INSERT INTO session_tunnel_loss_probe VALUES (2)")
+        ui.wait_for_node_containing("error in")
+        ui.wait_for_node_containing("session was retired")
+        assert psql("SELECT count(*) FROM public.session_tunnel_loss_probe") == "0"
+
+        ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        time.sleep(0.5)
+        ui.run_sql("SELECT 42")
+        ui.wait_for_node(name="42", role=pyatspi.ROLE_LABEL)
+        assert psql("SELECT count(*) FROM public.session_tunnel_loss_probe") == "0"
+
     def psql(sql):
         import subprocess
         out = subprocess.run(
-            ["docker", "exec", os.environ["TABLEPRO_GTK_POSTGRES_CONTAINER"], "psql", "--username=postgres",
-             "--dbname=bookie_test", "--tuples-only", "--no-align", f"--command={sql}"],
+            ["docker", "exec", os.environ["TABLEPRO_GTK_POSTGRES_CONTAINER"], "psql",
+             f"--username={os.environ.get('TABLEPRO_GTK_POSTGRES_USER', 'postgres')}",
+             f"--dbname={os.environ.get('TABLEPRO_GTK_POSTGRES_DB', 'bookie_test')}",
+             "--tuples-only", "--no-align", f"--command={sql}"],
             check=True, capture_output=True, text=True,
         )
         return out.stdout.strip()
@@ -619,9 +918,21 @@ def scenarios(ui):
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
+        result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_saved_connection_browses_rows_and_values)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
+    if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
+        result.append(postgres_saved_mtls_connection_authenticates_and_queries)
+    if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PORT"):
+        result.append(postgres_ssh_unknown_host_key_decline_is_durably_audited)
+        result.append(postgres_ssh_unknown_host_key_accepts_and_queries)
+        result.append(postgres_ssh_setup_failure_is_durably_audited)
+        result.append(postgres_ssh_tunnel_loss_retires_session_and_reconnects)
+        if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST"):
+            result.append(postgres_ssh_multihop_trusts_both_hops_and_queries)
+            result.append(postgres_ssh_second_hop_decline_does_not_learn_key)
+            result.append(postgres_ssh_changed_second_hop_key_is_refused)
     for scenario in result:
         scenario.environment = "local"
     return result

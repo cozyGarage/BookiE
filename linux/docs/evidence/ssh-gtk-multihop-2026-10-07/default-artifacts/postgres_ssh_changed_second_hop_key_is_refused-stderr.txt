@@ -1,0 +1,16 @@
+2026-10-07T05:40:10.602811Z  INFO starting tablepro-app drivers=7
+2026-10-07T05:40:10.602872Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-07T05:40:10.722734Z  INFO registered win.disconnect enabled=false
+2026-10-07T05:40:10.726157Z  INFO main window activated
+
+(com.tablepro.linux:1536506): Gtk-CRITICAL **: 07:40:10.765: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-07T05:40:11.275719Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+
+(com.tablepro.linux:1536506): Gtk-CRITICAL **: 07:40:11.306: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:1536506): Gtk-CRITICAL **: 07:40:11.313: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:1536506): Adwaita-CRITICAL **: 07:40:13.300: Trying to close AdwAlertDialog 0x577c0e70d690 that's not presented
+2026-10-07T05:40:13.365824Z  WARN candidate connection failed error=ssh host key changed: host key for relay:22 does not match /tmp/tablepro-postgres_ssh_changed_second_hop_key_is_refused-uzw12wku/config/tablepro/known_hosts: stored fingerprint differs (line 1). If the server was reinstalled, remove the old line; otherwise this may indicate a man-in-the-middle attack. New fingerprint: SHA256:MU8CrqI//FestiCT9Vr29qO+SeD8saEpnjhF+Zwqu5c

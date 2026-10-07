@@ -200,11 +200,9 @@ pub(crate) fn quote_literal(driver_id: &str, text: &str) -> String {
 /// Render a complete `INSERT` for one result row, for the user to paste
 /// and run.
 ///
-/// Generated columns are left out: the database computes them and
-/// rejects an `INSERT` that supplies one, so including them produced a
-/// statement that could never execute. An auto-increment column is kept,
-/// because copying a row usually means keeping its key, and every
-/// supported engine accepts an explicit value for one.
+/// Generated columns are left out because the database computes them.
+/// PostgreSQL and SQL Server identities are also left out so the target
+/// database assigns a fresh key; MySQL's explicit auto-increment copy stays.
 pub fn build_insert_literal(
     driver_id: &str,
     schema: Option<&str>,
@@ -221,7 +219,7 @@ pub fn build_insert_literal(
     let mut names: Vec<String> = Vec::with_capacity(columns.len());
     let mut values: Vec<String> = Vec::with_capacity(columns.len());
     for (column, value) in columns.iter().zip(row) {
-        if column.is_generated {
+        if column.is_generated || (column.is_auto_increment && matches!(driver_id, "postgres" | "mssql")) {
             continue;
         }
         names.push(quote_ident(driver_id, &column.name));
@@ -237,13 +235,17 @@ pub fn build_insert_literal(
         };
         values.push(literal);
     }
-    if names.is_empty() {
-        return Err(BuildSqlError::NothingToUpdate);
-    }
     let qualified = match schema {
         Some(schema) => format!("{}.{}", quote_ident(driver_id, schema), quote_ident(driver_id, table)),
         None => quote_ident(driver_id, table),
     };
+    if names.is_empty() {
+        return if matches!(driver_id, "postgres" | "mssql") {
+            Ok(format!("INSERT INTO {qualified} DEFAULT VALUES;"))
+        } else {
+            Err(BuildSqlError::NothingToUpdate)
+        };
+    }
     Ok(format!(
         "INSERT INTO {} ({}) VALUES ({});",
         qualified,
@@ -578,14 +580,40 @@ mod tests {
     }
 
     #[test]
-    fn an_insert_keeps_an_auto_increment_column_so_a_copied_row_keeps_its_key() {
+    fn copied_insert_uses_the_engine_identity_default() {
         let mut id = column("id");
         id.is_auto_increment = true;
         id.primary_key = true;
         let columns = vec![id, column("note")];
         let row = vec![Value::Int(7), Value::Text("hi".into())];
-        let sql = build_insert_literal("mysql", None, "t", &columns, &row).expect("build the insert");
-        assert_eq!(sql, "INSERT INTO `t` (`id`, `note`) VALUES (7, 'hi');");
+        assert_eq!(
+            build_insert_literal("mysql", None, "t", &columns, &row).unwrap(),
+            "INSERT INTO `t` (`id`, `note`) VALUES (7, 'hi');"
+        );
+        assert_eq!(
+            build_insert_literal("postgres", None, "t", &columns, &row).unwrap(),
+            "INSERT INTO \"t\" (\"note\") VALUES ('hi');"
+        );
+        assert_eq!(
+            build_insert_literal("mssql", None, "t", &columns, &row).unwrap(),
+            "INSERT INTO [t] ([note]) VALUES (N'hi');"
+        );
+    }
+
+    #[test]
+    fn copied_insert_uses_default_values_when_no_column_can_be_written() {
+        let mut id = column("id");
+        id.is_auto_increment = true;
+        let columns = vec![id, generated("computed")];
+        let row = vec![Value::Int(7), Value::Int(14)];
+        assert_eq!(
+            build_insert_literal("postgres", Some("public"), "t", &columns, &row).unwrap(),
+            "INSERT INTO \"public\".\"t\" DEFAULT VALUES;"
+        );
+        assert_eq!(
+            build_insert_literal("mssql", Some("dbo"), "t", &columns, &row).unwrap(),
+            "INSERT INTO [dbo].[t] DEFAULT VALUES;"
+        );
     }
 
     #[test]
@@ -629,10 +657,10 @@ mod tests {
     }
 
     #[test]
-    fn a_row_of_only_generated_columns_has_nothing_to_insert() {
+    fn mysql_still_refuses_a_row_of_only_generated_columns() {
         let columns = vec![generated("a")];
         let row = vec![Value::Int(1)];
-        let error = build_insert_literal("postgres", None, "t", &columns, &row).expect_err("nothing to insert");
+        let error = build_insert_literal("mysql", None, "t", &columns, &row).expect_err("nothing to insert");
         assert!(matches!(error, BuildSqlError::NothingToUpdate));
     }
 

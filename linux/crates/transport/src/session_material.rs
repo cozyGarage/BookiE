@@ -15,6 +15,7 @@ pub async fn session_material_digest(saved: &SavedConnection) -> Result<[u8; 32]
     append_db_password(&mut hasher, saved).await?;
     append_ssh_material(&mut hasher, saved).await?;
     append_tls_ca(&mut hasher, saved)?;
+    append_tls_client_identity(&mut hasher, saved)?;
     Ok(hasher.finish())
 }
 
@@ -89,6 +90,20 @@ fn append_tls_ca(hasher: &mut MaterialHasher, saved: &SavedConnection) -> Result
     Ok(())
 }
 
+fn append_tls_client_identity(hasher: &mut MaterialHasher, saved: &SavedConnection) -> Result<(), TransportError> {
+    match (saved.tls_client_cert.as_deref(), saved.tls_client_key.as_deref()) {
+        (None, None) => Ok(()),
+        (Some(cert), Some(key)) => {
+            hasher.tag(b"tls_client_cert", &read_material_file(cert)?);
+            hasher.tag(b"tls_client_key", &read_material_file(key)?);
+            Ok(())
+        }
+        _ => Err(TransportError::Driver(tablepro_core::DriverError::Unsupported(
+            "TLS client authentication requires both a certificate and a private key".into(),
+        ))),
+    }
+}
+
 fn read_material_file(path: &Path) -> Result<Vec<u8>, TransportError> {
     let file =
         File::open(path).map_err(|error| TransportError::Secret(format!("cannot read {}: {error}", path.display())))?;
@@ -144,6 +159,8 @@ mod tests {
             use_tls: false,
             tls_mode: Some(TlsMode::Disabled),
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             read_only: true,
             auth_mode: AuthMode::Password,
             environment: Environment::Local,
@@ -209,6 +226,46 @@ mod tests {
         std::fs::write(&ca, b"new-ca").unwrap();
         let second = session_material_digest(&saved).await.expect("digest with new ca");
         assert_ne!(first, second);
+    }
+
+    #[tokio::test]
+    async fn rotating_tls_client_certificate_or_key_changes_the_digest() {
+        let directory = tempfile::tempdir().unwrap();
+        let cert = directory.path().join("client.crt");
+        let key = directory.path().join("client.key");
+        std::fs::write(&cert, b"old-certificate").unwrap();
+        std::fs::write(&key, b"old-private-key").unwrap();
+        let mut saved = sqlite_saved();
+        saved.tls_client_cert = Some(cert.clone());
+        saved.tls_client_key = Some(key.clone());
+
+        let initial = session_material_digest(&saved).await.expect("initial identity digest");
+        std::fs::write(&cert, b"rotated-certificate").unwrap();
+        let rotated_cert = session_material_digest(&saved)
+            .await
+            .expect("rotated certificate digest");
+        assert_ne!(initial, rotated_cert);
+
+        std::fs::write(&cert, b"old-certificate").unwrap();
+        std::fs::write(&key, b"rotated-private-key").unwrap();
+        let rotated_key = session_material_digest(&saved).await.expect("rotated key digest");
+        assert_ne!(initial, rotated_key);
+    }
+
+    #[tokio::test]
+    async fn a_missing_tls_client_identity_file_fails_closed() {
+        let directory = tempfile::tempdir().unwrap();
+        let cert = directory.path().join("client.crt");
+        let key = directory.path().join("client.key");
+        std::fs::write(&cert, b"certificate").unwrap();
+        let mut saved = sqlite_saved();
+        saved.tls_client_cert = Some(cert);
+        saved.tls_client_key = Some(key);
+
+        let error = session_material_digest(&saved)
+            .await
+            .expect_err("missing client key must fail before cache reuse");
+        assert!(matches!(error, TransportError::Secret(_)));
     }
 
     #[tokio::test]

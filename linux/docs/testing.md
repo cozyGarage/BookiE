@@ -105,6 +105,17 @@ certificates retain the TLS classification. Wrong-authority cases exercise both
 verifying modes across all five TLS fixture drivers; fixture outages and authentication
 errors cannot stand in for certificate rejection.
 
+Run the driver TLS fixtures with `bash scripts/test-driver-tls.sh`. The MySQL
+and SQL Server fixtures also expose TLS-only servers behind the built-in SSH
+tunnel, so the same tier checks service identity through forwarding and refuses
+invalid certificates without plaintext fallback.
+
+SQL Server Kerberos is an opt-in local fixture because its Samba AD domain
+controller needs privileged Docker execution. Run
+`bash scripts/test-mssql-kerberos.sh` to verify a real Kerberos ticket, SQL
+Server service keytab, SPN refusal, and `VerifyFull` TLS through the BookiE
+driver. The fixture uses Samba AD DC and does not replace a Windows AD lab.
+
 ## Real-driver integration tests
 
 Run all configured Docker suites with:
@@ -143,7 +154,8 @@ Run the Phase 3 release gate with:
 ```
 
 The script generates fixture certificates and SSH keys, starts PostgreSQL 16 with TLS, an OpenSSH
-bastion, and Toxiproxy, then runs `tablepro-release-tests` with `--include-ignored --test-threads=1`.
+bastion, and Toxiproxy, builds the `tablepro-askpass` helper, runs the agentd system OpenSSH G5
+acceptance test, then runs `tablepro-release-tests` with `--include-ignored --test-threads=1`.
 Only Toxiproxy publishes host ports, so the database is reachable through the proxied path or the
 bastion and either path can be cut during a test.
 
@@ -265,7 +277,7 @@ Each scenario declares its own fixture shape through `environment` and `audit_av
 
 The Open Quickly scenario waits for the filtered result set before invoking its single action; the already-visible favorite is not proof that the debounced row rebuild has completed. It still requires the window to close and usage to be persisted.
 
-Buttons and rows are invoked through named AT-SPI actions; there is no generic Return-key fallback. Keyboard events exercise shortcuts and the export format combo's navigation. The combo has no AT-SPI click/focus action: its scenario tabs until the named control reports focus, opens its list, navigates to the requested format, and verifies its selected label before exporting. Each denial assertion requires the row count to hold for a settle window rather than matching once.
+Buttons and rows are invoked through named AT-SPI actions; the harness re-queries the row while waiting up to 15 seconds for its action to appear in the accessibility tree. There is no generic Return-key fallback. Keyboard events exercise shortcuts and the export format combo's navigation. The combo has no AT-SPI click/focus action: its scenario tabs until the named control reports focus, opens its list, navigates to the requested format, and verifies its selected label before exporting. Each denial assertion requires the row count to hold for a settle window rather than matching once.
 
 On Arch or Omarchy, install the harness dependencies with:
 

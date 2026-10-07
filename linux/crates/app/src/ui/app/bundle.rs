@@ -53,11 +53,54 @@ impl App {
             .iter()
             .map(|connection| (connection.id, self.connection_organization.get(connection.id)))
             .collect();
+        let operation_id = Uuid::new_v4();
+        let affected_count = chosen.len();
+        let database = self.database.clone();
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
+                    if database
+                        .audit_administrative_action(
+                            operation_id,
+                            tablepro_policy::AuditAdministrativeAction::ConnectionBundleExport,
+                            tablepro_policy::AuditRecordPhase::Intent,
+                            tablepro_policy::AuditTerminalStatus::Pending,
+                            affected_count,
+                            None,
+                        )
+                        .await
+                        .is_err()
+                    {
+                        sender_clone.input(AppMsg::BundleFailed(crate::tr!(
+                            "The export was cancelled because its audit record could not be saved."
+                        )));
+                        return;
+                    }
+                    let started = std::time::Instant::now();
                     let outcome = write_bundle(choice, chosen, organization).await;
+                    let status = if outcome.is_ok() {
+                        tablepro_policy::AuditTerminalStatus::Succeeded
+                    } else {
+                        tablepro_policy::AuditTerminalStatus::Failed
+                    };
+                    if database
+                        .audit_administrative_action(
+                            operation_id,
+                            tablepro_policy::AuditAdministrativeAction::ConnectionBundleExport,
+                            tablepro_policy::AuditRecordPhase::Outcome,
+                            status,
+                            affected_count,
+                            Some(started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64),
+                        )
+                        .await
+                        .is_err()
+                    {
+                        sender_clone.input(AppMsg::BundleFailed(crate::tr!(
+                            "The export finished, but its audit outcome could not be saved."
+                        )));
+                        return;
+                    }
                     match outcome {
                         Ok(count) => sender_clone.input(AppMsg::ExportConnectionsSucceeded(count)),
                         Err(error) => sender_clone.input(AppMsg::BundleFailed(error.to_string())),
@@ -127,16 +170,16 @@ impl App {
     }
 
     pub(super) fn on_import_bundle_unlock(&mut self, passphrase: String, sender: ComponentSender<Self>) {
-        let Some(sealed) = self.pending_bundle.take() else {
-            return;
-        };
-        let body = match sealed.unlock(&passphrase) {
-            Ok(body) => body,
-            Err(error) => {
+        let body = match self.pending_bundle.as_ref().map(|sealed| sealed.unlock(&passphrase)) {
+            Some(Ok(body)) => body,
+            Some(Err(error)) => {
                 self.show_toast(&error.to_string());
+                self.on_import_bundle_needs_passphrase(sender);
                 return;
             }
+            None => return,
         };
+        self.pending_bundle.take();
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -182,13 +225,19 @@ impl App {
         let plan = ImportPlan {
             items: accepted_items(&pending.plan, &choice.accepted),
         };
+        if plan.items.is_empty() {
+            self.show_toast(&crate::tr!("No connections were selected for import."));
+            return;
+        }
+        let operation_id = Uuid::new_v4();
         let secrets = pending.secrets;
         let replace = choice.replace_saved_passwords;
+        let database = self.database.clone();
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    match apply_plan(plan, secrets, replace).await {
+                    match apply_import_with_audit(database, operation_id, plan, secrets, replace).await {
                         Ok((imported, planned)) => {
                             sender_clone.input(AppMsg::ImportBundleFinished(imported, planned));
                             sender_clone.input(AppMsg::ReloadConnections);
@@ -203,6 +252,54 @@ impl App {
     pub(super) fn on_import_bundle_finished(&self, imported: usize, planned: usize) {
         self.show_toast(&crate::ui::connection_bundle::import_outcome_message(imported, planned));
     }
+}
+
+async fn apply_import_with_audit(
+    database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+    operation_id: Uuid,
+    plan: ImportPlan,
+    secrets: Vec<tablepro_storage::BundleSecrets>,
+    replace: bool,
+) -> Result<(usize, usize), String> {
+    let planned_count = plan.items.len();
+    if database
+        .audit_administrative_action(
+            operation_id,
+            tablepro_policy::AuditAdministrativeAction::ConnectionBundleImport,
+            tablepro_policy::AuditRecordPhase::Intent,
+            tablepro_policy::AuditTerminalStatus::Pending,
+            planned_count,
+            None,
+        )
+        .await
+        .is_err()
+    {
+        return Err(crate::tr!("The import was cancelled because its audit record could not be saved.").to_string());
+    }
+
+    let started = std::time::Instant::now();
+    let outcome = apply_plan(plan, secrets, replace).await;
+    let (status, affected_count) = match &outcome {
+        Ok((imported, planned)) if imported == planned => (tablepro_policy::AuditTerminalStatus::Succeeded, *imported),
+        Ok((imported, _)) => (tablepro_policy::AuditTerminalStatus::Failed, *imported),
+        Err(_) => (tablepro_policy::AuditTerminalStatus::Failed, 0),
+    };
+    if database
+        .audit_administrative_action(
+            operation_id,
+            tablepro_policy::AuditAdministrativeAction::ConnectionBundleImport,
+            tablepro_policy::AuditRecordPhase::Outcome,
+            status,
+            affected_count,
+            Some(started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64),
+        )
+        .await
+        .is_err()
+    {
+        return Err(crate::tr!("The import finished, but its audit outcome could not be saved.").to_string());
+    }
+
+    outcome
 }
 
 fn today_stamp() -> String {
@@ -333,6 +430,8 @@ mod tests {
             use_tls: false,
             tls_mode: Some(TlsMode::Disabled),
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             read_only: false,
             auth_mode: AuthMode::Password,
             environment: Environment::Local,

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 
 /// Who is asking the database to do something. Authority rides on the
 /// principal, not the connection: the same Prod connection allows a
@@ -30,6 +31,22 @@ impl Principal {
 
     pub fn is_agent(&self) -> bool {
         matches!(self, Self::Agent { .. })
+    }
+
+    /// Return the audit-safe representation of this principal. Agent tokens
+    /// are replaced with a short stable digest so attempts can be correlated
+    /// without persisting a credential.
+    pub fn sanitized(&self) -> Self {
+        match self {
+            Self::Human { session } => Self::Human {
+                session: session.clone(),
+            },
+            Self::Agent { token, client, model } => Self::Agent {
+                token: format!("sha256:{}", &hex::encode(sha2::Sha256::digest(token.as_bytes()))[..16]),
+                client: client.clone(),
+                model: model.clone(),
+            },
+        }
     }
 
     pub fn label(&self) -> String {

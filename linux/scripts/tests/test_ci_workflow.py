@@ -56,6 +56,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit",
                 "value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings",
                 "value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings",
+                "value_contract_mssql_max_values_survive_connection_session_and_consumers",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -124,6 +125,14 @@ class CiWorkflowTests(unittest.TestCase):
         script = (ROOT / "linux/scripts/test-ssh.sh").read_text()
         for required in ["set -euo pipefail", "--test agent_auth", "--test openssh_session", "--include-ignored", "--test-threads=1"]:
             self.assertIn(required, script)
+
+    def test_postgres_release_openssh_test_is_listed_in_its_actual_tier(self):
+        ledger = subprocess.check_output(["python3", str(ROOT / "linux/scripts/inventory-ignored-tests.py")], text=True)
+        self.assertIn(
+            "agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust](../crates/agentd/tests/g5_system_openssh.rs) | Release",
+            ledger,
+        )
+        self.assertIn("scripts/test-postgres-release.sh", ledger)
 
 
 if __name__ == "__main__":

@@ -8,23 +8,33 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `5f7e80145` (PR #123) on `linux`, pushed to
-`origin/linux`. Merges #103/#105 added mixed-case enum
-shadow-name and MongoDB stale-field delete coverage; #106/#107 refined Rust
-formatting and full-suite determinism. Merges #109/#111 made panic log capture
-safe under forced-color CI; #110 moved the transaction-local enum evidence to
-the merged PR #108 comment; #112 covers a missing target schema in transaction
-`search_path`; #113 records the B3 docs and evidence comments; #114 covers the
-same missing-schema case under restricted session and login roles; #115 advances
-the GUI phase 2 work; #117 adds the mixed-case quoted target under a restricted
-role with its schema absent from `search_path`. Earlier October 6 merges #65–#67,
-#81 and #82 retain the DuckDB, SQLite and ClickHouse cases described below.
-Their implementations and source-pinned evidence are linked from the [B3 board](type-contract-strategy.md)
-and [value evidence index](value-contracts.md). B3 remains open: the broader
-engine/type/consumer/configuration matrix, mutation triage and installed grid
-acceptance still need work. PR #118 merged PostgreSQL `xml[]` support across
-results, binding, grid edits and CSV restore. These changes do not qualify the
-release.
+Current integrated source baseline: `c358b9bce` on `linux` (PR #171).
+Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding, grid edits
+and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures for MySQL
+and SQL Server; #151 adds the daemon system-OpenSSH trust flow and headless
+audit-generation regressions. Earlier merges #138–#145 cover result budgets,
+PostgreSQL enum/array cases and the GTK AT-SPI row-action wait. PR #153
+reconciles hosted preflight/harness findings and SSH fixture setup; #154 and
+#156 add PostgreSQL enum-array slice and range-array coverage. PR #157 adds B4
+SSH audit, rollback-failure and Kerberos cases; #159 reconciles its hosted CI
+findings. PRs #158 and #160 add text-search and JSON array refusal contracts;
+#164 covers all six built-in range arrays; #166 adds seven geometric array
+families. PRs #161 and #162 fix PostgreSQL release GTK dependencies and the
+safety fixture setup. PR #165 hardens GTK SSH trust role detection and the
+two-hop tunnel-loss setup. PR #163 fixes the SSH trust-prompt timeout and
+merged; PR #170 then preserved the remaining handshake deadline after the
+trust decision. PR #169 implements the U2 default-copy policy: PostgreSQL and
+SQL Server generate fresh identity values, while MySQL preserves explicit
+auto-increment values. PR #171 removes an unused fixture import exposed by the
+first hosted preflight. Local `quick` and `integration` tiers pass on the
+resulting tree; hosted checks for #171 were still running at this checkpoint.
+Case details and evidence belong in the [B3
+board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence
+index](value-contracts.md), test sources and relevant PR comments. B3 remains
+open: the broader engine/type/consumer/configuration matrix, mutation triage and
+installed grid acceptance still need work. The scoped XLSX writer mutation run
+caught 41/41 mutants; broad core/package coverage remains open. These changes
+do not qualify the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
@@ -57,8 +67,8 @@ this existing-eight-driver stabilization scope.
 | A1–A4 | Prior correctness, drafts/planning, Jump to Column and BookiE branding implemented | Historical 0.1.x proof does not qualify 0.2; A5 installed candidate work folds into B7 |
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
-| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. Merges #81/#82 add SQLite STRICT `ANY` `length()` typed-CSV round trips and ClickHouse nested `Map → Array → Tuple → UInt128` oracle/refusal coverage; #112 adds a mixed-case PostgreSQL enum case with its target schema absent from transaction-local `search_path`; #122/#123 add PostgreSQL domain-over-array metadata and its regression coverage. Prior DuckDB malformed-tail and decimal fixes remain covered. B3 remains open pending the broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
-| B4 transport/sessions | Policy, daemon cache refusal, editor callback/retirement and awaited cleanup patches, built-in host consent and GUI uncertainty split merged through `6346a431c` | [Current B4 board](b4-task-board.md#b4-continuation-status-october-3): F4/F9, F6 and GUI F8 implementation are merged; MySQL DDL refusal, honest rollback reporting and the MyISAM-trigger rollback boundary have local regressions; headless generation/retirement parity, TLS/daemon/route/audit, PostgreSQL rollback-failure acceptance and installed acceptance remain open |
+| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. U2 identity-copy behavior is implemented and covered for PostgreSQL, SQL Server and MySQL policy; enum text/NULL inference and native-type mismatch refusals have PostgreSQL coverage. The broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance remain open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
+| B4 transport/sessions | C6/G5, SSH audit, rollback-failure, Kerberos, GTK trust-flow and prompt-timeout fixes are merged through #170. | [Current B4 board](b4-task-board.md): frozen B3+B4 candidate, hosted/installed acceptance, privacy and headless ownership acceptance remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
 | B7 qualification | Open | Frozen SHA, affected automated gates, both installed desktop targets and retry-free soak; publication separate |

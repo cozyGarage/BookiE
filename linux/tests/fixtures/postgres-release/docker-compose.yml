@@ -20,6 +20,10 @@ services:
       - -c
       - ssl_key_file=/certs/server.key
       - -c
+      - ssl_ca_file=/certs/ca.crt
+      - -c
+      - hba_file=/certs/pg_hba.conf
+      - -c
       - max_connections=200
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tablepro -d tablepro"]
@@ -38,6 +42,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 22"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - fixture
+
+  relay:
+    build:
+      context: .
+      dockerfile: relay/Dockerfile
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 22"]
       interval: 2s

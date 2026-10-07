@@ -4,6 +4,27 @@
 
 ### Added
 
+- PostgreSQL `timestamp[]` coverage now restores exported CSV under `ISO, MDY` after exporting under `SQL, DMY`, asserting native type, JSON, wire bytes, and an untouched sibling.
+- PostgreSQL name[] array coverage now checks empty/NULL distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact wire preservation through typed session rebinding and keyed grid edits.
+- PostgreSQL oid[] keyed grid edits now preserve zero, the UINT32 maximum and SQL NULL against native type/text/wire oracles while leaving sibling rows unchanged.
+- PostgreSQL name[] typed CSV import now checks NULL/empty distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact native array wire preservation.
+- PostgreSQL custom enum-array slicing now checks native lower-bound normalization, multidimensional shape, SQL NULL versus empty arrays, literal NULL/Unicode labels, and typed rebind wire equality.
+- PostgreSQL enum parameter tests now prove integer and boolean inputs keep their native types, fail safely in enum comparisons and updates, and leave target rows unchanged.
+- PostgreSQL `int4range[]` now has an explicit unsupported-value contract with native range text/JSON/wire oracles and refused-write target/sibling preservation.
+- PostgreSQL `tsvector[]` and `tsquery[]` now have explicit unsupported-value contracts with native text-search JSON/wire oracles and refused-write target/sibling preservation.
+- PostgreSQL `json[]` and `jsonb[]` now have explicit unsupported-value contracts with native text/JSON/wire oracles and refused-write target/sibling preservation.
+- PostgreSQL's six built-in range array families now share explicit refusal and target/sibling preservation coverage with native type and JSON oracles.
+- Copy-as-INSERT and SQL exports now let PostgreSQL and SQL Server generate fresh identity values; MySQL continues to preserve explicit auto-increment values.
+- PostgreSQL geometric array families now share explicit refusal, native type/text/JSON/wire oracles, and target/sibling preservation coverage.
+- The enum-array slice regression is split into its own test file so the PostgreSQL contract source stays within the file-size guard; the ignored-test inventory points to its new location.
+- B3 mutation triage now records a scoped PostgreSQL array-dimension decoder run: 10 mutants caught, 2 compile-unviable, none missed or timed out.
+- The scoped core XLSX writer mutation run caught all 41 generated mutants; broader core/package mutation triage remains open.
+- MySQL and SQL Server tunneled TLS contracts now cover valid server identity, wrong CA and hostname refusal, and no plaintext fallback through SSH forwarding. The fixture creates its SSH host key at container startup rather than baking it into the image.
+- MySQL transaction query coverage now verifies decoded-byte-budget truncation, exact retained payloads, and follow-up queries within the same transaction.
+- PostgreSQL query results now have Docker coverage for shared byte-budget truncation, row order and payloads, plus pooled connection reuse.
+- SQL Server `nvarchar(max)`, `varchar(max)` and `varbinary(max)` now have Docker-backed 64 KiB boundary and 1 MiB contracts across regular and dedicated sessions; CSV round-trips large values, while XLSX is verified to refuse cells beyond its format limit instead of truncating. CSV import keeps a 2 MiB per-field bound so 1 MiB hex-escaped binary values remain importable.
+- MongoDB `find` and `aggregate` queries now have Docker regression coverage for 64 MiB result-budget truncation, exact admitted payloads, and a usable connection afterward.
+- SQLite transaction queries now share the streaming row and byte budget with ordinary queries; the regression checks truncation and follow-up use in the same transaction.
 - Table tabs have a Row inspector pane that shows every column of the selected row with its type and full value.
 - The SQL editor shades the statement under the cursor so you can see what Run Statement at Cursor will send.
 - The SQL editor jumps to the next or previous statement with Alt+Shift+Down and Alt+Shift+Up.
@@ -13,6 +34,7 @@
 - Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
 - PostgreSQL `citext[]` preserves exact elements, SQL NULL, empty arrays, multidimensional shape, zero lower bounds and case-insensitive comparisons through results, typed parameters, keyed grid edits and CSV round-trips; malformed values are refused without changing target or sibling rows.
+- PostgreSQL custom enum arrays preserve three-dimensional shape and the six-dimensional limit, non-default bounds, SQL NULL, empty and escaped labels through result decoding and typed parameter rebinding, with native type, JSON and wire-byte comparisons.
 - PostgreSQL `bit[]` and `varbit[]` query results now preserve bit values through typed parameter and CSV re-import, including empty bit strings, SQL NULL, and non-default array bounds.
 - The result grid's cell menu also opens with Shift+F10, and the editor find fields have accessible names.
 - Result grids have a Columns… menu entry to hide and show columns; the choice is remembered per table and at least one column always stays visible.
@@ -22,6 +44,7 @@
 - PostgreSQL `inet[]` and `cidr[]` preserve IPv4/IPv6 addresses, prefixes, SQL NULL and array bounds through results, inferred typed bindings, keyed updates and typed CSV import; invalid prefixes and non-network CIDR host bits are refused without changing target or sibling rows.
 - PostgreSQL `xml[]` preserves XML fragments, SQL NULL, native array text and wire bytes through results, inferred bindings, keyed grid edits, typed CSV restore and JSON/CSV/XML/HTML/Markdown/XLSX/SQL file exports; malformed XML retains native `2200N` refusal without changing target or sibling rows.
 - PostgreSQL custom enum identifiers preserve metadata, keyed edits, and typed filters when a mixed-case quoted schema/type collides with lowercase names earlier in session or transaction-local `search_path`; native catalog and shadow-row checks verify the selected type, and shadow-only labels retain native `22P02` refusal.
+- PostgreSQL enum reads, bound value and SQL NULL filters, and bound enum updates work for a restricted role without enum `USAGE`; invalid labels retain native `22P02` refusal and sibling rows remain unchanged.
 - PostgreSQL custom composite arrays and unlisted built-in `money[]` and `point[]` arrays report explicit unsupported results and refuse literal/bound writes without changing target or sibling rows.
 - PostgreSQL mixed-case enum contracts also verify that transaction rollback restores target rows and the original `search_path` after typed writes under a shadow schema.
 - PostgreSQL custom enum metadata and keyed edits preserve schema and type identifiers at PostgreSQL's 63-byte catalog limit, including a multibyte UTF-8 character at the final type-name boundary.
@@ -77,6 +100,8 @@
 
 ### Fixed
 
+- SSH Docker integration fixtures now allow up to 180 seconds for container startup; host-key mismatch assertions remain unchanged.
+- GTK installed-flow smoke re-queries rows while AT-SPI makes their named actions available, avoiding a transient accessibility-tree race.
 - Saving an edited cell or deleting a row in a PostgreSQL, MySQL, SQL Server, SQLite or DuckDB table no longer asks for a manual write approval every time; the write is already limited to one row per statement.
 - MongoDB stale grid deletes now compare the document's full top-level field set as well as materialized values, so a field added after the read prevents deleting that changed document.
 

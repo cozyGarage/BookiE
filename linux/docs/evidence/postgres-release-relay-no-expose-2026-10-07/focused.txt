@@ -1,0 +1,377 @@
+fixture materials already present in /tmp/bookie-b4-i5/linux/tests/fixtures/postgres-release/materials
+ Image tablepro-postgres-release-db Building
+ Image tablepro-postgres-release-bastion Building
+ Image tablepro-postgres-release-relay Building
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.62kB done
+#1 DONE 0.0s
+
+#2 [bastion internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.03kB done
+#2 DONE 0.0s
+
+#3 [relay internal] load build definition from Dockerfile
+#3 transferring dockerfile: 1.02kB done
+#3 DONE 0.0s
+
+#4 [db internal] load build definition from Dockerfile
+#4 transferring dockerfile: 354B done
+#4 DONE 0.0s
+
+#5 [db internal] load metadata for docker.io/library/postgres:16-alpine
+#5 DONE 0.0s
+
+#6 [relay internal] load metadata for docker.io/library/alpine:3.21
+#6 ...
+
+#7 [db internal] load .dockerignore
+#7 transferring context: 2B done
+#7 DONE 0.0s
+
+#8 [db 1/6] FROM docker.io/library/postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+#8 resolve docker.io/library/postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777 0.0s done
+#8 DONE 0.0s
+
+#9 [db internal] load build context
+#9 transferring context: 4.70kB done
+#9 DONE 0.0s
+
+#10 [db 2/6] COPY materials/server.crt /certs/server.crt
+#10 CACHED
+
+#11 [db 3/6] COPY materials/server.key /certs/server.key
+#11 CACHED
+
+#12 [db 4/6] COPY materials/ca.crt /certs/ca.crt
+#12 CACHED
+
+#13 [db 5/6] COPY db/pg_hba.conf /certs/pg_hba.conf
+#13 CACHED
+
+#14 [db 6/6] RUN chown -R postgres:postgres /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#14 CACHED
+
+#15 [db] exporting to image
+#15 exporting layers done
+#15 exporting manifest sha256:20456cc8244b123db167ccf54fade9b3e5a9a45de7b1c0309e74e4b618f45f45 done
+#15 exporting config sha256:914588d6c35ecd361734d7e932465f6199039e53ed739f561196f7ac7335eeb0 done
+#15 exporting attestation manifest sha256:14f0433552e9c20b6d020be77a9cc7015fbdda7baaebb489af96f691cad3146f 0.0s done
+#15 exporting manifest list sha256:de7485f00e18c353f3812806a1fd7837b84530ae26bef4e16b9f920d5ed16c8f done
+#15 naming to docker.io/library/tablepro-postgres-release-db:latest done
+#15 unpacking to docker.io/library/tablepro-postgres-release-db:latest 0.0s done
+#15 DONE 0.1s
+
+#16 [db] resolving provenance for metadata file
+#16 DONE 0.0s
+
+#6 [relay internal] load metadata for docker.io/library/alpine:3.21
+#6 DONE 0.4s
+
+#7 [bastion internal] load .dockerignore
+#7 CACHED
+
+#17 [relay 1/5] FROM docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+#17 resolve docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507 0.0s done
+#17 DONE 0.0s
+
+#18 [bastion internal] load build context
+#18 transferring context: 669B done
+#18 DONE 0.0s
+
+#19 [relay internal] load build context
+#19 transferring context: 568B done
+#19 DONE 0.0s
+
+#20 [bastion 3/5] COPY materials/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+#20 CACHED
+
+#21 [bastion 4/5] COPY materials/client_ed25519_key.pub /home/tunnel/.ssh/authorized_keys
+#21 CACHED
+
+#22 [bastion 5/5] RUN chmod 600 /etc/ssh/ssh_host_ed25519_key     && chown -R tunnel:tunnel /home/tunnel/.ssh     && chmod 700 /home/tunnel/.ssh     && chmod 600 /home/tunnel/.ssh/authorized_keys     && printf '%s\n'         'Port 22'         'HostKey /etc/ssh/ssh_host_ed25519_key'         'PermitRootLogin no'         'PasswordAuthentication no'         'KbdInteractiveAuthentication no'         'PubkeyAuthentication yes'         'AllowTcpForwarding yes'         'AllowUsers tunnel'         'PermitOpen any'         'X11Forwarding no'         'AllowAgentForwarding no'         > /etc/ssh/sshd_config
+#22 CACHED
+
+#23 [relay 2/5] RUN apk add --no-cache openssh-server     && adduser -D -s /bin/sh tunnel     && sed -i 's/^tunnel:!:/tunnel:*:/' /etc/shadow     && mkdir -p /home/tunnel/.ssh
+#23 CACHED
+
+#24 [relay 3/5] COPY materials/ssh_relay_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+#24 CACHED
+
+#25 [relay 4/5] COPY materials/client_ed25519_key.pub /home/tunnel/.ssh/authorized_keys
+#25 CACHED
+
+#26 [relay 5/5] RUN chmod 600 /etc/ssh/ssh_host_ed25519_key     && chown -R tunnel:tunnel /home/tunnel/.ssh     && chmod 700 /home/tunnel/.ssh     && chmod 600 /home/tunnel/.ssh/authorized_keys     && printf '%s\n'         'Port 22'         'HostKey /etc/ssh/ssh_host_ed25519_key'         'PermitRootLogin no'         'PasswordAuthentication no'         'KbdInteractiveAuthentication no'         'PubkeyAuthentication yes'         'AllowTcpForwarding yes'         'AllowUsers tunnel'         'PermitOpen any'         'X11Forwarding no'         'AllowAgentForwarding no'         > /etc/ssh/sshd_config
+#26 CACHED
+
+#27 [bastion] exporting to image
+#27 exporting layers done
+#27 exporting manifest sha256:d69d18ee766f01b87b897fe4f3ed5320b53352c1e99bd67086f7e8349c8189d8 done
+#27 exporting config sha256:5e06f58353f10b14504804552e23018d2322d531554759f86c0f27ab24adcee4 done
+#27 exporting attestation manifest sha256:5082b4dc9dbc0cc94f7b4b3917ffaa49c2e3c83e1600aa8cd42a1f51cc09f0d8 0.0s done
+#27 exporting manifest list sha256:a56ace013f0965d8a43ce6fa9f6fb879419f3a6177f9d56d40af7200e5a2999b 0.0s done
+#27 naming to docker.io/library/tablepro-postgres-release-bastion:latest done
+#27 unpacking to docker.io/library/tablepro-postgres-release-bastion:latest
+#27 unpacking to docker.io/library/tablepro-postgres-release-bastion:latest done
+#27 DONE 0.1s
+
+#28 [relay] exporting to image
+#28 exporting layers done
+#28 exporting manifest sha256:cf31407b30627665a7f85f132cf068a91e025cf873189308f534d2115a4280d5 done
+#28 exporting config sha256:bf388ab01b4a6dea46a408e47f96d1fd53544b62b4ebe294d0e6c98090297d52 done
+#28 exporting attestation manifest sha256:4de951cfce6c87544646c8a571e091aaa7efc3c1ae0642daa5adff3efd6c0f44 0.0s done
+#28 exporting manifest list sha256:527f2bf4fd869cd55cfa761e2e9620d6f9b85048268bb1d6f5f6ee7da09f9221 0.0s done
+#28 naming to docker.io/library/tablepro-postgres-release-relay:latest done
+#28 unpacking to docker.io/library/tablepro-postgres-release-relay:latest done
+#28 DONE 0.1s
+
+#29 [relay] resolving provenance for metadata file
+#29 DONE 0.0s
+
+#30 [bastion] resolving provenance for metadata file
+#30 DONE 0.0s
+ Image tablepro-postgres-release-db Built
+ Image tablepro-postgres-release-bastion Built
+ Image tablepro-postgres-release-relay Built
+ Network tablepro-postgres-release_fixture Creating
+ Network tablepro-postgres-release_fixture Creating
+ Network tablepro-postgres-release_fixture Created
+ Network tablepro-postgres-release_fixture Created
+ Container tablepro-postgres-release-relay-1 Creating
+ Container tablepro-postgres-release-db-1 Creating
+ Container tablepro-postgres-release-relay-1 Created
+ Container tablepro-postgres-release-db-1 Created
+ Container tablepro-postgres-release-bastion-1 Creating
+ Container tablepro-postgres-release-bastion-1 Created
+ Container tablepro-postgres-release-toxiproxy-1 Creating
+ Container tablepro-postgres-release-toxiproxy-1 Created
+ Container tablepro-postgres-release-relay-1 Starting
+ Container tablepro-postgres-release-db-1 Starting
+ Container tablepro-postgres-release-relay-1 Started
+ Container tablepro-postgres-release-db-1 Started
+ Container tablepro-postgres-release-db-1 Waiting
+ Container tablepro-postgres-release-db-1 Healthy
+ Container tablepro-postgres-release-bastion-1 Starting
+ Container tablepro-postgres-release-bastion-1 Started
+ Container tablepro-postgres-release-bastion-1 Waiting
+ Container tablepro-postgres-release-bastion-1 Healthy
+ Container tablepro-postgres-release-toxiproxy-1 Starting
+ Container tablepro-postgres-release-toxiproxy-1 Started
+ Container tablepro-postgres-release-toxiproxy-1 Waiting
+ Container tablepro-postgres-release-db-1 Waiting
+ Container tablepro-postgres-release-bastion-1 Waiting
+ Container tablepro-postgres-release-relay-1 Waiting
+ Container tablepro-postgres-release-bastion-1 Healthy
+ Container tablepro-postgres-release-db-1 Healthy
+ Container tablepro-postgres-release-relay-1 Healthy
+ Container tablepro-postgres-release-toxiproxy-1 Healthy
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running tests/g5_system_openssh.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/g5_system_openssh-9c81bffc98a03c13)
+
+running 1 test
+test agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+     Running tests/mtls.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/mtls-a12fe4285917ca3b)
+
+running 3 tests
+test agentd_refuses_a_saved_client_certificate_from_an_untrusted_authority ... ok
+test agentd_uses_a_saved_client_certificate_for_the_database_session ... ok
+test agentd_uses_a_saved_client_certificate_through_its_saved_ssh_route ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/lib.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/tablepro_release_tests-afd251b201610dc7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/activity_locks.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/activity_locks-dc8632ff952f7257)
+
+running 2 tests
+test activity_templates_run_against_a_verified_session ... ok
+test blocking_lock_query_reports_a_contended_row ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+
+     Running tests/agent_transport.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/agent_transport-b16896c31a2f1052)
+
+running 4 tests
+test a_direct_session_and_a_tunnelled_session_reach_the_same_database ... ok
+test a_tunnelled_connection_fails_closed_when_the_bastion_is_unreachable ... ok
+test shared_transport_records_builtin_unknown_and_changed_host_key_refusals ... ok
+test the_shared_transport_verifies_the_database_hostname_through_the_bastion ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+     Running tests/browse_filters.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/browse_filters-a73700fb1924f653)
+
+running 8 tests
+test a_composite_keyset_seeks_past_the_last_seen_pair ... ok
+test a_filter_value_carrying_sql_stays_data ... ok
+test an_unknown_filter_column_is_refused_before_reaching_the_database ... ok
+test capped_stream_preserves_columns_values_and_connection_reuse ... ok
+test combinators_and_raw_sql_compose_with_bound_rules ... ok
+test every_filter_operator_selects_the_expected_rows ... ok
+test keyset_paging_walks_the_same_rows_as_offset_paging ... ok
+test postgres_patterns_search_non_text_columns_without_changing_comparisons ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.22s
+
+     Running tests/mcp_tools.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/mcp_tools-4827616cf89e468e)
+
+running 9 tests
+test a_denied_agent_write_is_journalled ... ok
+test a_hostile_table_name_cannot_inject_sql_through_a_metadata_tool ... ok
+test a_metadata_tool_is_refused_for_a_connection_outside_the_allowlist ... ok
+test a_read_scoped_agent_can_read_a_query_plan ... ok
+test a_read_scoped_agent_cannot_run_a_write_through_execute_query ... ok
+test a_read_scoped_agent_reads_table_metadata_a_count_and_a_page ... ok
+test csv_export_escapes_values_read_from_the_database ... ok
+test explain_analyze_is_denied_and_leaves_the_table_intact ... ok
+test explain_analyze_stays_denied_on_a_read_only_connection_with_write_scope ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.82s
+
+     Running tests/parameters.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/parameters-62f7cfed11c3709e)
+
+running 5 tests
+test a_copied_insert_round_trips_a_value_holding_a_backslash_and_a_quote ... ok
+test a_dollar_quoted_function_body_executes_as_one_statement ... ok
+test a_sql_payload_in_a_parameter_stays_data ... ok
+test named_parameters_bind_values_through_the_driver ... ok
+test repeated_parameters_bind_the_same_value_at_every_position ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+     Running tests/policy_transactions.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/policy_transactions-5ff527372c5397a1)
+
+running 4 tests
+test batch_rollback_discards_every_statement_after_a_failure ... ok
+test interactive_rollback_discards_uncommitted_writes ... ok
+test read_only_denies_a_data_changing_cte_and_leaves_rows_in_place ... ok
+test read_only_denies_an_administrative_function ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+
+     Running tests/reconnect.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/reconnect-278c2fbafd80193a)
+
+running 2 tests
+test direct_reconnect_restores_a_verified_session ... ok
+test ssh_reconnect_replaces_the_tunnel_and_the_session ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running tests/saved_tls.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/saved_tls-e70aee750b96cc90)
+
+running 9 tests
+test a_rotated_valid_client_certificate_is_used_by_the_saved_connection ... ok
+test a_saved_certificate_authority_verifies_a_privately_issued_certificate ... ok
+test a_saved_connection_naming_the_wrong_authority_is_refused ... ok
+test a_saved_connection_without_an_authority_cannot_verify_a_private_certificate ... ok
+test an_unverified_mode_ignores_a_saved_authority ... ok
+test saved_mtls_connection_authenticates_directly_with_client_certificate ... ok
+test saved_mtls_connection_authenticates_through_ssh ... ok
+test server_requiring_client_certificate_rejects_missing_identity ... ok
+test server_requiring_client_certificate_rejects_untrusted_identity ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+
+     Running tests/structure_ddl.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/structure_ddl-1875648239a30f8f)
+
+running 8 tests
+test a_created_table_matches_the_drafted_columns_indexes_and_keys ... ok
+test a_drafted_foreign_key_is_created_and_enforced ... ok
+test a_failed_statement_rolls_back_the_whole_ddl_batch ... ok
+test a_renamed_column_keeps_a_comment_edited_in_the_same_save ... ok
+test a_renamed_table_keeps_its_rows ... ok
+test an_edited_draft_applies_the_diffed_column_changes ... ok
+test column_comments_are_created_added_edited_and_cleared ... ok
+test structure_batches_do_not_commit_or_rollback_an_editor_transaction ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.57s
+
+     Running tests/tls_identity.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/tls_identity-616aef0691b20087)
+
+running 8 tests
+test ssh_tunnel_reaches_a_database_with_no_published_port ... ok
+test verify_ca_rejects_an_unknown_certificate_authority ... ok
+test verify_full_over_a_tcp_tunnel_never_downgrades_to_the_local_dial_address ... ok
+test verify_full_rejects_a_hostname_outside_the_certificate ... ok
+test verify_full_rejects_an_unknown_certificate_authority ... ok
+test verify_full_succeeds_against_the_certificate_hostname ... ok
+test verify_full_through_ssh_rejects_a_hostname_outside_the_certificate ... ok
+test verify_full_through_ssh_uses_the_original_database_hostname ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.32s
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1000 pid=2016970 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[2016981]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=2016993 comm="python3 /tmp/bookie-b4-i5/linux/crates/app/tests/g")
+dbus-daemon[2016981]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.10' (uid=1000 pid=2017009 comm="/home/trung/Projects/tablepro/linux/target/debug/t")
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.10' (uid=1000 pid=2017009 comm="/home/trung/Projects/tablepro/linux/target/debug/t")
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.13' (uid=1000 pid=2017079 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.13' (uid=1000 pid=2017079 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.862: Choosing gtk.portal for org.freedesktop.impl.portal.Lockdown via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.862: The preferred method to match portal implementations to desktop environments is to use the portals.conf(5) configuration file
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.13' (uid=1000 pid=2017079 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.914: Choosing gtk.portal for org.freedesktop.impl.portal.Access via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.922: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.923: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.923: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.923: Choosing gtk.portal for org.freedesktop.impl.portal.Settings via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.923: Choosing gtk.portal for org.freedesktop.impl.portal.FileChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.924: Choosing gtk.portal for org.freedesktop.impl.portal.AppChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.925: Choosing gtk.portal for org.freedesktop.impl.portal.Print via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.925: Choosing gtk.portal for org.freedesktop.impl.portal.Notification via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.926: Choosing gtk.portal for org.freedesktop.impl.portal.Inhibit via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.928: Failed to connect to PipeWire: Couldn't connect to PipeWire
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.928: Choosing gtk.portal for org.freedesktop.impl.portal.Account via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.929: Choosing gtk.portal for org.freedesktop.impl.portal.Email via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.930: Choosing gnome-keyring.portal for org.freedesktop.impl.portal.Secret via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2017079): xdg-desktop-portal-WARNING **: 09:17:10.930: Choosing gtk.portal for org.freedesktop.impl.portal.DynamicLauncher via the deprecated UseIn key
+dbus-daemon[2016827]: [session uid=1000 pid=2016827 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+
+(process:2016993): dbind-WARNING **: 09:17:11.069: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:2016993): dbind-WARNING **: 09:17:14.861: AT-SPI: Error in GetItems, sender=:1.4, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:2016993): dbind-WARNING **: 09:17:18.167: AT-SPI: Error in GetItems, sender=:1.5, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:2016993): dbind-WARNING **: 09:17:23.373: AT-SPI: Error in GetItems, sender=:1.6, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:2016993): dbind-WARNING **: 09:17:27.468: AT-SPI: Error in GetItems, sender=:1.7, error=Object does not exist at path “/org/a11y/atspi/cache”
+passed: postgres_saved_mtls_connection_authenticates_and_queries
+passed: postgres_ssh_unknown_host_key_decline_is_durably_audited
+passed: postgres_ssh_multihop_trusts_both_hops_and_queries
+passed: postgres_ssh_second_hop_decline_does_not_learn_key
+passed: postgres_ssh_changed_second_hop_key_is_refused
+A connection to the bus can't be made

@@ -14,7 +14,11 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
         ("int4[]", "NULL::int4[]"),
         ("int4[]", "ARRAY[]::int4[]"),
         ("int4[]", "'{{{{{{1,NULL}}}}}}'::int4[]"),
-        ("name[]", "ARRAY['alpha','',NULL]::name[]"),
+        (
+            "name[]",
+            "ARRAY['alpha'::name, ''::name, NULL::name, 'NULL'::name, 'a,b'::name, \
+             'a\"b'::name, E'slash\\\\path'::name, '東京'::name, (repeat('x',61) || 'é')::name]",
+        ),
         ("oid[]", "ARRAY[0,4294967295,NULL]::oid[]"),
         ("int4[]", "ARRAY[1,NULL,-2147483648,2147483647]"),
         ("int2[]", "ARRAY[-32768,0,32767]::int2[]"),
@@ -124,11 +128,13 @@ include!("array_contract_parts/result_consumers_text.rs");
 include!("array_contract_parts/xml_array_file_exports.rs");
 include!("array_contract_parts/result_consumers_numeric.rs");
 include!("array_contract_parts/result_consumers_temporal.rs");
+include!("array_contract_parts/result_consumers_timestamp_dmy.rs");
 include!("array_contract_parts/network_array_consumers.rs");
 include!("array_contract_parts/citext_array_consumers.rs");
 include!("array_contract_parts/bit_array_consumers.rs");
 
 include!("array_contract_parts/enum_consumers.rs");
+include!("array_contract_parts/enum_array_slices.rs");
 
 include!("array_contract_parts/enum_catalog_changes.rs");
 
@@ -201,6 +207,77 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
             ],
         ]
     );
+
+    const NAME_ARRAY: &str = r#"{"",NULL,"NULL","a,b","a\"b","slash\\path","東京"}"#;
+    connection
+        .execute("CREATE TABLE name_array_grid_edit (id integer PRIMARY KEY, value name[], sibling text NOT NULL)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO name_array_grid_edit VALUES \
+             (1, ARRAY['before']::name[], 'target sibling'), \
+             (2, ARRAY['keep']::name[], 'sibling row')",
+        )
+        .await
+        .unwrap();
+    let mut name_rows = connection
+        .query("SELECT * FROM name_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let id_index = name_rows.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = name_rows
+        .columns
+        .iter()
+        .position(|column| column.name == "value")
+        .unwrap();
+    name_rows.columns[id_index].primary_key = true;
+    let sibling_wire_before = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM name_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "name_array_grid_edit",
+        &name_rows.columns,
+        &[(value_index, Value::Text(NAME_ARRAY.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update_sql.contains("$1::text::pg_catalog.name[]"), "{update_sql}");
+    assert_eq!(
+        connection
+            .execute_in_transaction(&[(update_sql, update_params)])
+            .await
+            .unwrap(),
+        vec![1]
+    );
+    let native = connection
+        .query(
+            "SELECT pg_typeof(value)::text, value::text, encode(array_send(value), 'hex'), sibling \
+             FROM name_array_grid_edit WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    let oracle = connection
+        .query(
+            r#"SELECT pg_typeof(expected)::text, expected::text, encode(array_send(expected), 'hex'), 'target sibling'
+               FROM (SELECT ARRAY[''::name, NULL, 'NULL'::name, 'a,b'::name, 'a"b'::name,
+                                  'slash\path'::name, '東京'::name]::name[] AS expected) source"#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows, oracle.rows);
+    assert_eq!(native.rows[0][0], Value::Text("name[]".into()));
+    let sibling = connection
+        .query("SELECT encode(array_send(value), 'hex'), sibling FROM name_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap();
+    assert_eq!(sibling.rows[0][1], Value::Text("sibling row".into()));
+    assert_eq!(sibling.rows[0][0], sibling_wire_before);
 
     const XML_ARRAY: &str = r#"{"<a>one,two</a>","<b attr=\"quoted\">東京 &amp; 😀</b>",NULL}"#;
     connection
@@ -301,6 +378,73 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     assert_bytea_array_grid_edit(connection).await;
     assert_uuid_array_grid_edit(connection).await;
     assert_timestamptz_array_grid_edit(connection).await;
+    assert_oid_array_grid_edit(connection).await;
+}
+
+async fn assert_oid_array_grid_edit(connection: &dyn Connection) {
+    connection
+        .execute("CREATE TABLE oid_array_grid_edit (id integer PRIMARY KEY, value oid[], sibling text NOT NULL)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO oid_array_grid_edit VALUES \
+             (1, ARRAY[1::oid], 'target sibling'), (2, ARRAY[7::oid], 'sibling row')",
+        )
+        .await
+        .unwrap();
+    let mut rows = connection
+        .query("SELECT * FROM oid_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
+    rows.columns[id_index].primary_key = true;
+    let sibling_wire_before = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM oid_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "oid_array_grid_edit",
+        &rows.columns,
+        &[(value_index, Value::Text("{0,4294967295,NULL}".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update_sql.contains("$1::text::pg_catalog.oid[]"), "{update_sql}");
+    assert_eq!(
+        connection
+            .execute_in_transaction(&[(update_sql, update_params)])
+            .await
+            .unwrap(),
+        vec![1]
+    );
+    let native = connection
+        .query(
+            "SELECT pg_typeof(value)::text, value::text, encode(array_send(value), 'hex'), sibling \
+             FROM oid_array_grid_edit WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    let oracle = connection
+        .query(
+            "SELECT pg_typeof(expected)::text, expected::text, encode(array_send(expected), 'hex'), 'target sibling' \
+             FROM (SELECT ARRAY[0::oid, 4294967295::oid, NULL]::oid[] AS expected) source",
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows, oracle.rows);
+    assert_eq!(native.rows[0][0], Value::Text("oid[]".into()));
+    let sibling = connection
+        .query("SELECT encode(array_send(value), 'hex'), sibling FROM oid_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap();
+    assert_eq!(sibling.rows[0][1], Value::Text("sibling row".into()));
+    assert_eq!(sibling.rows[0][0], sibling_wire_before);
 }
 
 async fn assert_bool_array_grid_edit(connection: &dyn Connection) {
@@ -672,7 +816,11 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
         ),
         ("xml[]", "$$[0:1]={\"<root/>\",NULL}$$::xml[]"),
         ("bytea[]", "ARRAY[decode('00ff275c','hex'),decode('','hex'),NULL]"),
-        ("name[]", "ARRAY['alpha','','',NULL]::name[]"),
+        (
+            "name[]",
+            "ARRAY['alpha'::name, ''::name, NULL::name, 'NULL'::name, 'a,b'::name, \
+             'a\"b'::name, E'slash\\\\path'::name, '東京'::name, (repeat('x',61) || 'é')::name]",
+        ),
         ("int2[]", "ARRAY[-32768,0,32767]::int2[]"),
         ("int4[]", "ARRAY[-2147483648,0,2147483647]::int4[]"),
         ("int8[]", "ARRAY[-9223372036854775808,0,9223372036854775807]::int8[]"),

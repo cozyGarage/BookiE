@@ -17,6 +17,8 @@ fn connection(name: &str, driver_id: &str) -> SavedConnection {
         use_tls: false,
         tls_mode: Some(TlsMode::Disabled),
         tls_root_cert: None,
+        tls_client_cert: None,
+        tls_client_key: None,
         read_only: false,
         auth_mode: AuthMode::Password,
         environment: Environment::Local,

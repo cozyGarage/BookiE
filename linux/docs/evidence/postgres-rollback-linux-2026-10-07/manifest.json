@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "source_commit": "b33a0f90352abd5d84c0593215dd3c132eed827e",
+  "source_sha256": {
+    "crates/drivers/postgres/tests/integration.rs": "801b31e9b36c4ca7581ff47d80247c7724aa8c7cb7e79aab8d4af542ae182f41",
+    "crates/drivers/postgres/tests/support/rollback_failure.rs": "6bd69e560aaee54a04fc02c4ec6b2ac8b84b49b7dca17d8ee5783c684cdb4811"
+  },
+  "engine": "PostgreSQL 16-alpine testcontainers fixture",
+  "test": "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
+  "command": "cargo test --locked -p tablepro-driver-postgres --test integration rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend -- --ignored --exact --test-threads=1",
+  "result": "1 passed, 0 failed, 0 ignored; 210 filtered out; 2.23 seconds",
+  "assertions": [
+    "Backend termination while statement 1 is running reports TransactionRollbackFailed.",
+    "The failed statement and rollback errors are both classified as disconnected.",
+    "A fresh query confirms the earlier parent and trigger table rows were rolled back.",
+    "Identity and trigger sequence allocations remain consumed after rollback."
+  ],
+  "selector_note": "The test is nested in the rollback_failure module on this source commit, so the fully qualified name is required with --exact. The unqualified selector now matches zero tests; the historical packets record older top-level test layouts.",
+  "log": {
+    "path": "focused.txt",
+    "sha256": "82e3c160e848dc61498cbe1efafdaa27f650ee911f285b840edcf3b743455a32"
+  },
+  "remaining": [
+    "Frozen B3+B4 candidate and hosted acceptance remain separate.",
+    "Installed acceptance remains open.",
+    "This rerun covers PostgreSQL table rollback and sequence side effects only; it does not close broader MySQL engine or external-side-effect coverage."
+  ]
+}

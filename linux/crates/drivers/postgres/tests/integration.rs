@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::str::FromStr;
+use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use rust_decimal::Decimal;
@@ -30,6 +31,15 @@ mod array_contract;
 #[path = "support/custom_array_contract.rs"]
 mod custom_array_contract;
 
+#[path = "support/range_array_contract.rs"]
+mod range_array_contract;
+
+#[path = "support/identity_copy_contract.rs"]
+mod identity_copy_contract;
+
+#[path = "support/unsupported_builtin_array_contract.rs"]
+mod unsupported_builtin_array_contract;
+
 #[path = "support/binary_array_file_export_contract.rs"]
 mod binary_array_file_export_contract;
 
@@ -45,6 +55,9 @@ mod wide_numeric_contract;
 #[path = "support/interval_contract.rs"]
 mod interval_contract;
 
+#[path = "support/query_budget_contract.rs"]
+mod query_budget_contract;
+
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
@@ -56,6 +69,9 @@ mod enum_parameter_context_contract;
 
 #[path = "support/enum_role_context_contract.rs"]
 mod enum_role_context_contract;
+
+#[path = "support/enum_type_privilege_contract.rs"]
+mod enum_type_privilege_contract;
 
 #[path = "support/quoted_enum_identifier_contract.rs"]
 mod quoted_enum_identifier_contract;
@@ -86,6 +102,9 @@ mod enum_file_export_contract;
 
 #[path = "support/disconnection.rs"]
 mod disconnection;
+
+#[path = "support/rollback_failure.rs"]
+mod rollback_failure;
 
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;

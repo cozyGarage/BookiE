@@ -53,6 +53,7 @@ pub struct SshEnvironment {
     pub unknown_host_key: UnknownHostKey,
     pub builtin_prompter: Option<Arc<dyn Prompter>>,
     pub openssh: Option<OpenSshEnvironment>,
+    pub audit: Option<super::TransportAuditContext>,
 }
 
 impl SshEnvironment {
@@ -61,7 +62,13 @@ impl SshEnvironment {
             unknown_host_key,
             builtin_prompter: None,
             openssh: None,
+            audit: None,
         }
+    }
+
+    pub fn with_audit(mut self, audit: super::TransportAuditContext) -> Self {
+        self.audit = Some(audit);
+        self
     }
 
     pub fn set_builtin_prompter(&mut self, prompter: Arc<dyn Prompter>) {
@@ -70,6 +77,15 @@ impl SshEnvironment {
 }
 
 pub(crate) async fn openssh_config(id: Uuid, saved: &SavedSshConfig) -> Result<OpenSshConfig, TransportError> {
+    openssh_config_in_sandbox(id, saved, running_in_flatpak()).await
+}
+
+pub(crate) async fn openssh_config_in_sandbox(
+    id: Uuid,
+    saved: &SavedSshConfig,
+    sandboxed: bool,
+) -> Result<OpenSshConfig, TransportError> {
+    ensure_system_ssh_available(sandboxed)?;
     if saved.jump.is_some() {
         return Err(TransportError::Ssh(
             "the system OpenSSH client takes jump hosts from ~/.ssh/config (ProxyJump); remove the saved jump \
@@ -77,7 +93,7 @@ pub(crate) async fn openssh_config(id: Uuid, saved: &SavedSshConfig) -> Result<O
                 .into(),
         ));
     }
-    openssh_config_for(&crate::resolve_saved_ssh_hop(id, saved, 0).await?)
+    build_openssh_config(&crate::resolve_saved_ssh_hop(id, saved, 0).await?, sandboxed)
 }
 
 pub fn openssh_config_for(config: &SshConfig) -> Result<OpenSshConfig, TransportError> {
@@ -116,16 +132,28 @@ pub(crate) async fn open_openssh(
         .openssh
         .as_ref()
         .ok_or_else(|| TransportError::Ssh("the system OpenSSH client is not available in this process".into()))?;
-    let ssh = |error: tablepro_ssh::openssh::OpenSshError| TransportError::Ssh(error.to_string());
     let session = OpenSshSession::connect(config, &openssh.context, openssh.prompter.clone(), cancel)
         .await
-        .map_err(ssh)?;
-    let target = ForwardTarget::new(remote.0, remote.1).map_err(ssh)?;
+        .map_err(map_openssh_error)?;
+    let target = ForwardTarget::new(remote.0, remote.1).map_err(map_openssh_error)?;
     let route = match socket_name {
         Some(name) => ForwardRoute::NamedUnixSocket(name),
         None => ForwardRoute::LoopbackTcp,
     };
-    session.forward(target, route).await.map_err(ssh)
+    session.forward(target, route).await.map_err(map_openssh_error)
+}
+
+fn map_openssh_error(error: tablepro_ssh::openssh::OpenSshError) -> TransportError {
+    use tablepro_ssh::openssh::OpenSshError;
+
+    match error {
+        error @ OpenSshError::HostKeyUnknown { .. } => TransportError::HostKeyRefused(error.to_string()),
+        error @ OpenSshError::HostKeyChanged { .. } => TransportError::HostKeyChanged(error.to_string()),
+        error @ OpenSshError::HostKeyRevoked { .. } => TransportError::HostKeyRevoked(error.to_string()),
+        error @ OpenSshError::Timeout { .. } => TransportError::SshTimeout(error.to_string()),
+        OpenSshError::Cancelled => TransportError::Cancelled,
+        error => TransportError::Ssh(error.to_string()),
+    }
 }
 
 const ASKPASS_PROGRAM: &str = "tablepro-askpass";
@@ -237,6 +265,7 @@ exec sleep 300
                 context,
                 prompter: Arc::new(tablepro_ssh::openssh::UnattendedPrompter),
             }),
+            audit: None,
         };
         let config = OpenSshConfig {
             destination: SshDestination::new("bastion", None, None).unwrap(),
@@ -276,7 +305,7 @@ exec sleep 300
     }
 }
 
-fn running_in_flatpak() -> bool {
+pub(crate) fn running_in_flatpak() -> bool {
     std::env::var_os("FLATPAK_ID").is_some() || std::path::Path::new("/.flatpak-info").exists()
 }
 

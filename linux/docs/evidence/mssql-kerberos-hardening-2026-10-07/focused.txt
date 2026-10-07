@@ -1,0 +1,100 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.09kB done
+#1 DONE 0.0s
+
+#2 [client internal] load build definition from Dockerfile
+#2 transferring dockerfile: 213B done
+#2 DONE 0.0s
+
+#3 [mssql internal] load build definition from Dockerfile
+#3 transferring dockerfile: 509B done
+#3 DONE 0.0s
+
+#4 [client internal] load metadata for docker.io/library/archlinux@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd
+#4 DONE 0.0s
+
+#5 [client internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [client 1/2] FROM docker.io/library/archlinux@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd
+#6 resolve docker.io/library/archlinux@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd 0.0s done
+#6 DONE 0.0s
+
+#7 [client 2/2] RUN pacman -Sy --noconfirm krb5 openssl     && pacman -Scc --noconfirm
+#7 CACHED
+
+#8 [client] exporting to image
+#8 exporting layers done
+#8 exporting manifest sha256:cf53f9e177d88be2971c3c87916b20f93740874b9bd6423619432aeb7db645a4 done
+#8 exporting config sha256:d8446fc722c06fc4fcaba1c30dd546638c506531d154f95464eb1e3bfcc605f3 done
+#8 exporting attestation manifest sha256:9621c73af537cad2df8f348ec424fedfafc73d041dd49dcc8c81e36de4ba1a44 done
+#8 exporting manifest list sha256:58f45b7068706d58ccbf8eba89aab99c756390c8c46b9786783315f2835f5c63 done
+#8 naming to docker.io/library/bookie-mssql-kerberos-client:latest
+#8 naming to docker.io/library/bookie-mssql-kerberos-client:latest done
+#8 unpacking to docker.io/library/bookie-mssql-kerberos-client:latest done
+#8 DONE 0.0s
+
+#5 [mssql internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#9 [mssql internal] load metadata for mcr.microsoft.com/mssql/server@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb
+#9 DONE 0.2s
+
+#10 [mssql 1/5] FROM mcr.microsoft.com/mssql/server@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb
+#10 resolve mcr.microsoft.com/mssql/server@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb 0.0s done
+#10 DONE 0.0s
+
+#11 [client] resolving provenance for metadata file
+#11 DONE 0.0s
+
+#12 [mssql internal] load build context
+#12 transferring context: 140B done
+#12 DONE 0.0s
+
+#13 [mssql 3/5] COPY mssql/start-mssql.sh /fixture/start-mssql.sh
+#13 CACHED
+
+#14 [mssql 4/5] COPY mssql/setup.sql /fixture/setup.sql
+#14 CACHED
+
+#15 [mssql 2/5] COPY mssql/entrypoint.sh /fixture/entrypoint.sh
+#15 CACHED
+
+#16 [mssql 5/5] RUN mkdir -p /var/opt/mssql/secrets     && chown -R mssql:root /fixture /var/opt/mssql/secrets     && chmod 500 /fixture/entrypoint.sh /fixture/start-mssql.sh
+#16 CACHED
+
+#17 [mssql] exporting to image
+#17 exporting layers done
+#17 exporting manifest sha256:140a5b5763d66630e80de8fabbe1cd4e68527e8fb89d25508e41eadd50cfabf0 done
+#17 exporting config sha256:0bcf047ba28a0916b73f8d476a9eaa9275c71f5e84d1b4c14726d2ece37fe523 done
+#17 exporting attestation manifest sha256:a3d6e189194f74fe5ed55acee8b946706313c8317a8d2ba120f9fd79bab35cad 0.0s done
+#17 exporting manifest list sha256:a4c9d6ad0f0dc476f0cf4180629a233e84c8e2fbf4392190f03cf32fba76e419 done
+#17 naming to docker.io/library/bookie-mssql-kerberos-mssql:latest done
+#17 unpacking to docker.io/library/bookie-mssql-kerberos-mssql:latest done
+#17 DONE 0.1s
+
+#18 [mssql] resolving provenance for metadata file
+#18 DONE 0.0s
+User 'bookiekerb' added successfully
+User 'mssqlsvc' added successfully
+Record added successfully
+Record added successfully
+Zone 50.30.172.in-addr.arpa created successfully
+Record added successfully
+ktutil:
+</fixtures/mssql-kerberos/materials/mssql-spn.keytab
+ktutil:
+<tures/mssql-kerberos/materials/mssql-account.keytab
+ktutil:
+<ests/fixtures/mssql-kerberos/materials/mssql.keytab
+ktutil:  quit
+Password for bookiekerb@DOMAIN1.SINK.TEST:
+MSSQLSvc/mssql.domain1.sink.test:1433@DOMAIN1.SINK.TEST: kvno = 2, keytab entry valid
+
+running 2 tests
+test kerberos_refuses_an_unregistered_sql_server_spn ... ok
+test kerberos_ticket_connects_over_verified_tls_and_executes_query ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s

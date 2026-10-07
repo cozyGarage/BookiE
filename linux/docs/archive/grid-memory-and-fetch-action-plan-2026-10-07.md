@@ -148,7 +148,10 @@ spaced across the scrollbar range, so RSS samples show real GtkColumnView
 requests but do not count every unique row object directly.
 
 Historical PR CI outcomes remain historical evidence only. This work started
-from the freshly fetched BookiE `linux` tip `4d0ee77d1`; local evidence includes
-all 574 app library tests (536 passed, 38 ignored), the GTK browse edit/save
-scenario, the three-repetition before/after profile, documentation checks and
-`git diff --check`. No ODBC/vendor or installed Wayland profile was run.
+from the freshly fetched BookiE `linux` tip `4d0ee77d1`; that is the profile
+baseline, not the current integration tip. The current fetched `fork/linux` tip
+is tracked in the [sprint](../bookie-0.2-sprint.md). Local evidence at the time
+included all 574 app library tests (536 passed, 38 ignored), the GTK browse
+edit/save scenario, the three-repetition before/after profile, documentation
+checks and `git diff --check`. The profile has not been rerun on the newer tip.
+No ODBC/vendor or installed Wayland profile was run.

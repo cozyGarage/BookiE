@@ -17,6 +17,9 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 KEEP_UP="${TABLEPRO_FIXTURE_KEEP_UP:-0}"
+XDG_CONFIG_HOME="$(mktemp -d)"
+export XDG_CONFIG_HOME
+trap teardown EXIT
 
 compose() {
   docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
@@ -25,18 +28,18 @@ compose() {
 teardown() {
   if [[ "$KEEP_UP" == "1" ]]; then
     echo "leaving the driver-tls fixture running (TABLEPRO_FIXTURE_KEEP_UP=1)"
-    return
+  else
+    compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   fi
-  compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  rm -rf "$XDG_CONFIG_HOME"
 }
 
 bash "$FIXTURE/generate-materials.sh" --force
-
-trap teardown EXIT
 compose down --volumes --remove-orphans >/dev/null 2>&1 || true
 compose up -d --build --wait
 
 export TABLEPRO_FIXTURE_DRIVER_TLS=1
 export TABLEPRO_DRIVER_TLS_MATERIALS="$FIXTURE/materials"
+export TABLEPRO_DRIVER_TLS_SSH_KEY="$FIXTURE/materials/ssh_client"
 
 cargo test --locked -p tablepro-driver-tls-tests --tests -- --include-ignored --test-threads=1

@@ -111,6 +111,8 @@ async fn mongodb_extended_json_survives_the_mcp_query_tool_round_trip() {
         use_tls: false,
         tls_mode: None,
         tls_root_cert: None,
+        tls_client_cert: None,
+        tls_client_key: None,
         read_only: true,
         auth_mode: Default::default(),
         environment: Environment::Local,

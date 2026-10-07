@@ -1,0 +1,24 @@
+{
+  "project": "BookiE",
+  "date": "2026-10-07",
+  "source_commit": "83df8dc7f58a921bc30aff66aba1301235427966",
+  "source_file": "crates/drivers/postgres/tests/integration.rs",
+  "source_sha256": "f947844ca8e8d750c80552398ee067dd124d6875f3770d91ebf1ccd8ae417b25",
+  "fixture": "PostgreSQL 16 (Docker; repository fixture image postgres:16-alpine)",
+  "command": "cargo test --locked -p tablepro-driver-postgres --test integration a_batch_reports_rollback_failure_after_postgres_terminates_its_backend -- --ignored --exact --test-threads=1",
+  "result": "passed: 1 test, 0 failed, 196 filtered out",
+  "assertions": [
+    "backend termination during the batch reports TransactionRollbackFailed",
+    "the parent table row is absent after connection loss",
+    "the transactional trigger effect row is absent after rollback",
+    "the trigger sequence allocation remains consumed after rollback"
+  ],
+  "log": {
+    "path": "focused.txt",
+    "sha256": "b6d59eed7b173ffbf97bc55afd167470bf5efab1bb155dc1fe5e0761bb15299c"
+  },
+  "scope_limits": [
+    "local Docker run only",
+    "frozen B3+B4 candidate, hosted CI, installed acceptance, and other side-effect patterns remain open"
+  ]
+}

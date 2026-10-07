@@ -1,0 +1,16 @@
+BookiE B4 MySQL atomicity group, Docker-backed
+
+Command:
+rtk proxy cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic:: -- --ignored --test-threads=1
+
+Result:
+test result: ok. 7 passed; 0 failed; 0 ignored; 58 filtered out; finished in 69.81s
+
+Included selectors:
+- a_failed_mysql_dml_batch_confirms_rollback_and_preserves_neighbor_rows
+- a_lost_connection_during_a_batch_reports_rollback_failure
+- empty_query_results_preserve_mysql_projection_metadata
+- implicit_commit_batch_is_refused_before_mysql_dispatch
+- mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects
+- mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigger_effects
+- mysql_transaction_queries_are_bounded_and_mark_truncation

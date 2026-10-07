@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "4f819f9123fe005db7dbd5f530ad8f3c73e1f0d4",
+  "working_tree": "M .github/workflows/build-linux.yml\n M linux/crates/app/tests/gtk_safety.py",
+  "tracked_diff_sha256": "c9341a8990a7eb969e20fd2f0ffc34398faa58b66a42e27f7781256d52f1823d",
+  "started_utc": "2026-10-07T08:17:30.453614+00:00",
+  "status": "passed",
+  "layers": {
+    "ui": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-safety.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "ui-1.log",
+          "exit_code": 0,
+          "seconds": 238.348
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-07T08:21:28.801896+00:00"
+}

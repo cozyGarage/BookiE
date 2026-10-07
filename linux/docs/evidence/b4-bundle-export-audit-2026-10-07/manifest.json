@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-07",
+  "scope": "BookiE B4-22 confirmed connection-bundle export audit",
+  "source_commit": "bcc9be2db",
+  "command": "TABLEPRO_GTK_BINARY=target/release/tablepro-app TABLEPRO_GTK_SCENARIO=bundle_export_records_sanitized_audit_outcome bash scripts/test-gtk-safety.sh",
+  "binary_build": "cargo build --release --locked -p tablepro-app --bin tablepro-app",
+  "result": "passed",
+  "assertions": [
+    "The GTK welcome-view export action creates the selected bundle file.",
+    "The durable audit journal contains exactly one intent and one outcome with the same operation ID.",
+    "The outcome is succeeded and both records contain only the aggregate affected count.",
+    "The records use the fixed local_settings identity and nil connection ID.",
+    "The destination file path is absent from both audit records."
+  ],
+  "not_established": [
+    "GTK import chooser and confirmation flow",
+    "Frozen-candidate acceptance",
+    "Hosted CI",
+    "Installed desktop acceptance"
+  ]
+}

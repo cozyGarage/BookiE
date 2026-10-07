@@ -6,7 +6,7 @@ use tablepro_transport::TransportError;
 use tablepro_transport::{SshEnvironment, SshRoute, Tunnel};
 use uuid::Uuid;
 
-use super::database_service::{ConnectionMetadata, DatabaseService, ReconnectParams};
+use super::database_service::{CandidateGuardFactory, ConnectionMetadata, DatabaseService, ReconnectParams};
 
 /// A connection that has authenticated and completed its initial metadata
 /// query, but has not replaced the active application connection yet.
@@ -18,7 +18,7 @@ pub struct PreparedConnection {
     pub driver_id: String,
     id: uuid::Uuid,
     metadata: ConnectionMetadata,
-    connection: Box<dyn Connection>,
+    connection: Arc<dyn Connection>,
     tunnel: Option<Tunnel>,
     read_only: bool,
     params: ReconnectParams,
@@ -56,7 +56,7 @@ impl PreparedConnection {
         views: Vec<tablepro_core::TableInfo>,
         driver_id: String,
         metadata: ConnectionMetadata,
-        connection: Box<dyn Connection>,
+        connection: Arc<dyn Connection>,
         tunnel: Option<Tunnel>,
         params: ReconnectParams,
     ) -> Self {
@@ -82,7 +82,7 @@ impl PreparedConnection {
     /// refusal here never needs to be rolled back.
     pub fn activate(self, database: &DatabaseService) -> Option<ActivatedConnection> {
         let id = self.id;
-        let activated = database.activate(
+        let activated = database.activate_shared(
             id,
             self.metadata,
             self.connection,
@@ -107,6 +107,8 @@ pub async fn open_saved(
     saved: SavedConnection,
     timeout_secs: u32,
     ssh_environment: SshEnvironment,
+    cancellation: tokio_util::sync::CancellationToken,
+    guard_factory: CandidateGuardFactory,
 ) -> Result<PreparedConnection, String> {
     let driver = registry
         .get(&saved.driver_id)
@@ -119,25 +121,43 @@ pub async fn open_saved(
     let mut opts = tablepro_transport::connect_options_for(&saved).await.map_err(message)?;
     opts.application_name = Some("BookiE".into());
 
-    let (conn, tunnel) = establish(&*driver, opts.clone(), ssh_hops.clone(), &ssh_environment).await?;
-    let server_version = conn.server_version().await.ok().flatten();
-    let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = conn
-        .list_tables_controlled(&control)
-        .await
-        .map_err(|e| format!("list_tables: {e}"))?;
-    let views = conn
-        .list_views_controlled(&control)
-        .await
-        .map_err(|e| format!("list_views: {e}"))?;
+    let (conn, tunnel) = tablepro_transport::establish_with_cancellation(
+        &*driver,
+        opts.clone(),
+        ssh_hops.clone(),
+        &ssh_environment,
+        cancellation,
+    )
+    .await
+    .map_err(message)?;
+    let connection: Arc<dyn Connection> = Arc::from(conn);
     let metadata = ConnectionMetadata {
         id,
         name: saved.name.clone(),
         driver_id: saved.driver_id.clone(),
         environment,
         read_only,
-        server_version,
+        server_version: None,
         query_timeout_secs: saved.query_timeout_secs,
+    };
+    let guarded = guard_factory.guard(connection.clone(), &metadata, tablepro_policy::Principal::human_gui());
+    let server_version = match guarded.server_version().await {
+        Ok(version) => version,
+        Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(_) => None,
+    };
+    let control = crate::services::operation_control::bounded(timeout_secs);
+    let tables = guarded
+        .list_tables_controlled(&control)
+        .await
+        .map_err(|e| format!("list_tables: {e}"))?;
+    let views = guarded
+        .list_views_controlled(&control)
+        .await
+        .map_err(|e| format!("list_views: {e}"))?;
+    let metadata = ConnectionMetadata {
+        server_version,
+        ..metadata
     };
     let params = ReconnectParams {
         driver,
@@ -150,21 +170,10 @@ pub async fn open_saved(
         views,
         saved.driver_id,
         metadata,
-        conn,
+        connection,
         tunnel,
         params,
     ))
-}
-
-pub async fn until_cancelled<T>(
-    token: &tokio_util::sync::CancellationToken,
-    work: impl std::future::Future<Output = T>,
-) -> Option<T> {
-    tokio::select! {
-        biased;
-        () = token.cancelled() => None,
-        value = work => Some(value),
-    }
 }
 
 pub struct EstablishFailure {
@@ -172,29 +181,19 @@ pub struct EstablishFailure {
     pub permanent: bool,
 }
 
-pub async fn establish_classified(
+pub async fn establish_classified_with_cancellation(
     driver: &dyn tablepro_core::DatabaseDriver,
     opts: ConnectOptions,
     ssh: Option<SshRoute>,
     environment: &SshEnvironment,
+    cancellation: tokio_util::sync::CancellationToken,
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), EstablishFailure> {
-    tablepro_transport::establish(driver, opts, ssh, environment)
+    tablepro_transport::establish_with_cancellation(driver, opts, ssh, environment, cancellation)
         .await
         .map_err(|error| EstablishFailure {
             permanent: is_permanent_failure(&error),
             message: message(error),
         })
-}
-
-pub async fn establish(
-    driver: &dyn tablepro_core::DatabaseDriver,
-    opts: ConnectOptions,
-    ssh: Option<SshRoute>,
-    environment: &SshEnvironment,
-) -> Result<(Box<dyn Connection>, Option<Tunnel>), String> {
-    establish_classified(driver, opts, ssh, environment)
-        .await
-        .map_err(|failure| failure.message)
 }
 
 pub fn is_permanent_failure(error: &TransportError) -> bool {
@@ -216,7 +215,14 @@ pub fn is_permanent_failure(error: &TransportError) -> bool {
         | TransportError::LocalSocketWithTls
         | TransportError::InvalidLocalSocket(_)
         | TransportError::SystemSshUnavailableInSandbox => true,
-        TransportError::Ssh(_) | TransportError::DatabaseTimeout { .. } => false,
+        TransportError::HostKeyRefused(_) | TransportError::HostKeyChanged(_) | TransportError::HostKeyRevoked(_) => {
+            true
+        }
+        TransportError::AuditWriteFailed(_) => true,
+        TransportError::Ssh(_)
+        | TransportError::SshTimeout(_)
+        | TransportError::Cancelled
+        | TransportError::DatabaseTimeout { .. } => false,
     }
 }
 
@@ -229,32 +235,6 @@ fn message(error: TransportError) -> String {
                 .replace("{driver}", &driver_name)
         }
         other => other.to_string(),
-    }
-}
-
-#[cfg(test)]
-mod cancellation_tests {
-    use super::*;
-    use tokio_util::sync::CancellationToken;
-
-    #[tokio::test]
-    async fn a_cancelled_token_abandons_work_that_never_finishes() {
-        let token = CancellationToken::new();
-        token.cancel();
-        assert_eq!(until_cancelled(&token, std::future::pending::<u8>()).await, None);
-    }
-
-    #[tokio::test]
-    async fn finished_work_is_returned_when_nothing_cancels() {
-        assert_eq!(until_cancelled(&CancellationToken::new(), async { 7 }).await, Some(7));
-    }
-
-    #[tokio::test]
-    async fn cancelling_during_the_work_drops_it() {
-        let token = CancellationToken::new();
-        let canceller = token.clone();
-        tokio::spawn(async move { canceller.cancel() });
-        assert_eq!(until_cancelled(&token, std::future::pending::<u8>()).await, None);
     }
 }
 
@@ -274,6 +254,10 @@ mod failure_tests {
             TransportError::Keyring(KeyringFailure::Locked),
             TransportError::IntegratedAuthUnsupported("sqlite".into()),
             TransportError::LocalSocketWithSsh,
+            TransportError::HostKeyRefused("unknown".into()),
+            TransportError::HostKeyChanged("changed".into()),
+            TransportError::HostKeyRevoked("revoked".into()),
+            TransportError::AuditWriteFailed("journal unavailable".into()),
         ] {
             assert!(is_permanent_failure(&error), "{error} should stop a reconnect");
         }
@@ -286,6 +270,8 @@ mod failure_tests {
             TransportError::Driver(DriverError::Disconnected),
             TransportError::Driver(DriverError::TimedOut),
             TransportError::Ssh("connection reset".into()),
+            TransportError::SshTimeout("connection timeout".into()),
+            TransportError::Cancelled,
             TransportError::DatabaseTimeout { seconds: 30 },
         ] {
             assert!(!is_permanent_failure(&error), "{error} should keep retrying");

@@ -2,7 +2,7 @@ use tablepro_core::{Connection, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn server_owned_columns_are_generated_and_omitted_from_insert_consumers() {
+async fn value_contract_server_owned_columns_and_identity_copy_inserts_use_defaults() {
     let (_container, options) = super::start_mssql().await;
     let connection = super::connect(options).await;
     create_source(connection.as_ref()).await;
@@ -16,6 +16,7 @@ async fn server_owned_columns_are_generated_and_omitted_from_insert_consumers() 
         .map(|column| column.name.as_str())
         .collect();
     assert_eq!(generated, ["calculated", "version", "starts", "ends"]);
+    assert!(columns[0].is_auto_increment, "identity metadata must be exact");
     assert!(!columns[0].is_generated);
     assert!(!columns[1].is_generated);
     assert_eq!(columns[1].default_value.as_deref(), Some("N'pending'"));
@@ -55,13 +56,50 @@ async fn server_owned_columns_are_generated_and_omitted_from_insert_consumers() 
             ]
         );
     }
+
+    connection
+        .execute("CREATE TABLE [owned.schema].[identity_only] (id int IDENTITY(1,1) PRIMARY KEY)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO [owned.schema].[identity_only] DEFAULT VALUES")
+        .await
+        .unwrap();
+    let columns = connection
+        .fetch_columns(Some("owned.schema"), "identity_only")
+        .await
+        .unwrap();
+    let row = connection
+        .query("SELECT id FROM [owned.schema].[identity_only]")
+        .await
+        .unwrap()
+        .rows
+        .remove(0);
+    let sql = tablepro_core::sql_literal::build_insert_literal(
+        "mssql",
+        Some("owned.schema"),
+        "identity_only",
+        &columns,
+        &row,
+    )
+    .unwrap();
+    assert_eq!(sql, "INSERT INTO [owned.schema].[identity_only] DEFAULT VALUES;");
+    connection.execute(&sql).await.unwrap();
+    assert_eq!(
+        connection
+            .query("SELECT id FROM [owned.schema].[identity_only] ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)], vec![Value::Int(2)]]
+    );
 }
 
 async fn create_source(connection: &dyn Connection) {
     for sql in [
         "EXEC(N'CREATE SCHEMA [owned.schema]')",
-        "CREATE TABLE [owned.schema].[owned.table] (id int PRIMARY KEY, note nvarchar(20) DEFAULT N'pending', calculated AS (id * 2), version rowversion, starts datetime2(7) GENERATED ALWAYS AS ROW START HIDDEN NOT NULL DEFAULT SYSUTCDATETIME(), ends datetime2(7) GENERATED ALWAYS AS ROW END HIDDEN NOT NULL DEFAULT CONVERT(datetime2(7), '9999-12-31 23:59:59.9999999'), PERIOD FOR SYSTEM_TIME (starts, ends)) WITH (SYSTEM_VERSIONING = ON)",
-        "INSERT INTO [owned.schema].[owned.table] (id, note) VALUES (1, N'source')",
+        "CREATE TABLE [owned.schema].[owned.table] (id int IDENTITY(1,1) PRIMARY KEY, note nvarchar(20) DEFAULT N'pending', calculated AS (id * 2), version rowversion, starts datetime2(7) GENERATED ALWAYS AS ROW START HIDDEN NOT NULL DEFAULT SYSUTCDATETIME(), ends datetime2(7) GENERATED ALWAYS AS ROW END HIDDEN NOT NULL DEFAULT CONVERT(datetime2(7), '9999-12-31 23:59:59.9999999'), PERIOD FOR SYSTEM_TIME (starts, ends)) WITH (SYSTEM_VERSIONING = ON)",
+        "INSERT INTO [owned.schema].[owned.table] (note) VALUES (N'source')",
     ] {
         connection.execute(sql).await.unwrap();
     }

@@ -18,9 +18,10 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Source snapshot: `origin/linux` after PR #91, 2026-10-06. Items come from the
-archived audits of 2026-09-17 to 2026-10-06 and the
-[sprint](bookie-0.2-sprint.md); the first column says which area owns them.
+Reconciled against BookiE `fork/linux` at `548bec84e` (PR #167) and the current
+[B4 board](b4-task-board.md), checked 2026-10-07. Items come from the archived
+audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
+first column says which area owns them.
 
 ## UI (app layer)
 
@@ -67,34 +68,34 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-23 | PostgreSQL catalog: materialized views, routines, triggers, sequences, extensions, roles; typed activity console | OPEN | B6 | driver-docker |
 | UI-24 | Workspace restore proven only partially | UNVERIFIED | Restart with every referenced connection | gtk-installed |
 | UI-25 | ~~CSV create-table uses PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis, DuckDB~~ | DONE | Creating a table from a file is offered only on PostgreSQL, MySQL, SQLite, SQL Server and DuckDB (ClickHouse needs an ENGINE clause, MongoDB and Redis have no tables); DuckDB spells JSON as `JSON`. Tests `import::infer` | unit |
-| UI-26 | Reusable SSH profiles are not editable; client certificates are partial | OPEN | With U5 below | gtk-widget |
+| UI-26 | Reusable SSH profiles are not editable | OPEN | Separate connection-editor slice | gtk-widget |
 
 ## Transport, sessions, daemon (B4)
 
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
-| B4-1 | C6 MySQL: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback | OPEN | `driver-tls` fixture | driver-docker |
-| B4-2 | C6 SQL Server: same, needs a usable control connection | OPEN | | driver-docker |
-| B4-3 | G5: daemon provider through system OpenSSH; unknown host key declines without learning | OPEN | | driver-docker |
-| B4-4 | ~~F8 headless: agentd shared one `AuditState` across every connection~~ | DONE | Each cached session owns an audit generation; `audit_isolation_tests` proves A is blocked after an interrupted write, B stays writable and a replacement recovers (fails with the old shared state) | sandbox |
+| B4-1 | ~~C6 MySQL: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback~~ | DONE | `verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query`; invalid CA/identity refusal and plaintext refusal; 11 MySQL cases in `bash scripts/test-driver-tls.sh` on `11672cbe6` | driver-tls |
+| B4-2 | ~~C6 SQL Server: same, needs a usable control connection~~ | DONE | `verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query`; invalid CA/identity refusal and native `encrypt_option`; 9 SQL Server cases in `bash scripts/test-driver-tls.sh` on `11672cbe6` | driver-tls |
+| B4-3 | ~~G5: daemon provider through system OpenSSH; unknown host key declines without learning~~ | DONE | `agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust`; `bash scripts/test-postgres-release.sh` | postgres-release |
+| B4-4 | ~~F8 headless: agentd shared one `AuditState` across every connection~~ | DONE | Each cached session owns an audit generation; `audit_isolation_tests` covers A/B isolation, replacement, late cancellation and journal-failure sharing | sandbox |
 | B4-5 | ~~Retire the daemon handle after a driver panic or disconnect even when ping succeeds~~ | DONE | `SessionFaultSink` marks the cached session retired through the guard; `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy` (fails without the change) | sandbox |
 | B4-6 | ~~I2: Flatpak plus system OpenSSH must refuse explicitly before dispatch~~ | DONE | `TransportError::SystemSshUnavailableInSandbox` raised in `build_openssh_config` before any process; `sandbox_tests` | sandbox |
-| B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | OPEN | Design proposed in [ADR 0010](decisions/0010-administrative-audit-events.md), awaiting acceptance | sandbox |
+| B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | UNVERIFIED | Shared transport, GTK and PostgreSQL fixtures verify one terminal audit outcome on success, refusal, cancellation and setup failure; a separate UI case denies mutations after live journal loss. See [B4 I5 evidence](b4-task-board.md#in-progress-local-slices). Frozen-candidate, hosted and installed acceptance remain | sandbox |
 | B4-8 | ~~F7: isolated GTK Session, BEGIN, label, toggle-off confirm~~ | DONE | AT-SPI scenario `session_transaction_label_and_toggle_off_confirmation` (SQLite): Session on, BEGIN shows the transaction label, toggling off asks, Cancel keeps the session and the label, Roll Back returns the plain label. Runs in the installed suite on Arch, Ubuntu 24.04 and Debian 13 | gtk-installed |
-| B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | OPEN | Docs | manual |
+| B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | UNVERIFIED | Source evidence matrix is complete on the B4 board; frozen-candidate, hosted and installed acceptance remain | manual |
 | B4-10 | ~~I1: `packaging/debian/rules` has no askpass build or install~~ | DONE | `packaging/debian/rules` builds and installs `tablepro-askpass`; the validator and `test_deb_package.py` reject a package without it | sandbox |
-| B4-11 | MySQL batch: only InnoDB and the trigger boundary are proven | OPEN | Other engines and side effects | driver-docker |
-| B4-12 | PostgreSQL rollback-failure acceptance | OPEN | Native fixture | driver-docker |
+| B4-11 | MySQL failed-batch rollback: remaining storage engines and side effects | UNVERIFIED | InnoDB parent/trigger rollback, MyISAM/MEMORY/CSV/ARCHIVE surviving trigger writes, UPDATE/DELETE effects and AUTO_INCREMENT behavior have local Docker evidence linked from [the B4 board](b4-task-board.md#remaining-tasks); other engine classes and side-effect patterns still need bounded proof | driver-docker |
+| B4-12 | PostgreSQL rollback-failure acceptance | OPEN | The native Docker regression covers backend termination during statement 1, `TransactionRollbackFailed`, rolled-back rows, and non-transactional sequence advancement; the current `linux` rerun uses the qualified `rollback_failure::...` exact selector ([evidence](b4-task-board.md#completed-local-slices)). Frozen-candidate rerun and broader side-effect coverage remain | driver-docker |
 | B4-13 | ~~U4: reconnect retried every error forever~~ | DONE | `is_permanent_failure` tests; `a_credential_failure_ends_the_retry_loop_and_reports_the_reason`; `ConnectionHealth::Failed` shown in the banner. Raw error text still goes through `error_text` only | unit |
-| B4-14 | U5: no client certificate or key in transport or storage | OPEN | Scope drivers and routes first | driver-docker |
-| B4-15 | O1: connect A, cancel, switch to B, namespace ownership races | OPEN | | gtk-widget |
+| B4-14 | ~~U5: saved mTLS transport and consumer support~~ | DONE | PostgreSQL server requiring client cert: direct/SSH shared transport, missing/untrusted/rotated identities, GTK saved-connection query, agentd direct + saved SSH and untrusted-cert refusal. MySQL driver fixture: direct/SSH, missing/untrusted/rotated identities. `scripts/test-postgres-release.sh` and `scripts/test-driver-tls.sh` pass locally; installed/package/hosted acceptance remains separate | driver-docker + gtk-widget |
+| B4-15 | ~~O1: cancel a pending connection attempt, switch to B, and preserve connection ownership~~ | DONE | [GTK evidence](evidence/b4-connection-cancel-switch-2026-10-07/manifest.json): after cancelling a hanging attempt, the original database stays untouched and writes reach saved B; a second-window regression preserves its pending edit during another window's switch | gtk-widget |
 | B4-16 | F4/F9 stale-session invalidation merged but not accepted | UNVERIFIED | Installed acceptance | gtk-installed |
-| B4-17 | F6: native multi-hop, cancellation, installed trust flow | OPEN | | driver-docker |
-| B4-18 | Connect and Test Connection read tables on a raw connection before hand-out, with no audit record | OPEN | A decision for ADR 0008, not a bypass. Design proposed in [ADR 0010](decisions/0010-administrative-audit-events.md), awaiting acceptance | sandbox |
-| B4-19 | Hostile-server fixtures: real short or non-ASCII SCRAM nonces and excessive iterations | OPEN | Source-string tests only today | driver-docker |
+| B4-17 | F6: native multi-hop, cancellation, installed trust flow | OPEN | Native two-hop success, changed-key refusal and cancellation while the second-hop trust prompt is pending passed locally: `bash scripts/test-ssh.sh` (22 Docker-backed SSH tests) on `f3a1765`; see [evidence](evidence/ssh-multihop-2026-10-07/manifest.json). The [current relay fixture rerun](evidence/postgres-release-relay-no-expose-2026-10-07/manifest.json) also passed; installed GTK trust flow remains | driver-docker |
+| B4-18 | ~~Connect and Test Connection read tables on a raw connection before hand-out, with no audit record~~ | DONE | Saved connect and connect-dialog setup use `CandidateGuardFactory` for server version, table and view reads; Test Connection uses it for table listing. App tests verify durable intent/outcome events and refusal when a required audit intent cannot be written. See [B4 task board](b4-task-board.md#transport-sessions-daemon) | sandbox |
+| B4-19 | ~~Hostile-server SCRAM challenges: short or non-ASCII nonces and excessive iterations~~ | DONE | Vendored SQLx rejects a server nonce that does not extend the client nonce, includes a non-printable/non-ASCII byte, or has no server suffix. A local PostgreSQL wire fixture verifies short, non-ASCII, and 100,001-iteration challenges are rejected before the client sends its proof; `cargo test -p tablepro-driver-postgres --lib` passed (54 tests) | unit |
 | B4-20 | ~~Credential rotation during connect: fingerprint and assembly load material separately~~ | DONE | Daemon: `a_key_material_rotation_during_connect_is_not_cached_under_the_stale_digest` and `a_material_lookup_failure_*` tests; the GUI reconnect reuses the options captured at connect, so it has no second lookup | sandbox |
-| B4-21 | SQL Server Kerberos and TLS need a deterministic KDC and certificate fixture | OPEN | | driver-docker |
-| B4-22 | Bundle export and import write no audit entries | OPEN | Design proposed in [ADR 0010](decisions/0010-administrative-audit-events.md), awaiting acceptance | sandbox |
+| B4-21 | SQL Server Kerberos and TLS need a deterministic KDC and certificate fixture | OPEN | [Local Samba AD fixture](evidence/mssql-kerberos-2026-10-07/manifest.json) and [hardened-container rerun](evidence/mssql-kerberos-hardening-2026-10-07/manifest.json): ticket-based VerifyFull query and unregistered-SPN refusal pass; Windows AD interoperability and candidate/hosted acceptance remain | driver-docker |
+| B4-22 | Bundle export and import write no audit entries | UNVERIFIED | ADR 0010; durable intent/outcome implementation, interrupted-intent recovery, fail-closed, and paired-event checks pass. Plaintext export/import and encrypted round-trip GTK evidence is linked from [the B4 board](b4-task-board.md#in-progress-local-slices); frozen-candidate, hosted and installed acceptance remain | sandbox |
 
 ## Security
 
@@ -130,7 +131,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-2 | Mutation: core and package survivors untriaged; portable evidence | OPEN | B3-P6 | sandbox |
 | TEST-3 | ~~No line-coverage number~~ | DONE | 2026-10-07 on the runner: `cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --lib --bins` reports 58.1% of lines (47,493 of 112,706 uncovered), 58.7% of functions. Unit tier only: driver integration, GTK and installed tiers are not counted. Examples: storage `connections.rs` 94%, `secrets.rs` 55%, ssh `supervisor.rs` 0% | manual |
 | TEST-3b | Coverage is measured by hand, with no trend or floor | OPEN | The nightly Forgejo workflow runs `cargo llvm-cov` and fails below `coverage-floor.txt` (57). Not yet run on the schedule; trend storage still missing | sandbox |
-| TEST-4 | ~~Full driver, TLS and SSH matrix not rerun on one candidate tree~~ | DONE | 2026-10-07 on commit `400643944`: `scripts/ci-local.sh integration` on the runner reported 16 checks passed, 0 failed (PostgreSQL, MySQL, SQL Server, ClickHouse, MongoDB, SQLite, SSH and socket fixtures). The same tree's GitHub run on PR #124 passed all 16 jobs, including driver-tls, postgres-release, driver integration and the installed GTK smoke | driver-docker |
+| TEST-4 | Full driver, TLS and SSH matrix not rerun on one candidate tree | OPEN | Run on the runner; see below | driver-docker |
 | TEST-5 | Hosted DuckDB container ownership fix not confirmed | UNVERIFIED | | manual |
 | TEST-6 | 117 unchecked items in [manual verification](manual-verification-0.2-features.md) | OPEN | Automate what GTK automation can reach | gtk-installed |
 | TEST-7 | No bundle export and import round trip between two real profiles | OPEN | | gtk-installed |

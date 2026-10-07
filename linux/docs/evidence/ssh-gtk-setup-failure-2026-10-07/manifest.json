@@ -1,0 +1,28 @@
+{
+  "project": "BookiE",
+  "date": "2026-10-07",
+  "source_commit": "83df8dc7f58a921bc30aff66aba1301235427966",
+  "worktree_state": "local uncommitted changes; source hashes identify tested files",
+  "source_files": {
+    "crates/app/tests/gtk_safety.py": "1e53841d5cb20c8c6c8ff617e9205750e078186f93fcc6c6d6a4d5c4b9bef4d6",
+    "crates/app/tests/gtk_ux.py": "664014c15e8d6b0827c23520ef3d72149c71f54ba3fd11383e1636e941dda2e9"
+  },
+  "fixture": "PostgreSQL release Docker fixture with its SSH bastion; the setup-failure saved connection targets 127.0.0.1:1, where no SSH service is listening",
+  "command": "rtk proxy env TABLEPRO_GTK_SCENARIO=postgres_ssh_setup_failure_is_durably_audited bash scripts/test-postgres-release.sh",
+  "result": "passed; script exit status 0; PostgreSQL release integration targets passed and selected GTK scenario passed",
+  "scenario": "postgres_ssh_setup_failure_is_durably_audited",
+  "assertions": [
+    "opening the saved connection reports Connection failed",
+    "exactly one durable transport_attempt event exists for the failing connection ID",
+    "the event phase is outcome and terminal_status is failed",
+    "transport_attempt is builtin_ssh with outcome connection_failed"
+  ],
+  "log": {
+    "path": "focused.txt",
+    "sha256": "76acc8ba29966e1755586a195be7c9682b9e1dffea7546cf1622adb8af46e579"
+  },
+  "scope_limits": [
+    "local Docker and GTK run only",
+    "frozen-candidate, hosted CI and installed acceptance remain open"
+  ]
+}

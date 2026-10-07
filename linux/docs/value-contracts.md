@@ -25,6 +25,30 @@ and wire-byte checks plus sibling preservation
 ([rebind evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json),
 [file-consumer evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
 
+PostgreSQL `name[]` result decoding and session rebinding cover SQL NULL, empty
+and literal `NULL`, escaped labels, Unicode and the 63-byte UTF-8 boundary,
+checked against native `array_send` bytes in
+`value_contract_arrays_preserve_elements_dimensions_and_exports`. Keyed grid
+edits use the qualified built-in cast and preserve the sibling row in
+`value_contract_array_grid_edit_preserves_array_elements`.
+Typed CSV import of `name[]` uses the same value distinctions and checks the
+restored native wire bytes in `value_contract_builtin_array_families_survive_typed_csv_insert`.
+
+Copied INSERTs and SQL-file exports omit PostgreSQL and SQL Server identity
+values so the destination generates a fresh key; MySQL keeps explicit
+auto-increment values. PostgreSQL `GENERATED ALWAYS` and `BY DEFAULT` identities,
+SQL Server `IDENTITY`, generated columns and identity-only tables are checked
+against native rows in
+`value_contract_postgres_copy_insert_regenerates_identity_values` and
+`value_contract_server_owned_columns_and_identity_copy_inserts_use_defaults`.
+The SQL export writer pins the same per-engine output in
+`sql_export_uses_engine_generated_identity_values`. Explicit identity-value
+preservation is not supported by these copy/export paths.
+
+The same PostgreSQL keyed grid contract covers `oid[]` zero, the unsigned
+32-bit maximum and SQL NULL, using native type/text/`array_send` equality and
+sibling preservation in `value_contract_array_grid_edit_preserves_array_elements`.
+
 The exact Rust Decimal positive/negative mantissa limit and 28-place scale now
 have parser, parameter, PostgreSQL typed-binding and SQL-literal checks. Values
 just outside the crate's range are rejected by explicit Decimal and grid input;
@@ -46,6 +70,10 @@ and parameter paths refuse it without changing either row. Other custom array
 families remain untested. The unlisted built-in `money[]` refusal covers
 populated and NULL elements, native text/JSON/wire snapshots, literal/bind
 refusal, and target/sibling preservation ([validation comment on PR #126](https://github.com/cozyGarage/BookiE/pull/126#issuecomment-6028961640)).
+Built-in geometric arrays `point[]`, `line[]`, `lseg[]`, `box[]`, `path[]`,
+`polygon[]`, and `circle[]` have the same visible-refusal, native oracle, and
+write-preservation contract in
+`value_contract_geometric_array_refusals_preserve_target_and_sibling_rows`.
 
 A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
 
@@ -281,6 +309,10 @@ formulas; other spreadsheet applications and workbook shapes remain unverified
 | PostgreSQL enum-array quantifier under `search_path` shadow | [Qualified target type and shadow-only label refusal](evidence/postgres-enum-array-quantifier-shadowed-path-results-2026-10-05/manifest.json) |
 | PostgreSQL enum-array `generate_subscripts` | [Untyped type-resolution boundary and native subscript/type/wire comparisons](evidence/postgres-enum-array-generate-subscripts-results-2026-10-05/manifest.json) |
 | PostgreSQL enum-array shape functions | [Native shape functions, empty/NULL boundaries and wire-byte comparisons](evidence/postgres-enum-array-shape-functions-results-2026-10-05/manifest.json) |
+| PostgreSQL custom enum-array slice | [Multidimensional subscript slice resets lower bounds; SQL NULL, empty array, literal NULL, Unicode and typed rebind match native type/JSON/wire oracles](../crates/drivers/postgres/tests/support/array_contract_parts/enum_array_slices.rs) |
+| PostgreSQL built-in range array refusals | [All six native range-array types, refused bindings and unchanged target/sibling rows](../crates/drivers/postgres/tests/support/range_array_contract.rs) |
+| PostgreSQL text-search arrays refusal | [`tsvector[]` and `tsquery[]` native JSON/wire snapshots, refused bindings and unchanged target/sibling rows](../crates/drivers/postgres/tests/support/unsupported_builtin_array_contract.rs) |
+| PostgreSQL JSON arrays refusal | [`json[]` and `jsonb[]` native text/JSON/wire snapshots, refused bindings and unchanged target/sibling rows](../crates/drivers/postgres/tests/support/unsupported_builtin_array_contract.rs) |
 | PostgreSQL enum-array `array_to_string` | [NULL omission/replacement, empty labels, shadowed type resolution and native wire comparisons](evidence/postgres-enum-array-to-string-results-2026-10-05/manifest.json) |
 | PostgreSQL enum-array `array_fill` | [Polymorphic inference, dimensions, bounds, NULL values and native wire comparisons](evidence/postgres-enum-array-fill-results-2026-10-05/manifest.json) |
 | PostgreSQL enum multi-array `unnest` | [Heterogeneous enum/integer inputs, shorter-array NULL padding, order, and shadowed type resolution](evidence/postgres-enum-multi-array-unnest-results-2026-10-05/manifest.json) |
@@ -292,7 +324,7 @@ formulas; other spreadsheet applications and workbook shapes remain unverified
 | DuckDB nanosecond keyed edit | [Native `TIME_NS`/`TIMESTAMP_NS` values and sibling preservation](evidence/duckdb-nanosecond-keyed-grid-edit-results-2026-10-05/manifest.json) |
 | DuckDB nanosecond expression | `epoch_ns()` preserves the exact pre-epoch nanoseconds; interval arithmetic returns the native `TIMESTAMP` rounded to microseconds; `TIME_NS` interval binding refuses ([test](../crates/drivers/duckdb/tests/support/submicro_parameter_expression.rs)) |
 | XLSX/XML/other formats | [Workbook precision](archive/value-contract-history.md#xlsx-float-precision-and-excel-safe-cell-types-2026-10-02), [temporal workbook](archive/value-contract-history.md#xlsx-temporal-consumer-checkpoint-2026-09-27), [XML text](archive/value-contract-history.md#xml-text-consumer-checkpoint-2026-09-27) |
-| Mutation and infrastructure | [Scoped re-audit](archive/value-contract-history.md#b3-mutation-survivor-re-audit-2026-10-01), [regression audit](archive/regression-audit-2026-09-29.md), [B3 review](archive/b3-review-2026-10-01.md) |
+| Mutation and infrastructure | [PostgreSQL array dimensions, 10 caught / 2 unviable / no misses or timeouts](https://github.com/cozyGarage/BookiE/pull/149#issuecomment-6032390503), [core XLSX writer, 41 caught / no misses, timeouts or unviable mutants](https://github.com/cozyGarage/BookiE/pull/152#issuecomment-6032549530), [scoped re-audit](archive/value-contract-history.md#b3-mutation-survivor-re-audit-2026-10-01), [regression audit](archive/regression-audit-2026-09-29.md), [B3 review](archive/b3-review-2026-10-01.md) |
 | Local integration gate | [Six-driver, MCP, session, socket and SSH run (315 passed)](evidence/local-integration-tier-results-2026-10-04/manifest.json) |
 | Local value-contract tier, Oct 4 | [Enum-array depth](evidence/full-value-tier-enum-array-depth-results-2026-10-04/manifest.json), [baseline](evidence/full-value-tier-results-2026-10-04/manifest.json), [MongoDB delete follow-up](evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/manifest.json), [SQL Server grid follow-up](evidence/full-value-tier-mssql-grid-results-2026-10-04/manifest.json), [PostgreSQL COALESCE follow-up](evidence/full-value-tier-postgres-coalesce-results-2026-10-04/manifest.json) |
 | Local value-contract tier, Oct 5 | [Empty ENUM/SET grid edits](evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/manifest.json), [enum-array SQL modes](evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/manifest.json), [enum aggregate shadow path](evidence/postgres-enum-array-agg-shadowed-path-results-2026-10-05/manifest.json), [float4[] Calc](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json), [quoted enum shadow path](evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/manifest.json), [TSV clipboard](evidence/local-gtk-duckdb-value-tier-tsv-clipboard-results-2026-10-05/manifest.json), [enum-array subscripts](evidence/postgres-enum-array-generate-subscripts-results-2026-10-05/manifest.json) |
@@ -319,6 +351,9 @@ also checked against native target-enum casts after warming metadata and
 switching to a same-named shadow `search_path` on the same backend, for
 empty/literal-`NULL` labels, SQL NULL and invalid shadow-only labels
 ([evidence](evidence/postgres-shadowed-enum-parameter-context-results-2026-10-05/manifest.json)).
+Integer and boolean parameters remain their native types and are refused by
+PostgreSQL in enum comparisons and updates; the same fixture verifies the
+target rows remain unchanged.
 
 MySQL/MariaDB typed CSV import now also preserves an empty VARCHAR under
 `EMPTY_STRING_IS_NULL`, separately from SQL NULL, with native text-byte

@@ -18,6 +18,8 @@ if [[ "${TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE:-0}" != "1" ]]; then
   }
   trap cleanup_runtime EXIT
   TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE=1 \
+    ATSPI_DBUS_IMPLEMENTATION=dbus-daemon \
+    XDG_CURRENT_DESKTOP=GNOME \
     HOME="$runtime/home" \
     XDG_CONFIG_HOME="$runtime/config" \
     XDG_DATA_HOME="$runtime/data" \

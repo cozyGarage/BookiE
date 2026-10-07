@@ -1,7 +1,13 @@
 use secrecy::SecretString;
 use std::os::unix::fs::FileTypeExt;
+use std::sync::Arc;
 use std::time::Duration;
+use tablepro_core::Environment;
 use tablepro_core::{AuthMode, ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, TlsMode};
+use tablepro_policy::{
+    AuditErrorCategory, AuditEvent, AuditSink, AuditState, AuditTerminalStatus, AuditTransportClient,
+    AuditTransportOutcome, Principal,
+};
 use tablepro_ssh::{SshAuth, SshConfig, SshTunnel};
 use tablepro_storage::{
     SavedConnection, SavedSshAuth, SavedSshConfig, SshClient, load_password, load_ssh_passphrase, load_ssh_password,
@@ -16,10 +22,86 @@ pub use session_material::session_material_digest;
 
 const DATABASE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
+#[derive(Clone)]
+pub struct TransportAuditContext {
+    pub sink: Arc<dyn AuditSink>,
+    pub state: Arc<AuditState>,
+    pub principal: Principal,
+    pub connection_id: Uuid,
+    pub connection_name: String,
+    pub environment: Environment,
+    pub driver_id: String,
+}
+
+#[derive(Clone)]
+pub struct TransportAuditFactory {
+    sink: Arc<dyn AuditSink>,
+    state: Arc<AuditState>,
+}
+
+impl TransportAuditFactory {
+    pub fn new(sink: Arc<dyn AuditSink>, state: Arc<AuditState>) -> Self {
+        Self { sink, state }
+    }
+
+    pub fn context(
+        &self,
+        principal: Principal,
+        connection_id: Uuid,
+        connection_name: impl Into<String>,
+        environment: Environment,
+        driver_id: impl Into<String>,
+    ) -> TransportAuditContext {
+        TransportAuditContext::new(
+            self.sink.clone(),
+            self.state.clone(),
+            principal,
+            connection_id,
+            connection_name,
+            environment,
+            driver_id,
+        )
+    }
+}
+
+impl TransportAuditContext {
+    pub fn new(
+        sink: Arc<dyn AuditSink>,
+        state: Arc<AuditState>,
+        principal: Principal,
+        connection_id: Uuid,
+        connection_name: impl Into<String>,
+        environment: Environment,
+        driver_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            sink,
+            state,
+            principal,
+            connection_id,
+            connection_name: connection_name.into(),
+            environment,
+            driver_id: driver_id.into(),
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum TransportError {
     #[error("ssh: {0}")]
     Ssh(String),
+    #[error("ssh host-key trust was refused: {0}")]
+    HostKeyRefused(String),
+    #[error("ssh host key changed: {0}")]
+    HostKeyChanged(String),
+    #[error("ssh host key is revoked: {0}")]
+    HostKeyRevoked(String),
+    #[error("ssh operation timed out: {0}")]
+    SshTimeout(String),
+    #[error("ssh operation was cancelled")]
+    Cancelled,
+    #[error("transport audit could not be persisted: {0}")]
+    AuditWriteFailed(String),
     #[error(
         "the system OpenSSH client is not available inside the Flatpak sandbox; switch this connection to the built-in SSH client"
     )]
@@ -81,6 +163,8 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
         tls: TlsConfig {
             mode: saved.effective_tls_mode(),
             root_cert: saved.tls_root_cert.clone(),
+            client_cert: saved.tls_client_cert.clone(),
+            client_key: saved.tls_client_key.clone(),
             ..Default::default()
         },
         auth_mode: saved.auth_mode,
@@ -93,6 +177,13 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
 }
 
 pub async fn saved_ssh_route(saved: &SavedConnection) -> Result<Option<SshRoute>, TransportError> {
+    saved_ssh_route_with_sandbox_override(saved, None).await
+}
+
+async fn saved_ssh_route_with_sandbox_override(
+    saved: &SavedConnection,
+    sandboxed: Option<bool>,
+) -> Result<Option<SshRoute>, TransportError> {
     let Some(ssh) = &saved.ssh else {
         return Ok(None);
     };
@@ -100,28 +191,177 @@ pub async fn saved_ssh_route(saved: &SavedConnection) -> Result<Option<SshRoute>
         SshClient::Builtin => resolve_saved_ssh_chain(saved.id, ssh)
             .await
             .map(|hops| Some(SshRoute::Builtin(hops))),
-        SshClient::OpenSsh => route::openssh_config(saved.id, ssh)
-            .await
-            .map(|config| Some(SshRoute::OpenSsh(config))),
+        SshClient::OpenSsh => {
+            let config = match sandboxed {
+                Some(sandboxed) => route::openssh_config_in_sandbox(saved.id, ssh, sandboxed).await,
+                None => route::openssh_config(saved.id, ssh).await,
+            }?;
+            Ok(Some(SshRoute::OpenSsh(config)))
+        }
     }
 }
 
 pub async fn establish(
     driver: &dyn DatabaseDriver,
-    mut opts: ConnectOptions,
+    opts: ConnectOptions,
     ssh: Option<SshRoute>,
     environment: &SshEnvironment,
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), TransportError> {
+    establish_with_cancellation(
+        driver,
+        opts,
+        ssh,
+        environment,
+        tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+}
+
+pub async fn establish_with_cancellation(
+    driver: &dyn DatabaseDriver,
+    opts: ConnectOptions,
+    ssh: Option<SshRoute>,
+    environment: &SshEnvironment,
+    cancellation: tokio_util::sync::CancellationToken,
+) -> Result<(Box<dyn Connection>, Option<Tunnel>), TransportError> {
+    let client = match ssh.as_ref() {
+        Some(SshRoute::Builtin(_)) => Some(AuditTransportClient::BuiltinSsh),
+        Some(SshRoute::OpenSsh(_)) => Some(AuditTransportClient::SystemOpenSsh),
+        None => None,
+    };
+    let started = std::time::Instant::now();
+    let result = tokio::select! {
+        biased;
+        () = cancellation.cancelled() => Err(TransportError::Cancelled),
+        result = establish_inner(driver, opts, ssh, environment, cancellation.clone()) => result,
+    };
+    if let (Some(client), Some(context)) = (client, environment.audit.as_ref()) {
+        let (outcome, status, category) = classify_transport_result(&result);
+        let event = AuditEvent::transport_attempt(
+            Uuid::new_v4(),
+            context.principal.clone(),
+            context.connection_id,
+            context.connection_name.clone(),
+            context.environment,
+            context.driver_id.clone(),
+            client,
+            outcome,
+            status,
+            category,
+            started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
+        );
+        if let Err(error) = context.sink.record(event).await {
+            context.state.disable_after_audit_failure();
+            drop(result);
+            return Err(TransportError::AuditWriteFailed(error.to_string()));
+        }
+    }
+    result
+}
+
+fn classify_transport_result(
+    result: &Result<(Box<dyn Connection>, Option<Tunnel>), TransportError>,
+) -> (AuditTransportOutcome, AuditTerminalStatus, Option<AuditErrorCategory>) {
+    use AuditTerminalStatus as Status;
+    use AuditTransportOutcome as Outcome;
+    match result {
+        Ok(_) => (Outcome::Connected, Status::Succeeded, None),
+        Err(TransportError::HostKeyRefused(_)) => (
+            Outcome::HostKeyRefused,
+            Status::Denied,
+            Some(AuditErrorCategory::Authentication),
+        ),
+        Err(TransportError::HostKeyChanged(_)) => (
+            Outcome::HostKeyChanged,
+            Status::Denied,
+            Some(AuditErrorCategory::Authentication),
+        ),
+        Err(TransportError::HostKeyRevoked(_)) => (
+            Outcome::HostKeyRevoked,
+            Status::Denied,
+            Some(AuditErrorCategory::Authentication),
+        ),
+        Err(TransportError::Cancelled) => (
+            Outcome::Cancelled,
+            Status::Cancelled,
+            Some(AuditErrorCategory::Cancelled),
+        ),
+        Err(TransportError::SshTimeout(_) | TransportError::DatabaseTimeout { .. }) => {
+            (Outcome::TimedOut, Status::TimedOut, Some(AuditErrorCategory::Timeout))
+        }
+        Err(TransportError::Driver(DriverError::Tls(_))) => {
+            (Outcome::TlsFailed, Status::Failed, Some(AuditErrorCategory::Tls))
+        }
+        Err(TransportError::Driver(DriverError::AuthFailed)) => (
+            Outcome::AuthenticationFailed,
+            Status::Failed,
+            Some(AuditErrorCategory::Authentication),
+        ),
+        Err(_) => (
+            Outcome::ConnectionFailed,
+            Status::Failed,
+            Some(AuditErrorCategory::Connection),
+        ),
+    }
+}
+
+async fn establish_inner(
+    driver: &dyn DatabaseDriver,
+    mut opts: ConnectOptions,
+    ssh: Option<SshRoute>,
+    environment: &SshEnvironment,
+    cancellation: tokio_util::sync::CancellationToken,
+) -> Result<(Box<dyn Connection>, Option<Tunnel>), TransportError> {
     check_auth_mode(opts.auth_mode, driver.supports_integrated_auth(), driver.display_name())?;
+    validate_client_tls_auth(driver, &opts)?;
     validate_local_socket(&opts, driver, ssh.is_some())?;
     opts.forwarded_socket_dir = None;
     let tunnel = match ssh {
-        Some(route) => Some(open_tunnel(driver, &mut opts, route, environment).await?),
+        Some(route) => Some(open_tunnel(driver, &mut opts, route, environment, cancellation).await?),
         None => None,
     };
     let timeout = connect_timeout(&opts);
     let raw = connect_with_timeout(driver, opts, timeout).await?;
     Ok((raw, tunnel))
+}
+
+fn validate_client_tls_auth(driver: &dyn DatabaseDriver, opts: &ConnectOptions) -> Result<(), TransportError> {
+    let (Some(cert), Some(key)) = (&opts.tls.client_cert, &opts.tls.client_key) else {
+        if opts.tls.client_cert.is_none() && opts.tls.client_key.is_none() {
+            return Ok(());
+        }
+        return Err(DriverError::Unsupported(
+            "TLS client authentication requires both a certificate and a private key".into(),
+        )
+        .into());
+    };
+    if !driver.supports_client_tls_auth() {
+        return Err(DriverError::Unsupported(format!(
+            "{} does not support TLS client authentication",
+            driver.display_name()
+        ))
+        .into());
+    }
+    if matches!(opts.tls.mode, TlsMode::Disabled | TlsMode::Prefer) {
+        return Err(DriverError::Unsupported(
+            "TLS client authentication requires a TLS mode that cannot fall back to plaintext".into(),
+        )
+        .into());
+    }
+    for path in [cert, key] {
+        let file = std::fs::File::open(path)
+            .map_err(|_| DriverError::Unsupported("TLS client certificate or key file cannot be opened".into()))?;
+        let metadata = file
+            .metadata()
+            .map_err(|_| DriverError::Unsupported("TLS client certificate or key file cannot be inspected".into()))?;
+        if !metadata.is_file() || metadata.len() > 1024 * 1024 {
+            return Err(DriverError::Unsupported(
+                "TLS client certificate and key must be regular files no larger than 1 MiB".into(),
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 fn connect_timeout(opts: &ConnectOptions) -> Duration {
@@ -137,20 +377,14 @@ async fn open_tunnel(
     opts: &mut ConnectOptions,
     route: SshRoute,
     environment: &SshEnvironment,
+    cancellation: tokio_util::sync::CancellationToken,
 ) -> Result<Tunnel, TransportError> {
     let remote = (std::mem::take(&mut opts.host), opts.port);
     let socket_name = forwarded_socket_name(driver, opts.tls.mode, remote.1);
     let tunnel = match route {
         SshRoute::Builtin(hops) => Tunnel::Builtin(open_builtin(&hops, &remote, socket_name, environment).await?),
         SshRoute::OpenSsh(config) => Tunnel::OpenSsh(
-            route::open_openssh(
-                &config,
-                environment,
-                (&remote.0, remote.1),
-                socket_name,
-                tokio_util::sync::CancellationToken::new(),
-            )
-            .await?,
+            route::open_openssh(&config, environment, (&remote.0, remote.1), socket_name, cancellation).await?,
         ),
     };
     match (&tunnel, tunnel.socket_dir()) {
@@ -191,7 +425,12 @@ async fn open_builtin(
         (Some(name), None) => SshTunnel::open_chain_socket(hops, remote.0.clone(), remote.1, name, unknown).await,
         (None, None) => SshTunnel::open_chain(hops, remote.0.clone(), remote.1, unknown).await,
     }
-    .map_err(|e| TransportError::Ssh(e.to_string()))
+    .map_err(|error| match error {
+        error @ tablepro_ssh::SshError::UnknownHostKey { .. } => TransportError::HostKeyRefused(error.to_string()),
+        error @ tablepro_ssh::SshError::HostKeyMismatch { .. } => TransportError::HostKeyChanged(error.to_string()),
+        error @ tablepro_ssh::SshError::Timeout { .. } => TransportError::SshTimeout(error.to_string()),
+        error => TransportError::Ssh(error.to_string()),
+    })
 }
 
 async fn connect_with_timeout(
@@ -373,6 +612,148 @@ async fn saved_ssh_passphrase(id: Uuid, has_passphrase: bool) -> Result<Option<S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Default)]
+    struct RecordingAudit(std::sync::Mutex<Vec<AuditEvent>>);
+
+    #[async_trait::async_trait]
+    impl AuditSink for RecordingAudit {
+        async fn record(&self, event: AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+            self.0.lock().expect("audit events").push(event);
+            Ok(())
+        }
+    }
+
+    struct FailingAudit;
+
+    #[async_trait::async_trait]
+    impl AuditSink for FailingAudit {
+        async fn record(&self, _event: AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+            Err(tablepro_policy::AuditError::Persistence("disk full".into()))
+        }
+    }
+
+    fn audit_environment(sink: Arc<dyn AuditSink>, state: Arc<AuditState>) -> SshEnvironment {
+        SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse).with_audit(TransportAuditContext::new(
+            sink,
+            state,
+            Principal::Agent {
+                token: "secret-agent-token".into(),
+                client: None,
+                model: None,
+            },
+            Uuid::new_v4(),
+            "test connection",
+            Environment::Local,
+            "postgres",
+        ))
+    }
+
+    fn saved_ssh_connection(client: SshClient) -> SavedConnection {
+        SavedConnection {
+            id: Uuid::new_v4(),
+            name: "sandbox routing test".into(),
+            driver_id: "postgres".into(),
+            host: "db.example".into(),
+            port: 5432,
+            socket_dir: None,
+            database: "db".into(),
+            username: "user".into(),
+            use_tls: false,
+            tls_mode: None,
+            tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
+            auth_mode: AuthMode::Password,
+            read_only: false,
+            environment: Environment::Local,
+            ssh: Some(SavedSshConfig {
+                host: "bastion.example".into(),
+                port: 22,
+                username: "user".into(),
+                auth: SavedSshAuth::Password,
+                jump: None,
+                client,
+                agent: false,
+            }),
+            last_opened_at: None,
+            connect_timeout_secs: None,
+            query_timeout_secs: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn saved_system_openssh_refuses_deterministically_in_flatpak_without_fallback() {
+        let saved = saved_ssh_connection(SshClient::OpenSsh);
+        assert!(matches!(
+            saved_ssh_route_with_sandbox_override(&saved, Some(true)).await,
+            Err(TransportError::SystemSshUnavailableInSandbox)
+        ));
+
+        let mut builtin = saved.clone();
+        let builtin_ssh = builtin.ssh.as_mut().expect("ssh config");
+        builtin_ssh.client = SshClient::Builtin;
+        builtin_ssh.agent = true;
+        assert!(matches!(
+            saved_ssh_route_with_sandbox_override(&builtin, Some(true)).await,
+            Ok(Some(SshRoute::Builtin(_)))
+        ));
+
+        let mut native = builtin;
+        native.ssh.as_mut().expect("ssh config").client = SshClient::OpenSsh;
+        assert!(matches!(
+            saved_ssh_route_with_sandbox_override(&native, Some(false)).await,
+            Ok(Some(SshRoute::OpenSsh(_)))
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancelled_ssh_attempt_writes_one_terminal_redacted_record() {
+        let sink = Arc::new(RecordingAudit::default());
+        let state = Arc::new(AuditState::new());
+        let environment = audit_environment(sink.clone(), state);
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        cancellation.cancel();
+        let result = establish_with_cancellation(
+            &HangingDriver,
+            ConnectOptions::default(),
+            Some(SshRoute::Builtin(Vec::new())),
+            &environment,
+            cancellation,
+        )
+        .await;
+        assert!(matches!(result, Err(TransportError::Cancelled)));
+        let events = sink.0.lock().expect("audit events");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].phase, tablepro_policy::AuditRecordPhase::Outcome);
+        assert_eq!(events[0].terminal_status, AuditTerminalStatus::Cancelled);
+        assert_eq!(
+            events[0].transport_attempt.unwrap().client,
+            AuditTransportClient::BuiltinSsh
+        );
+        match &events[0].principal {
+            Principal::Agent { token, .. } => assert!(!token.contains("secret-agent-token")),
+            Principal::Human { .. } => panic!("agent principal expected"),
+        }
+    }
+
+    #[tokio::test]
+    async fn audit_persistence_failure_fails_closed_and_returns_no_connection() {
+        let state = Arc::new(AuditState::new());
+        let environment = audit_environment(Arc::new(FailingAudit), state.clone());
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        cancellation.cancel();
+        let result = establish_with_cancellation(
+            &HangingDriver,
+            ConnectOptions::default(),
+            Some(SshRoute::Builtin(Vec::new())),
+            &environment,
+            cancellation,
+        )
+        .await;
+        assert!(matches!(result, Err(TransportError::AuditWriteFailed(_))));
+        assert!(state.governed_writes_disabled());
+    }
 
     #[test]
     fn a_saved_connect_timeout_replaces_the_default_and_zero_keeps_it() {

@@ -101,6 +101,26 @@ mod tests {
     }
 
     #[test]
+    fn sql_export_uses_engine_generated_identity_values() {
+        let mut id = column("id");
+        id.is_auto_increment = true;
+        let columns = [id, column("note")];
+        let rows = [vec![Value::Int(7), Value::Text("copy".into())]];
+        assert_eq!(
+            render(&target("postgres", None, "people"), &columns, &rows),
+            "INSERT INTO \"people\" (\"note\") VALUES ('copy');\n"
+        );
+        assert_eq!(
+            render(&target("mssql", None, "people"), &columns, &rows),
+            "INSERT INTO [people] ([note]) VALUES (N'copy');\n"
+        );
+        assert_eq!(
+            render(&target("mysql", None, "people"), &columns, &rows),
+            "INSERT INTO `people` (`id`, `note`) VALUES (7, 'copy');\n"
+        );
+    }
+
+    #[test]
     fn a_value_and_a_column_name_cannot_close_the_statement_they_sit_in() {
         let sql = render(
             &target("mysql", None, "people`; DROP TABLE people; --"),

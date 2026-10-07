@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "b4/i5-ssh-audit",
+  "source_commit": "7f809e42aaec5127708d5d2c5ddeb155422636ab",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "2bc974f9c6ed58accc2b3a0a56cb4e042292a678e64f949b4a2088126cd799a2"
+  },
+  "engine": "MySQL Testcontainers fixture",
+  "case": "A failed InnoDB DML batch rolls back transactional rows but preserves trigger writes to MyISAM and MEMORY tables",
+  "test": "mysql_atomic::mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_trigger_effects",
+  "contract": [
+    "An AFTER INSERT trigger writes each new ID to both MyISAM and MEMORY tables.",
+    "The batch inserts a new InnoDB parent row and then fails on a duplicate key; the InnoDB row is absent after rollback.",
+    "The trigger writes for the failed batch row remain in both non-transactional tables.",
+    "This establishes only these MySQL engine and trigger cases; it does not promise rollback atomicity across all engines or side effects."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic::mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_trigger_effects -- --ignored --exact --test-threads=1",
+      "result": "1 passed, 63 filtered out",
+      "log": "focused.txt"
+    },
+    "format_and_diff": {
+      "command": "rtk cargo fmt --all -- --check; rtk git diff --check",
+      "result": "passed before commit"
+    }
+  },
+  "remaining": [
+    "Other non-transactional engines and trigger/side-effect patterns remain untested.",
+    "Re-run on the frozen B3+B4 candidate SHA and hosted CI."
+  ],
+  "log_sha256": {
+    "focused.txt": "f709171f8c7101c462eb03281d9d98b2ddbdabd750792d9782b2fc42e19c6fe5"
+  }
+}

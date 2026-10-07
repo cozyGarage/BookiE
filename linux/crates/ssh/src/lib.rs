@@ -16,7 +16,9 @@ use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
 
 use crate::openssh::Prompter;
 
+mod handshake;
 mod known_hosts;
+use handshake::{HandshakeWaitError, HostKeyPromptEvent, wait_for_handshake};
 use known_hosts::HostKeyOutcome;
 pub mod openssh;
 pub use known_hosts::default_known_hosts_path;
@@ -362,6 +364,7 @@ struct ClientHandler {
     known_hosts_path: PathBuf,
     unknown: UnknownHostKey,
     prompter: Option<Arc<dyn Prompter>>,
+    prompt_events: tokio::sync::mpsc::UnboundedSender<HostKeyPromptEvent>,
     outcome: Arc<Mutex<Option<known_hosts::HostKeyOutcome>>>,
 }
 
@@ -387,6 +390,7 @@ impl client::Handler for ClientHandler {
                     &self.known_hosts_path,
                     &fingerprint,
                     prompter.as_ref(),
+                    &self.prompt_events,
                 )
                 .await
             }
@@ -525,21 +529,28 @@ async fn connect_and_auth(
     let known_hosts_path = default_known_hosts_path()
         .ok_or_else(|| SshError::KnownHosts("neither XDG_CONFIG_HOME nor HOME is set".into()))?;
     let outcome = Arc::new(Mutex::new(None));
+    let (prompt_events, prompt_event_receiver) = tokio::sync::mpsc::unbounded_channel();
     let handler = ClientHandler {
         target_host: cfg.host.clone(),
         target_port: cfg.port,
         known_hosts_path: known_hosts_path.clone(),
         unknown,
         prompter,
+        prompt_events,
         outcome: outcome.clone(),
     };
 
     let config = Arc::new(client_config());
     let connecting = client::connect(config, (tcp_host, tcp_port), handler);
-    let mut session = match tokio::time::timeout(CONNECT_TIMEOUT, connecting).await {
-        Ok(Ok(s)) => s,
-        Ok(Err(e)) => return Err(map_connect_error(e, &cfg.host, cfg.port, &known_hosts_path, &outcome)),
-        Err(_) => return Err(timeout_error("ssh handshake", cfg, CONNECT_TIMEOUT)),
+    let mut session = match wait_for_handshake(connecting, prompt_event_receiver, CONNECT_TIMEOUT).await {
+        Ok(s) => s,
+        Err(HandshakeWaitError::Handshake(e)) => {
+            return Err(map_connect_error(e, &cfg.host, cfg.port, &known_hosts_path, &outcome));
+        }
+        Err(HandshakeWaitError::HostKeyDeclined(fingerprint)) => {
+            return Err(unknown_host_key(&cfg.host, cfg.port, fingerprint, &known_hosts_path));
+        }
+        Err(HandshakeWaitError::Timeout) => return Err(timeout_error("ssh handshake", cfg, CONNECT_TIMEOUT)),
     };
 
     match outcome.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone() {
@@ -806,6 +817,86 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn host_key_prompt_does_not_consume_the_ssh_handshake_timeout() {
+        let (events, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (reply, wait_for_reply) = tokio::sync::oneshot::channel();
+        let prompt = tokio::spawn(async move {
+            tokio::task::yield_now().await;
+            tokio::time::advance(Duration::from_secs(60)).await;
+            reply.send(()).unwrap();
+        });
+        let handshake = async move {
+            events.send(HostKeyPromptEvent::WaitingForUser).unwrap();
+            wait_for_reply.await.unwrap();
+            events
+                .send(HostKeyPromptEvent::UserResponded {
+                    declined_fingerprint: None,
+                })
+                .unwrap();
+            Ok::<_, ()>("connected")
+        };
+
+        let result = wait_for_handshake(handshake, receiver, Duration::from_secs(10)).await;
+        prompt.await.unwrap();
+        assert!(matches!(result, Ok("connected")));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn ssh_handshake_timeout_resumes_after_host_key_prompt_response() {
+        let (events, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (reply, wait_for_reply) = tokio::sync::oneshot::channel();
+        let prompt = tokio::spawn(async move {
+            tokio::task::yield_now().await;
+            tokio::time::advance(Duration::from_secs(60)).await;
+            reply.send(()).unwrap();
+        });
+        let handshake = async move {
+            events.send(HostKeyPromptEvent::WaitingForUser).unwrap();
+            wait_for_reply.await.unwrap();
+            events
+                .send(HostKeyPromptEvent::UserResponded {
+                    declined_fingerprint: None,
+                })
+                .unwrap();
+            tokio::time::sleep(Duration::from_secs(11)).await;
+            Ok::<_, ()>("connected")
+        };
+
+        let result = wait_for_handshake(handshake, receiver, Duration::from_secs(10)).await;
+        prompt.await.unwrap();
+        assert!(matches!(result, Err(HandshakeWaitError::Timeout)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn host_key_prompt_resumes_only_the_remaining_handshake_budget() {
+        let (events, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (prompt_started, wait_for_prompt) = tokio::sync::oneshot::channel();
+        let (reply, wait_for_reply) = tokio::sync::oneshot::channel();
+        let prompt = tokio::spawn(async move {
+            wait_for_prompt.await.unwrap();
+            tokio::time::advance(Duration::from_secs(60)).await;
+            reply.send(()).unwrap();
+        });
+        let handshake = async move {
+            tokio::time::sleep(Duration::from_secs(8)).await;
+            events.send(HostKeyPromptEvent::WaitingForUser).unwrap();
+            prompt_started.send(()).unwrap();
+            wait_for_reply.await.unwrap();
+            events
+                .send(HostKeyPromptEvent::UserResponded {
+                    declined_fingerprint: None,
+                })
+                .unwrap();
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            Ok::<_, ()>("connected")
+        };
+
+        let result = wait_for_handshake(handshake, receiver, Duration::from_secs(10)).await;
+        prompt.await.unwrap();
+        assert!(matches!(result, Err(HandshakeWaitError::Timeout)));
+    }
 
     #[test]
     fn client_config_enables_keepalive_so_a_dead_bastion_is_eventually_detected() {

@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-07",
+  "scope": "BookiE B4-16/F4-F9 GTK acceptance for SSH tunnel loss, stale-session retirement, and recovery",
+  "branch": "b4/i5-ssh-audit",
+  "source_commit": "83df8dc7f58a921bc30aff66aba1301235427966",
+  "worktree_state": "local uncommitted GTK test and fixture-runner changes; source hashes identify the tested scenario",
+  "source_sha256": {
+    "crates/app/tests/gtk_safety.py": "8002813b822b85de73ec0b48d6c4d26cea49d2149eaed11bb4ee717aa02a7826",
+    "crates/app/tests/gtk_ux.py": "ba3128c977e95321fb34bcaaaebdc8d7d2c4300b465e48a675ef12ae051ff67b",
+    "scripts/test-postgres-release.sh": "428c8f25cd46fa648c78b7c7c42652fcf4a30a3d0331ee683a87da6fef2786d1"
+  },
+  "binary": {
+    "path": "target/installed/usr/bin/tablepro",
+    "sha256": "50658f88ef18ccdf206a449cc6ea9df993e5db655156899932cd4fe72604d1db",
+    "execution": "release binary under the GTK/Xvfb harness"
+  },
+  "fixture": "PostgreSQL release Docker fixture with Toxiproxy and SSH bastion; the GTK saved connection traverses the bastion to the unpublished PostgreSQL service",
+  "command": "rtk proxy env TABLEPRO_GTK_SCENARIO=postgres_ssh_tunnel_loss_retires_session_and_reconnects TABLEPRO_GTK_BINARY=target/installed/usr/bin/tablepro bash scripts/test-postgres-release.sh",
+  "result": "passed; script exit status 0; PostgreSQL release integration targets and selected GTK scenario passed",
+  "scenario": "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+  "assertions": [
+    "the GTK flow accepts the fixture SSH host key and opens a dedicated editor session",
+    "the editor inserts a row inside that transaction and reads it back in-session, while an independent PostgreSQL connection still sees zero rows",
+    "disabling the Toxiproxy bastion cuts the live route and presents the reconnect state; the fixture then restores the route",
+    "a write through the stale editor session is refused with the retired-session error and PostgreSQL remains at zero rows",
+    "after the saved connection recovers, reopening Session runs SELECT 42 successfully and PostgreSQL still has zero rows"
+  ],
+  "related_backend_case": "ssh_reconnect_replaces_the_tunnel_and_the_session passed as part of scripts/test-postgres-release.sh",
+  "log_sha256": "dc07cd9b5f14cf673b7a257f658aabc08853bd1061bbe7a48c6f4d096f4229d7",
+  "not_established": [
+    "distribution-package installed desktop or native Wayland acceptance",
+    "frozen B3+B4 candidate acceptance",
+    "hosted CI"
+  ]
+}

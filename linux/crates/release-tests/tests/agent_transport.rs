@@ -2,9 +2,11 @@
 use std::sync::Arc;
 
 use tablepro_core::{AuthMode, Connection, TlsMode};
+use tablepro_policy::{AuditState, AuditTransportOutcome, Principal};
 use tablepro_release_tests::Fixture;
-use tablepro_ssh::{SshConfig, SshTunnel};
-use tablepro_transport::establish;
+use tablepro_ssh::SshConfig;
+use tablepro_storage::AuditJournal;
+use tablepro_transport::{TransportAuditContext, establish};
 
 use drivers_postgres::PgDriver;
 
@@ -118,7 +120,7 @@ async fn a_direct_session_and_a_tunnelled_session_reach_the_same_database() {
 
 #[tokio::test]
 #[ignore = "requires the postgres release fixture"]
-async fn agentd_refuses_an_unknown_host_key_with_an_empty_known_hosts_file() {
+async fn shared_transport_records_builtin_unknown_and_changed_host_key_refusals() {
     let fixture = Fixture::from_env();
     let known_hosts = tablepro_ssh::default_known_hosts_path().expect("a known_hosts path must be resolvable");
     let backup = known_hosts.with_extension("bak-refuse-test");
@@ -130,26 +132,80 @@ async fn agentd_refuses_an_unknown_host_key_with_an_empty_known_hosts_file() {
         "the refusal case must start from an empty known_hosts file"
     );
 
-    let result = SshTunnel::open(
-        fixture.ssh_config(),
-        fixture.database_hostname.clone(),
-        fixture.database_port,
-        tablepro_ssh::UnknownHostKey::Refuse,
+    let audit_dir = tempfile::tempdir().expect("isolated audit directory");
+    let journal = Arc::new(
+        AuditJournal::open_validated(audit_dir.path().join("transport-audit.jsonl"))
+            .expect("open isolated audit journal"),
+    );
+    let state = Arc::new(AuditState::new());
+    let environment = tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse).with_audit(
+        TransportAuditContext::new(
+            journal.clone(),
+            state,
+            Principal::human_gui(),
+            uuid::Uuid::new_v4(),
+            "built-in refusal fixture",
+            tablepro_core::Environment::Local,
+            "postgres",
+        ),
+    );
+    let first = establish(
+        &PgDriver,
+        verifying_options(&fixture),
+        Some(tablepro_transport::SshRoute::Builtin(chain(&fixture))),
+        &environment,
     )
     .await;
 
     let known_hosts_written = known_hosts.exists();
-    if backup.exists() {
-        std::fs::rename(&backup, &known_hosts).expect("restore the known_hosts file for later tests");
-    }
-
-    let error = result.err().expect("an unknown host key must be refused, not learned");
-    assert!(
-        matches!(error, tablepro_ssh::SshError::UnknownHostKey { .. }),
-        "the refused connection must fail with UnknownHostKey, got: {error}"
-    );
+    let error = first.err().expect("an unknown host key must be refused, not learned");
+    assert!(matches!(error, tablepro_transport::TransportError::HostKeyRefused(_)));
     assert!(
         !known_hosts_written,
         "refusing an unknown host key must not write a known_hosts file"
     );
+    let events = journal.recent(10).await.expect("read audit journal");
+    assert_eq!(events.len(), 1);
+    assert_eq!(
+        events[0].transport_attempt.expect("transport event").outcome,
+        AuditTransportOutcome::HostKeyRefused
+    );
+
+    let wrong_key = known_hosts.with_file_name("i5-wrong-host-key");
+    let generated = std::process::Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", ""])
+        .arg("-f")
+        .arg(&wrong_key)
+        .output()
+        .expect("ssh-keygen is available");
+    assert!(generated.status.success());
+    let public_key = std::fs::read_to_string(wrong_key.with_extension("pub")).expect("read wrong public key");
+    std::fs::create_dir_all(known_hosts.parent().expect("known_hosts parent")).expect("create config directory");
+    std::fs::write(
+        &known_hosts,
+        format!("[{}]:{} {}", fixture.ssh_host, fixture.ssh_port, public_key),
+    )
+    .expect("write wrong key to test known_hosts");
+    let changed = establish(
+        &PgDriver,
+        verifying_options(&fixture),
+        Some(tablepro_transport::SshRoute::Builtin(chain(&fixture))),
+        &environment,
+    )
+    .await
+    .err()
+    .expect("a changed host key must be refused");
+    assert!(matches!(changed, tablepro_transport::TransportError::HostKeyChanged(_)));
+    let events = journal.recent(10).await.expect("read audit journal");
+    assert_eq!(events.len(), 2, "one terminal record per builtin SSH attempt");
+    assert_eq!(
+        events[1].transport_attempt.expect("transport event").outcome,
+        AuditTransportOutcome::HostKeyChanged
+    );
+    std::fs::remove_file(&known_hosts).expect("remove the disposable mismatched host key");
+    let _ = std::fs::remove_file(&wrong_key);
+    let _ = std::fs::remove_file(wrong_key.with_extension("pub"));
+    if backup.exists() {
+        std::fs::rename(&backup, &known_hosts).expect("restore the original known_hosts file");
+    }
 }

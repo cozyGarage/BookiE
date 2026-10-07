@@ -64,6 +64,7 @@ mkdir -p "$secret_root/home" "$secret_root/data" "$secret_root/cache" "$secret_r
 chmod 0700 "$secret_root/runtime"
 
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+target_dir="${CARGO_TARGET_DIR:-$ROOT/target}"
 CARGO_HOME="$cargo_home" \
 RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   HOME="$secret_root/home" \
@@ -74,8 +75,39 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   XDG_RUNTIME_DIR="$secret_root/runtime" \
   TABLEPRO_FIXTURE_POSTGRES_RELEASE=1 \
   TABLEPRO_FIXTURE_MATERIALS="$FIXTURE/materials" \
+  TABLEPRO_TARGET_DIR="$target_dir" \
+  TABLEPRO_GTK_POSTGRES_CONTAINER="$(compose ps -q db)" \
   dbus-run-session -- bash -c '
     set -euo pipefail
     eval "$(printf "tablepro-test" | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo build --locked -p tablepro-ssh --bin tablepro-askpass
+    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo test --locked -p tablepro-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
+    cargo test --locked -p tablepro-agentd --test mtls -- --include-ignored --test-threads=1
     cargo test --locked -p tablepro-release-tests --tests -- --include-ignored --test-threads=1
+    cargo build --locked -p tablepro-app --bin tablepro-app
+    TABLEPRO_GTK_DBUS_ACTIVE=0 \
+      TABLEPRO_GTK_POSTGRES_DB=tablepro \
+      TABLEPRO_GTK_POSTGRES_USER=tablepro \
+      TABLEPRO_GTK_POSTGRES_MTLS_PASSWORD=tablepro \
+      TABLEPRO_GTK_BINARY="${TABLEPRO_GTK_BINARY:-$TABLEPRO_TARGET_DIR/debug/tablepro-app}" \
+      TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_mtls_connection_authenticates_and_queries,postgres_ssh_unknown_host_key_decline_is_durably_audited,postgres_ssh_multihop_trusts_both_hops_and_queries,postgres_ssh_second_hop_decline_does_not_learn_key,postgres_ssh_changed_second_hop_key_is_refused}" \
+      TABLEPRO_GTK_POSTGRES_MTLS_PORT=5433 \
+      TABLEPRO_GTK_POSTGRES_MTLS_HOST=localhost \
+      TABLEPRO_GTK_POSTGRES_MTLS_DB=tablepro \
+      TABLEPRO_GTK_POSTGRES_MTLS_USER=tablepro_mtls \
+      TABLEPRO_GTK_POSTGRES_MTLS_CA="$TABLEPRO_FIXTURE_MATERIALS/ca.crt" \
+      TABLEPRO_GTK_POSTGRES_MTLS_CERT="$TABLEPRO_FIXTURE_MATERIALS/client.crt" \
+      TABLEPRO_GTK_POSTGRES_MTLS_KEY="$TABLEPRO_FIXTURE_MATERIALS/client.key" \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PORT=2223 \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_HOST=127.0.0.1 \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST=relay \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT=22 \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_USER=tunnel \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_READ_ONLY=false \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_DB_HOST=db.tablepro.test \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_DB_PORT=5432 \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_KEY="$TABLEPRO_FIXTURE_MATERIALS/client_ed25519_key" \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_CA="$TABLEPRO_FIXTURE_MATERIALS/ca.crt" \
+      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PASSWORD=tablepro \
+      bash scripts/test-gtk-safety.sh
   '

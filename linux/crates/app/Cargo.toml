@@ -66,6 +66,7 @@ testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mongo", "mysql", "postgres", "mssql_server"] }
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
 zip = { version = "8.3", default-features = false, features = ["deflate"] }
+sha2.workspace = true
 
 [build-dependencies]
 glib-build-tools.workspace = true

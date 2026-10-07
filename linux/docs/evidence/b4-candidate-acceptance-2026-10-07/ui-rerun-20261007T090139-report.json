@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "b7362ee1360b64ffde7867143ad7df3945fab7d5",
+  "working_tree": "",
+  "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "started_utc": "2026-10-07T09:01:39.605265+00:00",
+  "status": "passed",
+  "layers": {
+    "ui": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-safety.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "ui-1.log",
+          "exit_code": 0,
+          "seconds": 205.639
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-07T09:05:05.244777+00:00"
+}

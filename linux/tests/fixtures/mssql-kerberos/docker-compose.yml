@@ -1,0 +1,86 @@
+name: bookie-mssql-kerberos
+
+services:
+  ad:
+    image: quay.io/samba.org/samba-ad-server@sha256:e61f23d474d4c0e0aafd1626d52cc565d7ccb491c35618e060737df721b5f43e
+    privileged: true
+    hostname: dc1.domain1.sink.test
+    command: ["run", "--setup", "provision"]
+    healthcheck:
+      test: ["CMD-SHELL", "samba-tool user list >/dev/null 2>&1"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    networks:
+      fixture:
+        ipv4_address: 172.30.50.2
+
+  mssql:
+    build:
+      context: .
+      dockerfile: mssql/Dockerfile
+    # The entrypoint copies the generated keytab, then drops to mssql before sqlservr starts.
+    user: "0:0"
+    depends_on:
+      ad:
+        condition: service_healthy
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "BookieFixture!2026"
+    volumes:
+      - ./materials/server.crt:/certs/server.crt:ro
+      - ./materials/server.key:/certs/server.key:ro
+      - ./materials/mssql.keytab:/fixture/mssql.keytab:ro
+      - ./mssql/mssql.conf:/var/opt/mssql/mssql.conf:ro
+      - ./mssql/krb5.conf:/etc/krb5.conf:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT 1" >/dev/null 2>&1
+      interval: 3s
+      timeout: 5s
+      retries: 60
+    dns:
+      - 172.30.50.2
+    dns_search:
+      - domain1.sink.test
+    extra_hosts:
+      - "dc1.domain1.sink.test:172.30.50.2"
+    networks:
+      fixture:
+        ipv4_address: 172.30.50.3
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    user: "${BOOKIE_UID:?set by test-mssql-kerberos.sh}:${BOOKIE_GID:?set by test-mssql-kerberos.sh}"
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      BOOKIE_KRB_PRINCIPAL: bookiekerb@DOMAIN1.SINK.TEST
+      BOOKIE_KRB_PASSWORD: "BookieFixture!2026"
+      BOOKIE_TEST_BINARY: ${BOOKIE_TEST_BINARY:?set by test-mssql-kerberos.sh}
+      BOOKIE_MSSQL_KRB_CA: /fixture/materials/ca.crt
+    volumes:
+      - ${BOOKIE_TEST_DEPS:?set by test-mssql-kerberos.sh}:/bookie-target:ro
+      - ./materials:/fixture/materials:ro
+      - ./mssql/krb5.conf:/etc/krb5.conf:ro
+      - ./client/run-tests.sh:/fixture/run-tests.sh:ro
+    entrypoint: ["bash", "/fixture/run-tests.sh"]
+    dns:
+      - 172.30.50.2
+    dns_search:
+      - domain1.sink.test
+    networks:
+      fixture:
+        ipv4_address: 172.30.50.4
+
+networks:
+  fixture:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.50.0/24
