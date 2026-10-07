@@ -862,6 +862,11 @@ main-schema table name with a dot collides with that flattened origin, metadata
 stays at the original fallback. See the
 [attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json).
 
+SQLite transaction queries now use the same streaming row and byte budget as
+ordinary queries. A regression crosses the 64 MiB decoded-result limit, checks
+ordered exact rows and `truncated`, then verifies the transaction can query
+again ([test](../crates/drivers/sqlite/tests/integration.rs)).
+
 Rows identify work areas, not completed engine support. State the four ADR 0007
 outcomes per concrete case. The older detailed matrix remains useful for lookup;
 do not re-import its long case descriptions into this board.
