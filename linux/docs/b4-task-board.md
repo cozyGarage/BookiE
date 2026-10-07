@@ -33,9 +33,13 @@ unavailable evidence. The broad release audit is dated
 | --- | --- | --- | --- |
 | C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
 | G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
+| I5 | PR #165, merge commit `b33a0f903` | GTK trust prompt handles `alert` and `frame`; tunnel-loss fixture trusts both hops; full local GTK safety layer passes, including post-connect audit-journal-loss write denial. See the [October 7 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json) | PR-head security-policy, workflow-lint, harness, resolve-ref and Sonar passed; preflight, supply-chain and Flatpak were in progress at merge. Merge-commit workflows were still running at this update. Frozen-candidate and installed acceptance remain |
 
-PRs #153–#162 and #164 have merged into `fork/linux`; PR #163 remains open.
-Current baseline is `c2fa01c08`. PR #159 adds the SSH audit, rollback, and Kerberos slices. Its
+PRs #153–#162 and #164–#166 have merged into `fork/linux`; PR #163 remains open
+with conflicts against current `linux`. Its distinct post-connect journal-loss
+regression is covered by merged PR #165; the passing local GTK safety run does
+not require `xdotool`.
+Current baseline is `b33a0f903`. PR #159 adds the SSH audit, rollback, and Kerberos slices. Its
 PostgreSQL release check lacked GTK development libraries; PR #161 added them.
 PR #162 merged the first local GTK safety setup fix. Follow-up hosted runs
 exposed Debian GTK role and two-hop test assumptions; this branch fixes those

@@ -8,8 +8,8 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `c2fa01c08` (PR #164) on `fork/linux`;
-PRs #158, #160, #162 and #164 merged after the earlier PR #161 checkpoint.
+Current integrated source baseline: `b33a0f903` (PR #165) on `fork/linux`;
+PRs #158, #160, #162, #164, #165 and #166 merged after the earlier PR #161 checkpoint.
 Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding,
 grid edits and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures
 for MySQL and SQL Server; #151 adds the daemon system-OpenSSH trust flow and
@@ -29,8 +29,15 @@ PR #156, which also adds range-array refusal contracts. PR #157 adds B4 SSH
 audit, rollback-failure, and Kerberos slices; PR #159 reconciles hosted CI
 findings. PR #158 and #160 add PostgreSQL text-search and JSON array refusal
 contracts. PR #161 adds GTK build dependencies to the PostgreSQL release job.
-The installed GTK safety smoke still needs the local scenario setup correction
-recorded in the [B4 candidate acceptance checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
+The installed GTK safety smoke still needs candidate-level and installed
+acceptance beyond the local setup correction recorded in the [B4 candidate
+acceptance checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
+PR #165 fixes GTK SSH trust prompt discovery across GTK roles, trusts each hop
+in the tunnel-loss/reconnect fixture, and adds a post-connect audit-journal-loss
+write-denial scenario. Its full GTK safety layer passed locally on PR head
+`551c6a9`; hosted CI was still running after merge. PR #163 remains open with
+conflicts; its distinct journal-loss case is covered by #165, while its
+`xdotool` dependency was unnecessary in the passing local run.
 The scoped XLSX writer mutation run caught 41/41 mutants; broad core/package
 coverage remains open. These changes do not qualify the release.
 
