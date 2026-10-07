@@ -24,6 +24,10 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "Array(Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))",
         ),
         (
+            "tuple(CAST('low' AS Enum8('low' = -128, 'NULL' = 0, 'high' = 127)), CAST(NULL AS Nullable(Enum8('low' = -128, 'NULL' = 0, 'high' = 127))), CAST('NULL' AS Enum8('low' = -128, 'NULL' = 0, 'high' = 127)))",
+            "Tuple(Enum8('low' = -128, 'NULL' = 0, 'high' = 127), Nullable(Enum8('low' = -128, 'NULL' = 0, 'high' = 127)), Enum8('low' = -128, 'NULL' = 0, 'high' = 127))",
+        ),
+        (
             "tuple(CAST('low' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), CAST(NULL AS Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))), CAST('NULL' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))",
             "Tuple(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767), Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))",
         ),
