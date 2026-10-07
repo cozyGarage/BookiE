@@ -42,6 +42,9 @@ mod wide_numeric_contract;
 #[path = "support/interval_contract.rs"]
 mod interval_contract;
 
+#[path = "support/query_budget_contract.rs"]
+mod query_budget_contract;
+
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
