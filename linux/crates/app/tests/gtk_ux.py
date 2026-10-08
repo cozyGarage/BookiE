@@ -1026,6 +1026,35 @@ def scenarios(ui):
     def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
         grid_edit_and_delete_commit_to_the_server(ui.POSTGRES_CONNECTION_NAME, "public.people", psql)
 
+    def postgres_enum_grid_edit_preserves_native_label_and_siblings(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke_named_action_within("public.enum_grid", "Open enum_grid")
+        ui.wait_for_node(name="ready", role=pyatspi.ROLE_LABEL)
+        click_cell("ready", count=2)
+        for key in "done":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+
+        snapshot = "SELECT string_agg(format('%s:%s:%s:%s', id, " \
+            "COALESCE(state::text, '<SQL_NULL>'), state IS NULL, sibling), E'\\n' ORDER BY id) " \
+            "FROM public.enum_grid"
+        before = "\n".join((
+            "1:ready:f:target",
+            "2:NULL:f:literal NULL",
+            "3:<SQL_NULL>:t:SQL NULL",
+            "4::f:empty",
+            "5:ready:f:sibling",
+        ))
+        after = before.replace("1:ready:f:target", "1:done:f:target")
+        actual = psql(snapshot)
+        assert actual == before, ("pending enum edit changed the native rows", actual, before)
+        ui.press_x11_key("s", ("Control_L",))
+        wait_for_oracle(psql, snapshot, after)
+        assert ui.find_node(name="Approve once") is None, "a plain enum grid edit asked for approval"
+        ui.wait_for_node(name="1 unsaved change", present=False)
+
     def mysql_grid_edit_and_delete_commit_to_the_server(database, base):
         grid_edit_and_delete_commit_to_the_server(ui.MYSQL_CONNECTION_NAME, "bookie_test.people", mysql)
 
@@ -1060,6 +1089,7 @@ def scenarios(ui):
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_saved_connection_browses_rows_and_values)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
+        result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
         result.append(postgres_saved_mtls_connection_authenticates_and_queries)

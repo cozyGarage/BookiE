@@ -81,6 +81,12 @@ codes plus SQL NULL, literal `NULL`, empty-label and sibling-row preservation
 ([scenario](../scripts/test-gtk-clickhouse.sh)). This Xvfb run does not replace
 the later distribution-package/Wayland acceptance.
 
+The PostgreSQL GTK fixture now edits a native enum cell through the grid and
+checks it remains pending until Save. The database oracle confirms the new
+label while preserving a literal `NULL` label, SQL NULL, an empty label and a
+sibling row ([scenario](../scripts/test-gtk-postgres.sh)). This local Xvfb run
+does not replace the later distribution-package/Wayland acceptance.
+
 PostgreSQL `citext` scalar and array values preserve exact label text while
 comparisons remain case-insensitive. `citext[]` now round-trips SQL NULL, empty
 arrays, zero lower bounds, empty elements, literal `NULL`, quoting and Unicode
