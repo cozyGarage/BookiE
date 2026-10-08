@@ -61,7 +61,7 @@ or installed acceptance; those gates remain open.
 
 ## Frozen-candidate acceptance (2026-10-08)
 
-The latest local checkpoint is candidate
+The previous local checkpoint is candidate
 `7eea6f09d7154f03400e82cec7c16215488b2115`; see the [candidate results and
 hosted run state](https://github.com/cozyGarage/BookiE/pull/298#issuecomment-6050658653).
 Policy, SSH, TLS, PostgreSQL release, GTK bundle audit, SQL Server Kerberos,
@@ -87,6 +87,25 @@ The earlier `0d22bfe9` checkpoint remains available in the
 Neither checkpoint establishes distribution-package installation on native
 Wayland, upgrade/rollback acceptance or Windows AD interoperability. This does
 not qualify 0.2.0.
+
+### Next B4 acceptance run
+
+The previous candidate and hosted evidence is historical; `linux` has advanced
+since the `7eea6f09` checkpoint. B4 acceptance remains scheduled after B3 closes,
+per the approved sprint order. At that point, pin the then-current clean full
+SHA and rerun the applicable layers against that exact source. No B4 candidate
+is pinned for the current sprint phase. If Linux advances during a future run,
+retain the pinned result and schedule a new run for the new tip rather than
+describing it as current.
+
+| Work | Required evidence on the next candidate | Current boundary |
+| --- | --- | --- |
+| B4-7, B4-9, B4-16, B4-22 | Frozen-candidate tests, hosted checks for the same SHA, and installed acceptance | Prior candidate and hosted runs at `7eea6f09` / `1e1a30dc` do not close the current-source run. Installed acceptance means a distribution package on the target desktop; Xvfb with `target/installed/usr/bin/tablepro` is staged-binary evidence only |
+| B4-12 | Repeat the PostgreSQL backend-termination rollback-failure selector on the frozen candidate; retain table, identity-sequence, and trigger-sequence assertions | Earlier candidate/hosted evidence is at `7eea6f09`; it does not prove the current candidate |
+| B4-11 | Rerun the scoped nine-test MySQL atomicity group on the candidate and hosted CI; keep any proposed additional engines or side effects as explicit new cases | Existing scope covers InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, failed INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT, and a trigger session-variable effect. It does not prove untested engines or side effects |
+| B4-17 | Run native two-hop success, changed-key refusal and second-hop cancellation, plus GTK trust/query, second-hop decline and changed-key refusal on the same candidate; run hosted and installed trust acceptance | The `ssh-gtk-*` records prove the GTK flows on older source and a staged release binary. Distribution-package/native Wayland acceptance remains separate |
+| B4-21 | Keep the local Samba Kerberos+TLS fixture and pinned hosted TLS evidence; obtain Windows AD interoperability and candidate/package acceptance | Samba AD is not equivalent to Windows AD |
+| UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | Proposal only; implementation and acceptance are open |
 
 ## Remaining tasks
 
