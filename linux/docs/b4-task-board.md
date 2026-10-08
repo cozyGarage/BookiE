@@ -59,9 +59,22 @@ checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json) retains
 the earlier candidate evidence. These runs do not establish frozen-candidate
 or installed acceptance; those gates remain open.
 
-## Frozen-candidate acceptance (2026-10-08)
+## Exact-SHA B4 acceptance checkpoint (2026-10-08)
 
-Frozen code candidate `1c197ffc9e8a925a9ad2061473f27ef36c5a5876` is the exact-SHA checkpoint for the local results. Local rollback, 48-case TLS, SSH, PostgreSQL release GTK, Samba Kerberos, policy/sandbox, and selected bundle GTK layers passed. Hosted [Build Linux run #37764482634](https://github.com/cozyGarage/BookiE/actions/runs/37764482634) is pinned to `00731e0`, a docs-only descendant, and remains pending. The earlier full hosted run #37758384574 passed on `9ef43f5`. The source-pinned [acceptance manifest](evidence/b4-acceptance-2026-10-08/manifest.json) records the results and limits. GTK used a staged release binary under Xvfb/AT-SPI; distro-package/native Wayland and Windows AD remain separate acceptance gates.
+Local B4 layers passed on runtime SHA `a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200`,
+including rollback, TLS, SSH, PostgreSQL release GTK, Samba Kerberos,
+security-policy and sandbox. The same staged release binary passed all five
+selected B4-22 GTK scenarios, including import from one profile into a second.
+The current `fork/linux` tip `0bb8e34354d13e3ab9911b9db710eddb02115170` changes GTK test harnesses, fixture scripts and documentation only relative to `a7f14fa`; it adds two of those bundle scenarios plus MySQL enum/set grid coverage. The
+current-tip hosted Build Linux run
+[#37772724483](https://github.com/cozyGarage/BookiE/actions/runs/37772724483)
+is queued. The preceding run [#37764482634](https://github.com/cozyGarage/BookiE/actions/runs/37764482634)
+on `00731e0` passed rollback, TLS, PostgreSQL release, DuckDB and broad driver
+integration. Fast GTK failed while pulling `mongo:7` for the ignored MongoDB
+integer-width selector; the exact selector passed locally on `a7f14fa`. The
+source-pinned [acceptance manifest](evidence/b4-acceptance-2026-10-08/manifest.json)
+records the reports and remaining limits. GTK used a staged release binary
+under Xvfb/AT-SPI; package/native Wayland and Windows AD remain separate gates.
 
 The previous local checkpoint is candidate
 `7eea6f09d7154f03400e82cec7c16215488b2115`; see the [candidate results and
@@ -92,12 +105,14 @@ not qualify 0.2.0.
 
 ### Next B4 acceptance run
 
-Earlier candidate reports remain historical and are preserved below. Candidate
-`1c197ff` is the current code acceptance checkpoint; `00731e0` is a docs-only
-descendant and its hosted candidate run is pending. Rerun the B4 matrix if a later
-source SHA changes application or driver code. Remaining work is limited to platform acceptance,
-additional MySQL engine/side-effect coverage, Windows AD interoperability, and
-the UI-1b per-hop credential implementation.
+Earlier candidate reports remain historical and are preserved below. Runtime
+SHA `a7f14fa` is the latest local B4 acceptance checkpoint. The current
+`fork/linux` tip `0bb8e34` adds GTK test harness, fixture script and documentation changes only;
+its hosted run is queued. Rerun affected layers if a later source SHA changes
+application or driver code. Remaining work includes current-tip hosted
+acceptance, distribution-package/native Wayland flows, additional MySQL
+engine/side-effect coverage, Windows AD interoperability, and the UI-1b
+per-hop credential implementation.
 
 The hosted Build Linux run for `8e5d1b18` was
 [cancelled](https://github.com/cozyGarage/BookiE/actions/runs/37723088254) as
@@ -130,13 +145,13 @@ undetermined.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-16 | The exact candidate, hosted, and staged-release GTK trust/reconnect runs passed; retain the package/native Wayland gate as separate evidence | Local PostgreSQL release scenarios passed on `1c197ff`; earlier hosted scenarios passed on `9ef43f5`, while current hosted run `00731e0` is pending. Distribution-package/native Wayland acceptance remains open |
-| B4-9 | Record the exact-candidate TLS matrix and hosted result; complete distribution-package/native Wayland acceptance | Local 48-case TLS matrix passed on `1c197ff`; earlier hosted TLS passed on `9ef43f5` and current hosted `00731e0` is pending. Saved PostgreSQL mTLS through SSH also passed locally. Package/native Wayland acceptance remains open |
-| B4-22 | Record the exact-candidate bundle audit and encrypted credential GTK flows; complete distribution-package/native Wayland acceptance | Local selected B4-22 GTK cases passed on `1c197ff`; earlier hosted Installed GTK safety passed on `9ef43f5` and current hosted `00731e0` is pending. Package/native Wayland acceptance remains open |
-| B4-12 | Repeat the PostgreSQL rollback-failure selector on the selected frozen candidate and hosted CI | The exact selector passed locally on `1c197ff` and hosted on earlier candidate `9ef43f5`; current hosted acceptance on `00731e0` is pending. The row remains open until the selected frozen candidate is accepted. See [candidate evidence](evidence/b4-acceptance-2026-10-08/manifest.json) |
-| B4-11 | Extend failed-batch tests to additional MySQL storage engines and side-effect patterns | Exact candidate `1c197ff` passed all 11 bounded MySQL atomicity tests locally; hosted B4 rollback passed on earlier candidate `9ef43f5`, with current hosted `00731e0` pending. Direct INSERT, UPDATE/DELETE, trigger, session-variable and sequence cases are covered for the fixture engines; optional/vendor engines and broader side effects remain open |
-| B4-17 | Verify native multi-hop, cancellation, and installed trust flow | Native two-hop and cancellation tests plus seven staged-release PostgreSQL SSH GTK scenarios passed locally on `1c197ff`; earlier hosted scenarios passed on `9ef43f5`, and current hosted `00731e0` is pending. The GTK trust scenarios used Xvfb/AT-SPI; installed-package/native Wayland trust acceptance remains open |
-| B4-21 | Preserve candidate Samba Kerberos+VerifyFull proof, then perform Windows AD interoperability | The exact candidate Samba fixture passed both tests; it does not establish Windows AD interoperability, which remains open |
+| B4-7, B4-16 | Confirm current-tip hosted results, then complete distribution-package/native Wayland trust and reconnect acceptance | Local PostgreSQL release scenarios passed on runtime SHA `a7f14fa`; current hosted run `37772724483` is queued. The Xvfb/AT-SPI staged-release run does not establish package/native Wayland acceptance |
+| B4-9 | Confirm current-tip hosted TLS results, then complete distribution-package/native Wayland acceptance | Local 48-case TLS matrix passed on `a7f14fa`; hosted TLS passed on earlier code candidate `00731e0`. Current-tip run `37772724483` is queued |
+| B4-22 | Confirm current-tip hosted result and complete distribution-package/native Wayland bundle audit and encrypted credential flows | Five selected B4-22 GTK cases passed with a release binary built from `a7f14fa`, including the new cross-profile import case; current-tip hosted run `37772724483` is queued |
+| B4-12 | Confirm PostgreSQL rollback-failure acceptance on the selected frozen candidate and hosted CI | The exact selector passed locally on `a7f14fa`; hosted B4 rollback passed on `00731e0`, while current-tip run `37772724483` is queued. The row remains open until candidate acceptance; see [candidate evidence](evidence/b4-acceptance-2026-10-08/manifest.json) |
+| B4-11 | Extend failed-batch tests to additional MySQL storage engines and side-effect patterns | Runtime `a7f14fa` passed all 11 bounded MySQL atomicity tests locally. Hosted B4 rollback passed on `00731e0`; current-tip run `37772724483` is queued. Optional/vendor engines and broader side effects remain open |
+| B4-17 | Confirm current-tip hosted native multi-hop and complete installed trust flow | Native two-hop/cancellation tests and seven staged-release PostgreSQL SSH GTK scenarios passed locally on `a7f14fa`; current-tip hosted run `37772724483` is queued. Installed-package/native Wayland trust acceptance remains open |
+| B4-21 | Preserve current candidate Samba Kerberos+VerifyFull proof, then perform Windows AD interoperability | Samba Kerberos fixture passed both tests on `a7f14fa`; current-tip hosted run `37772724483` is queued. Windows AD interoperability remains unestablished |
 | UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | Proposal only; implementation and acceptance are open |
 
 ## Remaining tasks
@@ -158,7 +173,7 @@ additional privacy, value and evidence tasks without duplicating this board.
 
 | ID | Current implementation and validation | Remaining |
 | --- | --- | --- |
-| B4-22 | Record the exact-candidate bundle audit and encrypted credential GTK flows; complete distribution-package/native Wayland acceptance | Local selected B4-22 GTK cases passed on `1c197ff`; earlier hosted Installed GTK safety passed on `9ef43f5` and current hosted `00731e0` is pending. Package/native Wayland acceptance remains open |
+| B4-22 | Record the exact-candidate bundle audit and encrypted credential GTK flows; complete distribution-package/native Wayland acceptance | Five selected B4-22 GTK cases passed with a staged release binary built from runtime SHA `a7f14fa`; current-tip hosted run `37772724483` is queued. Package/native Wayland acceptance remains open |
 
 ## Completed local slices
 
@@ -172,9 +187,9 @@ additional privacy, value and evidence tasks without duplicating this board.
 | I5 | `security-policy`, `ssh`, and `postgres-release` passed on `b4/i5-reconciled` (2026-10-07). PostgreSQL release fixtures assert one journal event each for built-in unknown/mismatched-key refusal and system OpenSSH unknown/mismatched-key refusal, plus one connected event for pretrusted system OpenSSH. Transport units cover cancellation, audit sink failure (no connection returned; governed writes disabled), and legacy journal deserialization. Agent credentials are hashed before persistence. GTK saved/open, reconnect, connect-dialog submit, and test-connection call sites pass the audit context into the same transport boundary. The targeted GTK setup-failure scenario also proves a closed SSH port produces exactly one durable `connection_failed` outcome; `audit_journal_loss_after_connection_denies_mutation` verifies a live editor still denies writes after journal storage disappears. See [setup-failure evidence](evidence/ssh-gtk-setup-failure-2026-10-07/manifest.json) and the [candidate checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json). | Frozen candidate `7eea6f09` passed local I5 layers. Hosted release-binary PostgreSQL SSH GTK scenarios also passed in run `37708183936` at PR #286 head `a056bf1`; distribution-package/native Wayland acceptance remains |
 | F7 | The rollback action sends `ROLLBACK`, awaits its result, then closes the dedicated session; Session stays active and controls stay disabled until both steps finish. Unit coverage gates delayed rollback/close and close-after-rollback-error; isolated GTK dialog coverage checks Cancel, Roll Back and Commit semantics. The `widgets` layer passed 13 selectors, `postgres-release` passed, and the full app library suite passed (537 passed, 39 ignored). The focused PostgreSQL 17 GTK flow passed: Cancel kept the same transaction open, later writes remained uncommitted, and Roll Back closed the session with zero persisted rows. See [GTK session evidence](evidence/gtk-postgres-session-confirmation-2026-10-07/manifest.json) | Re-run on the frozen B3+B4 candidate; hosted CI and installed acceptance remain |
 | B4-16 | The [current-Linux seven-scenario evidence](evidence/ssh-gtk-audit-linux-fb82ea1-2026-10-07/manifest.json) cuts the saved SSH route during an editor transaction; the transaction remains absent, a stale-session write is refused, and after recovery a new Session successfully runs `SELECT 42`. The same tunnel-loss retirement/reconnect scenario passed on frozen candidate `7eea6f09` against the staged release binary and in hosted run `37708183936` against the staged release binary at PR #286 head `a056bf1`; see the [candidate checkpoint](https://github.com/cozyGarage/BookiE/pull/298#issuecomment-6050658653) | **Unverified:** distribution-package/native Wayland acceptance remains |
-| B4-17 | Verify native multi-hop, cancellation, and installed trust flow | Native two-hop and cancellation tests plus seven staged-release PostgreSQL SSH GTK scenarios passed locally on `1c197ff`; earlier hosted scenarios passed on `9ef43f5`, and current hosted `00731e0` is pending. The GTK trust scenarios used Xvfb/AT-SPI; installed-package/native Wayland trust acceptance remains open |
+| B4-17 | Verify native multi-hop, cancellation, and installed trust flow | Native two-hop and cancellation tests plus seven staged-release PostgreSQL SSH GTK scenarios passed locally on runtime `a7f14fa`; current-tip hosted run `37772724483` is queued. The GTK trust scenarios used Xvfb/AT-SPI; installed-package/native Wayland trust acceptance remains open |
 | B4-21 | Preserve candidate Samba Kerberos+VerifyFull proof, then perform Windows AD interoperability | The exact candidate Samba fixture passed both tests; it does not establish Windows AD interoperability, which remains open |
-| B4-12 | Repeat the PostgreSQL rollback-failure selector on the selected frozen candidate and hosted CI | The exact selector passed locally on `1c197ff` and hosted on earlier candidate `9ef43f5`; current hosted acceptance on `00731e0` is pending. The row remains open until the selected frozen candidate is accepted. See [candidate evidence](evidence/b4-acceptance-2026-10-08/manifest.json) |
+| B4-12 | Repeat the PostgreSQL rollback-failure selector on the selected frozen candidate and hosted CI | The exact selector passed locally on runtime `a7f14fa`; hosted B4 rollback passed on `00731e0`, while current-tip run `37772724483` is queued. The row remains open until selected-candidate hosted acceptance. See [candidate evidence](evidence/b4-acceptance-2026-10-08/manifest.json) |
 | B4-18 | Candidate `SERVER VERSION`, `LIST TABLES`, and `LIST VIEWS` reads for saved connect and connect-dialog submit now use `CandidateGuardFactory`; Test Connection table listing uses the same guard. `candidate_catalog_reads_use_the_durable_policy_audit_journal` verifies intent/outcome entries; `candidate_metadata_read_refuses_when_its_audit_intent_cannot_be_written` verifies fail-closed behavior. Both passed in `cargo test -p tablepro-app --lib candidate_ -- --nocapture` | Local app tests only; frozen-candidate, hosted, and installed acceptance remain |
 | B4-19 | The vendored PostgreSQL SCRAM client rejects server nonces that fail to extend the client nonce or contain non-ASCII/non-printable bytes, before deriving a proof. A local wire fixture sends an echoed nonce, a non-ASCII suffix, and 100,001 iterations; all three cases reject before a client proof is sent. `cargo test -p tablepro-driver-postgres --lib` passed (54 tests) | Local driver tests only; frozen-candidate and hosted acceptance remain |
 
