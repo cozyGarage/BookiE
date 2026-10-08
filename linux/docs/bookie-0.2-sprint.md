@@ -5,17 +5,17 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Integrated baseline: `bdae116d5` on `linux`. PR #293 refreshed the sprint
-documentation; PR #289 added result-header type and primary-key markers; PR
-#294 added ClickHouse Enum8/Enum16 map-key consumer checks; and PR #295
-reconciled the B4 hosted-candidate checkpoint. PR #296 fixed MongoDB native
-collection browsing. PR #298 extended the driver-integration budget and moved
-the B4 checkpoint evidence from the repository into its PR comment. PR #300
-added a native ClickHouse Enum8/Enum16 GTK grid-edit scenario. PR #301 adds a
-native PostgreSQL custom-range-array refusal contract and is under hosted
-validation. PR #288 splits hosted CI tiers and shards the Linux regression
-gate, #290 completes ClickHouse Enum8/Enum16 map-value pairings, and #291 adds
-MySQL/MariaDB ENUM/SET XLSX consumer checks.
+Integrated baseline: `c1efc8f63` on `linux`. PR #301 added the PostgreSQL
+custom-range-array refusal contract and its documented consumer outcomes; its
+hosted checks and post-merge Linux regression gate passed. PR #302 updates GTK
+accessibility selectors for typed result headers. Recent foundation work also
+includes PR #293's sprint-doc refresh, #289's result-header type and
+primary-key markers, #294's ClickHouse Enum8/Enum16 map-key checks, #295's B4
+checkpoint reconciliation, #296's MongoDB native collection browsing, #298's
+integration-budget update and PR-comment evidence, and #300's installed
+ClickHouse enum grid scenario. PR #288 split hosted CI tiers; #290 completed
+ClickHouse Enum8/Enum16 map-value pairings; #291 added MySQL/MariaDB ENUM/SET
+XLSX checks.
 Earlier baseline work includes PR #280
 ClickHouse Map(Enum) consumer
 coverage, #282/#284 PostgreSQL lost-ack non-replay and its regression proxy
