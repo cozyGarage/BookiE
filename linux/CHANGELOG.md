@@ -4,6 +4,7 @@
 
 ### Added
 - ClickHouse Enum8 and Enum16 map keys now have native JSON and JSON/CSV/XLSX consumer coverage, with lossy SQL, binding and grid writes refused and the stored row preserved.
+- MongoDB and Redis unfiltered, unsorted table pages now use native fetches even when metadata finds a primary key; a native MongoDB GTK scenario checks cursor values remain visible until refresh and an approved post-refresh edit preserves sibling fields.
 - ClickHouse nested enum map coverage now includes all Enum8/Enum16 nullable and non-nullable pairings, with native JSON and JSON/CSV/XLSX consumer checks plus lossy-write refusal and stored-row preservation.
 - MySQL and MariaDB ENUM/SET contracts now prove non-empty XLSX exports preserve native labels and keep SQL NULL cells blank across the twelve tested SQL modes; empty SET values still refuse the export without replacing an existing workbook.
 - Result column headers show the column type and mark primary-key columns.

@@ -298,6 +298,21 @@
         }
       ]
     },
+    "gtk-mongodb": {
+      "purpose": "Installed GTK MongoDB cursor observation and native grid edit",
+      "prerequisites": "GNOME 50; Docker with mongo:7; Rust 1.98; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Local release gate",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-mongodb.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit"
+        }
+      ]
+    },
     "values": {
       "purpose": "Exact shared values across eight drivers, GTK and DuckDB",
       "prerequisites": "Rust 1.98; GNOME 50 development stack; Docker; disk space for DuckDB",

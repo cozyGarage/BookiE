@@ -26,6 +26,8 @@ CONNECTION_B_NAME = "Safety SQLite B"
 BROKEN_CONNECTION_NAME = "Broken SQLite"
 MYSQL_CONNECTION_NAME = "Safety MySQL"
 MYSQL_CONNECTION_ID = "c38e2d93-4314-4c18-b192-08f164386e09"
+MONGODB_CONNECTION_NAME = "Safety MongoDB"
+MONGODB_CONNECTION_ID = "d87c89b2-3e9c-4c36-9662-c75c69f513ab"
 POSTGRES_CONNECTION_NAME = "Safety PostgreSQL"
 POSTGRES_CONNECTION_ID = "0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11"
 POSTGRES_MTLS_CONNECTION_NAME = "PostgreSQL mTLS"
@@ -630,6 +632,24 @@ def write_fixture(base, audit_available=True, environment="prod"):
                 "port": int(mysql_port),
                 "database": "bookie_test",
                 "username": "root",
+                "use_tls": False,
+                "tls_mode": "disabled",
+                "read_only": False,
+                "auth_mode": "password",
+                "environment": environment,
+            }
+        )
+    mongodb_port = os.environ.get("TABLEPRO_GTK_MONGODB_PORT")
+    if mongodb_port:
+        connections["connections"].append(
+            {
+                "id": MONGODB_CONNECTION_ID,
+                "name": MONGODB_CONNECTION_NAME,
+                "driver_id": "mongodb",
+                "host": os.environ.get("TABLEPRO_GTK_MONGODB_HOST", "127.0.0.1"),
+                "port": int(mongodb_port),
+                "database": "bookie_test",
+                "username": "",
                 "use_tls": False,
                 "tls_mode": "disabled",
                 "read_only": False,
