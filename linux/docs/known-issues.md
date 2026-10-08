@@ -18,13 +18,13 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against the BookiE `linux` code tip `1b16d1101a33af30acb5c695bec7f97846a788eb` (PR #347, merged after #354), checked
-2026-10-08. This review covers merged code PRs through #354 and the later #347
+Reconciled against the BookiE `linux` code tip `69186dd238525af349e7209f2388abf833debed4` (PR #348, merged after #355), checked
+2026-10-08. This review covers merged code PRs through #355 and the later #348
 merge, plus the B4/B3
 documentation updates in PRs #319, #321–#323, #332, #335, #338, #340, #342,
 #343, and #350, including the B4 evidence move (#310), MongoDB nested null-filter
-contract (#312), MySQL, Redis and ClickHouse lost-ack contracts (#315, #345,
-#354), SQLite
+contract (#312), MySQL, Redis, ClickHouse and SQL Server lost-ack contracts
+(#315, #345, #354, #355), SQLite
 declared/runtime value-decoder cases (#333, #335), PostgreSQL domain-over-enum
 contracts at 302 and 512 layers plus direct query type checks (#338, #340,
 #342), PostgreSQL domain-array projections (#344), and the MySQL direct-DML
