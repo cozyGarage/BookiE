@@ -4,7 +4,7 @@
 
 ### Added
 - Concurrent MongoDB first-page requests now share one schema census and retain the union of types observed across pages.
-- MongoDB browse performs a complete type census on initial load and refresh, then reuses it across pages and invalidates it after driver writes.
+- MongoDB browse performs a complete type census on initial load and refresh, then reuses it across pages and invalidates it after driver writes; browse pages use stable ascending _id order.
 - MongoDB paged `find` queries reuse the same connection-local type census instead of rescanning the collection for each page.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.

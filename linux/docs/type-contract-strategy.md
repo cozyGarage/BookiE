@@ -80,7 +80,9 @@ MongoDB browse cells now also preview long text, binary and structured values
 and refetch one selected field through a bound `_id` query under `PolicyGuard`.
 Its Docker app-service contract binds an ObjectId and checks exact 9,000-byte
 text, generic binary and nested BSON document values against native MongoDB
-storage. Redis string refetch binds arbitrary key bytes and checks an exact
+storage. MongoDB browse and paged find requests sort by unique _id before
+applying skip/limit, so page boundaries remain deterministic. Redis string
+refetch binds arbitrary key bytes and checks an exact
 9,000-byte value through `PolicyGuard` against native Redis GET. Arbitrary SQL,
 shared result memory, installed GTK and memory profiling remain open under
 PERF-10.

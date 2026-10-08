@@ -288,6 +288,7 @@ impl Connection for MongodbConnection {
         if limit > 0 {
             let mut cursor = coll
                 .find(doc! {})
+                .sort(doc! { "_id": 1 })
                 .skip(offset)
                 .limit(limit.min(i64::MAX as u64) as i64)
                 .await
@@ -533,6 +534,7 @@ impl MongodbConnection {
         let coll = self.db().collection::<Document>(&q.collection);
         let mut cursor = coll
             .find(q.filter)
+            .sort(doc! { "_id": 1 })
             .skip(q.skip)
             .limit(q.limit)
             .await
@@ -716,8 +718,10 @@ mod tests {
             assert_eq!(commands.len(), 3);
             assert_eq!(commands[0].get("limit"), None);
             assert_eq!(commands[1].get_i64("limit").unwrap(), 1);
+            assert_eq!(commands[1].get_document("sort").unwrap().get_i32("_id").unwrap(), 1);
             assert_eq!(commands[2].get_i64("limit").unwrap(), 1);
             assert_eq!(commands[2].get_i64("skip").unwrap(), 1);
+            assert_eq!(commands[2].get_document("sort").unwrap().get_i32("_id").unwrap(), 1);
         }
         assert_empty_collection_and_zero_limit_contract(&connection, &database, &finds).await;
 
@@ -851,8 +855,10 @@ mod tests {
         let commands = finds.lock().unwrap();
         assert_eq!(commands.len(), 8);
         assert_eq!(commands[6].get_i64("limit").unwrap(), 1);
+        assert_eq!(commands[6].get_document("sort").unwrap().get_i32("_id").unwrap(), 1);
         assert_eq!(commands[7].get_i64("limit").unwrap(), 1);
         assert_eq!(commands[7].get_i64("skip").unwrap(), 1);
+        assert_eq!(commands[7].get_document("sort").unwrap().get_i32("_id").unwrap(), 1);
     }
 
     #[test]
