@@ -18,12 +18,6 @@ pub fn clickhouse_datetime64_precision(stamp: chrono::NaiveDateTime) -> Option<u
     (0..=9).find(|precision| clickhouse_datetime64_fits_precision(stamp, *precision))
 }
 
-/// Whether a timestamp fits ClickHouse `DateTime64(9)` without saturating its
-/// signed nanosecond count.
-pub fn clickhouse_datetime64_nanos_supported(stamp: chrono::NaiveDateTime) -> bool {
-    clickhouse_datetime64_fits_precision(stamp, 9)
-}
-
 /// Render a timestamp as a precision-preserving ClickHouse DateTime64 literal.
 /// An optional timezone is included in the native expression.
 pub fn clickhouse_datetime64_literal(stamp: chrono::NaiveDateTime, timezone: Option<&str>) -> Option<String> {

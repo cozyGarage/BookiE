@@ -6113,7 +6113,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "secrecy",
  "tablepro-core",
  "tablepro-driver-clickhouse",
  "tablepro-driver-duckdb",
@@ -6140,7 +6139,6 @@ dependencies = [
 name = "tablepro-app"
 version = "0.1.6-dev"
 dependencies = [
- "anyhow",
  "async-channel",
  "async-trait",
  "chrono",
@@ -6393,7 +6391,6 @@ dependencies = [
  "async-trait",
  "axum",
  "chrono",
- "futures",
  "hex",
  "libc",
  "mongodb",
@@ -6409,7 +6406,6 @@ dependencies = [
  "tempfile",
  "testcontainers",
  "testcontainers-modules",
- "thiserror 2.0.20",
  "tokio",
  "tokio-util",
  "tracing",
@@ -6469,11 +6465,9 @@ name = "tablepro-ssh"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "futures",
  "libc",
  "russh",
  "secrecy",
- "serde",
  "serde_json",
  "tempfile",
  "testcontainers",
@@ -6504,7 +6498,6 @@ dependencies = [
  "sqlx",
  "tablepro-core",
  "tablepro-policy",
- "tablepro-ssh",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
