@@ -1,6 +1,6 @@
 # Packaging
 
-GitHub Release `linux-v0.1.4` ships an Arch/Omarchy `.pkg.tar.zst` and an amd64 `.deb`.
+GitHub Release `linux-v0.1.5` ships an Arch/Omarchy `.pkg.tar.zst` and an amd64 `.deb`.
 Nothing here is ready for AUR or Flathub. BookiE keeps the existing repository and
 application ID. Portal permissions and the public update channel still need release review.
 

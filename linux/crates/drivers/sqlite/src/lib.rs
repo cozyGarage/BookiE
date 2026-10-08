@@ -890,7 +890,7 @@ async fn request_interrupt(handle: &InterruptHandle) -> Result<(), DriverError> 
 /// reports the extended result code, so both the plain code and an
 /// extended code in the same family have to be accepted.
 fn confirms_cancellation(error: &DriverError) -> bool {
-    let DriverError::Query { message, sqlstate } = error else {
+    let DriverError::Query { message, sqlstate, .. } = error else {
         return false;
     };
     if sqlstate.as_deref() == Some("9") {
@@ -911,6 +911,7 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         Database(e) => DriverError::Query {
             message: e.message().to_string(),
             sqlstate: e.code().map(|c| c.to_string()),
+            position: None,
         },
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
         Tls(e) => DriverError::Tls(e.to_string()),

@@ -27,6 +27,27 @@ pub(crate) async fn run_statements(
     error_policy: BatchErrorPolicy,
     succeeded: impl Fn(&str),
 ) -> ScriptRunResult {
+    crate::services::approval_wait::track(run_tracked_statements(
+        target,
+        statements,
+        driver_id,
+        parameter_values,
+        control,
+        error_policy,
+        succeeded,
+    ))
+    .await
+}
+
+async fn run_tracked_statements(
+    target: super::session_mode::StatementTarget,
+    statements: Vec<String>,
+    driver_id: &str,
+    parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
+    control: &OperationControl,
+    error_policy: BatchErrorPolicy,
+    succeeded: impl Fn(&str),
+) -> ScriptRunResult {
     if statements.is_empty() {
         return ScriptRunResult::Completed(Vec::new());
     }
@@ -44,6 +65,7 @@ pub(crate) async fn run_statements(
             continue;
         }
         let started = std::time::Instant::now();
+        let waited_before = crate::services::approval_wait::waited();
         let bound = match crate::services::query_parameters::bind_statement(&sql, driver_id, parameter_values) {
             Ok(bound) => bound,
             Err(reason) => {
@@ -66,12 +88,20 @@ pub(crate) async fn run_statements(
 
             Err(e) => {
                 aborted = stops_on_error;
-                StatementOutcomeKind::Error(crate::ui::error_text::driver_message(&e))
+                let position = match &e {
+                    DriverError::Query { position, .. } if bound.sql == sql => *position,
+                    _ => None,
+                };
+                let message = crate::ui::error_text::driver_message(&e);
+                StatementOutcomeKind::Error(super::error_location::located_message(&message, &bound.sql, position))
             }
         };
         out.push(StatementOutcome {
             sql_preview: preview,
-            elapsed_ms: started.elapsed().as_millis(),
+            elapsed_ms: started
+                .elapsed()
+                .saturating_sub(crate::services::approval_wait::waited().saturating_sub(waited_before))
+                .as_millis(),
             kind,
         });
     }
@@ -498,6 +528,79 @@ mod tests {
         assert!(matches!(outcomes[1].kind, StatementOutcomeKind::NotRun));
         let rows = conn.query_controlled("SELECT count(*) FROM t", &control).await.unwrap();
         assert_eq!(rows.rows, vec![vec![tablepro_core::Value::Int(0)]]);
+    }
+
+    struct SlowApproval {
+        asked: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl tablepro_policy::ApprovalSink for SlowApproval {
+        async fn request(&self, _request: tablepro_policy::ApprovalRequest) -> tablepro_policy::ApprovalOutcome {
+            self.asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            tablepro_policy::ApprovalOutcome::AllowOnce
+        }
+    }
+
+    struct QuietAudit;
+
+    #[async_trait::async_trait]
+    impl tablepro_policy::AuditSink for QuietAudit {
+        async fn record(&self, _event: tablepro_policy::AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn the_elapsed_time_of_a_statement_excludes_the_wait_for_approval() {
+        let slow = std::sync::Arc::new(SlowApproval {
+            asked: Default::default(),
+        });
+        let approval = std::sync::Arc::new(crate::services::approval_router::ApprovalRouter::new(
+            slow.clone(),
+            slow.clone(),
+        ));
+        let guard = tablepro_policy::PolicyGuard::new(
+            sqlite_connection().await,
+            tablepro_policy::GuardContext {
+                connection_id: uuid::Uuid::new_v4(),
+                connection_name: "production".into(),
+                driver_id: "sqlite".into(),
+                environment: tablepro_core::Environment::Prod,
+                read_only: false,
+                principal: tablepro_policy::Principal::human_gui(),
+                policy: std::sync::Arc::new(tablepro_policy::PolicyConfig::default()),
+                approval,
+                audit: std::sync::Arc::new(QuietAudit),
+                audit_state: std::sync::Arc::new(tablepro_policy::AuditState::new()),
+            },
+        );
+        let control = crate::services::operation_control::bounded(0);
+        let result = run_statements(
+            StatementTarget::Pool(std::sync::Arc::new(guard)),
+            vec!["CREATE TABLE t (id int)".into()],
+            "sqlite",
+            &Default::default(),
+            &control,
+            BatchErrorPolicy::StopScript,
+            |_| {},
+        )
+        .await;
+        let ScriptRunResult::Completed(outcomes) = result else {
+            panic!("expected the run to complete")
+        };
+        assert!(
+            matches!(outcomes[0].kind, StatementOutcomeKind::Rows(_)),
+            "{:?}",
+            outcomes[0].kind
+        );
+        assert_eq!(
+            slow.asked.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the statement must ask for approval"
+        );
+        assert!(outcomes[0].elapsed_ms < 200, "{} ms", outcomes[0].elapsed_ms);
     }
 
     #[tokio::test]
