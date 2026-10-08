@@ -6,6 +6,9 @@ mod finish_notice;
 pub(crate) mod open_file;
 use tablepro_core::sql_format as format_plan;
 mod outcomes;
+mod pinned;
+mod run_generation;
+mod run_marks;
 mod schema;
 mod session_mode;
 mod sql_text;
@@ -31,7 +34,8 @@ use crate::ui::grid::GridMsg;
 pub use completion::{SchemaIndex, SchemaRequest, candidate_words, referenced_tables, table_key};
 pub use schema::{SQL_KEYWORDS, build_schema_buffer, derive_tab_label, update_schema_buffer};
 
-use outcomes::{ScriptRunResult, clear_box, render_outcomes, run_statements, summary_label};
+use outcomes::{ScriptRunResult, clear_box, render_outcomes, run_statements};
+use run_generation::{RunGeneration, RunTerminal};
 use schema::{apply_editor_preferences, apply_editor_scheme};
 use sql_text::toggle_line_comment;
 use statement_cursor::{adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor};
@@ -57,6 +61,8 @@ pub struct SqlEditor {
     session_teardown_running: bool,
     session_teardown_waiters: Vec<tokio::sync::oneshot::Sender<Result<(), String>>>,
     cancel_button: gtk::Button,
+    pin_button: gtk::Button,
+    pinned: pinned::PinnedResults,
     running_spinner: gtk::Spinner,
     results_holder: gtk::Box,
     status: gtk::Label,
@@ -92,6 +98,7 @@ pub struct StatementOutcome {
     pub sql_preview: String,
     pub elapsed_ms: u128,
     pub kind: StatementOutcomeKind,
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -117,6 +124,7 @@ pub enum SqlEditorInput {
         values: std::collections::HashMap<String, tablepro_core::Value>,
     },
     Cancel,
+    TogglePin,
     ShowOutcomes {
         generation: u64,
         outcomes: Vec<StatementOutcome>,
@@ -191,45 +199,6 @@ struct ExecutionContext {
     sql: String,
     metadata: ConnectionMetadata,
     started_at: SystemTime,
-}
-
-#[derive(Debug, Default)]
-struct RunGeneration {
-    next: u64,
-    current: Option<u64>,
-    active: std::collections::HashSet<u64>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct RunTerminal {
-    replace_ui: bool,
-    became_idle: bool,
-}
-
-impl RunGeneration {
-    fn begin(&mut self) -> u64 {
-        self.next = self.next.wrapping_add(1);
-        self.current = Some(self.next);
-        self.next
-    }
-
-    fn accepts(&self, generation: u64) -> bool {
-        self.current == Some(generation)
-    }
-
-    fn start(&mut self, generation: u64) -> bool {
-        self.accepts(generation) && self.active.insert(generation)
-    }
-
-    fn finish(&mut self, generation: u64) -> Option<RunTerminal> {
-        if !self.active.remove(&generation) {
-            return None;
-        }
-        Some(RunTerminal {
-            replace_ui: self.accepts(generation),
-            became_idle: self.active.is_empty(),
-        })
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -309,6 +278,15 @@ impl SimpleComponent for SqlEditor {
                 gtk::Label {
                     set_halign: gtk::Align::End,
                     add_css_class: "dim-label",
+                },
+
+                #[name = "pin_button"]
+                gtk::Button {
+                    set_label: &crate::tr!("Pin results"),
+                    set_tooltip_text: Some(crate::tr!("Keep these results above the results of the next run").as_str()),
+                    set_sensitive: false,
+                    add_css_class: "flat",
+                    connect_clicked => SqlEditorInput::TogglePin,
                 },
 
                 #[name = "cancel_button"]
@@ -401,6 +379,7 @@ impl SimpleComponent for SqlEditor {
             init.database.clone(),
             init.connection_id,
         );
+        run_marks::install(&widgets.source_view);
         let find = find_bar::FindBar::new(&widgets.source_view);
         if let Some(find) = &find {
             root.add_top_bar(find.widget());
@@ -586,6 +565,8 @@ impl SimpleComponent for SqlEditor {
             session_teardown_running: false,
             session_teardown_waiters: Vec::new(),
             cancel_button: widgets.cancel_button.clone(),
+            pin_button: widgets.pin_button.clone(),
+            pinned: pinned::PinnedResults::default(),
             running_spinner: widgets.running_spinner.clone(),
             results_holder: widgets.results_holder.clone(),
             status: widgets.status.clone(),
@@ -749,6 +730,8 @@ impl SimpleComponent for SqlEditor {
                 }
             }
 
+            SqlEditorInput::TogglePin => self.toggle_pin(),
+
             SqlEditorInput::ShowOutcomes { generation, outcomes } => {
                 let Some((terminal, context)) = self.finish_run(generation, &sender) else {
                     return;
@@ -756,42 +739,25 @@ impl SimpleComponent for SqlEditor {
                 if terminal.replace_ui {
                     self.cancel_token = None;
                 }
-                let total_ms: u128 = outcomes.iter().map(|o| o.elapsed_ms).sum();
-                let n_total = outcomes.len();
-                let n_ok = outcomes
-                    .iter()
-                    .filter(|o| matches!(o.kind, StatementOutcomeKind::Rows(_)))
-                    .count();
-                let first_error = outcomes.iter().find_map(|o| match &o.kind {
-                    StatementOutcomeKind::Error(msg) => Some(msg.clone()),
-                    _ => None,
-                });
-
-                let total_rows: i64 = outcomes
-                    .iter()
-                    .filter_map(|o| match &o.kind {
-                        StatementOutcomeKind::Rows(result_sets) => {
-                            Some(result_sets.iter().map(|result| result.rows.len() as i64).sum::<i64>())
-                        }
-                        _ => None,
-                    })
-                    .sum();
-                let history_outcome = match &first_error {
-                    Some(msg) => Outcome::Error(msg.clone()),
-                    None => Outcome::Success,
-                };
-                let rows_for_history = if total_rows > 0 { Some(total_rows) } else { None };
-                self.record_history(context, total_ms as i64, rows_for_history, history_outcome);
+                let totals = outcomes::RunTotals::of(&outcomes);
+                self.mark_statements(&context, terminal.replace_ui, &outcomes);
+                self.record_history(
+                    context,
+                    totals.elapsed_ms as i64,
+                    totals.history_rows(),
+                    totals.history_outcome(),
+                );
                 if !terminal.replace_ui {
                     return;
                 }
 
-                self.status
-                    .set_label(&summary_label(n_total, n_ok, total_ms, first_error.is_some()));
+                self.status.set_label(&totals.summary());
+                let shown = self.pinned.show(outcomes);
+                self.refresh_pin_button();
                 clear_box(&self.results_holder);
                 render_outcomes(
                     &self.results_holder,
-                    &outcomes,
+                    &shown,
                     &self.grid_sender,
                     self.connection_id,
                     self.database.clone(),
@@ -1011,6 +977,7 @@ impl SqlEditor {
         self.set_running(true, conn.supports_server_cancellation(), &sender);
         self.status.set_label(&crate::tr!("Running…"));
         clear_box(&self.results_holder);
+        self.clear_run_marks();
 
         self.executions.insert(
             generation,

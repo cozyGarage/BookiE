@@ -12,6 +12,58 @@ pub(crate) fn clear_box(b: &gtk::Box) {
     }
 }
 
+pub(super) struct RunTotals {
+    pub(super) elapsed_ms: u128,
+    pub(super) statements: usize,
+    pub(super) succeeded: usize,
+    pub(super) first_error: Option<String>,
+    pub(super) rows: i64,
+}
+
+impl RunTotals {
+    pub(super) fn summary(&self) -> String {
+        summary_label(
+            self.statements,
+            self.succeeded,
+            self.elapsed_ms,
+            self.first_error.is_some(),
+        )
+    }
+
+    pub(super) fn history_rows(&self) -> Option<i64> {
+        (self.rows > 0).then_some(self.rows)
+    }
+
+    pub(super) fn history_outcome(&self) -> tablepro_storage::query_history::Outcome {
+        match &self.first_error {
+            Some(message) => tablepro_storage::query_history::Outcome::Error(message.clone()),
+            None => tablepro_storage::query_history::Outcome::Success,
+        }
+    }
+
+    pub(super) fn of(outcomes: &[StatementOutcome]) -> Self {
+        let rows_in = |outcome: &StatementOutcome| match &outcome.kind {
+            StatementOutcomeKind::Rows(result_sets) => {
+                Some(result_sets.iter().map(|result| result.rows.len() as i64).sum::<i64>())
+            }
+            _ => None,
+        };
+        Self {
+            elapsed_ms: outcomes.iter().map(|outcome| outcome.elapsed_ms).sum(),
+            statements: outcomes.len(),
+            succeeded: outcomes
+                .iter()
+                .filter(|outcome| matches!(outcome.kind, StatementOutcomeKind::Rows(_)))
+                .count(),
+            first_error: outcomes.iter().find_map(|outcome| match &outcome.kind {
+                StatementOutcomeKind::Error(message) => Some(message.clone()),
+                _ => None,
+            }),
+            rows: outcomes.iter().filter_map(rows_in).sum(),
+        }
+    }
+}
+
 pub(crate) enum ScriptRunResult {
     Completed(Vec<StatementOutcome>),
     Cancelled,
@@ -61,6 +113,7 @@ async fn run_tracked_statements(
                 sql_preview: preview,
                 elapsed_ms: 0,
                 kind: StatementOutcomeKind::NotRun,
+                pinned: false,
             });
             continue;
         }
@@ -73,6 +126,7 @@ async fn run_tracked_statements(
                     sql_preview: preview,
                     elapsed_ms: 0,
                     kind: StatementOutcomeKind::Error(reason),
+                    pinned: false,
                 });
                 aborted = stops_on_error;
                 continue;
@@ -88,12 +142,7 @@ async fn run_tracked_statements(
 
             Err(e) => {
                 aborted = stops_on_error;
-                let position = match &e {
-                    DriverError::Query { position, .. } if bound.sql == sql => *position,
-                    _ => None,
-                };
-                let message = crate::ui::error_text::driver_message(&e);
-                StatementOutcomeKind::Error(super::error_location::located_message(&message, &bound.sql, position))
+                StatementOutcomeKind::Error(failure_message(&e, &sql, &bound.sql))
             }
         };
         out.push(StatementOutcome {
@@ -103,9 +152,19 @@ async fn run_tracked_statements(
                 .saturating_sub(crate::services::approval_wait::waited().saturating_sub(waited_before))
                 .as_millis(),
             kind,
+            pinned: false,
         });
     }
     ScriptRunResult::Completed(out)
+}
+
+fn failure_message(error: &DriverError, written: &str, sent: &str) -> String {
+    let position = match error {
+        DriverError::Query { position, .. } if sent == written => *position,
+        _ => None,
+    };
+    let message = crate::ui::error_text::driver_message(error);
+    super::error_location::located_message(&message, sent, position)
 }
 
 fn sql_preview(sql: &str) -> String {
@@ -295,6 +354,9 @@ fn statement_subject(sql: &str) -> Option<String> {
 }
 
 fn outcome_tab_label(idx: usize, o: &StatementOutcome) -> String {
+    if o.pinned {
+        return pinned_tab_label(o);
+    }
     let n = (idx + 1).to_string();
     let Some(statement) = statement_subject(&o.sql_preview) else {
         return match &o.kind {
@@ -317,6 +379,17 @@ fn outcome_tab_label(idx: usize, o: &StatementOutcome) -> String {
             .replace("{n}", &n)
             .replace("{statement}", &statement),
     }
+}
+
+fn pinned_tab_label(o: &StatementOutcome) -> String {
+    let rows = match &o.kind {
+        StatementOutcomeKind::Rows(sets) => result_rows(sets).to_string(),
+        _ => String::new(),
+    };
+    let subject = statement_subject(&o.sql_preview).unwrap_or_else(|| crate::tr!("Result"));
+    crate::tr!("📌 {statement} ({rows})")
+        .replace("{statement}", &subject)
+        .replace("{rows}", &rows)
 }
 
 fn result_rows(result_sets: &[std::sync::Arc<tablepro_core::QueryResult>]) -> usize {
@@ -715,6 +788,17 @@ mod tests {
         let button = page.child().unwrap().downcast::<relm4::gtk::Button>().unwrap();
         assert_eq!(button.label().as_deref(), Some("Copy error"));
         assert_eq!(page.description().as_deref(), Some("syntax error at position 8"));
+    }
+
+    #[test]
+    fn a_pinned_result_is_named_by_its_statement_without_a_run_number() {
+        let outcome = super::StatementOutcome {
+            sql_preview: "select * from public.users".into(),
+            elapsed_ms: 3,
+            kind: StatementOutcomeKind::Rows(Vec::new()),
+            pinned: true,
+        };
+        assert_eq!(super::outcome_tab_label(4, &outcome), "📌 SELECT public.users (0)");
     }
 
     #[test]
