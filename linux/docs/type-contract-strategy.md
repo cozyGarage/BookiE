@@ -190,9 +190,15 @@ remain visibly undecodable while a whole-array SQL NULL remains `Value::Null`.
 SQL-literal, query-parameter and update bindings refuse the value without
 changing the target or sibling rows
 (`value_contract_custom_range_array_refusal_preserves_target_and_sibling_rows`
-in `crates/drivers/postgres/tests/support/range_array_contract.rs`). This does
-not establish support for custom range values or other user-defined array
-families.
+in `crates/drivers/postgres/tests/support/range_array_contract.rs`). This is a
+refusal contract; other user-defined array families remain open.
+Custom range scalars have a separate refusal contract: native type, text, JSON
+and `range_send` bytes identify the original value, while empty ranges remain
+distinct from SQL NULL. Literal rendering, query binding and keyed update
+binding refuse the value without changing target or sibling rows
+(`value_contract_custom_range_scalar_refusal_preserves_target_and_sibling_rows`
+in `crates/drivers/postgres/tests/support/range_array_contract.rs`). This
+documents a safe refusal boundary, not custom range support.
 PostgreSQL built-in multirange scalars and arrays resolve through SQLx's type
 metadata and reach BookiE's value decoder. BookiE returns a named
 `Value::Undecodable` for non-NULL values; SQL literal rendering and parameter
