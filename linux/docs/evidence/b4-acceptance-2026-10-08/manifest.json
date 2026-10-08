@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "branch": "linux",
   "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
-  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 30f9d37 adds GTK harness and fixture changes, package upgrade/removal checks, the MySQL Aria rollback regression, and documentation only; no application or driver implementation code changed.",
+  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 26d1355 adds GTK harness and fixture changes, package upgrade/removal checks, MySQL Aria rollback test coverage (including a trigger side effect), and documentation only relative to the runtime candidate; no application or driver implementation code changed.",
   "local_tracked_diff": "none",
   "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
@@ -25,11 +25,12 @@
   ],
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37777911341,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911341",
-    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
+    "run_id": 37780731260,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37780731260",
+    "source_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
     "status": "pending",
-    "conclusion": null
+    "conclusion": null,
+    "note": "No jobs had started at last check."
   },
   "earlier_hosted": {
     "workflow": "Build Linux",
@@ -44,9 +45,9 @@
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "e4ff65d3803b29d5e6b54d5b23849b826b5f6826699a987ec39004819768d380"
+    "sha256": "8e1a0de5d3666bc4ab837d1f3a4836bd00414d06403831e7a818b38060e18e8f"
   },
-  "branch_head_at_update": "30f9d379ed90939124d03323537e4febd07493d8",
+  "branch_head_at_update": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
   "runtime_diff_since_tested_commit": [
     "linux/crates/app/tests/gtk_safety.py",
     "linux/crates/app/tests/gtk_ux.py",
@@ -143,12 +144,11 @@
   },
   "flatpak_packaging": {
     "workflow": "Flatpak Linux (packaging only)",
-    "run_id": 37777911507,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911507",
-    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
-    "status": "in_progress",
-    "scope": "default and development Flatpak builds; includes Flatpak AT-SPI window and Arch package upgrade/removal checks in current target",
-    "conclusion": null
+    "run_id": 37780731167,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37780731167",
+    "source_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
+    "status": "completed",
+    "conclusion": "success"
   },
   "intermediate_hosted": {
     "workflow": "Build Linux",
@@ -160,9 +160,9 @@
   },
   "security": {
     "workflow": "Linux Security",
-    "run_id": 37777911360,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911360",
-    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
+    "run_id": 37780731293,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37780731293",
+    "source_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
     "status": "completed",
     "conclusion": "success"
   },
@@ -185,16 +185,29 @@
   ],
   "ci_contracts": {
     "workflow": "Linux CI contracts",
-    "run_id": 37777911374,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911374",
-    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
+    "run_id": 37780731218,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37780731218",
+    "source_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
     "status": "completed",
     "conclusion": "success"
   },
   "aria_trigger_followup": {
     "test_commit": "5211e6a33187c4e4499fe192399361e063d1c852",
+    "merged_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
+    "pull_request": 383,
     "local_report": "/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
     "local_result": "passed; the test is the sole tracked source modification in the report",
-    "hosted_acceptance": "pending; current target Build Linux run predates this follow-up commit"
+    "previous_hosted_rollback": "passed on 30f9d37; run predates this test",
+    "current_hosted_acceptance": "pending on merged SHA; Build Linux run 37780731260 had no jobs started at last check"
+  },
+  "previous_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37777911341,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911341",
+    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
+    "run_status": "in_progress",
+    "b4_rollback_job": "success",
+    "conclusion": null,
+    "note": "Other jobs remain active; this run predates PR #383 trigger coverage."
   }
 }
