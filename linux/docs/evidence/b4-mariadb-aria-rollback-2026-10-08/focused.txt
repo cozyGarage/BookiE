@@ -18,6 +18,6 @@ Commands:
 
 Layer report: `/tmp/bookie-b4-aria/linux/target/quality/20261008T120021537624Z-layers/report.json`.
 The report records both layer steps as passed. The current hosted target run
-#37774162145 is queued with no jobs started, so hosted frozen-candidate
+#37776917323 is pending with no jobs started, so hosted frozen-candidate
 acceptance remains open. Windows AD, installed package/native Wayland, and the
 remaining optional/vendor engine coverage are not established by this run.
