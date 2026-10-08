@@ -133,12 +133,12 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::tests::value_contract_mongodb_browse_uses_one_find_for_schema_and_page"
+      "ui::browse_tab::tests::value_contract_mongodb_browse_censuses_once_then_uses_bounded_page_queries"
     ],
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::tests::value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents"
+      "ui::browse_tab::tests::value_contract_mongodb_type_change_after_census_is_marked_mixed"
     ],
     [
       "tablepro-app",

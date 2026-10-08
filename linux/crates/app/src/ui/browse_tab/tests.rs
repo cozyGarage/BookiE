@@ -247,7 +247,7 @@ async fn value_contract_mongodb_off_page_type_change_during_census_refuses_edit(
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents() {
+async fn value_contract_mongodb_type_change_after_census_is_marked_mixed() {
     use mongodb::bson::{Decimal128, doc};
     use tablepro_core::OperationControl;
 
@@ -294,8 +294,11 @@ async fn value_contract_mongodb_census_is_not_a_snapshot_for_already_read_docume
     let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
     let id_index = page.columns.iter().position(|column| column.name == "_id").unwrap();
     let first_row = page.rows.iter().find(|row| row[id_index] == Value::Int(0)).unwrap();
-    assert_eq!(page.columns[value_index].data_type, "string");
-    assert_eq!(first_row[value_index], Value::Text("before".into()));
+    assert_eq!(page.columns[value_index].data_type, "mixed");
+    assert_eq!(
+        first_row[value_index],
+        Value::Json(serde_json::json!({ "$numberDecimal": decimal.to_string() }))
+    );
     let persisted = collection.find_one(doc! { "_id": 0 }).await.unwrap().unwrap();
     assert_eq!(persisted.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
     // MongoDB does not give this collection scan snapshot semantics. The
@@ -304,7 +307,7 @@ async fn value_contract_mongodb_census_is_not_a_snapshot_for_already_read_docume
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_mongodb_browse_uses_one_find_for_schema_and_page() {
+async fn value_contract_mongodb_browse_censuses_once_then_uses_bounded_page_queries() {
     use tablepro_core::OperationControl;
 
     let (_container, native, _collection, connection) = mongodb_census_race_fixture().await;
@@ -314,11 +317,26 @@ async fn value_contract_mongodb_browse_uses_one_find_for_schema_and_page() {
         .fetch_rows_controlled(None, "page_census_race", 0, 1, &control)
         .await
         .unwrap();
-    let after = mongodb_find_command_count(&native).await;
-    assert_eq!(after - before, 1, "schema and page data must share one find cursor");
+    let after_first_page = mongodb_find_command_count(&native).await;
+    assert_eq!(
+        after_first_page - before,
+        2,
+        "initial browse performs one census and one page query"
+    );
     let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
     assert_eq!(page.columns[value_index].data_type, "string");
     assert_eq!(page.rows[0][value_index], Value::Text("before".into()));
+
+    let next_page = connection
+        .fetch_rows_controlled(None, "page_census_race", 1, 1, &control)
+        .await
+        .unwrap();
+    assert_eq!(
+        mongodb_find_command_count(&native).await - after_first_page,
+        1,
+        "a later page must reuse cached census metadata"
+    );
+    assert_eq!(next_page.rows[0][value_index], Value::Text("sibling".into()));
 }
 
 async fn mongodb_find_command_count(native: &mongodb::Client) -> i64 {

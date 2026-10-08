@@ -24,8 +24,8 @@ Total: 628 declarations. App server: 35; Driver: 447; GTK: 21; Helper: 2; Keyrin
 | [the_shortcuts_window_lists_keys_and_describes_mouse_gestures](../crates/app/src/ui/app/shortcuts.rs) | GTK | requires an isolated GTK display | `scripts/test-gtk-widgets.sh` |
 | [value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit](../crates/app/src/ui/browse_tab/tests.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [value_contract_mongodb_off_page_type_change_during_census_refuses_edit](../crates/app/src/ui/browse_tab/tests.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
-| [value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents](../crates/app/src/ui/browse_tab/tests.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
-| [value_contract_mongodb_browse_uses_one_find_for_schema_and_page](../crates/app/src/ui/browse_tab/tests.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
+| [value_contract_mongodb_type_change_after_census_is_marked_mixed](../crates/app/src/ui/browse_tab/tests.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
+| [value_contract_mongodb_browse_censuses_once_then_uses_bounded_page_queries](../crates/app/src/ui/browse_tab/tests.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values](../crates/app/src/ui/browse_tab/tests.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [find_selects_matches_and_replace_all_rewrites_every_occurrence](../crates/app/src/ui/editor/find_bar.rs) | GTK | requires an isolated GTK display | `scripts/test-gtk-widgets.sh` |
 | [a_failed_statement_offers_a_copy_button](../crates/app/src/ui/editor/outcomes.rs) | GTK | requires an isolated GTK display | `scripts/test-gtk-widgets.sh` |
