@@ -658,6 +658,115 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "requires docker"]
+    async fn mysql_value_query_refetches_the_exact_blob_for_a_composite_key() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+        use testcontainers::ImageExt;
+        use testcontainers::runners::AsyncRunner;
+        use testcontainers_modules::mysql::Mysql;
+
+        let container = Mysql::default()
+            .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+            .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+            .start()
+            .await
+            .unwrap();
+        let connection = drivers_mysql::MysqlDriver
+            .connect(ConnectOptions {
+                host: container.get_host().await.unwrap().to_string(),
+                port: container.get_host_port_ipv4(3306).await.unwrap(),
+                database: "test".into(),
+                username: "root".into(),
+                password: secrecy::SecretString::new("tablepro_test".into()),
+                tls: TlsConfig::disabled(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+        let tenant = b"tenant ' OR 1=1 --".to_vec();
+        let bytes: Vec<u8> = (0..9000).map(|index| (index % 256) as u8).collect();
+        insert_mysql_value_preview_rows(&*connection, &control, &tenant, &bytes).await;
+        assert_mysql_value_preview_native(&*connection, &control, &tenant).await;
+        let columns = connection
+            .fetch_columns_controlled(None, "value_preview_records", &control)
+            .await
+            .unwrap();
+        assert!(columns[0].primary_key && columns[1].primary_key);
+        let target = BrowseTarget {
+            driver_id: "mysql",
+            schema: None,
+            table: "value_preview_records",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let query = target.value_query(2, &[Value::Bytes(tenant), Value::Int(7)]).unwrap();
+        let fetched = connection
+            .query_params_controlled(&query.sql, &query.params, &control)
+            .await
+            .unwrap();
+        assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes)]]);
+    }
+
+    async fn insert_mysql_value_preview_rows(
+        connection: &dyn tablepro_core::Connection,
+        control: &tablepro_core::OperationControl,
+        tenant: &[u8],
+        bytes: &[u8],
+    ) {
+        connection
+            .execute_controlled(
+                "CREATE TABLE value_preview_records (tenant VARBINARY(64), id BIGINT, payload LONGBLOB, PRIMARY KEY (tenant, id))",
+                control,
+            )
+            .await
+            .unwrap();
+        connection
+            .execute_params_controlled(
+                "INSERT INTO value_preview_records VALUES (?, ?, ?), (?, ?, ?)",
+                &[
+                    Value::Bytes(tenant.to_vec()),
+                    Value::Int(7),
+                    Value::Bytes(bytes.to_vec()),
+                    Value::Bytes(b"other tenant".to_vec()),
+                    Value::Int(7),
+                    Value::Bytes(vec![0xff; bytes.len()]),
+                ],
+                control,
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn assert_mysql_value_preview_native(
+        connection: &dyn tablepro_core::Connection,
+        control: &tablepro_core::OperationControl,
+        tenant: &[u8],
+    ) {
+        let native_type = connection
+            .query_controlled(
+                "SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'value_preview_records' AND COLUMN_NAME = 'payload'",
+                control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(native_type.rows, vec![vec![Value::Bytes(b"longblob".to_vec())]]);
+        let native_value = connection
+            .query_params_controlled(
+                "SELECT OCTET_LENGTH(payload), HEX(SUBSTRING(payload, 1, 8)) FROM value_preview_records WHERE tenant = ? AND id = ?",
+                &[Value::Bytes(tenant.to_vec()), Value::Int(7)],
+                control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            native_value.rows,
+            vec![vec![Value::Int(9000), Value::Text("0001020304050607".into())]]
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires docker"]
     async fn postgres_value_query_refetches_by_enum_and_domain_composite_key() {
         use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
         use testcontainers::ImageExt;

@@ -46,13 +46,14 @@ the complete primary key through the policy-guarded connection; the query caps
 at two rows and refuses missing or ambiguous matches. PostgreSQL enum/domain
 key casts have planner regressions. This first slice leaves arbitrary SQL,
 MongoDB and Redis paths unchanged, and the shared result still retains full
-values. A local SQLite service test refetches a 9,000-byte BLOB by composite
-key, verifies SQLite's native storage type, length and hex prefix, then asserts
-the exact returned bytes. A Docker PostgreSQL 16 test uses catalog enum/domain
-key metadata, confirms both native types with `pg_typeof`, and refetches the
-same-size BLOB through the typed composite key. Both tests call drivers
-directly, so guarded-path and other-driver native checks, installed GTK
-acceptance and memory profiling remain open under PERF-10.
+values. Local SQLite and Docker MySQL service tests refetch a 9,000-byte BLOB by
+composite key and compare its exact returned bytes with native storage oracles;
+the MySQL test also checks `LONGBLOB`, byte length and the native hex prefix. A
+Docker PostgreSQL 16 test uses catalog enum/domain key metadata, confirms both
+native types with `pg_typeof`, and refetches the same-size BLOB through the
+typed composite key. These service tests call drivers directly, so
+guarded-path and other-driver native checks, installed GTK acceptance and
+memory profiling remain open under PERF-10.
 
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete
