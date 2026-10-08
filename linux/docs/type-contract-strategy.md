@@ -66,12 +66,6 @@ a guarded 12,000-byte String refetch with native type/length/prefix oracles.
 MongoDB, Redis, arbitrary SQL, shared result memory, installed GTK and memory
 profiling remain open under PERF-10.
 
-ClickHouse now also has an app-service contract that refetches a 12,000-byte
-String through `PolicyGuard` using a hostile composite key; native `String`
-type, length and prefix checks prove the value before refetch. DuckDB, MongoDB,
-Redis, arbitrary SQL, shared result memory, installed GTK and memory profiling
-remain open under PERF-10.
-
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete
 label lists, missing quotes, or trailing metadata must refuse the edit rather
