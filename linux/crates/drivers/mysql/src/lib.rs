@@ -953,6 +953,7 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         Database(e) => DriverError::Query {
             message: e.message().to_string(),
             sqlstate: e.code().map(|c| c.to_string()),
+            position: None,
         },
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
         Io(e) if tablepro_core::looks_like_tls_failure(&tablepro_core::error_chain_text(&e)) => {

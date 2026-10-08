@@ -258,6 +258,7 @@ impl Connection for MongodbConnection {
                 .map_err(|e| DriverError::Query {
                     message: format!("invalid MongoDB filter JSON: {e}"),
                     sqlstate: None,
+                    position: None,
                 })?;
             let coll_name = self
                 .list_tables()
@@ -268,6 +269,7 @@ impl Connection for MongodbConnection {
                 .ok_or_else(|| DriverError::Query {
                     message: "no collections available for filter query".into(),
                     sqlstate: None,
+                    position: None,
                 })?;
             return self
                 .run_find(FindQuery {

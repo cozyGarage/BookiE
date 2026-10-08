@@ -11,6 +11,8 @@ use super::editing::enter_edit_mode;
 use super::export;
 use super::value_viewer;
 
+const CELL_MENU_TRIGGER: &str = "Menu|<Shift>F10";
+
 #[derive(Clone)]
 struct CellContext {
     widget: gtk::Widget,
@@ -484,7 +486,7 @@ pub(super) fn attach_cell_gesture(
     let key_context = menus.context.clone();
     let key_action = menus.edit_action.clone();
     let shortcut = gtk::Shortcut::builder()
-        .trigger(&crate::ui::shortcut::parse("Menu|<Shift>F10"))
+        .trigger(&crate::ui::shortcut::parse(CELL_MENU_TRIGGER))
         .action(&gtk::CallbackAction::new(move |_, _| {
             select_row_for_menu(&key_view, POSITION_SLOT.get(&key_widget).unwrap_or(0));
             *key_context.borrow_mut() = Some(CellContext {
@@ -580,5 +582,21 @@ fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bo
             .filter_map(|position| row_at(view, position))
             .collect(),
         truncated,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_cell_menu_opens_with_the_menu_key_and_shift_f10() {
+        relm4::adw::init().unwrap();
+        let trigger = crate::ui::shortcut::parse(CELL_MENU_TRIGGER);
+        assert!(!trigger.is::<gtk::NeverTrigger>());
+        let text = trigger.to_str().to_string();
+        assert!(text.contains("Menu"), "{text}");
+        assert!(text.contains("<Shift>F10"), "{text}");
     }
 }
