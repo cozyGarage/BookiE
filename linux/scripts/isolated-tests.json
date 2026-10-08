@@ -164,6 +164,11 @@
       "tablepro-app",
       "--lib",
       "services::browse_query::tests::clickhouse_value_query_refetches_the_exact_text_for_a_composite_key"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "services::browse_query::tests::mongodb_value::mongodb_guarded_refetch_preserves_long_text_and_binary_values"
     ]
   ],
   "gtk": [

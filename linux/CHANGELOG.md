@@ -5,6 +5,7 @@
 ### Added
 - MongoDB browse performs a complete type census on initial load and refresh, then reuses it across pages and invalidates it after driver writes.
 - MongoDB paged `find` queries reuse the same connection-local type census instead of rescanning the collection for each page.
+- MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
 - ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
 - DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.

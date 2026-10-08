@@ -4,6 +4,8 @@ use std::collections::HashSet;
 
 use tablepro_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build_filter_where, keyset_where_clause};
 
+mod mongodb;
+
 pub(crate) struct BrowseTarget<'a> {
     pub driver_id: &'a str,
     pub schema: Option<&'a str>,
@@ -52,8 +54,11 @@ impl BrowseTarget<'_> {
     }
 
     pub fn value_query(&self, column_index: usize, pk_values: &[Value]) -> Result<BoundQuery, String> {
-        if matches!(self.driver_id, "mongodb" | "redis") {
-            return Err(format!("single-cell fetch is unsupported for {}", self.driver_id));
+        if self.driver_id == "mongodb" {
+            return mongodb::value_query(self, column_index, pk_values);
+        }
+        if self.driver_id == "redis" {
+            return Err("single-cell fetch is unsupported for redis".into());
         }
         let (sql, params) = tablepro_core::sql_dialect::build_keyed_value_select(
             self.driver_id,
@@ -186,6 +191,9 @@ fn resolved_order_by(driver_id: &str, columns: &[ColumnInfo], sort: Option<(usiz
 mod tests {
     use super::*;
     use tablepro_core::{FilterOp, FilterRule, FilterValue};
+
+    #[path = "mongodb_value.rs"]
+    mod mongodb_value;
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {
         ColumnInfo {

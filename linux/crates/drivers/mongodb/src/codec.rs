@@ -121,7 +121,7 @@ pub(super) fn document_to_row(doc: &Document, columns: &[ColumnInfo]) -> Vec<Val
         .collect()
 }
 
-fn bson_to_value(b: &Bson) -> Value {
+pub(super) fn bson_to_value(b: &Bson) -> Value {
     match b {
         Bson::Null => Value::Null,
         Bson::Boolean(v) => Value::Bool(*v),

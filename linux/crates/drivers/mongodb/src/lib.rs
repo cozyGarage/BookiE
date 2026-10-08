@@ -8,7 +8,8 @@ mod update;
 
 use async_trait::async_trait;
 use codec::{
-    columns_from_docs, columns_from_types, document_to_row, merge_page_types, observe_bson_type, serde_json_to_document,
+    bson_to_value, columns_from_docs, columns_from_types, document_to_row, merge_page_types, observe_bson_type,
+    serde_json_to_document,
 };
 use error::{map_mongo_connect_error, map_mongo_error};
 use futures::TryStreamExt;
@@ -20,7 +21,7 @@ use shell::{
     AggregateQuery, FindQuery, parse_aggregate_shell, parse_delete_many, parse_drop_table_sql, parse_find_shell,
     parse_insert_one,
 };
-use update::{parse_keyed_delete, parse_keyed_update};
+use update::{parse_keyed_delete, parse_keyed_update, parse_keyed_value_select};
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
@@ -298,6 +299,18 @@ impl Connection for MongodbConnection {
         })
     }
 
+    async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
+        if params.is_empty() {
+            return self.query(sql).await;
+        }
+        let Some(query) = parse_keyed_value_select(sql, params, &self.database_name)? else {
+            return Err(DriverError::Unsupported(
+                "MongoDB bound reads support a single selected value by _id".into(),
+            ));
+        };
+        self.run_keyed_value_select(query).await
+    }
+
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
         let trimmed = sql.trim();
         if let Some(parsed) = parse_find_shell(trimmed) {
@@ -451,6 +464,58 @@ impl Connection for MongodbConnection {
 }
 
 impl MongodbConnection {
+    async fn run_keyed_value_select(&self, query: update::KeyedValueSelect) -> Result<QueryResult, DriverError> {
+        let mut cursor = self
+            .db()
+            .collection::<Document>(&query.collection)
+            .find(doc! { "_id": query.key })
+            .projection(doc! { &query.column: 1 })
+            .limit(2)
+            .await
+            .map_err(map_mongo_error)?;
+        let mut docs = Vec::new();
+        while docs.len() < 2 {
+            let Some(document) = cursor.try_next().await.map_err(map_mongo_error)? else {
+                break;
+            };
+            docs.push(document);
+        }
+        let data_type = docs
+            .first()
+            .and_then(|document| document.get(&query.column))
+            .map(codec::bson_type_name)
+            .unwrap_or_else(|| "unknown".into());
+        let columns = vec![ColumnInfo {
+            name: query.column.clone(),
+            data_type,
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }];
+        let rows = docs
+            .iter()
+            .map(|document| {
+                let value = document.get(&query.column).ok_or_else(|| DriverError::Query {
+                    message: "MongoDB value field is missing".into(),
+                    sqlstate: None,
+                    position: None,
+                })?;
+                Ok(vec![bson_to_value(value)])
+            })
+            .collect::<Result<Vec<_>, DriverError>>()?;
+        Ok(QueryResult {
+            columns,
+            rows,
+            truncated: docs.len() > 1,
+        })
+    }
+
     async fn run_find(&self, q: FindQuery) -> Result<QueryResult, DriverError> {
         let mut columns = self.page_columns(&q.collection).await?;
         let coll = self.db().collection::<Document>(&q.collection);

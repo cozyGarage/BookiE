@@ -63,7 +63,11 @@ DuckDB now has a feature-gated app-service contract that refetches a 9,000-byte
 BLOB through `PolicyGuard` using a hostile composite key; native storage class,
 length and prefix checks prove the value before refetch. ClickHouse also checks
 a guarded 12,000-byte String refetch with native type/length/prefix oracles.
-MongoDB, Redis, arbitrary SQL, shared result memory, installed GTK and memory
+MongoDB browse cells now also preview long text, binary and structured values
+and refetch one selected field through a bound `_id` query under `PolicyGuard`.
+Its Docker app-service contract binds an ObjectId and checks exact 9,000-byte
+text, generic binary and nested BSON document values against native MongoDB
+storage. Redis, arbitrary SQL, shared result memory, installed GTK and memory
 profiling remain open under PERF-10.
 
 The MySQL ENUM/SET editor parser now has focused regressions for malformed

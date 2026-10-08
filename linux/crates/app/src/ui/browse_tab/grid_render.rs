@@ -242,7 +242,7 @@ impl BrowseTab {
             tab_id: Some(self.tab_id),
             pk_col_indices,
             projected_columns: self.current_projection.clone(),
-            preview_long_values: !matches!(self.driver_id.as_str(), "mongodb" | "redis"),
+            preview_long_values: self.driver_id != "redis",
             foreign_key_columns,
         };
         let (column_view, selection) = build_column_view(
@@ -314,7 +314,7 @@ impl BrowseTab {
         result: &std::sync::Arc<QueryResult>,
         store: &crate::ui::row_store::RowStore,
     ) -> bool {
-        let key_indices = if !matches!(self.driver_id.as_str(), "mongodb" | "redis") {
+        let key_indices = if self.driver_id != "redis" {
             self.current_columns
                 .iter()
                 .enumerate()
