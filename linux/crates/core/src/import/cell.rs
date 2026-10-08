@@ -353,6 +353,19 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
 }
 
 fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver_id: &str) -> Result<Value, CellError> {
+    if driver_id == "sqlite"
+        && kind == ColumnKind::Text
+        && crate::sqlite_declared_type_has_numeric_affinity(&column.data_type)
+    {
+        if let Some(decimal) = crate::sqlite_affinity_decimal(text) {
+            return Ok(Value::Decimal(decimal));
+        }
+        return if crate::is_numeric_input(text) {
+            Err(CellError::NotANumber)
+        } else {
+            Ok(Value::Text(text.to_owned()))
+        };
+    }
     if driver_id == "duckdb"
         && let Some(value) = duckdb_extended_calendar_text(text, &column.data_type)
     {

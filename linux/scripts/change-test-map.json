@@ -5,6 +5,7 @@
     { "prefix": "crates/core/tests/", "package": "tablepro-core", "target": "--tests" },
     { "prefix": "crates/app/src/", "package": "tablepro-app", "target": "--lib" },
     { "prefix": "crates/app/tests/", "package": "tablepro-app", "target": "--tests" },
+    { "prefix": "crates/drivers/sqlite/tests/", "package": "tablepro-driver-sqlite", "target": "--tests" },
     { "prefix": "crates/drivers/postgres/tests/", "package": "tablepro-driver-postgres", "target": "--test=integration" },
     { "prefix": "crates/mcp/src/", "package": "tablepro-mcp", "target": "--lib" },
     { "prefix": "crates/drivers/", "path_contains": "/src/", "package_from_manifest": true, "target": "--lib" }
@@ -15,6 +16,20 @@
       "target": "--lib",
       "tests": [
         "query::tests::result_budget_caps_cells_and_dynamic_value_storage"
+      ]
+    },
+    "crates/core/src/numeric_input.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "numeric_input::tests::sqlite_declared_types_follow_native_affinity_precedence"
+      ]
+    },
+    "crates/core/src/import/cell.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "import::cell::tests::sqlite_affinity_tests::sqlite_unrecognized_numeric_affinity_types_parse_numeric_values_safely"
       ]
     },
     "crates/core/src/sql_dialect/updates.rs": {
@@ -64,7 +79,16 @@
       "target": "--lib",
       "tests": [
         "ui::browse_tab::value_parse::tests::sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior",
+        "ui::browse_tab::tests::sqlite_grid_parses_unknown_numeric_affinity_values_without_losing_precision",
+        "ui::browse_tab::value_parse::tests::sqlite_numeric_affinity::sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values",
         "ui::browse_tab::value_parse::tests::mssql_datetimeoffset_parser_preserves_text_and_refuses_lossy_input"
+      ]
+    },
+    "crates/drivers/sqlite/tests/runtime_typed_values.rs": {
+      "package": "tablepro-driver-sqlite",
+      "target": "--test=runtime_typed_values",
+      "tests": [
+        "declared_enum_values_follow_sqlite_numeric_affinity_and_keep_runtime_kinds"
       ]
     },
     "crates/drivers/clickhouse/src/lib.rs": {
