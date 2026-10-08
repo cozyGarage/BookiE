@@ -5,7 +5,8 @@
 ### Added
 - SQLite STRICT `ANY` computed `iif()` now has a native `typeof()` and typed
   CSV round-trip case for INTEGER, REAL, formula-shaped TEXT, BLOB and SQL NULL.
-  The focused app test passed on system SQLite 3.53.4.
+  The focused app test passed on system SQLite 3.53.4; [PR #331 validation](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990)
+  also records the local quick-gate result.
 - Current-Linux B4 TLS evidence moved from tracked files to [PR #329](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352):
   all 48 checks passed twice locally on source `a47b1fb`, while frozen-candidate,
   exact-SHA hosted and installed-package/Wayland acceptance remain open.
