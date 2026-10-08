@@ -12,6 +12,7 @@
 - Arbitrary SQL result grids now preview long text, JSON and binary cells with byte counts; View Value reads the complete value from the guarded result already in memory.
 - ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
 - DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.
+- MySQL and MariaDB CHAR results now have `PAD_CHAR_TO_FULL_LENGTH` coverage for padding, VARCHAR, empty values and NULL.
 - The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
 - Each statement of a script gets a gutter mark after a run: a tick for a statement that returned, a cross for one that failed.

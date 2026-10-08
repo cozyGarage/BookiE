@@ -280,6 +280,93 @@ jobs:
         run: |
           cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
 
+  duckdb:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/duckdb
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: DuckDB driver and the app with DuckDB
+        run: |
+          cd src/linux
+          cargo clippy --locked -p tablepro-driver-duckdb --all-targets -- -D warnings
+          cargo test --locked -p tablepro-driver-duckdb -- --include-ignored
+          cargo build --locked -p tablepro-app --features duckdb
+  gtk-server:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-server-${{ matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [clickhouse, mysql-approval, mongodb]
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Installed GTK scenarios against a real server
+        run: |
+          cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
+  values:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 120
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/values
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Shared value contracts across drivers, GTK and DuckDB
+        run: |
+          cd src/linux && python3 scripts/run-test-layer.py values
+  supply-chain:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/supply-chain
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Supply-chain tools
+        run: |
+          command -v cargo-deny >/dev/null || cargo install --locked cargo-deny --version 0.20.2
+          command -v cargo-audit >/dev/null || cargo install --locked cargo-audit --version 0.22.2
+      - name: Advisories, licenses and sources
+        run: |
+          cd src/linux && python3 scripts/run-test-layer.py supply-chain
   distro-floor:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
@@ -303,6 +390,12 @@ jobs:
       - name: Distro floor
         run: |
           cd src/linux && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ${{ matrix.base }}
-      - name: Debian package build, install and purge
+      - name: Debian package build, install, upgrade from the released package and purge
         run: |
-          cd src/linux && bash scripts/test-deb-package.sh ${{ matrix.base }}
+          released=/var/cache/ci/releases/tablepro_0.1.5-1_amd64.deb
+          if [ ! -s "$released" ]; then
+            mkdir -p "$(dirname "$released")"
+            curl -fsSL -o "$released.part" https://github.com/cozyGarage/BookiE/releases/download/linux-v0.1.5/tablepro_0.1.5-1_amd64.deb
+            mv "$released.part" "$released"
+          fi
+          cd src/linux && PREVIOUS_DEB="$released" bash scripts/test-deb-package.sh ${{ matrix.base }}
