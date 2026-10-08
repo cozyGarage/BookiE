@@ -862,7 +862,11 @@ def start_application(binary, environment, restored=False):
         text=True,
     )
     try:
-        if restored:
+        if restored == "empty":
+            wait_for_node(name="BookiE", role=pyatspi.ROLE_FRAME)
+        elif restored == "welcome":
+            wait_for_node(name=CONNECTION_NAME)
+        elif restored:
             wait_for_frame_containing(" — BookiE")
         else:
             wait_for_node(name=CONNECTION_NAME)
@@ -917,14 +921,17 @@ def run_scenario(binary, scenario):
         process = start_application(binary, environment)
         if getattr(scenario, "requires_editor", True):
             open_editor()
-        def restart():
+        def restart(before_start=None, empty=False):
             nonlocal process, stderr
             invoke_accessible_action("win.quit")
             process.wait(timeout=WAIT_SECONDS)
             assert process.returncode == 0, "graceful quit failed"
             stderr += stop_application(process)
             wait_for_frame_containing(" — BookiE", present=False)
-            process = start_application(binary, environment, restored=True)
+            if before_start is not None:
+                before_start(environment)
+            restored = "empty" if empty else "welcome" if before_start else True
+            process = start_application(binary, environment, restored=restored)
 
         if getattr(scenario, "needs_restart", False):
             scenario(database, base, restart)
@@ -1656,6 +1663,82 @@ restart_restores_active_editor_and_connection.environment = "local"
 restart_restores_active_editor_and_connection.needs_restart = True
 
 
+def restart_with_a_deleted_connection_opens_the_welcome_list(database, base, restart):
+    open_saved_connection(CONNECTION_B_NAME)
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    invoke_named_action_within("safety_items", "Open safety_items")
+    wait_for_node_containing("Rows")
+    config_path = base / "config" / storage_dir_name() / "connections.json"
+
+    def delete_connection_b(_environment):
+        state = json.loads(config_path.read_text(encoding="utf-8"))
+        state["connections"] = [record for record in state["connections"] if record["name"] != CONNECTION_B_NAME]
+        config_path.write_text(json.dumps(state), encoding="utf-8")
+
+    restart(delete_connection_b)
+    wait_for_node(name=CONNECTION_NAME)
+    wait_for_node(name=CONNECTION_B_NAME, present=False)
+    assert find_node(name=f"{CONNECTION_B_NAME} — BookiE") is None, "a deleted connection was reopened"
+    assert database_ids(base / "safety-b.sqlite") == [], "restoring a deleted connection must not touch its database"
+
+
+restart_with_a_deleted_connection_opens_the_welcome_list.environment = "local"
+restart_with_a_deleted_connection_opens_the_welcome_list.needs_restart = True
+
+
+def a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile(database, base, restart):
+    bundle_path = base / "home" / "two-profile.bundle"
+    passphrase = "two profile passphrase"
+    config_path = base / "config" / storage_dir_name() / "connections.json"
+    def without_usage(records):
+        return {
+            record["id"]: {key: value for key, value in record.items() if key != "last_opened_at"}
+            for record in records
+        }
+
+    original = without_usage(json.loads(config_path.read_text(encoding="utf-8"))["connections"])
+    invoke_accessible_action("win.disconnect")
+    invoke_accessible_action("welcome.export-bundle")
+    set_text_by_name("Passphrase (optional)", passphrase)
+    invoke(wait_for_node(name="Choose File…", role=pyatspi.ROLE_PUSH_BUTTON))
+    chooser = wait_for_node(name="Export connections", role=FILE_CHOOSER_ROLES)
+    set_visible_editable_within("Export connections", FILE_CHOOSER_ROLES, str(bundle_path))
+    invoke(wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline and not bundle_path.exists():
+        time.sleep(POLL_SECONDS)
+    assert bundle_path.exists(), "the connection bundle was not exported"
+
+    second_config = base / "profile2" / "config" / storage_dir_name() / "connections.json"
+
+    def empty_second_profile(environment):
+        for kind in ("config", "data"):
+            (base / "profile2" / kind).mkdir(parents=True)
+        environment["XDG_CONFIG_HOME"] = str(base / "profile2" / "config")
+        environment["XDG_DATA_HOME"] = str(base / "profile2" / "data")
+
+    restart(empty_second_profile, empty=True)
+    assert not second_config.exists() or not json.loads(second_config.read_text(encoding="utf-8"))["connections"]
+    choose_import_bundle(bundle_path)
+    wait_for_node(name="Passphrase", role=pyatspi.ROLE_PASSWORD_TEXT)
+    set_text_by_name("Passphrase", passphrase)
+    invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name=CONNECTION_NAME)
+    invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
+    deadline = time.monotonic() + WAIT_SECONDS
+    imported = {}
+    while time.monotonic() < deadline and len(imported) < len(original):
+        if second_config.exists():
+            imported = without_usage(json.loads(second_config.read_text(encoding="utf-8"))["connections"])
+        time.sleep(POLL_SECONDS)
+    assert imported == original, f"the second profile differs from the first: {imported!r} != {original!r}"
+    assert json.loads(config_path.read_text(encoding="utf-8"))["connections"], "the first profile lost its connections"
+
+
+a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile.environment = "local"
+a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile.needs_restart = True
+
+
 def pending_edits_gate_a_connection_switch(database, base):
     invoke_named_action_within("safety_items", "Open safety_items")
     wait_for_node(name="No rows on this page")
@@ -1913,6 +1996,8 @@ def main():
         switched_connection_keeps_workspace_tabs_after_debounce,
         switching_one_window_leaves_the_other_windows_edits,
         sidebar_tables_group_collapses_and_expands,
+        restart_with_a_deleted_connection_opens_the_welcome_list,
+        a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile,
     ]
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         scenarios.append(mysql_unparseable_routine_dialog_denial_preserves_database)
