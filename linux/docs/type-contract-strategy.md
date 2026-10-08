@@ -183,7 +183,8 @@ JSON, exact type and post-refusal row/wire preservation checks in
 `crates/drivers/postgres/tests/support/range_array_contract.rs`.
 User-defined range arrays now have a separate explicit-refusal case: a
 schema-qualified integer range array preserves its native type, range text,
-JSON and wire snapshot, while SQL-literal, query-parameter and update bindings
+JSON and wire snapshot; BookiE's JSON and CSV exports emit the visible
+undecodable-type marker. SQL-literal, query-parameter and update bindings
 refuse it without changing the target or sibling row
 (`value_contract_custom_range_array_refusal_preserves_target_and_sibling_rows`
 in `crates/drivers/postgres/tests/support/range_array_contract.rs`). This does
