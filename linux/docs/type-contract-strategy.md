@@ -62,6 +62,12 @@ BIGINT key and checks the 9,000-byte payload against native `DATALENGTH` and
 Other-driver native checks, installed GTK acceptance and memory profiling
 remain open under PERF-10.
 
+ClickHouse now also has an app-service contract that refetches a 12,000-byte
+String through `PolicyGuard` using a hostile composite key; native `String`
+type, length and prefix checks prove the value before refetch. DuckDB, MongoDB,
+Redis, arbitrary SQL, shared result memory, installed GTK and memory profiling
+remain open under PERF-10.
+
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete
 label lists, missing quotes, or trailing metadata must refuse the edit rather

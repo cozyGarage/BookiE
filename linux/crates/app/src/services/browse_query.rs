@@ -745,6 +745,120 @@ mod tests {
         assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
     }
 
+    #[tokio::test]
+    #[ignore = "requires docker"]
+    async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+        use testcontainers::core::wait::HttpWaitStrategy;
+        use testcontainers::core::{IntoContainerPort, WaitFor};
+        use testcontainers::runners::AsyncRunner;
+        use testcontainers::{GenericImage, ImageExt};
+
+        let container = GenericImage::new("clickhouse/clickhouse-server", "24.8")
+            .with_exposed_port(8123.tcp())
+            .with_wait_for(WaitFor::http(
+                HttpWaitStrategy::new("/ping")
+                    .with_port(8123.tcp())
+                    .with_expected_status_code(200u16),
+            ))
+            .with_env_var("CLICKHOUSE_USER", "default")
+            .with_env_var("CLICKHOUSE_PASSWORD", "tablepro")
+            .with_env_var("CLICKHOUSE_DB", "default")
+            .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
+            .start()
+            .await
+            .unwrap();
+        let connection = drivers_clickhouse::ClickhouseDriver
+            .connect(ConnectOptions {
+                host: container.get_host().await.unwrap().to_string(),
+                port: container.get_host_port_ipv4(8123).await.unwrap(),
+                database: "default".into(),
+                username: "default".into(),
+                password: secrecy::SecretString::new("tablepro".into()),
+                tls: TlsConfig::disabled(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+        let tenant = "tenant ' OR 1=1 --";
+        let value = "BookiE-clickhouse-value-".repeat(500);
+        seed_clickhouse_value_preview(&*connection, &control, tenant, &value).await;
+        assert_clickhouse_value_preview_native(&*connection, &control, tenant).await;
+
+        let columns = connection
+            .fetch_columns_controlled(None, "value_preview_records", &control)
+            .await
+            .unwrap();
+        assert!(columns[0].primary_key && columns[1].primary_key);
+        let target = BrowseTarget {
+            driver_id: "clickhouse",
+            schema: None,
+            table: "value_preview_records",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let query = target
+            .value_query(2, &[Value::Text(tenant.into()), Value::Int(7)])
+            .unwrap();
+        let guarded = guarded_value_refetch(std::sync::Arc::from(connection), "clickhouse", &query, &control).await;
+        assert_eq!(guarded.rows, vec![vec![Value::Text(value)]]);
+    }
+
+    async fn seed_clickhouse_value_preview(
+        connection: &dyn tablepro_core::Connection,
+        control: &tablepro_core::OperationControl,
+        tenant: &str,
+        value: &str,
+    ) {
+        connection
+            .execute_controlled(
+                "CREATE TABLE value_preview_records (tenant String, id UInt64, payload String) ENGINE = MergeTree ORDER BY (tenant, id)",
+                control,
+            )
+            .await
+            .unwrap();
+        connection
+            .execute_params_controlled(
+                "INSERT INTO value_preview_records VALUES (?, ?, ?), (?, ?, ?)",
+                &[
+                    Value::Text(tenant.into()),
+                    Value::Int(7),
+                    Value::Text(value.into()),
+                    Value::Text("other tenant".into()),
+                    Value::Int(7),
+                    Value::Text("distractor".into()),
+                ],
+                control,
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn assert_clickhouse_value_preview_native(
+        connection: &dyn tablepro_core::Connection,
+        control: &tablepro_core::OperationControl,
+        tenant: &str,
+    ) {
+        let native = connection
+            .query_params_controlled(
+                "SELECT toTypeName(payload), length(payload), hex(substring(payload, 1, 8)) FROM value_preview_records WHERE tenant = ? AND id = ?",
+                &[Value::Text(tenant.into()), Value::Int(7)],
+                control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            native.rows,
+            vec![vec![
+                Value::Text("String".into()),
+                Value::Int(12000),
+                Value::Text("426F6F6B69452D63".into()),
+            ]]
+        );
+    }
+
     async fn insert_mysql_value_preview_rows(
         connection: &dyn tablepro_core::Connection,
         control: &tablepro_core::OperationControl,
