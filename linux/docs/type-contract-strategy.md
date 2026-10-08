@@ -28,6 +28,13 @@ to ordinary scalar results.
 
 ## Current evidence and next targets
 
+[PR #365](https://github.com/cozyGarage/BookiE/pull/365) is merged; it adds
+native MySQL/MariaDB ENUM/SET metadata refusal and consumer regressions. [PR
+#369](https://github.com/cozyGarage/BookiE/pull/369) extends the PostgreSQL
+enum-domain recursion contract to a tested 513-layer point and awaits
+maintainer merge. The 513-layer case is a checkpoint, not a maximum-depth
+claim, and neither change closes the broader B3 matrix.
+
 ClickHouse Enum8 now covers its signed endpoints and zero (`-128`, `0`, `127`)
 in the existing native contract. Parameter insertion, result label decoding,
 native Int8 casts, CSV import and SQL-literal replay all preserve the labels;
