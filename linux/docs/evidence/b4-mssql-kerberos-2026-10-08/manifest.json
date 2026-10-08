@@ -34,11 +34,35 @@
     "run_id": 37797466945,
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37797466945",
     "source_commit": "c3122d97459685060f1cf3474b55e1a11b961abe",
-    "status_at_recording": "pending"
+    "status_at_recording": "completed",
+    "status": "completed",
+    "conclusion": "success",
+    "note": "Build Linux #37797466945 completed successfully on c3122d9, but its jobs did not run scripts/test-mssql-kerberos.sh or the Samba AD fixture; this is general hosted code evidence, not hosted Kerberos interoperability evidence."
   },
   "not_established": [
     "Windows Active Directory interoperability",
     "installed distribution package and native Wayland behavior",
     "Kerberos interoperability beyond the pinned Samba AD and SQL Server fixture"
-  ]
+  ],
+  "current_fork_linux_run": {
+    "workflow": "Build Linux",
+    "run_id": 37806196821,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37806196821",
+    "source_commit": "896f1b316dbf9c3c46b5bc6f6efd999281e491a0",
+    "status_at_recording": "in_progress",
+    "completed_jobs": [
+      {
+        "name": "Preflight and sandbox tier (no GTK app)",
+        "conclusion": "success"
+      }
+    ],
+    "active_jobs": [
+      "B4 rollback acceptance (docker)",
+      "PostgreSQL release fixture (docker)",
+      "Driver TLS fixture (docker)",
+      "Fast checks (GTK)",
+      "Optional DuckDB driver and GTK feature"
+    ],
+    "note": "The current-tip Build Linux run is active. The preflight/sandbox job passed; B4 rollback, PostgreSQL release, Driver TLS, GTK and optional DuckDB jobs were still running at this update."
+  }
 }

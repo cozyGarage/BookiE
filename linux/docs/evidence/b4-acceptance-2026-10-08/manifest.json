@@ -3,11 +3,11 @@
   "date": "2026-10-08",
   "branch": "linux",
   "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
-  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip b4dd2b4 adds GTK test harness, fixture and packaging changes, MySQL Aria rollback test coverage (including a trigger side effect), and documentation only relative to the runtime candidate; no application or driver implementation code changed.",
+  "source_note": "This manifest records the local acceptance candidate built from a7f14fa. Subsequent hosted results are separately recorded under subsequent_current_tip_hosted and are on c3122d9, not this candidate; the current fork/linux tip is tracked separately.",
   "local_tracked_diff": "none",
   "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
-  "result": "all seven local B4 layers passed on a7f14fa; the full B4 rollback layer also passed locally at 4db3077; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa; current-tip Build Linux acceptance is pending",
+  "result": "All seven local B4 layers passed on a7f14fa; the full B4 rollback layer also passed locally at 4db3077; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa. Later Build Linux run #37797466945 completed successfully on c3122d9, but it is not a hosted acceptance run on the selected a7f14fa candidate and its installed GTK job was a generic safety smoke, not B4-22 bundle acceptance.",
   "release_binary": {
     "build_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
     "staged_path": "/home/trung/.cache/bookie-b4-target-0d5/installed/usr/bin/tablepro",
@@ -28,9 +28,9 @@
     "run_id": 37787165733,
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37787165733",
     "source_commit": "b4dd2b4b1f25d8096d73067dffe2350719558208",
-    "status": "pending",
-    "conclusion": null,
-    "note": "No jobs had started at last check. Previous source SHA c52f3d7 passed B4 rollback, PostgreSQL release, Driver TLS and Fast GTK in Build Linux run 37784483261; installed GTK and broad driver integration were still running."
+    "status": "completed",
+    "conclusion": "cancelled",
+    "note": "Cancelled before any jobs started; superseded by Build Linux #37797466945 on c3122d9."
   },
   "earlier_hosted": {
     "workflow": "Build Linux",
@@ -39,10 +39,11 @@
     "conclusion": "success"
   },
   "not_established": [
-    "Latest-tip Build Linux acceptance after PR 387",
-    "Distribution-package installation and native Wayland acceptance; GTK acceptance used a staged release binary under Xvfb/AT-SPI",
-    "Windows Active Directory interoperability; local Kerberos coverage used the Samba AD fixture",
-    "Rollback effects for MySQL storage engines and side-effect classes outside bounded fixture coverage"
+    "Hosted B4 acceptance on the selected runtime candidate a7f14fa; the completed current-tip run tested c3122d9.",
+    "Distribution-package installation and native Wayland acceptance; GTK evidence used Xvfb/AT-SPI or a generic installed safety smoke.",
+    "B4-22 bundle export/import audit acceptance on the frozen candidate.",
+    "Windows Active Directory interoperability; local Kerberos coverage used the Samba AD fixture.",
+    "Rollback effects for MySQL storage engines and side-effect classes outside bounded fixture coverage."
   ],
   "summary": {
     "path": "focused.txt",
@@ -202,21 +203,78 @@
     "local_report": "/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
     "local_result": "passed; the test is the sole tracked source modification in the report",
     "previous_hosted_rollback": "passed on 30f9d37; run predates this test",
-    "current_hosted_acceptance": "B4 rollback job passed on c52f3d7 in Build Linux run 37784483261 with trigger commit 5211e6a included; latest-tip run 37787165733 is pending"
+    "current_hosted_acceptance": "B4 rollback job passed on c3122d9 in Build Linux run 37797466945 with the merged Aria trigger regression included; the full Build Linux run completed successfully."
   },
   "previous_hosted": {
     "workflow": "Build Linux",
     "run_id": 37784483261,
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37784483261",
     "source_commit": "c52f3d7d910f0e7dcb896c16cf315a76298f0d49",
-    "run_status": "in_progress",
+    "run_status": "completed",
     "b4_rollback_job": "success",
     "postgres_release_job": "success",
     "driver_tls_job": "success",
     "fast_gtk_job": "success",
     "optional_duckdb_job": "success",
-    "driver_integration_job": "in_progress",
-    "installed_gtk_job": "in_progress",
-    "note": "The B4 rollback job passed with Aria trigger follow-up commit 5211e6a included; other jobs were still active at last check."
+    "driver_integration_job": "success",
+    "installed_gtk_job": "success",
+    "note": "Build Linux #37784483261 completed successfully on c52f3d7; its B4 rollback job included trigger follow-up commit 5211e6a. Later run #37797466945 provides newer hosted evidence on c3122d9.",
+    "run_conclusion": "success"
+  },
+  "subsequent_current_tip_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37797466945,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37797466945",
+    "source_commit": "c3122d97459685060f1cf3474b55e1a11b961abe",
+    "status": "completed",
+    "conclusion": "success",
+    "relevant_jobs": {
+      "B4 rollback acceptance (docker)": {
+        "job_id": 113398752913,
+        "conclusion": "success"
+      },
+      "PostgreSQL release fixture (docker)": {
+        "job_id": 113398752985,
+        "conclusion": "success"
+      },
+      "Driver TLS fixture (docker)": {
+        "job_id": 113398753132,
+        "conclusion": "success"
+      },
+      "Driver integration tests (docker)": {
+        "job_id": 113400053674,
+        "conclusion": "success"
+      },
+      "Installed GTK safety smoke": {
+        "job_id": 113403721623,
+        "conclusion": "success"
+      },
+      "Linux regression gate": {
+        "job_id": 113413677242,
+        "conclusion": "success"
+      }
+    },
+    "scope_limit": "This run is on c3122d9, not the selected runtime candidate a7f14fa; the installed GTK job is not the B4-22 bundle flow or native Wayland acceptance."
+  },
+  "current_fork_linux_tip": {
+    "source_commit": "896f1b316dbf9c3c46b5bc6f6efd999281e491a0",
+    "workflow_run_id": 37806196821,
+    "workflow_url": "https://github.com/cozyGarage/BookiE/actions/runs/37806196821",
+    "status_at_recording": "in_progress",
+    "run_id": 37806196821,
+    "completed_jobs": [
+      {
+        "name": "Preflight and sandbox tier (no GTK app)",
+        "conclusion": "success"
+      }
+    ],
+    "active_jobs": [
+      "B4 rollback acceptance (docker)",
+      "PostgreSQL release fixture (docker)",
+      "Driver TLS fixture (docker)",
+      "Fast checks (GTK)",
+      "Optional DuckDB driver and GTK feature"
+    ],
+    "note": "The current-tip Build Linux run is active. The preflight/sandbox job passed; B4 rollback, PostgreSQL release, Driver TLS, GTK and optional DuckDB jobs were still running at this update."
   }
 }
