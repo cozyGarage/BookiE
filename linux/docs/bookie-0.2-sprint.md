@@ -61,11 +61,13 @@ These runs do not establish B4 acceptance on a selected frozen candidate.
 The local focused B4 rollback layer passed on clean documentation-only commit
 `73f8ce935`; its tested source files match `684ea40f`. Commands, results and
 source hashes are in the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
-PR #337 merged the B4-11 direct-DML follow-up. Its Docker rollback layer passed
-locally; hosted preflight, GTK fast checks, workflow lint, harness, security,
-SonarCloud, both Flatpak builds and the regression gate passed on head
-`96628dd`. The B4 Docker job was skipped by its PR workflow condition; local run
-details are in the [PR #337 evidence comment](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536).
+PR #337 added failed-batch INSERT coverage across InnoDB, MyISAM, MEMORY, CSV
+and ARCHIVE. PR #353 then added direct UPDATE and DELETE coverage across InnoDB,
+MyISAM, MEMORY and CSV. Its local Docker rollback layer passed; hosted PR checks
+passed, while the B4 Docker job was skipped by the PR workflow condition. The
+post-merge Build Linux run on `32b170f` is still pending. See the [PR #337
+evidence comment](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536)
+and [PR #353](https://github.com/cozyGarage/BookiE/pull/353).
 PR #312 skipped its B4-specific job because it only changed MongoDB tests.
 These focused cases do not close B3: the broader
 engine/type/consumer/configuration matrix, mutation triage, performance rows and
@@ -112,7 +114,7 @@ this existing-eight-driver stabilization scope.
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
 | B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. SQLite STRICT `ANY` computed `iif()` now has native storage-class and typed CSV coverage (#331); declared BOOLEAN/temporal decoding, BLOB-affinity runtime classes, and malformed temporal text fallback have focused tests (#333, #335). PostgreSQL domain-over-enum metadata/query coverage now reaches 302 and 512 layers, including arrays (#338, #340, #342, #344); Redis has a committed-write lost-ack contract (#345). U2 identity-copy behavior is implemented and covered for PostgreSQL, SQL Server and MySQL policy; PostgreSQL enum parameter inference has restricted-role coverage, and PR #249 adds a keyed grid-edit case under shadowed transaction-local `search_path`. The broader engine/type/consumer/configuration matrix, mutation triage, remaining TEST-15 paths and installed grid acceptance remain open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
-| B4 transport/sessions | SSH audit, rollback-failure, Kerberos, GTK trust-flow, prompt-timeout, cross-engine DML regressions and the B4-11 direct-DML follow-up (#337) are merged. | [Current B4 board](b4-task-board.md): frozen-candidate and hosted/installed acceptance remains open for the listed rows; B4-11 optional engine/effect coverage, B4-12 next-candidate rollback proof, B4-21 Windows AD interoperability, and UI-1b chain editing remain |
+| B4 transport/sessions | SSH audit, rollback-failure, Kerberos, GTK trust-flow, prompt-timeout, cross-engine DML regressions and B4-11 failed-batch INSERT/UPDATE/DELETE coverage (#337, #353) are merged. | [Current B4 board](b4-task-board.md): frozen-candidate and hosted/installed acceptance remains open for the listed rows; B4-11 other engines/effects, B4-12 next-candidate rollback proof, B4-21 Windows AD interoperability, and UI-1b chain editing remain |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
 | B7 qualification | Open | Frozen SHA, affected automated gates, both installed desktop targets and retry-free soak; publication separate |
@@ -151,7 +153,7 @@ owners; do not create a second completion cache, exporter or type policy.
 
 ## B4 acceptance worklist (2026-10-08)
 
-This is the next acceptance slice on current `linux` tip `b5112ca7`. Prior runs
+This is the next acceptance slice on current `linux` tip `32b170f`. Prior runs
 remain useful evidence for their exact SHAs, but do not substitute for current
 frozen-candidate, hosted or installed acceptance where required. The SSH GTK
 artifacts below prove staged release-binary behavior under Xvfb/AT-SPI; they do
@@ -159,11 +161,11 @@ not prove a distribution-package installation or native Wayland session.
 
 | Item | Current evidence and action |
 | --- | --- |
-| B4-7, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. At current tip `b5112ca7`, Security passed, Build Linux is pending and Flatpak packaging is running. |
+| B4-7, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. Post-merge Build Linux run `37743149992` on `32b170f` is pending; the B4 rollback job has not started. |
 | B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Repeat on the selected frozen SHA, confirm hosted results, and complete installed-package/native Wayland acceptance. |
 | B4-22 | Keep UNVERIFIED. The GTK bundle export/import and encrypted credential round-trip have local and earlier hosted evidence; obtain acceptance on the selected frozen candidate, hosted SHA, and installed package/native Wayland. |
 | B4-12 | The focused PostgreSQL backend-termination case passed again on frozen candidate `7eea6f09d7154f03400e82cec7c16215488b2115`; see the [PR discussion](https://github.com/cozyGarage/BookiE/pull/350#issuecomment-6054276678). Exact-candidate hosted coverage and a rerun on any next selected candidate remain open. |
-| B4-11 | [PR #337 local rollback evidence](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536) adds direct failed-batch INSERT coverage on InnoDB, MyISAM, MEMORY, CSV and ARCHIVE; the full layer passed 10 MySQL atomicity tests and the PostgreSQL rollback-failure selector. Optional/vendor-specific engines and broader side effects remain open. |
+| B4-11 | [PR #337](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536) covers direct failed-batch INSERTs on InnoDB, MyISAM, MEMORY, CSV and ARCHIVE. [PR #353](https://github.com/cozyGarage/BookiE/pull/353) adds direct UPDATE and DELETE coverage on InnoDB, MyISAM, MEMORY and CSV. The local rollback layer passed; other storage engines and additional side-effect patterns remain open. |
 | B4-17 | Reconcile existing `ssh-gtk-*` artifacts before rerunning: they already show both-hop trust prompts, routed query, second-hop decline without learning, changed-key refusal, and terminal audit outcomes. They use staged release binaries under Xvfb/AT-SPI. Close only after selected-candidate/hosted evidence and the required installed-package/native Wayland trust flow. |
 | B4-21 | Keep Windows AD interoperability open. Samba AD Kerberos+TLS fixtures are useful local coverage but do not establish interoperability with Windows AD; candidate acceptance is also outstanding. |
 | UI-1b | Keep refusing edits to saved SSH jump chains. Implement the per-hop secret editor design across persistence, transport identity, bundle compatibility and GTK before enabling chain editing. |
