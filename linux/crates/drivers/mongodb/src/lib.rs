@@ -452,7 +452,7 @@ impl Connection for MongodbConnection {
 
 impl MongodbConnection {
     async fn run_find(&self, q: FindQuery) -> Result<QueryResult, DriverError> {
-        let mut columns = self.fetch_columns(None, &q.collection).await?;
+        let mut columns = self.page_columns(&q.collection).await?;
         let coll = self.db().collection::<Document>(&q.collection);
         let mut cursor = coll
             .find(q.filter)
@@ -647,10 +647,32 @@ mod tests {
             .await
             .unwrap();
         connection.fetch_rows(None, "browse_pages", 0, 1).await.unwrap();
+        {
+            let commands = finds.lock().unwrap();
+            assert_eq!(commands.len(), 6);
+            assert_eq!(commands[4].get("limit"), None);
+            assert_eq!(commands[5].get_i64("limit").unwrap(), 1);
+        }
+        assert_paged_find_queries_reuse_census(&connection, &finds).await;
+    }
+
+    async fn assert_paged_find_queries_reuse_census(
+        connection: &MongodbConnection,
+        finds: &std::sync::Arc<std::sync::Mutex<Vec<mongodb::bson::Document>>>,
+    ) {
+        connection
+            .query("db.browse_pages.find({}).skip(0).limit(1)")
+            .await
+            .unwrap();
+        connection
+            .query("db.browse_pages.find({}).skip(1).limit(1)")
+            .await
+            .unwrap();
         let commands = finds.lock().unwrap();
-        assert_eq!(commands.len(), 6);
-        assert_eq!(commands[4].get("limit"), None);
-        assert_eq!(commands[5].get_i64("limit").unwrap(), 1);
+        assert_eq!(commands.len(), 8);
+        assert_eq!(commands[6].get_i64("limit").unwrap(), 1);
+        assert_eq!(commands[7].get_i64("limit").unwrap(), 1);
+        assert_eq!(commands[7].get_i64("skip").unwrap(), 1);
     }
 
     #[test]

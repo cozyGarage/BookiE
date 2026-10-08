@@ -4,6 +4,7 @@
 
 ### Added
 - MongoDB browse performs a complete type census on initial load and refresh, then reuses it across pages and invalidates it after driver writes.
+- MongoDB paged `find` queries reuse the same connection-local type census instead of rescanning the collection for each page.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
 - The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
