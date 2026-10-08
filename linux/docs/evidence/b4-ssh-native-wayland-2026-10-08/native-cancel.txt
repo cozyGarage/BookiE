@@ -1,0 +1,218 @@
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.2' (uid=1000 pid=2380498 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[2380509]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=2380487 comm="python3 /tmp/b4_native_wayland_cancel.py /home/tru")
+dbus-daemon[2380509]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.9' (uid=1000 pid=2380520 comm="/home/trung/.cache/bookie-b4-target-0d5/installed/")
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.9' (uid=1000 pid=2380520 comm="/home/trung/.cache/bookie-b4-target-0d5/installed/")
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.12' (uid=1000 pid=2380555 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.12' (uid=1000 pid=2380555 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.12' (uid=1000 pid=2380555 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:2380555): xdg-desktop-portal-WARNING **: 23:21:32.509: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2380555): xdg-desktop-portal-WARNING **: 23:21:32.509: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2380555): xdg-desktop-portal-WARNING **: 23:21:32.509: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2380555): xdg-desktop-portal-WARNING **: 23:21:32.515: Failed to connect to PipeWire: Couldn't connect to PipeWire
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.hyprland' requested by ':1.12' (uid=1000 pid=2380555 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.hyprland'
+[LOG] Initializing xdph...
+[LOG] XDG_CURRENT_DESKTOP set to Hyprland
+[LOG] Gathering exported interfaces
+[LOG]  | Got interface: wl_seat (ver 9)
+[LOG]  | Got interface: wl_data_device_manager (ver 3)
+[LOG]  | Got interface: wl_compositor (ver 6)
+[LOG]  | Got interface: wl_subcompositor (ver 1)
+[LOG]  | Got interface: wl_shm (ver 2)
+[LOG]  | Got interface: wp_viewporter (ver 1)
+[LOG]  | Got interface: wp_tearing_control_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_fractional_scale_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_output_manager_v1 (ver 3)
+[LOG]  | Got interface: wp_cursor_shape_manager_v1 (ver 2)
+[LOG]  | Got interface: zwp_idle_inhibit_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_relative_pointer_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_decoration_manager_v1 (ver 2)
+[LOG]  | Got interface: wp_alpha_modifier_v1 (ver 1)
+[LOG]  | Got interface: zwlr_gamma_control_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_foreign_toplevel_list_v1 (ver 1)
+[LOG]  | Got interface: zwp_pointer_gestures_v1 (ver 3)
+[LOG]  | Got interface: zwlr_foreign_toplevel_manager_v1 (ver 3)
+[LOG] [toplevel] (activate) locks: 1
+[LOG]  | Got interface: zwp_keyboard_shortcuts_inhibit_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_text_input_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_text_input_manager_v3 (ver 1)
+[LOG]  | Got interface: zwp_pointer_constraints_v1 (ver 1)
+[LOG]  | Got interface: zwlr_output_power_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_activation_v1 (ver 1)
+[LOG]  | Got interface: ext_idle_notifier_v1 (ver 2)
+[LOG]  | Got interface: hyprland_lock_notifier_v1 (ver 1)
+[LOG]  | Got interface: ext_session_lock_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_input_method_manager_v2 (ver 1)
+[LOG]  | Got interface: zwp_virtual_keyboard_manager_v1 (ver 1)
+[LOG]  | Got interface: zwlr_virtual_pointer_manager_v1 (ver 2)
+[LOG]  | Got interface: zwlr_output_manager_v1 (ver 4)
+[LOG]  | Got interface: org_kde_kwin_server_decoration_manager (ver 1)
+[LOG]  | Got interface: hyprland_focus_grab_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_tablet_manager_v2 (ver 1)
+[LOG]  | Got interface: zwlr_layer_shell_v1 (ver 5)
+[LOG]  | Got interface: wp_presentation (ver 2)
+[LOG]  | Got interface: xdg_wm_base (ver 7)
+[LOG]  | Got interface: zwlr_data_control_manager_v1 (ver 2)
+[LOG]  | Got interface: zwp_primary_selection_device_manager_v1 (ver 1)
+[LOG]  | Got interface: xwayland_shell_v1 (ver 1)
+[LOG]  | Got interface: hyprland_toplevel_mapping_manager_v1 (ver 1)
+[LOG] [toplevel mapping] registered manager
+[LOG]  | Got interface: hyprland_global_shortcuts_manager_v1 (ver 1)
+[LOG] [globalshortcuts] registered
+[LOG]  | Got interface: xdg_wm_dialog_v1 (ver 1)
+[LOG]  | Got interface: wp_single_pixel_buffer_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_security_context_manager_v1 (ver 1)
+[LOG]  | Got interface: hyprland_ctm_control_manager_v1 (ver 2)
+[LOG]  | Got interface: hyprland_input_capture_manager_v1 (ver 1)
+[LOG] [input-capture] initializing input capture portal
+[LOG] [input-capture] init successful
+[LOG]  | Got interface: hyprland_surface_manager_v1 (ver 2)
+[LOG]  | Got interface: wp_content_type_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_toplevel_tag_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_system_bell_v1 (ver 1)
+[LOG]  | Got interface: vicinae_hotkey_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_workspace_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_data_control_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_pointer_warp_v1 (ver 1)
+[LOG]  | Got interface: wp_fifo_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_exporter_v2 (ver 1)
+[LOG]  | Got interface: zxdg_importer_v2 (ver 1)
+[LOG]  | Got interface: ext_background_effect_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_commit_timing_manager_v1 (ver 1)
+[LOG]  | Got interface: zwlr_screencopy_manager_v1 (ver 3)
+[ERR] [pipewire] pw didn't allow for a context connection
+[LOG] [screencopy] init successful
+[LOG]  | Got interface: hyprland_toplevel_export_manager_v1 (ver 2)
+[LOG]  | Got interface: ext_output_image_capture_source_manager_v1 (ver 1)
+[LOG]  | Got interface: extdbus-daemon[2380486]: [session uid=1000 pid=2380486 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+
+(process:2380487): dbind-WARNING **: 23:21:32.638: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+Traceback (most recent call last):
+  File "/home/trung/.cache/bookie-b4-candidate-a7f14/linux/crates/app/tests/gtk_safety.py", line 932, in run_scenario
+    scenario(database, base)
+    ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/trung/.cache/bookie-b4-candidate-a7f14/linux/crates/app/tests/gtk_ux.py", line 616, in postgres_ssh_unknown_host_key_decline_is_durably_audited
+    ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/trung/.cache/bookie-b4-candidate-a7f14/linux/crates/app/tests/gtk_safety.py", line 261, in wait_for_node
+    raise AssertionError(f"expected accessible node {name!r} to {expectation}:\n{accessible_snapshot()}")
+AssertionError: expected accessible node 'Trust this SSH host?' to disappear:
+application: xdg-desktop-portal-gtk
+application: com.tablepro.linux
+frame: Safety SQLite — BookiE [0,0 941x1150] actions=['win.recent-tab-end', 'win.new-window', 'win.refresh-page', 'win.open-file', 'win.quit', 'win.undo-change', 'win.disconnect', 'win.show-history', 'win.show-catalog', 'win.recent-tab', 'win.save-changes', 'default.activate', 'win.redo-change', 'win.jump-column', 'win.shortcuts', 'win.save-favorite', 'win.open-quickly', 'win.export-all-csv', 'win.export-json', 'window.close', 'win.about', 'win.save-file-as', 'win.show-saved-queries', 'win.explain-query', 'win.export-csv', 'win.export-all-json', 'win.preferences', 'win.open-filter', 'window.toggle-maximized', 'win.reopen-closed-tab', 'win.show-activity', 'win.close-current', 'win.open-editor']
+page tab: Query 1 [0,0 650x34] actions=[]
+label: Query 1 [0,0 53x26] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Close Tab [0,0 24x24] actions=['click']
+button: New query (Ctrl+E) [0,0 34x34] actions=['click']
+panel: Query 1 [0,0 706x1057]
+label: Ln 1, Col 10 [0,0 106x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Pin results [0,0 110x34] actions=['click']
+label: Pin results [0,0 76x24]
+toggle button: Session [0,0 91x34] actions=['click']
+label: Session [0,0 57x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Explain [0,0 87x34] actions=['click']
+label: Explain [0,0 53x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Run [0,0 62x34] actions=['click']
+label: Run [0,0 28x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+list item: Tables [0,0 223x46] actions=[]
+label: Tables [0,0 58x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: 1 [0,0 5x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: New Table… [0,0 36x34] actions=['click']
+button: Table from CSV… [0,0 36x34] actions=['click']
+list item: safety_items [0,0 223x46] actions=['sidebar-row.open-in-new-tab', 'sidebar-row.show-create-table', 'sidebar-row.edit-structure', 'sidebar-row.drop-table', 'sidebar-row.import-csv']
+label: safety_items [0,0 101x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Open safety_items [0,0 36x34] actions=['click']
+label: Safety SQLite [0,0 122x18] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+toggle button: Search tables [0,0 34x34] actions=['click']
+button: New connection [0,0 34x34] actions=['click']
+button: Open saved connection [0,0 34x34] actions=[]
+toggle button: Open saved connection [0,0 34x34] actions=['click']
+label: BookiE [0,0 275x18] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: Safety SQLite · sqlite · Local · SQLite 3.53.4 [0,0 275x15] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Main menu [0,0 34x34] actions=[]
+toggle button: Main menu [0,0 34x34] actions=['click']
+button: Close [0,0 34x34] actions=['click']
+frame: Trust this SSH host? [0,0 372x280] actions=['window.close', 'default.activate']
+alert: Trust this SSH host? [0,0 372x280] actions=['default.activate']
+label: Trust this SSH host? [0,0 324x25] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: This computer has not connected to 127.0.0.1:2223 before. Its ssh-ed25519 key fingerprint is SHA256:A5SIZ/ti2LK7cpPS7GMcjXnU+3jKHUQTBWyDBGFsn0I. Compare it with the fingerprint your server administrator gave you before trusting it. [0,0 372x124] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Cancel [0,0 156x44] actions=['click']
+label: Cancel [0,0 116x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Trust [0,0 156x44] actions=['click']
+label: Trust [0,0 116x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/b4_native_wayland_cancel.py", line 10, in <module>
+    gtk_safety.main()
+    ~~~~~~~~~~~~~~~^^
+  File "/home/trung/.cache/bookie-b4-candidate-a7f14/linux/crates/app/tests/gtk_safety.py", line 1931, in main
+    run_scenario(binary, scenario)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/trung/.cache/bookie-b4-candidate-a7f14/linux/crates/app/tests/gtk_safety.py", line 959, in run_scenario
+    raise AssertionError(f"{failure}\napplication stderr:\n{stderr}") from failure
+AssertionError: expected accessible node 'Trust this SSH host?' to disappear:
+application: xdg-desktop-portal-gtk
+application: com.tablepro.linux
+frame: Safety SQLite — BookiE [0,0 941x1150] actions=['win.recent-tab-end', 'win.new-window', 'win.refresh-page', 'win.open-file', 'win.quit', 'win.undo-change', 'win.disconnect', 'win.show-history', 'win.show-catalog', 'win.recent-tab', 'win.save-changes', 'default.activate', 'win.redo-change', 'win.jump-column', 'win.shortcuts', 'win.save-favorite', 'win.open-quickly', 'win.export-all-csv', 'win.export-json', 'window.close', 'win.about', 'win.save-file-as', 'win.show-saved-queries', 'win.explain-query', 'win.export-csv', 'win.export-all-json', 'win.preferences', 'win.open-filter', 'window.toggle-maximized', 'win.reopen-closed-tab', 'win.show-activity', 'win.close-current', 'win.open-editor']
+page tab: Query 1 [0,0 650x34] actions=[]
+label: Query 1 [0,0 53x26] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Close Tab [0,0 24x24] actions=['click']
+button: New query (Ctrl+E) [0,0 34x34] actions=['click']
+panel: Query 1 [0,0 706x1057]
+label: Ln 1, Col 10 [0,0 106x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Pin results [0,0 110x34] actions=['click']
+label: Pin results [0,0 76x24]
+toggle button: Session [0,0 91x34] actions=['click']
+label: Session [0,0 57x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Explain [0,0 87x34] actions=['click']
+label: Explain [0,0 53x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Run [0,0 62x34] actions=['click']
+label: Run [0,0 28x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+list item: Tables [0,0 223x46] actions=[]
+label: Tables [0,0 58x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: 1 [0,0 5x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: New Table… [0,0 36x34] actions=['click']
+button: Table from CSV… [0,0 36x34] actions=['click']
+list item: safety_items [0,0 223x46] actions=['sidebar-row.open-in-new-tab', 'sidebar-row.show-create-table', 'sidebar-row.edit-structure', 'sidebar-row.drop-table', 'sidebar-row.import-csv']
+label: safety_items [0,0 101x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Open safety_items [0,0 36x34] actions=['click']
+label: Safety SQLite [0,0 122x18] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+toggle button: Search tables [0,0 34x34] actions=['click']
+button: New connection [0,0 34x34] actions=['click']
+button: Open saved connection [0,0 34x34] actions=[]
+toggle button: Open saved connection [0,0 34x34] actions=['click']
+label: BookiE [0,0 275x18] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: Safety SQLite · sqlite · Local · SQLite 3.53.4 [0,0 275x15] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Main menu [0,0 34x34] actions=[]
+toggle button: Main menu [0,0 34x34] actions=['click']
+button: Close [0,0 34x34] actions=['click']
+frame: Trust this SSH host? [0,0 372x280] actions=['window.close', 'default.activate']
+alert: Trust this SSH host? [0,0 372x280] actions=['default.activate']
+label: Trust this SSH host? [0,0 324x25] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: This computer has not connected to 127.0.0.1:2223 before. Its ssh-ed25519 key fingerprint is SHA256:A5SIZ/ti2LK7cpPS7GMcjXnU+3jKHUQTBWyDBGFsn0I. Compare it with the fingerprint your server administrator gave you before trusting it. [0,0 372x124] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Cancel [0,0 156x44] actions=['click']
+label: Cancel [0,0 116x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Trust [0,0 156x44] actions=['click']
+label: Trust [0,0 116x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+application stderr:
+2026-10-08T21:21:32.421837Z  INFO starting tablepro-app drivers=7
+2026-10-08T21:21:32.422003Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+2026-10-08T21:21:32.607334Z  INFO registered win.disconnect enabled=false
+2026-10-08T21:21:32.610323Z  INFO main window activated
+2026-10-08T21:21:33.121339Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+
+A connection to the bus can't be made
+/bin/sh: line 1: kill: (2380589) - No such process

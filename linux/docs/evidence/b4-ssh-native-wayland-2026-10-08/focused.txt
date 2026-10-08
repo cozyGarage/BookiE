@@ -1,0 +1,10 @@
+Candidate source: a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200
+Runtime: staged release binary (SHA-256 in binary-sha256.txt), GDK_BACKEND=wayland, Hyprland, private D-Bus and isolated test profile.
+
+Results:
+- The saved mTLS query scenario passed with the staged binary.
+- The candidate-source Xvfb/AT-SPI host-key refusal scenario passed.
+- Under native Wayland, the exact candidate-source GTK harness could not dismiss the SSH trust prompt with either synthetic Escape or an AT-SPI Cancel action. The prompt remained visible until the test process exited; no trust decision was made.
+- A separate probe paired the candidate binary with the newer `fork/linux` GTK harness and reached a connection-ready state after Escape. Because that harness and binary came from different commits, this result is not attributed to product behavior.
+
+No person clicked Trust. Native input automation did not reliably exercise host-key refusal, so this does not prove native acceptance or a confirmed product defect. B4-17 remains open pending a reliable native installed trust-flow run.
