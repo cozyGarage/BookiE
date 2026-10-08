@@ -817,10 +817,19 @@ mod tests {
             "",
             "db/path",
             "db?replicaSet=evil",
+            "db#fragment",
             "user@db",
+            "db,other",
             "db:27018",
+            "db%2fother",
+            "db\\other",
+            " db",
+            "db ",
             "-db",
             "db..internal",
+            "[::1",
+            "::1]",
+            "[127.0.0.1]",
         ] {
             assert!(mongo_host_authority(input).is_err(), "accepted {input:?}");
         }
