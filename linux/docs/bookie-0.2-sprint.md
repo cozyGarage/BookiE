@@ -34,8 +34,11 @@ At this baseline, the full local driver integration tier passed, plus optional
 DuckDB driver and app-contract suites. This does not close B3: remaining work is
 the listed consumer/configuration matrix, mutation triage, performance rows and
 installed grid acceptance. Hosted run #37708183936 passed the focused MySQL and
-PostgreSQL rollback layer; hosted release-binary GTK acceptance from #286 is
-tracked separately on the [B4 board](b4-task-board.md).
+PostgreSQL rollback layer, seven release-binary PostgreSQL SSH GTK scenarios,
+and the installed GTK safety suite including encrypted credential restoration.
+The broad driver integration tier timed out during dependency compilation
+before tests ran. See the [B4 board](b4-task-board.md) for scoped results and
+remaining package/Wayland and Windows AD acceptance.
 
 B3 remains open for the broader engine/type/consumer/configuration matrix,
 mutation triage and installed grid acceptance. B4 still needs the remaining
