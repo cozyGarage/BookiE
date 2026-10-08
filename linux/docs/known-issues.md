@@ -19,14 +19,15 @@ Rules:
   acceptance.
 
 Reconciled against BookiE `fork/linux` tip
-`ae3a1e00a47c876076dec7bedff7c9efc02c445e` (PR #404), checked 2026-10-08.
-This refresh includes the AUD-2/AUD-4 fixes in PR #402, the B4-12 frozen-source
-rollback result, and the latest hosted evidence. Build Linux #37806196821 passed
-on `896f1b3`; Build Linux #37844691724 on `ae3a1e0` was still in progress at
-this check. Hosted success does not replace the frozen-candidate, installed,
-or native Wayland gates that remain open in the B4 board. Older audits remain
-historical; this ledger and the [active sprint](bookie-0.2-sprint.md) own
-current status.
+`7be233dc99d479f9ca6f33fc0044802cff16e583` (PR #406), checked 2026-10-08.
+This refresh includes the AUD-2/AUD-4 fixes in PR #402, B4-12's scoped
+frozen-source rollback result, and current hosted evidence. On `7be233d`, Linux
+Security #37847211329, CI contracts #37847211259, and Flatpak #37847211267
+passed; Build Linux #37847211229 was pending at this check. PR #408 adds a
+locally passing B4-11 BLACKHOLE side-effect case; hosted checks remain pending.
+Hosted success does not replace the frozen-candidate, installed, or native
+Wayland gates that remain open in the B4 board. Older audits remain historical;
+this ledger and the [active sprint](bookie-0.2-sprint.md) own current status.
 ## Owners and handoff
 
 Every open row has one owner. `scripts/check-known-issues.py` fails when an
@@ -119,7 +120,7 @@ edits the other lane's files without a ledger entry.
 | B4-8 | ~~F7: isolated GTK Session, BEGIN, label, toggle-off confirm~~ | DONE | AT-SPI scenario `session_transaction_label_and_toggle_off_confirmation` (SQLite): Session on, BEGIN shows the transaction label, toggling off asks, Cancel keeps the session and the label, Roll Back returns the plain label. Runs in the installed suite on Arch, Ubuntu 24.04 and Debian 13 | gtk-installed |
 | B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | UNVERIFIED | Runtime SHA `a7f14fa` passed the 48-case local TLS matrix and PostgreSQL saved mTLS through SSH; hosted Driver TLS passed on `c3122d9` in #37797466945 and `896f1b3` in #37806196821. The earlier MongoDB refusal on `98134709` did not recur and its cause remains undetermined. Frozen-candidate and distribution-package/native Wayland acceptance remain open; see the [candidate manifest](evidence/b4-acceptance-2026-10-08/manifest.json) | manual |
 | B4-10 | ~~I1: the Debian package has no askpass build or install~~ | DONE | `scripts/build-deb.sh` builds and installs `tablepro-askpass`; `test_deb_package.py` rejects a builder or package without it, and `scripts/test-deb-package.sh` checks the installed binary | sandbox |
-| B4-11 | MySQL failed-batch rollback across additional storage engines and side effects | OPEN | On implementation SHA `c3122d9`, the MySQL atomicity selector passed 12 cases locally and hosted B4 rollback acceptance passed in #37797466945 and #37806196821, including MariaDB Aria `TRANSACTIONAL=0` INSERT, UPDATE and DELETE effects and an Aria trigger write surviving rollback of an InnoDB parent. Optional/vendor engines and broader side effects remain open. See [current-tip rollback evidence](evidence/b4-rollback-current-tip-2026-10-08/manifest.json) and [Aria detail](evidence/b4-mariadb-aria-rollback-2026-10-08/manifest.json) | driver-docker |
+| B4-11 | MySQL failed-batch rollback across additional storage engines and side effects | OPEN | The current `mysql_atomic` selector passed 13 tests locally on source `3d64a98`, including a BLACKHOLE trigger sink with a surviving MyISAM witness and rolled-back InnoDB parent ([PR #408](https://github.com/cozyGarage/BookiE/pull/408)). Hosted checks for this new case, optional/vendor engines and broader side effects remain open. See [current-tip rollback evidence](evidence/b4-rollback-current-tip-2026-10-08/manifest.json) and [Aria detail](evidence/b4-mariadb-aria-rollback-2026-10-08/manifest.json) | driver-docker |
 | B4-12 | ~~PostgreSQL rollback-failure acceptance on a frozen candidate~~ | DONE | The focused backend-termination selector passed on frozen source candidate `a7f14fa` (1 passed); it verifies `TransactionRollbackFailed`, absent row and transactional trigger effects after reconnect, and persistent identity/trigger sequence advancement. It also passed in hosted B4 rollback jobs #37797466945 (`c3122d9`) and #37806196821 (`896f1b3`). This closes the scoped rollback-failure acceptance; full-candidate and distribution-package qualification remain separate. See the [frozen-candidate evidence](evidence/b4-rollback-frozen-candidate-2026-10-08/manifest.json) and [current-tip rollback evidence](evidence/b4-rollback-current-tip-2026-10-08/manifest.json) | driver-docker |
 | B4-13 | ~~U4: reconnect retried every error forever~~ | DONE | `is_permanent_failure` tests; `a_credential_failure_ends_the_retry_loop_and_reports_the_reason`; `ConnectionHealth::Failed` shown in the banner. Raw error text still goes through `error_text` only | unit |
 | B4-14 | ~~U5: saved mTLS transport and consumer support~~ | DONE | PostgreSQL server requiring client cert: direct/SSH shared transport, missing/untrusted/rotated identities, GTK saved-connection query, agentd direct + saved SSH and untrusted-cert refusal. MySQL driver fixture: direct/SSH, missing/untrusted/rotated identities. `scripts/test-postgres-release.sh` and `scripts/test-driver-tls.sh` pass locally; installed/package/hosted acceptance remains separate | driver-docker + gtk-widget |
