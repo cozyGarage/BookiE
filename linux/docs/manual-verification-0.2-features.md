@@ -273,6 +273,11 @@ enough elements).
 - [ ] Tag a connection red and open it: the strip above the workspace tabs is
       red in light and dark. Change the tag: the strip follows without a restart.
 
+## Pinned results and gutter marks
+
+- [ ] Run `SELECT 1; SELECT 2;`, click Pin results, change the script and run it again: the first results stay as tabs marked 📌 ahead of the new ones. The button now reads Unpin results (2); clicking it drops the pinned tabs.
+- [ ] After running a script, each statement's first line shows a tick or, for a failed statement, a cross in the gutter, in light and dark. Edit the script and run it again: the marks follow the new run.
+
 ## Carried over from the earlier sprint
 
 - [ ] `cell_editor.rs`: in-place cell editing in light and dark. Held since the

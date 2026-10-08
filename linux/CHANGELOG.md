@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
+- Each statement of a script gets a gutter mark after a run: a tick for a statement that returned, a cross for one that failed.
 - MySQL ENUM/SET grid parsing now tests malformed metadata refusal and escaped
   labels, using real MySQL column metadata and native ordinal/byte oracles.
 - A failed PostgreSQL statement in the SQL editor shows the line and column of the error.
