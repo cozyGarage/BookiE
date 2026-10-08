@@ -31,15 +31,22 @@ while [ "$SECONDS" -lt "$deadline" ]; do
   case "$status" in
     success) echo "forgejo run $run_id passed for $sha"; exit 0 ;;
     failure|cancelled)
-      echo "forgejo run $run_id $status for $sha"
-      curl -fsS -H "Authorization: token $token" "$api/actions/tasks?limit=100" | python3 -c '
+      report="$(curl -fsS -H "Authorization: token $token" "$api/actions/tasks?limit=100" | python3 -c '
 import json, sys
 run = int(sys.argv[1])
-for task in json.load(sys.stdin).get("workflow_runs", []):
-    if task.get("run_number") == run and task.get("status") != "success":
-        print("  ", task["status"], task["name"])
-' "$run_id"
-      exit 1 ;;
+tasks = [task for task in json.load(sys.stdin).get("workflow_runs", []) if task.get("run_number") == run]
+if any(task["status"] in ("running", "waiting") for task in tasks):
+    print("RUNNING")
+else:
+    for task in tasks:
+        if task["status"] != "success":
+            print("  ", task["status"], task["name"])
+' "$run_id")"
+      if [ "$report" != "RUNNING" ]; then
+        echo "forgejo run $run_id $status for $sha"
+        [ -n "$report" ] && echo "$report"
+        exit 1
+      fi ;;
   esac
   sleep 30
 done

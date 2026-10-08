@@ -20,7 +20,7 @@ for base in "${images[@]}"; do
     if [ "${DISTRO_FLOOR_INSTALLED:-0}" = 1 ]; then
       status=0
       bash /src/scripts/test-gtk-safety.sh >/tmp/gtk-safety.log 2>&1 || status=$?
-      grep -v Adwaita-WARNING /tmp/gtk-safety.log | grep -v "^$" | tail -12
+      grep -aE "^passed:|^AssertionError|^  File .*gtk_[a-z]*\.py\", line [0-9]+, in " /tmp/gtk-safety.log | tail -14
       echo "installed GTK suite exit status: $status"
       [ "$status" = 0 ]
     fi
