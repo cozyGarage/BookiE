@@ -94,7 +94,7 @@ impl RowObject {
     }
 
     pub fn preview_long_values(&self, key_indices: &[usize]) {
-        let mut cells = self.imp().cells.borrow_mut();
+        let cells = self.imp().cells.borrow();
         let mut previews = self.imp().previews.borrow_mut();
         if key_indices.is_empty()
             || key_indices.iter().any(|&index| {
@@ -106,27 +106,21 @@ impl RowObject {
         {
             return;
         }
-        for (index, cell) in cells.iter_mut().enumerate() {
+        for (index, cell) in cells.iter().enumerate() {
             if key_indices.contains(&index) {
                 continue;
             }
             let Some(value) = cell.as_ref() else { continue };
-            if let Some(preview) = preview_value(value) {
-                *cell = None;
-                previews[index] = Some(preview);
-            }
+            previews[index] = preview_value(value);
         }
     }
 
     pub fn preview_values_from_result(&self) {
-        let mut cells = self.imp().cells.borrow_mut();
+        let cells = self.imp().cells.borrow();
         let mut previews = self.imp().previews.borrow_mut();
-        for (index, cell) in cells.iter_mut().enumerate() {
+        for (index, cell) in cells.iter().enumerate() {
             let Some(value) = cell.as_ref() else { continue };
-            if let Some(preview) = preview_value(value) {
-                *cell = None;
-                previews[index] = Some(preview);
-            }
+            previews[index] = preview_value(value);
         }
     }
 
@@ -197,9 +191,9 @@ fn preview_value(value: &Value) -> Option<CellPreview> {
             value: Value::Text(text[..text.floor_char_boundary(PREVIEW_BYTES)].to_owned()),
             byte_count: text.len(),
         }),
-        Value::Json(json) => {
+        Value::Json(json) if json_exceeds(json, PREVIEW_BYTES) => {
             let text = json.to_string();
-            (text.len() > PREVIEW_BYTES).then(|| CellPreview {
+            Some(CellPreview {
                 value: Value::Text(text[..text.floor_char_boundary(PREVIEW_BYTES)].to_owned()),
                 byte_count: text.len(),
             })
@@ -212,9 +206,30 @@ fn preview_value(value: &Value) -> Option<CellPreview> {
     }
 }
 
+fn json_exceeds(json: &serde_json::Value, limit: usize) -> bool {
+    struct Budget(usize);
+    impl std::io::Write for Budget {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0 = self.0.checked_sub(bytes.len()).ok_or(std::io::ErrorKind::WriteZero)?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    serde_json::to_writer(Budget(limit), json).is_err()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_json_value_is_measured_without_serialising_small_documents_twice() {
+        assert!(!json_exceeds(&serde_json::json!({"a": 1}), 8));
+        assert!(json_exceeds(&serde_json::json!({"payload": "x".repeat(20)}), 8));
+        assert!(!json_exceeds(&serde_json::json!("12345"), 7));
+    }
 
     #[test]
     fn projected_cells_distinguish_unfetched_values_from_sql_null() {
@@ -251,11 +266,11 @@ mod tests {
         row.preview_long_values(&[0]);
 
         assert_eq!(row.cell_value(0), Value::Int(7));
-        assert_eq!(row.cell_value(1), Value::Undecodable("not fetched".into()));
+        assert_eq!(row.cell_value(1), Value::Text(text.clone()));
         let preview = row.cell_preview(1).unwrap();
         assert_eq!(preview.value, Value::Text("x".repeat(8191)));
         assert_eq!(preview.byte_count, text.len());
-        assert!(row.complete_cells().is_none());
+        assert_eq!(row.complete_cells(), Some(vec![Value::Int(7), Value::Text(text)]));
     }
 
     #[test]

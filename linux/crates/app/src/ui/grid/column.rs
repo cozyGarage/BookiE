@@ -114,21 +114,22 @@ pub(super) fn build_column(
             .iter()
             .map(|&i| row.cell_value(i))
             .collect();
-        let value = if let Some(tab_id) = tab_ctx_for_bind.tab_id
+        let (value, edited) = if let Some(tab_id) = tab_ctx_for_bind.tab_id
             && row.draft_id().is_none()
         {
             crate::services::change_tracker::with_tab_ref(tab_id, |t| {
                 crate::services::change_tracker::RowKey::from_pk_values(&pk_values)
-                    .map(|key| t.current_cell_value(&key, idx, &raw_value).clone())
-                    .unwrap_or_else(|| raw_value.clone())
+                    .map(|key| {
+                        let current = t.current_cell_value(&key, idx, &raw_value);
+                        (current.clone(), !std::ptr::eq(current, &raw_value))
+                    })
+                    .unwrap_or_else(|| (raw_value.clone(), false))
             })
-            .unwrap_or(raw_value)
+            .unwrap_or((raw_value, false))
         } else {
-            raw_value
+            (raw_value, false)
         };
-        let preview = matches!(&value, Value::Undecodable(kind) if kind == "not fetched")
-            .then(|| row.cell_preview(idx))
-            .flatten();
+        let preview = (!edited).then(|| row.cell_preview(idx)).flatten();
         let view = preview
             .as_ref()
             .map(CellView::from_preview)
