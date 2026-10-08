@@ -29,7 +29,8 @@ to ordinary scalar results.
 A dedicated PostgreSQL session also binds enum text and SQL NULL when the
 target schema is absent from `search_path` and a same-named shadow type is the
 only visible enum. The active schema list, native literal, returned enum type
-and untouched sibling row are checked in
+and untouched sibling row are checked; a label defined only by the shadow enum
+is refused with SQLSTATE `22P02` and leaves the target row unchanged in
 `value_contract_enum_parameter_resolves_without_target_schema_in_session_path`.
 
 ## Current evidence and next targets

@@ -124,6 +124,36 @@ async fn assert_session_enum_parameter_oracles(session: &mut dyn Session, contro
     );
 }
 
+async fn assert_shadow_only_enum_label_is_refused(session: &mut dyn Session, control: &OperationControl) {
+    let error = session
+        .query_params_controlled(
+            "UPDATE enum_session_target.rows SET state = $1 WHERE id = 3",
+            &[Value::Text("shadow-only".into())],
+            control,
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&error, DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        "expected target enum to reject the shadow-only label with 22P02, got {error:?}"
+    );
+    assert_eq!(
+        session_query(
+            session,
+            "SELECT state::text, pg_typeof(state)::text \
+             FROM enum_session_target.rows WHERE id = 3",
+            &[],
+            control,
+        )
+        .await
+        .rows,
+        vec![vec![
+            Value::Text("ready".into()),
+            Value::Text("enum_session_target.state".into()),
+        ]]
+    );
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_enum_parameter_resolves_without_target_schema_in_session_path() {
@@ -134,6 +164,7 @@ async fn value_contract_enum_parameter_resolves_without_target_schema_in_session
     let control = OperationControl::new(CancellationToken::new(), None);
     assert_session_enum_path(&mut *session, &control).await;
     assert_session_enum_parameter_oracles(&mut *session, &control).await;
+    assert_shadow_only_enum_label_is_refused(&mut *session, &control).await;
 }
 
 #[tokio::test]
