@@ -28,16 +28,29 @@ to ordinary scalar results.
 
 ## Current evidence and next targets
 
-Draft [PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements PERF-9: saved hidden non-key columns
+[PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements PERF-9: saved hidden non-key columns
 are removed from SQL browse projections while primary keys and hidden filter or
 sort columns remain usable. Projected rows distinguish unfetched cells from SQL
 NULL; full-row copy, row JSON and current-page export refuse incomplete rows,
 and the inspector labels them “Not fetched.” Pending edits disable projection.
 Native SQLite tests assert the visible projection and the hidden stored value;
 planner, keyset mapping, sparse-row, row-search and app-library regressions pass
-in the candidate. Local preflight passed; GitHub validation is pending. This does not close UI-14b: installed GTK acceptance and
-the complete on-demand value path in PERF-10 remain open. After hiding columns,
-refresh the browse page for the reduced SELECT to take effect.
+in the candidate. Local preflight and required GitHub checks passed; the PR is
+ready for review. This does not close UI-14b: maintainer merge, installed GTK
+acceptance and the complete on-demand value path in PERF-10 remain open. After
+hiding columns, refresh the browse page for the reduced SELECT to take effect.
+
+SQL-backed browse rows now keep an 8 KiB text/JSON/binary sample and original
+byte count in each materialized grid row. View Value refetches one column using
+the complete primary key through the policy-guarded connection; the query caps
+at two rows and refuses missing or ambiguous matches. PostgreSQL enum/domain
+key casts have planner regressions. This first slice leaves arbitrary SQL,
+MongoDB and Redis paths unchanged, and the shared result still retains full
+values. A local SQLite service test refetches a 9,000-byte BLOB by composite
+key, verifies SQLite's native storage type, length and hex prefix, then asserts
+the exact returned bytes. It calls the driver directly, so guarded-path and
+other-driver native checks, installed GTK acceptance and memory profiling
+remain open under PERF-10.
 
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete

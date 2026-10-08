@@ -33,6 +33,7 @@ mod imp {
         pub(in crate::ui) slots: RefCell<Vec<Slot>>,
         pub(in crate::ui) source: RefCell<Option<Arc<QueryResult>>>,
         pub(in crate::ui) projection: RefCell<Option<(Vec<usize>, usize)>>,
+        pub(in crate::ui) preview_keys: RefCell<Vec<usize>>,
     }
 
     #[glib::object_subclass]
@@ -62,7 +63,7 @@ mod imp {
                     let source = self.source.borrow();
                     let cells = source.as_ref()?.rows.get(source_index)?.clone();
                     let projection = self.projection.borrow();
-                    let row = row_for_source(cells, projection.as_ref())?;
+                    let row = row_for_source(cells, projection.as_ref(), &self.preview_keys.borrow())?;
                     let object = glib::WeakRef::new();
                     object.set(Some(&row));
                     *slot = Slot::Cached { source_index, object };
@@ -76,7 +77,7 @@ mod imp {
                         let source = self.source.borrow();
                         let cells = source.as_ref()?.rows.get(source_index)?.clone();
                         let projection = self.projection.borrow();
-                        let row = row_for_source(cells, projection.as_ref())?;
+                        let row = row_for_source(cells, projection.as_ref(), &self.preview_keys.borrow())?;
                         object.set(Some(&row));
                         Some(row.upcast())
                     }
@@ -87,11 +88,17 @@ mod imp {
     }
 }
 
-fn row_for_source(cells: Vec<tablepro_core::Value>, projection: Option<&(Vec<usize>, usize)>) -> Option<RowObject> {
-    match projection {
+fn row_for_source(
+    cells: Vec<tablepro_core::Value>,
+    projection: Option<&(Vec<usize>, usize)>,
+    preview_keys: &[usize],
+) -> Option<RowObject> {
+    let row = match projection {
         Some((indices, width)) => RowObject::new_projected(cells, indices, *width),
         None => Some(RowObject::new(cells)),
-    }
+    }?;
+    row.preview_long_values(preview_keys);
+    Some(row)
 }
 
 fn valid_projection(result: &QueryResult, indices: &[usize], width: usize) -> bool {
@@ -106,9 +113,50 @@ glib::wrapper! {
 }
 
 impl RowStore {
+    pub fn cells_for_search(&self, position: u32) -> Option<Vec<Option<tablepro_core::Value>>> {
+        let slots = self.imp().slots.borrow();
+        match slots.get(position as usize)? {
+            Slot::Object(row) => Some(row.loaded_cells()),
+            Slot::Shared(source_index) => self.source_cells(*source_index),
+            Slot::Cached { source_index, object } => {
+                let mut source = self.source_cells(*source_index)?;
+                if let Some(row) = object.upgrade() {
+                    for (index, value) in row.loaded_cells().into_iter().enumerate() {
+                        if row.cell_preview(index).is_none() && value.is_some() {
+                            source[index] = value;
+                        }
+                    }
+                }
+                Some(source)
+            }
+        }
+    }
+
+    fn source_cells(&self, source_index: usize) -> Option<Vec<Option<tablepro_core::Value>>> {
+        let source = self.imp().source.borrow();
+        let cells = source.as_ref()?.rows.get(source_index)?;
+        let projection = self.imp().projection.borrow();
+        Some(match projection.as_ref() {
+            Some((indices, width)) => {
+                let mut values = vec![None; *width];
+                for (index, value) in indices.iter().copied().zip(cells) {
+                    values[index] = Some(value.clone());
+                }
+                values
+            }
+            None => cells.iter().cloned().map(Some).collect(),
+        })
+    }
+
     pub fn from_shared(result: Arc<QueryResult>) -> Self {
         let store: Self = glib::Object::new();
-        store.install_shared(result, None);
+        store.install_shared(result, None, Vec::new());
+        store
+    }
+
+    pub fn from_shared_with_previews(result: Arc<QueryResult>, key_indices: Vec<usize>) -> Self {
+        let store: Self = glib::Object::new();
+        store.install_shared(result, None, key_indices);
         store
     }
 
@@ -117,30 +165,64 @@ impl RowStore {
             return Err("projected browse result does not match its schema mapping".into());
         }
         let store: Self = glib::Object::new();
-        store.install_shared(result, Some((indices, width)));
+        store.install_shared(result, Some((indices, width)), Vec::new());
+        Ok(store)
+    }
+
+    pub fn from_projected_with_previews(
+        result: Arc<QueryResult>,
+        indices: Vec<usize>,
+        width: usize,
+        key_indices: Vec<usize>,
+    ) -> Result<Self, String> {
+        if !valid_projection(&result, &indices, width) {
+            return Err("projected browse result does not match its schema mapping".into());
+        }
+        let store: Self = glib::Object::new();
+        store.install_shared(result, Some((indices, width)), key_indices);
         Ok(store)
     }
 
     pub fn replace_shared(&self, result: Arc<QueryResult>) {
+        self.replace_shared_with_previews(result, Vec::new());
+    }
+
+    pub fn replace_shared_with_previews(&self, result: Arc<QueryResult>, key_indices: Vec<usize>) {
         let removed = self.n_items();
-        self.install_shared(result, None);
+        self.install_shared(result, None, key_indices);
         self.items_changed(0, removed, self.n_items());
     }
 
     pub fn replace_projected(&self, result: Arc<QueryResult>, indices: Vec<usize>, width: usize) -> Result<(), String> {
+        self.replace_projected_with_previews(result, indices, width, Vec::new())
+    }
+
+    pub fn replace_projected_with_previews(
+        &self,
+        result: Arc<QueryResult>,
+        indices: Vec<usize>,
+        width: usize,
+        key_indices: Vec<usize>,
+    ) -> Result<(), String> {
         if !valid_projection(&result, &indices, width) {
             return Err("projected browse result does not match its schema mapping".into());
         }
         let removed = self.n_items();
-        self.install_shared(result, Some((indices, width)));
+        self.install_shared(result, Some((indices, width)), key_indices);
         self.items_changed(0, removed, self.n_items());
         Ok(())
     }
 
-    fn install_shared(&self, result: Arc<QueryResult>, projection: Option<(Vec<usize>, usize)>) {
+    fn install_shared(
+        &self,
+        result: Arc<QueryResult>,
+        projection: Option<(Vec<usize>, usize)>,
+        preview_keys: Vec<usize>,
+    ) {
         *self.imp().slots.borrow_mut() = (0..result.rows.len()).map(Slot::Shared).collect();
         *self.imp().source.borrow_mut() = Some(result);
         *self.imp().projection.borrow_mut() = projection;
+        *self.imp().preview_keys.borrow_mut() = preview_keys;
     }
 
     pub fn insert(&self, position: u32, row: &RowObject) {
@@ -373,6 +455,39 @@ mod tests {
         assert!(!row.cell_is_loaded(1));
         assert!(row.complete_cells().is_none());
         assert_eq!(row.cell_value(2), Value::Text("Ada".into()));
+    }
+
+    #[test]
+    fn projected_browse_rows_preview_long_values_without_losing_the_key() {
+        let text = "x".repeat(9000);
+        let result = Arc::new(QueryResult {
+            columns: vec![column("id"), column("payload")],
+            rows: vec![vec![Value::Int(7), Value::Text(text.clone())]],
+            truncated: false,
+        });
+        let store = RowStore::from_projected_with_previews(result, vec![0, 2], 3, vec![0]).unwrap();
+        let row = store.item(0).and_downcast::<RowObject>().unwrap();
+
+        assert_eq!(row.cell_value(0), Value::Int(7));
+        assert!(row.cell_preview(2).is_some());
+        assert!(!row.cell_is_loaded(2));
+        assert_eq!(row.cell_preview(2).unwrap().byte_count, text.len());
+        assert!(row.complete_cells().is_none());
+    }
+
+    #[test]
+    fn loaded_row_search_uses_full_shared_value_without_materializing_it_in_the_grid() {
+        let text = "x".repeat(9000);
+        let result = Arc::new(QueryResult {
+            columns: vec![column("id"), column("payload")],
+            rows: vec![vec![Value::Int(7), Value::Text(text.clone())]],
+            truncated: false,
+        });
+        let store = RowStore::from_shared_with_previews(result, vec![0]);
+        let row = store.item(0).and_downcast::<RowObject>().unwrap();
+
+        assert!(!row.cell_is_loaded(1));
+        assert_eq!(store.cells_for_search(0).unwrap()[1], Some(Value::Text(text)));
     }
 
     #[test]

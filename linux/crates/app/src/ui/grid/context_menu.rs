@@ -158,12 +158,27 @@ pub(super) fn install_grid_context_menus(
     };
     let view_value_action = {
         let context = context.clone();
+        let sender = sender.clone();
         let view = column_view.downgrade();
         gio::ActionEntry::builder("view-value")
             .activate(move |_, _, _| {
                 let context = context.borrow();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if row_object_at(&view, position(slot))
+                    .and_then(|row| row.cell_preview(slot.col_index))
+                    .is_some()
+                {
+                    let (_, row_key) = cell_row_identity(&slot.widget);
+                    sender
+                        .send(GridMsg::FetchCellValue {
+                            col_index: slot.col_index,
+                            column_name: slot.column_name.clone(),
+                            row_key,
+                        })
+                        .ok();
+                    return;
+                }
                 let Some(value) = row_at(&view, position(slot)).and_then(|row| row.into_iter().nth(slot.col_index))
                 else {
                     return;
@@ -561,11 +576,13 @@ fn cell_text(widget: &gtk::Widget) -> String {
     }
 }
 fn row_at(view: &gtk::ColumnView, position: u32) -> Option<Vec<Value>> {
+    row_object_at(view, position).map(|row| row.cells_clone())
+}
+fn row_object_at(view: &gtk::ColumnView, position: u32) -> Option<crate::ui::row_object::RowObject> {
     view.model()?
         .item(position)?
         .downcast::<crate::ui::row_object::RowObject>()
         .ok()
-        .map(|row| row.cells_clone())
 }
 fn complete_row_at(view: &gtk::ColumnView, position: u32) -> Option<Vec<Value>> {
     let row = view

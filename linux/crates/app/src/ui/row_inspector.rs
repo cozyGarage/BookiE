@@ -33,6 +33,19 @@ pub(crate) fn inspector_fields(columns: &[ColumnInfo], cells: &[Value]) -> Vec<I
         .collect()
 }
 
+pub(crate) fn inspector_fields_for_row(
+    columns: &[ColumnInfo],
+    row: &crate::ui::row_object::RowObject,
+) -> Vec<InspectorField> {
+    let mut fields = inspector_fields(columns, &row.cells_clone());
+    for (index, field) in fields.iter_mut().enumerate() {
+        if let Some(preview) = row.cell_preview(index) {
+            field.text = crate::ui::grid::preview_to_display_text(&preview);
+        }
+    }
+    fields
+}
+
 #[derive(Clone)]
 pub(crate) struct RowInspector {
     split: adw::OverlaySplitView,
@@ -162,6 +175,17 @@ mod tests {
         assert!(!fields[2].is_null);
         assert_eq!(fields[2].text, "Not fetched");
         assert_eq!(fields[1].data_type, "text");
+    }
+
+    #[test]
+    fn long_value_inspection_shows_the_sample_and_native_byte_count() {
+        let columns = [column("id", "int"), column("note", "text")];
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Int(7), Value::Text("a".repeat(9000))]);
+        row.preview_long_values(&[0]);
+
+        let fields = inspector_fields_for_row(&columns, &row);
+        assert!(fields[1].text.starts_with(&"a".repeat(8192)));
+        assert!(fields[1].text.ends_with("9000 bytes total)"));
     }
 
     #[test]

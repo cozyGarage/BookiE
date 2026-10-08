@@ -128,9 +128,15 @@ pub(super) fn build_column(
         } else {
             raw_value
         };
+        let preview = matches!(&value, Value::Undecodable(kind) if kind == "not fetched")
+            .then(|| row.cell_preview(idx))
+            .flatten();
         let is_null = matches!(value, Value::Null);
         let inline_editable = editable_for_bind && cell_allows_inline_edit(&column_info, &value);
-        let text = cell_text_for_bind(&value, editable_for_bind, column_auto_filled);
+        let text = preview
+            .as_ref()
+            .map(super::display::preview_to_display_text)
+            .unwrap_or_else(|| cell_text_for_bind(&value, editable_for_bind, column_auto_filled));
 
         let pending_classes: Vec<&'static str> = if let Some(_tab_id) = tab_ctx_for_bind.tab_id {
             if row.draft_id().is_some() {

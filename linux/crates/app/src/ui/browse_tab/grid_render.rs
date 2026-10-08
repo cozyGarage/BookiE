@@ -242,6 +242,7 @@ impl BrowseTab {
             tab_id: Some(self.tab_id),
             pk_col_indices,
             projected_columns: self.current_projection.clone(),
+            preview_long_values: !matches!(self.driver_id.as_str(), "mongodb" | "redis"),
             foreign_key_columns,
         };
         let (column_view, selection) = build_column_view(
@@ -313,8 +314,22 @@ impl BrowseTab {
         result: &std::sync::Arc<QueryResult>,
         store: &crate::ui::row_store::RowStore,
     ) -> bool {
+        let key_indices = if !matches!(self.driver_id.as_str(), "mongodb" | "redis") {
+            self.current_columns
+                .iter()
+                .enumerate()
+                .filter_map(|(index, column)| column.primary_key.then_some(index))
+                .collect()
+        } else {
+            Vec::new()
+        };
         if let Some(indices) = &self.current_projection {
-            if let Err(error) = store.replace_projected(result.clone(), indices.clone(), self.current_columns.len()) {
+            if let Err(error) = store.replace_projected_with_previews(
+                result.clone(),
+                indices.clone(),
+                self.current_columns.len(),
+                key_indices,
+            ) {
                 tracing::error!(%error, "projected browse refresh does not match the table schema");
                 store.replace_shared(std::sync::Arc::new(QueryResult {
                     columns: self.current_columns.clone(),
@@ -324,7 +339,7 @@ impl BrowseTab {
                 return false;
             }
         } else {
-            store.replace_shared(result.clone());
+            store.replace_shared_with_previews(result.clone(), key_indices);
         }
         self.reprepend_drafts();
         true
@@ -429,7 +444,7 @@ fn inspected_row(
         .item(bits.nth(0))?
         .downcast::<crate::ui::row_object::RowObject>()
         .ok()?;
-    Some(row.with_cells(|cells| crate::ui::row_inspector::inspector_fields(columns, cells)))
+    Some(crate::ui::row_inspector::inspector_fields_for_row(columns, &row))
 }
 
 fn selection_tooltip(selection: &gtk::MultiSelection, columns: &[ColumnInfo]) -> Option<String> {

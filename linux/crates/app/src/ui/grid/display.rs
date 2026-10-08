@@ -47,6 +47,23 @@ pub fn value_to_display_text(value: &Value) -> String {
     value_to_text(value, truncate_for_display)
 }
 
+pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPreview) -> String {
+    let total = crate::tr!("{n} bytes total").replace("{n}", &preview.byte_count.to_string());
+    match &preview.value {
+        Value::Text(text) => format!("{text}… ({total})"),
+        Value::Bytes(bytes) => {
+            let head = bytes
+                .iter()
+                .take(16)
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("{head}… ({total})")
+        }
+        other => value_to_display_text(other),
+    }
+}
+
 pub fn value_to_edit_text(value: &Value) -> String {
     match value {
         Value::Null => String::new(),
@@ -54,7 +71,7 @@ pub fn value_to_edit_text(value: &Value) -> String {
     }
 }
 
-pub(super) fn value_to_full_edit_text(value: &Value) -> String {
+pub(crate) fn value_to_full_edit_text(value: &Value) -> String {
     match value {
         Value::Null => String::new(),
         other => value_to_text(other, |s| s.to_string()),
@@ -352,6 +369,15 @@ mod tests {
         blob[0] = 0x00;
         assert_eq!(value_to_display_text(&Value::Bytes(blob)), "<100001 bytes>");
         assert_eq!(value_to_display_text(&Value::Bytes(vec![0x00])), "<1 bytes>");
+    }
+
+    #[test]
+    fn value_preview_shows_sample_and_original_byte_count() {
+        let preview = crate::ui::row_object::CellPreview {
+            value: Value::Text("sample".into()),
+            byte_count: 9000,
+        };
+        assert_eq!(preview_to_display_text(&preview), "sample… (9000 bytes total)");
     }
 
     #[test]

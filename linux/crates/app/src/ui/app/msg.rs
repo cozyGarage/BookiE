@@ -135,6 +135,8 @@ pub enum AppMsg {
         row_position: u32,
     },
     FetchBrowsePage(Uuid),
+    FetchBrowseCellValue(Uuid, usize, String, Vec<Value>),
+    BrowseCellValueLoaded(Uuid, usize, String, Result<Value, String>),
     FetchBrowseColumns(Uuid),
     FetchBrowseRowCount(Uuid),
     WorkspaceSchemaWordsChanged,

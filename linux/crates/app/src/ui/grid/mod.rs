@@ -22,7 +22,10 @@ use crate::ui::row_store::RowStore;
 use column::{build_column, is_cell_editable};
 use context_menu::install_grid_context_menus;
 
+pub(crate) use display::preview_to_display_text;
+pub(crate) use display::value_to_full_edit_text;
 pub use display::{editable_null_sentinel, focused_cell_identity, value_to_display_text};
+pub(crate) use value_viewer::present as present_value_viewer;
 
 #[derive(Debug)]
 pub enum GridMsg {
@@ -37,6 +40,11 @@ pub enum GridMsg {
         row_key: Vec<tablepro_core::Value>,
     },
     CopyToClipboard(String),
+    FetchCellValue {
+        col_index: usize,
+        column_name: String,
+        row_key: Vec<tablepro_core::Value>,
+    },
     IncompleteRowData,
     ProjectionFailure,
     CopyRowAsInsert {
@@ -68,6 +76,7 @@ pub struct TabGridContext {
     pub tab_id: Option<uuid::Uuid>,
     pub pk_col_indices: Vec<usize>,
     pub projected_columns: Option<Vec<usize>>,
+    pub preview_long_values: bool,
     /// Names of columns that are part of a foreign key on this table.
     /// Marks the column header so a reference is visible before the
     /// cell value picker (a later slice) exists.
@@ -93,7 +102,16 @@ pub fn build_column_view(
 ) -> (gtk4::ColumnView, gtk4::MultiSelection) {
     let result: &QueryResult = shared;
     let store = match &tab_ctx.projected_columns {
-        Some(indices) => match RowStore::from_projected(shared.clone(), indices.clone(), schema_columns.len()) {
+        Some(indices) => match if tab_ctx.preview_long_values && !tab_ctx.pk_col_indices.is_empty() {
+            RowStore::from_projected_with_previews(
+                shared.clone(),
+                indices.clone(),
+                schema_columns.len(),
+                tab_ctx.pk_col_indices.clone(),
+            )
+        } else {
+            RowStore::from_projected(shared.clone(), indices.clone(), schema_columns.len())
+        } {
             Ok(store) => store,
             Err(error) => {
                 tracing::error!(%error, "projected browse rows do not match the table schema");
@@ -107,6 +125,9 @@ pub fn build_column_view(
                 }))
             }
         },
+        None if tab_ctx.preview_long_values && !tab_ctx.pk_col_indices.is_empty() => {
+            RowStore::from_shared_with_previews(shared.clone(), tab_ctx.pk_col_indices.clone())
+        }
         None => RowStore::from_shared(shared.clone()),
     };
     let columns = if tab_ctx.projected_columns.is_some() {

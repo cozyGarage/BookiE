@@ -51,6 +51,26 @@ impl BrowseTarget<'_> {
         self.filtered_query("COUNT(*)")
     }
 
+    pub fn value_query(&self, column_index: usize, pk_values: &[Value]) -> Result<BoundQuery, String> {
+        if matches!(self.driver_id, "mongodb" | "redis") {
+            return Err(format!("single-cell fetch is unsupported for {}", self.driver_id));
+        }
+        let (sql, params) = tablepro_core::sql_dialect::build_keyed_value_select(
+            self.driver_id,
+            self.schema,
+            self.table,
+            self.columns,
+            column_index,
+            pk_values,
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(BoundQuery {
+            sql,
+            params,
+            projected_columns: None,
+        })
+    }
+
     pub fn page(
         &self,
         offset: u64,
@@ -412,6 +432,28 @@ mod tests {
     }
 
     #[test]
+    fn value_query_fetches_one_column_by_primary_key() {
+        let columns = vec![column("tenant", true), column("id", true), column("payload", false)];
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: Some("app"),
+            table: "records",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let query = target
+            .value_query(2, &[Value::Text("acme".into()), Value::Int(7)])
+            .unwrap();
+
+        assert_eq!(
+            query.sql,
+            "SELECT \"payload\" FROM \"app\".\"records\" WHERE \"tenant\" = $1 AND \"id\" = $2 ORDER BY \"tenant\" ASC, \"id\" ASC LIMIT 2 OFFSET 0"
+        );
+        assert_eq!(query.params, vec![Value::Text("acme".into()), Value::Int(7)]);
+    }
+
+    #[test]
     fn explicit_sort_ignores_a_keyset_cursor_and_keeps_offset_pagination() {
         let columns = vec![column("id", true), column("rank", false)];
         let target = BrowseTarget {
@@ -547,5 +589,70 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(native.rows, vec![vec![Value::Text("still stored".into())]]);
+    }
+
+    #[tokio::test]
+    async fn sqlite_value_query_refetches_the_exact_blob_for_a_composite_key() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+        let directory = tempfile::tempdir().unwrap();
+        let connection = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: directory.path().join("value-fetch.db").to_string_lossy().into_owned(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let control = crate::services::operation_control::bounded(30);
+        connection
+            .execute_controlled(
+                "CREATE TABLE records (tenant TEXT, id INTEGER, payload BLOB, PRIMARY KEY (tenant, id))",
+                &control,
+            )
+            .await
+            .unwrap();
+        let tenant = "tenant ' OR 1=1 --";
+        let bytes: Vec<u8> = (0..9000).map(|index| (index % 256) as u8).collect();
+        connection
+            .execute_params_controlled(
+                "INSERT INTO records VALUES (?1, ?2, ?3)",
+                &[Value::Text(tenant.into()), Value::Int(7), Value::Bytes(bytes.clone())],
+                &control,
+            )
+            .await
+            .unwrap();
+        let native = connection
+            .query_controlled(
+                "SELECT typeof(payload), length(payload), hex(substr(payload, 1, 8)) FROM records WHERE tenant = 'tenant '' OR 1=1 --' AND id = 7",
+                &control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            native.rows,
+            vec![vec![
+                Value::Text("blob".into()),
+                Value::Int(9000),
+                Value::Text("0001020304050607".into())
+            ]]
+        );
+
+        let columns = vec![column("tenant", true), column("id", true), column("payload", false)];
+        let target = BrowseTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: "records",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let query = target
+            .value_query(2, &[Value::Text(tenant.into()), Value::Int(7)])
+            .unwrap();
+        let fetched = connection
+            .query_params_controlled(&query.sql, &query.params, &control)
+            .await
+            .unwrap();
+        assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes)]]);
     }
 }
