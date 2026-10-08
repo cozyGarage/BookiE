@@ -27,20 +27,20 @@
   },
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37780731260,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37780731260",
-    "source_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
+    "run_id": 37787165733,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37787165733",
+    "source_commit": "b4dd2b4b1f25d8096d73067dffe2350719558208",
     "status": "pending",
     "conclusion": null,
-    "note": "No jobs had started at last check; this merged-SHA run includes trigger regression commit 5211e6a and is the hosted gate for that change."
+    "note": "No jobs had started at last check. The immediately previous Build Linux run 37784483261 passed the B4 rollback job on c52f3d7 with trigger test commit 5211e6a included; this latest-tip run follows PR 387 test-harness-only changes."
   },
   "local_report": "/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
   "summary": {
     "path": "focused.txt",
-    "sha256": "9a6b8707949e60a35381c11c3655af9e5c36b2f5a5faf2ac9102873b8e360a76"
+    "sha256": "0205b325462f53beee18764694ab86a02b6a29fe4f869bbe391bc06bddaaf50d"
   },
   "not_established": [
-    "Hosted acceptance of the Aria trigger follow-up on merged SHA 26d1355",
+    "Latest-tip Build Linux acceptance after PR 387",
     "Other optional/vendor MySQL-family engines and side-effect patterns",
     "Windows Active Directory interoperability",
     "Installed distribution package and native Wayland flows"
@@ -50,12 +50,30 @@
   "pull_request": 383,
   "previous_hosted": {
     "workflow": "Build Linux",
-    "run_id": 37777911341,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911341",
-    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
+    "run_id": 37784483261,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37784483261",
+    "source_commit": "c52f3d7d910f0e7dcb896c16cf315a76298f0d49",
     "run_status": "in_progress",
     "run_conclusion": null,
     "b4_rollback_job": "success",
-    "note": "The B4 rollback job passed on the previous target SHA. That SHA predates trigger follow-up commit 5211e6a; other jobs in the run were still active at last check."
-  }
+    "postgres_release_job": "success",
+    "driver_tls_job": "success",
+    "fast_gtk_job": "success",
+    "optional_duckdb_job": "success",
+    "driver_integration_job": "in_progress",
+    "installed_gtk_job": "in_progress",
+    "note": "The B4 rollback job passed on c52f3d7 with trigger follow-up commit 5211e6a included; other jobs were still active at last check."
+  },
+  "earlier_hosted_before_trigger": {
+    "workflow": "Build Linux",
+    "run_id": 37777911341,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911341",
+    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
+    "run_status": "completed",
+    "run_conclusion": "success",
+    "installed_gtk_job": "success",
+    "b4_rollback_job": "success",
+    "note": "Full workflow passed, but the B4 rollback job predates the Aria trigger regression."
+  },
+  "local_report_current_tip": "/tmp/bookie-ui-1b/linux/target/quality/20261008T132136234214Z-layers/report.json"
 }
