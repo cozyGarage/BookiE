@@ -1,0 +1,19 @@
+BookiE B4-7/B4-16/B4-17 exact-tip SSH evidence, 2026-10-08
+
+Source: `fork/linux` commit `ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9`.
+
+`bash scripts/test-ssh.sh` passed 22 tests: 10 built-in agent-auth and 12 system OpenSSH session tests. Coverage includes two-hop reachability, cancellation while the second-hop trust prompt is pending, second-hop key change, and system OpenSSH ProxyJump.
+
+`bash scripts/test-postgres-release.sh` returned exit code 0. The system OpenSSH agentd trust fixture passed, and all seven selected GTK SSH trust/audit/reconnect scenarios reported passed:
+
+- `postgres_ssh_unknown_host_key_decline_is_durably_audited`
+- `postgres_ssh_setup_failure_is_durably_audited`
+- `postgres_ssh_tunnel_loss_retires_session_and_reconnects`
+- `postgres_ssh_multihop_trusts_both_hops_and_queries`
+- `postgres_ssh_second_hop_decline_does_not_learn_key`
+- `postgres_ssh_changed_second_hop_key_is_refused`
+- `postgres_saved_mtls_connection_authenticates_and_queries`
+
+The GTK run used local Xvfb, private D-Bus and AT-SPI. Its D-Bus disconnect line occurred during shutdown after all scenarios passed and the script returned 0.
+
+Build Linux run [#37794837722](https://github.com/cozyGarage/BookiE/actions/runs/37794837722) for this source SHA was cancelled before jobs started; Security and Flatpak packaging passed. The current `fork/linux` tip advanced to `60e3f2666`; its Build Linux run [#37796530008](https://github.com/cozyGarage/BookiE/actions/runs/37796530008) was pending when recorded. This evidence does not establish a frozen candidate, distribution-package installation, native Wayland trust flow, or Windows AD interoperability. Saved jump-chain editing remains open under UI-1b.

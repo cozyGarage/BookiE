@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "branch": "linux",
+  "source_commit": "ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9",
+  "scope": [
+    "B4-7 SSH audit terminal outcomes",
+    "B4-16 tunnel-loss stale-session retirement",
+    "B4-17 native multi-hop, cancellation and GTK trust flow"
+  ],
+  "result": "Both local layers passed on the exact fork/linux source SHA; test-postgres-release returned exit code 0.",
+  "ssh_layer": {
+    "command": "bash scripts/test-ssh.sh",
+    "result": "22 passed, 0 failed",
+    "built_in_agent_auth_tests": 10,
+    "openssh_session_tests": 12,
+    "covered": [
+      "two-hop chain reaches the final host",
+      "cancelling while the second-hop trust prompt is pending does not learn the host key",
+      "changed second-hop host key is reported",
+      "system OpenSSH ProxyJump reaches the target"
+    ]
+  },
+  "postgres_release_layer": {
+    "command": "bash scripts/test-postgres-release.sh",
+    "result": "passed; seven selected GTK SSH trust/audit/reconnect scenarios reported passed",
+    "agentd_system_openssh": "agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust passed",
+    "gtk_scenarios": [
+      "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+      "postgres_ssh_setup_failure_is_durably_audited",
+      "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+      "postgres_ssh_multihop_trusts_both_hops_and_queries",
+      "postgres_ssh_second_hop_decline_does_not_learn_key",
+      "postgres_ssh_changed_second_hop_key_is_refused",
+      "postgres_saved_mtls_connection_authenticates_and_queries"
+    ],
+    "gtk_environment": "local Xvfb with private D-Bus and AT-SPI"
+  },
+  "hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37794837722,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37794837722",
+    "source_commit": "ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9",
+    "status": "cancelled",
+    "conclusion": "cancelled",
+    "note": "Cancelled before any jobs started when linux advanced. Security passed and Flatpak packaging passed on this source SHA."
+  },
+  "latest_tip_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37796530008,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37796530008",
+    "source_commit": "60e3f2666df21b04cb448c8dfe3b9b777dc61a9e",
+    "status_at_recording": "pending"
+  },
+  "not_established": [
+    "frozen-candidate acceptance",
+    "distribution-package installation and native Wayland trust flow",
+    "Windows Active Directory interoperability",
+    "saved jump-chain editing; UI-1b remains open"
+  ],
+  "environment_note": "An attempted additional worktree could not be created under the /tmp quota; tests ran from the existing clean worktree at the exact source commit using the shared Cargo target cache. The PostgreSQL GTK runner emitted a D-Bus disconnect message during shutdown after all selected scenarios passed; the script exited 0."
+}
