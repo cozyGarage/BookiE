@@ -283,6 +283,21 @@
         }
       ]
     },
+    "gtk-clickhouse": {
+      "purpose": "Installed GTK Enum16 grid edit against a native ClickHouse fixture",
+      "prerequisites": "GNOME 50; Docker with clickhouse/clickhouse-server:24.8; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Local release gate",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-clickhouse.sh"
+          ],
+          "timeout_seconds": 1500,
+          "evidence": "exit"
+        }
+      ]
+    },
     "gtk-mysql-approval": {
       "purpose": "Human approval dialog policy and dispatch against a native MySQL fixture",
       "prerequisites": "GNOME 50; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",

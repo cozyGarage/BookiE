@@ -928,6 +928,15 @@ def scenarios(ui):
         )
         return out.stdout.strip()
 
+    def clickhouse(sql):
+        import subprocess
+        out = subprocess.run(
+            ["docker", "exec", os.environ["TABLEPRO_GTK_CLICKHOUSE_CONTAINER"], "clickhouse-client",
+             "--user=default", "--password=tablepro", "--format=TabSeparatedRaw", f"--query={sql}"],
+            check=True, capture_output=True, text=True,
+        )
+        return out.stdout.strip()
+
     def mongodb_name():
         return json.loads(mongodb("JSON.stringify(db.people.findOne({_id: 2}).name)"))
 
@@ -966,6 +975,44 @@ def scenarios(ui):
         assert mongodb_name() == "clientedit"
         row = json.loads(mongodb("JSON.stringify(db.people.findOne({_id: 2}))"))
         assert row == {"_id": 2, "name": "clientedit", "note": "untouched"}, row
+    def clickhouse_enum_grid_edit_preserves_native_label_and_siblings(database, base):
+        ui.open_saved_connection(ui.CLICKHOUSE_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.CLICKHOUSE_CONNECTION_NAME} — BookiE")
+        ui.invoke_named_action_within("default.enum_grid", "Open enum_grid")
+        ui.wait_for_node(name="low", role=pyatspi.ROLE_LABEL)
+        click_cell("low", count=2)
+        for key in "high":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+
+        query = (
+            "SELECT toString(id), toString(isNull(state)), "
+            "toString(CAST(assumeNotNull(state) AS Int16)), "
+            "ifNull(toString(state), '<SQL_NULL>') "
+            "FROM default.enum_grid ORDER BY id FORMAT TabSeparatedRaw"
+        )
+        before_save = "\n".join((
+            "1\t0\t-32768\tlow",
+            "2\t0\t0\tNULL",
+            "3\t1\t0\t<SQL_NULL>",
+            "4\t0\t1\t",
+            "5\t0\t32767\thigh",
+        ))
+        after_save = "\n".join((
+            "1\t0\t32767\thigh",
+            "2\t0\t0\tNULL",
+            "3\t1\t0\t<SQL_NULL>",
+            "4\t0\t1\t",
+            "5\t0\t32767\thigh",
+        ))
+        assert clickhouse(query) == before_save, "the pending grid edit reached ClickHouse"
+        ui.press_x11_key("s", ("Control_L",))
+        approval = ui.find_node(name="Approve once")
+        if approval is not None:
+            ui.invoke(approval)
+        wait_for_oracle(clickhouse, query, after_save)
+        ui.wait_for_node(name="1 unsaved change", present=False)
 
     def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
         grid_edit_and_delete_commit_to_the_server(ui.POSTGRES_CONNECTION_NAME, "public.people", psql)
@@ -998,6 +1045,8 @@ def scenarios(ui):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
     if os.environ.get("TABLEPRO_GTK_MONGODB_CONTAINER"):
         result.append(mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row)
+    if os.environ.get("TABLEPRO_GTK_CLICKHOUSE_CONTAINER"):
+        result.append(clickhouse_enum_grid_edit_preserves_native_label_and_siblings)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_saved_connection_browses_rows_and_values)
