@@ -253,4 +253,39 @@ mod tests {
             "[\n  {\n    \"id\": 7,\n    \"id_3\": 1.5,\n    \"id_2\": 12.30,\n    \"payload\": {\n      \"ok\": true\n    }\n  },\n  {\n    \"id\": 8,\n    \"id_3\": null,\n    \"id_2\": null,\n    \"payload\": null\n  }\n]"
         );
     }
+
+    #[test]
+    fn json_field_names_make_progress_when_duplicate_names_have_gaps() {
+        const CHILD: &str = "BOOKIEE_JSON_FIELD_NAMES_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            let columns = vec![column("id"), column("id"), column("id_2")];
+            assert_eq!(json_field_names(&columns), ["id", "id_3", "id_2"]);
+            return;
+        }
+
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "export::json::tests::json_field_names_make_progress_when_duplicate_names_have_gaps",
+            ])
+            .env(CHILD, "1")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                assert!(status.success(), "JSON field-name child failed: {status}");
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                child.kill().unwrap();
+                let _ = child.wait();
+                panic!("JSON field-name generation did not finish within two seconds");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
 }
