@@ -20,6 +20,12 @@ identity values and server-generated computed and rowversion values; both
 tables' rows are checked in
 `value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers`.
 
+PostgreSQL enum metadata refresh now also has a unit guard proving built-in
+`INT4` is not an enum leaf, alongside the native enum array rename/schema-move
+contract. The Docker contract catches enum/array-recursion changes; the unit
+guard catches an over-broad classification that would add enum catalog lookups
+to ordinary scalar results.
+
 ## Current evidence and next targets
 
 ClickHouse Enum8 now covers its signed endpoints and zero (`-128`, `0`, `127`)
