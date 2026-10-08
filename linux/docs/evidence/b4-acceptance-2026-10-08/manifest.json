@@ -3,11 +3,11 @@
   "date": "2026-10-08",
   "branch": "linux",
   "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
-  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 0bb8e34 changes GTK harness, fixture scripts and documentation only relative to that runtime; the two new B4-22 scenarios added in #375 remain unchanged.",
+  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip bd4ff0f changes GTK harnesses, fixture scripts and documentation only relative to that runtime; no application or driver implementation code changed.",
   "local_tracked_diff": "none",
   "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
-  "result": "all seven local B4 layers passed on a7f14fa; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa, including two selectors from the 0529e83 GTK harness; current-tip hosted acceptance is queued",
+  "result": "all seven local B4 layers passed on a7f14fa; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa; current-tip hosted acceptance is queued",
   "release_binary": {
     "build_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
     "staged_path": "/home/trung/.cache/bookie-b4-target-0d5/installed/usr/bin/tablepro",
@@ -25,9 +25,9 @@
   ],
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37772724483,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37772724483",
-    "source_commit": "0bb8e34354d13e3ab9911b9db710eddb02115170",
+    "run_id": 37774162145,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37774162145",
+    "source_commit": "bd4ff0fdb656cb26dda55a465551ed1e87fb870c",
     "status": "queued",
     "conclusion": null
   },
@@ -44,15 +44,17 @@
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "86e88189f8ba52704cef0dfe432007789065e1e3eb219604c2c5d2760af5fdf2"
+    "sha256": "18b2ea14da10fa5052ca46de8d89ac3d7b4dd35421ede4690c9e5359edec3ef0"
   },
-  "branch_head_at_update": "0bb8e34354d13e3ab9911b9db710eddb02115170",
+  "branch_head_at_update": "bd4ff0fdb656cb26dda55a465551ed1e87fb870c",
   "runtime_diff_since_tested_commit": [
     "linux/crates/app/tests/gtk_safety.py",
     "linux/crates/app/tests/gtk_ux.py",
-    "linux/scripts/test-gtk-mysql.sh",
+    "linux/docs/bookie-0.2-sprint.md",
     "linux/docs/known-issues.md",
-    "linux/docs/type-contract-strategy.md"
+    "linux/docs/type-contract-strategy.md",
+    "linux/scripts/test-deb-package.sh",
+    "linux/scripts/test-gtk-mysql.sh"
   ],
   "local_bundle_gtk": {
     "result": "passed",
@@ -78,9 +80,9 @@
   ],
   "superseded_hosted": {
     "workflow": "Build Linux",
-    "run_id": 37771409148,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37771409148",
-    "source_commit": "0529e830915a6bcd0ac316a01976c97f1ed5222a",
+    "run_id": 37772724483,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37772724483",
+    "source_commit": "0bb8e34354d13e3ab9911b9db710eddb02115170",
     "status": "cancelled"
   },
   "older_hosted": {
@@ -121,5 +123,12 @@
     "stopped_at": "bundle_export_records_sanitized_audit_outcome",
     "observation": "The application and fixture opened; AT-SPI showed an Export connections alert without the expected Choose File control. The test therefore stopped before file selection. This does not establish a product failure or acceptance; the other two scenarios did not run.",
     "artifacts": "/tmp/bookie-b4-wayland-bundle-evidence/"
+  },
+  "earlier_cancelled_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37771409148,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37771409148",
+    "source_commit": "0529e830915a6bcd0ac316a01976c97f1ed5222a",
+    "status": "cancelled"
   }
 }
