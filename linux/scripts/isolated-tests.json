@@ -144,6 +144,11 @@
       "tablepro-app",
       "--lib",
       "ui::browse_tab::tests::value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "services::browse_query::tests::postgres_value_query_refetches_by_enum_and_domain_composite_key"
     ]
   ],
   "gtk": [
