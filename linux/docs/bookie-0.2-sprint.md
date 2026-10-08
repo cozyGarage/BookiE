@@ -6,14 +6,18 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 i
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `299f94fcfebac2635de36e937f62e527ceeb8c51` on `linux`, checked
+Code baseline: `0bb8e34354d13e3ab9911b9db710eddb02115170` on `linux`, checked
 2026-10-08.
 Merged since the 0.1.5 release, by lane:
 
 - **UX:** result headers show type and key markers (#289), selection sum and
   average (#346), a Copy error button (#347), a connection-coloured workspace
-  tab strip (#348). The single action table is deferred behind the drift tests
-  (#349, docs only).
+  tab strip (#348), elapsed time without the approval wait (#364), line and
+  column of PostgreSQL statement errors (#366), pinned results and per-statement
+  gutter marks (#372), a collapsible sidebar tree with counts and saved state
+  (#373), and installed scenarios for restore after a deleted connection and a
+  second-profile bundle import (#375). The single action table is deferred
+  behind the drift tests (#349, docs only).
 - **B3 values and drivers:** PostgreSQL range refusal and enum grid coverage
   (#305–#311), MongoDB nested null-filter parity (#312), SQLite STRICT `ANY`
   computed `iif()` (#331), declared BOOLEAN/temporal and BLOB-affinity decoders
