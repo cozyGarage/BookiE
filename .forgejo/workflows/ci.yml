@@ -11,6 +11,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: never
   CARGO_INCREMENTAL: "0"
+  TABLEPRO_GTK_WAIT_SECONDS: "45"
   GITHUB_STEP_SUMMARY: /dev/null
   PATH: /home/runner/.cargo/bin:/usr/local/bin:/usr/bin:/bin
   RUSTC_WRAPPER: sccache
