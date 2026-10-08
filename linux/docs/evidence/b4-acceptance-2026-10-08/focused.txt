@@ -1,0 +1,39 @@
+BookiE B4 acceptance checkpoint, 2026-10-08
+
+Frozen code candidate: `fork/linux` SHA `1c197ffc9e8a925a9ad2061473f27ef36c5a5876`.
+The local test checkout was pinned to this SHA. It contains the merged UI-34
+changes from PRs #364 and #366. Current `fork/linux` is `00731e0`; #367 and #368
+since the frozen code candidate are documentation-only.
+
+Local exact-SHA results:
+- `b4-rollback`: all 11 bounded MySQL atomicity tests and the PostgreSQL
+  backend-termination rollback-failure selector passed.
+- `tls`: the 48-case TLS and plaintext-fallback matrix passed.
+- `ssh`: 10 built-in agent-auth and 12 system OpenSSH tests passed, including
+  two-hop reachability and cancellation during second-hop trust.
+- `postgres-release`: all seven staged-release GTK trust/audit scenarios passed,
+  including saved mTLS, host-key refusal, setup-failure audit, tunnel-loss
+  recovery, two-hop trust/query, second-hop decline without learning, and
+  changed-key refusal.
+- `mssql-kerberos`: both local Samba AD fixture tests passed (VerifyFull query
+  and unregistered-SPN refusal).
+- `security-policy` and `sandbox` passed.
+- The three selected B4-22 GTK scenarios passed on the release binary:
+  sanitized export audit, sanitized import audit, and encrypted credential
+  round-trip.
+
+The local layer report is `/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T103353400187Z-layers/report.json`. The release binary built from `1c197ffc9e8a925a9ad2061473f27ef36c5a5876` and
+staged at `/home/trung/.cache/bookie-b4-target-0d5/installed/usr/bin/tablepro` has SHA-256 `83a78e92f295dd29015d1fb6bc5138372800189113327405a1fd9664ac40610d`. The report records no tracked
+diff; its working-tree field notes the temporary `linux/target` artifact link
+used to move generated test data off the `/tmp` quota.
+
+Hosted Build Linux push run [37764482634](https://github.com/cozyGarage/BookiE/actions/runs/37764482634)
+is pinned to `00731e0fad9fa36c807ec23779f69331cb75d0bc`. It was pending with no jobs started at the time this
+record was written. The earlier 86ff run passed B4 rollback, TLS, PostgreSQL
+release GTK, and Installed GTK safety, but its full driver-integration job was
+still running and it predates the frozen code candidate.
+
+Acceptance limits: staged GTK runs use Xvfb/AT-SPI, not distro-package/native
+Wayland acceptance. Samba AD is not Windows AD. MySQL coverage remains bounded
+to the fixture engines and side effects listed in the B4-11 ledger. All open B4
+ledger statuses remain open/unverified pending their full acceptance criteria.
