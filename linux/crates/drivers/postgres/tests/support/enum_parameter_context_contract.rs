@@ -154,6 +154,53 @@ async fn assert_shadow_only_enum_label_is_refused(session: &mut dyn Session, con
     );
 }
 
+async fn assert_session_enum_expression_parameters(session: &mut dyn Session, control: &OperationControl) {
+    let enum_type = "enum_session_target.state";
+    for (parameter, coalesced, appended) in [
+        (
+            Value::Text("paused".into()),
+            Value::Text("paused".into()),
+            r#"["ready","paused"]"#,
+        ),
+        (Value::Null, Value::Text("ready".into()), r#"["ready",null]"#),
+    ] {
+        assert_eq!(
+            session_query(
+                session,
+                "SELECT COALESCE($1, state)::text, pg_typeof($1)::text, \
+                 pg_typeof(COALESCE($1, state))::text \
+                 FROM enum_session_target.rows WHERE id = 3",
+                std::slice::from_ref(&parameter),
+                control,
+            )
+            .await
+            .rows,
+            vec![vec![
+                coalesced,
+                Value::Text(enum_type.into()),
+                Value::Text(enum_type.into()),
+            ]]
+        );
+        assert_eq!(
+            session_query(
+                session,
+                "SELECT array_to_json(array_append(ARRAY[state], $1))::text, \
+                 pg_typeof($1)::text, pg_typeof(array_append(ARRAY[state], $1))::text \
+                 FROM enum_session_target.rows WHERE id = 3",
+                std::slice::from_ref(&parameter),
+                control,
+            )
+            .await
+            .rows,
+            vec![vec![
+                Value::Text(appended.into()),
+                Value::Text(enum_type.into()),
+                Value::Text(format!("{enum_type}[]")),
+            ]]
+        );
+    }
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_enum_parameter_resolves_without_target_schema_in_session_path() {
@@ -164,6 +211,7 @@ async fn value_contract_enum_parameter_resolves_without_target_schema_in_session
     let control = OperationControl::new(CancellationToken::new(), None);
     assert_session_enum_path(&mut *session, &control).await;
     assert_session_enum_parameter_oracles(&mut *session, &control).await;
+    assert_session_enum_expression_parameters(&mut *session, &control).await;
     assert_shadow_only_enum_label_is_refused(&mut *session, &control).await;
 }
 
