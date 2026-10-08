@@ -605,6 +605,16 @@ impl MongodbConnection {
 mod tests {
     use super::*;
 
+    fn assert_first_id(page: &QueryResult, expected: &str) {
+        let id_column = page.columns.iter().position(|column| column.name == "_id").unwrap();
+        let actual = match &page.rows[0][id_column] {
+            Value::Text(value) => value.as_str(),
+            Value::Json(serde_json::Value::String(value)) => value.as_str(),
+            other => panic!("unexpected MongoDB _id value: {other:?}"),
+        };
+        assert_eq!(actual, expected);
+    }
+
     #[tokio::test]
     async fn open_session_is_refused() {
         let client_opts = ClientOptions::parse("mongodb://127.0.0.1:27017").await.unwrap();
@@ -704,15 +714,17 @@ mod tests {
         let client = Client::with_options(options).unwrap();
         let database = client.database("appdb");
         let coll = database.collection::<Document>("browse_pages");
-        coll.insert_many([doc! { "value": 1 }, doc! { "value": 2 }])
+        coll.insert_many([doc! { "_id": "b", "value": 2 }, doc! { "_id": "a", "value": 1 }])
             .await
             .unwrap();
         let connection = MongodbConnection::new(client, "appdb".into());
 
         connection.fetch_columns(None, "browse_pages").await.unwrap();
         assert_eq!(finds.lock().unwrap().len(), 1);
-        connection.fetch_rows(None, "browse_pages", 0, 1).await.unwrap();
-        connection.fetch_rows(None, "browse_pages", 1, 1).await.unwrap();
+        let first_page = connection.fetch_rows(None, "browse_pages", 0, 1).await.unwrap();
+        let second_page = connection.fetch_rows(None, "browse_pages", 1, 1).await.unwrap();
+        assert_first_id(&first_page, "a");
+        assert_first_id(&second_page, "b");
         {
             let commands = finds.lock().unwrap();
             assert_eq!(commands.len(), 3);
@@ -844,14 +856,16 @@ mod tests {
         connection: &MongodbConnection,
         finds: &std::sync::Arc<std::sync::Mutex<Vec<mongodb::bson::Document>>>,
     ) {
-        connection
+        let first_page = connection
             .query("db.browse_pages.find({}).skip(0).limit(1)")
             .await
             .unwrap();
-        connection
+        let second_page = connection
             .query("db.browse_pages.find({}).skip(1).limit(1)")
             .await
             .unwrap();
+        assert_first_id(&first_page, "a");
+        assert_first_id(&second_page, "b");
         let commands = finds.lock().unwrap();
         assert_eq!(commands.len(), 8);
         assert_eq!(commands[6].get_i64("limit").unwrap(), 1);
