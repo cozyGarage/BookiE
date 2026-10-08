@@ -37,7 +37,7 @@ row are asserted in
 
 ## Current evidence and next targets
 
-Draft [PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements PERF-9: saved hidden non-key columns
+Merged [PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements PERF-9: saved hidden non-key columns
 are removed from SQL browse projections while primary keys and hidden filter or
 sort columns remain usable. Projected rows distinguish unfetched cells from SQL
 NULL; full-row copy, row JSON and current-page export refuse incomplete rows,
