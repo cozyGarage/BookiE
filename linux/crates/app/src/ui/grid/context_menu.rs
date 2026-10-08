@@ -589,13 +589,11 @@ fn values_for_column_menu(view: &gtk::ColumnView, clicked: u32, column: usize) -
         .collect()
 }
 fn selected_row_positions(view: &gtk::ColumnView, clicked: u32) -> Vec<u32> {
-    let positions = view
-        .model()
+    view.model()
         .and_then(|model| model.downcast::<gtk::MultiSelection>().ok())
         .map(|selection| selected_positions(&selection))
         .filter(|positions| !positions.is_empty())
-        .unwrap_or_else(|| vec![clicked]);
-    positions
+        .unwrap_or_else(|| vec![clicked])
 }
 fn complete_rows(rows: impl Iterator<Item = Option<Vec<Value>>>) -> Option<Vec<Vec<Value>>> {
     rows.collect()
