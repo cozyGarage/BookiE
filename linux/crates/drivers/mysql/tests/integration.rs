@@ -1173,6 +1173,8 @@ mod value_contracts;
 #[path = "support/database_listing.rs"]
 mod database_listing;
 
+#[path = "support/char_padding_mode.rs"]
+mod char_padding_mode;
 #[path = "support/enum_sql_mode_contract.rs"]
 mod enum_sql_mode_contract;
 #[path = "support/timezone_contract.rs"]
