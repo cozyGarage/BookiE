@@ -54,7 +54,14 @@ impl BrowseTarget<'_> {
         cursor: Option<&[Value]>,
     ) -> Result<PageQuery, String> {
         let mut query = self.filtered_query("*")?;
-        let order = resolved_order_by(self.driver_id, self.columns, sort);
+        // These drivers use their native page readers; SQL ordering by the
+        // inferred key would force an otherwise-unfiltered browse through the
+        // SQL query path, which their command grammar does not support.
+        let order = if sort.is_none() && matches!(self.driver_id, "mongodb" | "redis") {
+            None
+        } else {
+            resolved_order_by(self.driver_id, self.columns, sort)
+        };
         let keys: Vec<&str> = self
             .columns
             .iter()
@@ -220,14 +227,17 @@ mod tests {
     }
 
     #[test]
-    fn unfiltered_unsorted_non_sql_fetch_is_preserved() {
-        let target = BrowseTarget {
-            driver_id: "mongodb",
-            schema: None,
-            table: "stats",
-            columns: &[],
-            filter: &FilterSet::default(),
-        };
-        assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
+    fn unfiltered_unsorted_non_sql_fetch_stays_native_with_a_primary_key() {
+        let columns = vec![column("_id", true)];
+        for driver_id in ["mongodb", "redis"] {
+            let target = BrowseTarget {
+                driver_id,
+                schema: None,
+                table: "stats",
+                columns: &columns,
+                filter: &FilterSet::default(),
+            };
+            assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
+        }
     }
 }
