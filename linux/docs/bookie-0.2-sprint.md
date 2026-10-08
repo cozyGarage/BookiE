@@ -27,7 +27,11 @@ depths. PR #344 adds domain-array projections at 302 and 512 layers and raises
 the bounded SQLx type-resolution cap to support those cases. PR #345 adds a
 Redis committed-write lost-ack contract across reconnect. PR #354 adds a
 ClickHouse committed INSERT lost-ack contract with independent native and
-materialized-view oracles. Earlier B3 work added
+materialized-view oracles. PR #355 adds SQL Server lost-ack coverage. Its
+focused Docker test, strict MSSQL Clippy, formatting, ignored-test inventory and
+documentation checks passed locally (see the [PR #355 evidence
+comment](https://github.com/cozyGarage/BookiE/pull/355#issuecomment-6055451200));
+hosted checks are pending. Earlier B3 work added
 PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
 nested null-filter parity (#312), and a MySQL lost-ack no-replay contract
 (#315). These tests preserve native type/value oracles and verify refused
