@@ -1097,7 +1097,7 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
         .expect_err(&format!("{levels}-layer enum array decoding must refuse explicitly"));
     assert!(
         matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
-        "unexpected 1024-layer array outcome: {error:?}"
+        "unexpected {levels}-layer array outcome: {error:?}"
     );
     let oracle = connection
         .query(&format!(
