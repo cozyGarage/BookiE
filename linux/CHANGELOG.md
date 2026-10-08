@@ -3,11 +3,16 @@
 ## [Unreleased]
 
 ### Added
-- Selecting several rows shows the sum and average of each numeric column in the selection badge tooltip.
+- Evidence validation now accepts wrapper-script runs that list multiple test
+  names and manifests that pair one source digest with `source_file`.
+- Redis now has a Docker-backed lost-ack contract: a committed Lua write with
+  its reply dropped returns `Disconnected`, reconnects for a later read, and
+  leaves both target and independent audit keys at one execution.
 - PostgreSQL enum-leaf metadata and schema-aware write/filter contracts now
   include direct `pg_typeof()` query projections plus 302- and 512-layer
-  domain-over-enum cases; 512 stress-checks recursive metadata handling beyond
-  the prior 301-layer proof. Deeper chains remain open.
+  domain-over-enum cases. Array projections of the outer domain also preserve
+  exact array values and type metadata at both depths. Deeper chains remain
+  open.
 - SQLite declared DATE/TIME/DATETIME/TIMESTAMP columns now have a regression
   contract proving invalid calendar/clock strings remain exact text when typed
   decoding fails.

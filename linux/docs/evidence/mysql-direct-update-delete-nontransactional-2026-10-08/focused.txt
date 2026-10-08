@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests/integration.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/integration-901ab74c5204a70b)
+
+running 1 test
+test mysql_atomic::mysql_failed_batch_keeps_direct_updates_and_deletes_on_nontransactional_engines ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 74 filtered out; finished in 9.13s
+
