@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- MySQL ENUM/SET grid parsing now tests malformed metadata refusal and escaped
+  labels, using real MySQL column metadata and native ordinal/byte oracles.
 - SQL Server now has a Docker-backed lost-ack contract: an independent
   connection observes an UPDATE and audit row committed before SQL Server is
   stopped during a delayed batch response; after restart both rows remain
