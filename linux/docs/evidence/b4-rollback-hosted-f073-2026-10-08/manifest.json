@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "branch": "fork/linux",
+  "source_commit": "f073844461d11291b7eb9ae094e175bdd5a6ea7a",
+  "scope": [
+    "B4-11 MySQL failed-batch rollback, including the BLACKHOLE trigger-sink regression",
+    "B4-12 PostgreSQL backend-termination rollback failure"
+  ],
+  "hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37854177911,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37854177911",
+    "run_status_at_capture": "in_progress",
+    "job": "B4 rollback acceptance (docker)",
+    "job_id": 113578648695,
+    "job_status": "completed",
+    "job_conclusion": "success",
+    "successful_step": "Focused MySQL and PostgreSQL rollback cases",
+    "layer": "b4-rollback",
+    "selectors": [
+      "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+      "cargo test --locked -p tablepro-driver-postgres --test integration rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend -- --include-ignored --test-threads=1"
+    ]
+  },
+  "not_established": [
+    "The overall Build Linux workflow conclusion at evidence capture",
+    "Optional/vendor MySQL-family engines and broader side-effect patterns",
+    "Installed distribution-package acceptance"
+  ],
+  "summary": "focused.txt"
+}
