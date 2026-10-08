@@ -1,0 +1,12 @@
+   Compiling sqlx-postgres v0.9.0 (/tmp/bookie-b4-mysql-direct-dml/linux/vendor/sqlx-postgres)
+   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-mysql-direct-dml/linux/crates/core)
+   Compiling sqlx v0.9.0
+   Compiling tablepro-driver-postgres v0.1.0 (/tmp/bookie-b4-mysql-direct-dml/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.46s
+     Running tests/integration.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/integration-c9dc0a899870fef8)
+
+running 1 test
+test rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 220 filtered out; finished in 3.04s
+
