@@ -24,17 +24,17 @@
   },
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37776466311,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776466311",
-    "source_commit": "12dc20020824e7ef65e185940efc4503d2fd5c64",
+    "run_id": 37776917323,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917323",
+    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
     "status": "pending",
     "conclusion": null,
-    "note": "The current target run has no jobs started yet; it includes the Aria regression and PostgreSQL rollback selector."
+    "note": "Current target run has no jobs started; it includes the Aria regression and PostgreSQL rollback selector."
   },
   "local_report": "/tmp/bookie-b4-aria/linux/target/quality/20261008T120021537624Z-layers/report.json",
   "summary": {
     "path": "focused.txt",
-    "sha256": "471454553ce8036aba3575463a094547e63ac1f3792aaa24b49db395217a5497"
+    "sha256": "b4878ffcc5c2b605a9f32c098e03e6ecd79846f18a8928a19d69ed1731222e63"
   },
   "not_established": [
     "Hosted acceptance on this test commit",

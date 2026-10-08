@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "branch": "linux",
   "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
-  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 12dc200 adds GTK harness and fixture changes, packaging checks, the MySQL Aria regression test, and documentation only; no application or driver implementation code changed relative to the runtime candidate.",
+  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 9961e60 adds GTK harness and fixture changes, package upgrade/removal checks, the MySQL Aria regression test, and documentation only; no application or driver implementation code changed relative to the runtime candidate.",
   "local_tracked_diff": "none",
   "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
@@ -25,9 +25,9 @@
   ],
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37776466311,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776466311",
-    "source_commit": "12dc20020824e7ef65e185940efc4503d2fd5c64",
+    "run_id": 37776917323,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917323",
+    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
     "status": "pending",
     "conclusion": null
   },
@@ -44,9 +44,9 @@
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "c9cc58776fe0a5ee0063ab0977f02dab6dc944a641f70f860c4f33ba674e2bec"
+    "sha256": "657d0ed5d41e4b7cd053ae3bc237dd94917d69914d3679eab05f7af140692d0b"
   },
-  "branch_head_at_update": "12dc20020824e7ef65e185940efc4503d2fd5c64",
+  "branch_head_at_update": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
   "runtime_diff_since_tested_commit": [
     "linux/crates/app/tests/gtk_safety.py",
     "linux/crates/app/tests/gtk_ux.py",
@@ -58,6 +58,7 @@
     "linux/docs/ignored-tests.md",
     "linux/docs/known-issues.md",
     "linux/docs/type-contract-strategy.md",
+    "linux/scripts/test-arch-package.sh",
     "linux/scripts/test-deb-package.sh",
     "linux/scripts/test-flatpak-window.sh",
     "linux/scripts/test-gtk-mysql.sh"
@@ -139,11 +140,11 @@
   },
   "flatpak_packaging": {
     "workflow": "Flatpak Linux (packaging only)",
-    "run_id": 37776466271,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776466271",
-    "source_commit": "12dc20020824e7ef65e185940efc4503d2fd5c64",
+    "run_id": 37776917341,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917341",
+    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
     "status": "in_progress",
-    "scope": "default and development Flatpak builds; target includes the PR #380 AT-SPI Flatpak window check",
+    "scope": "default and development Flatpak builds; includes Flatpak AT-SPI window and Arch package upgrade/removal checks in current target",
     "conclusion": null
   },
   "intermediate_hosted": {
@@ -153,5 +154,30 @@
     "source_commit": "d5a830856932540928c14809cf904afb32bfc59a",
     "status": "cancelled",
     "conclusion": "cancelled"
-  }
+  },
+  "security": {
+    "workflow": "Linux Security",
+    "run_id": 37776917383,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917383",
+    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "cancelled_intermediate_runs": [
+    {
+      "run_id": 37775494283,
+      "source_commit": "d5a830856932540928c14809cf904afb32bfc59a",
+      "status": "cancelled"
+    },
+    {
+      "run_id": 37776466311,
+      "source_commit": "12dc20020824e7ef65e185940efc4503d2fd5c64",
+      "status": "cancelled"
+    },
+    {
+      "run_id": 37776765921,
+      "source_commit": "b62cada571f874be4ee8b4eac4d8d96fe05f2706",
+      "status": "cancelled"
+    }
+  ]
 }
