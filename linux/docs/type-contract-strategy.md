@@ -76,7 +76,10 @@ native query checks confirm stored and expected arrays have identical text,
 wire bytes and PostgreSQL type. Inferred text and SQL NULL array parameters to
 `array_cat` also refuse explicitly at both depths, and native text, domain type
 and array wire bytes remain unchanged. This is a tested boundary, not array
-support.
+support. A scoped mutation run on PostgreSQL parameter inference source
+SHA-256 `8626deee182c090ce18aaa4628df3e3d296bc3ca15521e714604cf883bc9feb8`
+caught 23 of 24 resolver mutants with the deep-domain contract; one generated
+return-value mutant was unviable, with no misses or timeouts.
 See `../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs`.
 
 ClickHouse Enum8 now covers its signed endpoints and zero (`-128`, `0`, `127`)
