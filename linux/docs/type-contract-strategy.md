@@ -28,17 +28,17 @@ to ordinary scalar results.
 
 ## Current evidence and next targets
 
-[PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements PERF-9: saved hidden non-key columns
-are removed from SQL browse projections while primary keys and hidden filter or
-sort columns remain usable. Projected rows distinguish unfetched cells from SQL
-NULL; full-row copy, row JSON and current-page export refuse incomplete rows,
-and the inspector labels them “Not fetched.” Pending edits disable projection.
-Native SQLite tests assert the visible projection and the hidden stored value;
-planner, keyset mapping, sparse-row, row-search and app-library regressions pass
-in the candidate. Local preflight and required GitHub checks passed; the PR is
-ready for review. This does not close UI-14b: maintainer merge, installed GTK
-acceptance and the complete on-demand value path in PERF-10 remain open. After
-hiding columns, refresh the browse page for the reduced SELECT to take effect.
+Merged [PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements
+PERF-9: saved hidden non-key columns are removed from SQL browse projections
+while primary keys and hidden filter or sort columns remain usable. Projected
+rows distinguish unfetched cells from SQL NULL; full-row copy, row JSON and
+current-page export refuse incomplete rows, and the inspector labels them “Not
+fetched.” Pending edits disable projection. Native SQLite tests assert the
+visible projection and the hidden stored value; planner, keyset mapping,
+sparse-row, row-search and app regressions passed with the required GitHub
+checks. Installed GTK acceptance for hide/unhide refresh and edited-row paths
+remains open under UI-14b. After hiding columns, refresh the browse page for the
+reduced SELECT to take effect.
 
 SQL-backed browse rows now keep an 8 KiB text/JSON/binary sample and original
 byte count in each materialized grid row. View Value refetches one column using
@@ -74,8 +74,9 @@ enum-domain recursion contract to a tested 513-layer point and is merged. This
 is a checkpoint, not a maximum-depth claim, and it does not close the broader
 B3 matrix.
 
-The local follow-up extends schema-aware scalar reads, keyed edits, draft
-inserts, filters and shadowed-`search_path` checks through 1,024 domain layers.
+Merged [PR #388](https://github.com/cozyGarage/BookiE/pull/388) extends
+schema-aware scalar reads, keyed edits, draft inserts, filters and
+shadowed-`search_path` checks through 1,024 domain layers.
 Raw inferred text and SQL NULL parameters still refuse at 64 layers. At 1,024
 layers, decoding a domain-over-enum array also refuses explicitly; a separate
 native query confirms the stored and expected arrays have identical text, wire
