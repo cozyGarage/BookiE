@@ -745,6 +745,96 @@ mod tests {
         assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
     }
 
+    #[cfg(feature = "duckdb")]
+    #[tokio::test]
+    async fn value_contract_duckdb_guarded_value_query_refetches_exact_blob() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+        let connection = drivers_duckdb::DuckdbDriver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let control = crate::services::operation_control::bounded(30);
+        let tenant = "tenant ' OR 1=1 --";
+        let bytes: Vec<u8> = (0..9000).map(|index| (index % 256) as u8).collect();
+        seed_duckdb_value_preview(&*connection, &control, &tenant, &bytes).await;
+        assert_duckdb_value_preview_native(&*connection, &control, &tenant).await;
+        let columns = connection
+            .fetch_columns_controlled(None, "value_preview_records", &control)
+            .await
+            .unwrap();
+        assert!(columns[0].primary_key && columns[1].primary_key);
+        let target = BrowseTarget {
+            driver_id: "duckdb",
+            schema: None,
+            table: "value_preview_records",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let query = target
+            .value_query(2, &[Value::Text(tenant.into()), Value::Int(7)])
+            .unwrap();
+        let guarded = guarded_value_refetch(std::sync::Arc::from(connection), "duckdb", &query, &control).await;
+        assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
+    }
+
+    async fn seed_duckdb_value_preview(
+        connection: &dyn tablepro_core::Connection,
+        control: &tablepro_core::OperationControl,
+        tenant: &str,
+        bytes: &[u8],
+    ) {
+        connection
+            .execute_controlled(
+                "CREATE TABLE value_preview_records (tenant VARCHAR, id BIGINT, payload BLOB, PRIMARY KEY (tenant, id))",
+                control,
+            )
+            .await
+            .unwrap();
+        connection
+            .execute_params_controlled(
+                "INSERT INTO value_preview_records VALUES (?, ?, ?), (?, ?, ?)",
+                &[
+                    Value::Text(tenant.into()),
+                    Value::Int(7),
+                    Value::Bytes(bytes.to_vec()),
+                    Value::Bytes(b"other tenant".to_vec()),
+                    Value::Int(7),
+                    Value::Bytes(vec![0xff; bytes.len()]),
+                ],
+                control,
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn assert_duckdb_value_preview_native(
+        connection: &dyn tablepro_core::Connection,
+        control: &tablepro_core::OperationControl,
+        tenant: &str,
+    ) {
+        let native = connection
+            .query_params_controlled(
+                "SELECT typeof(payload), octet_length(payload), substr(hex(payload), 1, 16) FROM value_preview_records WHERE tenant = ? AND id = ?",
+                &[Value::Text(tenant.into()), Value::Int(7)],
+                control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            native.rows,
+            vec![vec![
+                Value::Text("BLOB".into()),
+                Value::Int(9000),
+                Value::Text("0001020304050607".into()),
+            ]]
+        );
+    }
+
     #[tokio::test]
     #[ignore = "requires docker"]
     async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {

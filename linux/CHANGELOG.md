@@ -7,6 +7,7 @@
 - MongoDB paged `find` queries reuse the same connection-local type census instead of rescanning the collection for each page.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
 - ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
+- DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.
 - The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
 - Each statement of a script gets a gutter mark after a run: a tick for a statement that returned, a cross for one that failed.

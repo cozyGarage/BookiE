@@ -59,8 +59,12 @@ run the same guarded query; the Docker cases retain native storage and key-type
 oracles. SQL Server now covers the guarded refetch with a composite VARBINARY/
 BIGINT key and checks the 9,000-byte payload against native `DATALENGTH` and
 `fn_varbintohexstr` results (`mssql_value_query_refetches_the_exact_blob_for_a_composite_key`).
-Other-driver native checks, installed GTK acceptance and memory profiling
-remain open under PERF-10.
+DuckDB now has a feature-gated app-service contract that refetches a 9,000-byte
+BLOB through `PolicyGuard` using a hostile composite key; native storage class,
+length and prefix checks prove the value before refetch. ClickHouse also checks
+a guarded 12,000-byte String refetch with native type/length/prefix oracles.
+MongoDB, Redis, arbitrary SQL, shared result memory, installed GTK and memory
+profiling remain open under PERF-10.
 
 ClickHouse now also has an app-service contract that refetches a 12,000-byte
 String through `PolicyGuard` using a hostile composite key; native `String`
