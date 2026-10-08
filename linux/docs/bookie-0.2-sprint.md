@@ -5,11 +5,11 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `0807b7de6605a1b65319e251438ac581aefa3d6a` on `linux`, checked
+Code baseline: `1e76bab2f9620cb5261571ecb4d74c4f81743333` on `linux`, checked
 2026-10-08. Code changes include PR #289 result header types and key markers, PR #346 result-footer statistics, PR #347's
 failed-statement copy action, PR #348's connection-coloured workspace tab strip,
-PR #349's action registry, PR #354 ClickHouse lost-ack coverage, and PR #355
-SQL Server lost-ack coverage. PRs #357 and #358 fix GTK soak workflow setup.
+PR #349's deferral of the single action table, PR #354 ClickHouse lost-ack coverage, and PR #355
+SQL Server lost-ack coverage. PRs #357 and #358 fix GTK soak workflow setup. PR #359 makes SQLite honor affinity for enum-like declared types, and PR #360 serializes the GTK tunnel-loss transaction assertions.
 PR #344 adds
 PostgreSQL domain-array projections and PR #350 records the frozen-candidate
 PostgreSQL rollback rerun. Since PR #315,
@@ -33,7 +33,7 @@ materialized-view oracles. PR #355 adds SQL Server lost-ack coverage. Its
 focused Docker test, strict MSSQL Clippy, formatting, ignored-test inventory and
 documentation checks passed locally, and its hosted PR checks passed. The PR
 workflow skips Docker driver integration on pull requests; post-merge
-merge-tier run `37752816805` is in progress (see the
+merge-tier run `37752816805` finished successfully (see the
 [PR #355 evidence comment](https://github.com/cozyGarage/BookiE/pull/355#issuecomment-6055451200)).
 Earlier B3 work added
 PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
@@ -78,7 +78,7 @@ PR #337 added failed-batch INSERT coverage across InnoDB, MyISAM, MEMORY, CSV
 and ARCHIVE. PR #353 then added direct UPDATE and DELETE coverage across InnoDB,
 MyISAM, MEMORY and CSV. Its local Docker rollback layer passed; hosted PR checks
 passed, while the B4 Docker job was skipped by the PR workflow condition. The
-post-merge Build Linux run on `32b170f` is still pending. See the [PR #337
+post-merge Build Linux run on `32b170f` was cancelled, so it has no hosted result. See the [PR #337
 evidence comment](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536)
 and [PR #353](https://github.com/cozyGarage/BookiE/pull/353).
 PR #312 skipped its B4-specific job because it only changed MongoDB tests.
@@ -126,7 +126,7 @@ this existing-eight-driver stabilization scope.
 | A1–A4 | Prior correctness, drafts/planning, Jump to Column and BookiE branding implemented | Historical 0.1.x proof does not qualify 0.2; A5 installed candidate work folds into B7 |
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
-| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. SQLite STRICT `ANY` computed `iif()` now has native storage-class and typed CSV coverage (#331); declared BOOLEAN/temporal decoding, BLOB-affinity runtime classes, and malformed temporal text fallback have focused tests (#333, #335). PostgreSQL domain-over-enum metadata/query coverage now reaches 302 and 512 layers, including arrays (#338, #340, #342, #344); Redis and ClickHouse have committed-write lost-ack contracts (#345 and current B3 follow-up). U2 identity-copy behavior is implemented and covered for PostgreSQL, SQL Server and MySQL policy; PostgreSQL enum parameter inference has restricted-role coverage, and PR #249 adds a keyed grid-edit case under shadowed transaction-local `search_path`. The broader engine/type/consumer/configuration matrix, mutation triage, remaining TEST-15 paths and installed grid acceptance remain open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
+| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. SQLite STRICT `ANY` computed `iif()` now has native storage-class and typed CSV coverage (#331); declared BOOLEAN/temporal decoding, BLOB-affinity runtime classes, and malformed temporal text fallback have focused tests (#333, #335). PostgreSQL domain-over-enum metadata/query coverage now reaches 302 and 512 layers, including arrays (#338, #340, #342, #344); Redis and ClickHouse have committed-write lost-ack contracts (#345, #354, #355). U2 identity-copy behavior is implemented and covered for PostgreSQL, SQL Server and MySQL policy; PostgreSQL enum parameter inference has restricted-role coverage, and PR #249 adds a keyed grid-edit case under shadowed transaction-local `search_path`. The broader engine/type/consumer/configuration matrix, mutation triage, remaining TEST-15 paths and installed grid acceptance remain open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
 | B4 transport/sessions | SSH audit, rollback-failure, Kerberos, GTK trust-flow, prompt-timeout, cross-engine DML regressions and B4-11 failed-batch INSERT/UPDATE/DELETE coverage (#337, #353) are merged. | [Current B4 board](b4-task-board.md): frozen-candidate and hosted/installed acceptance remains open for the listed rows; B4-11 other engines/effects, B4-12 next-candidate rollback proof, B4-21 Windows AD interoperability, and UI-1b chain editing remain |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
@@ -174,7 +174,7 @@ not prove a distribution-package installation or native Wayland session.
 
 | Item | Current evidence and action |
 | --- | --- |
-| B4-7, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. Post-merge Build Linux run `37743149992` on `32b170f` is pending; the B4 rollback job has not started. |
+| B4-7, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. Post-merge Build Linux run `37743149992` on `32b170f` was cancelled; the B4 rollback job has not started. |
 | B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Repeat on the selected frozen SHA, confirm hosted results, and complete installed-package/native Wayland acceptance. |
 | B4-22 | Keep UNVERIFIED. The GTK bundle export/import and encrypted credential round-trip have local and earlier hosted evidence; obtain acceptance on the selected frozen candidate, hosted SHA, and installed package/native Wayland. |
 | B4-12 | The focused PostgreSQL backend-termination case passed again on frozen candidate `7eea6f09d7154f03400e82cec7c16215488b2115`; see the [PR discussion](https://github.com/cozyGarage/BookiE/pull/350#issuecomment-6054276678). Exact-candidate hosted coverage and a rerun on any next selected candidate remain open. |

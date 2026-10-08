@@ -55,7 +55,7 @@
 - MongoDB and Redis unfiltered, unsorted table pages now use native fetches even when metadata finds a primary key; a native MongoDB GTK scenario checks cursor values remain visible until refresh and an approved post-refresh edit preserves sibling fields.
 - ClickHouse nested enum map coverage now includes all Enum8/Enum16 nullable and non-nullable pairings, with native JSON and JSON/CSV/XLSX consumer checks plus lossy-write refusal and stored-row preservation.
 - MySQL and MariaDB ENUM/SET contracts now prove non-empty XLSX exports preserve native labels and keep SQL NULL cells blank across the twelve tested SQL modes; empty SET values still refuse the export without replacing an existing workbook.
-- Result column headers show the column type and mark primary-key columns.
+- Result column headers show the column type and mark primary-key and foreign-key columns.
 - Redis 0.2.0 support remains scoped to a single host/port endpoint; Sentinel and Cluster topologies are explicitly deferred.
 - Redis key browsing preserves arbitrary-byte keys and non-UTF-8 string values, and fills requested pages across partial SCAN batches; Docker contracts check native Redis oracles.
 - The MongoDB census diagnostic now profiles one million documents; this host measured a five-sample release median of 772 ms per 50-row browse, so the 100 ms budget remains scoped to 100k documents.
