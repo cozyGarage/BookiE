@@ -3,6 +3,7 @@ use relm4::adw::prelude::*;
 use crate::services::database_service::ConnectionMetadata;
 
 use super::{App, qualified_label};
+use crate::services::sidebar_tree::NodeKind;
 
 impl App {
     pub(super) fn on_switch_to_recent_tab(&self) {
@@ -99,22 +100,20 @@ impl App {
             listbox.unselect_all();
             return;
         };
-        let schemas = self.sidebar_schemas.borrow();
-        let mut idx = 0_i32;
-        while let Some(row) = listbox.row_at_index(idx) {
-            // The factory builds one row per TableInfo, in the same order
-            // as `sidebar_schemas`, so we can pair each row with its
-            // schema-Option by index. SidebarRow stashes its table name
-            // in widget-name (no CSS conflict, no qdata machinery).
-            let row_table = row.widget_name();
-            let row_schema = schemas.get(idx as usize).cloned().unwrap_or(None);
-            if row_table.as_str() == table && row_schema.as_deref() == schema.as_deref() {
-                // select_row doesn't trigger row-activated (user-only
-                // signal), so this won't recurse into SelectTable.
-                listbox.select_row(Some(&row));
-                return;
+        let nodes = self.sidebar_nodes.borrow();
+        let found = nodes.iter().position(|node| match &node.kind {
+            NodeKind::Table {
+                schema: node_schema,
+                name,
             }
-            idx += 1;
+            | NodeKind::View {
+                schema: node_schema,
+                name,
+            } => name.as_str() == table && node_schema.as_deref() == schema.as_deref(),
+            _ => false,
+        });
+        if let Some(row) = found.and_then(|index| listbox.row_at_index(index as i32)) {
+            listbox.select_row(Some(&row));
         }
     }
 }

@@ -865,8 +865,12 @@ impl App {
     }
 
     pub(super) fn sidebar_schemas_distinct(&self) -> usize {
-        let schemas = self.sidebar_schemas.borrow();
-        let distinct: std::collections::BTreeSet<&str> = schemas.iter().filter_map(|s| s.as_deref()).collect();
+        let distinct: std::collections::BTreeSet<&str> = self
+            .sidebar_tables
+            .iter()
+            .chain(&self.sidebar_views)
+            .filter_map(|table| table.schema.as_deref())
+            .collect();
         distinct.len()
     }
 

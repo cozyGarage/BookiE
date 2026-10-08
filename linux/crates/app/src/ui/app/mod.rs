@@ -17,6 +17,7 @@ mod row_ops;
 mod schema_index;
 mod session_teardown;
 mod shortcuts;
+mod sidebar_state;
 mod status_pages;
 mod structure;
 mod types;
@@ -103,8 +104,9 @@ pub struct App {
     sidebar_title: adw::WindowTitle,
     disconnect_action: gio::SimpleAction,
     sidebar_factory: FactoryVecDeque<SidebarRow>,
-    sidebar_schemas: std::rc::Rc<std::cell::RefCell<Vec<Option<String>>>>,
-    sidebar_kinds: std::rc::Rc<std::cell::RefCell<Vec<crate::ui::sidebar_row::SidebarObjectKind>>>,
+    sidebar_nodes: std::rc::Rc<std::cell::RefCell<Vec<crate::services::sidebar_tree::TreeNode>>>,
+    sidebar_collapsed: std::rc::Rc<std::cell::RefCell<crate::services::sidebar_tree::CollapseState>>,
+    sidebar_visible: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<usize>>>,
     sidebar_views: Vec<tablepro_core::TableInfo>,
     sidebar_tables: Vec<tablepro_core::TableInfo>,
     catalog_generation: std::cell::Cell<u64>,
@@ -496,8 +498,9 @@ impl SimpleComponent for App {
             sidebar_title: widgets.sidebar_title.clone(),
             disconnect_action,
             sidebar_factory: sidebar.factory,
-            sidebar_schemas: sidebar.schemas,
-            sidebar_kinds: sidebar.kinds,
+            sidebar_nodes: sidebar.nodes,
+            sidebar_collapsed: sidebar.collapsed,
+            sidebar_visible: sidebar.visible,
             sidebar_views: Vec::new(),
             sidebar_tables: Vec::new(),
             catalog_generation: std::cell::Cell::new(0),
@@ -751,6 +754,7 @@ impl SimpleComponent for App {
             ),
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
+            AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
             AppMsg::NewTableTab { schema } => self.on_new_table_tab(schema, sender),
             AppMsg::EditStructureTab { schema, table } => self.on_edit_structure_tab(schema, table, sender),
             AppMsg::ShowCreateTableForExisting { schema, table } => self.on_show_create_table(schema, table, sender),

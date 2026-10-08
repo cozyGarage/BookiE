@@ -11,18 +11,38 @@ use tablepro_core::TableInfo;
 pub enum SidebarObjectKind {
     Table,
     View,
+    Group,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupInit {
+    pub label: String,
+    pub count: usize,
+    pub collapsed: bool,
+    pub actions: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct SidebarRowInit {
     pub info: TableInfo,
     pub kind: SidebarObjectKind,
+    pub depth: u8,
+    pub group: Option<GroupInit>,
+}
+
+fn chevron_icon(collapsed: bool) -> &'static str {
+    if collapsed {
+        "pan-end-symbolic"
+    } else {
+        "pan-down-symbolic"
+    }
 }
 
 fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
     match kind {
         SidebarObjectKind::Table => "view-list-symbolic",
         SidebarObjectKind::View => "view-paged-symbolic",
+        SidebarObjectKind::Group => "folder-symbolic",
     }
 }
 
@@ -30,6 +50,11 @@ fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
 pub struct SidebarRow {
     pub info: TableInfo,
     kind: SidebarObjectKind,
+    depth: u8,
+    group: Option<GroupInit>,
+    chevron: gtk::Image,
+    new_table_button: gtk::Button,
+    csv_button: gtk::Button,
     open_button: gtk::Button,
     /// The eagerly-parented context-menu popover. Held on the model
     /// so `shutdown` can `unparent()` it before the row's root widget
@@ -47,10 +72,19 @@ pub enum SidebarRowMsg {
     ShowCreateTable,
     ImportCsv,
     DropTable,
+    SetCollapsed(bool),
+    NewTable,
+    TableFromCsv,
 }
 
 #[derive(Debug)]
 pub enum SidebarRowOutput {
+    NewTable {
+        schema: Option<String>,
+    },
+    TableFromCsv {
+        schema: Option<String>,
+    },
     Open {
         schema: Option<String>,
         name: String,
@@ -127,23 +161,35 @@ impl FactoryComponent for SidebarRow {
                 // ~8px standard. 12 was loose enough to read as two
                 // separate columns rather than one labelled icon.
                 set_spacing: 8,
-                set_margin_start: 12,
+                set_margin_start: 12 + 14 * i32::from(self.depth),
                 set_margin_end: 12,
                 set_margin_top: 6,
                 set_margin_bottom: 6,
 
+                append: &self.chevron,
+
                 gtk::Image {
                     set_icon_name: Some(sidebar_icon(self.kind)),
                     set_pixel_size: 16,
+                    set_visible: self.group.is_none(),
                 },
 
                 gtk::Label {
-                    set_label: &self.info.name,
+                    set_label: &self.title(),
                     set_xalign: 0.0,
                     set_hexpand: true,
                     set_ellipsize: pango::EllipsizeMode::End,
+                    set_css_classes: if self.group.is_some() { &["caption-heading"] } else { &[] },
                 },
 
+                gtk::Label {
+                    set_label: &self.group.as_ref().map(|group| group.count.to_string()).unwrap_or_default(),
+                    set_visible: self.group.is_some(),
+                    set_css_classes: &["dim-label", "caption"],
+                },
+
+                append: &self.new_table_button,
+                append: &self.csv_button,
                 append: &self.open_button,
             },
         }
@@ -158,9 +204,38 @@ impl FactoryComponent for SidebarRow {
             .css_classes(["flat"])
             .build();
         open_button.update_property(&[gtk::accessible::Property::Label(&open_label)]);
+        let actions = init.group.as_ref().is_some_and(|group| group.actions);
+        let group_button = |icon: &str, tooltip: String| {
+            let button = gtk::Button::builder()
+                .icon_name(icon)
+                .tooltip_text(&tooltip)
+                .valign(gtk::Align::Center)
+                .visible(actions)
+                .css_classes(["flat"])
+                .build();
+            button.update_property(&[gtk::accessible::Property::Label(&tooltip)]);
+            button
+        };
+        let schema = init.info.schema.clone();
+        let (new_table_label, csv_label) = match schema.as_deref() {
+            Some(schema) => (
+                crate::tr!("New Table in {schema}\u{2026}").replace("{schema}", schema),
+                crate::tr!("Table from CSV in {schema}\u{2026}").replace("{schema}", schema),
+            ),
+            None => (crate::tr!("New Table\u{2026}"), crate::tr!("Table from CSV\u{2026}")),
+        };
+        let collapsed = init.group.as_ref().is_some_and(|group| group.collapsed);
+        let chevron = gtk::Image::from_icon_name(chevron_icon(collapsed));
+        chevron.set_visible(init.group.is_some());
+        open_button.set_visible(init.group.is_none());
         Self {
             info: init.info,
             kind: init.kind,
+            depth: init.depth,
+            group: init.group,
+            chevron,
+            new_table_button: group_button("list-add-symbolic", new_table_label),
+            csv_button: group_button("document-open-symbolic", csv_label),
             open_button,
             popover: None,
         }
@@ -185,6 +260,10 @@ impl FactoryComponent for SidebarRow {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
+        if self.group.is_some() {
+            self.wire_group_buttons(&sender);
+            return widgets;
+        }
         let sender_for_open_button = sender.clone();
         self.open_button
             .connect_clicked(move |_| sender_for_open_button.input(SidebarRowMsg::Open));
@@ -323,6 +402,10 @@ impl FactoryComponent for SidebarRow {
     }
 
     fn update(&mut self, msg: Self::Input, sender: FactorySender<Self>) {
+        if let SidebarRowMsg::SetCollapsed(collapsed) = msg {
+            self.chevron.set_icon_name(Some(chevron_icon(collapsed)));
+            return;
+        }
         tracing::trace!(
             target: "tablepro_app::sidebar_row",
             table = %self.info.name,
@@ -360,6 +443,17 @@ impl FactoryComponent for SidebarRow {
                     name: self.info.name.clone(),
                 });
             }
+            SidebarRowMsg::SetCollapsed(_) => {}
+            SidebarRowMsg::NewTable => {
+                let _ = sender.output(SidebarRowOutput::NewTable {
+                    schema: self.info.schema.clone(),
+                });
+            }
+            SidebarRowMsg::TableFromCsv => {
+                let _ = sender.output(SidebarRowOutput::TableFromCsv {
+                    schema: self.info.schema.clone(),
+                });
+            }
             SidebarRowMsg::DropTable => {
                 let _ = sender.output(SidebarRowOutput::DropTable {
                     schema: self.info.schema.clone(),
@@ -367,5 +461,79 @@ impl FactoryComponent for SidebarRow {
                 });
             }
         }
+    }
+}
+
+impl SidebarRow {
+    fn title(&self) -> String {
+        match &self.group {
+            Some(group) => group.label.clone(),
+            None => self.info.name.clone(),
+        }
+    }
+
+    fn wire_group_buttons(&self, sender: &FactorySender<Self>) {
+        let new_table = sender.clone();
+        self.new_table_button
+            .connect_clicked(move |_| new_table.input(SidebarRowMsg::NewTable));
+        let from_csv = sender.clone();
+        self.csv_button
+            .connect_clicked(move |_| from_csv.input(SidebarRowMsg::TableFromCsv));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use relm4::factory::FactoryVecDeque;
+
+    fn pump() {
+        let context = glib::MainContext::default();
+        while context.iteration(false) {}
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_group_row_shows_a_chevron_that_follows_its_collapse_state() {
+        relm4::adw::init().unwrap();
+        let list = gtk::ListBox::new();
+        let mut factory = FactoryVecDeque::<SidebarRow>::builder().launch(list.clone()).detach();
+        factory.guard().push_back(SidebarRowInit {
+            info: TableInfo {
+                schema: None,
+                name: "schema:/tables".into(),
+            },
+            kind: SidebarObjectKind::Group,
+            depth: 0,
+            group: Some(GroupInit {
+                label: "Tables".into(),
+                count: 3,
+                collapsed: false,
+                actions: true,
+            }),
+        });
+        factory.guard().push_back(SidebarRowInit {
+            info: TableInfo {
+                schema: None,
+                name: "users".into(),
+            },
+            kind: SidebarObjectKind::Table,
+            depth: 1,
+            group: None,
+        });
+        pump();
+        let chevron_of = |index: i32| {
+            let row = list.row_at_index(index).unwrap();
+            let body = row.child().unwrap();
+            let chevron = body.first_child().unwrap().downcast::<gtk::Image>().unwrap();
+            (chevron.icon_name().map(|name| name.to_string()), chevron.is_visible())
+        };
+        assert_eq!(chevron_of(0), (Some("pan-down-symbolic".into()), true));
+        assert!(!chevron_of(1).1, "an object row has no chevron");
+
+        factory.send(0, SidebarRowMsg::SetCollapsed(true));
+        pump();
+
+        assert_eq!(chevron_of(0).0.as_deref(), Some("pan-end-symbolic"));
     }
 }

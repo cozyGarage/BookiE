@@ -22,13 +22,11 @@ pub struct TreeNode {
     pub key: String,
     pub label: String,
     pub kind: NodeKind,
+    pub schema: Option<String>,
+    pub count: usize,
 }
 
 impl TreeNode {
-    pub fn is_object(&self) -> bool {
-        matches!(self.kind, NodeKind::Table { .. } | NodeKind::View { .. })
-    }
-
     fn qualified_name(&self) -> Option<String> {
         match &self.kind {
             NodeKind::Table { schema, name } | NodeKind::View { schema, name } => Some(match schema {
@@ -85,6 +83,8 @@ pub fn build_nodes(tables: &[TableInfo], views: &[TableInfo]) -> Vec<TreeNode> {
                 key: prefix.clone(),
                 label: schema.clone().unwrap_or_default(),
                 kind: NodeKind::Schema,
+                schema: schema.clone(),
+                count: schema_tables.len() + schema_views.len(),
             });
             depth += 1;
         }
@@ -107,6 +107,8 @@ fn push_group(nodes: &mut Vec<TreeNode>, depth: u8, prefix: &str, group: GroupKi
         key: format!("{prefix}/{suffix}"),
         label,
         kind: NodeKind::Group(group),
+        schema: objects.first().and_then(|object| object.schema.clone()),
+        count: objects.len(),
     });
     for object in objects {
         let (schema, name) = (object.schema.clone(), object.name.clone());
@@ -118,6 +120,8 @@ fn push_group(nodes: &mut Vec<TreeNode>, depth: u8, prefix: &str, group: GroupKi
                 GroupKind::Tables => NodeKind::Table { schema, name },
                 GroupKind::Views => NodeKind::View { schema, name },
             },
+            schema: object.schema.clone(),
+            count: 0,
         });
     }
 }
@@ -211,6 +215,18 @@ mod tests {
                 "    recent"
             ]
         );
+    }
+
+    #[test]
+    fn groups_and_schemas_carry_how_many_objects_they_hold() {
+        let tables = [info(Some("a"), "t1"), info(Some("a"), "t2"), info(Some("b"), "t3")];
+        let views = [info(Some("a"), "v1")];
+        let nodes = build_nodes(&tables, &views);
+        let count_of = |key: &str| nodes.iter().find(|node| node.key == key).map(|node| node.count);
+        assert_eq!(count_of("schema:a"), Some(3));
+        assert_eq!(count_of("schema:a/tables"), Some(2));
+        assert_eq!(count_of("schema:a/views"), Some(1));
+        assert_eq!(count_of("schema:b/tables"), Some(1));
     }
 
     #[test]

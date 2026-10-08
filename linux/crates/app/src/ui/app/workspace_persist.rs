@@ -26,13 +26,20 @@ impl App {
         let tab_view = self.workspace_tab_view.clone();
         let connection_id = self.connection_id;
         let workspace = self.workspace.clone();
+        let collapsed = self.sidebar_collapsed.clone();
         let id = glib::timeout_add_local_once(PERSIST_DELAY, move || {
             timeout.borrow_mut().take();
             pending.set(false);
             if !request_generation::is_current(generation, current_generation.get()) {
                 return;
             }
-            do_persist_workspace_state(&workspace, connection_id, &workspace_tabs, tab_view.as_ref());
+            do_persist_workspace_state(
+                &workspace,
+                connection_id,
+                &workspace_tabs,
+                tab_view.as_ref(),
+                collapsed.borrow().keys(),
+            );
         });
         *self.persist_timeout.borrow_mut() = Some(id);
     }
@@ -49,6 +56,7 @@ impl App {
             self.connection_id,
             &self.workspace_tabs,
             self.workspace_tab_view.as_ref(),
+            self.sidebar_collapsed.borrow().keys(),
         );
     }
 
@@ -66,6 +74,7 @@ fn do_persist_workspace_state(
     connection_id: Option<Uuid>,
     workspace_tabs: &std::rc::Rc<std::cell::RefCell<std::collections::HashMap<Uuid, WorkspaceTab>>>,
     tab_view: Option<&relm4::adw::TabView>,
+    collapsed_groups: Vec<String>,
 ) {
     let Some(connection_id) = connection_id else {
         return;
@@ -123,6 +132,7 @@ fn do_persist_workspace_state(
         ConnectionWorkspaceState {
             tabs: tab_records,
             active_idx,
+            collapsed_groups,
         },
     );
 }

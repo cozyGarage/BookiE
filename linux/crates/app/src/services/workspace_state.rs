@@ -114,6 +114,8 @@ impl WorkspaceQueue {
 
 const MAX_TABS_PER_CONNECTION: usize = 32;
 const MAX_TABLE_NAME_BYTES: usize = 256;
+const MAX_COLLAPSED_GROUPS: usize = 256;
+const MAX_COLLAPSED_KEY_BYTES: usize = 600;
 const MAX_SCHEMA_NAME_BYTES: usize = 256;
 const FILE_NAME: &str = "workspace_state.json";
 
@@ -138,6 +140,8 @@ pub struct ConnectionWorkspaceState {
     pub tabs: Vec<WorkspaceTabRecord>,
     #[serde(default)]
     pub active_idx: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub collapsed_groups: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -484,6 +488,8 @@ fn clamp(state: &mut WorkspaceState) {
 }
 
 fn clamp_connection(conn: &mut ConnectionWorkspaceState) {
+    conn.collapsed_groups.retain(|key| key.len() <= MAX_COLLAPSED_KEY_BYTES);
+    conn.collapsed_groups.truncate(MAX_COLLAPSED_GROUPS);
     // Preserve the identity of the selected tab when forward-compatible
     // records are removed. A removed selection falls back to the first tab.
     let selected = conn.active_idx as usize;
@@ -625,6 +631,7 @@ mod tests {
                 editor_with_file(&long),
             ],
             active_idx: 0,
+            ..Default::default()
         };
         clamp_connection(&mut state);
 
@@ -653,6 +660,7 @@ mod tests {
         let mut state = ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Unknown, editor("selected"), editor("other")],
             active_idx: 1,
+            ..Default::default()
         };
         clamp_connection(&mut state);
         assert!(
@@ -665,6 +673,7 @@ mod tests {
         let mut state = ConnectionWorkspaceState {
             tabs: vec![editor("first"), WorkspaceTabRecord::Unknown, editor("last")],
             active_idx: 1,
+            ..Default::default()
         };
         clamp_connection(&mut state);
         assert_eq!(state.active_idx, 0);
@@ -693,6 +702,7 @@ mod tests {
         ConnectionWorkspaceState {
             tabs: vec![editor(query)],
             active_idx: 0,
+            ..Default::default()
         }
     }
 
@@ -888,6 +898,7 @@ mod tests {
         let mut conn = ConnectionWorkspaceState {
             tabs: (0..40).map(|i| browse(&format!("t{i}"))).collect(),
             active_idx: 35,
+            ..Default::default()
         };
         clamp_connection(&mut conn);
         assert_eq!(conn.tabs.len(), MAX_TABS_PER_CONNECTION);
@@ -899,6 +910,7 @@ mod tests {
         let mut conn = ConnectionWorkspaceState {
             tabs: vec![browse("users"), editor("SELECT 1"), browse("orders")],
             active_idx: 1,
+            ..Default::default()
         };
         clamp_connection(&mut conn);
         assert_eq!(conn.tabs.len(), 3);
@@ -918,6 +930,7 @@ mod tests {
                 sort_asc: None,
             }],
             active_idx: 0,
+            ..Default::default()
         };
         clamp_connection(&mut conn);
         // Legacy Browse migrates to Table(Data) and the foreign page
@@ -938,6 +951,7 @@ mod tests {
         let mut conn = ConnectionWorkspaceState {
             tabs: vec![editor(&q)],
             active_idx: 0,
+            ..Default::default()
         };
         clamp_connection(&mut conn);
         match &conn.tabs[0] {
@@ -969,6 +983,7 @@ mod tests {
                     },
                 ],
                 active_idx: 1,
+                ..Default::default()
             },
         );
         let bytes = serde_json::to_vec(&state).unwrap();
