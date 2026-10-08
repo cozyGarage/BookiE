@@ -257,6 +257,83 @@ async fn mysql_failed_batch_keeps_direct_inserts_on_nontransactional_engines() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_failed_batch_blackhole_trigger_sink_discards_rows_but_runs_with_trigger() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts.clone()).await;
+    conn.execute("CREATE TABLE blackhole_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE blackhole_sink (id INT PRIMARY KEY) ENGINE=BLACKHOLE")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE myisam_trigger_witness (id INT PRIMARY KEY) ENGINE=MyISAM")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO blackhole_parent VALUES (1)").await.unwrap();
+
+    let fixture = sqlx::mysql::MySqlPoolOptions::new()
+        .connect_with(
+            sqlx::mysql::MySqlConnectOptions::new()
+                .host(&opts.host)
+                .port(opts.port)
+                .username(&opts.username)
+                .password(opts.password.expose_secret())
+                .database(&opts.database),
+        )
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER blackhole_parent_after_insert AFTER INSERT ON blackhole_parent \
+         FOR EACH ROW BEGIN \
+             INSERT INTO blackhole_sink VALUES (NEW.id); \
+             INSERT INTO myisam_trigger_witness VALUES (NEW.id); \
+         END",
+    )
+    .execute(&fixture)
+    .await
+    .unwrap();
+    fixture.close().await;
+
+    let batch = vec![
+        ("INSERT INTO blackhole_parent VALUES (2)".into(), vec![]),
+        ("INSERT INTO blackhole_parent VALUES (1)".into(), vec![]),
+    ];
+    let error = conn
+        .execute_in_transaction(&batch)
+        .await
+        .expect_err("duplicate key must fail after the trigger side effects");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+        "the trigger statement must complete before the batch fails, got {error:?}"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM blackhole_parent ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "the InnoDB parent insert is rolled back"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM myisam_trigger_witness ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(2)]],
+        "the trigger ran and its nontransactional witness survives rollback"
+    );
+    assert!(
+        conn.query("SELECT id FROM blackhole_sink")
+            .await
+            .unwrap()
+            .rows
+            .is_empty(),
+        "BLACKHOLE executes as a sink and does not retain the trigger row"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn mysql_failed_batch_keeps_direct_updates_and_deletes_on_nontransactional_engines() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts).await;

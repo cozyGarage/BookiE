@@ -1,0 +1,198 @@
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.2' (uid=1000 pid=2371342 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[2371353]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=2371354 comm="python3 /tmp/bookie-b4-ssh-audit/linux/crates/app/")
+dbus-daemon[2371353]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.10' (uid=1000 pid=2371370 comm="/home/trung/.cache/bookie-b4-target-0d5/installed/")
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.10' (uid=1000 pid=2371370 comm="/home/trung/.cache/bookie-b4-target-0d5/installed/")
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.13' (uid=1000 pid=2371407 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.13' (uid=1000 pid=2371407 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.13' (uid=1000 pid=2371407 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:2371407): xdg-desktop-portal-WARNING **: 23:18:59.564: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2371407): xdg-desktop-portal-WARNING **: 23:18:59.564: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2371407): xdg-desktop-portal-WARNING **: 23:18:59.564: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2371407): xdg-desktop-portal-WARNING **: 23:18:59.575: Failed to connect to PipeWire: Couldn't connect to PipeWire
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.hyprland' requested by ':1.13' (uid=1000 pid=2371407 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.hyprland'
+[LOG] Initializing xdph...
+[LOG] XDG_CURRENT_DESKTOP set to Hyprland
+[LOG] Gathering exported interfaces
+[LOG]  | Got interface: wl_seat (ver 9)
+[LOG]  | Got interface: wl_data_device_manager (ver 3)
+[LOG]  | Got interface: wl_compositor (ver 6)
+[LOG]  | Got interface: wl_subcompositor (ver 1)
+[LOG]  | Got interface: wl_shm (ver 2)
+[LOG]  | Got interface: wp_viewporter (ver 1)
+[LOG]  | Got interface: wp_tearing_control_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_fractional_scale_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_output_manager_v1 (ver 3)
+[LOG]  | Got interface: wp_cursor_shape_manager_v1 (ver 2)
+[LOG]  | Got interface: zwp_idle_inhibit_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_relative_pointer_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_decoration_manager_v1 (ver 2)
+[LOG]  | Got interface: wp_alpha_modifier_v1 (ver 1)
+[LOG]  | Got interface: zwlr_gamma_control_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_foreign_toplevel_list_v1 (ver 1)
+[LOG]  | Got interface: zwp_pointer_gestures_v1 (ver 3)
+[LOG]  | Got interface: zwlr_foreign_toplevel_manager_v1 (ver 3)
+[LOG] [toplevel] (activate) locks: 1
+[LOG]  | Got interface: zwp_keyboard_shortcuts_inhibit_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_text_input_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_text_input_manager_v3 (ver 1)
+[LOG]  | Got interface: zwp_pointer_constraints_v1 (ver 1)
+[LOG]  | Got interface: zwlr_output_power_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_activation_v1 (ver 1)
+[LOG]  | Got interface: ext_idle_notifier_v1 (ver 2)
+[LOG]  | Got interface: hyprland_lock_notifier_v1 (ver 1)
+[LOG]  | Got interface: ext_session_lock_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_input_method_manager_v2 (ver 1)
+[LOG]  | Got interface: zwp_virtual_keyboard_manager_v1 (ver 1)
+[LOG]  | Got interface: zwlr_virtual_pointer_manager_v1 (ver 2)
+[LOG]  | Got interface: zwlr_output_manager_v1 (ver 4)
+[LOG]  | Got interface: org_kde_kwin_server_decoration_manager (ver 1)
+[LOG]  | Got interface: hyprland_focus_grab_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_tablet_manager_v2 (ver 1)
+[LOG]  | Got interface: zwlr_layer_shell_v1 (ver 5)
+[LOG]  | Got interface: wp_presentation (ver 2)
+[LOG]  | Got interface: xdg_wm_base (ver 7)
+[LOG]  | Got interface: zwlr_data_control_manager_v1 (ver 2)
+[LOG]  | Got interface: zwp_primary_selection_device_manager_v1 (ver 1)
+[LOG]  | Got interface: xwayland_shell_v1 (ver 1)
+[LOG]  | Got interface: hyprland_toplevel_mapping_manager_v1 (ver 1)
+[LOG] [toplevel mapping] registered manager
+[LOG]  | Got interface: hyprland_global_shortcuts_manager_v1 (ver 1)
+[LOG] [globalshortcuts] registered
+[LOG]  | Got interface: xdg_wm_dialog_v1 (ver 1)
+[LOG]  | Got interface: wp_single_pixel_buffer_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_security_context_manager_v1 (ver 1)
+[LOG]  | Got interface: hyprland_ctm_control_manager_v1 (ver 2)
+[LOG]  | Got interface: hyprland_input_capture_manager_v1 (ver 1)
+[LOG] [input-capture] initializing input capture portal
+[LOG] [input-capture] init successful
+[LOG]  | Got interface: hyprland_surface_manager_v1 (ver 2)
+[LOG]  | Got interface: wp_content_type_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_toplevel_tag_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_system_bell_v1 (ver 1)
+[LOG]  | Got interface: vicinae_hotkey_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_workspace_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_data_control_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_pointer_warp_v1 (ver 1)
+[LOG]  | Got interface: wp_fifo_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_exporter_v2 (ver 1)
+[LOG]  | Got interface: zxdg_importer_v2 (ver 1)
+[LOG]  | Got interface: ext_background_effect_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_commit_timing_manager_v1 (ver 1)
+[LOG]  | Got interface: zwlr_screencopy_manager_v1 (ver 3)
+[ERR] [pipewire] pw didn't allow for a context connection
+[LOG] [screencopy] init successful
+[LOG]  | Got interface: hyprland_toplevel_export_manager_v1 (ver 2)
+[LOG]  | Got interface: ext_output_image_capture_source_manager_v1 (ver 1)
+[LOG]  | Got interface: extdbus-daemon[2371330]: [session uid=1000 pid=2371330 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+
+(process:2371354): dbind-WARNING **: 23:18:59.764: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:2371354): dbind-WARNING **: 23:19:03.575: AT-SPI: Error in GetItems, sender=:1.4, error=Object does not exist at path “/org/a11y/atspi/cache”
+passed: postgres_saved_mtls_connection_authenticates_and_queries
+Traceback (most recent call last):
+  File "/tmp/bookie-b4-ssh-audit/linux/crates/app/tests/gtk_safety.py", line 964, in run_scenario
+    scenario(database, base)
+    ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/tmp/bookie-b4-ssh-audit/linux/crates/app/tests/gtk_ux.py", line 617, in postgres_ssh_unknown_host_key_decline_is_durably_audited
+    ui.wait_for_node(name="Connection failed")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/bookie-b4-ssh-audit/linux/crates/app/tests/gtk_safety.py", line 267, in wait_for_node
+    raise AssertionError(f"expected accessible node {name!r} to {expectation}:\n{accessible_snapshot()}")
+AssertionError: expected accessible node 'Connection failed' to appear:
+application: xdg-desktop-portal-gtk
+application: com.tablepro.linux
+frame: PostgreSQL SSH audit refusal — BookiE [0,0 941x1150] actions=['win.recent-tab-end', 'win.new-window', 'win.refresh-page', 'win.open-file', 'win.quit', 'win.undo-change', 'win.disconnect', 'win.show-history', 'win.show-catalog', 'win.recent-tab', 'win.save-changes', 'default.activate', 'win.redo-change', 'win.jump-column', 'win.shortcuts', 'win.save-favorite', 'win.open-quickly', 'win.export-all-csv', 'win.export-json', 'window.close', 'win.about', 'win.save-file-as', 'win.show-saved-queries', 'win.explain-query', 'win.export-csv', 'win.export-all-json', 'win.preferences', 'win.open-filter', 'window.toggle-maximized', 'win.reopen-closed-tab', 'win.show-activity', 'win.close-current', 'win.open-editor']
+grouping: Select a table [0,0 706x1104] actions=[]
+label: Select a table [0,0 570x33] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: Pick a table from the sidebar, or use the button below (Ctrl+T). [0,0 570x21] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Open SQL editor [0,0 181x44] actions=['click']
+label: Open SQL editor [0,0 117x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+list item: Tables [0,0 223x46] actions=[]
+label: Tables [0,0 55x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: 2 [0,0 8x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: New Table in public… [0,0 36x34] actions=['click']
+button: Table from CSV in public… [0,0 36x34] actions=['click']
+list item: public.lock_targets [0,0 223x46] actions=['sidebar-row.open-in-new-tab', 'sidebar-row.show-create-table', 'sidebar-row.edit-structure', 'sidebar-row.drop-table', 'sidebar-row.import-csv']
+label: lock_targets [0,0 101x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Open lock_targets [0,0 36x34] actions=['click']
+list item: public.release_items [0,0 223x46] actions=['sidebar-row.open-in-new-tab', 'sidebar-row.show-create-table', 'sidebar-row.edit-structure', 'sidebar-row.drop-table', 'sidebar-row.import-csv']
+label: release_items [0,0 101x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Open release_items [0,0 36x34] actions=['click']
+label: PostgreSQL SSH audit refusal [0,0 183x18] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+toggle button: Search tables [0,0 34x34] actions=['click']
+button: New connection [0,0 34x34] actions=['click']
+button: Open saved connection [0,0 34x34] actions=[]
+toggle button: Open saved connection [0,0 34x34] actions=['click']
+button: Switch database [0,0 34x34] actions=[]
+toggle button: Switch database [0,0 34x34] actions=['click']
+label: BookiE [0,0 409x18] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: PostgreSQL SSH audit refusal · postgres · Local · PostgreSQL 16.14 [0,0 409x15] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Main menu [0,0 34x34] actions=[]
+toggle button: Main menu [0,0 34x34] actions=['click']
+button: Close [0,0 34x34] actions=['click']
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/bookie-b4-ssh-audit/linux/crates/app/tests/gtk_safety.py", line 2053, in <module>
+    main()
+    ~~~~^^
+  File "/tmp/bookie-b4-ssh-audit/linux/crates/app/tests/gtk_safety.py", line 2048, in main
+    run_scenario(binary, scenario)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/tmp/bookie-b4-ssh-audit/linux/crates/app/tests/gtk_safety.py", line 991, in run_scenario
+    raise AssertionError(f"{failure}\napplication stderr:\n{stderr}") from failure
+AssertionError: expected accessible node 'Connection failed' to appear:
+application: xdg-desktop-portal-gtk
+application: com.tablepro.linux
+frame: PostgreSQL SSH audit refusal — BookiE [0,0 941x1150] actions=['win.recent-tab-end', 'win.new-window', 'win.refresh-page', 'win.open-file', 'win.quit', 'win.undo-change', 'win.disconnect', 'win.show-history', 'win.show-catalog', 'win.recent-tab', 'win.save-changes', 'default.activate', 'win.redo-change', 'win.jump-column', 'win.shortcuts', 'win.save-favorite', 'win.open-quickly', 'win.export-all-csv', 'win.export-json', 'window.close', 'win.about', 'win.save-file-as', 'win.show-saved-queries', 'win.explain-query', 'win.export-csv', 'win.export-all-json', 'win.preferences', 'win.open-filter', 'window.toggle-maximized', 'win.reopen-closed-tab', 'win.show-activity', 'win.close-current', 'win.open-editor']
+grouping: Select a table [0,0 706x1104] actions=[]
+label: Select a table [0,0 570x33] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: Pick a table from the sidebar, or use the button below (Ctrl+T). [0,0 570x21] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Open SQL editor [0,0 181x44] actions=['click']
+label: Open SQL editor [0,0 117x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+list item: Tables [0,0 223x46] actions=[]
+label: Tables [0,0 55x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: 2 [0,0 8x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: New Table in public… [0,0 36x34] actions=['click']
+button: Table from CSV in public… [0,0 36x34] actions=['click']
+list item: public.lock_targets [0,0 223x46] actions=['sidebar-row.open-in-new-tab', 'sidebar-row.show-create-table', 'sidebar-row.edit-structure', 'sidebar-row.drop-table', 'sidebar-row.import-csv']
+label: lock_targets [0,0 101x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Open lock_targets [0,0 36x34] actions=['click']
+list item: public.release_items [0,0 223x46] actions=['sidebar-row.open-in-new-tab', 'sidebar-row.show-create-table', 'sidebar-row.edit-structure', 'sidebar-row.drop-table', 'sidebar-row.import-csv']
+label: release_items [0,0 101x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Open release_items [0,0 36x34] actions=['click']
+label: PostgreSQL SSH audit refusal [0,0 183x18] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+toggle button: Search tables [0,0 34x34] actions=['click']
+button: New connection [0,0 34x34] actions=['click']
+button: Open saved connection [0,0 34x34] actions=[]
+toggle button: Open saved connection [0,0 34x34] actions=['click']
+button: Switch database [0,0 34x34] actions=[]
+toggle button: Switch database [0,0 34x34] actions=['click']
+label: BookiE [0,0 409x18] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: PostgreSQL SSH audit refusal · postgres · Local · PostgreSQL 16.14 [0,0 409x15] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+button: Main menu [0,0 34x34] actions=[]
+toggle button: Main menu [0,0 34x34] actions=['click']
+button: Close [0,0 34x34] actions=['click']
+application stderr:
+2026-10-08T21:19:03.406799Z  INFO starting tablepro-app drivers=7
+2026-10-08T21:19:03.406871Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+2026-10-08T21:19:03.472306Z  INFO registered win.disconnect enabled=false
+2026-10-08T21:19:03.475553Z  INFO main window activated
+2026-10-08T21:19:04.028912Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+2026-10-08T21:19:19.376815Z  INFO workspace ready driver=postgres table_count=2 view_count=0
+
+A connection to the bus can't be made
+/bin/sh: line 1: kill: (2371439) - No such process
