@@ -116,6 +116,7 @@ impl ApprovalSink for GtkApprovalSink {
                 .wrap(true)
                 .wrap_mode(gtk::pango::WrapMode::WordChar)
                 .selectable(true)
+                .css_classes(["monospace"])
                 .build();
             let sql_scroll = gtk::ScrolledWindow::builder()
                 .min_content_height(180)
