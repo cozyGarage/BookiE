@@ -1080,7 +1080,8 @@ async fn sqlite_json_quote_any_csv_round_trip_keeps_json_text_distinct_from_null
     connection
         .execute(
             "INSERT INTO flexible VALUES \
-             (1, NULL), (2, ''), (3, 'NULL'), (4, '=1+1'), (5, '東京')",
+             (1, NULL), (2, ''), (3, 'NULL'), (4, '=1+1'), (5, '東京'), \
+             (6, 7), (7, 1.5), (8, 'line' || char(10) || '\"quoted\",text')",
         )
         .await
         .unwrap();
@@ -1101,7 +1102,16 @@ async fn sqlite_json_quote_any_csv_round_trip_keeps_json_text_distinct_from_null
         )
         .await
         .unwrap();
-    let expected = ["null", "\"\"", "\"NULL\"", "\"=1+1\"", "\"東京\""]
+    let expected = [
+        "null",
+        "\"\"",
+        "\"NULL\"",
+        "\"=1+1\"",
+        "\"東京\"",
+        "7",
+        "1.5",
+        r#""line\n\"quoted\",text""#,
+    ]
         .into_iter()
         .enumerate()
         .map(|(index, quoted)| {
