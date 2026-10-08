@@ -94,7 +94,7 @@ The previous candidate and hosted evidence is historical; `linux` has advanced
 since the `7eea6f09` checkpoint. The user-requested local B4 rerun passed on
 clean SHA `7eff6f26`; the rollback layer was repeated on `8e5d1b18` after PR
 #308 changed PostgreSQL integration tests. See the [current candidate
-evidence](evidence/b4-current-candidate-2026-10-08/manifest.json). This does not
+evidence comment index](https://github.com/cozyGarage/BookiE/pull/310#issuecomment-6051740646). This does not
 change the approved sprint order: full B4 release acceptance remains scheduled
 after B3 closes. If `8e5d1b18` is selected as the frozen release candidate,
 rerun the remaining B4 layers on that exact SHA. Preserve the pinned results
@@ -102,18 +102,19 @@ and rerun for any later source tip.
 
 The hosted Build Linux run for `8e5d1b18` was
 [cancelled](https://github.com/cozyGarage/BookiE/actions/runs/37723088254) as
-`linux` advanced. The remote tip is now `f5ff9f926` after PR #309; its [Build
-Linux run #37723730584](https://github.com/cozyGarage/BookiE/actions/runs/37723730584)
-is pending. Neither run establishes hosted B4 acceptance yet. The
+`linux` advanced. The remote tip is now `ddb808b9f` after PR #311; its [Build
+Linux run #37724107715](https://github.com/cozyGarage/BookiE/actions/runs/37724107715)
+is pending; Linux Security #37724107789 passed and Flatpak #37724107709 is
+running. These current branch checks do not establish hosted B4 acceptance. The
 completed local GTK runs use a staged release binary under Xvfb, not a
 distribution package installed on the target Wayland desktop.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-9, B4-16, B4-22 | Local candidate layers passed on `7eff6f26`; obtain hosted acceptance for the selected frozen SHA and installed package acceptance | Hosted run on `8e5d1b18` was cancelled during remote advancement; the latest tip `f5ff9f926` has a Build Linux run pending. Installed acceptance means a distribution package on the target desktop; Xvfb with a staged binary does not satisfy it |
+| B4-7, B4-9, B4-16, B4-22 | Local candidate layers passed on `7eff6f26`; obtain hosted acceptance for the selected frozen SHA and installed package acceptance | Hosted run on `8e5d1b18` was cancelled during remote advancement; the latest tip `ddb808b9f` has a Build Linux run pending. Installed acceptance means a distribution package on the target desktop; Xvfb with a staged binary does not satisfy it |
 | B4-12 | Backend-termination rollback-failure selector passed on `8e5d1b18`, with table and identity/trigger-sequence assertions | Hosted run on this SHA was cancelled; rerun on the final frozen candidate and obtain hosted result |
 | B4-11 | Scoped nine-test MySQL atomicity group passed on `7eff6f26` and `8e5d1b18` | Hosted run on `8e5d1b18` was cancelled. Existing scope covers InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, failed INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT, and a trigger session-variable effect; untested engines and side effects remain open |
-| B4-17 | Native SSH and GTK trust/query, second-hop decline and changed-key refusal passed on `7eff6f26`; see the candidate manifest | Hosted execution of these exact GTK flows and distribution-package/native Wayland trust acceptance remain open |
+| B4-17 | Native SSH and GTK trust/query, second-hop decline and changed-key refusal passed on `7eff6f26`; see the [PR #310 evidence comments](https://github.com/cozyGarage/BookiE/pull/310#issuecomment-6051740646) | Hosted execution of these exact GTK flows and distribution-package/native Wayland trust acceptance remain open |
 | B4-21 | Local Samba Kerberos+TLS fixture passed on `7eff6f26`; retain the separate hosted TLS evidence | Windows AD interoperability is still unverified; Samba AD is not equivalent to Windows AD |
 | UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | Proposal only; implementation and acceptance are open |
 

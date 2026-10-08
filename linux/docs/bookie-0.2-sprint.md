@@ -5,21 +5,18 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `4d1fa5aaa` on `linux`. Recent focused B3 work added native
-consumer checks for custom PostgreSQL range arrays (#305) and a separate custom
-range scalar refusal contract (#306). The contracts prove native type/value
-preservation and refuse lossy writes without changing target or sibling rows.
-PR #304 refreshed B4 acceptance docs and keeps B4 closure behind B3. PR #301's
-array contract and #302's typed result-header accessibility selectors are also
-integrated. Earlier implementation details and dated validation are in the
-changelog and owning boards.
+Code baseline: `ddb808b9f` on `linux`. Recent B3 work added custom PostgreSQL
+range-array consumer refusal checks (#305), custom and built-in range scalar
+refusal contracts (#306, #308), and PostgreSQL enum GTK grid edits (#309,
+#311). These tests preserve native type/value oracles and verify refused writes
+or unsaved edits do not alter database state. Earlier implementation details
+and dated validation are in the changelog and owning boards.
 
-The local `scripts/ci-local.sh quick` gate passed at `4d1fa5aaa`, including
-formatting, non-GTK Clippy, workspace unit/integration checks and guards. The
-focused PostgreSQL range scalar/array Docker checks and strict integration
-Clippy passed. Hosted Linux test quality, Build Linux, Security and Flatpak
-checks for this baseline are still running; reconcile their results before
-recording hosted acceptance. These focused cases do not close B3: the broader
+The local `scripts/ci-local.sh quick` gate passed at `dbc0bdc`; the focused
+PostgreSQL range scalar Docker contract and strict integration Clippy passed.
+The PostgreSQL enum GTK scenario passed against the current merged test code on
+the local Xvfb fixture. At `ddb808b9f`, hosted Security passed, Build Linux is
+pending and Flatpak is running. These focused cases do not close B3: the broader
 engine/type/consumer/configuration matrix, mutation triage, performance rows and
 installed grid acceptance remain open. See the [B4 board](b4-task-board.md)
 for its remaining package/Wayland and Windows AD acceptance.
