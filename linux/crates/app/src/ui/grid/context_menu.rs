@@ -59,10 +59,14 @@ pub(super) fn install_grid_context_menus(
     let copy_value_action = {
         let context = context.clone();
         let sender = sender.clone();
+        let view = column_view.downgrade();
         gio::ActionEntry::builder("copy-value")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.borrow().as_ref() {
-                    sender.send(GridMsg::CopyToClipboard(cell_text(&slot.widget))).ok();
+                    let row = view.upgrade().and_then(|view| row_object_at(&view, position(slot)));
+                    let text =
+                        previewed_cell_text(row.as_ref(), slot.col_index).unwrap_or_else(|| cell_text(&slot.widget));
+                    sender.send(GridMsg::CopyToClipboard(text)).ok();
                 }
             })
             .build()
@@ -580,6 +584,12 @@ fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {
         ROW_KEY_SLOT.cloned(widget).unwrap_or_default(),
     )
 }
+fn previewed_cell_text(row: Option<&crate::ui::row_object::RowObject>, col: usize) -> Option<String> {
+    let row = row?;
+    row.cell_preview(col)?;
+    Some(super::display::value_to_full_edit_text(&row.cell_value(col)))
+}
+
 fn cell_text(widget: &gtk::Widget) -> String {
     if let Some(label) = widget.downcast_ref::<crate::ui::cell_editor::CellEditor>() {
         label.text().to_string()
@@ -654,6 +664,19 @@ fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn copying_a_previewed_cell_copies_the_full_value() {
+        let full = "x".repeat(9000);
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Int(1), Value::Text(full.clone())]);
+        row.preview_long_values(&[0]);
+        assert_eq!(previewed_cell_text(Some(&row), 1), Some(full));
+        assert_eq!(
+            previewed_cell_text(Some(&row), 0),
+            None,
+            "a cell without a preview copies its label text"
+        );
+    }
 
     #[test]
     fn export_rows_refuse_an_incomplete_page() {

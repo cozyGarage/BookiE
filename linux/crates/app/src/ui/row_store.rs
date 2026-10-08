@@ -552,9 +552,13 @@ mod tests {
 
         assert_eq!(row.cell_value(0), Value::Int(7));
         assert!(row.cell_preview(2).is_some());
-        assert!(!row.cell_is_loaded(2));
+        assert!(!row.cell_is_loaded(1));
+        assert_eq!(row.cell_value(2), Value::Text(text.clone()));
         assert_eq!(row.cell_preview(2).unwrap().byte_count, text.len());
-        assert!(row.complete_cells().is_none());
+        assert!(
+            row.complete_cells().is_none(),
+            "the projected hidden column is still unfetched"
+        );
     }
 
     #[test]
@@ -581,8 +585,17 @@ mod tests {
         assert!(row.cell_preview(3).unwrap().byte_count > 9000);
         assert_eq!(store.source_value_at(0, 1), Some(Value::Text("x".repeat(9000))));
         assert_eq!(store.source_value_at(0, 2), Some(Value::Bytes(bytes)));
-        assert_eq!(store.source_value_at(0, 3), Some(Value::Json(json)));
-        assert!(row.complete_cells().is_none());
+        assert_eq!(store.source_value_at(0, 3), Some(Value::Json(json.clone())));
+        assert_eq!(
+            row.complete_cells(),
+            Some(vec![
+                Value::Int(7),
+                Value::Text("x".repeat(9000)),
+                Value::Bytes(vec![7; 9000]),
+                Value::Json(json)
+            ]),
+            "copy, export and row JSON read the full values"
+        );
     }
 
     #[test]
@@ -626,7 +639,8 @@ mod tests {
         let store = RowStore::from_shared_with_previews(result, vec![0]);
         let row = store.item(0).and_downcast::<RowObject>().unwrap();
 
-        assert!(!row.cell_is_loaded(1));
+        assert!(row.cell_preview(1).is_some());
+        assert_eq!(row.cell_value(1), Value::Text(text.clone()));
         assert_eq!(store.cells_for_search(0).unwrap()[1], Some(Value::Text(text)));
     }
 
