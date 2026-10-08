@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "branch": "linux",
   "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
-  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip bd4ff0f changes GTK harnesses, fixture scripts and documentation only relative to that runtime; no application or driver implementation code changed.",
+  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 8b35c18 changes GTK harnesses, fixture scripts and documentation only relative to that runtime; no application or driver implementation code changed.",
   "local_tracked_diff": "none",
   "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
@@ -25,9 +25,9 @@
   ],
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37774162145,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37774162145",
-    "source_commit": "bd4ff0fdb656cb26dda55a465551ed1e87fb870c",
+    "run_id": 37774595671,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37774595671",
+    "source_commit": "8b35c186bdb1ff5bf49bff7ea08e3f7f8639d9a3",
     "status": "queued",
     "conclusion": null
   },
@@ -44,9 +44,9 @@
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "18b2ea14da10fa5052ca46de8d89ac3d7b4dd35421ede4690c9e5359edec3ef0"
+    "sha256": "3220d554ea4081f32cf2b1f98b82f02b0c87ab1b5c6f283c3c02ba10d21db9ed"
   },
-  "branch_head_at_update": "bd4ff0fdb656cb26dda55a465551ed1e87fb870c",
+  "branch_head_at_update": "8b35c186bdb1ff5bf49bff7ea08e3f7f8639d9a3",
   "runtime_diff_since_tested_commit": [
     "linux/crates/app/tests/gtk_safety.py",
     "linux/crates/app/tests/gtk_ux.py",
@@ -80,9 +80,9 @@
   ],
   "superseded_hosted": {
     "workflow": "Build Linux",
-    "run_id": 37772724483,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37772724483",
-    "source_commit": "0bb8e34354d13e3ab9911b9db710eddb02115170",
+    "run_id": 37774162145,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37774162145",
+    "source_commit": "bd4ff0fdb656cb26dda55a465551ed1e87fb870c",
     "status": "cancelled"
   },
   "older_hosted": {
@@ -126,9 +126,9 @@
   },
   "earlier_cancelled_hosted": {
     "workflow": "Build Linux",
-    "run_id": 37771409148,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37771409148",
-    "source_commit": "0529e830915a6bcd0ac316a01976c97f1ed5222a",
+    "run_id": 37772724483,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37772724483",
+    "source_commit": "0bb8e34354d13e3ab9911b9db710eddb02115170",
     "status": "cancelled"
   }
 }
