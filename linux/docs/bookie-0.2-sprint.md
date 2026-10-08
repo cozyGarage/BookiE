@@ -5,14 +5,17 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `b5112ca7` on `linux` (PR #331; fetched 2026-10-08). Since PR #315,
+Code baseline: `2a7877108` on `linux` (PR #333; fetched 2026-10-08). Since PR #315,
 PRs #316, #319, #321–#323, #328–#330 refreshed architecture/B3/B4 documentation;
 PRs #317–#320 added Redis binary-value, binary-key and SCAN page-boundary
 coverage; PRs #322 and #328 recorded mutation audits; PR #324 added enum-leaf
 metadata coverage; PR #325 added PostgreSQL timestamp-array JSON export under
 `SQL, DMY`; PR #326 bounded JSON field-name mutation loops; and PR #327 recorded
 shared exporter mutation results. PR #331 adds SQLite STRICT `ANY` computed
-`iif()` native storage-class and typed CSV round-trip coverage. Earlier B3 work added
+`iif()` native storage-class and typed CSV round-trip coverage; PR #333 adds
+declared SQLite BOOLEAN/temporal and BLOB-affinity runtime decoder contracts,
+and PR #334 refreshes the known-issues baseline. The current SQLite follow-up
+adds malformed temporal text fallback coverage. Earlier B3 work added
 PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
 nested null-filter parity (#312), and a MySQL lost-ack no-replay contract
 (#315). These tests preserve native type/value oracles and verify refused
@@ -21,10 +24,10 @@ validation are in the changelog and owning boards.
 
 The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
 the focused MongoDB selector passed against MongoDB 7. The MySQL lost-ack
-selector passed against its Docker fixture on PR #315. At `b5112ca7`, Build
-Linux is pending, Security passed, and Flatpak packaging is running. PR #331
-Sonar and Security checks passed, while preflight and Flatpak remain pending
-([validation](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990)).
+selector passed against its Docker fixture on PR #315. At PR #333 source
+`2a7877108`, SonarCloud, both security jobs, and Build Linux preflight passed;
+both Flatpak builds were still running at the last status check. PR #331 local
+validation is recorded in its [evidence comment](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990), and PR #333 mutation/test evidence is in its [discussion](https://github.com/cozyGarage/BookiE/pull/333#issuecomment-6053147574).
 These runs do not establish B4 acceptance on a selected frozen candidate.
 The local focused B4 rollback layer passed on clean documentation-only commit
 `73f8ce935`; its tested source files match `684ea40f`. Commands, results and
@@ -74,7 +77,7 @@ this existing-eight-driver stabilization scope.
 | A1–A4 | Prior correctness, drafts/planning, Jump to Column and BookiE branding implemented | Historical 0.1.x proof does not qualify 0.2; A5 installed candidate work folds into B7 |
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
-| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. SQLite STRICT `ANY` computed `iif()` now has native storage-class and typed CSV coverage (#331). U2 identity-copy behavior is implemented and covered for PostgreSQL, SQL Server and MySQL policy; PostgreSQL enum parameter inference has restricted-role coverage, and PR #249 adds a keyed grid-edit case under shadowed transaction-local `search_path`. The broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance remain open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
+| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. SQLite STRICT `ANY` computed `iif()` now has native storage-class and typed CSV coverage (#331); declared BOOLEAN/temporal decoding, BLOB-affinity runtime classes, and malformed temporal text fallback have focused tests (#333 plus current follow-up). U2 identity-copy behavior is implemented and covered for PostgreSQL, SQL Server and MySQL policy; PostgreSQL enum parameter inference has restricted-role coverage, and PR #249 adds a keyed grid-edit case under shadowed transaction-local `search_path`. The broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance remain open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
 | B4 transport/sessions | SSH audit, rollback-failure, Kerberos, GTK trust-flow, prompt-timeout and cross-engine DML regressions are merged. | [Current B4 board](b4-task-board.md): frozen-candidate and hosted/installed acceptance remains open for the listed rows; B4-11 additional engine/effect coverage, B4-12 next-candidate rollback proof, B4-21 Windows AD interoperability, and UI-1b chain editing remain |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
