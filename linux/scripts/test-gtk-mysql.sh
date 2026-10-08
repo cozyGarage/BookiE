@@ -19,6 +19,7 @@ if [[ "${TABLEPRO_GTK_MYSQL_E2E_DBUS_ACTIVE:-0}" != "1" ]]; then
   trap cleanup_runtime EXIT
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
+  ATSPI_DBUS_IMPLEMENTATION=dbus-daemon \
   TABLEPRO_GTK_MYSQL_E2E_DBUS_ACTIVE=1 \
     CARGO_HOME="$cargo_home" \
     RUSTUP_HOME="$rustup_home" \
@@ -68,6 +69,18 @@ CREATE TABLE people (id INT PRIMARY KEY, name VARCHAR(100) NOT NULL, profile JSO
 INSERT INTO people VALUES
   (1, 'Ada Lovelace', '{"role": "analyst"}', 1),
   (2, 'Grace Hopper', NULL, 0);
+CREATE TABLE enum_grid (
+  id INT PRIMARY KEY,
+  state ENUM('ready', 'done', 'NULL', '') NULL,
+  permissions SET('read', 'write', 'NULL') NULL,
+  sibling VARCHAR(32) NOT NULL
+);
+INSERT INTO enum_grid VALUES
+  (1, 'ready', 'read', 'target'),
+  (2, 'NULL', 'NULL', 'literal NULL'),
+  (3, NULL, NULL, 'SQL NULL'),
+  (4, '', '', 'empty'),
+  (5, 'ready', 'read,write', 'sibling');
 SQL
 
 eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
@@ -77,7 +90,7 @@ printf 'tablepro_test' | secret-tool store --label='BookiE GTK MySQL fixture' \
   kind db_password
 TABLEPRO_GTK_KEYRING_READY=1 \
   TABLEPRO_GTK_DBUS_ACTIVE=1 \
-  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-mysql_grid_edit_and_delete_commit_to_the_server}" \
+  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-mysql_grid_edit_and_delete_commit_to_the_server,mysql_enum_set_grid_edit_preserves_native_values_and_siblings}" \
   TABLEPRO_GTK_MYSQL_CONTAINER="$container" \
   TABLEPRO_GTK_MYSQL_HOST=127.0.0.1 \
   TABLEPRO_GTK_MYSQL_PORT="$port" \
