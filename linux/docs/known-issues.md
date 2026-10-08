@@ -18,10 +18,10 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against the BookiE `linux` code tip `e6a73b3d9` (PR #343), checked
-2026-10-08. This includes merged code PRs #289–#342 and the B4/B3
+Reconciled against the BookiE `linux` code tip `bb8c4435f` (PR #345), checked
+2026-10-08. This includes merged code PRs #289–#345 and the B4/B3
 documentation updates in PRs #319, #321–#323, #332, #335, #338, #340, #342,
-and #343, including the B4 evidence move (#310), MongoDB nested null-filter
+#343, and #350, including the B4 evidence move (#310), MongoDB nested null-filter
 contract (#312), MySQL lost-ack contract (#315), SQLite declared/runtime
 value-decoder cases (#333, #335), and PostgreSQL's domain-over-enum contracts
 at 302 and 512 layers plus direct query type checks (#338, #340, #342).
