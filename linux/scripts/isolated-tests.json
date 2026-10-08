@@ -236,6 +236,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::outcomes::tests::a_failed_statement_offers_a_copy_button"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
     ]
   ],
   "keyring": [
