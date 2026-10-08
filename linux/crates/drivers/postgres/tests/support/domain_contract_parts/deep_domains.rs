@@ -656,7 +656,7 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path() {
-    let (_container, opts) = start_pg().await;
+    let (_container, opts) = start_pg_dedicated().await;
     assert_domain_level_contract(opts.clone(), 6).await;
     assert_domain_level_contract(opts.clone(), 7).await;
     assert_domain_level_contract(opts.clone(), 8).await;

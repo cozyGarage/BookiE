@@ -3,7 +3,7 @@ use serde_json::json;
 
 use tablepro_core::{ConnectOptions, Connection, OperationControl, Value};
 
-use super::{connect, start_mariadb, start_mysql};
+use super::{connect, start_mariadb, start_mariadb_dedicated, start_mysql, start_mysql_dedicated};
 
 #[path = "../../../../core/tests/support/value_contract.rs"]
 mod value_contract;
@@ -34,7 +34,7 @@ fn text(value: &str) -> Value {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn native_time_zero_date_and_year_values_survive_reads_parameters_and_exports() {
-    let (_container, options) = start_mysql().await;
+    let (_container, options) = start_mysql_dedicated().await;
     let conn = connect_with_permissive_dates(options).await;
     let definition = "(id INT PRIMARY KEY, t TIME(6), d DATE, dt DATETIME(6), ts TIMESTAMP(6) NULL, y YEAR)";
     for table in ["native_source", "native_bound", "native_exported"] {
@@ -1002,21 +1002,21 @@ async fn assert_text_exports_survive_both_backslash_modes(options: ConnectOption
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_text_exports_survive_with_and_without_backslash_escapes() {
-    let (_container, options) = start_mysql().await;
+    let (_container, options) = start_mysql_dedicated().await;
     assert_text_exports_survive_both_backslash_modes(options).await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mariadb_text_exports_survive_with_and_without_backslash_escapes() {
-    let (_container, options) = start_mariadb().await;
+    let (_container, options) = start_mariadb_dedicated().await;
     assert_text_exports_survive_both_backslash_modes(options).await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_pad_char_mode_keeps_fixed_width_text_through_csv_and_writes() {
-    let (_container, options) = start_mysql().await;
+    let (_container, options) = start_mysql_dedicated().await;
     let connection = connect_in_sql_mode(&options, "PAD_CHAR_TO_FULL_LENGTH").await;
     for table in ["pad_char_source", "pad_char_bound", "pad_char_literal"] {
         connection

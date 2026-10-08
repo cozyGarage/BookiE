@@ -2,7 +2,7 @@
 
 use tablepro_core::{ConnectOptions, Connection, Value};
 
-use crate::{connect, start_mariadb, start_mysql};
+use crate::{connect, start_mariadb, start_mariadb_dedicated, start_mysql, start_mysql_dedicated};
 
 const MODES: [&str; 12] = [
     "",
@@ -430,14 +430,14 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_enum_and_set_consumers_survive_mysql_sql_modes() {
-    let (_container, options) = start_mysql().await;
+    let (_container, options) = start_mysql_dedicated().await;
     assert_enum_and_set_export_modes(options, &[]).await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_enum_and_set_consumers_survive_mariadb_sql_modes() {
-    let (_container, options) = start_mariadb().await;
+    let (_container, options) = start_mariadb_dedicated().await;
     assert_enum_and_set_export_modes(
         options,
         &[
@@ -451,7 +451,7 @@ async fn value_contract_enum_and_set_consumers_survive_mariadb_sql_modes() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null() {
-    let (_container, options) = start_mariadb().await;
+    let (_container, options) = start_mariadb_dedicated().await;
     let setup = connect(options.clone()).await;
     setup
         .execute(

@@ -1,11 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use crate::{connect, start_mysql};
+use crate::{connect, start_mysql_dedicated};
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn list_databases_returns_user_databases_and_hides_system_schemas() {
-    let (_c, opts) = start_mysql().await;
+    let (_c, opts) = start_mysql_dedicated().await;
     let conn = connect(opts).await;
     conn.execute("CREATE DATABASE alpha_db").await.unwrap();
 

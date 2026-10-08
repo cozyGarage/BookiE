@@ -26,6 +26,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 csv.workspace = true
+libc.workspace = true
 secrecy.workspace = true
 tempfile.workspace = true
 testcontainers.workspace = true

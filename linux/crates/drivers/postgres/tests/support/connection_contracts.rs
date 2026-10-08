@@ -1,11 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use crate::{connect, start_pg};
+use crate::{connect, start_pg, start_pg_dedicated};
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn list_databases_returns_connectable_user_databases_only() {
-    let (_c, opts) = start_pg().await;
+    let (_c, opts) = start_pg_dedicated().await;
     let conn = connect(opts).await;
     conn.execute("CREATE DATABASE alpha_db").await.unwrap();
 

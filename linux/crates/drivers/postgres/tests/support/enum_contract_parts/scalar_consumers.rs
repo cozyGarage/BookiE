@@ -528,7 +528,7 @@ async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_custom_enum_csv_import_uses_target_schema_under_shadowed_search_path() {
-    let (_container, opts) = start_pg().await;
+    let (_container, opts) = start_pg_dedicated().await;
     let setup = connect(opts.clone()).await;
     setup.execute("CREATE SCHEMA enum_csv_shadow_a").await.unwrap();
     setup.execute("CREATE SCHEMA enum_csv_shadow_b").await.unwrap();

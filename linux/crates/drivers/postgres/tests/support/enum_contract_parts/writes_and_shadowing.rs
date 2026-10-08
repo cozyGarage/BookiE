@@ -512,7 +512,7 @@ async fn value_contract_custom_enum_keyed_edit_preserves_label_and_siblings() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema() {
-    let (_container, opts) = start_pg().await;
+    let (_container, opts) = start_pg_dedicated().await;
     let setup = connect(opts.clone()).await;
     setup.execute("CREATE SCHEMA enum_shadow_a").await.unwrap();
     setup.execute("CREATE SCHEMA enum_shadow_b").await.unwrap();

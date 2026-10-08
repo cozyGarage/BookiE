@@ -1,6 +1,6 @@
 use tablepro_core::{Connection, FilterOp, FilterRule, FilterSet, FilterValue, Value};
 
-use crate::{connect, start_pg};
+use crate::{connect, start_pg, start_pg_dedicated};
 
 include!("domain_contract_parts/basic_domains.rs");
 

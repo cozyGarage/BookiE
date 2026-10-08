@@ -1,7 +1,7 @@
 use tablepro_core::Value;
 use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue};
 
-use crate::{connect, start_pg};
+use crate::{connect, start_pg, start_pg_dedicated};
 
 include!("enum_contract_parts/scalar_consumers.rs");
 include!("enum_contract_parts/scalar_csv.rs");
@@ -11,7 +11,7 @@ include!("enum_contract_parts/writes_and_shadowing.rs");
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter() {
-    let (_container, opts) = start_pg().await;
+    let (_container, opts) = start_pg_dedicated().await;
     let setup = connect(opts.clone()).await;
     setup.execute("CREATE SCHEMA \"Enum \"\"Shadow\"").await.unwrap();
     setup.execute("CREATE SCHEMA \"Enum \"\"Shelf\"").await.unwrap();
@@ -237,7 +237,7 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
-    let (_container, opts) = start_pg().await;
+    let (_container, opts) = start_pg_dedicated().await;
     let setup = connect(opts.clone()).await;
     setup.execute("CREATE SCHEMA enum_domain_shadow_a").await.unwrap();
     setup.execute("CREATE SCHEMA enum_domain_shadow_b").await.unwrap();

@@ -7,9 +7,8 @@ use serde_json::json;
 
 use drivers_mysql::MysqlDriver;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
-use testcontainers::ContainerAsync;
-use testcontainers::core::{IntoContainerPort, WaitFor};
-use testcontainers::{GenericImage, ImageExt};
+use testcontainers::ImageExt;
+use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
@@ -25,53 +24,18 @@ mod mysql_atomic;
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
 
+#[path = "../../shared/tests/container_cleanup.rs"]
+mod container_cleanup;
+
+#[path = "support/container.rs"]
+mod container;
+use container::{start_mariadb, start_mariadb_dedicated, start_mysql, start_mysql_dedicated};
+
 #[tokio::test]
 async fn an_unavailable_mysql_server_is_classified_as_connection_refused() {
     connect_refusal::assert_connection_refused(&MysqlDriver)
         .await
         .expect("MySQL setup refusal remains distinct from established disconnect");
-}
-
-async fn start_mysql() -> (ContainerAsync<Mysql>, ConnectOptions) {
-    let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
-        .start()
-        .await
-        .expect("start mysql container");
-    let host = container.get_host().await.expect("host").to_string();
-    let port = container.get_host_port_ipv4(3306).await.expect("port");
-    let opts = ConnectOptions {
-        host,
-        port,
-        database: "test".into(),
-        username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
-        ..Default::default()
-    };
-    (container, opts)
-}
-
-async fn start_mariadb() -> (ContainerAsync<GenericImage>, ConnectOptions) {
-    let container = GenericImage::new("mariadb", "11")
-        .with_exposed_port(3306.tcp())
-        .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
-        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
-        .with_env_var("MARIADB_DATABASE", "test")
-        .start()
-        .await
-        .expect("start mariadb container");
-    let opts = ConnectOptions {
-        host: container.get_host().await.expect("host").to_string(),
-        port: container.get_host_port_ipv4(3306).await.expect("port"),
-        database: "test".into(),
-        username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
-        ..Default::default()
-    };
-    (container, opts)
 }
 
 async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {

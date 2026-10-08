@@ -2,7 +2,7 @@
 
 use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, Value};
 
-use crate::{connect, start_pg};
+use crate::{connect, start_pg, start_pg_dedicated};
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -100,7 +100,7 @@ async fn assert_incompatible_enum_assignments_refused(connection: &dyn tablepro_
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values() {
-    let (_container, options) = start_pg().await;
+    let (_container, options) = start_pg_dedicated().await;
     let setup = connect(options.clone()).await;
     let schema = "value_contract_257_domains";
     let shadow = "value_contract_257_shadow";
@@ -285,7 +285,7 @@ async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_259_levels_preserve_schema_aware_values() {
-    let (_container, options) = start_pg().await;
+    let (_container, options) = start_pg_dedicated().await;
     let setup = connect(options.clone()).await;
     let schema = "value_contract_259_domains";
     let shadow = "value_contract_259_shadow";
