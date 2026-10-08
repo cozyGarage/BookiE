@@ -1107,8 +1107,8 @@ classes; SQL NULL uses the export's explicit collision-free marker. Untagged
 text stays text, while a blank without a marker and malformed reserved tags are
 refused. Both app round trips have a native `typeof()`/value oracle. Empty query
 results retain their column metadata and CSV header. The `json_quote()` case
-checks exact JSON text and a STRICT `ANY` CSV round trip, including JSON text
-`"NULL"` distinct from SQL NULL ([test](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs)). Other computed-expression shapes beyond the
+checks exact JSON text, confirms shared JSON export keeps `null` and numeric-looking
+`7` as strings, and round-trips through STRICT `ANY` CSV ([test](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs)). Other computed-expression shapes beyond the
 matrix above, attached-origin patterns and formats, and installed editing remain open;
 see the
 [table CSV case](archive/value-contract-history.md#sqlite-strict-any-csv-storage-class-round-trip-2026-10-03)

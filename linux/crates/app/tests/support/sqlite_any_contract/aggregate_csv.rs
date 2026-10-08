@@ -1124,6 +1124,15 @@ async fn sqlite_json_quote_any_csv_round_trip_keeps_json_text_distinct_from_null
         .collect::<Vec<_>>();
     assert_eq!(result.columns[1].data_type, "NULL");
     assert_eq!(result.rows, expected);
+    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+        &result.columns,
+        &result.rows,
+    ))
+    .unwrap();
+    assert_eq!(json[0]["result"], "null");
+    assert!(json[0]["result"].is_string());
+    assert_eq!(json[5]["result"], "7");
+    assert!(json[5]["result"].is_string());
 
     sqlite_result_csv_round_trip(connection.as_ref(), &result, "restored", &[None, Some(0), Some(1), Some(2)])
         .await;
