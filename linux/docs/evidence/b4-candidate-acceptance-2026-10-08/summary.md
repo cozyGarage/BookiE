@@ -33,14 +33,16 @@ out. The focused MySQL and PostgreSQL cases above completed on this candidate.
 ## Hosted candidate evidence
 
 - [Linux Security dispatch #37703162399](https://github.com/cozyGarage/BookiE/actions/runs/37703162399) passed both security-policy and supply-chain jobs. Run logs confirm the tested SHA was `7eea6f09d7154f03400e82cec7c16215488b2115`.
-- [Build Linux dispatch #37703159104](https://github.com/cozyGarage/BookiE/actions/runs/37703159104) was dispatched with the same pinned SHA. Preflight, Driver TLS, PostgreSQL release, Fast GTK and scheduled Clippy passed. Driver integration, optional DuckDB, and hosted installed GTK smoke were still running at this checkpoint. Record final outcomes before closing related acceptance items.
+- [Build Linux dispatch #37703159104](https://github.com/cozyGarage/BookiE/actions/runs/37703159104) was dispatched with the same pinned SHA. Preflight, Driver TLS, PostgreSQL release, Fast GTK and scheduled Clippy passed. Driver integration and optional DuckDB remained in progress at the latest check. Hosted Installed GTK safety smoke failed: 10 scenarios passed, but `encrypted_bundle_round_trip_restores_credentials` reported that confirmed encrypted import did not restore the bundled database credential. The local staged-binary run passed that scenario, so the discrepancy remains unresolved; the hosted diagnostics artifact is retained outside the repository in the candidate cache. Do not treat installed GTK acceptance as passed.
 
 ## Remaining acceptance
 
 B4-7, B4-9, B4-11, B4-12, B4-16, B4-17 and B4-22 remain open pending final
 hosted candidate results and the applicable installed acceptance. The MySQL
 and PostgreSQL focused rollback cases passed locally; hosted driver integration
-remains in progress. B4-21's Samba AD fixture passes locally, but Windows AD
+remains in progress. The hosted installed GTK failure also leaves B4-22 open,
+despite the successful local staged-binary rerun. B4-21's Samba AD fixture
+passes locally, but Windows AD
 interoperability is not tested by that fixture or by hosted CI. Native Wayland
 and distribution-package installation/upgrade acceptance are separate from the
 Xvfb staged-binary run. Local Arch package acceptance could not start because
