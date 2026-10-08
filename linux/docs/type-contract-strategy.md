@@ -47,6 +47,14 @@ enum-domain recursion contract to a tested 513-layer point and awaits
 maintainer merge. This is a checkpoint, not a maximum-depth claim, and it does
 not close the broader B3 matrix.
 
+The local follow-up extends schema-aware scalar reads, keyed edits, draft
+inserts, filters and shadowed-`search_path` checks through 1,024 domain layers.
+Raw inferred text and SQL NULL parameters still refuse at 64 layers. At 1,024
+layers, decoding a domain-over-enum array also refuses explicitly; a separate
+native query confirms the stored and expected arrays have identical text, wire
+bytes and PostgreSQL type. This is a tested boundary, not array support. See
+`../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs`.
+
 ClickHouse Enum8 now covers its signed endpoints and zero (`-128`, `0`, `127`)
 in the existing native contract. Parameter insertion, result label decoding,
 native Int8 casts, CSV import and SQL-literal replay all preserve the labels;
