@@ -53,8 +53,8 @@ trap cleanup EXIT
 published="$(docker port "$container" 3306/tcp)"
 port="${published##*:}"
 attempt=0
-until docker exec "$container" mysql --user=root --password=tablepro_test --batch --skip-column-names \
-  --execute='SELECT 1' >/dev/null 2>&1; do
+until docker exec "$container" mysql --protocol=TCP --host=127.0.0.1 --user=root --password=tablepro_test --batch \
+  --skip-column-names --execute='SELECT 1' >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   if (( attempt >= 90 )); then
     docker logs "$container" >&2

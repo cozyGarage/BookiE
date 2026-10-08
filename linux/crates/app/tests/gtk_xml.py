@@ -22,7 +22,7 @@ def rows(database):
 def save_xml(ui, base, name):
     ui.invoke_named_action_within("safety_items", "Open safety_items")
     ui.wait_for_node(name="Rows 1 – 3 of 3")
-    ui.choose_export_format("XML", ["Down", "Down", "Down", "Down"])
+    ui.choose_export_format("XML", ["End", "Up", "Up"])
     export = base / "home" / name
     ui.set_visible_editable_within("Export Results", ui.FILE_CHOOSER_ROLES, str(export))
     ui.invoke(ui.wait_for_node(name="Save", role=ui.pyatspi.ROLE_PUSH_BUTTON))
