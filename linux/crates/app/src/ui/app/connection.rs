@@ -341,12 +341,18 @@ impl App {
 
         let sender_for_response = sender;
         let workspace = self.workspace.clone();
+        let column_widths = self.persistence.column_widths.clone();
         dialog.connect_response(None, move |dialog, response| {
             dialog.close();
             if response != "delete" {
                 return;
             }
-            execute_delete_connection(id, workspace.clone(), sender_for_response.clone());
+            execute_delete_connection(
+                id,
+                workspace.clone(),
+                column_widths.clone(),
+                sender_for_response.clone(),
+            );
         });
         dialog.present(Some(&self.window));
     }
@@ -781,6 +787,7 @@ fn duplicate_connection_message(name: &str) -> String {
 fn execute_delete_connection(
     id: Uuid,
     workspace: crate::services::workspace_state::WorkspaceStore,
+    column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
     sender: ComponentSender<App>,
 ) {
     let sender_clone = sender.clone();
@@ -794,6 +801,9 @@ fn execute_delete_connection(
                     return;
                 }
                 workspace.forget_connection(id);
+                if let Some(Err(error)) = column_widths.as_ref().map(|store| store.forget_connection(id)) {
+                    tracing::warn!(error = %error, "forgetting the connection's column settings failed");
+                }
 
                 let password = tablepro_storage::delete_password(id).await;
                 let ssh_password = tablepro_storage::delete_ssh_password(id).await;
