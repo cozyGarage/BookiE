@@ -5,7 +5,9 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `e6a73b3d9` on `linux` (PR #343; fetched 2026-10-08). Since PR #315,
+Code baseline: `bb8c4435f` on `linux` (PR #345; fetched 2026-10-08). PR #344 adds
+PostgreSQL domain-array projections; PR #350 records the frozen-candidate
+PostgreSQL rollback rerun. Since PR #315,
 PRs #316, #319, #321–#323, #328–#330 refreshed architecture/B3/B4 documentation;
 PRs #317–#320 added Redis binary-value, binary-key and SCAN page-boundary
 coverage; PRs #322 and #328 recorded mutation audits; PR #324 added enum-leaf

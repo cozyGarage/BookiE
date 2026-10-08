@@ -107,6 +107,15 @@ check, Security had passed, Build Linux was pending and Flatpak was in progress
 ([Build Linux](https://github.com/cozyGarage/BookiE/actions/runs/37732479926),
 [Flatpak](https://github.com/cozyGarage/BookiE/actions/runs/37732479760),
 [Linux Security](https://github.com/cozyGarage/BookiE/actions/runs/37732479814)).
+That status is superseded: the code tip is now `bb8c4435f` (PR #345), and PR
+#350 adds documentation only. Build Linux run
+[#37738503595](https://github.com/cozyGarage/BookiE/actions/runs/37738503595)
+on its parent code SHA `b6134e813` had Security and Flatpak passed while Build
+Linux, GTK fast checks, PostgreSQL release and B4 rollback were still running at
+the last check. The newer run
+[#37740062602](https://github.com/cozyGarage/BookiE/actions/runs/37740062602)
+is pending on merge SHA `bb3e94c`; confirm its B4 job result, but neither run is
+acceptance on a selected frozen candidate.
 PR #312 skipped its B4 rollback job because it only changed MongoDB tests. The
 focused `b4-rollback` layer passed locally on documentation-only commit
 `73f8ce935`; the tested source files match `684ea40f`. See the [PR #314 evidence
@@ -125,7 +134,7 @@ undetermined.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-16 | Re-run affected layers on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | On `b5112ca7`, Security passed, Build Linux was pending and Flatpak was in progress. All three acceptance gates remain open |
+| B4-7, B4-16 | Re-run affected layers on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | Current-tip hosted run `37740062602` is pending; candidate and installed acceptance remain open |
 | B4-9 | Re-run the TLS matrix on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | The full local matrix passed twice on `a47b1fb` (48/48); the earlier MongoDB refusal on `98134709` did not recur, and its cause remains undetermined. See [PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352) |
 | B4-22 | Run GTK export/import audit and encrypted credential round-trip on the selected frozen SHA; confirm hosted result and installed-package/native Wayland acceptance | Prior local and hosted GTK results are SHA-scoped; later hosted run on `8e5d1b18` was cancelled |
 | B4-12 | Repeat `a_batch_reports_rollback_failure_after_postgres_terminates_its_backend` on the selected frozen candidate and retain exact SHA/results | The exact frozen candidate `7eea6f09d7154f03400e82cec7c16215488b2115` passed the focused local rerun; see [candidate evidence](evidence/postgres-rollback-frozen-7eea6f09-2026-10-08/manifest.json). Hosted B4 rollback passes exist at other SHAs, but exact-candidate hosted coverage and acceptance on any next candidate remain open |
