@@ -325,7 +325,7 @@ async fn mysql_failed_batch_keeps_direct_updates_and_deletes_on_nontransactional
 #[ignore = "requires docker"]
 async fn mariadb_aria_nontransactional_effects_survive_failed_batches() {
     let (_container, opts) = start_mariadb().await;
-    let conn = connect(opts).await;
+    let conn = connect(opts.clone()).await;
     let table = "aria_nontransactional_effects";
     conn.execute(&format!(
         "CREATE TABLE {table} (id INT PRIMARY KEY, value INT NOT NULL) ENGINE=Aria TRANSACTIONAL=0"
@@ -376,6 +376,64 @@ async fn mariadb_aria_nontransactional_effects_survive_failed_batches() {
             "the Aria TRANSACTIONAL=0 {operation} effect must survive rollback"
         );
     }
+
+    conn.execute("CREATE TABLE aria_trigger_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE aria_trigger_effects (id INT PRIMARY KEY) ENGINE=Aria TRANSACTIONAL=0")
+        .await
+        .unwrap();
+    let fixture = sqlx::mysql::MySqlPoolOptions::new()
+        .connect_with(
+            sqlx::mysql::MySqlConnectOptions::new()
+                .host(&opts.host)
+                .port(opts.port)
+                .username(&opts.username)
+                .password(opts.password.expose_secret())
+                .database(&opts.database),
+        )
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER aria_parent_after_insert AFTER INSERT ON aria_trigger_parent \
+         FOR EACH ROW INSERT INTO aria_trigger_effects VALUES (NEW.id)",
+    )
+    .execute(&fixture)
+    .await
+    .unwrap();
+    fixture.close().await;
+
+    conn.execute("INSERT INTO aria_trigger_parent VALUES (1)")
+        .await
+        .unwrap();
+    let trigger_batch = vec![
+        ("INSERT INTO aria_trigger_parent VALUES (2)".into(), vec![]),
+        ("INSERT INTO aria_trigger_parent VALUES (1)".into(), vec![]),
+    ];
+    let error = conn
+        .execute_in_transaction(&trigger_batch)
+        .await
+        .expect_err("duplicate parent key must fail the trigger batch");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+        "got {error:?}"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM aria_trigger_parent ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "the InnoDB parent row rolls back"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM aria_trigger_effects ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+        "the Aria TRANSACTIONAL=0 trigger side effect survives rollback"
+    );
 }
 
 #[tokio::test]

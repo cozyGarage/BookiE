@@ -3,7 +3,7 @@
   "date": "2026-10-08",
   "branch": "linux",
   "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
-  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 9961e60 adds GTK harness and fixture changes, package upgrade/removal checks, the MySQL Aria regression test, and documentation only; no application or driver implementation code changed relative to the runtime candidate.",
+  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 30f9d37 adds GTK harness and fixture changes, package upgrade/removal checks, the MySQL Aria rollback regression, and documentation only; no application or driver implementation code changed.",
   "local_tracked_diff": "none",
   "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
@@ -25,9 +25,9 @@
   ],
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37776917323,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917323",
-    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+    "run_id": 37777911341,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911341",
+    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
     "status": "pending",
     "conclusion": null
   },
@@ -44,15 +44,17 @@
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "657d0ed5d41e4b7cd053ae3bc237dd94917d69914d3679eab05f7af140692d0b"
+    "sha256": "e4ff65d3803b29d5e6b54d5b23849b826b5f6826699a987ec39004819768d380"
   },
-  "branch_head_at_update": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+  "branch_head_at_update": "30f9d379ed90939124d03323537e4febd07493d8",
   "runtime_diff_since_tested_commit": [
     "linux/crates/app/tests/gtk_safety.py",
     "linux/crates/app/tests/gtk_ux.py",
     "linux/crates/drivers/mysql/tests/shared/mysql_atomic.rs",
     "linux/docs/b4-task-board.md",
     "linux/docs/bookie-0.2-sprint.md",
+    "linux/docs/evidence/b4-acceptance-2026-10-08/focused.txt",
+    "linux/docs/evidence/b4-acceptance-2026-10-08/manifest.json",
     "linux/docs/evidence/b4-mariadb-aria-rollback-2026-10-08/focused.txt",
     "linux/docs/evidence/b4-mariadb-aria-rollback-2026-10-08/manifest.json",
     "linux/docs/ignored-tests.md",
@@ -87,10 +89,11 @@
   ],
   "superseded_hosted": {
     "workflow": "Build Linux",
-    "run_id": 37774162145,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37774162145",
-    "source_commit": "bd4ff0fdb656cb26dda55a465551ed1e87fb870c",
-    "status": "cancelled"
+    "run_id": 37776917323,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917323",
+    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+    "status": "completed",
+    "conclusion": "cancelled"
   },
   "older_hosted": {
     "workflow": "Build Linux",
@@ -140,9 +143,9 @@
   },
   "flatpak_packaging": {
     "workflow": "Flatpak Linux (packaging only)",
-    "run_id": 37776917341,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917341",
-    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+    "run_id": 37777911507,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911507",
+    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
     "status": "in_progress",
     "scope": "default and development Flatpak builds; includes Flatpak AT-SPI window and Arch package upgrade/removal checks in current target",
     "conclusion": null
@@ -157,9 +160,9 @@
   },
   "security": {
     "workflow": "Linux Security",
-    "run_id": 37776917383,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917383",
-    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+    "run_id": 37777911360,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911360",
+    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
     "status": "completed",
     "conclusion": "success"
   },
@@ -179,5 +182,19 @@
       "source_commit": "b62cada571f874be4ee8b4eac4d8d96fe05f2706",
       "status": "cancelled"
     }
-  ]
+  ],
+  "ci_contracts": {
+    "workflow": "Linux CI contracts",
+    "run_id": 37777911374,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911374",
+    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "aria_trigger_followup": {
+    "test_commit": "5211e6a33187c4e4499fe192399361e063d1c852",
+    "local_report": "/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
+    "local_result": "passed; the test is the sole tracked source modification in the report",
+    "hosted_acceptance": "pending; current target Build Linux run predates this follow-up commit"
+  }
 }
