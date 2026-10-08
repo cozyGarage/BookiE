@@ -230,6 +230,120 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_range_scalar_refusal_preserves_target_and_sibling_rows() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    connection
+        .execute("CREATE SCHEMA custom_range_scalar_contract")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE custom_range_scalar_contract.int_range AS RANGE (subtype = integer)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE custom_range_scalar_contract.rows \
+             (id integer PRIMARY KEY, value custom_range_scalar_contract.int_range, sibling text NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO custom_range_scalar_contract.rows VALUES \
+             (1, '[1,5)'::custom_range_scalar_contract.int_range, 'target'), \
+             (2, '(10,20]'::custom_range_scalar_contract.int_range, 'sibling'), \
+             (3, 'empty'::custom_range_scalar_contract.int_range, 'empty range'), \
+             (4, NULL, 'SQL NULL range')",
+        )
+        .await
+        .unwrap();
+
+    let source = connection
+        .query(
+            "SELECT value, pg_typeof(value)::text, value::text, to_json(value)::text, \
+             encode(range_send(value), 'hex') \
+             FROM custom_range_scalar_contract.rows WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    let refusal = source.rows[0][0].clone();
+    assert!(
+        matches!(&refusal, Value::Undecodable(name) if name.eq_ignore_ascii_case("custom_range_scalar_contract.int_range")),
+        "custom range scalars must be visibly undecodable: {refusal:?}"
+    );
+    assert_eq!(
+        source.rows[0][1],
+        Value::Text("custom_range_scalar_contract.int_range".into())
+    );
+    assert_eq!(source.rows[0][2], Value::Text("[1,5)".into()));
+    assert_eq!(source.rows[0][3], Value::Text(r#""[1,5)""#.into()));
+    assert_eq!(
+        source.rows[0][4],
+        Value::Text("0200000004000000010000000400000005".into())
+    );
+
+    let empty = connection
+        .query(
+            "SELECT value, value IS NULL, isempty(value) \
+             FROM custom_range_scalar_contract.rows WHERE id = 3",
+        )
+        .await
+        .unwrap();
+    assert!(
+        matches!(&empty.rows[0][0], Value::Undecodable(name) if name.eq_ignore_ascii_case("custom_range_scalar_contract.int_range")),
+        "empty custom range must remain visibly undecodable: {:?}",
+        empty.rows[0][0]
+    );
+    assert_eq!(empty.rows[0][1], Value::Bool(false));
+    assert_eq!(empty.rows[0][2], Value::Bool(true));
+    let null = connection
+        .query(
+            "SELECT value, value IS NULL, isempty(value) \
+             FROM custom_range_scalar_contract.rows WHERE id = 4",
+        )
+        .await
+        .unwrap();
+    assert_eq!(null.rows[0][0], Value::Null);
+    assert_eq!(null.rows[0][1], Value::Bool(true));
+    assert_eq!(null.rows[0][2], Value::Null);
+
+    let snapshot_sql = "SELECT id, value::text, to_json(value)::text, \
+                        encode(range_send(value), 'hex'), sibling \
+                        FROM custom_range_scalar_contract.rows ORDER BY id";
+    let before = connection.query(snapshot_sql).await.unwrap();
+    assert_eq!(before.rows.len(), 4);
+    assert_eq!(before.rows[0][1], source.rows[0][2]);
+    assert_eq!(before.rows[0][2], source.rows[0][3]);
+    assert_eq!(before.rows[0][3], source.rows[0][4]);
+    assert_eq!(before.rows[1][4], Value::Text("sibling".into()));
+    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+    assert!(
+        connection
+            .query_params("SELECT $1", std::slice::from_ref(&refusal))
+            .await
+            .is_err()
+    );
+    assert!(
+        connection
+            .execute_params(
+                "UPDATE custom_range_scalar_contract.rows SET value = $1 WHERE id = 1",
+                &[refusal],
+            )
+            .await
+            .is_err()
+    );
+
+    let after = connection.query(snapshot_sql).await.unwrap();
+    assert_eq!(after.rows, before.rows, "refused binding changed stored values");
+    assert_eq!(after.rows[0][1], source.rows[0][2]);
+    assert_eq!(after.rows[0][2], source.rows[0][3]);
+    assert_eq!(after.rows[0][3], source.rows[0][4]);
+    assert_eq!(after.rows[0][4], Value::Text("target".into()));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_range_array_refusal_preserves_target_and_sibling_rows() {
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;
