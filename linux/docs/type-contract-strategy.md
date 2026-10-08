@@ -26,10 +26,11 @@ contract. The Docker contract catches enum/array-recursion changes; the unit
 guard catches an over-broad classification that would add enum catalog lookups
 to ordinary scalar results.
 
-A dedicated PostgreSQL session also binds enum text and SQL NULL with a
-same-named shadow type first in `search_path`. The native literal, returned
-enum type and untouched sibling row are checked in
-`value_contract_enum_parameter_uses_target_type_under_session_search_path`.
+A dedicated PostgreSQL session also binds enum text and SQL NULL when the
+target schema is absent from `search_path` and a same-named shadow type is the
+only visible enum. The active schema list, native literal, returned enum type
+and untouched sibling row are checked in
+`value_contract_enum_parameter_resolves_without_target_schema_in_session_path`.
 
 ## Current evidence and next targets
 

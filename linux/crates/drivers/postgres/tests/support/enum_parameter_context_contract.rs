@@ -41,10 +41,20 @@ async fn create_shadowed_enum_fixture(connection: &dyn tablepro_core::Connection
 async fn assert_session_enum_path(session: &mut dyn Session, control: &OperationControl) {
     session_query(session, "SET search_path = enum_session_shadow, public", &[], control).await;
     assert_eq!(
-        session_query(session, "SELECT current_schema()::text", &[], control)
-            .await
-            .rows,
-        vec![vec![Value::Text("enum_session_shadow".into())]]
+        session_query(
+            session,
+            "SELECT current_schema()::text, current_setting('search_path')::text, \
+             current_schemas(false)::text",
+            &[],
+            control,
+        )
+        .await
+        .rows,
+        vec![vec![
+            Value::Text("enum_session_shadow".into()),
+            Value::Text("enum_session_shadow, public".into()),
+            Value::Text("{enum_session_shadow,public}".into()),
+        ]]
     );
 }
 
@@ -116,7 +126,7 @@ async fn assert_session_enum_parameter_oracles(session: &mut dyn Session, contro
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_enum_parameter_uses_target_type_under_session_search_path() {
+async fn value_contract_enum_parameter_resolves_without_target_schema_in_session_path() {
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;
     create_shadowed_enum_fixture(connection.as_ref()).await;
