@@ -1,8 +1,130 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{DriverError, Value};
+use tablepro_core::{DriverError, OperationControl, QueryResult, Session, Value};
+use tokio_util::sync::CancellationToken;
 
 use crate::{connect, start_pg};
+
+async fn session_query(
+    session: &mut dyn Session,
+    sql: &str,
+    params: &[Value],
+    control: &OperationControl,
+) -> QueryResult {
+    session.query_params_controlled(sql, params, control).await.unwrap()
+}
+
+async fn create_shadowed_enum_fixture(connection: &dyn tablepro_core::Connection) {
+    connection.execute("CREATE SCHEMA enum_session_target").await.unwrap();
+    connection.execute("CREATE SCHEMA enum_session_shadow").await.unwrap();
+    connection
+        .execute("CREATE TYPE enum_session_target.state AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE enum_session_shadow.state AS ENUM ('shadow-only')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE enum_session_target.rows \
+             (id INT PRIMARY KEY, state enum_session_target.state)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO enum_session_target.rows VALUES (1, 'ready'), (2, 'ready'), (3, 'ready')")
+        .await
+        .unwrap();
+}
+
+async fn assert_session_enum_path(session: &mut dyn Session, control: &OperationControl) {
+    session_query(session, "SET search_path = enum_session_shadow, public", &[], control).await;
+    assert_eq!(
+        session_query(session, "SELECT current_schema()::text", &[], control)
+            .await
+            .rows,
+        vec![vec![Value::Text("enum_session_shadow".into())]]
+    );
+}
+
+async fn assert_session_enum_parameter_oracles(session: &mut dyn Session, control: &OperationControl) {
+    let native = session_query(
+        session,
+        "UPDATE enum_session_target.rows SET state = 'paused'::enum_session_target.state \
+         WHERE id = 2 RETURNING state::text, pg_typeof(state)::text",
+        &[],
+        control,
+    )
+    .await;
+    let bound = session_query(
+        session,
+        "UPDATE enum_session_target.rows SET state = $1 \
+         WHERE id = 1 RETURNING state::text, pg_typeof(state)::text",
+        &[Value::Text("paused".into())],
+        control,
+    )
+    .await;
+    assert_eq!(bound.rows, native.rows);
+
+    let native_null = session_query(
+        session,
+        "UPDATE enum_session_target.rows SET state = NULL::enum_session_target.state \
+         WHERE id = 2 RETURNING state::text, pg_typeof(state)::text",
+        &[],
+        control,
+    )
+    .await;
+    let bound_null = session_query(
+        session,
+        "UPDATE enum_session_target.rows SET state = $1 \
+         WHERE id = 1 RETURNING state::text, pg_typeof(state)::text",
+        &[Value::Null],
+        control,
+    )
+    .await;
+    assert_eq!(bound_null.rows, native_null.rows);
+    assert_eq!(
+        session_query(
+            session,
+            "SELECT id, state::text, pg_typeof(state)::text \
+             FROM enum_session_target.rows ORDER BY id",
+            &[],
+            control,
+        )
+        .await
+        .rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Null,
+                Value::Text("enum_session_target.state".into())
+            ],
+            vec![
+                Value::Int(2),
+                Value::Null,
+                Value::Text("enum_session_target.state".into())
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("ready".into()),
+                Value::Text("enum_session_target.state".into())
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_enum_parameter_uses_target_type_under_session_search_path() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    create_shadowed_enum_fixture(connection.as_ref()).await;
+    let mut session = connection.open_session().await.unwrap();
+    let control = OperationControl::new(CancellationToken::new(), None);
+    assert_session_enum_path(&mut *session, &control).await;
+    assert_session_enum_parameter_oracles(&mut *session, &control).await;
+}
 
 #[tokio::test]
 #[ignore = "requires docker"]
