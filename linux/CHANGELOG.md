@@ -3,7 +3,12 @@
 ## [Unreleased]
 
 ### Added
-- Current-Linux B4 TLS evidence was moved from tracked files to [PR #329](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352): all 48 checks passed twice locally on source `a47b1fb`, while frozen-candidate, exact-SHA hosted and installed-package/Wayland acceptance remain open.
+- SQLite STRICT `ANY` computed `iif()` now has a native `typeof()` and typed
+  CSV round-trip case for INTEGER, REAL, formula-shaped TEXT, BLOB and SQL NULL.
+  The focused app test passed on system SQLite 3.53.4.
+- Current-Linux B4 TLS evidence moved from tracked files to [PR #329](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352):
+  all 48 checks passed twice locally on source `a47b1fb`, while frozen-candidate,
+  exact-SHA hosted and installed-package/Wayland acceptance remain open.
 - PostgreSQL `timestamp[]` JSON export is covered under `DateStyle = SQL, DMY`;
   the test checks exact JSON values and restores the CSV under a different date
   style (#325). JSON field-name collision loops now have a bounded regression

@@ -68,6 +68,7 @@ async fn sqlite_result_csv_round_trip(
 
 include!("sqlite_any_contract/table_and_compound.rs");
 include!("sqlite_any_contract/computed_csv.rs");
+include!("sqlite_any_contract/iif_csv.rs");
 include!("sqlite_any_contract/aggregate_csv.rs");
 #[tokio::test]
 async fn sqlite_cast_blob_any_csv_round_trip_preserves_computed_bytes() {
