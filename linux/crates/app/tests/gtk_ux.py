@@ -120,6 +120,9 @@ def scenarios(ui):
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         time.sleep(0.4)
 
+    def wait_for_result_column(name, present=True):
+        ui.wait_for_node_containing(f"{name}\n", role=pyatspi.ROLE_LABEL, present=present)
+
     def choose_menu_item(position):
         for _ in range(position):
             ui.press_x11_key("Down")
@@ -420,7 +423,7 @@ def scenarios(ui):
 
     def columns_dialog_hides_a_column_and_keeps_the_last_one(database, base):
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
-        ui.wait_for_node(name="beta")
+        wait_for_result_column("beta")
         open_cell_menu("1")
         choose_menu_item(6)
         wait_for_adw_dialog("Columns")
@@ -438,8 +441,8 @@ def scenarios(ui):
         time.sleep(0.3)
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("Columns", present=False)
-        ui.wait_for_node(name="beta", present=False)
-        ui.wait_for_node(name="alpha")
+        wait_for_result_column("beta", present=False)
+        wait_for_result_column("alpha")
 
     def session_transaction_label_and_toggle_off_confirmation(database, base):
         def session_toggle(name):
@@ -489,7 +492,7 @@ def scenarios(ui):
 
     def interactive_controls_have_accessible_names(database, base):
         ui.run_sql("SELECT 1 AS alpha")
-        ui.wait_for_node(name="alpha")
+        wait_for_result_column("alpha")
         roles = {
             pyatspi.ROLE_PUSH_BUTTON: "push button",
             pyatspi.ROLE_TOGGLE_BUTTON: "toggle button",
