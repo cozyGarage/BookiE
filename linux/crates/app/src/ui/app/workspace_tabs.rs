@@ -772,6 +772,7 @@ impl App {
             WorkspaceTab::Table(s) => s.page.clone(),
         };
         self.recent_pages.borrow_mut().forget(&page);
+        self.read_scopes.borrow_mut().cancel_tab(id);
         tab_view.close_page_finish(&page, true);
         drop(removed);
         self.persist_workspace_state();
@@ -938,6 +939,7 @@ impl App {
         self.cancel_persist_timer();
         self.do_persist_workspace_state_now();
         self.cancel_all_editor_runs();
+        self.read_scopes.borrow_mut().cancel_all();
         // Drop per-tab pending-change trackers — disconnecting wipes
         // the connection and its row identities, so any pending edits
         // would no longer be commitable.

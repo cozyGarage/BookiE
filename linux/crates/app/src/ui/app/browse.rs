@@ -8,6 +8,7 @@ use crate::services::browse_query::{BrowseTarget, PageQuery};
 use crate::ui::browse_tab::{BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest, BrowseTabInput};
 
 use super::{App, AppMsg, ExportFormat, OpenMode};
+use crate::services::read_scopes::ReadScope;
 
 impl App {
     /// Sidebar click — routes via OpenMode (smart switch / new tab).
@@ -93,11 +94,12 @@ impl App {
 
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Page);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let (result, projected_columns) = match query {
                         PageQuery::Native => (
                             conn.fetch_rows_controlled(schema.as_deref(), &table, offset, limit, &control)
@@ -116,6 +118,7 @@ impl App {
                         Ok(query_result) => {
                             sender_clone.input(AppMsg::RowsLoaded(tab_id, request, query_result, projected_columns))
                         }
+                        Err(_) if control.cancellation_token().is_cancelled() => {}
                         Err(e) => sender_clone.input(AppMsg::LoadFailed(
                             Some(tab_id),
                             BrowseLoadFailure {
@@ -144,13 +147,15 @@ impl App {
         };
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Columns);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     match conn.fetch_columns_controlled(schema.as_deref(), &table, &control).await {
                         Ok(columns) => sender_clone.input(AppMsg::ColumnsLoaded(tab_id, columns)),
+                        Err(_) if control.cancellation_token().is_cancelled() => {}
                         Err(error) => sender_clone.input(AppMsg::LoadFailed(
                             Some(tab_id),
                             BrowseLoadFailure {
@@ -179,11 +184,12 @@ impl App {
         };
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::ForeignKeys);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     // Foreign keys are used only to offer a value picker on
                     // the referencing cell -- a failed or unsupported read
                     // just means no picker, not a load failure for the tab.
@@ -238,14 +244,16 @@ impl App {
 
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Count);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let qr_result = run_browse_count(conn, query, &control).await;
                     let count = qr_result.ok().and_then(|qr| row_count_from_result(&qr));
                     match count {
+                        None if control.cancellation_token().is_cancelled() => {}
                         Some(count) => sender_clone.input(AppMsg::RowCountLoaded(tab_id, request, count)),
                         // A stale total left on screen after a failed
                         // recount can enable Last Page past the real
