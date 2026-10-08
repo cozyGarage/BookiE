@@ -56,8 +56,11 @@ native types with `pg_typeof`, and refetches the same-size BLOB through the
 typed composite key. The SQLite test also runs the same parameterized refetch
 through `PolicyGuard` and compares the exact bytes. MySQL and PostgreSQL also
 run the same guarded query; the Docker cases retain native storage and key-type
-oracles. Other-driver native checks, installed GTK
-acceptance and memory profiling remain open under PERF-10.
+oracles. SQL Server now covers the guarded refetch with a composite VARBINARY/
+BIGINT key and checks the 9,000-byte payload against native `DATALENGTH` and
+`fn_varbintohexstr` results (`mssql_value_query_refetches_the_exact_blob_for_a_composite_key`).
+Other-driver native checks, installed GTK acceptance and memory profiling
+remain open under PERF-10.
 
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete

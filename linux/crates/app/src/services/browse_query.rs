@@ -878,4 +878,99 @@ mod tests {
         let guarded = guarded_value_refetch(std::sync::Arc::from(connection), "postgres", &query, &control).await;
         assert_eq!(guarded.rows, vec![vec![Value::Bytes(vec![0xab; 9000])]]);
     }
+
+    #[tokio::test]
+    #[ignore = "requires docker"]
+    async fn mssql_value_query_refetches_the_exact_blob_for_a_composite_key() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+        use testcontainers::runners::AsyncRunner;
+        use testcontainers_modules::mssql_server::MssqlServer;
+
+        let container = MssqlServer::default().with_accept_eula().start().await.unwrap();
+        let connection = drivers_mssql::MssqlDriver
+            .connect(ConnectOptions {
+                host: container.get_host().await.unwrap().to_string(),
+                port: container.get_host_port_ipv4(1433).await.unwrap(),
+                database: "master".into(),
+                username: "sa".into(),
+                password: secrecy::SecretString::new(MssqlServer::DEFAULT_SA_PASSWORD.to_string().into()),
+                tls: TlsConfig::disabled(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(90));
+        let tenant = b"tenant ' OR 1=1 --".to_vec();
+        let bytes: Vec<u8> = (0..9000).map(|index| (index % 256) as u8).collect();
+        insert_mssql_value_preview_rows(&*connection, &control, &tenant, &bytes).await;
+        assert_mssql_value_preview_native(&*connection, &control).await;
+
+        let columns = connection
+            .fetch_columns_controlled(None, "value_preview_records", &control)
+            .await
+            .unwrap();
+        let target = BrowseTarget {
+            driver_id: "mssql",
+            schema: None,
+            table: "value_preview_records",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let query = target.value_query(2, &[Value::Bytes(tenant), Value::Int(7)]).unwrap();
+        let fetched = connection
+            .query_params_controlled(&query.sql, &query.params, &control)
+            .await
+            .unwrap();
+        assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes.clone())]]);
+        let guarded = guarded_value_refetch(std::sync::Arc::from(connection), "mssql", &query, &control).await;
+        assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
+    }
+
+    async fn insert_mssql_value_preview_rows(
+        connection: &dyn tablepro_core::Connection,
+        control: &tablepro_core::OperationControl,
+        tenant: &[u8],
+        bytes: &[u8],
+    ) {
+        connection
+            .execute_controlled(
+                "CREATE TABLE value_preview_records (tenant VARBINARY(64), id BIGINT, payload VARBINARY(MAX), PRIMARY KEY (tenant, id))",
+                control,
+            )
+            .await
+            .unwrap();
+        connection
+            .execute_params_controlled(
+                "INSERT INTO value_preview_records VALUES (@P1, @P2, @P3), (@P4, @P5, @P6)",
+                &[
+                    Value::Bytes(tenant.to_vec()),
+                    Value::Int(7),
+                    Value::Bytes(bytes.to_vec()),
+                    Value::Bytes(b"other tenant".to_vec()),
+                    Value::Int(7),
+                    Value::Bytes(vec![0xff; bytes.len()]),
+                ],
+                control,
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn assert_mssql_value_preview_native(
+        connection: &dyn tablepro_core::Connection,
+        control: &tablepro_core::OperationControl,
+    ) {
+        let native = connection
+            .query_controlled(
+                "SELECT DATALENGTH(payload), sys.fn_varbintohexstr(SUBSTRING(payload, 1, 8)) FROM value_preview_records WHERE tenant = 0x74656e616e742027204f5220313d31202d2d AND id = 7",
+                control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            native.rows,
+            vec![vec![Value::Int(9000), Value::Text("0x0001020304050607".into())]]
+        );
+    }
 }

@@ -60,6 +60,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mysql_spatial_grid_refusal_preserves_native_bytes",
                 "postgres_value_query_refetches_by_enum_and_domain_composite_key",
                 "mysql_value_query_refetches_the_exact_blob_for_a_composite_key",
+                "mssql_value_query_refetches_the_exact_blob_for_a_composite_key",
                 "value_contract_mysql_bit_parser_edits_preserve_native_values",
                 "value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit",
                 "value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings",
