@@ -199,6 +199,10 @@ binding refuse the value without changing target or sibling rows
 (`value_contract_custom_range_scalar_refusal_preserves_target_and_sibling_rows`
 in `crates/drivers/postgres/tests/support/range_array_contract.rs`). This
 documents a safe refusal boundary, not custom range support.
+The six built-in scalar range types now follow the same visible refusal policy:
+native text, JSON and wire values are checked, empty ranges stay distinct from
+SQL NULL, and refused literals/bindings leave target and sibling rows unchanged
+([test](../crates/drivers/postgres/tests/support/range_scalar_contract.rs)).
 PostgreSQL built-in multirange scalars and arrays resolve through SQLx's type
 metadata and reach BookiE's value decoder. BookiE returns a named
 `Value::Undecodable` for non-NULL values; SQL literal rendering and parameter

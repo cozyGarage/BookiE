@@ -34,6 +34,9 @@ mod custom_array_contract;
 #[path = "support/range_array_contract.rs"]
 mod range_array_contract;
 
+#[path = "support/range_scalar_contract.rs"]
+mod range_scalar_contract;
+
 #[path = "support/identity_copy_contract.rs"]
 mod identity_copy_contract;
 
