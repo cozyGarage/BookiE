@@ -16,7 +16,9 @@ Merged since the 0.1.5 release, by lane:
   column of PostgreSQL statement errors (#366), pinned results and per-statement
   gutter marks (#372), a collapsible sidebar tree with counts and saved state
   (#373), and installed scenarios for restore after a deleted connection and a
-  second-profile bundle import (#375). The single action table is deferred
+  second-profile bundle import (#375), package upgrade checks from the released
+  0.1.5 deb and Arch package (#377, #381) and a Flatpak window check through
+  AT-SPI (#380). The single action table is deferred
   behind the drift tests (#349, docs only).
 - **B3 values and drivers:** PostgreSQL range refusal and enum grid coverage
   (#305–#311), MongoDB nested null-filter parity (#312), SQLite STRICT `ANY`
