@@ -55,6 +55,7 @@
 - PostgreSQL geometric array families now share explicit refusal, native type/text/JSON/wire oracles, and target/sibling preservation coverage.
 - The enum-array slice regression is split into its own test file so the PostgreSQL contract source stays within the file-size guard; the ignored-test inventory points to its new location.
 - B3 mutation triage now records a scoped PostgreSQL array-dimension decoder run: 10 mutants caught, 2 compile-unviable, none missed or timed out.
+- The PostgreSQL NUMERIC decoder mutation audit tested 66 generated mutants at `c51d6e63`: all 15 buildable variants were caught by existing native-wire and malformed-payload contracts; 51 did not build, with no missed or timed-out mutants.
 - The scoped core XLSX writer mutation run caught all 41 generated mutants; broader core/package mutation triage remains open.
 - MySQL and SQL Server tunneled TLS contracts now cover valid server identity, wrong CA and hostname refusal, and no plaintext fallback through SSH forwarding. The fixture creates its SSH host key at container startup rather than baking it into the image.
 - MySQL transaction query coverage now verifies decoded-byte-budget truncation, exact retained payloads, and follow-up queries within the same transaction.
