@@ -593,7 +593,11 @@ mod tests {
 
     #[tokio::test]
     async fn sqlite_value_query_refetches_the_exact_blob_for_a_composite_key() {
-        use tablepro_core::{ConnectOptions, DatabaseDriver};
+        use std::sync::Arc;
+        use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment};
+        use tablepro_policy::{
+            AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal,
+        };
 
         let directory = tempfile::tempdir().unwrap();
         let connection = drivers_sqlite::SqliteDriver
@@ -653,7 +657,28 @@ mod tests {
             .query_params_controlled(&query.sql, &query.params, &control)
             .await
             .unwrap();
-        assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes)]]);
+        assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes.clone())]]);
+
+        let guard = PolicyGuard::new(
+            Arc::from(connection),
+            GuardContext {
+                connection_id: uuid::Uuid::new_v4(),
+                connection_name: "SQLite value refetch".into(),
+                driver_id: "sqlite".into(),
+                environment: Environment::Local,
+                read_only: true,
+                principal: Principal::human_gui(),
+                policy: Arc::new(PolicyConfig::default()),
+                approval: Arc::new(DenyApprovalSink),
+                audit: Arc::new(NullAuditSink),
+                audit_state: Arc::new(AuditState::new()),
+            },
+        );
+        let guarded = guard
+            .query_params_controlled(&query.sql, &query.params, &control)
+            .await
+            .unwrap();
+        assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
     }
 
     #[tokio::test]

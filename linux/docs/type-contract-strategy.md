@@ -36,9 +36,11 @@ current-page export refuse incomplete rows, and the inspector labels them “Not
 fetched.” Pending edits disable projection. Native SQLite tests assert the
 visible projection and the hidden stored value; planner, keyset mapping,
 sparse-row, row-search and app regressions passed with the required GitHub
-checks. Installed GTK acceptance for hide/unhide refresh and edited-row paths
-remains open under UI-14b. After hiding columns, refresh the browse page for the
-reduced SELECT to take effect.
+checks. The release-binary PostgreSQL Xvfb scenario
+`postgres_hidden_projection_refresh_and_edit_preserve_hidden_value` now covers
+hide, refresh, inspector, edit/sibling preservation and unhide; distribution
+Wayland/GNOME acceptance remains open under UI-14b. After hiding columns, refresh
+the browse page for the reduced SELECT to take effect.
 
 SQL-backed browse rows now keep an 8 KiB text/JSON/binary sample and original
 byte count in each materialized grid row. View Value refetches one column using
@@ -51,9 +53,10 @@ composite key and compare its exact returned bytes with native storage oracles;
 the MySQL test also checks `LONGBLOB`, byte length and the native hex prefix. A
 Docker PostgreSQL 16 test uses catalog enum/domain key metadata, confirms both
 native types with `pg_typeof`, and refetches the same-size BLOB through the
-typed composite key. These service tests call drivers directly, so
-guarded-path and other-driver native checks, installed GTK acceptance and
-memory profiling remain open under PERF-10.
+typed composite key. The SQLite test also runs the same parameterized refetch
+through `PolicyGuard` and compares the exact bytes. MySQL and PostgreSQL service
+tests still call drivers directly. Other-driver native checks, installed GTK
+acceptance and memory profiling remain open under PERF-10.
 
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete
