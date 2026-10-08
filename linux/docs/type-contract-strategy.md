@@ -46,9 +46,10 @@ SQL-backed browse rows now keep an 8 KiB text/JSON/binary sample and original
 byte count in each materialized grid row. View Value refetches one column using
 the complete primary key through the policy-guarded connection; the query caps
 at two rows and refuses missing or ambiguous matches. PostgreSQL enum/domain
-key casts have planner regressions. This first slice leaves arbitrary SQL,
-MongoDB and Redis paths unchanged, and the shared result still retains full
-values. Local SQLite and Docker MySQL service tests refetch a 9,000-byte BLOB by
+key casts have planner regressions. Arbitrary SQL previews remain open, and
+the shared result still retains full values. MongoDB refetches selected fields
+by `_id`; Redis string refetch binds arbitrary key bytes. Local SQLite and
+Docker MySQL service tests refetch a 9,000-byte BLOB by
 composite key and compare its exact returned bytes with native storage oracles;
 the MySQL test also checks `LONGBLOB`, byte length and the native hex prefix. A
 Docker PostgreSQL 16 test uses catalog enum/domain key metadata, confirms both
