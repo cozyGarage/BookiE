@@ -1,5 +1,65 @@
 use super::*;
 
+async fn postgres_proxy_dropping_update_ack(
+    target_host: String,
+    target_port: u16,
+) -> (
+    u16,
+    std::sync::Arc<std::sync::atomic::AtomicBool>,
+    tokio::task::JoinHandle<()>,
+) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::{TcpListener, TcpStream};
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind lost-ack proxy");
+    let port = listener.local_addr().expect("proxy address").port();
+    let dropped_ack = std::sync::Arc::new(AtomicBool::new(false));
+    let ack_state = dropped_ack.clone();
+    let task = tokio::spawn(async move {
+        loop {
+            let (client, _) = listener.accept().await.expect("accept proxied connection");
+            let host = target_host.clone();
+            let dropped_ack = ack_state.clone();
+            tokio::spawn(async move {
+                let Ok(server) = TcpStream::connect((host.as_str(), target_port)).await else {
+                    return;
+                };
+                let (mut client_read, mut client_write) = client.into_split();
+                let (mut server_read, mut server_write) = server.into_split();
+                let forward_client = tokio::spawn(async move {
+                    let _ = tokio::io::copy(&mut client_read, &mut server_write).await;
+                });
+                let mut buffer = [0; 8192];
+                let mut tail = Vec::new();
+                loop {
+                    let Ok(read) = server_read.read(&mut buffer).await else {
+                        break;
+                    };
+                    if read == 0 {
+                        break;
+                    }
+                    let mut scan = std::mem::take(&mut tail);
+                    scan.extend_from_slice(&buffer[..read]);
+                    if scan.windows(b"UPDATE 1\0".len()).any(|window| window == b"UPDATE 1\0")
+                        && !dropped_ack.swap(true, Ordering::SeqCst)
+                    {
+                        let _ = client_write.shutdown().await;
+                        forward_client.abort();
+                        return;
+                    }
+                    tail.extend_from_slice(&scan[scan.len().saturating_sub(b"UPDATE 1\0".len() - 1)..]);
+                    if client_write.write_all(&buffer[..read]).await.is_err() {
+                        break;
+                    }
+                }
+                forward_client.abort();
+            });
+        }
+    });
+    (port, dropped_ack, task)
+}
+
 async fn tagged_query_is_active(connection: &dyn Connection, tag: &str) -> bool {
     let sql = format!(
         "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%{tag}%' AND pid <> pg_backend_pid()"
@@ -69,6 +129,75 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
         .await
         .expect("pool must recover on a new connection");
     assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_committed_write_with_a_lost_ack_is_not_replayed_after_reconnect() {
+    use std::sync::atomic::Ordering;
+
+    let (_container, opts) = start_pg().await;
+    let observer = connect(opts.clone()).await;
+    observer
+        .execute("CREATE TABLE lost_ack_target (id integer PRIMARY KEY, value integer NOT NULL)")
+        .await
+        .unwrap();
+    observer
+        .execute("CREATE TABLE lost_ack_audit (target_id integer NOT NULL)")
+        .await
+        .unwrap();
+    observer
+        .execute(
+            "CREATE FUNCTION lost_ack_record_update() RETURNS trigger LANGUAGE plpgsql AS $$
+             BEGIN INSERT INTO lost_ack_audit VALUES (NEW.id); RETURN NEW; END $$",
+        )
+        .await
+        .unwrap();
+    observer
+        .execute(
+            "CREATE TRIGGER lost_ack_record_update AFTER UPDATE ON lost_ack_target
+             FOR EACH ROW EXECUTE FUNCTION lost_ack_record_update()",
+        )
+        .await
+        .unwrap();
+    observer
+        .execute("INSERT INTO lost_ack_target VALUES (1, 0)")
+        .await
+        .unwrap();
+
+    let (proxy_port, dropped_ack, proxy_task) = postgres_proxy_dropping_update_ack(opts.host.clone(), opts.port).await;
+    let mut proxied_opts = opts;
+    proxied_opts.host = "127.0.0.1".into();
+    proxied_opts.port = proxy_port;
+    let connection = PgDriver.connect(proxied_opts).await.expect("connect through proxy");
+    let write = connection
+        .execute("UPDATE lost_ack_target SET value = value + 1 WHERE id = 1")
+        .await;
+    assert!(
+        dropped_ack.load(Ordering::SeqCst),
+        "proxy must drop the committed UPDATE acknowledgement"
+    );
+    assert!(
+        matches!(write, Err(DriverError::Disconnected)),
+        "a write with a lost acknowledgement must remain uncertain, got {write:?}"
+    );
+
+    let recovered = connection
+        .query("SELECT value FROM lost_ack_target WHERE id = 1")
+        .await
+        .expect("a later operation should reconnect the pool");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+    let audit = observer
+        .query("SELECT target_id FROM lost_ack_audit ORDER BY target_id")
+        .await
+        .unwrap();
+    assert_eq!(
+        audit.rows,
+        vec![vec![Value::Int(1)]],
+        "the trigger audit is an independent replay oracle"
+    );
+
+    proxy_task.abort();
 }
 
 #[tokio::test]
