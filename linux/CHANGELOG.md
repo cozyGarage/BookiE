@@ -14,7 +14,7 @@
 - MySQL and MariaDB ENUM/SET contracts now prove non-empty XLSX exports preserve native labels and keep SQL NULL cells blank across the twelve tested SQL modes; empty SET values still refuse the export without replacing an existing workbook.
 - Result column headers show the column type and mark primary-key columns.
 - Redis 0.2.0 support remains scoped to a single host/port endpoint; Sentinel and Cluster topologies are explicitly deferred.
-- Redis key browsing preserves non-UTF-8 string values as bytes, checked against a native Redis `GET` oracle.
+- Redis key browsing preserves arbitrary-byte keys and non-UTF-8 string values, checked against native Redis command oracles.
 - The MongoDB census diagnostic now profiles one million documents; this host measured a five-sample release median of 772 ms per 50-row browse, so the 100 ms budget remains scoped to 100k documents.
 - PostgreSQL optimistic update coverage asserts schema-qualified casts for custom enums and array domains; a restricted-role grid edit exercises the enum path under a shadowed transaction-local `search_path`.
 - MongoDB stale-grid tests now pin ABA behavior: value-based edits and deletes proceed after a field changes and returns to its materialized value, matching the documented last-write-wins contract.

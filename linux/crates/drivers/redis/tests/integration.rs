@@ -110,6 +110,16 @@ use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers_modules::redis::Redis;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+struct BinaryBulk(Vec<u8>);
+impl redis::ToRedisArgs for BinaryBulk {
+    fn write_redis_args<W>(&self, out: &mut W)
+    where
+        W: ?Sized + redis::RedisWrite,
+    {
+        out.write_arg(&self.0);
+    }
+}
+
 async fn start_redis() -> (ContainerAsync<Redis>, String, u16) {
     let container = Redis::default().start().await.expect("start redis container");
     let host = container.get_host().await.expect("host").to_string();
@@ -270,16 +280,6 @@ async fn browsing_another_database_does_not_leak_into_later_queries() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_browsing_binary_string_values_preserves_the_native_bytes() {
-    struct BinaryBulk(Vec<u8>);
-    impl redis::ToRedisArgs for BinaryBulk {
-        fn write_redis_args<W>(&self, out: &mut W)
-        where
-            W: ?Sized + redis::RedisWrite,
-        {
-            out.write_arg(&self.0);
-        }
-    }
-
     let (_container, host, port) = start_redis().await;
     let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
     let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
@@ -308,6 +308,41 @@ async fn value_contract_browsing_binary_string_values_preserves_the_native_bytes
             Value::Text("string".into()),
             Value::Int(-1),
             Value::Bytes(native_bytes),
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_browsing_binary_keys_preserves_the_native_bytes() {
+    let (_container, host, port) = start_redis().await;
+    let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
+    let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
+    let key = vec![0xFF, 0x00, 0x41];
+    redis::cmd("SET")
+        .arg(BinaryBulk(key.clone()))
+        .arg("value")
+        .query_async::<()>(&mut native_connection)
+        .await
+        .expect("seed binary key");
+    let native_value: Vec<u8> = redis::cmd("GET")
+        .arg(BinaryBulk(key.clone()))
+        .query_async(&mut native_connection)
+        .await
+        .expect("read native value at binary key");
+    assert_eq!(native_value, b"value");
+
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    let result = connection.fetch_rows(None, "db0", 0, 10).await.unwrap();
+
+    assert_eq!(result.rows.len(), 1, "only the seeded key should be present");
+    assert_eq!(
+        result.rows[0],
+        vec![
+            Value::Bytes(key),
+            Value::Text("string".into()),
+            Value::Int(-1),
+            Value::Text("value".into()),
         ]
     );
 }
@@ -345,16 +380,6 @@ async fn value_contract_preserves_integer_and_text_command_arguments() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_resp3_hash_map_preserves_binary_fields_and_values() {
-    struct BinaryBulk(Vec<u8>);
-    impl redis::ToRedisArgs for BinaryBulk {
-        fn write_redis_args<W>(&self, out: &mut W)
-        where
-            W: ?Sized + redis::RedisWrite,
-        {
-            out.write_arg(&self.0);
-        }
-    }
-
     let (_container, host, port) = start_redis_resp3().await;
     let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
     let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
