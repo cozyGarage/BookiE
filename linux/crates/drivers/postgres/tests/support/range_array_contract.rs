@@ -79,6 +79,102 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
         .contains(&marker),
         "CSV export must expose the undecodable type marker"
     );
+    let export_result = tablepro_core::QueryResult {
+        columns: vec![source.columns[0].clone()],
+        rows: vec![vec![refusal.clone()]],
+        truncated: false,
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    for (format, expected_marker) in [
+        (tablepro_core::export::ResultFormat::Json, marker.clone()),
+        (tablepro_core::export::ResultFormat::Csv, marker.clone()),
+        (
+            tablepro_core::export::ResultFormat::Markdown,
+            marker
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('_', "&#95;")
+                .replace('[', "&#91;")
+                .replace(']', "&#93;"),
+        ),
+        (
+            tablepro_core::export::ResultFormat::Html,
+            marker.replace('<', "&lt;").replace('>', "&gt;"),
+        ),
+        (
+            tablepro_core::export::ResultFormat::Xml,
+            marker.replace('<', "&lt;").replace('>', "&gt;"),
+        ),
+    ] {
+        let path = directory.path().join(format!("{format:?}"));
+        tablepro_core::export::write_result_file(
+            &path,
+            &export_result,
+            &tablepro_core::export::ResultExport {
+                format,
+                csv: &csv_options,
+                sql: None,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let output = std::fs::read_to_string(path).unwrap();
+        assert!(
+            output.contains(&expected_marker),
+            "{format:?} export must expose the undecodable type marker: {output}"
+        );
+    }
+
+    let xlsx_path = directory.path().join("range-array.xlsx");
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &export_result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut workbook = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut workbook.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    assert!(
+        shared_strings.contains(&marker.replace('<', "&lt;").replace('>', "&gt;")),
+        "XLSX export must expose the undecodable type marker: {shared_strings}"
+    );
+
+    let sql_path = directory.path().join("range-array.sql");
+    std::fs::write(&sql_path, b"keep existing export").unwrap();
+    let error = tablepro_core::export::write_result_file(
+        &sql_path,
+        &export_result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &csv_options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: Some("custom_range_array_contract"),
+                table: "rows",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap_err();
+    assert!(
+        error.to_string().contains("cannot be represented in a SQL statement"),
+        "{error}"
+    );
+    assert_eq!(std::fs::read(sql_path).unwrap(), b"keep existing export");
 
     let snapshot_sql = "SELECT id, value::text, array_to_json(value)::text, \
                         encode(array_send(value), 'hex'), sibling \
