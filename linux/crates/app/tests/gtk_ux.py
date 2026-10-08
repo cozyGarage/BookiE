@@ -610,9 +610,9 @@ def scenarios(ui):
         name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
         connection_id = ui.POSTGRES_SSH_AUDIT_CONNECTION_ID
         ui.open_saved_connection(name)
-        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
+        prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.wait_for_node_containing("127.0.0.1:2223")
-        ui.press_x11_key("Escape")
+        ui.invoke(ui.wait_within(prompt, name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_node(name="Connection failed")
 
@@ -705,7 +705,7 @@ def scenarios(ui):
 
         second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.wait_for_node_containing("relay:22")
-        ui.press_x11_key("Escape")
+        ui.invoke(ui.wait_within(second_prompt, name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_node(name="Connection failed")
 
