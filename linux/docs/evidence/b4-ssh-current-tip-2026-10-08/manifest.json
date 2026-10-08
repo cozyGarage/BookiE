@@ -62,7 +62,24 @@
     "run_id": 37797466945,
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37797466945",
     "source_commit": "c3122d97459685060f1cf3474b55e1a11b961abe",
-    "status_at_recording": "pending"
+    "status_at_recording": "completed",
+    "status": "completed",
+    "conclusion": "success",
+    "completed_jobs": [
+      {
+        "name": "PostgreSQL release fixture (docker)",
+        "job_id": 113398752985,
+        "conclusion": "success",
+        "coverage": "system OpenSSH, agentd mTLS, release integration, and seven selected GTK SSH trust/audit/reconnect scenarios"
+      },
+      {
+        "name": "Driver integration tests (docker)",
+        "job_id": 113400053674,
+        "conclusion": "success",
+        "coverage": "scripts/ci-local.sh integration includes bash scripts/test-ssh.sh"
+      }
+    ],
+    "note": "Full Build Linux run completed successfully. Hosted checks are on c3122d9; frozen-candidate and installed-package/native Wayland acceptance remain separate."
   },
   "current_pr_hosted": {
     "workflow": "Build Linux",
@@ -77,5 +94,26 @@
     "Windows Active Directory interoperability",
     "saved jump-chain editing; UI-1b remains open"
   ],
-  "environment_note": "Tests ran from the PR worktree at 79e4aa0 using the shared Cargo target cache, after rebasing onto fork/linux c3122d9 (PR #396). The PostgreSQL GTK runner emitted a D-Bus disconnect message during shutdown after all selected scenarios passed; the script exited 0. These are local Xvfb/Docker results, not frozen-candidate or installed Wayland acceptance."
+  "environment_note": "Tests ran from the PR worktree at 79e4aa0 using the shared Cargo target cache, after rebasing onto fork/linux c3122d9 (PR #396). The PostgreSQL GTK runner emitted a D-Bus disconnect message during shutdown after all selected scenarios passed; the script exited 0. These are local Xvfb/Docker results, not frozen-candidate or installed Wayland acceptance.",
+  "current_fork_linux_run": {
+    "workflow": "Build Linux",
+    "run_id": 37806196821,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37806196821",
+    "source_commit": "896f1b316dbf9c3c46b5bc6f6efd999281e491a0",
+    "status_at_recording": "in_progress",
+    "note": "The current-tip Build Linux run is active. The preflight/sandbox job passed; B4 rollback, PostgreSQL release, Driver TLS, GTK and optional DuckDB jobs were still running at this update.",
+    "completed_jobs": [
+      {
+        "name": "Preflight and sandbox tier (no GTK app)",
+        "conclusion": "success"
+      }
+    ],
+    "active_jobs": [
+      "B4 rollback acceptance (docker)",
+      "PostgreSQL release fixture (docker)",
+      "Driver TLS fixture (docker)",
+      "Fast checks (GTK)",
+      "Optional DuckDB driver and GTK feature"
+    ]
+  }
 }
