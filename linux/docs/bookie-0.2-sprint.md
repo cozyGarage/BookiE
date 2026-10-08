@@ -5,12 +5,17 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Integrated baseline: `1e1a30dc7` on `linux` (PR #288; PR #287 cleans the active
-documentation and removes committed evidence artifacts, #288 splits hosted CI
-tiers and shards the Linux regression gate, #290 completes ClickHouse
+Integrated baseline: `19816c0ab` on `linux`. PR #293 refreshed the sprint
+documentation; PR #289 then added result-header type and primary-key markers;
+PR #294 adds ClickHouse Enum8/Enum16 map-key consumer checks. PR #288 splits
+hosted CI tiers and shards the Linux regression gate, #290 completes ClickHouse
 Enum8/Enum16 map-value pairings, and #291 adds MySQL/MariaDB ENUM/SET XLSX
-consumer checks). PR #289 remains open for result-header type and primary-key
-markers. Earlier baseline work includes PR #280 ClickHouse Map(Enum) consumer
+consumer checks. PR #295 reconciles the B4 hosted-candidate checkpoint. PR #296
+remains under hosted validation for MongoDB native collection browsing, and
+#298 extends the driver-integration budget and moves the B4 checkpoint evidence
+from the repository into its PR comment; validation is in progress.
+Earlier baseline work includes PR #280
+ClickHouse Map(Enum) consumer
 coverage, #282/#284 PostgreSQL lost-ack non-replay and its regression proxy
 Clippy fix, #285 ClickHouse mutation results, and #286 hosted rollback plus
 release-binary SSH checks.
