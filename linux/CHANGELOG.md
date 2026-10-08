@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- ClickHouse now has a Docker-backed lost-ack contract: the server commits an
+  INSERT and its materialized-view audit row, the proxy drops the HTTP response,
+  and a later query plus direct native oracles prove the write ran once.
 - Evidence validation now accepts wrapper-script runs that list multiple test
   names and manifests that pair one source digest with `source_file`.
 - Redis now has a Docker-backed lost-ack contract: a committed Lua write with
