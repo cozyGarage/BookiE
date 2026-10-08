@@ -1085,4 +1085,33 @@ mod tests {
             _ => panic!("expected Editor"),
         }
     }
+
+    #[test]
+    fn collapsed_groups_round_trip_and_an_older_file_has_none() {
+        let mut conn = connection("SELECT 1");
+        conn.collapsed_groups = vec!["schema:public/views".into()];
+        let json = serde_json::to_string(&conn).unwrap();
+        let restored: ConnectionWorkspaceState = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.collapsed_groups, vec!["schema:public/views".to_string()]);
+
+        let older: ConnectionWorkspaceState = serde_json::from_str(r#"{"tabs":[],"active_idx":0}"#).unwrap();
+        assert!(older.collapsed_groups.is_empty());
+        assert!(!serde_json::to_string(&older).unwrap().contains("collapsed_groups"));
+    }
+
+    #[test]
+    fn collapsed_groups_are_bounded_when_saved() {
+        let mut conn = connection("SELECT 1");
+        conn.collapsed_groups = (0..MAX_COLLAPSED_GROUPS + 10)
+            .map(|index| format!("schema:s{index}/tables"))
+            .collect();
+        conn.collapsed_groups.push("x".repeat(MAX_COLLAPSED_KEY_BYTES + 1));
+        clamp_connection(&mut conn);
+        assert_eq!(conn.collapsed_groups.len(), MAX_COLLAPSED_GROUPS);
+        assert!(
+            conn.collapsed_groups
+                .iter()
+                .all(|key| key.len() <= MAX_COLLAPSED_KEY_BYTES)
+        );
+    }
 }

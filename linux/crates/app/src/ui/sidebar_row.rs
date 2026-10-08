@@ -52,6 +52,7 @@ pub struct SidebarRow {
     kind: SidebarObjectKind,
     depth: u8,
     group: Option<GroupInit>,
+    row: Option<gtk::ListBoxRow>,
     chevron: gtk::Image,
     new_table_button: gtk::Button,
     csv_button: gtk::Button,
@@ -233,6 +234,7 @@ impl FactoryComponent for SidebarRow {
             kind: init.kind,
             depth: init.depth,
             group: init.group,
+            row: None,
             chevron,
             new_table_button: group_button("list-add-symbolic", new_table_label),
             csv_button: group_button("document-open-symbolic", csv_label),
@@ -261,6 +263,7 @@ impl FactoryComponent for SidebarRow {
     ) -> Self::Widgets {
         let widgets = view_output!();
         if self.group.is_some() {
+            self.describe_group(&root);
             self.wire_group_buttons(&sender);
             return widgets;
         }
@@ -402,69 +405,48 @@ impl FactoryComponent for SidebarRow {
     }
 
     fn update(&mut self, msg: Self::Input, sender: FactorySender<Self>) {
-        if let SidebarRowMsg::SetCollapsed(collapsed) = msg {
-            self.chevron.set_icon_name(Some(chevron_icon(collapsed)));
-            return;
-        }
         tracing::trace!(
             target: "tablepro_app::sidebar_row",
             table = %self.info.name,
             ?msg,
             "input"
         );
-        match msg {
-            SidebarRowMsg::Open => {
-                let _ = sender.output(SidebarRowOutput::Open {
-                    schema: self.info.schema.clone(),
-                    name: self.info.name.clone(),
-                });
-            }
-            SidebarRowMsg::OpenInNewTab => {
-                let _ = sender.output(SidebarRowOutput::OpenInNewTab {
-                    schema: self.info.schema.clone(),
-                    name: self.info.name.clone(),
-                });
-            }
-            SidebarRowMsg::EditStructure => {
-                let _ = sender.output(SidebarRowOutput::EditStructure {
-                    schema: self.info.schema.clone(),
-                    name: self.info.name.clone(),
-                });
-            }
-            SidebarRowMsg::ShowCreateTable => {
-                let _ = sender.output(SidebarRowOutput::ShowCreateTable {
-                    schema: self.info.schema.clone(),
-                    name: self.info.name.clone(),
-                });
-            }
-            SidebarRowMsg::ImportCsv => {
-                let _ = sender.output(SidebarRowOutput::ImportCsv {
-                    schema: self.info.schema.clone(),
-                    name: self.info.name.clone(),
-                });
-            }
-            SidebarRowMsg::SetCollapsed(_) => {}
-            SidebarRowMsg::NewTable => {
-                let _ = sender.output(SidebarRowOutput::NewTable {
-                    schema: self.info.schema.clone(),
-                });
-            }
-            SidebarRowMsg::TableFromCsv => {
-                let _ = sender.output(SidebarRowOutput::TableFromCsv {
-                    schema: self.info.schema.clone(),
-                });
-            }
-            SidebarRowMsg::DropTable => {
-                let _ = sender.output(SidebarRowOutput::DropTable {
-                    schema: self.info.schema.clone(),
-                    name: self.info.name.clone(),
-                });
-            }
-        }
+        let (schema, name) = (self.info.schema.clone(), self.info.name.clone());
+        let output = match msg {
+            SidebarRowMsg::SetCollapsed(collapsed) => return self.apply_collapse(collapsed),
+            SidebarRowMsg::Open => SidebarRowOutput::Open { schema, name },
+            SidebarRowMsg::OpenInNewTab => SidebarRowOutput::OpenInNewTab { schema, name },
+            SidebarRowMsg::EditStructure => SidebarRowOutput::EditStructure { schema, name },
+            SidebarRowMsg::ShowCreateTable => SidebarRowOutput::ShowCreateTable { schema, name },
+            SidebarRowMsg::ImportCsv => SidebarRowOutput::ImportCsv { schema, name },
+            SidebarRowMsg::DropTable => SidebarRowOutput::DropTable { schema, name },
+            SidebarRowMsg::NewTable => SidebarRowOutput::NewTable { schema },
+            SidebarRowMsg::TableFromCsv => SidebarRowOutput::TableFromCsv { schema },
+        };
+        let _ = sender.output(output);
     }
 }
 
 impl SidebarRow {
+    fn apply_collapse(&self, collapsed: bool) {
+        self.chevron.set_icon_name(Some(chevron_icon(collapsed)));
+        if let Some(row) = &self.row {
+            row.update_state(&[gtk::accessible::State::Expanded(Some(!collapsed))]);
+        }
+    }
+
+    fn describe_group(&mut self, root: &gtk::ListBoxRow) {
+        let Some(group) = &self.group else {
+            return;
+        };
+        root.update_property(&[
+            gtk::accessible::Property::Label(&group.label),
+            gtk::accessible::Property::Description(&group.count.to_string()),
+        ]);
+        root.update_state(&[gtk::accessible::State::Expanded(Some(!group.collapsed))]);
+        self.row = Some(root.clone());
+    }
+
     fn title(&self) -> String {
         match &self.group {
             Some(group) => group.label.clone(),

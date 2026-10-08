@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
 - Each statement of a script gets a gutter mark after a run: a tick for a statement that returned, a cross for one that failed.
 - MySQL ENUM/SET grid parsing now tests malformed metadata refusal and escaped

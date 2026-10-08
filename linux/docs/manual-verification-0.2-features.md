@@ -273,6 +273,12 @@ enough elements).
 - [ ] Tag a connection red and open it: the strip above the workspace tabs is
       red in light and dark. Change the tag: the strip follows without a restart.
 
+## Sidebar tree
+
+- [ ] On a PostgreSQL connection with two schemas, the sidebar shows each schema with Tables and Views groups and a count. Click a group: its objects hide and the chevron points right; click again to restore.
+- [ ] Type in the sidebar search: groups holding a match open even if collapsed; clearing the search restores your collapsed groups. Quit and reopen the connection: the groups you collapsed are still collapsed.
+- [ ] New Table and Table from CSV on a Tables group still open their dialogs for that schema. Light and dark look right.
+
 ## Pinned results and gutter marks
 
 - [ ] Run `SELECT 1; SELECT 2;`, click Pin results, change the script and run it again: the first results stay as tabs marked 📌 ahead of the new ones. The button now reads Unpin results (2); clicking it drops the pinned tabs.

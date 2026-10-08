@@ -1345,6 +1345,41 @@ def named_parameter_binds_a_value(database, _base):
 named_parameter_binds_a_value.environment = "local"
 
 
+def activate_sidebar_group(name):
+    if find_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON).getState().contains(pyatspi.STATE_CHECKED) is False:
+        invoke(wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON))
+    for _ in range(40):
+        group = find_node(name=name, role=pyatspi.ROLE_LIST_ITEM)
+        if group is not None and group.getState().contains(pyatspi.STATE_FOCUSED):
+            press_x11_key("Return")
+            return
+        press_x11_key("Tab")
+        time.sleep(POLL_SECONDS)
+    raise AssertionError(f"the sidebar row {name!r} is not keyboard reachable:\n{accessible_snapshot()}")
+
+
+def wait_for_node_showing(name, showing):
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        node = find_node(name=name, role=pyatspi.ROLE_LIST_ITEM)
+        visible = node is not None and node.getState().contains(pyatspi.STATE_SHOWING)
+        if visible == showing:
+            return
+        time.sleep(POLL_SECONDS)
+    raise AssertionError(f"expected {name!r} showing={showing}:\n{accessible_snapshot()}")
+
+
+def sidebar_tables_group_collapses_and_expands(database, _base):
+    wait_for_node_showing("safety_items", True)
+    activate_sidebar_group("Tables")
+    wait_for_node_showing("safety_items", False)
+    activate_sidebar_group("Tables")
+    wait_for_node_showing("safety_items", True)
+
+
+sidebar_tables_group_collapses_and_expands.environment = "local"
+
+
 def press_x11_text(text):
     for character in text:
         name = {" ": "space", "_": "underscore", "-": "minus"}.get(character, character)
@@ -1877,6 +1912,7 @@ def main():
         two_windows_hold_two_connections,
         switched_connection_keeps_workspace_tabs_after_debounce,
         switching_one_window_leaves_the_other_windows_edits,
+        sidebar_tables_group_collapses_and_expands,
     ]
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         scenarios.append(mysql_unparseable_routine_dialog_denial_preserves_database)
