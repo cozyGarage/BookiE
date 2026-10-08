@@ -37,12 +37,6 @@ pub async fn assert_certificate_rejected(
     );
 }
 
-pub const DRIVER_TLS_ENV: &str = "TABLEPRO_FIXTURE_DRIVER_TLS";
-
-pub fn driver_tls_enabled() -> bool {
-    std::env::var(DRIVER_TLS_ENV).map(|value| value == "1").unwrap_or(false)
-}
-
 fn env_or(key: &str, fallback: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| fallback.to_string())
 }

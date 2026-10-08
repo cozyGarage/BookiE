@@ -3,8 +3,8 @@ use std::{future::Future, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use tablepro_core::sql_dialect::{explain_statement, quote_ident};
 use tablepro_core::{
-    ColumnInfo, Connection, DriverError, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl, QueryResult,
-    QueryResultBatch, TableInfo, Value, check_pre_dispatch,
+    ColumnInfo, Connection, DriverError, ForeignKeyInfo, IndexInfo, OperationControl, QueryResult, QueryResultBatch,
+    TableInfo, Value, check_pre_dispatch,
 };
 use tablepro_policy::Principal;
 use tablepro_storage::SavedConnection;
@@ -472,18 +472,6 @@ impl McpBridge {
             })
         })
         .await
-    }
-
-    pub async fn execute_write_commit(
-        &self,
-        token: &McpToken,
-        connection_id: Uuid,
-        sql: &str,
-    ) -> Result<ExecResult, String> {
-        match self.execute_write(token, connection_id, sql, false).await? {
-            WriteOutcome::Committed { rows_affected } => Ok(ExecResult { rows_affected }),
-            WriteOutcome::Preview { .. } => Err("unexpected preview outcome".into()),
-        }
     }
 }
 

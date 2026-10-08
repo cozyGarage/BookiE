@@ -37,7 +37,6 @@ tablepro-driver-sqlite = { path = "../drivers/sqlite" }
 async-trait.workspace = true
 chrono.workspace = true
 clap = { version = "4", features = ["derive"] }
-secrecy.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

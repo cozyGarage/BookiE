@@ -78,17 +78,6 @@ impl TlsConfig {
             ..Default::default()
         }
     }
-
-    pub fn from_legacy_bool(use_tls: bool) -> Self {
-        if use_tls {
-            Self {
-                mode: TlsMode::VerifyFull,
-                ..Default::default()
-            }
-        } else {
-            Self::disabled()
-        }
-    }
 }
 
 /// Deployment environment for a saved connection. Drives policy defaults:
