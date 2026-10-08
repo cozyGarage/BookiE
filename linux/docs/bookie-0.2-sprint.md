@@ -6,7 +6,7 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 i
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `00731e0fad9fa36c807ec23779f69331cb75d0bc` on `linux`, checked
+Code baseline: `299f94fcfebac2635de36e937f62e527ceeb8c51` on `linux`, checked
 2026-10-08.
 Merged since the 0.1.5 release, by lane:
 
