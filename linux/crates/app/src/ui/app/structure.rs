@@ -15,6 +15,8 @@ use uuid::Uuid;
 use tablepro_core::{ColumnInfo, Value};
 use tablepro_storage::query_history::{Outcome, Source};
 
+use crate::services::read_scopes::ReadScope;
+
 use crate::services::catalog::CatalogOrigin;
 use crate::services::structure_tracker;
 use crate::ui::app::ran_statements::finish_if_recorded;
@@ -626,6 +628,7 @@ impl App {
             };
             (schema.map(str::to_owned), table.to_string())
         };
+        let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Structure);
         let sender_for_cmd = sender.clone();
         let connection_id = self.connection_id;
         let database = self.database.clone();
@@ -641,39 +644,32 @@ impl App {
                         });
                         return;
                     };
-                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
+                    let fail = |message: String| {
+                        if !control.cancellation_token().is_cancelled() {
+                            sender_for_cmd.input(AppMsg::StructureLoadFailed { tab_id, message });
+                        }
+                    };
                     let columns = match conn.fetch_columns_controlled(schema.as_deref(), &table, &control).await {
                         Ok(c) => c,
                         Err(e) => {
-                            sender_for_cmd.input(AppMsg::StructureLoadFailed {
-                                tab_id,
-                                message: format!("{e}"),
-                            });
+                            fail(format!("{e}"));
                             return;
                         }
                     };
                     if let Err(e) = tablepro_core::check_pre_dispatch(&control) {
-                        sender_for_cmd.input(AppMsg::StructureLoadFailed {
-                            tab_id,
-                            message: format!("{e}"),
-                        });
+                        fail(format!("{e}"));
                         return;
                     }
                     let indexes = match conn.fetch_indexes_controlled(schema.as_deref(), &table, &control).await {
                         Ok(indexes) => indexes,
                         Err(e) => {
-                            sender_for_cmd.input(AppMsg::StructureLoadFailed {
-                                tab_id,
-                                message: format!("{e}"),
-                            });
+                            fail(format!("{e}"));
                             return;
                         }
                     };
                     if let Err(e) = tablepro_core::check_pre_dispatch(&control) {
-                        sender_for_cmd.input(AppMsg::StructureLoadFailed {
-                            tab_id,
-                            message: format!("{e}"),
-                        });
+                        fail(format!("{e}"));
                         return;
                     }
                     let fks = match conn
@@ -682,10 +678,7 @@ impl App {
                     {
                         Ok(fks) => fks,
                         Err(e) => {
-                            sender_for_cmd.input(AppMsg::StructureLoadFailed {
-                                tab_id,
-                                message: format!("{e}"),
-                            });
+                            fail(format!("{e}"));
                             return;
                         }
                     };

@@ -16,6 +16,7 @@ pub mod persistence_stores;
 pub mod preferences;
 pub mod query_parameters;
 pub mod quick_switcher;
+pub mod read_scopes;
 pub mod recent_tabs;
 pub mod request_generation;
 pub mod sidebar_tree;
