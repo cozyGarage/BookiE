@@ -90,14 +90,13 @@ not qualify 0.2.0.
 
 ### Next B4 acceptance run
 
-The previous candidate and hosted evidence is historical for the current tree:
-`fork/linux` advanced from `7eea6f09` through `7eff6f26` with changes to 41
-files, including GTK/SSH coverage and PostgreSQL regression contracts. Pin the
-next frozen candidate to one clean full SHA and rerun the applicable layers on
-that exact source. The proposed pin for this cycle is
-`7eff6f26cd06d6bd4d1df022bf944831294b4ef4` (the `fork/linux` tip at review
-time). If Linux advances during the run, retain the pinned result and schedule
-a new run for the new tip rather than describing it as current.
+The previous candidate and hosted evidence is historical; `linux` has advanced
+since the `7eea6f09` checkpoint. B4 acceptance remains scheduled after B3 closes,
+per the approved sprint order. At that point, pin the then-current clean full
+SHA and rerun the applicable layers against that exact source. No B4 candidate
+is pinned for the current sprint phase. If Linux advances during a future run,
+retain the pinned result and schedule a new run for the new tip rather than
+describing it as current.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
