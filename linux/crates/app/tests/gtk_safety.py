@@ -1234,8 +1234,13 @@ def encrypted_bundle_round_trip_restores_credentials(_database, base):
     invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="Safety SQLite")
     replace = wait_for_node(name="Replace saved passwords", role=pyatspi.ROLE_SWITCH)
+    assert not replace.getState().contains(pyatspi.STATE_CHECKED), "credential replacement should start disabled"
     extents = replace.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
     gtk_ux.x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline and not replace.getState().contains(pyatspi.STATE_CHECKED):
+        time.sleep(POLL_SECONDS)
+    assert replace.getState().contains(pyatspi.STATE_CHECKED), "credential replacement switch did not become enabled"
     invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
 
     deadline = time.monotonic() + WAIT_SECONDS

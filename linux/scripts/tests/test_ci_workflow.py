@@ -145,9 +145,30 @@ class CiWorkflowTests(unittest.TestCase):
         for name in checker.REQUIRED | {checker.SCHEDULED}:
             self.assertIn(f"      - {name}\n", section)
 
+    def test_b4_rollback_gate_runs_focused_mysql_and_postgres_tests_before_broad_integration(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        focused = workflow.split("  b4-rollback:\n", 1)[1].split("  driver-tls:\n", 1)[0]
+        for required in [
+            "if: github.event_name != 'pull_request'",
+            "prefix-key: linux-integration",
+            "run-test-layer.py b4-rollback",
+            "regression-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}",
+        ]:
+            self.assertIn(required, focused)
+        integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        self.assertIn("needs: [preflight, b4-rollback]", integration)
+        layers = json.loads((ROOT / "linux/scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
+        commands = [step["argv"] for step in layers["steps"]]
+        self.assertEqual(len(commands), 2)
+        self.assertIn("mysql_atomic", commands[0])
+        self.assertIn(
+            "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
+            commands[1],
+        )
+
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        hosted = workflow.split("  integration:\n", 1)[1].split("  driver-tls:\n", 1)[0]
+        hosted = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
         local = (ROOT / "linux/scripts/ci-local.sh").read_text().split("run_integration() {", 1)[1].split("run_release()", 1)[0]
         self.assertIn("run-test-layer.py drivers", hosted)
         self.assertIn("scripts/test-ssh.sh", local)
@@ -162,6 +183,14 @@ class CiWorkflowTests(unittest.TestCase):
             ledger,
         )
         self.assertIn("scripts/test-postgres-release.sh", ledger)
+
+    def test_postgres_release_gtk_uses_the_staged_release_binary(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        release = workflow.split("  postgres-release:\n", 1)[1].split("  duckdb:\n", 1)[0]
+        self.assertIn("timeout-minutes: 45", release)
+        self.assertIn("cargo build --locked --release -p tablepro-app", release)
+        self.assertIn("target/release/tablepro-app target/installed/usr/bin/tablepro", release)
+        self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", release)
 
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "linux/scripts/test-postgres-release.sh").read_text()

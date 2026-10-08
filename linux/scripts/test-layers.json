@@ -119,6 +119,47 @@
         }
       ]
     },
+    "b4-rollback": {
+      "purpose": "Focused MySQL failed-batch rollback and PostgreSQL rollback-failure acceptance",
+      "prerequisites": "Rust 1.98; Docker; native TLS build dependencies",
+      "hosted_gate": "Build Linux / B4 rollback acceptance",
+      "steps": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-driver-mysql",
+            "--test",
+            "integration",
+            "mysql_atomic",
+            "--",
+            "--include-ignored",
+            "--test-threads=1"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests"
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-driver-postgres",
+            "--test",
+            "integration",
+            "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
+            "--",
+            "--include-ignored",
+            "--test-threads=1"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
     "tls": {
       "purpose": "Certificate authority, hostname and TLS-mode contracts",
       "prerequisites": "Rust 1.98; Docker Compose; OpenSSL",

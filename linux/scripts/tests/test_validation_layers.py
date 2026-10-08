@@ -121,7 +121,7 @@ class LayerRunnerTests(unittest.TestCase):
             self.assertIn(text, security)
         self.assertNotIn("continue-on-error:", security)
         build = (workflows / "build-linux.yml").read_text()
-        for layer in ["quick", "full", "drivers", "tls", "postgres-release", "ui", "widgets", "keyring"]:
+        for layer in ["quick", "full", "drivers", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring"]:
             self.assertIn(f"run-test-layer.py {layer}", build)
         self.assertNotIn("if-no-files-found: ignore", build)
         contracts = (workflows / "linux-ci-contracts.yml").read_text()
