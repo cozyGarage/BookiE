@@ -16,16 +16,20 @@ pub(super) struct RowMatch {
     pub text: String,
 }
 
-pub(super) fn first_matching_cell(cells: &[Value], needle: &str) -> Option<(usize, String)> {
-    cells.iter().enumerate().find_map(|(column, value)| {
-        let text = value_to_display_text(value);
-        text.to_lowercase().contains(needle).then_some((column, text))
-    })
+pub(super) fn first_matching_cell(cells: &[Option<Value>], needle: &str) -> Option<(usize, String)> {
+    cells
+        .iter()
+        .enumerate()
+        .filter_map(|(column, value)| value.as_ref().map(|value| (column, value)))
+        .find_map(|(column, value)| {
+            let text = value_to_display_text(value);
+            text.to_lowercase().contains(needle).then_some((column, text))
+        })
 }
 
 pub(super) fn matching_rows(
     count: u32,
-    row_at: impl Fn(u32) -> Option<Vec<Value>>,
+    row_at: impl Fn(u32) -> Option<Vec<Option<Value>>>,
     query: &str,
     limit: usize,
 ) -> Vec<RowMatch> {
@@ -158,7 +162,7 @@ fn show_matches(widgets: &FindWidgets, model: &gtk::SelectionModel, names: &[Str
         model.n_items(),
         |position| {
             let item = model.item(position)?.downcast::<RowObject>().ok()?;
-            Some(item.cells_clone())
+            Some(item.loaded_cells())
         },
         &query,
         MAX_MATCHES,
@@ -256,10 +260,18 @@ mod tests {
 
     fn find(query: &str, limit: usize) -> Vec<(u32, usize)> {
         let rows = rows();
-        matching_rows(rows.len() as u32, |p| rows.get(p as usize).cloned(), query, limit)
-            .into_iter()
-            .map(|hit| (hit.position, hit.column))
-            .collect()
+        matching_rows(
+            rows.len() as u32,
+            |p| {
+                rows.get(p as usize)
+                    .map(|cells| cells.iter().cloned().map(Some).collect())
+            },
+            query,
+            limit,
+        )
+        .into_iter()
+        .map(|hit| (hit.position, hit.column))
+        .collect()
     }
 
     #[test]
@@ -272,6 +284,12 @@ mod tests {
     fn an_empty_query_matches_nothing() {
         assert!(find("", 10).is_empty());
         assert!(find("   ", 10).is_empty());
+    }
+
+    #[test]
+    fn a_missing_projected_cell_is_not_a_search_match() {
+        let found = matching_rows(1, |_| Some(vec![Some(Value::Int(1)), None]), "not fetched", 10);
+        assert!(found.is_empty());
     }
 
     #[test]

@@ -21,7 +21,12 @@ pub enum AppMsg {
     ColumnsLoaded(Uuid, Vec<ColumnInfo>),
     FetchBrowseForeignKeys(Uuid),
     ForeignKeysLoaded(Uuid, Vec<ForeignKeyInfo>),
-    RowsLoaded(Uuid, crate::ui::browse_tab::BrowsePageRequest, QueryResult),
+    RowsLoaded(
+        Uuid,
+        crate::ui::browse_tab::BrowsePageRequest,
+        QueryResult,
+        Option<Vec<usize>>,
+    ),
     LoadFailed(Option<Uuid>, crate::ui::browse_tab::BrowseLoadFailure),
     RowOpStarted,
     ReloadConnections,

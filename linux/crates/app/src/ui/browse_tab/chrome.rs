@@ -447,7 +447,11 @@ impl BrowseTab {
     }
 }
 
-pub(super) fn extract_keyset_cursor(columns: &[ColumnInfo], result: &QueryResult) -> Option<Vec<tablepro_core::Value>> {
+pub(super) fn extract_keyset_cursor(
+    columns: &[ColumnInfo],
+    result: &QueryResult,
+    projected_columns: Option<&[usize]>,
+) -> Option<Vec<tablepro_core::Value>> {
     let last_row = result.rows.last()?;
     let pk_indexes: Vec<usize> = columns
         .iter()
@@ -460,7 +464,11 @@ pub(super) fn extract_keyset_cursor(columns: &[ColumnInfo], result: &QueryResult
     }
     let mut values = Vec::with_capacity(pk_indexes.len());
     for idx in pk_indexes {
-        values.push(last_row.get(idx)?.clone());
+        let result_index = match projected_columns {
+            Some(projection) => projection.iter().position(|projected| *projected == idx)?,
+            None => idx,
+        };
+        values.push(last_row.get(result_index)?.clone());
     }
     Some(values)
 }
@@ -522,7 +530,39 @@ pub(super) fn bind_inspector(
 
 #[cfg(test)]
 mod tests {
-    use super::format_thousands;
+    use super::{extract_keyset_cursor, format_thousands};
+    use tablepro_core::{ColumnInfo, QueryResult, Value};
+
+    #[test]
+    fn projected_keyset_cursor_maps_primary_keys_to_result_positions() {
+        let columns = vec![column("name", false), column("id", true), column("flag", false)];
+        let result = QueryResult {
+            columns: vec![column("id", true), column("name", false)],
+            rows: vec![vec![Value::Int(7), Value::Text("Ada".into())]],
+            truncated: false,
+        };
+        assert_eq!(
+            extract_keyset_cursor(&columns, &result, Some(&[1, 0])),
+            Some(vec![Value::Int(7)])
+        );
+        assert_eq!(extract_keyset_cursor(&columns, &result, Some(&[0])), None);
+    }
+
+    fn column(name: &str, primary_key: bool) -> ColumnInfo {
+        ColumnInfo {
+            name: name.into(),
+            data_type: "text".into(),
+            nullable: false,
+            primary_key,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
 
     #[test]
     fn format_thousands_handles_common_page_sizes() {

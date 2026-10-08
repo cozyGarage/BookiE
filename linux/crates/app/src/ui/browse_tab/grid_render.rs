@@ -49,11 +49,7 @@ impl BrowseTab {
         // the reverted value. Atomic via splice: one items-
         // changed emission, no flicker, no scroll jump.
         if let (Some(store), Some(store_pos), Some(old)) = (store, store_pos, row_obj) {
-            let cells = old.cells_clone();
-            let replacement = match old.draft_id() {
-                Some(id) => crate::ui::row_object::RowObject::new_draft(id, cells),
-                None => crate::ui::row_object::RowObject::new(cells),
-            };
+            let replacement = old.clone_preserving_loading_state();
             store.splice(store_pos, 1, &[replacement]);
         }
     }
@@ -211,7 +207,10 @@ impl BrowseTab {
         if self.column_view_matches_current_columns()
             && let Some(store) = self.list_store()
         {
-            self.refresh_grid_data(&result, &store);
+            if !self.refresh_grid_data(&result, &store) {
+                self.show_projection_error();
+                return;
+            }
             self.refresh_grid_chrome(&result);
             self.restore_focused_row();
             let _ = sender.output(BrowseTabOutput::StateChanged);
@@ -242,6 +241,7 @@ impl BrowseTab {
         let tab_ctx = TabGridContext {
             tab_id: Some(self.tab_id),
             pk_col_indices,
+            projected_columns: self.current_projection.clone(),
             foreign_key_columns,
         };
         let (column_view, selection) = build_column_view(
@@ -312,9 +312,29 @@ impl BrowseTab {
         &self,
         result: &std::sync::Arc<QueryResult>,
         store: &crate::ui::row_store::RowStore,
-    ) {
-        store.replace_shared(result.clone());
+    ) -> bool {
+        if let Some(indices) = &self.current_projection {
+            if let Err(error) = store.replace_projected(result.clone(), indices.clone(), self.current_columns.len()) {
+                tracing::error!(%error, "projected browse refresh does not match the table schema");
+                store.replace_shared(std::sync::Arc::new(QueryResult {
+                    columns: self.current_columns.clone(),
+                    rows: Vec::new(),
+                    truncated: false,
+                }));
+                return false;
+            }
+        } else {
+            store.replace_shared(result.clone());
+        }
         self.reprepend_drafts();
+        true
+    }
+
+    pub(super) fn show_projection_error(&self) {
+        self.show_error_inner(&crate::tr!(
+            "The database returned rows that do not match the table columns."
+        ));
+        self.inner_stack.set_visible_child_name("error");
     }
 
     /// Update paginator label, button sensitivity, and stack child —

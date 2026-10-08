@@ -37,6 +37,8 @@ pub enum GridMsg {
         row_key: Vec<tablepro_core::Value>,
     },
     CopyToClipboard(String),
+    IncompleteRowData,
+    ProjectionFailure,
     CopyRowAsInsert {
         row_position: u32,
     },
@@ -65,6 +67,7 @@ pub enum GridMsg {
 pub struct TabGridContext {
     pub tab_id: Option<uuid::Uuid>,
     pub pk_col_indices: Vec<usize>,
+    pub projected_columns: Option<Vec<usize>>,
     /// Names of columns that are part of a foreign key on this table.
     /// Marks the column header so a reference is visible before the
     /// cell value picker (a later slice) exists.
@@ -89,7 +92,28 @@ pub fn build_column_view(
     database: std::sync::Arc<DatabaseService>,
 ) -> (gtk4::ColumnView, gtk4::MultiSelection) {
     let result: &QueryResult = shared;
-    let store = RowStore::from_shared(shared.clone());
+    let store = match &tab_ctx.projected_columns {
+        Some(indices) => match RowStore::from_projected(shared.clone(), indices.clone(), schema_columns.len()) {
+            Ok(store) => store,
+            Err(error) => {
+                tracing::error!(%error, "projected browse rows do not match the table schema");
+                if let Some(sender) = &menu_sender {
+                    sender.send(GridMsg::ProjectionFailure).ok();
+                }
+                RowStore::from_shared(std::sync::Arc::new(QueryResult {
+                    columns: schema_columns.to_vec(),
+                    rows: Vec::new(),
+                    truncated: false,
+                }))
+            }
+        },
+        None => RowStore::from_shared(shared.clone()),
+    };
+    let columns = if tab_ctx.projected_columns.is_some() {
+        schema_columns
+    } else {
+        &result.columns
+    };
     let selection = gtk4::MultiSelection::new(Some(store));
     let column_view = gtk4::ColumnView::builder()
         .model(&selection)
@@ -105,19 +129,20 @@ pub fn build_column_view(
         install_grid_context_menus(
             &column_view,
             sender.clone(),
-            result,
+            columns,
+            result.truncated,
             driver_id,
             tab_ctx.tab_id.is_some(),
         )
     });
 
-    let default_min_width = if result.columns.len() > WIDE_TABLE_THRESHOLD {
+    let default_min_width = if columns.len() > WIDE_TABLE_THRESHOLD {
         Some(MIN_COLUMN_WIDTH_PX)
     } else {
         None
     };
-    let mut columns: Vec<gtk4::ColumnViewColumn> = Vec::with_capacity(result.columns.len());
-    for (i, column) in result.columns.iter().enumerate() {
+    let mut view_columns: Vec<gtk4::ColumnViewColumn> = Vec::with_capacity(columns.len());
+    for (i, column) in columns.iter().enumerate() {
         let editable = is_cell_editable(schema_columns.get(i).unwrap_or(column));
         let col = build_column(
             column,
@@ -134,23 +159,23 @@ pub fn build_column_view(
             column_widths.clone(),
         );
         column_view.append_column(&col);
-        columns.push(col);
+        view_columns.push(col);
     }
 
     let grid_actions = gtk4::gio::SimpleActionGroup::new();
     column_visibility::install(
         &column_view,
         &grid_actions,
-        &columns,
-        result.columns.iter().map(|column| column.name.clone()).collect(),
+        &view_columns,
+        columns.iter().map(|column| column.name.clone()).collect(),
         connection_id
             .zip(column_widths.clone())
             .map(|(id, store)| (id, table.to_string(), store)),
     );
     column_order::install(
         &column_view,
-        &columns,
-        result.columns.iter().map(|column| column.name.clone()).collect(),
+        &view_columns,
+        columns.iter().map(|column| column.name.clone()).collect(),
         connection_id
             .zip(column_widths.clone())
             .map(|(id, store)| (id, table.to_string(), store)),
@@ -158,20 +183,20 @@ pub fn build_column_view(
     column_jump::install(
         &column_view,
         &grid_actions,
-        &columns,
-        result.columns.iter().map(|column| column.name.clone()).collect(),
+        &view_columns,
+        columns.iter().map(|column| column.name.clone()).collect(),
         connection_id,
         database,
     );
     row_find::install(
         &column_view,
         &grid_actions,
-        result.columns.iter().map(|column| column.name.clone()).collect(),
+        columns.iter().map(|column| column.name.clone()).collect(),
     );
     column_view.insert_action_group("grid", Some(&grid_actions));
 
     if let Some((col_idx, ascending)) = sort
-        && let Some(col) = columns.get(col_idx)
+        && let Some(col) = view_columns.get(col_idx)
     {
         let direction = if ascending {
             gtk4::SortType::Ascending
@@ -188,7 +213,7 @@ pub fn build_column_view(
     {
         let dispatch = {
             let app_sender = app_sender.clone();
-            let columns = columns.clone();
+            let columns = view_columns.clone();
             move |sorter: &gtk4::ColumnViewSorter| {
                 let Some(active) = sorter.primary_sort_column() else {
                     return;

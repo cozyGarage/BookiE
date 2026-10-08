@@ -55,9 +55,10 @@ the PR evidence comments: [#314](https://github.com/cozyGarage/BookiE/pull/314#i
 
 [B3 PR #365](https://github.com/cozyGarage/BookiE/pull/365) merged with
 MySQL/MariaDB ENUM/SET malformed-metadata refusal and consumer regressions.
-PR #369 (PostgreSQL 513-layer enum-domain contract) awaits maintainer merge;
-see the [B3 board](type-contract-strategy.md) for contract details. B3 remains
-open for the broader engine/type/consumer/configuration matrix,
+[PR #369](https://github.com/cozyGarage/BookiE/pull/369) also merged with the
+PostgreSQL 513-layer enum-domain checkpoint; see the [B3 board](type-contract-strategy.md)
+for contract details. B3 remains open for the broader
+engine/type/consumer/configuration matrix,
 mutation triage and installed grid acceptance. B4 still needs the remaining
 privacy, daemon retirement, headless ownership and transport/session acceptance.
 B7 still needs a frozen candidate, installed Arch/Wayland and Debian/GNOME

@@ -32,6 +32,7 @@ mod imp {
     pub struct RowStore {
         pub(in crate::ui) slots: RefCell<Vec<Slot>>,
         pub(in crate::ui) source: RefCell<Option<Arc<QueryResult>>>,
+        pub(in crate::ui) projection: RefCell<Option<(Vec<usize>, usize)>>,
     }
 
     #[glib::object_subclass]
@@ -60,7 +61,8 @@ mod imp {
                     let source_index = *index;
                     let source = self.source.borrow();
                     let cells = source.as_ref()?.rows.get(source_index)?.clone();
-                    let row = RowObject::new(cells);
+                    let projection = self.projection.borrow();
+                    let row = row_for_source(cells, projection.as_ref())?;
                     let object = glib::WeakRef::new();
                     object.set(Some(&row));
                     *slot = Slot::Cached { source_index, object };
@@ -73,7 +75,8 @@ mod imp {
                         let source_index = *source_index;
                         let source = self.source.borrow();
                         let cells = source.as_ref()?.rows.get(source_index)?.clone();
-                        let row = RowObject::new(cells);
+                        let projection = self.projection.borrow();
+                        let row = row_for_source(cells, projection.as_ref())?;
                         object.set(Some(&row));
                         Some(row.upcast())
                     }
@@ -84,6 +87,20 @@ mod imp {
     }
 }
 
+fn row_for_source(cells: Vec<tablepro_core::Value>, projection: Option<&(Vec<usize>, usize)>) -> Option<RowObject> {
+    match projection {
+        Some((indices, width)) => RowObject::new_projected(cells, indices, *width),
+        None => Some(RowObject::new(cells)),
+    }
+}
+
+fn valid_projection(result: &QueryResult, indices: &[usize], width: usize) -> bool {
+    (indices.len() == result.columns.len() || (result.columns.is_empty() && result.rows.is_empty()))
+        && indices.iter().all(|index| *index < width)
+        && indices.iter().copied().collect::<std::collections::HashSet<_>>().len() == indices.len()
+        && result.rows.iter().all(|row| row.len() == indices.len())
+}
+
 glib::wrapper! {
     pub struct RowStore(ObjectSubclass<imp::RowStore>) @implements gio::ListModel;
 }
@@ -91,19 +108,39 @@ glib::wrapper! {
 impl RowStore {
     pub fn from_shared(result: Arc<QueryResult>) -> Self {
         let store: Self = glib::Object::new();
-        store.install_shared(result);
+        store.install_shared(result, None);
         store
+    }
+
+    pub fn from_projected(result: Arc<QueryResult>, indices: Vec<usize>, width: usize) -> Result<Self, String> {
+        if !valid_projection(&result, &indices, width) {
+            return Err("projected browse result does not match its schema mapping".into());
+        }
+        let store: Self = glib::Object::new();
+        store.install_shared(result, Some((indices, width)));
+        Ok(store)
     }
 
     pub fn replace_shared(&self, result: Arc<QueryResult>) {
         let removed = self.n_items();
-        self.install_shared(result);
+        self.install_shared(result, None);
         self.items_changed(0, removed, self.n_items());
     }
 
-    fn install_shared(&self, result: Arc<QueryResult>) {
+    pub fn replace_projected(&self, result: Arc<QueryResult>, indices: Vec<usize>, width: usize) -> Result<(), String> {
+        if !valid_projection(&result, &indices, width) {
+            return Err("projected browse result does not match its schema mapping".into());
+        }
+        let removed = self.n_items();
+        self.install_shared(result, Some((indices, width)));
+        self.items_changed(0, removed, self.n_items());
+        Ok(())
+    }
+
+    fn install_shared(&self, result: Arc<QueryResult>, projection: Option<(Vec<usize>, usize)>) {
         *self.imp().slots.borrow_mut() = (0..result.rows.len()).map(Slot::Shared).collect();
         *self.imp().source.borrow_mut() = Some(result);
+        *self.imp().projection.borrow_mut() = projection;
     }
 
     pub fn insert(&self, position: u32, row: &RowObject) {
@@ -319,5 +356,48 @@ mod tests {
         store.replace_shared(shared(2));
         assert_eq!(Arc::strong_count(&old), 1);
         assert_eq!(store.n_items(), 2);
+    }
+
+    #[test]
+    fn projected_store_keeps_sql_null_distinct_from_an_unfetched_cell() {
+        let result = Arc::new(QueryResult {
+            columns: vec![column("id"), column("name")],
+            rows: vec![vec![Value::Null, Value::Text("Ada".into())]],
+            truncated: false,
+        });
+        let store = RowStore::from_projected(result, vec![0, 2], 3).unwrap();
+        let row = store.item(0).and_downcast::<RowObject>().unwrap();
+
+        assert!(row.cell_is_loaded(0));
+        assert_eq!(row.cell_value(0), Value::Null);
+        assert!(!row.cell_is_loaded(1));
+        assert!(row.complete_cells().is_none());
+        assert_eq!(row.cell_value(2), Value::Text("Ada".into()));
+    }
+
+    #[test]
+    fn projected_store_refuses_rows_that_do_not_match_the_column_map() {
+        let result = Arc::new(QueryResult {
+            columns: vec![column("id")],
+            rows: vec![vec![Value::Int(1), Value::Int(2)]],
+            truncated: false,
+        });
+        assert!(RowStore::from_projected(result, vec![0], 1).is_err());
+    }
+
+    fn column(name: &str) -> tablepro_core::ColumnInfo {
+        tablepro_core::ColumnInfo {
+            name: name.into(),
+            data_type: "text".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
     }
 }

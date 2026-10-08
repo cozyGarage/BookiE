@@ -59,12 +59,23 @@ impl App {
             ));
             return;
         };
+        let pending =
+            crate::services::change_tracker::with_tab_ref(tab_id, |tracker| tracker.has_pending()).unwrap_or(false);
+        let hidden_columns = if pending {
+            std::collections::HashSet::new()
+        } else {
+            self.connection_id
+                .zip(self.persistence.column_widths.as_ref())
+                .map(|(connection_id, store)| store.hidden_columns(connection_id, &table))
+                .unwrap_or_default()
+        };
         let target = BrowseTarget {
             driver_id: &driver_id,
             schema: schema.as_deref(),
             table: &table,
             columns: &columns,
             filter: &filter,
+            hidden_columns: Some(&hidden_columns),
         };
         let query = match target.page(offset, limit, sort, keyset_cursor.as_deref()) {
             Ok(query) => query,
@@ -87,17 +98,24 @@ impl App {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded(timeout_secs);
-                    let result = match query {
-                        PageQuery::Native => {
+                    let (result, projected_columns) = match query {
+                        PageQuery::Native => (
                             conn.fetch_rows_controlled(schema.as_deref(), &table, offset, limit, &control)
-                                .await
-                        }
+                                .await,
+                            None,
+                        ),
                         PageQuery::Sql(query) => {
-                            conn.query_params_controlled(&query.sql, &query.params, &control).await
+                            let projected_columns = query.projected_columns.clone();
+                            (
+                                conn.query_params_controlled(&query.sql, &query.params, &control).await,
+                                projected_columns,
+                            )
                         }
                     };
                     match result {
-                        Ok(query_result) => sender_clone.input(AppMsg::RowsLoaded(tab_id, request, query_result)),
+                        Ok(query_result) => {
+                            sender_clone.input(AppMsg::RowsLoaded(tab_id, request, query_result, projected_columns))
+                        }
                         Err(e) => sender_clone.input(AppMsg::LoadFailed(
                             Some(tab_id),
                             BrowseLoadFailure {
@@ -207,6 +225,7 @@ impl App {
             table: &table,
             columns: &columns,
             filter: &filter,
+            hidden_columns: None,
         };
         let query = match target.count() {
             Ok(query) => query,
@@ -224,11 +243,7 @@ impl App {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded(timeout_secs);
-                    let qr_result = if query.params.is_empty() {
-                        conn.query_controlled(&query.sql, &control).await
-                    } else {
-                        conn.query_params_controlled(&query.sql, &query.params, &control).await
-                    };
+                    let qr_result = run_browse_count(conn, query, &control).await;
                     let count = qr_result.ok().and_then(|qr| row_count_from_result(&qr));
                     match count {
                         Some(count) => sender_clone.input(AppMsg::RowCountLoaded(tab_id, request, count)),
@@ -262,8 +277,21 @@ impl App {
         self.dispatch_to_tab(tab_id, BrowseTabInput::ForeignKeysLoaded(foreign_keys));
     }
 
-    pub(super) fn on_browse_rows_loaded(&self, tab_id: Uuid, request: BrowsePageRequest, result: QueryResult) {
-        self.dispatch_to_tab(tab_id, BrowseTabInput::RowsLoaded { request, result });
+    pub(super) fn on_browse_rows_loaded(
+        &self,
+        tab_id: Uuid,
+        request: BrowsePageRequest,
+        result: QueryResult,
+        projected_columns: Option<Vec<usize>>,
+    ) {
+        self.dispatch_to_tab(
+            tab_id,
+            BrowseTabInput::RowsLoaded {
+                request,
+                result,
+                projected_columns,
+            },
+        );
     }
 
     pub(super) fn on_browse_row_count_loaded(&self, tab_id: Uuid, request: BrowseRowCountRequest, count: u64) {
@@ -308,14 +336,25 @@ impl App {
             return;
         };
 
-        let result = {
+        let (result, has_unfetched_columns) = {
             let tabs = self.workspace_tabs.borrow();
-            tabs.get(&active_id)
+            let Some(model) = tabs
+                .get(&active_id)
                 .and_then(|t| t.browse_controller())
-                .and_then(|c| c.model().snapshot())
+                .map(|c| c.model())
+            else {
+                self.show_toast(&crate::tr!("Nothing to export"));
+                return;
+            };
+            (model.snapshot(), model.has_unfetched_columns())
         };
         let Some(result) = result else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            let message = if has_unfetched_columns {
+                crate::tr!("Show hidden columns and reload before exporting this page.")
+            } else {
+                crate::tr!("Nothing to export")
+            };
+            self.show_toast(&message);
             return;
         };
         let table_label = match &schema {
@@ -447,6 +486,20 @@ fn row_count_from_result(result: &QueryResult) -> Option<u64> {
         tablepro_core::Value::Float(f) if *f >= 0.0 && f.is_finite() => Some(*f as u64),
         tablepro_core::Value::Decimal(d) => d.to_string().parse::<u64>().ok(),
         _ => None,
+    }
+}
+
+async fn run_browse_count(
+    connection: std::sync::Arc<dyn tablepro_core::Connection>,
+    query: crate::services::browse_query::BoundQuery,
+    control: &tablepro_core::OperationControl,
+) -> Result<QueryResult, tablepro_core::DriverError> {
+    if query.params.is_empty() {
+        connection.query_controlled(&query.sql, control).await
+    } else {
+        connection
+            .query_params_controlled(&query.sql, &query.params, control)
+            .await
     }
 }
 

@@ -431,7 +431,13 @@ impl BrowseTab {
             let Ok(row) = item.downcast::<crate::ui::row_object::RowObject>() else {
                 continue;
             };
-            rows.push(row.cells_clone());
+            let Some(cells) = row.complete_cells() else {
+                let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                    "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
+                )));
+                return;
+            };
+            rows.push(cells);
         }
         if rows.is_empty() {
             return;
