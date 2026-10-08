@@ -89,6 +89,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 
 async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, DriverError> {
     let scheme = "mongodb";
+    let host = mongo_host_authority(&opts.host)?;
     let password = opts.password.expose_secret();
     let auth = if !opts.username.is_empty() {
         format!("{}:{}@", encode_uri(&opts.username), encode_uri(password))
@@ -100,7 +101,7 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
     } else {
         format!("/{}", encode_uri(&opts.database))
     };
-    let uri = format!("{scheme}://{auth}{}:{}{db_path}", opts.host, opts.port);
+    let uri = format!("{scheme}://{auth}{host}:{}{db_path}", opts.port);
     let mut client_opts = ClientOptions::parse(&uri).await.map_err(map_mongo_error)?;
     client_opts.app_name = Some("TablePro".into());
     client_opts.tls = Some(tls_for(&opts.tls, opts.service_address().0));
@@ -112,6 +113,30 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
     // or reaching a host the client can't resolve.
     client_opts.direct_connection = Some(true);
     Ok(client_opts)
+}
+
+fn mongo_host_authority(host: &str) -> Result<String, DriverError> {
+    if let Ok(address) = host.parse::<std::net::IpAddr>() {
+        return Ok(match address {
+            std::net::IpAddr::V4(address) => address.to_string(),
+            std::net::IpAddr::V6(address) => format!("[{address}]"),
+        });
+    }
+    let labels = host.strip_suffix('.').unwrap_or(host).split('.');
+    let valid = !host.is_empty()
+        && host.len() <= 254
+        && labels.into_iter().all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        });
+    if valid {
+        Ok(host.to_string())
+    } else {
+        Err(DriverError::Unsupported("invalid MongoDB host".into()))
+    }
 }
 
 fn encode_uri(s: &str) -> String {
@@ -599,6 +624,33 @@ mod tests {
         };
         let client_opts = build_client_options(&opts).await.expect("build client options");
         assert_eq!(client_opts.direct_connection, Some(true));
+    }
+
+    #[test]
+    fn mongo_host_authority_accepts_dns_and_ip_literals() {
+        for (input, expected) in [
+            ("db.internal", "db.internal"),
+            ("db.internal.", "db.internal."),
+            ("127.0.0.1", "127.0.0.1"),
+            ("::1", "[::1]"),
+        ] {
+            assert_eq!(mongo_host_authority(input).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn mongo_host_authority_rejects_uri_syntax_and_malformed_names() {
+        for input in [
+            "",
+            "db/path",
+            "db?replicaSet=evil",
+            "user@db",
+            "db:27018",
+            "-db",
+            "db..internal",
+        ] {
+            assert!(mongo_host_authority(input).is_err(), "accepted {input:?}");
+        }
     }
 
     #[tokio::test]

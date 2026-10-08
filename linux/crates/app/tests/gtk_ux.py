@@ -123,6 +123,21 @@ def scenarios(ui):
     def wait_for_result_column(name, present=True):
         ui.wait_for_node_containing(f"{name}\n", role=pyatspi.ROLE_LABEL, present=present)
 
+    def toggle_table_column(cell_text, column_name):
+        open_cell_menu(cell_text)
+        choose_menu_item(8)
+        wait_for_adw_dialog("Columns")
+        switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
+        switch = next(
+            node for node in ui.descendants(ui.application_node())
+            if ui.node_name(node) == column_name
+            and ui.node_role(node) in switch_roles
+            and node.queryAction().nActions > 0
+        )
+        ui.invoke(switch)
+        ui.press_x11_key("Escape")
+        wait_for_adw_dialog("Columns", present=False)
+
     def choose_menu_item(position):
         for _ in range(position):
             ui.press_x11_key("Down")
@@ -597,6 +612,37 @@ def scenarios(ui):
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("name", present=False)
+
+    def postgres_hidden_projection_refresh_and_edit_preserve_hidden_value(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke_named_action_within("public.people", "Open people")
+        ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
+        toggle_table_column("Ada Lovelace", "profile")
+        wait_for_result_column("profile", present=False)
+        ui.press_x11_key("F5")
+        ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
+        click_cell("Ada Lovelace")
+        ui.invoke(ui.wait_for_node(name="Row inspector", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="Not fetched")
+        assert psql("SELECT profile->>'role' FROM people WHERE id=1") == "analyst"
+
+        psql("UPDATE people SET name='AdaByron' WHERE id=1")
+        ui.press_x11_key("F5")
+        ui.wait_for_node(name="AdaByron", role=pyatspi.ROLE_LABEL)
+        click_cell("AdaByron", count=2)
+        for key in "AdaLovelace":
+            ui.press_x11_key(key.lower(), ("Shift_L",) if key.isupper() else ())
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        ui.press_x11_key("s", ("Control_L",))
+        wait_for_oracle(psql, "SELECT name FROM people WHERE id=1", "AdaLovelace")
+        assert psql("SELECT profile->>'role' FROM people WHERE id=1") == "analyst"
+
+        toggle_table_column("AdaLovelace", "profile")
+        ui.press_x11_key("F5")
+        wait_for_result_column("profile")
+        ui.wait_for_node_containing("analyst", role=pyatspi.ROLE_LABEL)
 
     def postgres_saved_mtls_connection_authenticates_and_queries(database, base):
         ui.open_saved_connection(ui.POSTGRES_MTLS_CONNECTION_NAME)
@@ -1146,6 +1192,7 @@ def scenarios(ui):
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_saved_connection_browses_rows_and_values)
+        result.append(postgres_hidden_projection_refresh_and_edit_preserve_hidden_value)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
         result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
