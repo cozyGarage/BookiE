@@ -647,7 +647,10 @@ mod tests {
 
         // Hold the accepted socket open so this is an in-flight operation,
         // rather than a connect failure or a server disconnect.
-        let (_stream, _) = listener.accept().await.unwrap();
+        let (_stream, _) = tokio::time::timeout(std::time::Duration::from_secs(5), listener.accept())
+            .await
+            .expect("MongoDB did not connect to the localhost fixture")
+            .unwrap();
         token.cancel();
 
         match operation.await.unwrap() {
