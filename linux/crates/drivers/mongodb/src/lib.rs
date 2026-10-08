@@ -116,9 +116,15 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
 }
 
 fn mongo_host_authority(host: &str) -> Result<String, DriverError> {
-    if let Ok(address) = host.parse::<std::net::IpAddr>() {
+    let bracketed = host.starts_with('[') || host.ends_with(']');
+    let ip_host = host
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(host);
+    if let Ok(address) = ip_host.parse::<std::net::IpAddr>() {
         return Ok(match address {
-            std::net::IpAddr::V4(address) => address.to_string(),
+            std::net::IpAddr::V4(address) if !bracketed => address.to_string(),
+            std::net::IpAddr::V4(_) => return Err(DriverError::Unsupported("invalid MongoDB host".into())),
             std::net::IpAddr::V6(address) => format!("[{address}]"),
         });
     }
@@ -633,6 +639,7 @@ mod tests {
             ("db.internal.", "db.internal."),
             ("127.0.0.1", "127.0.0.1"),
             ("::1", "[::1]"),
+            ("[::1]", "[::1]"),
         ] {
             assert_eq!(mongo_host_authority(input).unwrap(), expected);
         }
