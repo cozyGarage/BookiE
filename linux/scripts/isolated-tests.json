@@ -241,6 +241,16 @@
       "tablepro-app",
       "--lib",
       "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::run_marks::tests::each_statement_gets_a_gutter_mark_for_its_outcome"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::tests::a_group_row_shows_a_chevron_that_follows_its_collapse_state"
     ]
   ],
   "keyring": [
