@@ -1,8 +1,219 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{DriverError, Value};
+use tablepro_core::{DriverError, OperationControl, QueryResult, Session, Value};
+use tokio_util::sync::CancellationToken;
 
 use crate::{connect, start_pg};
+
+async fn session_query(
+    session: &mut dyn Session,
+    sql: &str,
+    params: &[Value],
+    control: &OperationControl,
+) -> QueryResult {
+    session.query_params_controlled(sql, params, control).await.unwrap()
+}
+
+async fn create_shadowed_enum_fixture(connection: &dyn tablepro_core::Connection) {
+    connection.execute("CREATE SCHEMA enum_session_target").await.unwrap();
+    connection.execute("CREATE SCHEMA enum_session_shadow").await.unwrap();
+    connection
+        .execute("CREATE TYPE enum_session_target.state AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE enum_session_shadow.state AS ENUM ('shadow-only')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE enum_session_target.rows \
+             (id INT PRIMARY KEY, state enum_session_target.state)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO enum_session_target.rows VALUES (1, 'ready'), (2, 'ready'), (3, 'ready')")
+        .await
+        .unwrap();
+}
+
+async fn assert_session_enum_path(session: &mut dyn Session, control: &OperationControl) {
+    session_query(session, "SET search_path = enum_session_shadow, public", &[], control).await;
+    assert_eq!(
+        session_query(
+            session,
+            "SELECT current_schema()::text, current_setting('search_path')::text, \
+             current_schemas(false)::text",
+            &[],
+            control,
+        )
+        .await
+        .rows,
+        vec![vec![
+            Value::Text("enum_session_shadow".into()),
+            Value::Text("enum_session_shadow, public".into()),
+            Value::Text("{enum_session_shadow,public}".into()),
+        ]]
+    );
+}
+
+async fn assert_session_enum_parameter_oracles(session: &mut dyn Session, control: &OperationControl) {
+    let native = session_query(
+        session,
+        "UPDATE enum_session_target.rows SET state = 'paused'::enum_session_target.state \
+         WHERE id = 2 RETURNING state::text, pg_typeof(state)::text",
+        &[],
+        control,
+    )
+    .await;
+    let bound = session_query(
+        session,
+        "UPDATE enum_session_target.rows SET state = $1 \
+         WHERE id = 1 RETURNING state::text, pg_typeof(state)::text",
+        &[Value::Text("paused".into())],
+        control,
+    )
+    .await;
+    assert_eq!(bound.rows, native.rows);
+
+    let native_null = session_query(
+        session,
+        "UPDATE enum_session_target.rows SET state = NULL::enum_session_target.state \
+         WHERE id = 2 RETURNING state::text, pg_typeof(state)::text",
+        &[],
+        control,
+    )
+    .await;
+    let bound_null = session_query(
+        session,
+        "UPDATE enum_session_target.rows SET state = $1 \
+         WHERE id = 1 RETURNING state::text, pg_typeof(state)::text",
+        &[Value::Null],
+        control,
+    )
+    .await;
+    assert_eq!(bound_null.rows, native_null.rows);
+    assert_eq!(
+        session_query(
+            session,
+            "SELECT id, state::text, pg_typeof(state)::text \
+             FROM enum_session_target.rows ORDER BY id",
+            &[],
+            control,
+        )
+        .await
+        .rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Null,
+                Value::Text("enum_session_target.state".into())
+            ],
+            vec![
+                Value::Int(2),
+                Value::Null,
+                Value::Text("enum_session_target.state".into())
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("ready".into()),
+                Value::Text("enum_session_target.state".into())
+            ],
+        ]
+    );
+}
+
+async fn assert_shadow_only_enum_label_is_refused(session: &mut dyn Session, control: &OperationControl) {
+    let error = session
+        .query_params_controlled(
+            "UPDATE enum_session_target.rows SET state = $1 WHERE id = 3",
+            &[Value::Text("shadow-only".into())],
+            control,
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&error, DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        "expected target enum to reject the shadow-only label with 22P02, got {error:?}"
+    );
+    assert_eq!(
+        session_query(
+            session,
+            "SELECT state::text, pg_typeof(state)::text \
+             FROM enum_session_target.rows WHERE id = 3",
+            &[],
+            control,
+        )
+        .await
+        .rows,
+        vec![vec![
+            Value::Text("ready".into()),
+            Value::Text("enum_session_target.state".into()),
+        ]]
+    );
+}
+
+async fn assert_session_enum_expression_parameters(session: &mut dyn Session, control: &OperationControl) {
+    let enum_type = "enum_session_target.state";
+    for (parameter, coalesced, appended) in [
+        (
+            Value::Text("paused".into()),
+            Value::Text("paused".into()),
+            r#"["ready","paused"]"#,
+        ),
+        (Value::Null, Value::Text("ready".into()), r#"["ready",null]"#),
+    ] {
+        assert_eq!(
+            session_query(
+                session,
+                "SELECT COALESCE($1, state)::text, pg_typeof($1)::text, \
+                 pg_typeof(COALESCE($1, state))::text \
+                 FROM enum_session_target.rows WHERE id = 3",
+                std::slice::from_ref(&parameter),
+                control,
+            )
+            .await
+            .rows,
+            vec![vec![
+                coalesced,
+                Value::Text(enum_type.into()),
+                Value::Text(enum_type.into()),
+            ]]
+        );
+        assert_eq!(
+            session_query(
+                session,
+                "SELECT array_to_json(array_append(ARRAY[state], $1))::text, \
+                 pg_typeof($1)::text, pg_typeof(array_append(ARRAY[state], $1))::text \
+                 FROM enum_session_target.rows WHERE id = 3",
+                std::slice::from_ref(&parameter),
+                control,
+            )
+            .await
+            .rows,
+            vec![vec![
+                Value::Text(appended.into()),
+                Value::Text(enum_type.into()),
+                Value::Text(format!("{enum_type}[]")),
+            ]]
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_enum_parameter_resolves_without_target_schema_in_session_path() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    create_shadowed_enum_fixture(connection.as_ref()).await;
+    let mut session = connection.open_session().await.unwrap();
+    let control = OperationControl::new(CancellationToken::new(), None);
+    assert_session_enum_path(&mut *session, &control).await;
+    assert_session_enum_parameter_oracles(&mut *session, &control).await;
+    assert_session_enum_expression_parameters(&mut *session, &control).await;
+    assert_shadow_only_enum_label_is_refused(&mut *session, &control).await;
+}
 
 #[tokio::test]
 #[ignore = "requires docker"]
