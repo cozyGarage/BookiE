@@ -5,7 +5,7 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `b9558847` on `linux` (PR #328; fetched 2026-10-08). Since PR #315,
+Code baseline: `c61589a8` on `linux` (PR #330; fetched 2026-10-08). Since PR #315,
 PRs #316, #319, #321–#323 and #328 refreshed architecture/B3/B4 documentation;
 PRs #317–#320 added Redis binary-value, binary-key and SCAN page-boundary
 coverage; PRs #322 and #328 recorded mutation audits; PR #324 added enum-leaf
@@ -20,10 +20,11 @@ validation are in the changelog and owning boards.
 
 The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
 the focused MongoDB selector passed against MongoDB 7. The MySQL lost-ack
-selector passed against its Docker fixture on PR #315. On `b9558847`, Linux
-Security passed, Build Linux is queued, and Flatpak packaging is running. Sonar
-passed on PR #328. The PR #325–#328 checks are recorded in their PR discussions;
-these runs do not establish B4 acceptance on a selected frozen candidate.
+selector passed against its Docker fixture on PR #315. On `c61589a8`, Linux
+Security passed, Build Linux is pending, and Flatpak packaging is running.
+Sonar passed on PR #328. The PR #325–#328 checks are recorded in their PR
+discussions; these runs do not establish B4 acceptance on a selected frozen
+candidate.
 The local focused B4 rollback layer passed on clean documentation-only commit
 `73f8ce935`; its tested source files match `684ea40f`. Commands, results and
 source hashes are in the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
@@ -112,7 +113,7 @@ owners; do not create a second completion cache, exporter or type policy.
 
 ## B4 acceptance worklist (2026-10-08)
 
-This is the next acceptance slice on current `linux` tip `b9558847`. Prior runs
+This is the next acceptance slice on current `linux` tip `c61589a8`. Prior runs
 remain useful evidence for their exact SHAs, but do not substitute for current
 frozen-candidate, hosted or installed acceptance where required. The SSH GTK
 artifacts below prove staged release-binary behavior under Xvfb/AT-SPI; they do
@@ -120,7 +121,8 @@ not prove a distribution-package installation or native Wayland session.
 
 | Item | Current evidence and action |
 | --- | --- |
-| B4-7, B4-9, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. At current tip `b9558847`, Linux Security passed, Build Linux is queued and Flatpak packaging is running. |
+| B4-7, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. At current tip `c61589a8`, Linux Security passed, Build Linux is pending and Flatpak packaging is running. |
+| B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Repeat on the selected frozen SHA, confirm hosted results, and complete installed-package/native Wayland acceptance. |
 | B4-22 | Keep UNVERIFIED. The GTK bundle export/import and encrypted credential round-trip have local and earlier hosted evidence; obtain acceptance on the selected frozen candidate, hosted SHA, and installed package/native Wayland. |
 | B4-12 | Repeat PostgreSQL backend-termination rollback-failure acceptance on the selected frozen candidate; preserve `TransactionRollbackFailed`, row rollback, and sequence side-effect assertions with exact SHA. Prior candidate/hosted evidence remains historical. |
 | B4-11 | Extend MySQL failed-batch rollback coverage to the additional storage engines and side-effect patterns requested. Existing proof is bounded to InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, DML trigger effects, AUTO_INCREMENT, and one session-variable effect. |
