@@ -114,8 +114,8 @@ on that merge SHA is pending; the B4 rollback job has not started yet. PR #353's
 PR checks skipped that job by workflow condition, so confirm the post-merge run
 when it completes. Neither result is acceptance on a selected frozen candidate.
 PR #312 skipped its B4 rollback job because it only changed MongoDB tests. The
-focused `b4-rollback` layer passed locally on documentation-only commit
-`73f8ce935`; the tested source files match `684ea40f`. See the [PR #314 evidence
+focused `b4-rollback` layer passed locally on a documentation-only commit
+that was squashed away; the tested source files match `684ea40f`. See the [PR #314 evidence
 comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
 Those results do not establish hosted acceptance on a selected frozen
 candidate. GTK runs using a staged release binary under Xvfb do not establish
