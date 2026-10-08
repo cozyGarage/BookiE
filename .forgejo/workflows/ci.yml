@@ -2,9 +2,11 @@ name: lab-ci
 
 on:
   push:
-    branches: [linux]
-  pull_request:
-    branches: [linux]
+    branches: ["**"]
+
+concurrency:
+  group: lab-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/linux' }}
 
 env:
   CARGO_TERM_COLOR: never
