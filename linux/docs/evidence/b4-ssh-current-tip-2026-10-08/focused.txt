@@ -1,0 +1,19 @@
+BookiE B4-7/B4-16/B4-17 exact-tip SSH evidence, 2026-10-08
+
+The SSH-only layer below ran on `fork/linux` commit `ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9`. The PostgreSQL release layer was rerun at PR head `79e4aa0d5643ea0e99a0b100b002809ea8aef54f` after rebasing onto `fork/linux` commit `c3122d97459685060f1cf3474b55e1a11b961abe` (PR #396).
+
+`bash scripts/test-ssh.sh` passed 22 tests: 10 built-in agent-auth and 12 system OpenSSH session tests. Coverage includes two-hop reachability, cancellation while the second-hop trust prompt is pending, second-hop key change, and system OpenSSH ProxyJump.
+
+`rtk proxy env CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 bash scripts/test-postgres-release.sh` returned exit code 0. The system OpenSSH agentd trust fixture passed, all three agentd mTLS tests passed, the release integration test suite completed successfully, and all seven selected GTK SSH trust/audit/reconnect scenarios reported passed:
+
+- `postgres_ssh_unknown_host_key_decline_is_durably_audited`
+- `postgres_ssh_setup_failure_is_durably_audited`
+- `postgres_ssh_tunnel_loss_retires_session_and_reconnects`
+- `postgres_ssh_multihop_trusts_both_hops_and_queries`
+- `postgres_ssh_second_hop_decline_does_not_learn_key`
+- `postgres_ssh_changed_second_hop_key_is_refused`
+- `postgres_saved_mtls_connection_authenticates_and_queries`
+
+The GTK run used local Xvfb, private D-Bus and AT-SPI. Its D-Bus disconnect line occurred during shutdown after all scenarios passed and the script returned 0.
+
+Build Linux run [#37794837722](https://github.com/cozyGarage/BookiE/actions/runs/37794837722) for `ca1dc6002` was cancelled before jobs started; Security and Flatpak packaging passed. Build Linux run [#37796530008](https://github.com/cozyGarage/BookiE/actions/runs/37796530008) on `60e3f2666` was later cancelled after the branch advanced. Current `fork/linux` tip `c3122d97459685060f1cf3474b55e1a11b961abe` has Build Linux run [#37797466945](https://github.com/cozyGarage/BookiE/actions/runs/37797466945) pending. This evidence does not establish a frozen candidate, distribution-package installation, native Wayland trust flow, or Windows AD interoperability. Saved jump-chain editing remains open under UI-1b.
