@@ -41,7 +41,11 @@ POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID = "ee8f8451-05cf-4c21-8c7f-f37c8c96e251
 WAIT_SECONDS = 15
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
-SWITCH_ROLES = tuple(role for role in (getattr(pyatspi, "ROLE_SWITCH", None), pyatspi.ROLE_TOGGLE_BUTTON) if role is not None)
+SWITCH_ROLES = tuple(
+    role
+    for role in (getattr(pyatspi, "ROLE_SWITCH", None), pyatspi.ROLE_TOGGLE_BUTTON, pyatspi.ROLE_CHECK_BOX)
+    if role is not None
+)
 PASSPHRASE_ROLES = (pyatspi.ROLE_PASSWORD_TEXT, pyatspi.ROLE_TEXT)
 SETTLE_SECONDS = 3.0
 
