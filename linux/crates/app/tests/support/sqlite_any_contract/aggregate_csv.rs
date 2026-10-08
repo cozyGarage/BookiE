@@ -1061,3 +1061,71 @@ async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classe
         ]
     );
 }
+
+#[tokio::test]
+async fn sqlite_json_quote_any_csv_round_trip_keeps_json_text_distinct_from_null() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, NULL), (2, ''), (3, 'NULL'), (4, '=1+1'), (5, '東京')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, json_quote(value) AS result, \
+                    typeof(json_quote(value)) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let expected = ["null", "\"\"", "\"NULL\"", "\"=1+1\"", "\"東京\""]
+        .into_iter()
+        .enumerate()
+        .map(|(index, quoted)| {
+            vec![
+                Value::Int(index as i64 + 1),
+                Value::Text(quoted.into()),
+                Value::Text("text".into()),
+            ]
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(result.rows, expected);
+
+    sqlite_result_csv_round_trip(connection.as_ref(), &result, "restored", &[None, Some(0), Some(1), Some(2)])
+        .await;
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        expected
+            .into_iter()
+            .map(|row| vec![Value::Text("text".into()), row[1].clone(), Value::Text("text".into())])
+            .collect::<Vec<_>>()
+    );
+}
