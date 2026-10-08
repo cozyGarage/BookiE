@@ -224,7 +224,7 @@ pub struct ExecResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{ColumnInfo, QualifiedTypeName, QueryResultBudget, Value};
+    use super::{ColumnInfo, QualifiedTypeName, QueryResult, QueryResultBatch, QueryResultBudget, Value};
 
     #[test]
     fn enum_catalog_metadata_does_not_change_column_info_wire_shape() {
@@ -253,22 +253,67 @@ mod tests {
 
     #[test]
     fn result_budget_caps_cells_and_dynamic_value_storage() {
-        let row = vec![Value::Text("x".into())];
-        let mut byte_budget = QueryResultBudget {
-            bytes: super::MAX_QUERY_RESULT_BYTES - super::row_size(&row),
+        let mut exact_cell_budget = QueryResultBudget {
+            cells: super::MAX_QUERY_RESULT_CELLS - 1,
             ..QueryResultBudget::default()
         };
-        assert!(byte_budget.admit(&row));
-        assert!(!byte_budget.admit(&row));
+        assert!(exact_cell_budget.admit(&[Value::Null]));
+        assert!(!exact_cell_budget.admit(&[Value::Null]));
+
+        let one_cell = [Value::Null];
+        let mut exact_byte_budget = QueryResultBudget {
+            bytes: super::MAX_QUERY_RESULT_BYTES - super::row_size(&one_cell),
+            ..QueryResultBudget::default()
+        };
+        assert!(exact_byte_budget.admit(&one_cell));
+        assert!(!exact_byte_budget.admit(&one_cell));
         let mut cell_budget = QueryResultBudget {
             cells: super::MAX_QUERY_RESULT_CELLS,
             ..QueryResultBudget::default()
         };
         assert!(!cell_budget.admit(&[Value::Null]));
         let mut row_budget = QueryResultBudget {
-            rows: super::MAX_QUERY_ROWS,
+            rows: super::MAX_QUERY_ROWS - 1,
             ..QueryResultBudget::default()
         };
-        assert!(!row_budget.admit(&[Value::Null]));
+        assert!(row_budget.admit(&one_cell));
+        assert!(!row_budget.admit(&one_cell));
+    }
+
+    #[test]
+    fn result_budget_counts_dynamic_value_storage() {
+        let text = Value::Text(String::with_capacity(32));
+        let undecodable = Value::Undecodable(String::with_capacity(32));
+        let bytes = Value::Bytes(vec![0; 32]);
+        let json_string = serde_json::json!("a dynamically stored JSON string");
+        let json_array = serde_json::json!(["a dynamically stored JSON array"]);
+        let json_object = serde_json::json!({"key": "a dynamically stored JSON object"});
+
+        for value in [&text, &undecodable, &bytes] {
+            assert!(super::value_size(value) > 1);
+        }
+        for value in [&json_string, &json_array, &json_object] {
+            assert!(super::json_heap_size(value) > 1);
+            assert!(super::value_size(&Value::Json(value.clone())) > 1);
+        }
+
+        let empty_row = super::row_size(&[]);
+        let one_cell = super::row_size(&[Value::Null]);
+        assert!(empty_row > 1);
+        assert!(one_cell > empty_row);
+    }
+
+    #[test]
+    fn result_batch_preserves_truncation_when_selecting_first_result() {
+        let batch = QueryResultBatch {
+            result_sets: vec![QueryResult {
+                columns: Vec::new(),
+                rows: Vec::new(),
+                truncated: false,
+            }],
+            truncated: true,
+        };
+
+        assert!(batch.into_first().truncated);
     }
 }
