@@ -674,50 +674,8 @@ async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path
     assert_domain_level_contract(opts.clone(), 302).await;
     assert_domain_level_contract(opts.clone(), 512).await;
     assert_domain_level_contract(opts.clone(), 513).await;
-    assert_domain_level_contract(opts, 1024).await;
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn value_contract_enum_domain_result_preserves_values_beyond_1024_layers() {
-    let (_container, opts) = start_pg().await;
-    let setup = connect(opts.clone()).await;
-    let schema = "value_contract_1025_domains";
-    setup.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
-    setup
-        .execute(&format!("CREATE TYPE {schema}.state AS ENUM ('ready')"))
-        .await
-        .unwrap();
-    let mut base_type = "state".to_owned();
-    for level in 1..=1025 {
-        let domain = format!("state_domain_{level}");
-        setup
-            .execute(&format!("CREATE DOMAIN {schema}.{domain} AS {schema}.{base_type}"))
-            .await
-            .unwrap();
-        base_type = domain;
-    }
-    setup
-        .execute(&format!("CREATE TABLE {schema}.rows (status {schema}.{base_type})"))
-        .await
-        .unwrap();
-    setup.execute(&format!("INSERT INTO {schema}.rows VALUES ('ready')")).await.unwrap();
-
-    let connection = connect(opts).await;
-    let result = connection.query(&format!("SELECT status FROM {schema}.rows")).await.unwrap();
-    assert_eq!(result.columns[0].data_type, format!("{schema}.{base_type}"));
-    assert_eq!(result.rows, vec![vec![Value::Text("ready".into())]]);
-    let native = connection
-        .query(&format!("SELECT status::text, pg_typeof(status)::text FROM {schema}.rows"))
-        .await
-        .unwrap();
-    assert_eq!(
-        native.rows,
-        vec![vec![
-            Value::Text("ready".into()),
-            Value::Text(format!("{schema}.{base_type}")),
-        ]]
-    );
+    assert_domain_level_contract(opts.clone(), 1024).await;
+    assert_domain_level_contract(opts, 1025).await;
 }
 
 async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
@@ -1117,7 +1075,7 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
          pg_typeof(ARRAY[status, NULL]::{domain_array})::text \
          FROM {schema}.rows WHERE id = 1"
     );
-    if levels != 1024 {
+    if levels < 1024 {
         let projected = connection
             .query(&sql)
             .await
@@ -1133,7 +1091,10 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
         return;
     }
 
-    let error = connection.query(&sql).await.expect_err("1024-layer enum array decoding must refuse explicitly");
+    let error = connection
+        .query(&sql)
+        .await
+        .expect_err(&format!("{levels}-layer enum array decoding must refuse explicitly"));
     assert!(
         matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
         "unexpected 1024-layer array outcome: {error:?}"
