@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "branch": "linux",
+  "source_commit": "9ef43f5bdbb63fde60375818b6a2ac3913d35756",
+  "local_worktree": "clean",
+  "source_note": "PR #361 is a documentation-only descendant of 1e76bab2f9620cb5261571ecb4d74c4f81743333; B4 code and test sources are unchanged.",
+  "scope": "B4 candidate acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
+  "result": "passed for the listed local and hosted layers",
+  "release_binary": {
+    "build_source": "9ef43f5bdbb63fde60375818b6a2ac3913d35756",
+    "staged_path": "/home/trung/.cache/bookie-b4-target-0d5/installed/usr/bin/tablepro",
+    "sha256": "c2bfecac8c134002e121a79d4272a31d8a300c4b2162e72d9254af53a0ce4a48"
+  },
+  "local_reports": [
+    "/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T100041509867Z-layers/report.json",
+    "/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T100753870801Z-layers/report.json",
+    "/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T101502534875Z-layers/report.json",
+    "/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T094650243311Z-layers/report.json"
+  ],
+  "hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37758384574,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37758384574",
+    "source_commit": "9ef43f5bdbb63fde60375818b6a2ac3913d35756",
+    "conclusion": "success",
+    "jobs": {
+      "Preflight and sandbox tier (no GTK app)": "success",
+      "B4 rollback acceptance (docker)": "success",
+      "Driver TLS fixture (docker)": "success",
+      "PostgreSQL release fixture (docker)": "success",
+      "Driver integration tests (docker)": "success",
+      "Fast checks (GTK)": "success",
+      "Installed GTK safety smoke": "success",
+      "Optional DuckDB driver and GTK feature": "success",
+      "Current stable Clippy (scheduled)": "success",
+      "Linux regression gate": "success"
+    }
+  },
+  "not_established": [
+    "Distribution-package installation and native Wayland acceptance; GTK acceptance used a staged release binary under Xvfb/AT-SPI",
+    "Windows Active Directory interoperability; local Kerberos coverage used the Samba AD fixture",
+    "Rollback effects for MySQL storage engines and side-effect classes outside the bounded fixture coverage"
+  ],
+  "summary": {
+    "path": "focused.txt",
+    "sha256": "c7c9198ad94299cef77807b54a49549c78b90d89577f93316612a582c5e58803"
+  }
+}

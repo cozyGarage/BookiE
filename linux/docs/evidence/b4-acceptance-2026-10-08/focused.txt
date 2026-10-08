@@ -1,0 +1,42 @@
+BookiE B4 current-candidate acceptance, 2026-10-08
+
+Candidate: `fork/linux` SHA `9ef43f5bdbb63fde60375818b6a2ac3913d35756`.
+The clean local checkout was pinned to this exact SHA. It includes PR #360's
+GTK tunnel-loss assertion ordering fix and is a docs-only descendant of
+`1e76bab2f9620cb5261571ecb4d74c4f81743333`.
+
+Local results on exact candidate SHA `9ef43f5`:
+- `b4-rollback`: 11 MySQL atomicity tests and the PostgreSQL backend-termination
+  rollback-failure selector passed.
+- `tls`: 48 TLS and plaintext-fallback regression tests passed.
+- `ssh`: 10 built-in agent-auth tests and 12 system OpenSSH tests passed,
+  including two-hop reachability and cancellation during second-hop trust.
+- `postgres-release`: release-binary GTK acceptance passed for saved mTLS,
+  unknown-key refusal, setup-failure audit, tunnel-loss retirement/reconnect,
+  two-hop trust/query, second-hop decline without learning, and changed-key
+  refusal.
+- `mssql-kerberos`: 2 tests passed against the local Samba AD fixture: verified
+  TLS query and unregistered-SPN refusal.
+- `security-policy` and `sandbox` passed, including cancellation/audit fail-closed
+  and storage refusal regressions.
+- `ui` with the three B4-22 scenarios selected: sanitized export audit,
+  sanitized import audit, and encrypted credential round-trip all passed.
+- The full GTK safety UI matrix also passed locally on source-identical
+  `1e76bab` in 246.6 seconds, using the staged release binary under Xvfb/AT-SPI.
+
+The release binary rebuilt from `9ef43f5` and staged at the GTK test path has
+SHA-256 `c2bfecac8c134002e121a79d4272a31d8a300c4b2162e72d9254af53a0ce4a48`.
+
+Exact-SHA local reports:
+- `/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T100041509867Z-layers/report.json`
+- `/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T100753870801Z-layers/report.json`
+- `/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T101502534875Z-layers/report.json`
+- Source-identical full GTK report: `/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T094650243311Z-layers/report.json`
+
+Hosted Build Linux run [37758384574](https://github.com/cozyGarage/BookiE/actions/runs/37758384574), pinned to `9ef43f5`, completed successfully. Preflight, B4 rollback, TLS, PostgreSQL release, driver integration, Fast GTK, Installed GTK safety, optional DuckDB, current-stable Clippy, and the aggregate Linux regression gate all passed. The hosted PostgreSQL release job exercised the seven SSH/mTLS GTK scenarios; Installed GTK safety exercised bundle audit and credential flows.
+
+Acceptance limits: local and hosted GTK runs execute a staged release binary
+under Xvfb/AT-SPI; they do not establish distro-package installation or native
+Wayland acceptance. The Kerberos fixture is Samba AD, not Windows AD. MySQL
+coverage is limited to the storage engines and side effects listed in the
+B4-11 ledger; it is not evidence for every optional/vendor engine.
