@@ -25,6 +25,8 @@ Local exact-runtime results on `a7f14fa`:
   encrypted bundle import into a second profile. The last two use the updated
   GTK harness from `0529e83`; the tested app binary is still from `a7f14fa`.
 
+A follow-up native Wayland probe used the same staged release binary (SHA-256 above) with `GDK_BACKEND=wayland` on `wayland-1`. The app and fixture opened, but the first bundle-export scenario stopped before file selection: AT-SPI exposed an `Export connections` alert without its expected `Choose File…` control. The scenario failed at harness discovery; it does not establish either a product failure or native acceptance. Artifacts are in `/tmp/bookie-b4-wayland-bundle-evidence/`. The other two selected scenarios did not run after this failure.
+
 The local layer report is
 `/home/trung/.cache/bookie-b4-candidate-a7f14/linux/target/quality/20261008T113209359199Z-layers/report.json`.
 The staged release binary at

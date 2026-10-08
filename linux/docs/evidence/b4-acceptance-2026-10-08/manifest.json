@@ -44,7 +44,7 @@
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "d4f147412f75ac3bf8bcaf28ceed72144de7e642524987c46816c1f29fb557af"
+    "sha256": "86e88189f8ba52704cef0dfe432007789065e1e3eb219604c2c5d2760af5fdf2"
   },
   "branch_head_at_update": "0bb8e34354d13e3ab9911b9db710eddb02115170",
   "runtime_diff_since_tested_commit": [
@@ -106,5 +106,20 @@
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37770573229",
     "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
     "status": "cancelled"
+  },
+  "native_wayland_probe": {
+    "result": "inconclusive: harness stopped before file selection",
+    "backend": "native Wayland (GDK_BACKEND=wayland; WAYLAND_DISPLAY=/run/user/1000/wayland-1)",
+    "runtime_binary_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+    "runtime_binary_sha256": "5a8cf04f6b23ee1e6688b4e14c6ebd276a452e255f85506dc31d371c8e3863d7",
+    "attempted_scenarios": [
+      "bundle_export_records_sanitized_audit_outcome",
+      "bundle_import_records_sanitized_audit_outcome",
+      "encrypted_bundle_round_trip_restores_credentials"
+    ],
+    "completed_scenarios": [],
+    "stopped_at": "bundle_export_records_sanitized_audit_outcome",
+    "observation": "The application and fixture opened; AT-SPI showed an Export connections alert without the expected Choose File control. The test therefore stopped before file selection. This does not establish a product failure or acceptance; the other two scenarios did not run.",
+    "artifacts": "/tmp/bookie-b4-wayland-bundle-evidence/"
   }
 }
