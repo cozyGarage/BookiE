@@ -445,6 +445,7 @@ async fn fetch_result(
             return Err(DriverError::Query {
                 message: message.to_owned(),
                 sqlstate: None,
+                position: None,
             });
         }
         let row = response_row(raw, &columns)?;
@@ -853,6 +854,7 @@ fn map_clickhouse_error_in_context(err: clickhouse::error::Error, connecting: bo
                 DriverError::Query {
                     message: err.to_string(),
                     sqlstate: None,
+                    position: None,
                 }
             }
         }

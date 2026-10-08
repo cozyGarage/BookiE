@@ -469,6 +469,7 @@ fn query_error() -> DriverError {
     DriverError::Query {
         message: "injected query error".into(),
         sqlstate: Some("42000".into()),
+        position: None,
     }
 }
 

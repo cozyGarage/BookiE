@@ -989,6 +989,7 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
                 DriverError::Query {
                     message: e.message().to_string(),
                     sqlstate,
+                    position: statement_position(e.as_ref()),
                 }
             }
         }
@@ -1021,6 +1022,16 @@ fn map_sqlx_connect_error(err: sqlx::Error) -> DriverError {
 
 fn is_pool_startup_timeout(err: &sqlx::Error) -> bool {
     matches!(err, sqlx::Error::PoolTimedOut)
+}
+
+fn statement_position(error: &dyn sqlx::error::DatabaseError) -> Option<usize> {
+    match error
+        .try_downcast_ref::<sqlx::postgres::PgDatabaseError>()?
+        .position()?
+    {
+        sqlx::postgres::PgErrorPosition::Original(position) => Some(position),
+        sqlx::postgres::PgErrorPosition::Internal { .. } => None,
+    }
 }
 
 fn is_server_disconnect_sqlstate(sqlstate: Option<&str>) -> bool {

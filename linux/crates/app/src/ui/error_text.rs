@@ -35,6 +35,7 @@ pub fn driver_message(error: &DriverError) -> String {
         DriverError::Query {
             message,
             sqlstate: Some(s),
+            ..
         } => crate::tr!("Query failed (SQLSTATE {sqlstate}): {message}")
             .replace("{sqlstate}", s)
             .replace("{message}", message),
@@ -147,11 +148,13 @@ mod tests {
         let with_state = driver_message(&DriverError::Query {
             message: "duplicate key".into(),
             sqlstate: Some("23505".into()),
+            position: None,
         });
         assert!(with_state.contains("23505"));
         let without = driver_message(&DriverError::Query {
             message: "syntax error".into(),
             sqlstate: None,
+            position: None,
         });
         assert!(!without.contains("SQLSTATE"));
         assert!(without.contains("syntax error"));
@@ -171,6 +174,7 @@ mod tests {
             source: Box::new(DriverError::Query {
                 message: "statement failed".into(),
                 sqlstate: None,
+                position: None,
             }),
             rollback_error: Box::new(DriverError::Disconnected),
         });
@@ -187,6 +191,7 @@ mod tests {
             source: Box::new(DriverError::Query {
                 message: "statement failed".into(),
                 sqlstate: None,
+                position: None,
             }),
         });
         assert!(message.contains("rollback request succeeded"));

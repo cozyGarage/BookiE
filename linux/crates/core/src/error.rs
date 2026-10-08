@@ -12,7 +12,11 @@ pub enum DriverError {
     Tls(String),
 
     #[error("query failed: {message}")]
-    Query { message: String, sqlstate: Option<String> },
+    Query {
+        message: String,
+        sqlstate: Option<String>,
+        position: Option<usize>,
+    },
 
     #[error("connection closed unexpectedly")]
     Disconnected,
@@ -62,4 +66,14 @@ pub enum DriverError {
         source: Box<DriverError>,
         rollback_error: Box<DriverError>,
     },
+}
+
+impl DriverError {
+    pub fn query(message: impl Into<String>) -> Self {
+        Self::Query {
+            message: message.into(),
+            sqlstate: None,
+            position: None,
+        }
+    }
 }

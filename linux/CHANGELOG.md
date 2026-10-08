@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- A failed PostgreSQL statement in the SQL editor shows the line and column of the error.
 - A failed statement in the SQL editor offers a Copy error button.
 - Selecting several rows shows each numeric column's sum and average in the selection badge tooltip, with NULLs skipped.
 - A connection's colour tag now also paints a strip above its workspace tabs, so a window shows which connection it belongs to.

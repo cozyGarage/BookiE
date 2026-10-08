@@ -61,6 +61,7 @@ mod tests {
         assert!(!is_unsupported_result(&DriverError::Query {
             message: "server rejected SQL".into(),
             sqlstate: Some("42000".into()),
+            position: None,
         }));
     }
 
