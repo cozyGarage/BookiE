@@ -27,7 +27,7 @@ Database support is provided by static Rust crates compiled into the app:
 | SQLite | Implemented; local and GTK tests |
 | Microsoft SQL Server | Implemented; cancellation and authentication limits |
 | ClickHouse | Implemented; driver and TLS fixtures |
-| Redis | Experimental |
+| Redis | Experimental; single host/port endpoint in 0.2.0 |
 | MongoDB | Experimental |
 | DuckDB | Optional build feature |
 

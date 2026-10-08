@@ -5,8 +5,10 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Integrated baseline: `d3acba63a` on `linux` (PR #277; docs-only PRs #266,
-#268, #270, #272, #274, #275 and #276).
+Integrated baseline: `d5d63a95d` on `linux` (PR #286; PR #280 adds ClickHouse
+Map(Enum) consumer coverage, #282/#284 prove PostgreSQL lost-ack non-replay and
+fix the regression proxy's Clippy issue, #285 records ClickHouse mutation
+results, and #286 adds focused hosted rollback plus release-binary SSH checks).
 Recent B3 merges cover SQL Server server-owned values and mutation batches
 (#224–#225), multiple result sets (#228), MongoDB census cost/cancellation and
 nested filters (#229, #231, #234, #247), ClickHouse enum values (#242),
@@ -27,6 +29,13 @@ SQL NULL, plus Enum8/Enum16 tuple values through native JSON and export refusal
 checks.
 PR #236 reconciles the SQL Server matrix; #248 adds MySQL update/delete effect
 coverage across engines. These are focused cases, not milestone closure.
+
+At this baseline, the full local driver integration tier passed, plus optional
+DuckDB driver and app-contract suites. This does not close B3: remaining work is
+the listed consumer/configuration matrix, mutation triage, performance rows and
+installed grid acceptance. Hosted run #37708183936 passed the focused MySQL and
+PostgreSQL rollback layer; hosted release-binary GTK acceptance from #286 is
+tracked separately on the [B4 board](b4-task-board.md).
 
 B3 remains open for the broader engine/type/consumer/configuration matrix,
 mutation triage and installed grid acceptance. B4 still needs the remaining
