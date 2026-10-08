@@ -674,7 +674,8 @@ async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path
     assert_domain_level_contract(opts.clone(), 302).await;
     assert_domain_level_contract(opts.clone(), 512).await;
     assert_domain_level_contract(opts.clone(), 513).await;
-    assert_domain_level_contract(opts, 1024).await;
+    assert_domain_level_contract(opts.clone(), 1024).await;
+    assert_domain_level_contract(opts, 1025).await;
 }
 
 async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
@@ -729,6 +730,9 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         connection.query("SELECT current_schema()::text").await.unwrap().rows,
         vec![vec![Value::Text(shadow_schema.clone())]]
     );
+    if levels >= 1024 {
+        assert_deep_enum_array_parameter_contract(connection.as_ref(), &schema, &base_type, levels).await;
+    }
 
     let columns = connection.fetch_columns(Some(&schema), "rows").await.unwrap();
     assert_eq!(
@@ -1074,7 +1078,7 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
          pg_typeof(ARRAY[status, NULL]::{domain_array})::text \
          FROM {schema}.rows WHERE id = 1"
     );
-    if levels != 1024 {
+    if levels < 1024 {
         let projected = connection
             .query(&sql)
             .await
@@ -1090,10 +1094,13 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
         return;
     }
 
-    let error = connection.query(&sql).await.expect_err("1024-layer enum array decoding must refuse explicitly");
+    let error = connection
+        .query(&sql)
+        .await
+        .expect_err(&format!("{levels}-layer enum array decoding must refuse explicitly"));
     assert!(
         matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
-        "unexpected 1024-layer array outcome: {error:?}"
+        "unexpected {levels}-layer array outcome: {error:?}"
     );
     let oracle = connection
         .query(&format!(
@@ -1109,4 +1116,48 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
     assert_eq!(oracle.rows[0][0], oracle.rows[0][1]);
     assert_eq!(oracle.rows[0][2], oracle.rows[0][3]);
     assert_eq!(oracle.rows[0][4], Value::Text(domain_array));
+}
+
+async fn assert_deep_enum_array_parameter_contract(
+    connection: &dyn Connection,
+    schema: &str,
+    base_type: &str,
+    levels: usize,
+) {
+    let array_type = format!("{schema}.{base_type}[]");
+    let stored = connection
+        .query(&format!(
+            "SELECT status::text, pg_typeof(status)::text, \
+             encode(array_send(ARRAY[status, NULL]::{array_type}), 'hex') \
+             FROM {schema}.rows WHERE id = 1"
+        ))
+        .await
+        .unwrap();
+    for parameter in [Value::Text(r#"{"ready","paused"}"#.into()), Value::Null] {
+        let error = connection
+            .query_params(
+                &format!(
+                    "SELECT pg_typeof(array_cat($1, ARRAY[status]))::text, \
+                     encode(array_send(array_cat($1, ARRAY[status])), 'hex') \
+                     FROM {schema}.rows WHERE id = 1"
+                ),
+                &[parameter],
+            )
+            .await
+            .expect_err("deep inferred enum-array parameters must be refused explicitly");
+        assert!(
+            matches!(&error, tablepro_core::DriverError::Unsupported(message)
+                if message.contains("resolvable depth")),
+            "unexpected {levels}-level domain array outcome: {error:?}"
+        );
+    }
+    let after = connection
+        .query(&format!(
+            "SELECT status::text, pg_typeof(status)::text, \
+             encode(array_send(ARRAY[status, NULL]::{array_type}), 'hex') \
+             FROM {schema}.rows WHERE id = 1"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(after.rows, stored.rows, "{levels}-level stored value changed");
 }
