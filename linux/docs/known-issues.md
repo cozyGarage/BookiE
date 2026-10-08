@@ -18,12 +18,12 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against the BookiE `linux` code tip `2eb348660` (PR #335), checked
-2026-10-08. This includes merged code PRs #289–#335 and the B4/B3
-documentation updates in PRs #319, #321–#323, #332, and #335, including the
-B4 evidence move (#310), MongoDB nested null-filter contract (#312), MySQL
-lost-ack contract (#315), and SQLite declared/runtime value-decoder cases
-(#333, #335).
+Reconciled against the BookiE `linux` code tip `1448a6154` (PR #338), checked
+2026-10-08. This includes merged code PRs #289–#338 and the B4/B3
+documentation updates in PRs #319, #321–#323, #332, #335, and #338, including
+the B4 evidence move (#310), MongoDB nested null-filter contract (#312),
+MySQL lost-ack contract (#315), SQLite declared/runtime value-decoder cases
+(#333, #335), and PostgreSQL's 302-layer enum-domain contract (#338).
 The Redis 0.2.0 scope is one host/port endpoint; Sentinel and Cluster are
 deferred. B4 rows summarize the
 [B4 board](b4-task-board.md); when they differ, the board and linked PR
