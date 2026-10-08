@@ -65,9 +65,9 @@ until docker exec "$container" clickhouse-client --user=default --password=table
 done
 
 docker exec "$container" clickhouse-client --user=default --password=tablepro \
-  --query="CREATE TABLE enum_grid (id UInt8, state8 Nullable(Enum8('low8' = -128, 'NULL8' = 0, 'high8' = 127, '' = 1)), state16 Nullable(Enum16('low16' = -32768, 'NULL16' = 0, 'high16' = 32767, '' = 1))) ENGINE = MergeTree ORDER BY id"
+  --query="CREATE TABLE enum_grid (id UInt8, state8 Nullable(Enum8('low8' = -128, 'NULL' = 0, 'high8' = 127, '' = 1)), state16 Nullable(Enum16('low16' = -32768, 'NULL' = 0, 'high16' = 32767, '' = 1))) ENGINE = MergeTree ORDER BY id"
 docker exec "$container" clickhouse-client --user=default --password=tablepro \
-  --query="INSERT INTO enum_grid VALUES (1, 'low8', 'low16'), (2, 'NULL8', 'NULL16'), (3, NULL, NULL), (4, '', ''), (5, 'high8', 'high16')"
+  --query="INSERT INTO enum_grid VALUES (1, 'low8', 'low16'), (2, 'NULL', 'NULL'), (3, NULL, NULL), (4, '', ''), (5, 'high8', 'high16')"
 
 eval "$(printf 'tablepro' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
 printf 'tablepro' | secret-tool store --label='BookiE GTK ClickHouse fixture' \

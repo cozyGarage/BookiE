@@ -1000,14 +1000,14 @@ def scenarios(ui):
         )
         before_save = "\n".join((
             "1\t0\t-128\tlow8\t0\t-32768\tlow16",
-            "2\t0\t0\tNULL8\t0\t0\tNULL16",
+            "2\t0\t0\tNULL\t0\t0\tNULL",
             "3\t1\t0\t<SQL_NULL>\t1\t0\t<SQL_NULL>",
             "4\t0\t1\t\t0\t1\t",
             "5\t0\t127\thigh8\t0\t32767\thigh16",
         ))
         after_save = "\n".join((
             "1\t0\t127\thigh8\t0\t32767\thigh16",
-            "2\t0\t0\tNULL8\t0\t0\tNULL16",
+            "2\t0\t0\tNULL\t0\t0\tNULL",
             "3\t1\t0\t<SQL_NULL>\t1\t0\t<SQL_NULL>",
             "4\t0\t1\t\t0\t1\t",
             "5\t0\t127\thigh8\t0\t32767\thigh16",
