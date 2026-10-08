@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libglib2.0-dev-bin \
     libssl-dev libsecret-1-dev libkrb5-dev libsqlite3-dev \
     xvfb xauth dbus dbus-x11 dbus-user-session python3 python3-pyatspi at-spi2-core gnome-keyring libsecret-tools \
-    scrot libglib2.0-bin fuse3 x11-utils libsqlite3-0 \
+    scrot libglib2.0-bin fuse3 x11-utils libsqlite3-0 libsecret-tools openssh-client \
     && rm -rf /var/lib/apt/lists/*
 ARG RUST_VERSION=1.98.0
 ENV CARGO_HOME=/opt/cargo RUSTUP_HOME=/opt/rustup PATH=/opt/cargo/bin:$PATH
