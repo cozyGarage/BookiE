@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- PostgreSQL `timestamp[]` JSON export is covered under `DateStyle = SQL, DMY`;
+  the test checks exact JSON values and restores the CSV under a different date
+  style (#325). JSON field-name collision loops now have a bounded regression
+  test; its focused mutation rerun caught all three loop-boundary variants
+  (#326). Shared JSON/text exporters caught all five selected mutants (#327),
+  and CSV exporter triage caught 24 of 27 variants while reviewing the three
+  survivors as behavior-equivalent (#328; [evidence](https://github.com/cozyGarage/BookiE/pull/328#issuecomment-6052863399)).
 - ClickHouse Enum8 and Enum16 grid editing now share an installed GTK scenario that checks native enum codes, SQL NULL versus literal `NULL` and empty labels, pending values before Save, and unchanged sibling rows.
 - PostgreSQL custom range scalars and arrays now have native type, text, JSON and wire-oracle refusal coverage; empty values remain distinct from SQL NULL, and refused literals and bindings preserve target and sibling rows. For custom range arrays, JSON, CSV, Markdown, HTML, XML and XLSX preserve the undecodable marker visibly; SQL export refuses it without replacing the destination.
 - PostgreSQL's six built-in scalar range types now have native text/JSON/wire refusal checks; empty ranges remain distinct from SQL NULL, and refused literals and bindings preserve target and sibling rows.
