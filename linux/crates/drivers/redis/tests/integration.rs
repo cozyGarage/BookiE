@@ -4,6 +4,8 @@ mod server_restart;
 
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
+#[path = "support/disconnection.rs"]
+mod disconnection;
 
 #[tokio::test]
 async fn an_unavailable_redis_server_is_classified_as_connection_refused() {
