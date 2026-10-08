@@ -6,8 +6,9 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 i
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `1e76bab2f9620cb5261571ecb4d74c4f81743333` on `linux`, checked
-2026-10-08. Merged since the 0.1.5 release, by lane:
+Code baseline: `299f94fcfebac2635de36e937f62e527ceeb8c51` on `linux`, checked
+2026-10-08.
+Merged since the 0.1.5 release, by lane:
 
 - **UX:** result headers show type and key markers (#289), selection sum and
   average (#346), a Copy error button (#347), a connection-coloured workspace
@@ -46,7 +47,11 @@ the PR evidence comments: [#314](https://github.com/cozyGarage/BookiE/pull/314#i
 [#345](https://github.com/cozyGarage/BookiE/pull/345#issuecomment-6053620744),
 [#355](https://github.com/cozyGarage/BookiE/pull/355#issuecomment-6055451200).
 
-B3 remains open for the broader engine/type/consumer/configuration matrix,
+[B3 PR #365](https://github.com/cozyGarage/BookiE/pull/365) merged with
+MySQL/MariaDB ENUM/SET malformed-metadata refusal and consumer regressions.
+PR #369 (PostgreSQL 513-layer enum-domain contract) awaits maintainer merge;
+see the [B3 board](type-contract-strategy.md) for contract details. B3 remains
+open for the broader engine/type/consumer/configuration matrix,
 mutation triage and installed grid acceptance. B4 still needs the remaining
 privacy, daemon retirement, headless ownership and transport/session acceptance.
 B7 still needs a frozen candidate, installed Arch/Wayland and Debian/GNOME
