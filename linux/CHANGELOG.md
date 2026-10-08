@@ -3,14 +3,63 @@
 ## [Unreleased]
 
 ### Added
-
+- SQL Server now has a Docker-backed lost-ack contract: an independent
+  connection observes an UPDATE and audit row committed before SQL Server is
+  stopped during a delayed batch response; after restart both rows remain
+  present exactly once.
+- ClickHouse now has a Docker-backed lost-ack contract: the server commits an
+  INSERT and its materialized-view audit row, the proxy drops the HTTP response,
+  and a later query plus direct native oracles prove the write ran once.
+- Evidence validation now accepts wrapper-script runs that list multiple test
+  names and manifests that pair one source digest with `source_file`.
+- Redis now has a Docker-backed lost-ack contract: a committed Lua write with
+  its reply dropped returns `Disconnected`, reconnects for a later read, and
+  leaves both target and independent audit keys at one execution.
+- A failed statement in the SQL editor offers a Copy error button.
+- A connection's colour tag now also paints a strip above its workspace tabs, so a window shows which connection it belongs to.
+- PostgreSQL enum-leaf metadata and schema-aware write/filter contracts now
+  include direct `pg_typeof()` query projections plus 302- and 512-layer
+  domain-over-enum cases. Array projections of the outer domain also preserve
+  exact array values and type metadata at both depths. Deeper chains remain
+  open.
+- SQLite declared DATE/TIME/DATETIME/TIMESTAMP columns now have a regression
+  contract proving invalid calendar/clock strings remain exact text when typed
+  decoding fails.
+- SQLite result decoding now has native runtime contracts for declared BOOLEAN and temporal columns, SQL NULL, and BLOB-affinity TEXT/INTEGER/REAL/BLOB values. Scoped mutation triage caught 7 of 15 variants; 5 fall back to the same runtime decoder and are equivalent, 3 were unviable, with no timeouts. Broader TEST-2 mutation coverage remains open.
+- SQLite STRICT `ANY` computed `iif()` now has a native `typeof()` and typed
+  CSV round-trip case for INTEGER, REAL, formula-shaped TEXT, BLOB and SQL NULL.
+  The focused app test passed on system SQLite 3.53.4; [PR #331 validation](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990)
+  also records the local quick-gate result.
+- Current-Linux B4 TLS evidence moved from tracked files to [PR #329](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352):
+  all 48 checks passed twice locally on source `a47b1fb`, while frozen-candidate,
+  exact-SHA hosted and installed-package/Wayland acceptance remain open.
+- PostgreSQL `timestamp[]` JSON export is covered under `DateStyle = SQL, DMY`;
+  the test checks exact JSON values and restores the CSV under a different date
+  style (#325). JSON field-name collision loops now have a bounded regression
+  test; its focused mutation rerun caught all three loop-boundary variants
+  (#326). Shared JSON/text exporters caught all five selected mutants (#327),
+  and CSV exporter triage caught 24 of 27 variants while reviewing the three
+  survivors as behavior-equivalent (#328; [evidence](https://github.com/cozyGarage/BookiE/pull/328#issuecomment-6052863399)).
+- ClickHouse Enum8 and Enum16 grid editing now share an installed GTK scenario that checks native enum codes, SQL NULL versus literal `NULL` and empty labels, pending values before Save, and unchanged sibling rows.
+- PostgreSQL custom range scalars and arrays now have native type, text, JSON and wire-oracle refusal coverage; empty values remain distinct from SQL NULL, and refused literals and bindings preserve target and sibling rows. For custom range arrays, JSON, CSV, Markdown, HTML, XML and XLSX preserve the undecodable marker visibly; SQL export refuses it without replacing the destination.
+- PostgreSQL's six built-in scalar range types now have native text/JSON/wire refusal checks; empty ranges remain distinct from SQL NULL, and refused literals and bindings preserve target and sibling rows.
+- The PostgreSQL GTK fixture now edits ordinary and literal `NULL` enum labels through the grid, verifies both stay pending until Save, and keeps SQL NULL, an empty label and a sibling row distinct.
+- B4 candidate run logs were moved from tracked evidence files into linked PR #310 comments; the B4 board retains source pins, outcomes and remaining acceptance boundaries.
+- ClickHouse Enum8 and Enum16 map keys now have native JSON and JSON/CSV/XLSX consumer coverage, with lossy SQL, binding and grid writes refused and the stored row preserved.
+- MongoDB and Redis unfiltered, unsorted table pages now use native fetches even when metadata finds a primary key; a native MongoDB GTK scenario checks cursor values remain visible until refresh and an approved post-refresh edit preserves sibling fields.
+- ClickHouse nested enum map coverage now includes all Enum8/Enum16 nullable and non-nullable pairings, with native JSON and JSON/CSV/XLSX consumer checks plus lossy-write refusal and stored-row preservation.
+- MySQL and MariaDB ENUM/SET contracts now prove non-empty XLSX exports preserve native labels and keep SQL NULL cells blank across the twelve tested SQL modes; empty SET values still refuse the export without replacing an existing workbook.
+- Result column headers show the column type and mark primary-key columns.
 - Redis 0.2.0 support remains scoped to a single host/port endpoint; Sentinel and Cluster topologies are explicitly deferred.
+- Redis key browsing preserves arbitrary-byte keys and non-UTF-8 string values, and fills requested pages across partial SCAN batches; Docker contracts check native Redis oracles.
 - The MongoDB census diagnostic now profiles one million documents; this host measured a five-sample release median of 772 ms per 50-row browse, so the 100 ms budget remains scoped to 100k documents.
 - PostgreSQL optimistic update coverage asserts schema-qualified casts for custom enums and array domains; a restricted-role grid edit exercises the enum path under a shadowed transaction-local `search_path`.
 - MongoDB stale-grid tests now pin ABA behavior: value-based edits and deletes proceed after a field changes and returns to its materialized value, matching the documented last-write-wins contract.
 - PostgreSQL enum grid-edit coverage combines mixed-case quoted identifiers with restricted roles and a shadowed transaction-local `search_path`, including invalid-label and SQL NULL sibling checks.
 - PostgreSQL release profiling now compares the buffer-all collector with the streaming decoder on one-million-row results: median elapsed fell 20.4% and process peak RSS fell 58.3% under the same compiler, dependencies, and database fixture.
 - MongoDB nested array filter coverage now compares `$elemMatch` results against native MongoDB and proves separate array elements cannot jointly satisfy its predicates across JSON-filter and MQL paths.
+- MongoDB nested null filters now compare JSON-filter and MQL results against native queries, distinguishing missing paths, explicit BSON null, and ordinary values.
+- MySQL now has a Docker-backed lost-ack write regression: a TCP proxy drops the committed UPDATE response, the driver reports disconnection, a later read reconnects the pool, and native row plus trigger-audit oracles prove exactly one execution.
 - MySQL failed-batch rollback tests now cover UPDATE and DELETE trigger effects across MyISAM, MEMORY, CSV, and ARCHIVE alongside InnoDB rollback.
 - SQL Server query batches now preserve ordered result sets through the policy guard, editor, MCP query responses, and JSON export; MCP shares its row cap across sets, and CSV export refuses multi-set results rather than dropping data.
 - SQL Server server-owned columns now have native consumer coverage for the grid edit gate, CSV import, Copy as SQL, and SQL export replay; identity, computed, and rowversion values are generated by the destination server.
@@ -18,8 +67,11 @@
 - MongoDB's hostile SCRAM handshake now has a local wire-protocol regression for malformed nonces and excessive iterations, proving the driver refuses before sending a client proof.
 - MongoDB metadata census cancellation now has a Docker regression that blocks the census `find`, verifies prompt cancellation, and checks the same client and native rows afterward.
 - ClickHouse Enum8/Enum16 values now cover signed endpoints and zero (`-128`, `0`, `127` for Enum8; `-32768`, `0`, `32767` for Enum16) through native casts, parameter writes, CSV import and SQL-literal replay; undeclared labels for both enum widths are refused without changing stored rows. Nullable Enum16 also preserves SQL NULL, the literal `NULL`, and labels through these consumers.
+- ClickHouse Enum8/Enum16 consumers now distinguish an empty-string enum label from SQL NULL through native reads, parameter writes, CSV import and Copy as SQL replay; nullable Enum8 is included.
 - ClickHouse `Array(Enum8)` results now preserve enum labels as exact native-oracle JSON through JSON, CSV and XLSX exports; SQL literals, typed binding and grid edits explicitly refuse the type-less nested value without changing its stored row.
 - ClickHouse `Array(Nullable(Enum8))` results now keep SQL NULL array elements distinct from the literal `NULL` enum label, with the native `toJSONString` result checked through JSON/CSV/XLSX exports and explicit write refusal.
+- ClickHouse Map values now cover Enum8 apostrophe/Unicode/literal-`NULL` labels and nullable Enum16 empty/NULL distinctions through native JSON, JSON/CSV/XLSX exports, and explicit lossy-write refusal with stored-row preservation.
+- ClickHouse grid parsing now accepts quoted empty, literal `NULL`, and apostrophe-bearing Enum8/Enum16 labels while blank input remains SQL NULL; native Enum8/Enum16 grid edits check stored codes and unchanged rows after invalid-label refusal. Nested arrays and tuples containing Enum8/Enum16 have native JSON, JSON/CSV/XLSX and lossy-consumer refusal coverage.
 - SQLite's `json_group_object` CSV round-trip contract passes on Ubuntu 24.04 (SQLite 3.45.1), Debian 13 (SQLite 3.46.1), and the Arch-based development host (SQLite 3.53.4), checking native output on both sides of the 3.50.0 NULL-label fix without skipping distro versions or bundling a different engine.
 - PostgreSQL built-in multirange scalar and array projections now resolve to named `Undecodable` values, with literal and parameter refusal and SQL NULL distinction covered by Docker-backed contracts.
 - MariaDB now has the non-UTC TIMESTAMP refusal contract already used for MySQL, covering dedicated sessions, pooled queries, transaction-local changes, session-local text, and the native UTC epoch.
@@ -30,6 +82,7 @@
 - PostgreSQL name[] typed CSV import now checks NULL/empty distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact native array wire preservation.
 - PostgreSQL custom enum-array slicing now checks native lower-bound normalization, multidimensional shape, SQL NULL versus empty arrays, literal NULL/Unicode labels, and typed rebind wire equality.
 - PostgreSQL enum parameter tests now prove integer and boolean inputs keep their native types, fail safely in enum comparisons and updates, and leave target rows unchanged.
+- PostgreSQL now has a Docker-backed lost-ack write regression: a TCP proxy drops the committed UPDATE acknowledgement, the driver reports the outcome as uncertain, a later query reconnects, and independent row and trigger-audit oracles prove the write ran exactly once.
 - PostgreSQL `int4range[]` now has an explicit unsupported-value contract with native range text/JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL `tsvector[]` and `tsquery[]` now have explicit unsupported-value contracts with native text-search JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL `json[]` and `jsonb[]` now have explicit unsupported-value contracts with native text/JSON/wire oracles and refused-write target/sibling preservation.
@@ -39,6 +92,8 @@
 - PostgreSQL geometric array families now share explicit refusal, native type/text/JSON/wire oracles, and target/sibling preservation coverage.
 - The enum-array slice regression is split into its own test file so the PostgreSQL contract source stays within the file-size guard; the ignored-test inventory points to its new location.
 - B3 mutation triage now records a scoped PostgreSQL array-dimension decoder run: 10 mutants caught, 2 compile-unviable, none missed or timed out.
+- The PostgreSQL NUMERIC decoder mutation audit tested 66 generated mutants at `c51d6e63`: all 15 buildable variants were caught by existing native-wire and malformed-payload contracts; 51 did not build, with no missed or timed-out mutants.
+- PostgreSQL enum result metadata now has a regression proving built-in `INT4` is not treated as enum-bearing; native enum-array rename/schema-move coverage kills the three recursive classification mutants.
 - The scoped core XLSX writer mutation run caught all 41 generated mutants; broader core/package mutation triage remains open.
 - MySQL and SQL Server tunneled TLS contracts now cover valid server identity, wrong CA and hostname refusal, and no plaintext fallback through SSH forwarding. The fixture creates its SSH host key at container startup rather than baking it into the image.
 - MySQL transaction query coverage now verifies decoded-byte-budget truncation, exact retained payloads, and follow-up queries within the same transaction.
@@ -128,6 +183,7 @@
 
 ### Fixed
 
+- B4-11 MySQL rollback effects across the scoped storage engines and B4-12 PostgreSQL rollback-failure handling now have focused hosted acceptance; run details are in PR #287's [hosted-results comment](https://github.com/cozyGarage/BookiE/pull/287#issuecomment-6049956346).
 - PostgreSQL optimistic grid edits cast both new and previously read custom enum, enum-array, and domain values to qualified native types, so stale-row comparisons work across those columns.
 - A PostgreSQL query that returns more rows than the result cap now returns the capped rows promptly and stops the server query, instead of waiting for the server to finish or timing out.
 - Connection-list rebuilds no longer remove a nested row list from the wrong GTK parent; GTK safety runs now fail on criticals.

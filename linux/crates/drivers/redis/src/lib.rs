@@ -318,7 +318,7 @@ async fn fetch_page(
 ) -> Result<QueryResult, DriverError> {
     let keys = scan_keys(conn, "*", (offset + limit) as usize).await?;
     let skip = offset as usize;
-    let page: Vec<String> = keys.into_iter().skip(skip).take(limit as usize).collect();
+    let page: Vec<Vec<u8>> = keys.into_iter().skip(skip).take(limit as usize).collect();
     let mut rows = Vec::with_capacity(page.len());
     for key in page {
         rows.push(key_row(conn, &key).await?);
@@ -334,11 +334,11 @@ async fn scan_keys(
     conn: &mut redis::aio::MultiplexedConnection,
     pattern: &str,
     limit: usize,
-) -> Result<Vec<String>, DriverError> {
+) -> Result<Vec<Vec<u8>>, DriverError> {
     let mut cursor: u64 = 0;
     let mut keys = Vec::new();
     loop {
-        let (next, batch): (u64, Vec<String>) = redis::cmd("SCAN")
+        let (next, batch): (u64, Vec<Vec<u8>>) = redis::cmd("SCAN")
             .arg(cursor)
             .arg("MATCH")
             .arg(pattern)
@@ -357,37 +357,37 @@ async fn scan_keys(
     Ok(keys)
 }
 
-async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &str) -> Result<Vec<Value>, DriverError> {
+async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Result<Vec<Value>, DriverError> {
     let key_type: String = conn.key_type(key).await.map_err(map_redis_error)?;
     let ttl: i64 = conn.ttl(key).await.map_err(map_redis_error)?;
     let preview = match key_type.as_str() {
         "string" => {
-            let v: String = conn.get(key).await.map_err(map_redis_error)?;
-            v
+            let v: Vec<u8> = conn.get(key).await.map_err(map_redis_error)?;
+            bytes_to_value(v)
         }
         "hash" => {
             let v: Vec<(String, String)> = conn.hgetall(key).await.map_err(map_redis_error)?;
-            format!("{v:?}")
+            Value::Text(format!("{v:?}"))
         }
         "list" => {
             let v: Vec<String> = conn.lrange(key, 0, 20).await.map_err(map_redis_error)?;
-            format!("{v:?}")
+            Value::Text(format!("{v:?}"))
         }
         "set" => {
             let v: Vec<String> = conn.smembers(key).await.map_err(map_redis_error)?;
-            format!("{v:?}")
+            Value::Text(format!("{v:?}"))
         }
         "zset" => {
             let v: Vec<String> = conn.zrange(key, 0, 20).await.map_err(map_redis_error)?;
-            format!("{v:?}")
+            Value::Text(format!("{v:?}"))
         }
-        other => format!("<{other}>"),
+        other => Value::Text(format!("<{other}>")),
     };
     Ok(vec![
-        Value::Text(key.to_string()),
+        bytes_to_value(key.to_vec()),
         Value::Text(key_type),
         Value::Int(ttl),
-        Value::Text(preview),
+        preview,
     ])
 }
 

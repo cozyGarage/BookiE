@@ -9,7 +9,7 @@ BookiE is a Linux-only database client built with Rust, GTK4, libadwaita, and Re
 
 ## Status
 
-The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHouse. Redis and MongoDB are experimental, and DuckDB is an optional build feature.
+The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHouse. Redis and MongoDB are experimental; Redis 0.2.0 support uses one host/port endpoint, with Sentinel and Cluster deferred. DuckDB is an optional build feature.
 
 Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/adding-drivers.md#driver-maturity](docs/adding-drivers.md#driver-maturity), and [docs/production-audit.md](docs/archive/production-audit.md) for current limits.
 
@@ -61,7 +61,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 
 Drivers are linked at build time. BookiE does not load database drivers as runtime plugins. The UI uses native GTK widgets and does not embed a browser view.
 
-Browse results share an in-memory query result, with GTK row objects created when the view requests them. This reduces eager per-row UI object creation; it does not page rows from the database or bound result memory.
+Table browsing fetches bounded pages from the database, and GTK creates row objects on demand for the loaded page. Arbitrary SQL editor results are still materialized up to configured caps; progressive server-cursor paging is accepted in [ADR 0011](docs/decisions/0011-paged-query-results.md) but not implemented. Row-object reuse does not bound the memory held by a query result.
 
 ## Build requirements
 

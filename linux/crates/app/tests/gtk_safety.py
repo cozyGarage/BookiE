@@ -18,6 +18,7 @@ import gtk_parameters
 import gtk_xml
 import gtk_ux
 import gtk_input
+import gtk_shard
 
 APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
@@ -25,6 +26,10 @@ CONNECTION_B_NAME = "Safety SQLite B"
 BROKEN_CONNECTION_NAME = "Broken SQLite"
 MYSQL_CONNECTION_NAME = "Safety MySQL"
 MYSQL_CONNECTION_ID = "c38e2d93-4314-4c18-b192-08f164386e09"
+MONGODB_CONNECTION_NAME = "Safety MongoDB"
+MONGODB_CONNECTION_ID = "d87c89b2-3e9c-4c36-9662-c75c69f513ab"
+CLICKHOUSE_CONNECTION_NAME = "Safety ClickHouse"
+CLICKHOUSE_CONNECTION_ID = "31e33a85-4cbd-42ec-8f54-c66be5630f17"
 POSTGRES_CONNECTION_NAME = "Safety PostgreSQL"
 POSTGRES_CONNECTION_ID = "0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11"
 POSTGRES_MTLS_CONNECTION_NAME = "PostgreSQL mTLS"
@@ -636,6 +641,42 @@ def write_fixture(base, audit_available=True, environment="prod"):
                 "environment": environment,
             }
         )
+    mongodb_port = os.environ.get("TABLEPRO_GTK_MONGODB_PORT")
+    if mongodb_port:
+        connections["connections"].append(
+            {
+                "id": MONGODB_CONNECTION_ID,
+                "name": MONGODB_CONNECTION_NAME,
+                "driver_id": "mongodb",
+                "host": os.environ.get("TABLEPRO_GTK_MONGODB_HOST", "127.0.0.1"),
+                "port": int(mongodb_port),
+                "database": "bookie_test",
+                "username": "",
+                "use_tls": False,
+                "tls_mode": "disabled",
+                "read_only": False,
+                "auth_mode": "password",
+                "environment": environment,
+            }
+        )
+    clickhouse_port = os.environ.get("TABLEPRO_GTK_CLICKHOUSE_PORT")
+    if clickhouse_port:
+        connections["connections"].append(
+            {
+                "id": CLICKHOUSE_CONNECTION_ID,
+                "name": CLICKHOUSE_CONNECTION_NAME,
+                "driver_id": "clickhouse",
+                "host": os.environ.get("TABLEPRO_GTK_CLICKHOUSE_HOST", "127.0.0.1"),
+                "port": int(clickhouse_port),
+                "database": "default",
+                "username": "default",
+                "use_tls": False,
+                "tls_mode": "disabled",
+                "read_only": False,
+                "auth_mode": "password",
+                "environment": environment,
+            }
+        )
     postgres_port = os.environ.get("TABLEPRO_GTK_POSTGRES_PORT")
     if postgres_port:
         connections["connections"].append(
@@ -1233,8 +1274,13 @@ def encrypted_bundle_round_trip_restores_credentials(_database, base):
     invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="Safety SQLite")
     replace = wait_for_node(name="Replace saved passwords", role=pyatspi.ROLE_SWITCH)
+    assert not replace.getState().contains(pyatspi.STATE_CHECKED), "credential replacement should start disabled"
     extents = replace.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
     gtk_ux.x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline and not replace.getState().contains(pyatspi.STATE_CHECKED):
+        time.sleep(POLL_SECONDS)
+    assert replace.getState().contains(pyatspi.STATE_CHECKED), "credential replacement switch did not become enabled"
     invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
 
     deadline = time.monotonic() + WAIT_SECONDS
@@ -1844,6 +1890,7 @@ def main():
         scenarios = [scenario for scenario in scenarios if scenario.__name__ in names]
         if {scenario.__name__ for scenario in scenarios} != names:
             raise SystemExit(f"unknown GTK scenario in: {selected}")
+    scenarios = gtk_shard.select(scenarios, os.environ.get("TABLEPRO_GTK_SHARD", ""))
     for scenario in scenarios:
         run_scenario(binary, scenario)
         print(f"passed: {scenario.__name__}")

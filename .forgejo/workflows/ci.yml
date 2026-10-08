@@ -102,6 +102,13 @@ jobs:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name == 'push'
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-${{ matrix.shard }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Check out
         env:
@@ -111,14 +118,21 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
-      - name: Installed GTK end-to-end suite
+      - name: Installed GTK end-to-end suite, one third
         run: |
-          cd src/linux && bash scripts/test-gtk-safety.sh
+          cd src/linux && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
 
-  servers:
-    runs-on: arch
+  driver:
+    runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
+    strategy:
+      fail-fast: false
+      matrix:
+        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb]
     steps:
       - name: Check out
         env:
@@ -128,17 +142,153 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
-      - name: PostgreSQL end-to-end
+      - name: Driver integration
         run: |
-          cd src/linux && bash scripts/test-gtk-postgres.sh
-      - name: MySQL end-to-end
+          cd src/linux && cargo test --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
+
+  consumers:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/consumers
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
         run: |
-          cd src/linux && bash scripts/test-gtk-mysql.sh
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: MCP, policy sessions
+        run: |
+          cd src/linux
+          cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
+          cargo test --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
+          cargo test --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
+      - name: App server tests
+        run: |
+          cd src/linux && python3 scripts/run-isolated-tests.py app-server
+
+  socket-ssh:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: PostgreSQL socket and SSH fixtures
+        run: |
+          cd src/linux
+          ./scripts/test-postgres-socket.sh
+          bash ./scripts/test-ssh.sh
+
+  driver-tls:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Driver TLS fixtures
+        run: |
+          cd src/linux && ./scripts/test-driver-tls.sh
+
+  pg-release:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: PostgreSQL release fixture
+        run: |
+          cd src/linux && ./scripts/test-postgres-release.sh
+
+  keyring:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/keyring
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Secret Service tier
+        run: |
+          cd src/linux && ./scripts/test-secret-service.sh
+
+  e2e:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/e2e-${{ matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [postgres, mysql]
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Real server end to end
+        run: |
+          cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
 
   distro-floor:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name == 'push'
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/floor-${{ matrix.base }}
+    strategy:
+      fail-fast: false
+      matrix:
+        base: ["ubuntu:24.04", "debian:13"]
     steps:
       - name: Check out
         env:
@@ -148,9 +298,9 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
-      - name: Ubuntu 24.04 and Debian 13
+      - name: Distro floor
         run: |
-          cd src/linux && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ubuntu:24.04 debian:13
+          cd src/linux && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ${{ matrix.base }}
       - name: Debian package build, install and purge
         run: |
-          cd src/linux && bash scripts/test-deb-package.sh ubuntu:24.04 debian:13
+          cd src/linux && bash scripts/test-deb-package.sh ${{ matrix.base }}

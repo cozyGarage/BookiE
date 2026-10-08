@@ -68,3 +68,11 @@
             .tp-color-red { background-color: #e62d42; }
             .tp-color-purple { background-color: #9141ac; }
             .tp-color-brown { background-color: #986a44; }
+            .tp-strip-blue { box-shadow: inset 0 3px #3584e4; }
+            .tp-strip-teal { box-shadow: inset 0 3px #2190a4; }
+            .tp-strip-green { box-shadow: inset 0 3px #3a944a; }
+            .tp-strip-yellow { box-shadow: inset 0 3px #c88800; }
+            .tp-strip-orange { box-shadow: inset 0 3px #ed5b00; }
+            .tp-strip-red { box-shadow: inset 0 3px #e62d42; }
+            .tp-strip-purple { box-shadow: inset 0 3px #9141ac; }
+            .tp-strip-brown { box-shadow: inset 0 3px #986a44; }

@@ -207,6 +207,122 @@ async fn a_failed_mysql_dml_batch_confirms_rollback_and_preserves_neighbor_rows(
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_failed_batch_keeps_direct_inserts_on_nontransactional_engines() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    let engines = [
+        ("innodb", "InnoDB", true),
+        ("myisam", "MyISAM", false),
+        ("memory", "MEMORY", false),
+        ("csv", "CSV", false),
+        ("archive", "ARCHIVE", false),
+    ];
+
+    for (name, engine, transactional) in engines {
+        let table = format!("direct_{name}_effects");
+        conn.execute(&format!("CREATE TABLE {table} (id INT NOT NULL) ENGINE={engine}"))
+            .await
+            .unwrap();
+        conn.execute(&format!("INSERT INTO {table} VALUES (1)")).await.unwrap();
+
+        let missing_table = format!("missing_direct_{name}_target");
+        let batch = vec![
+            (format!("INSERT INTO {table} VALUES (2)"), vec![]),
+            (format!("INSERT INTO {missing_table} VALUES (99)"), vec![]),
+        ];
+        let error = conn
+            .execute_in_transaction(&batch)
+            .await
+            .expect_err("the absent table must fail after the direct engine write");
+        assert!(
+            matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+            "{engine} failure must identify statement 1, got {error:?}"
+        );
+
+        let expected = if transactional {
+            vec![vec![Value::Int(1)]]
+        } else {
+            vec![vec![Value::Int(1)], vec![Value::Int(2)]]
+        };
+        assert_eq!(
+            conn.query(&format!("SELECT id FROM {table} ORDER BY id"))
+                .await
+                .unwrap()
+                .rows,
+            expected,
+            "{engine} direct INSERT effects must match its rollback contract"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_failed_batch_keeps_direct_updates_and_deletes_on_nontransactional_engines() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    let engines = [
+        ("innodb", "InnoDB", true),
+        ("myisam", "MyISAM", false),
+        ("memory", "MEMORY", false),
+        ("csv", "CSV", false),
+    ];
+
+    for (name, engine, transactional) in engines {
+        for (operation, statement, persisted_rows) in [
+            (
+                "update",
+                "UPDATE {table} SET value = 11 WHERE id = 1",
+                vec![vec![Value::Int(1), Value::Int(11)], vec![Value::Int(2), Value::Int(20)]],
+            ),
+            (
+                "delete",
+                "DELETE FROM {table} WHERE id = 2",
+                vec![vec![Value::Int(1), Value::Int(10)]],
+            ),
+        ] {
+            let table = format!("direct_{name}_{operation}_effects");
+            conn.execute(&format!(
+                "CREATE TABLE {table} (id INT NOT NULL, value INT NOT NULL) ENGINE={engine}"
+            ))
+            .await
+            .unwrap();
+            conn.execute(&format!("INSERT INTO {table} VALUES (1, 10), (2, 20)"))
+                .await
+                .unwrap();
+
+            let missing_table = format!("missing_direct_{name}_{operation}_target");
+            let batch = vec![
+                (statement.replace("{table}", &table), vec![]),
+                (format!("INSERT INTO {missing_table} VALUES (99, 99)"), vec![]),
+            ];
+            let error = conn
+                .execute_in_transaction(&batch)
+                .await
+                .expect_err("the absent table must fail after the direct engine write");
+            assert!(
+                matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+                "{engine} {operation} failure must identify statement 1, got {error:?}"
+            );
+
+            let expected_rows = if transactional {
+                vec![vec![Value::Int(1), Value::Int(10)], vec![Value::Int(2), Value::Int(20)]]
+            } else {
+                persisted_rows
+            };
+            assert_eq!(
+                conn.query(&format!("SELECT id, value FROM {table} ORDER BY id"))
+                    .await
+                    .unwrap()
+                    .rows,
+                expected_rows,
+                "{engine} direct {operation} effects must match its rollback contract"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts.clone()).await;

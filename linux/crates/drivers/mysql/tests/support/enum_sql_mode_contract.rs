@@ -56,6 +56,90 @@ async fn connect_in_mode(options: &ConnectOptions, mode: &str) -> Box<dyn Connec
     connection
 }
 
+async fn assert_nonempty_enum_set_xlsx(connection: &dyn Connection, suffix: usize, mode: &str) {
+    let result = connection
+        .query("SELECT id, mood, perms FROM enum_mode_source WHERE id IN (1, 2, 3, 6, 7) ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("happy".into()), Value::Text("read".into())],
+            vec![
+                Value::Int(2),
+                Value::Text("it's ok".into()),
+                Value::Text("write,slash\\path".into())
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("back\\slash".into()),
+                Value::Text("NULL".into())
+            ],
+            vec![Value::Int(6), Value::Null, Value::Null],
+            vec![
+                Value::Int(7),
+                Value::Text("<tag>&".into()),
+                Value::Text("<member>".into())
+            ],
+        ],
+        "native enum/set values before XLSX export in sql_mode {mode:?}"
+    );
+
+    let path = std::env::temp_dir().join(format!(
+        "tablepro-enum-set-xlsx-{}-{:?}-{suffix}.xlsx",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    tablepro_core::export::write_result_file(
+        &path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap_or_else(|error| panic!("non-empty ENUM/SET XLSX export in {mode:?}: {error}"));
+
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(&path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    for (text, xml) in [
+        ("happy", "happy"),
+        ("read", "read"),
+        ("it's ok", "it's ok"),
+        ("write,slash\\path", "write,slash\\path"),
+        ("back\\slash", "back\\slash"),
+        ("NULL", "NULL"),
+        ("<tag>&", "&lt;tag&gt;&amp;"),
+        ("<member>", "&lt;member&gt;"),
+    ] {
+        assert!(
+            shared_strings.contains(&format!("<t>{xml}</t>")),
+            "XLSX must retain native ENUM/SET text {text:?} in sql_mode {mode:?}: {shared_strings}"
+        );
+    }
+    assert!(
+        sheet.contains("<c r=\"B4\" t=\"s\">"),
+        "literal ENUM/SET strings must be string cells: {sheet}"
+    );
+    assert!(!sheet.contains("r=\"B5\""), "SQL NULL enum must remain blank: {sheet}");
+    assert!(!sheet.contains("r=\"C5\""), "SQL NULL set must remain blank: {sheet}");
+    assert!(
+        !sheet.contains("<f>"),
+        "enum/set labels must not become formulas: {sheet}"
+    );
+    std::fs::remove_file(path).unwrap();
+}
+
 async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: &[&str]) {
     let setup = connect(options.clone()).await;
     setup
@@ -259,6 +343,7 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         );
         assert_eq!(std::fs::read(&xlsx_path).unwrap(), b"previous workbook");
         std::fs::remove_file(xlsx_path).unwrap();
+        assert_nonempty_enum_set_xlsx(connection.as_ref(), suffix, mode).await;
 
         let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
         let csv_options = tablepro_core::export::CsvOptions {

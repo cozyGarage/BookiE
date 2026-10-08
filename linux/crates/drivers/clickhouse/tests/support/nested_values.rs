@@ -16,6 +16,46 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "Array(Nullable(Enum8('zero' = 0, 'NULL' = 1, 'O\\'Brien' = 2)))",
         ),
         (
+            "CAST(['low', 'NULL', 'high'] AS Array(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))",
+            "Array(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))",
+        ),
+        (
+            "CAST(['low', CAST(NULL AS Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))), 'NULL', 'high'] AS Array(Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))))",
+            "Array(Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))",
+        ),
+        (
+            "tuple(CAST('low' AS Enum8('low' = -128, 'NULL' = 0, 'high' = 127)), CAST(NULL AS Nullable(Enum8('low' = -128, 'NULL' = 0, 'high' = 127))), CAST('NULL' AS Enum8('low' = -128, 'NULL' = 0, 'high' = 127)))",
+            "Tuple(Enum8('low' = -128, 'NULL' = 0, 'high' = 127), Nullable(Enum8('low' = -128, 'NULL' = 0, 'high' = 127)), Enum8('low' = -128, 'NULL' = 0, 'high' = 127))",
+        ),
+        (
+            "tuple(CAST('low' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), CAST(NULL AS Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))), CAST('NULL' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))",
+            "Tuple(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767), Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))",
+        ),
+        (
+            r#"CAST(map('NULL', CAST('NULL' AS Enum8('NULL' = 1, 'O''Brien' = 2, 'zero' = 0)), '東京', CAST('O''Brien' AS Enum8('NULL' = 1, 'O''Brien' = 2, 'zero' = 0))) AS Map(String, Enum8('NULL' = 1, 'O''Brien' = 2, 'zero' = 0)))"#,
+            r#"Map(String, Enum8('zero' = 0, 'NULL' = 1, 'O\'Brien' = 2))"#,
+        ),
+        (
+            r#"CAST(map('empty', CAST('' AS Nullable(Enum16('' = -32768, 'NULL' = 0, 'high' = 32767))), 'null', CAST(NULL AS Nullable(Enum16('' = -32768, 'NULL' = 0, 'high' = 32767))), 'label', CAST('NULL' AS Nullable(Enum16('' = -32768, 'NULL' = 0, 'high' = 32767)))) AS Map(String, Nullable(Enum16('' = -32768, 'NULL' = 0, 'high' = 32767))))"#,
+            r#"Map(String, Nullable(Enum16('' = -32768, 'NULL' = 0, 'high' = 32767)))"#,
+        ),
+        (
+            r#"CAST(map('min', CAST('low' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), 'zero', CAST('NULL' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), 'max', CAST('high' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))) AS Map(String, Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))"#,
+            r#"Map(String, Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))"#,
+        ),
+        (
+            r#"CAST(map('empty', CAST('' AS Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127))), 'sql_null', CAST(NULL AS Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127))), 'literal_null', CAST('NULL' AS Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127))), 'endpoint', CAST('high' AS Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127)))) AS Map(String, Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127))))"#,
+            r#"Map(String, Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127)))"#,
+        ),
+        (
+            r#"CAST(map(CAST('low' AS Enum8('low' = -128, 'high' = 127)), 'NULL', CAST('high' AS Enum8('low' = -128, 'high' = 127)), '東京') AS Map(Enum8('low' = -128, 'high' = 127), String))"#,
+            r#"Map(Enum8('low' = -128, 'high' = 127), String)"#,
+        ),
+        (
+            r#"CAST(map(CAST('low' AS Enum16('low' = -32768, 'high' = 32767)), 'O''Brien', CAST('high' AS Enum16('low' = -32768, 'high' = 32767)), 'NULL') AS Map(Enum16('low' = -32768, 'high' = 32767), String))"#,
+            r#"Map(Enum16('low' = -32768, 'high' = 32767), String)"#,
+        ),
+        (
             "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))",
             "Array(Nullable(UInt128))",
         ),

@@ -14,7 +14,7 @@ Every shipped feature is free to use. TablePro has no account, license, subscrip
 
 ## Status
 
-The Linux client is under active development toward BookiE 0.2.0. B3 type/value consumer coverage remains open, followed by B4 transport/session acceptance and installed desktop qualification. It includes database browsing, SQL editing, structure editing, inline row changes, query history, SSH tunnels, policy checks, audit records, MCP access, and a headless MCP process. The GTK grid creates row objects on demand over an in-memory result; it does not yet stream or page large results from the database.
+The Linux client is under active development toward BookiE 0.2.0. B3 type/value consumer coverage remains open, followed by B4 transport/session acceptance and installed desktop qualification. It includes database browsing, SQL editing, structure editing, inline row changes, query history, SSH tunnels, policy checks, audit records, MCP access, and a headless MCP process. Table browsing fetches bounded pages from the database. Arbitrary SQL editor results are still materialized up to configured caps; progressive server-cursor paging is accepted in ADR 0011 but not implemented.
 
 PostgreSQL is the furthest along: server-confirmed cancellation, certificate hostname and authority verification, verified TLS through an SSH tunnel, read-only denial, rollback, blocking-lock reporting, and reconnect run as deterministic container checks. MySQL, ClickHouse, Redis, and MongoDB also have driver TLS fixture evidence; those fixtures do not establish full transport or packaging readiness. Packaging is not release-verified. [`linux/ROADMAP.md`](linux/ROADMAP.md) links to current milestone status and the detailed acceptance boards.
 
@@ -27,7 +27,7 @@ Database support is provided by static Rust crates compiled into the app:
 | SQLite | Implemented; local and GTK tests |
 | Microsoft SQL Server | Implemented; cancellation and authentication limits |
 | ClickHouse | Implemented; driver and TLS fixtures |
-| Redis | Experimental |
+| Redis | Experimental; single host/port endpoint in 0.2.0 |
 | MongoDB | Experimental |
 | DuckDB | Optional build feature |
 

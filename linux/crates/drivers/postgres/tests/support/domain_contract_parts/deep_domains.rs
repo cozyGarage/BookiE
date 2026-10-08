@@ -670,7 +670,9 @@ async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path
     assert_domain_level_contract(opts.clone(), 256).await;
     assert_domain_level_contract(opts.clone(), 260).await;
     assert_domain_level_contract(opts.clone(), 300).await;
-    assert_domain_level_contract(opts, 301).await;
+    assert_domain_level_contract(opts.clone(), 301).await;
+    assert_domain_level_contract(opts.clone(), 302).await;
+    assert_domain_level_contract(opts, 512).await;
 }
 
 async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
@@ -734,6 +736,41 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
             name: "state".into(),
         })
     );
+    let projected = connection
+        .query(&format!(
+            "SELECT status, pg_typeof(status)::text \
+             FROM {schema}.rows WHERE id = 1"
+        ))
+        .await
+        .unwrap();
+    let outer_domain = format!("{schema}.state_domain_{levels}");
+    assert_eq!(projected.columns[0].data_type, outer_domain);
+    assert_eq!(
+        projected.rows,
+        vec![vec![
+            Value::Text("ready".into()),
+            Value::Text(format!("{schema}.state_domain_{levels}")),
+        ]]
+    );
+    if levels >= 302 {
+        let domain_array = format!("{schema}.{base_type}[]");
+        let array_projected = connection
+            .query(&format!(
+                "SELECT ARRAY[status, NULL]::{domain_array}, \
+                 pg_typeof(ARRAY[status, NULL]::{domain_array})::text \
+                 FROM {schema}.rows WHERE id = 1"
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("domain array projection failed at {levels} layers: {error:?}"));
+        assert_eq!(array_projected.columns[0].data_type, domain_array);
+        assert_eq!(
+            array_projected.rows,
+            vec![vec![
+                Value::Text("{\"ready\",NULL}".into()),
+                Value::Text(format!("{schema}.{base_type}[]")),
+            ]]
+        );
+    }
     let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(&schema),

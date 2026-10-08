@@ -253,9 +253,17 @@ pub(super) fn parse_input_for_grid_cell(
     {
         return Ok(Value::Text(String::new()));
     }
-    if driver_id == "duckdb"
-        && col.is_some_and(|column| column.data_type.trim().to_ascii_uppercase().starts_with("ENUM"))
-        && let Some(label) = parse_sql_single_quoted_string(text.trim())
+    if col.is_some_and(|column| {
+        let data_type = column.data_type.trim().to_ascii_lowercase();
+        match driver_id {
+            "duckdb" => data_type.starts_with("enum"),
+            "clickhouse" => {
+                let data_type = data_type.strip_prefix("nullable(").unwrap_or(&data_type);
+                data_type.starts_with("enum8(") || data_type.starts_with("enum16(")
+            }
+            _ => false,
+        }
+    }) && let Some(label) = parse_sql_single_quoted_string(text.trim())
     {
         return Ok(Value::Text(label));
     }
@@ -854,6 +862,10 @@ mod sqlite_any_contract;
 #[cfg(test)]
 #[path = "../../../tests/support/duckdb_enum_contract.rs"]
 mod duckdb_enum_contract;
+
+#[cfg(test)]
+#[path = "../../../tests/support/clickhouse_enum_contract.rs"]
+mod clickhouse_enum_contract;
 
 #[cfg(test)]
 #[path = "../../../tests/support/mysql_integer_contract.rs"]

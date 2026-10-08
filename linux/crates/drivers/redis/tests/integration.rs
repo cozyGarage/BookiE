@@ -4,6 +4,8 @@ mod server_restart;
 
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
+#[path = "support/disconnection.rs"]
+mod disconnection;
 
 #[tokio::test]
 async fn an_unavailable_redis_server_is_classified_as_connection_refused() {
@@ -109,6 +111,16 @@ use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers_modules::redis::Redis;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
+
+struct BinaryBulk(Vec<u8>);
+impl redis::ToRedisArgs for BinaryBulk {
+    fn write_redis_args<W>(&self, out: &mut W)
+    where
+        W: ?Sized + redis::RedisWrite,
+    {
+        out.write_arg(&self.0);
+    }
+}
 
 async fn start_redis() -> (ContainerAsync<Redis>, String, u16) {
     let container = Redis::default().start().await.expect("start redis container");
@@ -258,13 +270,162 @@ async fn browsing_another_database_does_not_leak_into_later_queries() {
 
     conn.query("SET home_key 1").await.expect("seed db0");
 
-    conn.fetch_rows(None, "db2", 0, 10).await.expect("browse db2");
+    let empty_page = tokio::time::timeout(std::time::Duration::from_secs(5), conn.fetch_rows(None, "db2", 0, 10))
+        .await
+        .expect("an empty SCAN must stop at its terminal cursor")
+        .expect("browse db2");
+    assert!(empty_page.rows.is_empty());
 
     let result = conn
         .query("GET home_key")
         .await
         .expect("read back on the connection's own db");
     assert_eq!(result.rows, vec![vec![Value::Text("1".into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_browsing_binary_string_values_preserves_the_native_bytes() {
+    let (_container, host, port) = start_redis().await;
+    let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
+    let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
+    let payload = vec![0xFF, 0x00, 0x41];
+    redis::cmd("SET")
+        .arg("browse_binary_value")
+        .arg(BinaryBulk(payload.clone()))
+        .query_async::<()>(&mut native_connection)
+        .await
+        .expect("seed binary string value");
+    let native_bytes: Vec<u8> = redis::cmd("GET")
+        .arg("browse_binary_value")
+        .query_async(&mut native_connection)
+        .await
+        .expect("read native binary value");
+    assert_eq!(native_bytes, payload);
+
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    let result = connection.fetch_rows(None, "db0", 0, 10).await.unwrap();
+
+    assert_eq!(result.rows.len(), 1, "only the seeded key should be present");
+    assert_eq!(
+        result.rows[0],
+        vec![
+            Value::Text("browse_binary_value".into()),
+            Value::Text("string".into()),
+            Value::Int(-1),
+            Value::Bytes(native_bytes),
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_browsing_binary_keys_preserves_the_native_bytes() {
+    let (_container, host, port) = start_redis().await;
+    let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
+    let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
+    let key = vec![0xFF, 0x00, 0x41];
+    redis::cmd("SET")
+        .arg(BinaryBulk(key.clone()))
+        .arg("value")
+        .query_async::<()>(&mut native_connection)
+        .await
+        .expect("seed binary key");
+    let native_value: Vec<u8> = redis::cmd("GET")
+        .arg(BinaryBulk(key.clone()))
+        .query_async(&mut native_connection)
+        .await
+        .expect("read native value at binary key");
+    assert_eq!(native_value, b"value");
+
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    let result = connection.fetch_rows(None, "db0", 0, 10).await.unwrap();
+
+    assert_eq!(result.rows.len(), 1, "only the seeded key should be present");
+    assert_eq!(
+        result.rows[0],
+        vec![
+            Value::Bytes(key),
+            Value::Text("string".into()),
+            Value::Int(-1),
+            Value::Text("value".into()),
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_redis_scan_keeps_fetching_until_the_requested_page_is_full() {
+    use std::collections::HashSet;
+
+    const KEY_COUNT: usize = 2048;
+    let (_container, host, port) = start_redis().await;
+    let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
+    let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
+
+    let mut seed = redis::cmd("MSET");
+    for index in 0..KEY_COUNT {
+        seed.arg(format!("scan_page_{index:04}")).arg("value");
+    }
+    seed.query_async::<()>(&mut native_connection)
+        .await
+        .expect("seed keys across multiple SCAN batches");
+
+    let (mut cursor, first_batch): (u64, Vec<String>) = redis::cmd("SCAN")
+        .arg(0)
+        .arg("MATCH")
+        .arg("scan_page_*")
+        .arg("COUNT")
+        .arg(100)
+        .query_async(&mut native_connection)
+        .await
+        .expect("inspect the native first SCAN batch");
+    assert_ne!(cursor, 0, "the fixture must require more than one SCAN batch");
+    let first_batch_len = first_batch.len();
+    assert!(first_batch_len < KEY_COUNT);
+
+    let mut native_keys: HashSet<String> = first_batch.into_iter().collect();
+    while cursor != 0 {
+        let (next, batch): (u64, Vec<String>) = redis::cmd("SCAN")
+            .arg(cursor)
+            .arg("MATCH")
+            .arg("scan_page_*")
+            .arg("COUNT")
+            .arg(100)
+            .query_async(&mut native_connection)
+            .await
+            .expect("read the next native SCAN batch");
+        native_keys.extend(batch);
+        cursor = next;
+    }
+    assert_eq!(native_keys.len(), KEY_COUNT, "native SCAN must census the fixture");
+
+    let requested = first_batch_len + 1;
+    assert!(requested <= KEY_COUNT);
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        connection.fetch_rows(None, "db0", 0, requested as u64),
+    )
+    .await
+    .expect("browse must stop after collecting the requested page")
+    .unwrap();
+
+    assert_eq!(result.rows.len(), requested);
+    let observed: HashSet<String> = result
+        .rows
+        .iter()
+        .map(|row| match row.first() {
+            Some(Value::Text(key)) => key.clone(),
+            other => panic!("Redis browse key must be text, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(observed.len(), result.rows.len(), "a page must not repeat keys");
+    assert!(
+        observed.is_subset(&native_keys),
+        "every browsed key must exist natively"
+    );
+    assert!(result.rows.iter().all(|row| row[3] == Value::Text("value".into())));
 }
 
 #[tokio::test]
@@ -300,16 +461,6 @@ async fn value_contract_preserves_integer_and_text_command_arguments() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_resp3_hash_map_preserves_binary_fields_and_values() {
-    struct BinaryBulk(Vec<u8>);
-    impl redis::ToRedisArgs for BinaryBulk {
-        fn write_redis_args<W>(&self, out: &mut W)
-        where
-            W: ?Sized + redis::RedisWrite,
-        {
-            out.write_arg(&self.0);
-        }
-    }
-
     let (_container, host, port) = start_redis_resp3().await;
     let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
     let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();

@@ -120,6 +120,9 @@ def scenarios(ui):
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         time.sleep(0.4)
 
+    def wait_for_result_column(name, present=True):
+        ui.wait_for_node_containing(f"{name}\n", role=pyatspi.ROLE_LABEL, present=present)
+
     def choose_menu_item(position):
         for _ in range(position):
             ui.press_x11_key("Down")
@@ -420,7 +423,7 @@ def scenarios(ui):
 
     def columns_dialog_hides_a_column_and_keeps_the_last_one(database, base):
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
-        ui.wait_for_node(name="beta")
+        wait_for_result_column("beta")
         open_cell_menu("1")
         choose_menu_item(6)
         wait_for_adw_dialog("Columns")
@@ -438,8 +441,8 @@ def scenarios(ui):
         time.sleep(0.3)
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("Columns", present=False)
-        ui.wait_for_node(name="beta", present=False)
-        ui.wait_for_node(name="alpha")
+        wait_for_result_column("beta", present=False)
+        wait_for_result_column("alpha")
 
     def session_transaction_label_and_toggle_off_confirmation(database, base):
         def session_toggle(name):
@@ -489,7 +492,7 @@ def scenarios(ui):
 
     def interactive_controls_have_accessible_names(database, base):
         ui.run_sql("SELECT 1 AS alpha")
-        ui.wait_for_node(name="alpha")
+        wait_for_result_column("alpha")
         roles = {
             pyatspi.ROLE_PUSH_BUTTON: "push button",
             pyatspi.ROLE_TOGGLE_BUTTON: "toggle button",
@@ -919,8 +922,146 @@ def scenarios(ui):
         )
         return out.stdout.strip()
 
+    def mongodb(sql):
+        import subprocess
+        out = subprocess.run(
+            ["docker", "exec", os.environ["TABLEPRO_GTK_MONGODB_CONTAINER"], "mongosh", "--quiet",
+             "bookie_test", f"--eval={sql}"],
+            check=True, capture_output=True, text=True,
+        )
+        return out.stdout.strip()
+
+    def clickhouse(sql):
+        import subprocess
+        out = subprocess.run(
+            ["docker", "exec", os.environ["TABLEPRO_GTK_CLICKHOUSE_CONTAINER"], "clickhouse-client",
+             "--user=default", "--password=tablepro", "--format=TabSeparatedRaw", f"--query={sql}"],
+            check=True, capture_output=True, text=True,
+        )
+        return out.stdout.strip()
+
+    def mongodb_name():
+        return json.loads(mongodb("JSON.stringify(db.people.findOne({_id: 2}).name)"))
+
+    def mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row(database, base):
+        name = ui.MONGODB_CONNECTION_NAME
+        ui.open_saved_connection(name)
+        ui.wait_for_frame_containing(f"{name} — BookiE")
+        ui.invoke_named_action_within("bookie_test.people", "Open people")
+        ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
+
+        assert mongodb_name() == "Grace Hopper"
+        assert mongodb(
+            'db.people.updateOne({_id: 2}, {$set: {name: "Server update"}}).matchedCount'
+        ) == "1"
+        ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
+        assert ui.find_node(name="Server update") is None, "a loaded page changed without a new cursor"
+
+        ui.press_x11_key("F5")
+        ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL, present=False)
+        ui.wait_for_node(name="Server update", role=pyatspi.ROLE_LABEL)
+        click_cell("Server update", count=2)
+        for key in "clientedit":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        assert mongodb_name() == "Server update", "an unsaved grid edit reached MongoDB"
+        ui.press_x11_key("s", ("Control_L",))
+        ui.wait_for_node(name="Approve write: Safety MongoDB")
+        ui.invoke(ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON))
+        try:
+            ui.wait_for_node(name="1 unsaved change", present=False)
+        except AssertionError as error:
+            raise AssertionError(
+                f"MongoDB grid edit did not save; server value is {mongodb_name()}: {error}"
+            ) from error
+        assert mongodb_name() == "clientedit"
+        row = json.loads(mongodb("JSON.stringify(db.people.findOne({_id: 2}))"))
+        assert row == {"_id": 2, "name": "clientedit", "note": "untouched"}, row
+    def clickhouse_enum_grid_edit_preserves_native_label_and_siblings(database, base):
+        ui.open_saved_connection(ui.CLICKHOUSE_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.CLICKHOUSE_CONNECTION_NAME} — BookiE")
+        ui.invoke_named_action_within("default.enum_grid", "Open enum_grid")
+        ui.wait_for_node(name="low8", role=pyatspi.ROLE_LABEL)
+        click_cell("low8", count=2)
+        for key in "high8":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        click_cell("low16", count=2)
+        for key in "high16":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="2 unsaved changes")
+
+        query = (
+            "SELECT toString(id), "
+            "toString(isNull(state8)), toString(CAST(assumeNotNull(state8) AS Int8)), "
+            "ifNull(toString(state8), '<SQL_NULL>'), "
+            "toString(isNull(state16)), toString(CAST(assumeNotNull(state16) AS Int16)), "
+            "ifNull(toString(state16), '<SQL_NULL>') "
+            "FROM default.enum_grid ORDER BY id FORMAT TabSeparatedRaw"
+        )
+        before_save = "\n".join((
+            "1\t0\t-128\tlow8\t0\t-32768\tlow16",
+            "2\t0\t0\tNULL\t0\t0\tNULL",
+            "3\t1\t0\t<SQL_NULL>\t1\t0\t<SQL_NULL>",
+            "4\t0\t1\t\t0\t1\t",
+            "5\t0\t127\thigh8\t0\t32767\thigh16",
+        ))
+        after_save = "\n".join((
+            "1\t0\t127\thigh8\t0\t32767\thigh16",
+            "2\t0\t0\tNULL\t0\t0\tNULL",
+            "3\t1\t0\t<SQL_NULL>\t1\t0\t<SQL_NULL>",
+            "4\t0\t1\t\t0\t1\t",
+            "5\t0\t127\thigh8\t0\t32767\thigh16",
+        ))
+        assert clickhouse(query) == before_save, "pending grid edits reached ClickHouse"
+        ui.press_x11_key("s", ("Control_L",))
+        approval = ui.find_node(name="Approve once")
+        if approval is not None:
+            ui.invoke(approval)
+        wait_for_oracle(clickhouse, query, after_save)
+        ui.wait_for_node(name="2 unsaved changes", present=False)
+
     def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
         grid_edit_and_delete_commit_to_the_server(ui.POSTGRES_CONNECTION_NAME, "public.people", psql)
+
+    def postgres_enum_grid_edit_preserves_native_label_and_siblings(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke_named_action_within("public.enum_grid", "Open enum_grid")
+        ui.wait_for_node(name="ready", role=pyatspi.ROLE_LABEL)
+        click_cell("ready", count=2)
+        for key in "done":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+
+        click_cell("NULL", count=2)
+        for key in "done":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="2 unsaved changes")
+
+        snapshot = "SELECT string_agg(format('%s:%s:%s:%s', id, " \
+            "COALESCE(state::text, '<SQL_NULL>'), state IS NULL, sibling), E'\\n' ORDER BY id) " \
+            "FROM public.enum_grid"
+        before = "\n".join((
+            "1:ready:f:target",
+            "2:NULL:f:literal NULL",
+            "3:<SQL_NULL>:t:SQL NULL",
+            "4::f:empty",
+            "5:ready:f:sibling",
+        ))
+        after = before.replace("1:ready:f:target", "1:done:f:target").replace(
+            "2:NULL:f:literal NULL", "2:done:f:literal NULL"
+        )
+        actual = psql(snapshot)
+        assert actual == before, ("pending enum edit changed the native rows", actual, before)
+        ui.press_x11_key("s", ("Control_L",))
+        wait_for_oracle(psql, snapshot, after)
+        assert ui.find_node(name="Approve once") is None, "a plain enum grid edit asked for approval"
+        ui.wait_for_node(name="1 unsaved change", present=False)
 
     def mysql_grid_edit_and_delete_commit_to_the_server(database, base):
         grid_edit_and_delete_commit_to_the_server(ui.MYSQL_CONNECTION_NAME, "bookie_test.people", mysql)
@@ -948,10 +1089,15 @@ def scenarios(ui):
         result.append(profile_large_result_in_the_grid)
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
+    if os.environ.get("TABLEPRO_GTK_MONGODB_CONTAINER"):
+        result.append(mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row)
+    if os.environ.get("TABLEPRO_GTK_CLICKHOUSE_CONTAINER"):
+        result.append(clickhouse_enum_grid_edit_preserves_native_label_and_siblings)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_saved_connection_browses_rows_and_values)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
+        result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
         result.append(postgres_saved_mtls_connection_authenticates_and_queries)

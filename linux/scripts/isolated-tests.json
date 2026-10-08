@@ -3,6 +3,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::clickhouse_enum_contract::value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::tests::postgres_numeric_csv::postgres_numeric_parser_outputs_round_trip_through_server"
     ],
     [
@@ -226,6 +231,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::schema::vim_tests::vim_keys_are_attached_only_when_enabled"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::outcomes::tests::a_failed_statement_offers_a_copy_button"
     ]
   ],
   "keyring": [

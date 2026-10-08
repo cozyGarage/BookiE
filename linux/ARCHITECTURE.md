@@ -1,6 +1,6 @@
 # Architecture
 
-TablePro is a Linux-only Rust workspace rooted in `linux/`. GTK4 and Relm4 provide the desktop UI. Domain, policy, storage, SSH, MCP, and database drivers are separate crates so they can be tested without starting the application.
+BookiE is a Linux-only Rust workspace rooted in `linux/`, forked from TablePro. GTK4 and Relm4 provide the desktop UI. Domain, policy, storage, SSH, MCP, and database drivers are separate crates so they can be tested without starting the application.
 
 The architecture description below reflects the current `linux` branch. The [cross-session consistency review](docs/archive/architecture-consistency-review-2026-10-03.md) is a dated source snapshot, useful for its document authority, evidence limits and then-open risks. Accepted [decisions](docs/decisions/README.md) constrain implementation; the [active sprint](docs/bookie-0.2-sprint.md) owns delivery sequencing and current acceptance.
 
@@ -105,7 +105,7 @@ Table tabs combine data browsing and structure views. Pending row changes and pe
 
 Workspace state is persisted per connection. Unknown persisted tab kinds deserialize to an `Unknown` variant and are dropped during restore instead of failing the whole file.
 
-Browse results use a custom `gio::ListModel` (`RowStore`) behind GTK's list and selection models. It retains the shared `QueryResult` and weakly caches GTK `RowObject`s for shared rows, preserving identity while consumers hold references and recreating a clean object after they release it. Draft and replacement rows remain strongly owned by the model. This bounds retained row objects around active consumers, but query rows and cell values remain fully materialized in memory. It is not database paging or constant-memory handling of large results.
+Table browsing fetches bounded pages from the database. Each loaded page is held in a custom `gio::ListModel` (`RowStore`) behind GTK's list and selection models. The store retains the shared `QueryResult` and weakly caches GTK `RowObject`s for shared rows, preserving identity while consumers hold references and recreating a clean object after they release it. Draft and replacement rows remain strongly owned by the model. This bounds retained row objects around active consumers, not the page data itself. Arbitrary SQL editor results remain materialized up to row, cell and decoded-byte caps; progressive server-cursor paging is accepted in [ADR 0011](docs/decisions/0011-paged-query-results.md) but not implemented (PERF-2/PERF-8).
 
 ## Driver contract
 
@@ -154,6 +154,7 @@ CI runs GTK build, widget and soak checks in Debian testing containers for the G
 
 - Linux is the only supported operating system.
 - Drivers are statically linked.
+- Redis is experimental and supports one host/port endpoint; Sentinel and Cluster topologies are deferred beyond 0.2.0.
 - There is no embedded browser UI.
 - There is no in-process user scripting runtime.
 - Packaging targets Arch x86_64 first and Debian/GNOME amd64 next. Current 0.2 installed upgrade, rollback and native Wayland qualification remains open. A recipe or CI build is not publication approval; AUR and Flathub remain deferred.

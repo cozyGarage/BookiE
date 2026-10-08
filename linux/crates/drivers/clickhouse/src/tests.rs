@@ -248,6 +248,20 @@ fn json_to_value_maps_common_types() {
 }
 
 #[test]
+fn clickhouse_enum_values_decode_as_exact_labels_and_keep_sql_null_distinct() {
+    let enum16 = "Nullable(Enum16('NULL' = 0, 'high' = 32767))";
+    assert_eq!(
+        json_to_value(serde_json::json!("NULL"), enum16),
+        Value::Text("NULL".into())
+    );
+    assert_eq!(
+        json_to_value(serde_json::json!("high"), enum16),
+        Value::Text("high".into())
+    );
+    assert_eq!(json_to_value(serde_json::Value::Null, enum16), Value::Null);
+}
+
+#[test]
 fn clickhouse_json_row_preserves_wide_integer_tokens_exactly() {
     let raw: Vec<serde_json::Value> = query::parse_line(
             br#"[-170141183460469231731687303715884105728,170141183460469231731687303715884105727,340282366920938463463374607431768211455]"#,

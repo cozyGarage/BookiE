@@ -1114,6 +1114,28 @@ fn unknown_type_falls_through_to_text() {
 }
 
 #[test]
+fn clickhouse_enum_grid_accepts_quoted_empty_and_literal_null_labels() {
+    let enum_column = col("Enum8('' = 1, 'NULL' = 2, 'O''Brien' = 3)", false);
+    assert_eq!(
+        parse_input_for_grid_cell("''", Some(&enum_column), "clickhouse", None).unwrap(),
+        Value::Text(String::new())
+    );
+    assert_eq!(
+        parse_input_for_grid_cell("'NULL'", Some(&enum_column), "clickhouse", None).unwrap(),
+        Value::Text("NULL".into())
+    );
+    assert_eq!(
+        parse_input_for_grid_cell("'O''Brien'", Some(&enum_column), "clickhouse", None).unwrap(),
+        Value::Text("O'Brien".into())
+    );
+    let nullable_enum_column = col("Nullable(Enum16('' = 1, 'NULL' = 2))", true);
+    assert_eq!(
+        parse_input_for_grid_cell("", Some(&nullable_enum_column), "clickhouse", None).unwrap(),
+        Value::Null
+    );
+}
+
+#[test]
 fn null_sentinel_typed_literally_is_text() {
     let r = parse_input_for_column("<NULL>", Some(&col("text", true))).unwrap();
     match r {

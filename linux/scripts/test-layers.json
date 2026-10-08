@@ -114,7 +114,48 @@
             "scripts/ci-local.sh",
             "integration"
           ],
-          "timeout_seconds": 1800,
+          "timeout_seconds": 2700,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
+    "b4-rollback": {
+      "purpose": "Focused MySQL failed-batch rollback and PostgreSQL rollback-failure acceptance",
+      "prerequisites": "Rust 1.98; Docker; native TLS build dependencies",
+      "hosted_gate": "Build Linux / B4 rollback acceptance",
+      "steps": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-driver-mysql",
+            "--test",
+            "integration",
+            "mysql_atomic",
+            "--",
+            "--include-ignored",
+            "--test-threads=1"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests"
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-driver-postgres",
+            "--test",
+            "integration",
+            "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
+            "--",
+            "--include-ignored",
+            "--test-threads=1"
+          ],
+          "timeout_seconds": 1200,
           "evidence": "rust-tests"
         }
       ]
@@ -242,6 +283,21 @@
         }
       ]
     },
+    "gtk-clickhouse": {
+      "purpose": "Installed GTK Enum16 grid edit against a native ClickHouse fixture",
+      "prerequisites": "GNOME 50; Docker with clickhouse/clickhouse-server:24.8; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Local release gate",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-clickhouse.sh"
+          ],
+          "timeout_seconds": 1500,
+          "evidence": "exit"
+        }
+      ]
+    },
     "gtk-mysql-approval": {
       "purpose": "Human approval dialog policy and dispatch against a native MySQL fixture",
       "prerequisites": "GNOME 50; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
@@ -253,6 +309,21 @@
             "scripts/test-gtk-mysql-approval.sh"
           ],
           "timeout_seconds": 900,
+          "evidence": "exit"
+        }
+      ]
+    },
+    "gtk-mongodb": {
+      "purpose": "Installed GTK MongoDB cursor observation and native grid edit",
+      "prerequisites": "GNOME 50; Docker with mongo:7; Rust 1.98; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Local release gate",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-mongodb.sh"
+          ],
+          "timeout_seconds": 1800,
           "evidence": "exit"
         }
       ]

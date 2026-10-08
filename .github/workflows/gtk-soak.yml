@@ -34,11 +34,17 @@ jobs:
       run:
         working-directory: linux
     steps:
+      - name: Install Git before checkout
+        working-directory: /tmp
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ inputs.ref || 'linux' }}
       - name: Record the commit under test
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           resolved="$(git rev-parse HEAD)"
           echo "soak attempt tree: $resolved"
           {
@@ -89,4 +95,4 @@ jobs:
         with:
           name: gtk-soak-${{ github.run_id }}-${{ github.run_attempt }}
           path: gtk-artifacts
-          if-no-files-found: error
+          if-no-files-found: warn

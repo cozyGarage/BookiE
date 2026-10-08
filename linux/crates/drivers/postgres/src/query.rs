@@ -473,3 +473,15 @@ pub(super) fn undecodable(idx: usize, type_name: &str) -> Value {
     );
     Value::Undecodable(type_name.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::has_enum_leaf;
+    use sqlx::{Postgres, Type};
+
+    #[test]
+    fn value_contract_enum_leaf_detection_skips_builtin_scalar_types() {
+        let int4 = <i32 as Type<Postgres>>::type_info();
+        assert!(!has_enum_leaf(&int4));
+    }
+}

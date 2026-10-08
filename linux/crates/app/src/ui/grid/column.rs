@@ -22,14 +22,19 @@ const PENDING_CSS_CLASSES: &[&str] = &[
 
 const TOOLTIP_MIN_CHARS: usize = 40;
 
-/// Marks a foreign-key column's header before the cell value picker
-/// (a later slice) exists to act on it.
-fn column_header_title(name: &str, is_foreign_key: bool) -> String {
-    if is_foreign_key {
-        format!("{name} \u{1F517}")
-    } else {
-        name.to_string()
+fn column_header_title(info: &ColumnInfo, is_foreign_key: bool) -> String {
+    let mut title = info.name.clone();
+    if info.primary_key {
+        title.push_str(" \u{1F511}");
     }
+    if is_foreign_key {
+        title.push_str(" \u{1F517}");
+    }
+    if !info.data_type.is_empty() {
+        title.push('\n');
+        title.push_str(&info.data_type.to_lowercase());
+    }
+    title
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -268,7 +273,7 @@ pub(super) fn build_column(
         }
     });
 
-    let title = column_header_title(&info.name, tab_ctx.foreign_key_columns.contains(&info.name));
+    let title = column_header_title(info, tab_ctx.foreign_key_columns.contains(&info.name));
     let column = gtk4::ColumnViewColumn::builder()
         .title(&title)
         .factory(&factory)
@@ -378,13 +383,18 @@ mod tests {
     }
 
     #[test]
-    fn header_title_marks_a_foreign_key_column() {
-        assert_eq!(column_header_title("customer_id", true), "customer_id \u{1F517}");
+    fn header_title_shows_type_and_key_markers() {
+        let mut info = col("INTEGER", true);
+        info.name = "id".into();
+        assert_eq!(column_header_title(&info, false), "id \u{1F511}\ninteger");
+        assert_eq!(column_header_title(&info, true), "id \u{1F511} \u{1F517}\ninteger");
     }
 
     #[test]
-    fn header_title_leaves_a_plain_column_unmarked() {
-        assert_eq!(column_header_title("name", false), "name");
+    fn header_title_omits_an_unknown_type() {
+        let mut info = col("", false);
+        info.name = "name".into();
+        assert_eq!(column_header_title(&info, false), "name");
     }
 
     #[test]
