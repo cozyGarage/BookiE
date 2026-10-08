@@ -18,9 +18,10 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against the BookiE `linux` code tip `d61a26ae4` (PR #355; checked
-2026-10-08). This review covers merged code PRs through #355, plus the GTK
-soak workflow setup fixes in PRs #357 and #358 and the B4/B3
+Reconciled against BookiE `linux` tip
+`d61a26ae4a5022b26264513afbd104acbd8bf27e`, checked 2026-10-08. This review
+covers merged code PRs through #355, plus the GTK soak workflow setup fixes in
+PRs #357 and #358 and the B4/B3
 documentation updates in PRs #319, #321–#323, #332, #335, #338, #340, #342,
 #343, and #350, including the B4 evidence move (#310), MongoDB nested null-filter
 contract (#312), MySQL, Redis, ClickHouse and SQL Server lost-ack contracts
