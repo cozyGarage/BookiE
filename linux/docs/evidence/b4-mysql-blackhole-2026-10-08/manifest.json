@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "task": "B4-11 MySQL failed-batch engine and side-effect coverage",
+  "base_commit": "e697824f92438ea641b0e3b98cdf7d11173ce25a",
+  "source_commit": "e267ba0a34dbf7c1fc985ec1b743cf0c22408ecb",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "1039ac2128a65f532f62806077e720d0e56c790468e7b5c981ca38d7819da6f7"
+  },
+  "environment": {
+    "platform": "Linux",
+    "docker_server": "29.7.2",
+    "mysql_fixture": "testcontainers-modules Mysql::default (mysql:8.1)",
+    "blackhole_availability_probe": "mysql:8.0 reported BLACKHOLE SUPPORT=YES"
+  },
+  "focused": {
+    "source_commit": "3d64a98882006e6c1f459822906a854382f33ab7",
+    "selector": "mysql_atomic::mysql_failed_batch_blackhole_trigger_sink_discards_rows_but_runs_with_trigger",
+    "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic::mysql_failed_batch_blackhole_trigger_sink_discards_rows_but_runs_with_trigger -- --include-ignored --exact --test-threads=1",
+    "passed": 1,
+    "failed": 0,
+    "filtered": 76
+  },
+  "full_mysql_atomic": {
+    "source_commit": "e267ba0a34dbf7c1fc985ec1b743cf0c22408ecb",
+    "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+    "passed": 13,
+    "failed": 0,
+    "filtered": 66,
+    "duration_seconds": 143.42
+  },
+  "assertions": [
+    "The failed batch reports the duplicate-key failure at statement index 1.",
+    "The InnoDB parent row from the first statement is rolled back.",
+    "The MyISAM trigger witness survives rollback, proving the trigger completed.",
+    "The BLACKHOLE trigger target retains no rows, matching its sink semantics."
+  ],
+  "scope_limit": "Focused local Docker evidence only. Hosted B4 rollback acceptance and candidate or installed qualification for this new selector are pending.",
+  "summary": "focused.txt"
+}
