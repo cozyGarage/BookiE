@@ -33,6 +33,7 @@
 - PostgreSQL name[] typed CSV import now checks NULL/empty distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact native array wire preservation.
 - PostgreSQL custom enum-array slicing now checks native lower-bound normalization, multidimensional shape, SQL NULL versus empty arrays, literal NULL/Unicode labels, and typed rebind wire equality.
 - PostgreSQL enum parameter tests now prove integer and boolean inputs keep their native types, fail safely in enum comparisons and updates, and leave target rows unchanged.
+- PostgreSQL now has a Docker-backed lost-ack write regression: a TCP proxy drops the committed UPDATE acknowledgement, the driver reports the outcome as uncertain, a later query reconnects, and independent row and trigger-audit oracles prove the write ran exactly once.
 - PostgreSQL `int4range[]` now has an explicit unsupported-value contract with native range text/JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL `tsvector[]` and `tsquery[]` now have explicit unsupported-value contracts with native text-search JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL `json[]` and `jsonb[]` now have explicit unsupported-value contracts with native text/JSON/wire oracles and refused-write target/sibling preservation.
