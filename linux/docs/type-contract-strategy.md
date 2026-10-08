@@ -28,6 +28,15 @@ to ordinary scalar results.
 
 ## Current evidence and next targets
 
+The MySQL ENUM/SET editor parser now has focused regressions for malformed
+declarations and MySQL literal escapes. Invalid type prefixes, incomplete
+label lists, missing quotes, or trailing metadata must refuse the edit rather
+than infer members; NUL and control-character labels plus backslash-percent
+and backslash-underscore labels retain their declared text. Docker coverage
+checks this against MySQL's reported column type and native enum ordinal/bytes
+([test](../crates/app/tests/support/mysql_enum_set_contract.rs)).
+This pins the parser boundary; it does not expand MySQL ENUM/SET support.
+
 ClickHouse Enum8 now covers its signed endpoints and zero (`-128`, `0`, `127`)
 in the existing native contract. Parameter insertion, result label decoding,
 native Int8 casts, CSV import and SQL-literal replay all preserve the labels;

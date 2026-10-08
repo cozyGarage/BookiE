@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- MySQL ENUM/SET grid parsing now tests malformed metadata refusal and escaped
+  labels, using real MySQL column metadata and native ordinal/byte oracles.
 - A failed PostgreSQL statement in the SQL editor shows the line and column of the error.
 - A failed statement in the SQL editor offers a Copy error button.
 - Selecting several rows shows each numeric column's sum and average in the selection badge tooltip, with NULLs skipped.
