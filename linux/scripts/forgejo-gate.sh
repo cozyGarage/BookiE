@@ -10,21 +10,38 @@ timeout_minutes="${FORGEJO_GATE_TIMEOUT_MINUTES:-60}"
 
 export GIT_ASKPASS="${GIT_ASKPASS:-$HOME/.config/forgejo/askpass.sh}"
 sha="$(git rev-parse "$branch")"
-git push --quiet "$remote" "$branch:$target"
 token="$(cat "$token_file")"
+latest_run_id() {
+  curl -fsS -H "Authorization: token $token" "$api/actions/runs?limit=1" | python3 -c '
+import json, sys
+runs = json.load(sys.stdin)["workflow_runs"]
+print(runs[0]["id"] if runs else 0)
+'
+}
+remote_sha="$(git ls-remote "$remote" "refs/heads/$target" | cut -f1)"
+if [ "$remote_sha" = "$sha" ]; then
+  after=0
+  echo "$target already points at $sha on $remote; using its latest ci run, which may be older than this check"
+else
+  after="$(latest_run_id)"
+  git push --quiet "$remote" "$branch:$target"
+fi
 deadline=$((SECONDS + timeout_minutes * 60))
 
 summarize() {
   curl -fsS -H "Authorization: token $token" "$api/actions/runs?limit=50" | python3 -c '
 import json, sys
-sha = sys.argv[1]
-runs = [run for run in json.load(sys.stdin)["workflow_runs"] if run["commit_sha"] == sha]
+sha, after = sys.argv[1], int(sys.argv[2])
+runs = [
+    run for run in json.load(sys.stdin)["workflow_runs"]
+    if run["commit_sha"] == sha and run["id"] > after and run.get("workflow_id") == "ci.yml"
+]
 if not runs:
     print("pending")
 else:
     run = max(runs, key=lambda item: item["id"])
     print(run["status"], run["id"])
-' "$sha"
+' "$sha" "$after"
 }
 
 while [ "$SECONDS" -lt "$deadline" ]; do
