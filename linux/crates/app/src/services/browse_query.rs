@@ -793,6 +793,7 @@ mod tests {
         assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
     }
 
+    #[cfg(feature = "duckdb")]
     async fn seed_duckdb_value_preview(
         connection: &dyn tablepro_core::Connection,
         control: &tablepro_core::OperationControl,
@@ -823,6 +824,7 @@ mod tests {
             .unwrap();
     }
 
+    #[cfg(feature = "duckdb")]
     async fn assert_duckdb_value_preview_native(
         connection: &dyn tablepro_core::Connection,
         control: &tablepro_core::OperationControl,
