@@ -37,6 +37,11 @@ checks this against MySQL's reported column type and native enum ordinal/bytes
 ([test](../crates/app/tests/support/mysql_enum_set_contract.rs)).
 This pins the parser boundary; it does not expand MySQL ENUM/SET support.
 
+[PR #369](https://github.com/cozyGarage/BookiE/pull/369) extends the PostgreSQL
+enum-domain recursion contract to a tested 513-layer point and awaits
+maintainer merge. This is a checkpoint, not a maximum-depth claim, and it does
+not close the broader B3 matrix.
+
 ClickHouse Enum8 now covers its signed endpoints and zero (`-128`, `0`, `127`)
 in the existing native contract. Parameter insertion, result label decoding,
 native Int8 casts, CSV import and SQL-literal replay all preserve the labels;

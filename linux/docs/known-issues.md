@@ -19,8 +19,10 @@ Rules:
   acceptance.
 
 Reconciled against BookiE `linux` tip
-`1e76bab2f9620cb5261571ecb4d74c4f81743333`, checked 2026-10-08. This review
-covers merged code PRs through #360, including the SQLite affinity contract
+`299f94fcfebac2635de36e937f62e527ceeb8c51`, checked 2026-10-08. This review
+covers merged PRs #365–#368, including the PostgreSQL error-position change
+and B3/UX ownership handoff; B3 PR #369 remains open. It also covers the
+SQLite affinity contract
 (#359) and GTK tunnel regression (#360), plus the GTK soak workflow setup fixes in
 PRs #357 and #358 and the B4/B3
 documentation updates in PRs #319, #321–#323, #332, #335, #338, #340, #342,
