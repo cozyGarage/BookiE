@@ -39,8 +39,11 @@ out. The focused MySQL and PostgreSQL cases above completed on this candidate.
 
 B4-7, B4-9, B4-11, B4-12, B4-16, B4-17 and B4-22 remain open pending final
 hosted candidate results and the applicable installed acceptance. The MySQL
-and PostgreSQL focused rollback cases passed locally; hosted driver integration
-timed out during compilation before running tests. The hosted installed GTK
+and PostgreSQL focused rollback cases passed locally; broad hosted driver
+integration timed out during compilation before tests ran. A focused hosted
+`b4-rollback` layer now runs those exact selectors before broad integration;
+it passed locally (9 MySQL cases and 1 PostgreSQL case), while the hosted
+candidate run is pending. The hosted installed GTK
 failure also leaves B4-22 open, despite the successful local staged-binary
 reruns. B4-21's Samba AD fixture
 passes locally, but Windows AD
