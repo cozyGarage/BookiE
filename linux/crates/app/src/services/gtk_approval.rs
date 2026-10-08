@@ -109,13 +109,15 @@ impl ApprovalSink for GtkApprovalSink {
                 return;
             }
 
-            let sql_view = gtk::TextView::builder()
-                .editable(false)
-                .cursor_visible(false)
-                .monospace(true)
-                .wrap_mode(gtk::WrapMode::WordChar)
+            let sql_view = gtk::Label::builder()
+                .label(&sql_c)
+                .xalign(0.0)
+                .yalign(0.0)
+                .wrap(true)
+                .wrap_mode(gtk::pango::WrapMode::WordChar)
+                .selectable(true)
+                .css_classes(["monospace"])
                 .build();
-            sql_view.buffer().set_text(&sql_c);
             let sql_scroll = gtk::ScrolledWindow::builder()
                 .min_content_height(180)
                 .max_content_height(360)
