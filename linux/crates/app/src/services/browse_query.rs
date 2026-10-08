@@ -88,7 +88,7 @@ impl BrowseTarget<'_> {
             query.params.extend(params);
             0
         } else {
-            if self.filter.is_empty() && order.is_none() && query.projected_columns.is_none() {
+            if self.filter.is_empty() && order.is_none() {
                 return Ok(PageQuery::Native);
             }
             offset
@@ -297,6 +297,41 @@ mod tests {
     }
 
     #[test]
+    fn hidden_projection_stays_disabled_when_no_non_key_column_is_hidden() {
+        let columns = vec![column("id", true), column("name", false)];
+        for hidden in [["id"], ["stale"]] {
+            let hidden: HashSet<String> = hidden.map(str::to_owned).into();
+            let target = BrowseTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "items",
+                columns: &columns,
+                filter: &FilterSet::default(),
+                hidden_columns: Some(&hidden),
+            };
+            assert_eq!(target.projected_columns(), None);
+        }
+    }
+
+    #[test]
+    fn hidden_projection_stays_disabled_for_native_document_and_key_browsing() {
+        let columns = vec![column("_id", true), column("name", false), column("secret", false)];
+        let hidden: HashSet<String> = ["secret"].map(str::to_owned).into();
+        for driver_id in ["mongodb", "redis"] {
+            let target = BrowseTarget {
+                driver_id,
+                schema: None,
+                table: "items",
+                columns: &columns,
+                filter: &FilterSet::default(),
+                hidden_columns: Some(&hidden),
+            };
+            assert_eq!(target.projected_columns(), None);
+            assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
+        }
+    }
+
+    #[test]
     fn hidden_raw_filter_column_stays_in_sql_but_not_projection() {
         let columns = vec![column("id", true), column("name", false), column("secret", false)];
         let filter = FilterSet {
@@ -374,6 +409,76 @@ mod tests {
         assert!(!page.sql.contains("10000"));
         assert_eq!(page.params, vec![Value::Text("Ada".into()), Value::Int(50)]);
         assert_eq!(count.params, vec![Value::Text("Ada".into())]);
+    }
+
+    #[test]
+    fn explicit_sort_ignores_a_keyset_cursor_and_keeps_offset_pagination() {
+        let columns = vec![column("id", true), column("rank", false)];
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "items",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let PageQuery::Sql(page) = target
+            .page(KEYSET_OFFSET_THRESHOLD, 25, Some((1, true)), Some(&[Value::Int(5)]))
+            .unwrap()
+        else {
+            panic!("expected offset SQL")
+        };
+        assert!(page.sql.contains("ORDER BY \"rank\" ASC, \"id\" ASC"));
+        assert!(
+            page.sql
+                .ends_with(&format!("LIMIT 25 OFFSET {KEYSET_OFFSET_THRESHOLD}"))
+        );
+        assert!(!page.sql.contains(" > "));
+        assert!(page.params.is_empty());
+    }
+
+    #[test]
+    fn incomplete_composite_cursor_is_ignored_and_keeps_offset_pagination() {
+        let columns = vec![column("tenant", true), column("id", true), column("name", false)];
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "items",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let PageQuery::Sql(page) = target
+            .page(KEYSET_OFFSET_THRESHOLD, 25, None, Some(&[Value::Int(5)]))
+            .unwrap()
+        else {
+            panic!("expected offset SQL")
+        };
+        assert!(
+            page.sql
+                .ends_with(&format!("LIMIT 25 OFFSET {KEYSET_OFFSET_THRESHOLD}"))
+        );
+        assert!(!page.sql.contains(" > "));
+        assert!(page.params.is_empty());
+    }
+
+    #[test]
+    fn keyset_cursor_is_ignored_when_the_table_has_no_primary_key() {
+        let columns = vec![column("name", false)];
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "items",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        assert!(matches!(
+            target
+                .page(KEYSET_OFFSET_THRESHOLD, 25, None, Some(&[Value::Int(5)]))
+                .unwrap(),
+            PageQuery::Native
+        ));
     }
 
     #[test]
