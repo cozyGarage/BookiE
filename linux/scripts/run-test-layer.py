@@ -22,7 +22,7 @@ def catalog():
     if data["schema_version"] != 1 or not data["layers"]:
         raise ValueError("unsupported or empty layer catalog")
     for name, layer in data["layers"].items():
-        if not re.fullmatch(r"[a-z][a-z-]*", name) or not layer["steps"]:
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", name) or not layer["steps"]:
             raise ValueError(f"invalid layer: {name}")
         for step in layer["steps"]:
             if not step["argv"] or not all(isinstance(arg, str) and arg for arg in step["argv"]):
