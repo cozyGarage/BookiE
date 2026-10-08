@@ -5,9 +5,11 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `d8459b46` on `linux` (PR #320; fetched 2026-10-08). Since PR #315,
-PRs #316 and #319 refreshed architecture/B3/B4 documentation; PRs #317–#320 added
-Redis binary-value, binary-key and SCAN page-boundary coverage. Earlier B3 work added
+Code baseline: `edac26a1` on `linux` (PR #324; fetched 2026-10-08). Since PR #315,
+PRs #316, #319 and #321–#323 refreshed architecture/B3/B4 documentation; PRs
+#317–#320 added Redis binary-value, binary-key and SCAN page-boundary coverage;
+PR #322 recorded the numeric mutation audit, and PR #324 added enum-leaf metadata
+coverage. Earlier B3 work added
 PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
 nested null-filter parity (#312), and a MySQL lost-ack no-replay contract
 (#315). These tests preserve native type/value oracles and verify refused
@@ -16,9 +18,10 @@ validation are in the changelog and owning boards.
 
 The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
 the focused MongoDB selector passed against MongoDB 7. The MySQL lost-ack
-selector passed against its Docker fixture on PR #315. At `d8459b46`, Linux
-Security and both Flatpak variants are running; Build Linux and Linux test
-quality are queued.
+selector passed against its Docker fixture on PR #315. At `edac26a1`, Linux
+Security and Flatpak are running; Build Linux and Linux test quality are queued.
+Sonar passed on PR #324. These runs do not establish B4 acceptance on a selected
+frozen candidate.
 The local focused B4 rollback layer passed on clean documentation-only commit
 `73f8ce935`; its tested source files match `684ea40f`. Commands, results and
 source hashes are in the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
@@ -107,7 +110,7 @@ owners; do not create a second completion cache, exporter or type policy.
 
 ## B4 acceptance worklist (2026-10-08)
 
-This is the next acceptance slice on current `linux` tip `d8459b46`. Prior runs
+This is the next acceptance slice on current `linux` tip `edac26a1`. Prior runs
 remain useful evidence for their exact SHAs, but do not substitute for current
 frozen-candidate, hosted or installed acceptance where required. The SSH GTK
 artifacts below prove staged release-binary behavior under Xvfb/AT-SPI; they do
@@ -115,7 +118,7 @@ not prove a distribution-package installation or native Wayland session.
 
 | Item | Current evidence and action |
 | --- | --- |
-| B4-7, B4-9, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. At current tip `d8459b46`, Linux Security and both Flatpak variants are running; Build Linux and Linux test quality are queued. |
+| B4-7, B4-9, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. At current tip `edac26a1`, Linux Security and Flatpak are running; Build Linux and Linux test quality are queued. |
 | B4-22 | Keep UNVERIFIED. The GTK bundle export/import and encrypted credential round-trip have local and earlier hosted evidence; obtain acceptance on the selected frozen candidate, hosted SHA, and installed package/native Wayland. |
 | B4-12 | Repeat PostgreSQL backend-termination rollback-failure acceptance on the selected frozen candidate; preserve `TransactionRollbackFailed`, row rollback, and sequence side-effect assertions with exact SHA. Prior candidate/hosted evidence remains historical. |
 | B4-11 | Extend MySQL failed-batch rollback coverage to the additional storage engines and side-effect patterns requested. Existing proof is bounded to InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, DML trigger effects, AUTO_INCREMENT, and one session-variable effect. |
