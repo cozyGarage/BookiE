@@ -3,11 +3,11 @@
   "date": "2026-10-08",
   "branch": "linux",
   "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
-  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 26d1355 adds GTK harness and fixture changes, package upgrade/removal checks, MySQL Aria rollback test coverage (including a trigger side effect), and documentation only relative to the runtime candidate; no application or driver implementation code changed.",
+  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip b4dd2b4 adds GTK test harness, fixture and packaging changes, MySQL Aria rollback test coverage (including a trigger side effect), and documentation only relative to the runtime candidate; no application or driver implementation code changed.",
   "local_tracked_diff": "none",
   "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
-  "result": "all seven local B4 layers passed on a7f14fa; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa; current-tip Build Linux acceptance is pending",
+  "result": "all seven local B4 layers passed on a7f14fa; the full B4 rollback layer also passed locally at 4db3077; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa; current-tip Build Linux acceptance is pending",
   "release_binary": {
     "build_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
     "staged_path": "/home/trung/.cache/bookie-b4-target-0d5/installed/usr/bin/tablepro",
@@ -25,12 +25,12 @@
   ],
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37780731260,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37780731260",
-    "source_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
+    "run_id": 37787165733,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37787165733",
+    "source_commit": "b4dd2b4b1f25d8096d73067dffe2350719558208",
     "status": "pending",
     "conclusion": null,
-    "note": "No jobs had started at last check."
+    "note": "No jobs had started at last check. Previous source SHA c52f3d7 passed B4 rollback, PostgreSQL release, Driver TLS and Fast GTK in Build Linux run 37784483261; installed GTK and broad driver integration were still running."
   },
   "earlier_hosted": {
     "workflow": "Build Linux",
@@ -39,15 +39,16 @@
     "conclusion": "success"
   },
   "not_established": [
+    "Latest-tip Build Linux acceptance after PR 387",
     "Distribution-package installation and native Wayland acceptance; GTK acceptance used a staged release binary under Xvfb/AT-SPI",
     "Windows Active Directory interoperability; local Kerberos coverage used the Samba AD fixture",
     "Rollback effects for MySQL storage engines and side-effect classes outside bounded fixture coverage"
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "8e1a0de5d3666bc4ab837d1f3a4836bd00414d06403831e7a818b38060e18e8f"
+    "sha256": "97a8d57f12564b5eee2af32606ea8b88d878c072b67352dda27d923e5d10fc9e"
   },
-  "branch_head_at_update": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
+  "branch_head_at_update": "b4dd2b4b1f25d8096d73067dffe2350719558208",
   "runtime_diff_since_tested_commit": [
     "linux/crates/app/tests/gtk_safety.py",
     "linux/crates/app/tests/gtk_ux.py",
@@ -121,7 +122,7 @@
     "status": "cancelled"
   },
   "native_wayland_probe": {
-    "result": "inconclusive: harness stopped before file selection",
+    "result": "inconclusive: fallback reached portal file-chooser discovery but chooser did not appear on isolated D-Bus",
     "backend": "native Wayland (GDK_BACKEND=wayland; WAYLAND_DISPLAY=/run/user/1000/wayland-1)",
     "runtime_binary_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
     "runtime_binary_sha256": "5a8cf04f6b23ee1e6688b4e14c6ebd276a452e255f85506dc31d371c8e3863d7",
@@ -132,8 +133,11 @@
     ],
     "completed_scenarios": [],
     "stopped_at": "bundle_export_records_sanitized_audit_outcome",
-    "observation": "The application and fixture opened; AT-SPI showed an Export connections alert without the expected Choose File control. The test therefore stopped before file selection. This does not establish a product failure or acceptance; the other two scenarios did not run.",
-    "artifacts": "/tmp/bookie-b4-wayland-bundle-evidence/"
+    "observation": "The initial probe exposed the Export connections alert without a Choose File button. PR 387 adds a test-harness fallback that invokes the alert default.activate action; a focused Xvfb export scenario passed with the fallback, and a native Wayland probe exercised it and advanced to file-chooser discovery. The portal chooser did not appear on the isolated D-Bus session; the headless wrapper could not start because gnome-shell is absent, and a separate desktop-bus attempt could not connect to its AT-SPI socket. These are environment-limited probes, not product failure or native acceptance.",
+    "artifacts": "/tmp/bookie-b4-wayland-bundle-evidence/",
+    "followup_harness_commit": "c52242762f8764f07e3e69db5891dbbc9fbfdece",
+    "followup_merged_commit": "b4dd2b4b1f25d8096d73067dffe2350719558208",
+    "focused_xvfb_export_scenario": "passed"
   },
   "earlier_cancelled_hosted": {
     "workflow": "Build Linux",
@@ -144,9 +148,9 @@
   },
   "flatpak_packaging": {
     "workflow": "Flatpak Linux (packaging only)",
-    "run_id": 37780731167,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37780731167",
-    "source_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
+    "run_id": 37784483281,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37784483281",
+    "source_commit": "c52f3d7d910f0e7dcb896c16cf315a76298f0d49",
     "status": "completed",
     "conclusion": "success"
   },
@@ -160,9 +164,9 @@
   },
   "security": {
     "workflow": "Linux Security",
-    "run_id": 37780731293,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37780731293",
-    "source_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
+    "run_id": 37784483408,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37784483408",
+    "source_commit": "c52f3d7d910f0e7dcb896c16cf315a76298f0d49",
     "status": "completed",
     "conclusion": "success"
   },
@@ -198,16 +202,21 @@
     "local_report": "/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
     "local_result": "passed; the test is the sole tracked source modification in the report",
     "previous_hosted_rollback": "passed on 30f9d37; run predates this test",
-    "current_hosted_acceptance": "pending on merged SHA; Build Linux run 37780731260 had no jobs started at last check"
+    "current_hosted_acceptance": "B4 rollback job passed on c52f3d7 in Build Linux run 37784483261 with trigger commit 5211e6a included; latest-tip run 37787165733 is pending"
   },
   "previous_hosted": {
     "workflow": "Build Linux",
-    "run_id": 37777911341,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911341",
-    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
+    "run_id": 37784483261,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37784483261",
+    "source_commit": "c52f3d7d910f0e7dcb896c16cf315a76298f0d49",
     "run_status": "in_progress",
     "b4_rollback_job": "success",
-    "conclusion": null,
-    "note": "Other jobs remain active; this run predates PR #383 trigger coverage."
+    "postgres_release_job": "success",
+    "driver_tls_job": "success",
+    "fast_gtk_job": "success",
+    "optional_duckdb_job": "success",
+    "driver_integration_job": "in_progress",
+    "installed_gtk_job": "in_progress",
+    "note": "The B4 rollback job passed with Aria trigger follow-up commit 5211e6a included; other jobs were still active at last check."
   }
 }

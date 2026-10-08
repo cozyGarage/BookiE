@@ -41,7 +41,11 @@ POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID = "ee8f8451-05cf-4c21-8c7f-f37c8c96e251
 WAIT_SECONDS = 15
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
-SWITCH_ROLES = tuple(role for role in (getattr(pyatspi, "ROLE_SWITCH", None), pyatspi.ROLE_TOGGLE_BUTTON) if role is not None)
+SWITCH_ROLES = tuple(
+    role
+    for role in (getattr(pyatspi, "ROLE_SWITCH", None), pyatspi.ROLE_TOGGLE_BUTTON, pyatspi.ROLE_CHECK_BOX)
+    if role is not None
+)
 PASSPHRASE_ROLES = (pyatspi.ROLE_PASSWORD_TEXT, pyatspi.ROLE_TEXT)
 SETTLE_SECONDS = 3.0
 
@@ -284,6 +288,25 @@ def invoke(node):
         except Exception:
             continue
     raise AssertionError(f"no invokable action for {node_name(node)!r}")
+
+
+def invoke_export_file_chooser_response():
+    button = find_node(name="Choose File…", role=pyatspi.ROLE_PUSH_BUTTON)
+    if button is not None:
+        invoke(button)
+        return
+
+    dialog = wait_for_node(name="Export connections", role=pyatspi.ROLE_ALERT)
+    try:
+        actions = dialog.queryAction()
+        names = [actions.getName(index) for index in range(actions.nActions)]
+    except Exception as error:
+        raise AssertionError("export dialog has no accessible default response") from error
+    assert "default.activate" in names, (
+        "export dialog did not expose its default Choose File response: "
+        f"{names!r}"
+    )
+    invoke(dialog)
 
 
 def invoke_named_action_within(anchor_name, action_name):
@@ -1102,7 +1125,7 @@ def bundle_export_records_sanitized_audit_outcome(_database, base):
     export_path = base / "home" / "review-only.bundle"
     invoke_accessible_action("win.disconnect")
     invoke_accessible_action("welcome.export-bundle")
-    invoke(wait_for_node(name="Choose File…", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke_export_file_chooser_response()
     chooser = wait_for_node(name="Export connections", role=FILE_CHOOSER_ROLES)
     set_visible_editable_within("Export connections", FILE_CHOOSER_ROLES, str(export_path))
     invoke(wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
@@ -1252,7 +1275,7 @@ def encrypted_bundle_round_trip_restores_credentials(_database, base):
     invoke_accessible_action("win.disconnect")
     invoke_accessible_action("welcome.export-bundle")
     set_text_by_name("Passphrase (optional)", passphrase)
-    invoke(wait_for_node(name="Choose File…", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke_export_file_chooser_response()
     chooser = wait_for_node(name="Export connections", role=FILE_CHOOSER_ROLES)
     set_visible_editable_within("Export connections", FILE_CHOOSER_ROLES, str(bundle_path))
     invoke(wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
@@ -1702,7 +1725,7 @@ def a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile(dat
     invoke_accessible_action("win.disconnect")
     invoke_accessible_action("welcome.export-bundle")
     set_text_by_name("Passphrase (optional)", passphrase)
-    invoke(wait_for_node(name="Choose File…", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke_export_file_chooser_response()
     chooser = wait_for_node(name="Export connections", role=FILE_CHOOSER_ROLES)
     set_visible_editable_within("Export connections", FILE_CHOOSER_ROLES, str(bundle_path))
     invoke(wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
