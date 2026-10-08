@@ -56,10 +56,13 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
         source.rows[0][3],
         Value::Text(r#"["[1,5)","(10,20]","empty",null]"#.into())
     );
-    let Value::Undecodable(type_name) = &refusal else {
-        unreachable!("the custom range array was asserted undecodable above")
-    };
-    let marker = format!("<undecodable {type_name}>");
+    let marker = format!(
+        "<undecodable {}>",
+        match &refusal {
+            Value::Undecodable(type_name) => type_name.as_str(),
+            _ => "",
+        }
+    );
     let json_export = tablepro_core::export::render_json(&source.columns, &source.rows);
     assert!(
         json_export.contains(&marker),
