@@ -118,6 +118,12 @@ impl RowObject {
         }
     }
 
+    pub fn preview_long_redis_string_values(&self, key_indices: &[usize]) {
+        if self.cell_value(1) == Value::Text("string".into()) {
+            self.preview_long_values(key_indices);
+        }
+    }
+
     pub fn cells_are_complete(&self) -> bool {
         self.imp().cells.borrow().iter().all(Option::is_some)
     }

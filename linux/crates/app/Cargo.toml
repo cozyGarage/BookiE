@@ -63,7 +63,7 @@ futures.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 testcontainers = { workspace = true, features = ["http_wait_plain"] }
-testcontainers-modules = { workspace = true, features = ["mongo", "mysql", "postgres", "mssql_server"] }
+testcontainers-modules = { workspace = true, features = ["mongo", "mysql", "postgres", "mssql_server", "redis"] }
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
 zip = { version = "8.3", default-features = false, features = ["deflate"] }
 sha2.workspace = true

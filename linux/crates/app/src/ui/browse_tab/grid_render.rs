@@ -243,6 +243,7 @@ impl BrowseTab {
             pk_col_indices,
             projected_columns: self.current_projection.clone(),
             preview_long_values: self.driver_id != "redis",
+            preview_redis_strings: self.driver_id == "redis",
             foreign_key_columns,
         };
         let (column_view, selection) = build_column_view(
@@ -314,22 +315,29 @@ impl BrowseTab {
         result: &std::sync::Arc<QueryResult>,
         store: &crate::ui::row_store::RowStore,
     ) -> bool {
-        let key_indices = if self.driver_id != "redis" {
-            self.current_columns
-                .iter()
-                .enumerate()
-                .filter_map(|(index, column)| column.primary_key.then_some(index))
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let key_indices = self
+            .current_columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| column.primary_key.then_some(index))
+            .collect();
         if let Some(indices) = &self.current_projection {
-            if let Err(error) = store.replace_projected_with_previews(
-                result.clone(),
-                indices.clone(),
-                self.current_columns.len(),
-                key_indices,
-            ) {
+            let replaced = if self.driver_id == "redis" {
+                store.replace_projected_with_redis_string_previews(
+                    result.clone(),
+                    indices.clone(),
+                    self.current_columns.len(),
+                    key_indices,
+                )
+            } else {
+                store.replace_projected_with_previews(
+                    result.clone(),
+                    indices.clone(),
+                    self.current_columns.len(),
+                    key_indices,
+                )
+            };
+            if let Err(error) = replaced {
                 tracing::error!(%error, "projected browse refresh does not match the table schema");
                 store.replace_shared(std::sync::Arc::new(QueryResult {
                     columns: self.current_columns.clone(),
@@ -339,7 +347,11 @@ impl BrowseTab {
                 return false;
             }
         } else {
-            store.replace_shared_with_previews(result.clone(), key_indices);
+            if self.driver_id == "redis" {
+                store.replace_shared_with_redis_string_previews(result.clone(), key_indices);
+            } else {
+                store.replace_shared_with_previews(result.clone(), key_indices);
+            }
         }
         self.reprepend_drafts();
         true

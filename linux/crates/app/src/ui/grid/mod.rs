@@ -77,6 +77,7 @@ pub struct TabGridContext {
     pub pk_col_indices: Vec<usize>,
     pub projected_columns: Option<Vec<usize>>,
     pub preview_long_values: bool,
+    pub preview_redis_strings: bool,
     /// Names of columns that are part of a foreign key on this table.
     /// Marks the column header so a reference is visible before the
     /// cell value picker (a later slice) exists.
@@ -102,7 +103,14 @@ pub fn build_column_view(
 ) -> (gtk4::ColumnView, gtk4::MultiSelection) {
     let result: &QueryResult = shared;
     let store = match &tab_ctx.projected_columns {
-        Some(indices) => match if tab_ctx.preview_long_values && !tab_ctx.pk_col_indices.is_empty() {
+        Some(indices) => match if tab_ctx.preview_redis_strings && !tab_ctx.pk_col_indices.is_empty() {
+            RowStore::from_projected_with_redis_string_previews(
+                shared.clone(),
+                indices.clone(),
+                schema_columns.len(),
+                tab_ctx.pk_col_indices.clone(),
+            )
+        } else if tab_ctx.preview_long_values && !tab_ctx.pk_col_indices.is_empty() {
             RowStore::from_projected_with_previews(
                 shared.clone(),
                 indices.clone(),
@@ -125,6 +133,9 @@ pub fn build_column_view(
                 }))
             }
         },
+        None if tab_ctx.preview_redis_strings && !tab_ctx.pk_col_indices.is_empty() => {
+            RowStore::from_shared_with_redis_string_previews(shared.clone(), tab_ctx.pk_col_indices.clone())
+        }
         None if tab_ctx.preview_long_values && !tab_ctx.pk_col_indices.is_empty() => {
             RowStore::from_shared_with_previews(shared.clone(), tab_ctx.pk_col_indices.clone())
         }

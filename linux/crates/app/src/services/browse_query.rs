@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use tablepro_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build_filter_where, keyset_where_clause};
 
 mod mongodb;
+mod redis;
 
 pub(crate) struct BrowseTarget<'a> {
     pub driver_id: &'a str,
@@ -58,7 +59,7 @@ impl BrowseTarget<'_> {
             return mongodb::value_query(self, column_index, pk_values);
         }
         if self.driver_id == "redis" {
-            return Err("single-cell fetch is unsupported for redis".into());
+            return redis::value_query(self, column_index, pk_values);
         }
         let (sql, params) = tablepro_core::sql_dialect::build_keyed_value_select(
             self.driver_id,
@@ -194,6 +195,8 @@ mod tests {
 
     #[path = "mongodb_value.rs"]
     mod mongodb_value;
+    #[path = "redis_value.rs"]
+    mod redis_value;
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {
         ColumnInfo {

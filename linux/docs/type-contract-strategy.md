@@ -67,8 +67,10 @@ MongoDB browse cells now also preview long text, binary and structured values
 and refetch one selected field through a bound `_id` query under `PolicyGuard`.
 Its Docker app-service contract binds an ObjectId and checks exact 9,000-byte
 text, generic binary and nested BSON document values against native MongoDB
-storage. Redis, arbitrary SQL, shared result memory, installed GTK and memory
-profiling remain open under PERF-10.
+storage. Redis string refetch binds arbitrary key bytes and checks an exact
+9,000-byte value through `PolicyGuard` against native Redis GET. Arbitrary SQL,
+shared result memory, installed GTK and memory profiling remain open under
+PERF-10.
 
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete

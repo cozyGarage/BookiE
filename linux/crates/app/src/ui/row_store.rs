@@ -34,6 +34,7 @@ mod imp {
         pub(in crate::ui) source: RefCell<Option<Arc<QueryResult>>>,
         pub(in crate::ui) projection: RefCell<Option<(Vec<usize>, usize)>>,
         pub(in crate::ui) preview_keys: RefCell<Vec<usize>>,
+        pub(in crate::ui) preview_redis_strings: std::cell::Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -63,7 +64,12 @@ mod imp {
                     let source = self.source.borrow();
                     let cells = source.as_ref()?.rows.get(source_index)?.clone();
                     let projection = self.projection.borrow();
-                    let row = row_for_source(cells, projection.as_ref(), &self.preview_keys.borrow())?;
+                    let row = row_for_source(
+                        cells,
+                        projection.as_ref(),
+                        &self.preview_keys.borrow(),
+                        self.preview_redis_strings.get(),
+                    )?;
                     let object = glib::WeakRef::new();
                     object.set(Some(&row));
                     *slot = Slot::Cached { source_index, object };
@@ -77,7 +83,12 @@ mod imp {
                         let source = self.source.borrow();
                         let cells = source.as_ref()?.rows.get(source_index)?.clone();
                         let projection = self.projection.borrow();
-                        let row = row_for_source(cells, projection.as_ref(), &self.preview_keys.borrow())?;
+                        let row = row_for_source(
+                            cells,
+                            projection.as_ref(),
+                            &self.preview_keys.borrow(),
+                            self.preview_redis_strings.get(),
+                        )?;
                         object.set(Some(&row));
                         Some(row.upcast())
                     }
@@ -92,12 +103,17 @@ fn row_for_source(
     cells: Vec<tablepro_core::Value>,
     projection: Option<&(Vec<usize>, usize)>,
     preview_keys: &[usize],
+    preview_redis_strings: bool,
 ) -> Option<RowObject> {
     let row = match projection {
         Some((indices, width)) => RowObject::new_projected(cells, indices, *width),
         None => Some(RowObject::new(cells)),
     }?;
-    row.preview_long_values(preview_keys);
+    if preview_redis_strings {
+        row.preview_long_redis_string_values(preview_keys);
+    } else {
+        row.preview_long_values(preview_keys);
+    }
     Some(row)
 }
 
@@ -160,6 +176,13 @@ impl RowStore {
         store
     }
 
+    pub fn from_shared_with_redis_string_previews(result: Arc<QueryResult>, key_indices: Vec<usize>) -> Self {
+        let store: Self = glib::Object::new();
+        store.install_shared(result, None, key_indices);
+        store.imp().preview_redis_strings.set(true);
+        store
+    }
+
     pub fn from_projected(result: Arc<QueryResult>, indices: Vec<usize>, width: usize) -> Result<Self, String> {
         if !valid_projection(&result, &indices, width) {
             return Err("projected browse result does not match its schema mapping".into());
@@ -183,6 +206,17 @@ impl RowStore {
         Ok(store)
     }
 
+    pub fn from_projected_with_redis_string_previews(
+        result: Arc<QueryResult>,
+        indices: Vec<usize>,
+        width: usize,
+        key_indices: Vec<usize>,
+    ) -> Result<Self, String> {
+        let store = Self::from_projected_with_previews(result, indices, width, key_indices)?;
+        store.imp().preview_redis_strings.set(true);
+        Ok(store)
+    }
+
     pub fn replace_shared(&self, result: Arc<QueryResult>) {
         self.replace_shared_with_previews(result, Vec::new());
     }
@@ -190,6 +224,13 @@ impl RowStore {
     pub fn replace_shared_with_previews(&self, result: Arc<QueryResult>, key_indices: Vec<usize>) {
         let removed = self.n_items();
         self.install_shared(result, None, key_indices);
+        self.items_changed(0, removed, self.n_items());
+    }
+
+    pub fn replace_shared_with_redis_string_previews(&self, result: Arc<QueryResult>, key_indices: Vec<usize>) {
+        let removed = self.n_items();
+        self.install_shared(result, None, key_indices);
+        self.imp().preview_redis_strings.set(true);
         self.items_changed(0, removed, self.n_items());
     }
 
@@ -213,6 +254,18 @@ impl RowStore {
         Ok(())
     }
 
+    pub fn replace_projected_with_redis_string_previews(
+        &self,
+        result: Arc<QueryResult>,
+        indices: Vec<usize>,
+        width: usize,
+        key_indices: Vec<usize>,
+    ) -> Result<(), String> {
+        self.replace_projected_with_previews(result, indices, width, key_indices)?;
+        self.imp().preview_redis_strings.set(true);
+        Ok(())
+    }
+
     fn install_shared(
         &self,
         result: Arc<QueryResult>,
@@ -223,6 +276,7 @@ impl RowStore {
         *self.imp().source.borrow_mut() = Some(result);
         *self.imp().projection.borrow_mut() = projection;
         *self.imp().preview_keys.borrow_mut() = preview_keys;
+        self.imp().preview_redis_strings.set(false);
     }
 
     pub fn insert(&self, position: u32, row: &RowObject) {
@@ -473,6 +527,36 @@ mod tests {
         assert!(!row.cell_is_loaded(2));
         assert_eq!(row.cell_preview(2).unwrap().byte_count, text.len());
         assert!(row.complete_cells().is_none());
+    }
+
+    #[test]
+    fn redis_previews_only_string_values_and_preserves_keys_and_other_types() {
+        let long = "x".repeat(9000);
+        let result = Arc::new(QueryResult {
+            columns: vec![column("Key"), column("Type"), column("TTL"), column("Value")],
+            rows: vec![
+                vec![
+                    Value::Text("str-key".into()),
+                    Value::Text("string".into()),
+                    Value::Int(-1),
+                    Value::Text(long.clone()),
+                ],
+                vec![
+                    Value::Text("hash-key".into()),
+                    Value::Text("hash".into()),
+                    Value::Int(-1),
+                    Value::Text(long.clone()),
+                ],
+            ],
+            truncated: false,
+        });
+        let store = RowStore::from_shared_with_redis_string_previews(result, vec![0]);
+        let string_row = store.item(0).and_downcast::<RowObject>().unwrap();
+        let hash_row = store.item(1).and_downcast::<RowObject>().unwrap();
+        assert_eq!(string_row.cell_value(0), Value::Text("str-key".into()));
+        assert_eq!(string_row.cell_preview(3).unwrap().byte_count, long.len());
+        assert_eq!(hash_row.cell_value(3), Value::Text(long));
+        assert!(hash_row.cell_preview(3).is_none());
     }
 
     #[test]
