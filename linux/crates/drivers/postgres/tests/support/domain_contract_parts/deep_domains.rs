@@ -673,7 +673,8 @@ async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path
     assert_domain_level_contract(opts.clone(), 301).await;
     assert_domain_level_contract(opts.clone(), 302).await;
     assert_domain_level_contract(opts.clone(), 512).await;
-    assert_domain_level_contract(opts, 513).await;
+    assert_domain_level_contract(opts.clone(), 513).await;
+    assert_domain_level_contract(opts, 1024).await;
 }
 
 async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
@@ -754,23 +755,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         ]]
     );
     if levels >= 302 {
-        let domain_array = format!("{schema}.{base_type}[]");
-        let array_projected = connection
-            .query(&format!(
-                "SELECT ARRAY[status, NULL]::{domain_array}, \
-                 pg_typeof(ARRAY[status, NULL]::{domain_array})::text \
-                 FROM {schema}.rows WHERE id = 1"
-            ))
-            .await
-            .unwrap_or_else(|error| panic!("domain array projection failed at {levels} layers: {error:?}"));
-        assert_eq!(array_projected.columns[0].data_type, domain_array);
-        assert_eq!(
-            array_projected.rows,
-            vec![vec![
-                Value::Text("{\"ready\",NULL}".into()),
-                Value::Text(format!("{schema}.{base_type}[]")),
-            ]]
-        );
+        assert_domain_array_result_contract(connection.as_ref(), &schema, &base_type, levels).await;
     }
     let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
@@ -1080,4 +1065,48 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         .await
         .unwrap();
     assert_eq!(after_rollback.rows, stored.rows);
+}
+
+async fn assert_domain_array_result_contract(connection: &dyn Connection, schema: &str, base_type: &str, levels: usize) {
+    let domain_array = format!("{schema}.{base_type}[]");
+    let sql = format!(
+        "SELECT ARRAY[status, NULL]::{domain_array}, \
+         pg_typeof(ARRAY[status, NULL]::{domain_array})::text \
+         FROM {schema}.rows WHERE id = 1"
+    );
+    if levels != 1024 {
+        let projected = connection
+            .query(&sql)
+            .await
+            .unwrap_or_else(|error| panic!("domain array projection failed at {levels} layers: {error:?}"));
+        assert_eq!(projected.columns[0].data_type, domain_array);
+        assert_eq!(
+            projected.rows,
+            vec![vec![
+                Value::Text("{\"ready\",NULL}".into()),
+                Value::Text(domain_array),
+            ]]
+        );
+        return;
+    }
+
+    let error = connection.query(&sql).await.expect_err("1024-layer enum array decoding must refuse explicitly");
+    assert!(
+        matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
+        "unexpected 1024-layer array outcome: {error:?}"
+    );
+    let oracle = connection
+        .query(&format!(
+            "SELECT stored::text, expected::text, encode(array_send(stored), 'hex'), \
+             encode(array_send(expected), 'hex'), pg_typeof(stored)::text \
+             FROM (SELECT ARRAY[status, NULL]::{domain_array} AS stored, \
+             ARRAY['ready', NULL]::{domain_array} AS expected \
+             FROM {schema}.rows WHERE id = 1) AS arrays"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(oracle.rows[0][0], Value::Text("{ready,NULL}".into()));
+    assert_eq!(oracle.rows[0][0], oracle.rows[0][1]);
+    assert_eq!(oracle.rows[0][2], oracle.rows[0][3]);
+    assert_eq!(oracle.rows[0][4], Value::Text(domain_array));
 }

@@ -1,4 +1,4 @@
-use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, Value};
+use tablepro_core::{Connection, FilterOp, FilterRule, FilterSet, FilterValue, Value};
 
 use crate::{connect, start_pg};
 
