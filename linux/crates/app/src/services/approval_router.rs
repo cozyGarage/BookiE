@@ -21,7 +21,7 @@ impl ApprovalSink for ApprovalRouter {
             Principal::Human { .. } => &self.human,
             Principal::Agent { .. } => &self.agent,
         };
-        sink.request(request).await
+        super::approval_wait::measure(sink.request(request)).await
     }
 }
 

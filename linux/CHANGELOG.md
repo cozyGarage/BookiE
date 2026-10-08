@@ -74,6 +74,7 @@
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- The time shown for a statement no longer includes the wait for your approval on a guarded connection.
 
 - Ctrl+Tab switches to the most recently used tab, and back again, instead of the next tab in the strip.
 - Create table from CSV now explains that ClickHouse, MongoDB and Redis connections cannot do it, and DuckDB gets its own JSON type name.
