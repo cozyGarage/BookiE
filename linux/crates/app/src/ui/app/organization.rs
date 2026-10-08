@@ -28,6 +28,24 @@ impl App {
     pub(super) fn on_connection_organization_loaded(&mut self, index: ConnectionOrganizationIndex) {
         self.connection_organization = index;
         self.publish_connection_organization();
+        self.apply_connection_strip();
+    }
+
+    pub(super) fn apply_connection_strip(&self) {
+        let Some(strip) = self.workspace_tab_view.as_ref().and_then(|view| view.parent()) else {
+            return;
+        };
+        for class in tablepro_storage::CONNECTION_STRIP_CLASSES {
+            strip.remove_css_class(class);
+        }
+        let color = self.connection_id.map(|id| self.connection_organization.get(id).color);
+        if let Some(class) = color
+            .flatten()
+            .as_deref()
+            .and_then(tablepro_storage::connection_strip_class)
+        {
+            strip.add_css_class(class);
+        }
     }
 
     fn publish_connection_organization(&self) {
