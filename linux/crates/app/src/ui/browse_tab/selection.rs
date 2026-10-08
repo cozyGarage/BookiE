@@ -1,3 +1,5 @@
+pub(in crate::ui::browse_tab) mod stats;
+
 use relm4::gtk;
 use relm4::gtk::glib;
 
@@ -174,13 +176,14 @@ pub(super) fn row_key_is_unreadable(cells: &[Value], pk_indices: &[usize]) -> bo
 /// multi-selects so the affordance stays discoverable now that
 /// the toolbar Delete button is gone (right-click + Delete key
 /// are the action surface).
-pub(super) fn update_selection_chrome(label: &gtk::Label, n: u32) {
+pub(super) fn update_selection_chrome(label: &gtk::Label, n: u32, stats_tooltip: Option<&str>) {
     if n <= 1 {
         label.set_visible(false);
         return;
     }
     let count = n.to_string();
     label.set_label(&crate::tr!("{n} selected · press Delete to remove").replace("{n}", &count));
+    label.set_tooltip_text(stats_tooltip.filter(|text| !text.is_empty()));
     label.set_visible(true);
 }
 

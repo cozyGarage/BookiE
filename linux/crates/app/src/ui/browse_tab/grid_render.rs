@@ -271,12 +271,13 @@ impl BrowseTab {
             let columns = self.current_columns.clone();
             sel.connect_selection_changed(move |sel, _, _| {
                 let n = sel.selection().size() as u32;
-                update_selection_chrome(&selection_label_for_signal, n);
+                let tooltip = selection_tooltip(sel, &columns);
+                update_selection_chrome(&selection_label_for_signal, n, tooltip.as_deref());
                 inspector.show_row(inspected_row(sel, &columns));
             });
             // Page rebuild clears MultiSelection's bitset; reset the
             // chrome explicitly so a stale "5 selected" doesn't linger.
-            update_selection_chrome(&self.selection_label, 0);
+            update_selection_chrome(&self.selection_label, 0, None);
         }
 
         // Re-prepend any pending draft rows so they survive page changes,
@@ -409,4 +410,20 @@ fn inspected_row(
         .downcast::<crate::ui::row_object::RowObject>()
         .ok()?;
     Some(row.with_cells(|cells| crate::ui::row_inspector::inspector_fields(columns, cells)))
+}
+
+fn selection_tooltip(selection: &gtk::MultiSelection, columns: &[ColumnInfo]) -> Option<String> {
+    let model = selection.model()?;
+    let bits = selection.selection();
+    let rows: Vec<Vec<tablepro_core::Value>> = (0..bits.size())
+        .filter_map(|i| {
+            let row = model
+                .item(bits.nth(i as u32))?
+                .downcast::<crate::ui::row_object::RowObject>()
+                .ok()?;
+            Some(row.with_cells(|cells| cells.to_vec()))
+        })
+        .collect();
+    let stats = super::selection::stats::column_stats(columns, &rows);
+    Some(super::selection::stats::tooltip(&stats))
 }

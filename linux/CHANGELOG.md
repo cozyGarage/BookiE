@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Selecting several rows shows the sum and average of each numeric column in the selection badge tooltip.
 - PostgreSQL enum-leaf metadata and schema-aware write/filter contracts now
   include direct `pg_typeof()` query projections plus 302- and 512-layer
   domain-over-enum cases; 512 stress-checks recursive metadata handling beyond
