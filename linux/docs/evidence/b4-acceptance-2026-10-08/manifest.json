@@ -2,30 +2,32 @@
   "schema_version": 1,
   "date": "2026-10-08",
   "branch": "linux",
-  "source_commit": "1c197ffc9e8a925a9ad2061473f27ef36c5a5876",
-  "source_note": "Frozen B4 code candidate. Local layers and staged-release GTK bundle scenarios ran on this exact SHA. Hosted Build Linux run is pinned to 00731e0, a docs-only descendant via #367 and #368.",
+  "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 9961e60 adds GTK harness and fixture changes, package upgrade/removal checks, the MySQL Aria regression test, and documentation only; no application or driver implementation code changed relative to the runtime candidate.",
   "local_tracked_diff": "none",
-  "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts off the /tmp quota; no tracked source diff.",
+  "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
-  "result": "all listed local B4 layers and selected bundle GTK scenarios passed; hosted acceptance on the current docs-only descendant is pending",
+  "result": "all seven local B4 layers passed on a7f14fa; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa; current-tip Build Linux acceptance is pending",
   "release_binary": {
-    "build_source": "1c197ffc9e8a925a9ad2061473f27ef36c5a5876",
+    "build_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
     "staged_path": "/home/trung/.cache/bookie-b4-target-0d5/installed/usr/bin/tablepro",
-    "sha256": "83a78e92f295dd29015d1fb6bc5138372800189113327405a1fd9664ac40610d"
+    "sha256": "5a8cf04f6b23ee1e6688b4e14c6ebd276a452e255f85506dc31d371c8e3863d7"
   },
   "local_reports": [
-    "/tmp/bookie-b4-candidate-1e76/linux/target/quality/20261008T103353400187Z-layers/report.json"
+    "/home/trung/.cache/bookie-b4-candidate-a7f14/linux/target/quality/20261008T113209359199Z-layers/report.json"
   ],
   "local_bundle_gtk_scenarios": [
     "bundle_export_records_sanitized_audit_outcome",
     "bundle_import_records_sanitized_audit_outcome",
-    "encrypted_bundle_round_trip_restores_credentials"
+    "encrypted_bundle_round_trip_restores_credentials",
+    "restart_with_a_deleted_connection_opens_the_welcome_list",
+    "a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile"
   ],
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37764482634,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37764482634",
-    "source_commit": "00731e0fad9fa36c807ec23779f69331cb75d0bc",
+    "run_id": 37776917323,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917323",
+    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
     "status": "pending",
     "conclusion": null
   },
@@ -42,6 +44,140 @@
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "33160d2323c50084fec9a767cb9f33449bb342477855f46cd93f1b329c3902fd"
-  }
+    "sha256": "657d0ed5d41e4b7cd053ae3bc237dd94917d69914d3679eab05f7af140692d0b"
+  },
+  "branch_head_at_update": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+  "runtime_diff_since_tested_commit": [
+    "linux/crates/app/tests/gtk_safety.py",
+    "linux/crates/app/tests/gtk_ux.py",
+    "linux/crates/drivers/mysql/tests/shared/mysql_atomic.rs",
+    "linux/docs/b4-task-board.md",
+    "linux/docs/bookie-0.2-sprint.md",
+    "linux/docs/evidence/b4-mariadb-aria-rollback-2026-10-08/focused.txt",
+    "linux/docs/evidence/b4-mariadb-aria-rollback-2026-10-08/manifest.json",
+    "linux/docs/ignored-tests.md",
+    "linux/docs/known-issues.md",
+    "linux/docs/type-contract-strategy.md",
+    "linux/scripts/test-arch-package.sh",
+    "linux/scripts/test-deb-package.sh",
+    "linux/scripts/test-flatpak-window.sh",
+    "linux/scripts/test-gtk-mysql.sh"
+  ],
+  "local_bundle_gtk": {
+    "result": "passed",
+    "display": "Xvfb with private D-Bus and AT-SPI",
+    "runtime_binary_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+    "runtime_binary_sha256": "5a8cf04f6b23ee1e6688b4e14c6ebd276a452e255f85506dc31d371c8e3863d7",
+    "test_harness_sources": [
+      "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+      "0529e8309"
+    ],
+    "additional_scenarios_from_0529e83": [
+      "restart_with_a_deleted_connection_opens_the_welcome_list",
+      "a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile"
+    ]
+  },
+  "local_followup_selectors": [
+    {
+      "selector": "ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width",
+      "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+      "result": "passed",
+      "passed": 1
+    }
+  ],
+  "superseded_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37774162145,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37774162145",
+    "source_commit": "bd4ff0fdb656cb26dda55a465551ed1e87fb870c",
+    "status": "cancelled"
+  },
+  "older_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37764482634,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37764482634",
+    "source_commit": "00731e0fad9fa36c807ec23779f69331cb75d0bc",
+    "conclusion": "failure",
+    "completed_jobs": {
+      "b4-rollback": "success",
+      "driver-tls": "success",
+      "postgres-release": "success",
+      "duckdb": "success",
+      "driver-integration": "success",
+      "fast-gtk": "failure: ignored MongoDB integer-width selector could not pull mongo:7 (bytes remaining on stream)",
+      "installed-gtk": "skipped",
+      "linux-regression-gate": "failure after Fast GTK failure"
+    }
+  },
+  "cancelled_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37770573229,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37770573229",
+    "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+    "status": "cancelled"
+  },
+  "native_wayland_probe": {
+    "result": "inconclusive: harness stopped before file selection",
+    "backend": "native Wayland (GDK_BACKEND=wayland; WAYLAND_DISPLAY=/run/user/1000/wayland-1)",
+    "runtime_binary_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+    "runtime_binary_sha256": "5a8cf04f6b23ee1e6688b4e14c6ebd276a452e255f85506dc31d371c8e3863d7",
+    "attempted_scenarios": [
+      "bundle_export_records_sanitized_audit_outcome",
+      "bundle_import_records_sanitized_audit_outcome",
+      "encrypted_bundle_round_trip_restores_credentials"
+    ],
+    "completed_scenarios": [],
+    "stopped_at": "bundle_export_records_sanitized_audit_outcome",
+    "observation": "The application and fixture opened; AT-SPI showed an Export connections alert without the expected Choose File control. The test therefore stopped before file selection. This does not establish a product failure or acceptance; the other two scenarios did not run.",
+    "artifacts": "/tmp/bookie-b4-wayland-bundle-evidence/"
+  },
+  "earlier_cancelled_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37772724483,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37772724483",
+    "source_commit": "0bb8e34354d13e3ab9911b9db710eddb02115170",
+    "status": "cancelled"
+  },
+  "flatpak_packaging": {
+    "workflow": "Flatpak Linux (packaging only)",
+    "run_id": 37776917341,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917341",
+    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+    "status": "in_progress",
+    "scope": "default and development Flatpak builds; includes Flatpak AT-SPI window and Arch package upgrade/removal checks in current target",
+    "conclusion": null
+  },
+  "intermediate_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37775494283,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37775494283",
+    "source_commit": "d5a830856932540928c14809cf904afb32bfc59a",
+    "status": "cancelled",
+    "conclusion": "cancelled"
+  },
+  "security": {
+    "workflow": "Linux Security",
+    "run_id": 37776917383,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917383",
+    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "cancelled_intermediate_runs": [
+    {
+      "run_id": 37775494283,
+      "source_commit": "d5a830856932540928c14809cf904afb32bfc59a",
+      "status": "cancelled"
+    },
+    {
+      "run_id": 37776466311,
+      "source_commit": "12dc20020824e7ef65e185940efc4503d2fd5c64",
+      "status": "cancelled"
+    },
+    {
+      "run_id": 37776765921,
+      "source_commit": "b62cada571f874be4ee8b4eac4d8d96fe05f2706",
+      "status": "cancelled"
+    }
+  ]
 }
