@@ -18,18 +18,13 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against BookiE `linux` at `1e1a30dc7` (PR #288), checked
-2026-10-08. This includes the docs/evidence cleanup (#287), hosted CI tier split
-and Linux regression sharding (#288), ClickHouse Enum8/Enum16 map-value
-pairings (#290), and MySQL/MariaDB ENUM/SET XLSX coverage (#291), alongside
-ClickHouse Map(Enum) consumers (#280), PostgreSQL lost-ack no-replay coverage
-(#282/#284), ClickHouse mutation results (#285), the Redis single-endpoint scope
-decision, and focused hosted B4 rollback acceptance (#286). PR #289 remains
-open. The
-B4-* rows summarize the [B4 board](b4-task-board.md); when they differ, the board
-and linked PR evidence discussions are authoritative. Items come from the archived
-audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
-first column says which area owns them.
+Reconciled against BookiE `linux` at `684ea40f` (PR #312), checked 2026-10-08.
+This includes merged PRs #289–#312, including the B4 evidence move (#310) and
+MongoDB nested null-filter contract (#312). The Redis 0.2.0 scope is one
+host/port endpoint; Sentinel and Cluster are deferred. B4 rows summarize the
+[B4 board](b4-task-board.md); when they differ, the board and linked PR
+discussions are authoritative. Older audits remain historical; this ledger and
+the [active sprint](bookie-0.2-sprint.md) own current status.
 
 ## Owners and handoff
 
@@ -102,7 +97,7 @@ table in the same commit.
 | B4-4 | ~~F8 headless: agentd shared one `AuditState` across every connection~~ | DONE | Each cached session owns an audit generation; `audit_isolation_tests` covers A/B isolation, replacement, late cancellation and journal-failure sharing | sandbox |
 | B4-5 | ~~Retire the daemon handle after a driver panic or disconnect even when ping succeeds~~ | DONE | `SessionFaultSink` marks the cached session retired through the guard; `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy` (fails without the change) | sandbox |
 | B4-6 | ~~I2: Flatpak plus system OpenSSH must refuse explicitly before dispatch~~ | DONE | `TransportError::SystemSshUnavailableInSandbox` raised in `build_openssh_config` before any process; `sandbox_tests` | sandbox |
-| B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | UNVERIFIED | The local candidate run at `7eff6f26` passed policy, native SSH and seven PostgreSQL GTK scenarios; see [PR #310 evidence comments](https://github.com/cozyGarage/BookiE/pull/310#issuecomment-6051740646). The hosted Build Linux run for `8e5d1b18` was cancelled during remote advancement; the latest tip `ddb808b9f` has a Build Linux run pending. Distribution-package/native Wayland acceptance remains separate | sandbox |
+| B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | UNVERIFIED | The local candidate run at `7eff6f26` passed policy, native SSH and seven PostgreSQL GTK scenarios; see [PR #310 evidence comments](https://github.com/cozyGarage/BookiE/pull/310#issuecomment-6051740646). The hosted Build Linux run for `8e5d1b18` was cancelled during remote advancement. At current tip `684ea40f`, Security passed, Build Linux is queued ([#37725267842](https://github.com/cozyGarage/BookiE/actions/runs/37725267842)), and Flatpak is running ([#37725267889](https://github.com/cozyGarage/BookiE/actions/runs/37725267889)). Distribution-package/native Wayland acceptance remains separate | sandbox |
 | B4-8 | ~~F7: isolated GTK Session, BEGIN, label, toggle-off confirm~~ | DONE | AT-SPI scenario `session_transaction_label_and_toggle_off_confirmation` (SQLite): Session on, BEGIN shows the transaction label, toggling off asks, Cancel keeps the session and the label, Roll Back returns the plain label. Runs in the installed suite on Arch, Ubuntu 24.04 and Debian 13 | gtk-installed |
 | B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | UNVERIFIED | Local `tls`, `postgres-release`, `mssql-kerberos` and `security-policy` layers passed on candidate `7eff6f26`; see [PR #310 evidence comments](https://github.com/cozyGarage/BookiE/pull/310#issuecomment-6051740646). The hosted run on `8e5d1b18` was cancelled; latest hosted checks remain incomplete; see the [B4 board](b4-task-board.md#next-b4-acceptance-run). Distribution-package/native Wayland acceptance remains separate | manual |
 | B4-10 | ~~I1: the Debian package has no askpass build or install~~ | DONE | `scripts/build-deb.sh` builds and installs `tablepro-askpass`; `test_deb_package.py` rejects a builder or package without it, and `scripts/test-deb-package.sh` checks the installed binary | sandbox |

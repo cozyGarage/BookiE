@@ -102,16 +102,16 @@ and rerun for any later source tip.
 
 The hosted Build Linux run for `8e5d1b18` was
 [cancelled](https://github.com/cozyGarage/BookiE/actions/runs/37723088254) as
-`linux` advanced. The remote tip is now `ddb808b9f` after PR #311; its [Build
-Linux run #37724107715](https://github.com/cozyGarage/BookiE/actions/runs/37724107715)
-is pending; Linux Security #37724107789 passed and Flatpak #37724107709 is
-running. These current branch checks do not establish hosted B4 acceptance. The
+`linux` advanced. PR #312 moved the branch to `684ea40f`. Its Linux Security
+run passed; Build Linux is queued ([#37725267842](https://github.com/cozyGarage/BookiE/actions/runs/37725267842))
+and both Flatpak jobs are running ([#37725267889](https://github.com/cozyGarage/BookiE/actions/runs/37725267889)).
+These current branch checks do not establish hosted B4 acceptance. The
 completed local GTK runs use a staged release binary under Xvfb, not a
 distribution package installed on the target Wayland desktop.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-9, B4-16, B4-22 | Local candidate layers passed on `7eff6f26`; obtain hosted acceptance for the selected frozen SHA and installed package acceptance | Hosted run on `8e5d1b18` was cancelled during remote advancement; the latest tip `ddb808b9f` has a Build Linux run pending. Installed acceptance means a distribution package on the target desktop; Xvfb with a staged binary does not satisfy it |
+| B4-7, B4-9, B4-16, B4-22 | Local candidate layers passed on `7eff6f26`; obtain hosted acceptance for the selected frozen SHA and installed package acceptance | Hosted run on `8e5d1b18` was cancelled during remote advancement; current tip `684ea40f` has Build Linux queued and Security passed. Installed acceptance means a distribution package on the target desktop; Xvfb with a staged binary does not satisfy it |
 | B4-12 | Backend-termination rollback-failure selector passed on `8e5d1b18`, with table and identity/trigger-sequence assertions | Hosted run on this SHA was cancelled; rerun on the final frozen candidate and obtain hosted result |
 | B4-11 | Scoped nine-test MySQL atomicity group passed on `7eff6f26` and `8e5d1b18` | Hosted run on `8e5d1b18` was cancelled. Existing scope covers InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, failed INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT, and a trigger session-variable effect; untested engines and side effects remain open |
 | B4-17 | Native SSH and GTK trust/query, second-hop decline and changed-key refusal passed on `7eff6f26`; see the [PR #310 evidence comments](https://github.com/cozyGarage/BookiE/pull/310#issuecomment-6051740646) | Hosted execution of these exact GTK flows and distribution-package/native Wayland trust acceptance remain open |

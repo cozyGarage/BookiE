@@ -5,18 +5,17 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `ddb808b9f` on `linux`. Recent B3 work added custom PostgreSQL
-range-array consumer refusal checks (#305), custom and built-in range scalar
-refusal contracts (#306, #308), and PostgreSQL enum GTK grid edits (#309,
-#311). These tests preserve native type/value oracles and verify refused writes
-or unsaved edits do not alter database state. Earlier implementation details
-and dated validation are in the changelog and owning boards.
+Code baseline: `684ea40f` on `linux` (PR #312). Recent B3 work added
+PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
+nested null-filter parity (#312), and moved B4 candidate logs into PR comments
+(#310). These tests preserve native type/value oracles and verify refused
+writes or unsaved edits do not alter database state. Details and dated
+validation are in the changelog and owning boards.
 
-The local `scripts/ci-local.sh quick` gate passed at `dbc0bdc`; the focused
-PostgreSQL range scalar Docker contract and strict integration Clippy passed.
-The PostgreSQL enum GTK scenario passed against the current merged test code on
-the local Xvfb fixture. At `ddb808b9f`, hosted Security passed, Build Linux is
-pending and Flatpak is running. These focused cases do not close B3: the broader
+The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
+the focused MongoDB selector passed against MongoDB 7. At `684ea40f`, hosted
+Linux Security passed, Build Linux is queued, and both Flatpak variants are
+running. These focused cases do not close B3: the broader
 engine/type/consumer/configuration matrix, mutation triage, performance rows and
 installed grid acceptance remain open. See the [B4 board](b4-task-board.md)
 for its remaining package/Wayland and Windows AD acceptance.
@@ -46,6 +45,7 @@ results live in the B3 board and value evidence index.
 | Shared type/value outcomes, metadata and proof | [ADR 0007](decisions/0007-type-and-value-preservation.md) |
 | Live connection/session ownership, trust and uncertainty | [ADR 0008](decisions/0008-connection-and-session-ownership.md) |
 | Durable identity, migration and rollback compatibility | [ADR 0009](decisions/0009-persistence-and-identity-compatibility.md) |
+| Redis topology in 0.2.0 | One host/port endpoint; Sentinel and Cluster deferred ([known-issues ledger](known-issues.md#owners-and-handoff)) |
 
 Plans and case evidence apply these decisions; they do not define another
 conversion, transport or persistence policy. Internal contracts update owning
