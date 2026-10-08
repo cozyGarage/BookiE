@@ -5,7 +5,10 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `bb8c4435f` on `linux` (PR #345; fetched 2026-10-08). PR #344 adds
+Code baseline: `1b16d1101a33af30acb5c695bec7f97846a788eb` on `linux` (PR #347;
+fetched 2026-10-08). PR #346 adds result-footer statistics, PR #347 adds the
+failed-statement copy action, PR #349 adds the action registry, and PR #354 adds
+ClickHouse lost-ack coverage. PR #344 adds
 PostgreSQL domain-array projections and PR #350 records the frozen-candidate
 PostgreSQL rollback rerun. Since PR #315,
 PRs #316, #319, #321–#323, #328–#330 refreshed architecture/B3/B4 documentation;
@@ -22,7 +25,13 @@ domain-over-enum contract to 302 layers; PR #340 adds a 512-layer stress case;
 and PR #342 checks direct enum-domain query values and result metadata at both
 depths. PR #344 adds domain-array projections at 302 and 512 layers and raises
 the bounded SQLx type-resolution cap to support those cases. PR #345 adds a
-Redis committed-write lost-ack contract across reconnect. Earlier B3 work added
+Redis committed-write lost-ack contract across reconnect. PR #354 adds a
+ClickHouse committed INSERT lost-ack contract with independent native and
+materialized-view oracles. PR #355 adds SQL Server lost-ack coverage. Its
+focused Docker test, strict MSSQL Clippy, formatting, ignored-test inventory and
+documentation checks passed locally (see the [PR #355 evidence
+comment](https://github.com/cozyGarage/BookiE/pull/355#issuecomment-6055451200));
+hosted checks are pending. Earlier B3 work added
 PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
 nested null-filter parity (#312), and a MySQL lost-ack no-replay contract
 (#315). These tests preserve native type/value oracles and verify refused

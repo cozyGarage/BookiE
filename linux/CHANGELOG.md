@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- SQL Server now has a Docker-backed lost-ack contract: an independent
+  connection observes an UPDATE and audit row committed before SQL Server is
+  stopped during a delayed batch response; after restart both rows remain
+  present exactly once.
 - ClickHouse now has a Docker-backed lost-ack contract: the server commits an
   INSERT and its materialized-view audit row, the proxy drops the HTTP response,
   and a later query plus direct native oracles prove the write ran once.
