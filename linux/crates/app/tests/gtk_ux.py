@@ -1037,6 +1037,12 @@ def scenarios(ui):
         ui.press_x11_key("Return")
         ui.wait_for_node(name="1 unsaved change")
 
+        click_cell("NULL", count=2)
+        for key in "done":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="2 unsaved changes")
+
         snapshot = "SELECT string_agg(format('%s:%s:%s:%s', id, " \
             "COALESCE(state::text, '<SQL_NULL>'), state IS NULL, sibling), E'\\n' ORDER BY id) " \
             "FROM public.enum_grid"
@@ -1047,7 +1053,9 @@ def scenarios(ui):
             "4::f:empty",
             "5:ready:f:sibling",
         ))
-        after = before.replace("1:ready:f:target", "1:done:f:target")
+        after = before.replace("1:ready:f:target", "1:done:f:target").replace(
+            "2:NULL:f:literal NULL", "2:done:f:literal NULL"
+        )
         actual = psql(snapshot)
         assert actual == before, ("pending enum edit changed the native rows", actual, before)
         ui.press_x11_key("s", ("Control_L",))
