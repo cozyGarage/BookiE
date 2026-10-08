@@ -46,8 +46,11 @@ SQL-backed browse rows now keep an 8 KiB text/JSON/binary sample and original
 byte count in each materialized grid row. View Value refetches one column using
 the complete primary key through the policy-guarded connection; the query caps
 at two rows and refuses missing or ambiguous matches. PostgreSQL enum/domain
-key casts have planner regressions. Arbitrary SQL previews remain open, and
-the shared result still retains full values. MongoDB refetches selected fields
+key casts have planner regressions. Arbitrary SQL editor result grids now use the
+same typed 8 KiB preview and byte count. View Value reads the exact full value
+from the already-returned guarded result instead of rerunning arbitrary SQL.
+The result still retains full values, so this does not reduce shared-result
+memory. MongoDB refetches selected fields
 by `_id`; Redis string refetch binds arbitrary key bytes. Local SQLite and
 Docker MySQL service tests refetch a 9,000-byte BLOB by
 composite key and compare its exact returned bytes with native storage oracles;

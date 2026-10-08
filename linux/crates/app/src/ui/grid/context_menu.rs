@@ -170,13 +170,27 @@ pub(super) fn install_grid_context_menus(
                     .is_some()
                 {
                     let (_, row_key) = cell_row_identity(&slot.widget);
-                    sender
-                        .send(GridMsg::FetchCellValue {
-                            col_index: slot.col_index,
-                            column_name: slot.column_name.clone(),
-                            row_key,
-                        })
-                        .ok();
+                    if row_key.is_empty() {
+                        let Some(value) = view
+                            .model()
+                            .and_then(|model| model.downcast::<gtk::MultiSelection>().ok())
+                            .and_then(|selection| selection.model())
+                            .and_then(|model| model.downcast::<crate::ui::row_store::RowStore>().ok())
+                            .and_then(|store| store.source_value_at(position(slot), slot.col_index))
+                        else {
+                            return;
+                        };
+                        let copy_text = super::display::value_to_full_edit_text(&value);
+                        value_viewer::present(&view, &slot.column_name, &value, copy_text);
+                    } else {
+                        sender
+                            .send(GridMsg::FetchCellValue {
+                                col_index: slot.col_index,
+                                column_name: slot.column_name.clone(),
+                                row_key,
+                            })
+                            .ok();
+                    }
                     return;
                 }
                 let Some(value) = row_at(&view, position(slot)).and_then(|row| row.into_iter().nth(slot.col_index))

@@ -78,6 +78,7 @@ pub struct TabGridContext {
     pub projected_columns: Option<Vec<usize>>,
     pub preview_long_values: bool,
     pub preview_redis_strings: bool,
+    pub preview_result_values: bool,
     /// Names of columns that are part of a foreign key on this table.
     /// Marks the column header so a reference is visible before the
     /// cell value picker (a later slice) exists.
@@ -136,6 +137,7 @@ pub fn build_column_view(
         None if tab_ctx.preview_redis_strings && !tab_ctx.pk_col_indices.is_empty() => {
             RowStore::from_shared_with_redis_string_previews(shared.clone(), tab_ctx.pk_col_indices.clone())
         }
+        None if tab_ctx.preview_result_values => RowStore::from_shared_with_result_previews(shared.clone()),
         None if tab_ctx.preview_long_values && !tab_ctx.pk_col_indices.is_empty() => {
             RowStore::from_shared_with_previews(shared.clone(), tab_ctx.pk_col_indices.clone())
         }

@@ -303,7 +303,10 @@ fn build_result_set_widget(
         None,
         None,
         connection_id,
-        TabGridContext::default(),
+        TabGridContext {
+            preview_result_values: true,
+            ..Default::default()
+        },
         None,
         database,
     );

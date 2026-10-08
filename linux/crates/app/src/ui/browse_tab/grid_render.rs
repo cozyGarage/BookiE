@@ -244,6 +244,7 @@ impl BrowseTab {
             projected_columns: self.current_projection.clone(),
             preview_long_values: self.driver_id != "redis",
             preview_redis_strings: self.driver_id == "redis",
+            preview_result_values: false,
             foreign_key_columns,
         };
         let (column_view, selection) = build_column_view(

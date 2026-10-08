@@ -118,6 +118,18 @@ impl RowObject {
         }
     }
 
+    pub fn preview_values_from_result(&self) {
+        let mut cells = self.imp().cells.borrow_mut();
+        let mut previews = self.imp().previews.borrow_mut();
+        for (index, cell) in cells.iter_mut().enumerate() {
+            let Some(value) = cell.as_ref() else { continue };
+            if let Some(preview) = preview_value(value) {
+                *cell = None;
+                previews[index] = Some(preview);
+            }
+        }
+    }
+
     pub fn preview_long_redis_string_values(&self, key_indices: &[usize]) {
         if self.cell_value(1) == Value::Text("string".into()) {
             self.preview_long_values(key_indices);

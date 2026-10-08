@@ -35,6 +35,7 @@ mod imp {
         pub(in crate::ui) projection: RefCell<Option<(Vec<usize>, usize)>>,
         pub(in crate::ui) preview_keys: RefCell<Vec<usize>>,
         pub(in crate::ui) preview_redis_strings: std::cell::Cell<bool>,
+        pub(in crate::ui) preview_from_result: std::cell::Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -69,6 +70,7 @@ mod imp {
                         projection.as_ref(),
                         &self.preview_keys.borrow(),
                         self.preview_redis_strings.get(),
+                        self.preview_from_result.get(),
                     )?;
                     let object = glib::WeakRef::new();
                     object.set(Some(&row));
@@ -88,6 +90,7 @@ mod imp {
                             projection.as_ref(),
                             &self.preview_keys.borrow(),
                             self.preview_redis_strings.get(),
+                            self.preview_from_result.get(),
                         )?;
                         object.set(Some(&row));
                         Some(row.upcast())
@@ -104,12 +107,15 @@ fn row_for_source(
     projection: Option<&(Vec<usize>, usize)>,
     preview_keys: &[usize],
     preview_redis_strings: bool,
+    preview_from_result: bool,
 ) -> Option<RowObject> {
     let row = match projection {
         Some((indices, width)) => RowObject::new_projected(cells, indices, *width),
         None => Some(RowObject::new(cells)),
     }?;
-    if preview_redis_strings {
+    if preview_from_result {
+        row.preview_values_from_result();
+    } else if preview_redis_strings {
         row.preview_long_redis_string_values(preview_keys);
     } else {
         row.preview_long_values(preview_keys);
@@ -173,6 +179,13 @@ impl RowStore {
     pub fn from_shared_with_previews(result: Arc<QueryResult>, key_indices: Vec<usize>) -> Self {
         let store: Self = glib::Object::new();
         store.install_shared(result, None, key_indices);
+        store
+    }
+
+    pub fn from_shared_with_result_previews(result: Arc<QueryResult>) -> Self {
+        let store: Self = glib::Object::new();
+        store.install_shared(result, None, Vec::new());
+        store.imp().preview_from_result.set(true);
         store
     }
 
@@ -277,6 +290,21 @@ impl RowStore {
         *self.imp().projection.borrow_mut() = projection;
         *self.imp().preview_keys.borrow_mut() = preview_keys;
         self.imp().preview_redis_strings.set(false);
+        self.imp().preview_from_result.set(false);
+    }
+
+    pub fn source_value_at(&self, position: u32, column: usize) -> Option<tablepro_core::Value> {
+        let source_index = {
+            let slots = self.imp().slots.borrow();
+            match slots.get(position as usize)? {
+                Slot::Shared(index)
+                | Slot::Cached {
+                    source_index: index, ..
+                } => *index,
+                Slot::Object(_) => return None,
+            }
+        };
+        self.source_cells(source_index)?.get(column)?.clone()
     }
 
     pub fn insert(&self, position: u32, row: &RowObject) {
@@ -526,6 +554,34 @@ mod tests {
         assert!(row.cell_preview(2).is_some());
         assert!(!row.cell_is_loaded(2));
         assert_eq!(row.cell_preview(2).unwrap().byte_count, text.len());
+        assert!(row.complete_cells().is_none());
+    }
+
+    #[test]
+    fn arbitrary_query_previews_can_recover_full_values_from_the_shared_result() {
+        let text = "x".repeat(9000);
+        let bytes = vec![7; 9000];
+        let json = serde_json::json!({"payload": text});
+        let result = Arc::new(QueryResult {
+            columns: vec![column("id"), column("text"), column("bytes"), column("json")],
+            rows: vec![vec![
+                Value::Int(7),
+                Value::Text("x".repeat(9000)),
+                Value::Bytes(bytes.clone()),
+                Value::Json(json.clone()),
+            ]],
+            truncated: false,
+        });
+        let store = RowStore::from_shared_with_result_previews(result);
+        let row = store.item(0).and_downcast::<RowObject>().unwrap();
+
+        assert_eq!(row.cell_value(0), Value::Int(7));
+        assert_eq!(row.cell_preview(1).unwrap().byte_count, 9000);
+        assert_eq!(row.cell_preview(2).unwrap().byte_count, bytes.len());
+        assert!(row.cell_preview(3).unwrap().byte_count > 9000);
+        assert_eq!(store.source_value_at(0, 1), Some(Value::Text("x".repeat(9000))));
+        assert_eq!(store.source_value_at(0, 2), Some(Value::Bytes(bytes)));
+        assert_eq!(store.source_value_at(0, 3), Some(Value::Json(json)));
         assert!(row.complete_cells().is_none());
     }
 
