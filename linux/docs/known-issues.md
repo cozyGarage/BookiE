@@ -20,7 +20,8 @@ Rules:
 
 Reconciled against BookiE `linux` tip
 `1e76bab2f9620cb5261571ecb4d74c4f81743333`, checked 2026-10-08. This review
-covers merged code PRs through #355, plus the GTK soak workflow setup fixes in
+covers merged code PRs through #360, including the SQLite affinity contract
+(#359) and GTK tunnel regression (#360), plus the GTK soak workflow setup fixes in
 PRs #357 and #358 and the B4/B3
 documentation updates in PRs #319, #321–#323, #332, #335, #338, #340, #342,
 #343, and #350, including the B4 evidence move (#310), MongoDB nested null-filter
@@ -46,7 +47,7 @@ table in the same commit.
 | Owner | Open rows | Next |
 | --- | --- | --- |
 | B3 (types, values, drivers, result paths) | UI-19, UI-20, TEST-2, TEST-12, PERF-3, PERF-4, PERF-7, PERF-9, PERF-10 | PERF-7, PERF-9, PERF-10 and UI-19 touch the grid files the UX lane also edits (`RowStore`, row inspector, find in rows): rebase on `linux` first |
-| B4 (transport, guard, audit, SSH, rollback) | B4-7, B4-9, B4-11, B4-12, B4-16, B4-17, B4-21, B4-22, UI-1b, UI-13b, TEST-15, PERF-2, PERF-8 | A guard read-snapshot session start (read-only `BEGIN`, audited as a read) unblocks UI-13b and the cursor paging in ADR 0011 (PERF-8, PERF-2). Frozen-candidate, hosted and installed acceptance remains open for B4 rows where listed. UI-1b has a [secrets-per-hop proposal](proposals/ui-1b-ssh-jump-chain-editor.md); implementation and GTK acceptance remain open. TEST-15 has independent row/audit coverage for PostgreSQL, MySQL, Redis, ClickHouse and SQL Server (#355); the SQL Server merge-tier Docker run is pending. Other driver and session write paths remain open |
+| B4 (transport, guard, audit, SSH, rollback) | B4-7, B4-9, B4-11, B4-12, B4-16, B4-17, B4-21, B4-22, UI-1b, UI-13b, TEST-15, PERF-2, PERF-8 | A guard read-snapshot session start (read-only `BEGIN`, audited as a read) unblocks UI-13b and the cursor paging in ADR 0011 (PERF-8, PERF-2). Frozen-candidate, hosted and installed acceptance remains open for B4 rows where listed. UI-1b has a [secrets-per-hop proposal](proposals/ui-1b-ssh-jump-chain-editor.md); implementation and GTK acceptance remain open. TEST-15 has independent row/audit coverage for PostgreSQL, MySQL, Redis, ClickHouse and SQL Server (#355); the SQL Server merge-tier Docker run passed in Build Linux run [37752816805](https://github.com/cozyGarage/BookiE/actions/runs/37752816805). Other driver and session write paths remain open |
 | UX lane (app layer, packaging, lab) | UI-10, UI-11, UI-14b, UI-15b, UI-18, UI-21, UI-34, UI-24, PKG-2, PKG-4, PKG-6, PKG-8, TEST-7 | UI-11 collapsible sidebar tree, UI-18 one action table, PKG-6 upgrade and rollback, TEST-7 two-profile installed run, PKG-4 on the lab guests |
 | The maintainer (needs a person or a decision) | PKG-1, DOC-3, DOC-5, TEST-6 | PKG-1: run the Wayland recipe in the row on a real desktop. DOC-3: Orca and high contrast. TEST-6: the manual checklist. DOC-5: compare clients on lab VMs |
 
