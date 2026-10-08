@@ -18,11 +18,14 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against BookiE `linux` at `d5d63a95d` (PR #286), checked
-2026-10-08. This includes ClickHouse Map(Enum) consumer coverage (PR #280),
-PostgreSQL lost-ack no-replay coverage (#282/#284), ClickHouse mutation results
-(#285), the Redis single-endpoint scope decision, and focused hosted B4 rollback
-acceptance (#286). The
+Reconciled against BookiE `linux` at `1e1a30dc7` (PR #288), checked
+2026-10-08. This includes the docs/evidence cleanup (#287), hosted CI tier split
+and Linux regression sharding (#288), ClickHouse Enum8/Enum16 map-value
+pairings (#290), and MySQL/MariaDB ENUM/SET XLSX coverage (#291), alongside
+ClickHouse Map(Enum) consumers (#280), PostgreSQL lost-ack no-replay coverage
+(#282/#284), ClickHouse mutation results (#285), the Redis single-endpoint scope
+decision, and focused hosted B4 rollback acceptance (#286). PR #289 remains
+open. The
 B4-* rows summarize the [B4 board](b4-task-board.md); when they differ, the board
 and linked PR evidence discussions are authoritative. Items come from the archived
 audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
