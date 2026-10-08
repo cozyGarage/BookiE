@@ -102,11 +102,12 @@ and rerun for any later source tip.
 
 The hosted Build Linux run for `8e5d1b18` was
 [cancelled](https://github.com/cozyGarage/BookiE/actions/runs/37723088254) as
-`linux` advanced through PRs #316–#322 to `4499e799`. At the 2026-10-08
-check, Linux Security passed, while Build Linux and Flatpak were in progress
-([Build Linux](https://github.com/cozyGarage/BookiE/actions/runs/37728859565),
-[Flatpak](https://github.com/cozyGarage/BookiE/actions/runs/37728859569),
-[Linux Security](https://github.com/cozyGarage/BookiE/actions/runs/37728859555)).
+`linux` advanced through PRs #316–#324 to `edac26a1`. At the 2026-10-08
+check, Linux Security and Flatpak were running; Build Linux and Linux test
+quality were queued ([Build Linux](https://github.com/cozyGarage/BookiE/actions/runs/37729917280),
+[Linux test quality](https://github.com/cozyGarage/BookiE/actions/runs/37729917269),
+[Flatpak](https://github.com/cozyGarage/BookiE/actions/runs/37729917331),
+[Linux Security](https://github.com/cozyGarage/BookiE/actions/runs/37729917289)).
 PR #312 skipped its B4 rollback job because it only changed MongoDB tests. The
 focused `b4-rollback` layer passed locally on documentation-only commit
 `73f8ce935`; the tested source files match `684ea40f`. See the [PR #314 evidence
@@ -122,7 +123,7 @@ before classifying this as transient fixture behavior or a regression.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-16 | Re-run affected layers on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | On `4499e799`, Linux Security passed; Build Linux and Flatpak were in progress. All three acceptance gates remain open |
+| B4-7, B4-16 | Re-run affected layers on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | On `edac26a1`, Linux Security and Flatpak were running; Build Linux and Linux test quality were queued. All three acceptance gates remain open |
 | B4-9 | Re-run the TLS matrix on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | The local combined run on `98134709` failed four MongoDB TLS cases with `ConnectionRefused`; ClickHouse TLS passed. Focused MongoDB fixture rerun is pending, so cause remains undetermined |
 | B4-22 | Run GTK export/import audit and encrypted credential round-trip on the selected frozen SHA; confirm hosted result and installed-package/native Wayland acceptance | Prior local and hosted GTK results are SHA-scoped; later hosted run on `8e5d1b18` was cancelled |
 | B4-12 | Repeat `a_batch_reports_rollback_failure_after_postgres_terminates_its_backend` on the selected frozen candidate and retain exact SHA/results | Prior frozen-candidate and hosted results remain historical; next candidate acceptance is open |
