@@ -154,6 +154,7 @@ CI runs GTK build, widget and soak checks in Debian testing containers for the G
 
 - Linux is the only supported operating system.
 - Drivers are statically linked.
+- Redis is experimental and supports one host/port endpoint; Sentinel and Cluster topologies are deferred beyond 0.2.0.
 - There is no embedded browser UI.
 - There is no in-process user scripting runtime.
 - Packaging targets Arch x86_64 first and Debian/GNOME amd64 next. Current 0.2 installed upgrade, rollback and native Wayland qualification remains open. A recipe or CI build is not publication approval; AUR and Flathub remain deferred.

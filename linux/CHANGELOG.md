@@ -132,6 +132,7 @@
 
 ### Fixed
 
+- B4-11 MySQL rollback effects across the scoped storage engines and B4-12 PostgreSQL rollback-failure handling now have focused hosted acceptance; run details are in PR #287's [hosted-results comment](https://github.com/cozyGarage/BookiE/pull/287#issuecomment-6049956346).
 - PostgreSQL optimistic grid edits cast both new and previously read custom enum, enum-array, and domain values to qualified native types, so stale-row comparisons work across those columns.
 - A PostgreSQL query that returns more rows than the result cap now returns the capped rows promptly and stops the server query, instead of waiting for the server to finish or timing out.
 - Connection-list rebuilds no longer remove a nested row list from the wrong GTK parent; GTK safety runs now fail on criticals.
