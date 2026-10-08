@@ -14,8 +14,12 @@ validation are in the changelog and owning boards.
 
 The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
 the focused MongoDB selector passed against MongoDB 7. At `684ea40f`, hosted
-Linux Security passed, Build Linux is queued, and both Flatpak variants are
-running. These focused cases do not close B3: the broader
+Linux Security passed, Build Linux is in progress, Flatpak default is in
+progress and Flatpak development passed. The local focused B4 rollback layer
+also passed on clean documentation-only commit `73f8ce935`, with test sources
+matching `684ea40f`; the PR #312 B4-specific job was skipped because that PR
+only changed MongoDB tests. See the [B4 board](b4-task-board.md) and [rollback evidence](evidence/b4-rollback-current-tip-2026-10-08/manifest.json).
+These focused cases do not close B3: the broader
 engine/type/consumer/configuration matrix, mutation triage, performance rows and
 installed grid acceptance remain open. See the [B4 board](b4-task-board.md)
 for its remaining package/Wayland and Windows AD acceptance.

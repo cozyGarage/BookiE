@@ -102,18 +102,23 @@ and rerun for any later source tip.
 
 The hosted Build Linux run for `8e5d1b18` was
 [cancelled](https://github.com/cozyGarage/BookiE/actions/runs/37723088254) as
-`linux` advanced. PR #312 moved the branch to `684ea40f`. Its Linux Security
-run passed; Build Linux is queued ([#37725267842](https://github.com/cozyGarage/BookiE/actions/runs/37725267842))
-and both Flatpak jobs are running ([#37725267889](https://github.com/cozyGarage/BookiE/actions/runs/37725267889)).
-These current branch checks do not establish hosted B4 acceptance. The
-completed local GTK runs use a staged release binary under Xvfb, not a
-distribution package installed on the target Wayland desktop.
+`linux` advanced. PR #312 moved the branch to `684ea40f`. Linux Security passed;
+Build Linux is in progress ([#37725267842](https://github.com/cozyGarage/BookiE/actions/runs/37725267842)),
+with only preflight running at the last check. Flatpak default is in progress
+and development passed ([#37725267889](https://github.com/cozyGarage/BookiE/actions/runs/37725267889)).
+The current PR #312 run skipped its B4 rollback job because it only changed
+MongoDB tests. The focused `b4-rollback` layer passed locally on clean
+documentation-only commit `73f8ce935`, based on `684ea40f`; see
+[current-tip evidence](evidence/b4-rollback-current-tip-2026-10-08/manifest.json).
+These checks do not establish hosted B4 acceptance. The completed local GTK
+runs use a staged release binary under Xvfb, not a distribution package
+installed on the target Wayland desktop.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-9, B4-16, B4-22 | Local candidate layers passed on `7eff6f26`; obtain hosted acceptance for the selected frozen SHA and installed package acceptance | Hosted run on `8e5d1b18` was cancelled during remote advancement; current tip `684ea40f` has Build Linux queued and Security passed. Installed acceptance means a distribution package on the target desktop; Xvfb with a staged binary does not satisfy it |
-| B4-12 | Backend-termination rollback-failure selector passed on `8e5d1b18`, with table and identity/trigger-sequence assertions | Hosted run on this SHA was cancelled; rerun on the final frozen candidate and obtain hosted result |
-| B4-11 | Scoped nine-test MySQL atomicity group passed on `7eff6f26` and `8e5d1b18` | Hosted run on `8e5d1b18` was cancelled. Existing scope covers InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, failed INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT, and a trigger session-variable effect; untested engines and side effects remain open |
+| B4-7, B4-9, B4-16, B4-22 | Local candidate layers passed on `7eff6f26`; obtain hosted acceptance for the selected frozen SHA and installed package acceptance | Build Linux on current tip `684ea40f` is still in progress and has not reached its B4 layer. Installed acceptance means a distribution package on the target desktop; Xvfb with a staged binary does not satisfy it |
+| B4-12 | Backend-termination rollback-failure selector passed on frozen candidate `7eea6f09`, hosted run `37708183936`, and the current-source rerun documented at `73f8ce935`; see [rollback evidence](evidence/b4-rollback-current-tip-2026-10-08/manifest.json) | The current hosted Build Linux run has not reached a B4-specific result; repeat on the final frozen candidate |
+| B4-11 | The nine-test MySQL atomicity group passed on current source `684ea40f`; see [rollback evidence](evidence/b4-rollback-current-tip-2026-10-08/manifest.json) | Existing scope covers InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, failed INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT and a trigger session-variable effect; untested engines and side effects remain open |
 | B4-17 | Native SSH and GTK trust/query, second-hop decline and changed-key refusal passed on `7eff6f26`; see the [PR #310 evidence comments](https://github.com/cozyGarage/BookiE/pull/310#issuecomment-6051740646) | Hosted execution of these exact GTK flows and distribution-package/native Wayland trust acceptance remain open |
 | B4-21 | Local Samba Kerberos+TLS fixture passed on `7eff6f26`; retain the separate hosted TLS evidence | Windows AD interoperability is still unverified; Samba AD is not equivalent to Windows AD |
 | UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | Proposal only; implementation and acceptance are open |

@@ -3,14 +3,15 @@
   "date": "2026-10-08",
   "project": "BookiE Linux",
   "candidate_commit": "73f8ce935ab49444b536c4e9bc46bebfd05a1908",
-  "source_commit": "73f8ce935ab49444b536c4e9bc46bebfd05a1908",
+  "source_commit": "684ea40f50e283b5a41ec2b10e6fc4b9076344da",
+  "execution_commit": "73f8ce935ab49444b536c4e9bc46bebfd05a1908",
   "remote_base_commit": "684ea40f50e283b5a41ec2b10e6fc4b9076344da",
   "source_sha256": {
     "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "4a2d66cd79acad8e61c948d52378726a88d536da4eb3d9253384ccaf22a01314",
     "crates/drivers/postgres/tests/integration.rs": "acbca07ab58f726bc9dc6dfa0e47df694132fbc381d36f1052ef0cd71e522336"
   },
   "working_tree": "clean; tracked_diff_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "purpose": "Recheck the focused MySQL atomicity and PostgreSQL rollback-failure layer on a clean documentation-only PR commit based on the current fork/linux tip. This is not the final frozen B3+B4 candidate.",
+  "purpose": "Recheck the focused MySQL atomicity and PostgreSQL rollback-failure layer on a clean documentation-only commit based on fork/linux tip 684ea40f5. Test source files match the 684ea40f5 source snapshot. This is not the final frozen B3+B4 candidate.",
   "result": "passed",
   "mysql_atomic": {
     "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
