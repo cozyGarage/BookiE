@@ -52,6 +52,71 @@ fn value_contract_mysql_enum_and_set_parser_preserves_labels() {
     );
 }
 
+#[test]
+fn value_contract_mysql_enum_and_set_parser_refuses_malformed_metadata() {
+    let column = |data_type: &str| ColumnInfo {
+        name: "value".into(),
+        data_type: data_type.into(),
+        nullable: false,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+
+    for data_type in [
+        "enumx('known')",
+        "enum('known',)",
+        "enum('unterminated)",
+        "set('read','write') trailing",
+        "set('read','write',)",
+    ] {
+        assert!(
+            parse_input_for_driver("known", Some(&column(data_type)), "mysql").is_err(),
+            "malformed MySQL type metadata must refuse edits: {data_type}"
+        );
+    }
+}
+
+#[test]
+fn value_contract_mysql_enum_metadata_unescapes_mysql_literals() {
+    let column = ColumnInfo {
+        name: "value".into(),
+        data_type:
+            r"enum('nul\0','backspace\b','line\nfeed','carriage\rreturn','tab\t','eof\Z','percent\\%','under\\_score')"
+                .into(),
+        nullable: false,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+
+    for label in [
+        "nul\0",
+        "backspace\u{0008}",
+        "line\nfeed",
+        "carriage\rreturn",
+        "tab\t",
+        "eof\u{001a}",
+        "percent\\%",
+        "under\\_score",
+    ] {
+        assert_eq!(
+            parse_input_for_driver(label, Some(&column), "mysql"),
+            Ok(Value::Text(label.into()))
+        );
+    }
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes() {
@@ -84,7 +149,8 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
         .query_params_controlled(
             "CREATE TABLE enum_set_grid (
                 id INT PRIMARY KEY,
-                mood ENUM('happy', 'it''s ok', 'back\\\\slash', 'NULL', '', '<tag>&'),
+                mood ENUM('happy', 'it''s ok', 'back\\\\slash', 'NULL', '', '<tag>&',
+                    'nul\\0', 'backspace\\b', 'line\\nfeed', 'carriage\\rreturn', 'tab\\t', 'eof\\Z', 'percent\\%', 'under\\_score'),
                 perms SET('read', 'write', 'slash\\\\path', 'NULL', '<member>')
             )",
             &[],
@@ -104,6 +170,16 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
     let columns = connection.fetch_columns(None, "enum_set_grid").await.unwrap();
     let mood = columns.iter().position(|column| column.name == "mood").unwrap();
     let perms = columns.iter().position(|column| column.name == "perms").unwrap();
+    let escaped_labels = [
+        "nul\0",
+        "backspace\u{0008}",
+        "line\nfeed",
+        "carriage\rreturn",
+        "tab\t",
+        "eof\u{001a}",
+        "percent\\%",
+        "under\\_score",
+    ];
     let siblings = session
         .query_params_controlled(
             "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), CAST(perms + 0 AS CHAR), HEX(perms)
@@ -164,6 +240,41 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             parse_input_for_driver("read,unknown", Some(&columns[perms]), "mysql").is_err(),
             "unknown SET members must be rejected in mode {mode:?}"
         );
+        for (index, label) in escaped_labels.iter().enumerate() {
+            let value = parse_input_for_driver(label, Some(&columns[mood]), "mysql").unwrap_or_else(|error| {
+                panic!(
+                    "server metadata {:?} must expose the declared label {label:?} in mode {mode:?}: {error}",
+                    columns[mood].data_type
+                )
+            });
+            let update = tablepro_core::sql_dialect::build_keyed_update(
+                "mysql",
+                None,
+                "enum_set_grid",
+                &columns,
+                &[(mood, value)],
+                &[Value::Int(1)],
+            )
+            .unwrap();
+            session
+                .query_params_controlled(&update.0, &update.1, &control)
+                .await
+                .unwrap();
+            let native = session
+                .query_params_controlled(
+                    "SELECT CAST(mood + 0 AS CHAR), HEX(mood) FROM enum_set_grid WHERE id = 1",
+                    &[],
+                    &control,
+                )
+                .await
+                .unwrap();
+            let expected_hex = label.bytes().map(|byte| format!("{byte:02X}")).collect::<String>();
+            assert_eq!(
+                native.rows[0],
+                vec![Value::Text((index + 7).to_string()), Value::Text(expected_hex)],
+                "mode {mode:?}, label {label:?}"
+            );
+        }
 
         if mode.is_empty() {
             session
