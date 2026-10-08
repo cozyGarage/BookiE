@@ -75,7 +75,7 @@ pub fn build_nodes(tables: &[TableInfo], views: &[TableInfo]) -> Vec<TreeNode> {
         let in_schema = |object: &&TableInfo| &object.schema == schema;
         let schema_tables: Vec<&TableInfo> = tables.iter().filter(in_schema).collect();
         let schema_views: Vec<&TableInfo> = views.iter().filter(in_schema).collect();
-        let prefix = format!("schema:{}", schema.as_deref().unwrap_or_default());
+        let prefix = format!("schema:{}", key_part(schema.as_deref().unwrap_or_default()));
         let mut depth = 0;
         if several_schemas {
             nodes.push(TreeNode {
@@ -114,7 +114,7 @@ fn push_group(nodes: &mut Vec<TreeNode>, depth: u8, prefix: &str, group: GroupKi
         let (schema, name) = (object.schema.clone(), object.name.clone());
         nodes.push(TreeNode {
             depth: depth + 1,
-            key: format!("{prefix}/{suffix}/{name}"),
+            key: format!("{prefix}/{suffix}/{}", key_part(&name)),
             label: name.clone(),
             kind: match group {
                 GroupKind::Tables => NodeKind::Table { schema, name },
@@ -124,6 +124,10 @@ fn push_group(nodes: &mut Vec<TreeNode>, depth: u8, prefix: &str, group: GroupKi
             count: 0,
         });
     }
+}
+
+fn key_part(raw: &str) -> String {
+    raw.replace('%', "%25").replace('/', "%2F").replace(':', "%3A")
 }
 
 fn ancestor_keys(node: &TreeNode) -> Vec<String> {
@@ -227,6 +231,31 @@ mod tests {
         assert_eq!(count_of("schema:a/tables"), Some(2));
         assert_eq!(count_of("schema:a/views"), Some(1));
         assert_eq!(count_of("schema:b/tables"), Some(1));
+    }
+
+    #[test]
+    fn a_schema_or_table_name_with_separators_cannot_collide_with_another_node() {
+        let tables = [
+            info(Some("a"), "t"),
+            info(Some("a/b"), "u"),
+            info(Some("x/tables"), "v"),
+            info(Some("x"), "w"),
+            info(Some("x"), "p/q"),
+        ];
+        let nodes = build_nodes(&tables, &[]);
+        let keys: HashSet<&str> = nodes.iter().map(|node| node.key.as_str()).collect();
+        assert_eq!(keys.len(), nodes.len());
+
+        let mut collapsed = CollapseState::default();
+        collapsed.toggle("schema:a");
+        let shown = visible_nodes(&nodes, &collapsed, "");
+        let hidden: Vec<&str> = nodes
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !shown.contains(index))
+            .map(|(_, node)| node.label.as_str())
+            .collect();
+        assert_eq!(hidden, vec!["Tables", "t"]);
     }
 
     #[test]

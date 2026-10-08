@@ -30,6 +30,9 @@ fn category_of(outcome: &StatementOutcome) -> Option<&'static str> {
 
 pub(super) fn install(view: &sourceview5::View) {
     view.set_show_line_marks(true);
+    if let Ok(buffer) = view.buffer().downcast::<sourceview5::Buffer>() {
+        buffer.connect_changed(clear);
+    }
     for (category, icon) in [
         (OK_CATEGORY, "emblem-ok-symbolic"),
         (ERROR_CATEGORY, "dialog-error-symbolic"),
@@ -79,7 +82,9 @@ fn mark_outcomes(buffer: &sourceview5::Buffer, sql: &str, driver: &str, outcomes
         let (Some(line), Some(category)) = (line, category_of(outcome)) else {
             continue;
         };
-        let at = buffer.iter_at_line((line + leading_lines) as i32).unwrap_or(start);
+        let Some(at) = buffer.iter_at_line((line + leading_lines) as i32) else {
+            continue;
+        };
         buffer.create_source_mark(None, category, &at);
     }
 }
@@ -136,6 +141,14 @@ mod tests {
         assert_eq!(buffer.source_marks_at_line(0, Some(OK_CATEGORY)).len(), 1);
         assert_eq!(buffer.source_marks_at_line(1, Some(ERROR_CATEGORY)).len(), 1);
         assert!(buffer.source_marks_at_line(2, None).is_empty());
+
+        let view = sourceview5::View::with_buffer(&buffer);
+        install(&view);
+        buffer.insert_at_cursor("-- edit");
+        assert!(
+            buffer.source_marks_at_line(0, None).is_empty(),
+            "an edit drops the marks"
+        );
 
         clear(&buffer);
         buffer.set_text("SELECT 1;\nSELECT x;\nSELECT 3;\n-- edited");
