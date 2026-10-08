@@ -64,6 +64,29 @@ class EvidenceManifestTests(unittest.TestCase):
         errors, _ = VALIDATOR.validate_manifest(path, strict=True)
         self.assertTrue(any("digest mismatch" in error for error in errors))
 
+    def test_manifest_accepts_multiple_tests_run_by_wrapper_script(self):
+        path, manifest = self.fixture()
+        names = ["first_case", "second_case"]
+        log = "test first_case ... ok\ntest second_case ... ok\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n"
+        (path.parent / "focused.txt").write_text(log)
+        manifest["test"] = names
+        manifest["log_sha256"]["focused.txt"] = hashlib.sha256(log.encode()).hexdigest()
+        manifest["validation"]["focused_test"].update(
+            command="bash scripts/run-focused.sh",
+            result="2 passed, 0 failed",
+        )
+        path.write_text(json.dumps(manifest))
+        self.assertEqual(VALIDATOR.validate_manifest(path, strict=True)[0], [])
+
+    def test_manifest_accepts_single_source_digest_with_source_file(self):
+        path, manifest = self.fixture()
+        source = path.parent / "source.rs"
+        source.write_text("source")
+        manifest["source_file"] = "source.rs"
+        manifest["source_sha256"] = hashlib.sha256(b"source").hexdigest()
+        path.write_text(json.dumps(manifest))
+        self.assertEqual(VALIDATOR.validate_manifest(path, strict=True)[0], [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -49,7 +49,13 @@ def validate_manifest(path, strict=False):
             errors.append(f"{path}: source_commit or base_commit is required")
         else:
             warnings.append(f"{path}: source snapshot identity is incomplete")
-    for name, expected in manifest.get("source_sha256", {}).items():
+    source_digests = manifest.get("source_sha256", {})
+    if isinstance(source_digests, str) and manifest.get("source_file"):
+        source_digests = {manifest["source_file"]: source_digests}
+    if not isinstance(source_digests, dict):
+        (errors if strict else warnings).append(f"{path}: source_sha256 must be a digest map or a digest with source_file")
+        source_digests = {}
+    for name, expected in source_digests.items():
         if not re.fullmatch(r"[0-9a-f]{64}", expected):
             errors.append(f"{path}: invalid source digest for {name}")
             continue
@@ -75,9 +81,11 @@ def validate_manifest(path, strict=False):
     selector = manifest.get("test")
     if focused and selector:
         recorded_selector, exact = test_selector(focused.get("command", ""))
-        matches = recorded_selector == selector or (isinstance(selector, str) and selector.endswith(f"::{recorded_selector}"))
-        matches = matches and (not exact or recorded_selector == selector)
-        if not matches:
+        selectors = selector if isinstance(selector, list) else [selector]
+        if recorded_selector is not None and not any(
+            recorded_selector == item or (isinstance(item, str) and item.endswith(f"::{recorded_selector}"))
+            for item in selectors
+        ):
             (errors if strict else warnings).append(f"{path}: test selector {selector!r} differs from focused command {recorded_selector!r}")
         result = focused.get("result", "")
         expected_count = re.search(r"(\d+)\s+passed", result)
@@ -87,9 +95,11 @@ def validate_manifest(path, strict=False):
             (errors if strict else warnings).append(f"{path}: focused test needs a logged pass count and log")
         else:
             content = log.read_text(errors="replace")
-            exact_name = re.escape(selector)
-            completed = re.findall(rf"^test (?:.*::)?{exact_name} \.\.\. ok$", content, re.MULTILINE)
-            if int(expected_count.group(1)) == 1 and (len(completed) != 1 or (exact and recorded_selector != selector)):
+            exact_names = "|".join(re.escape(item) for item in selectors if isinstance(item, str))
+            completed = re.findall(rf"^test (?:.*::)?(?:{exact_names}) \.\.\. ok$", content, re.MULTILINE) if exact_names else []
+            expected_tests = int(expected_count.group(1))
+            selector_count_mismatch = isinstance(selector, list) and expected_tests != len(selectors)
+            if len(completed) != expected_tests or selector_count_mismatch or (exact and recorded_selector not in selectors):
                 (errors if strict else warnings).append(f"{path}: focused selector is absent, failed, or executed an unexpected number of times")
             summaries = re.findall(r"test result: ok\. (\d+) passed; (\d+) failed;", content)
             if not any(int(passed) == int(expected_count.group(1)) and int(failed) == 0 for passed, failed in summaries):
