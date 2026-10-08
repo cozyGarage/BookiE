@@ -32,11 +32,16 @@ impl App {
     }
 
     pub(super) fn apply_connection_strip(&self) {
-        let Some(strip) = self.workspace_tab_view.as_ref().and_then(|view| view.parent()) else {
+        let Some(tab_bar) = self
+            .workspace_tab_view
+            .as_ref()
+            .and_then(|view| view.parent())
+            .and_then(|parent| parent.first_child())
+        else {
             return;
         };
         for class in tablepro_storage::CONNECTION_STRIP_CLASSES {
-            strip.remove_css_class(class);
+            tab_bar.remove_css_class(class);
         }
         let color = self.connection_id.map(|id| self.connection_organization.get(id).color);
         if let Some(class) = color
@@ -44,7 +49,7 @@ impl App {
             .as_deref()
             .and_then(tablepro_storage::connection_strip_class)
         {
-            strip.add_css_class(class);
+            tab_bar.add_css_class(class);
         }
     }
 
