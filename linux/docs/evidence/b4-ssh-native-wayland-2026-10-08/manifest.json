@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "candidate_source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+  "runtime_binary_sha256_file": "binary-sha256.txt",
+  "runtime": "staged release binary on Hyprland native Wayland (GDK_BACKEND=wayland), private D-Bus and isolated test profile",
+  "scenarios": {
+    "postgres_saved_mtls_connection_authenticates_and_queries": "passed with staged candidate binary; GTK harness came from newer fork/linux source",
+    "postgres_ssh_unknown_host_key_decline_is_durably_audited": "inconclusive; candidate-source GTK harness could not dismiss the prompt with synthetic Escape under native Wayland; exact candidate-source Xvfb run passed",
+    "native_atspi_cancel_action": "inconclusive; the prompt remained after the attempted accessibility action and the test process exited"
+  },
+  "scope_limit": "No person clicked Trust. One probe paired different harness and binary commits and is explicitly not attributed to product behavior. Native input automation did not reliably exercise host-key refusal. This is not native acceptance or a confirmed product defect; installed-package/native Wayland SSH trust acceptance remains open.",
+  "summary": "focused.txt",
+  "attempt_logs": [
+    "native-wayland.txt",
+    "native-escape-kept.txt",
+    "native-cancel.txt",
+    "xvfb-refusal.txt"
+  ],
+  "source_harness": {
+    "checkout": "/home/trung/.cache/bookie-b4-candidate-a7f14",
+    "commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
+    "files": [
+      "linux/crates/app/tests/gtk_safety.py",
+      "linux/crates/app/tests/gtk_ux.py"
+    ]
+  },
+  "attempt_logs_sha256": {
+    "native-wayland.txt": "f7a286840a158f110c1519c8eb3f262ac220203a3913bc29df250dbc42793dca",
+    "native-escape-kept.txt": "fd88c930d96533e577095a2ff4074d04e9e3a688201736adf5dc350a16618bf5",
+    "native-cancel.txt": "9ed7ea1455e4a17ecdd42fbbff67bfddf6950ba2b35bd3b1f7257acc5ace6e06",
+    "xvfb-refusal.txt": "c332e5ba13b9be403af1bd45fa6715319ca5c98a0e78574a70d22eb96bdf7ff7"
+  }
+}

@@ -260,21 +260,74 @@
     "source_commit": "896f1b316dbf9c3c46b5bc6f6efd999281e491a0",
     "workflow_run_id": 37806196821,
     "workflow_url": "https://github.com/cozyGarage/BookiE/actions/runs/37806196821",
-    "status_at_recording": "in_progress",
+    "status_at_recording": "completed",
     "run_id": 37806196821,
+    "conclusion": "success",
     "completed_jobs": [
       {
         "name": "Preflight and sandbox tier (no GTK app)",
+        "job_id": 113413755835,
+        "conclusion": "success"
+      },
+      {
+        "name": "Driver TLS fixture (docker)",
+        "job_id": 113416172397,
+        "conclusion": "success"
+      },
+      {
+        "name": "Fast checks (GTK)",
+        "job_id": 113416172406,
+        "conclusion": "success"
+      },
+      {
+        "name": "Optional DuckDB driver and GTK feature",
+        "job_id": 113416172438,
+        "conclusion": "success"
+      },
+      {
+        "name": "PostgreSQL release fixture (docker)",
+        "job_id": 113416172590,
+        "conclusion": "success"
+      },
+      {
+        "name": "B4 rollback acceptance (docker)",
+        "job_id": 113416172631,
+        "conclusion": "success"
+      },
+      {
+        "name": "Current stable Clippy (scheduled)",
+        "job_id": 113416175061,
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Driver integration tests (docker)",
+        "job_id": 113417491141,
+        "conclusion": "success"
+      },
+      {
+        "name": "Installed GTK safety smoke",
+        "job_id": 113421009111,
+        "conclusion": "success"
+      },
+      {
+        "name": "Linux regression gate",
+        "job_id": 113430909853,
         "conclusion": "success"
       }
     ],
+    "note": "Build Linux completed successfully. Scheduled Clippy was skipped. PostgreSQL release, B4 rollback, Driver TLS, driver integration, installed GTK safety smoke, and the regression gate passed. The installed GTK smoke is generic and does not prove native Wayland SSH trust acceptance or frozen-candidate package acceptance."
+  },
+  "latest_fork_linux_run": {
+    "workflow": "Build Linux",
+    "run_id": 37844691724,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37844691724",
+    "source_commit": "ae3a1e00a47c876076dec7bedff7c9efc02c445e",
+    "status_at_recording": "in_progress",
+    "status": "in_progress",
+    "conclusion": null,
     "active_jobs": [
-      "B4 rollback acceptance (docker)",
-      "PostgreSQL release fixture (docker)",
-      "Driver TLS fixture (docker)",
-      "Fast checks (GTK)",
-      "Optional DuckDB driver and GTK feature"
+      "Preflight and sandbox tier (no GTK app)"
     ],
-    "note": "The current-tip Build Linux run is active. The preflight/sandbox job passed; B4 rollback, PostgreSQL release, Driver TLS, GTK and optional DuckDB jobs were still running at this update."
+    "note": "Latest fork/linux merge run was in progress when this evidence was refreshed; no result is claimed."
   }
 }
