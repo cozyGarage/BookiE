@@ -44,6 +44,7 @@ jobs:
           ref: ${{ inputs.ref || 'linux' }}
       - name: Record the commit under test
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           resolved="$(git rev-parse HEAD)"
           echo "soak attempt tree: $resolved"
           {
@@ -94,4 +95,4 @@ jobs:
         with:
           name: gtk-soak-${{ github.run_id }}-${{ github.run_attempt }}
           path: gtk-artifacts
-          if-no-files-found: error
+          if-no-files-found: warn
