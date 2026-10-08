@@ -82,7 +82,10 @@ async fn assert_incompatible_enum_assignments_refused(connection: &dyn tablepro_
             .execute_params(&format!("UPDATE {schema}.rows SET state = $1 WHERE id = 1"), &[value])
             .await
             .unwrap_err();
-        assert_eq!(sqlstate(parameterized), sqlstate(native), "literal {literal}");
+        let native_state = sqlstate(native);
+        let parameterized_state = sqlstate(parameterized);
+        assert_eq!(native_state, "42804", "literal {literal}");
+        assert_eq!(parameterized_state, native_state, "literal {literal}");
     }
     assert_eq!(
         connection
