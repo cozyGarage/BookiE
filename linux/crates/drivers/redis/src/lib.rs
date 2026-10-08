@@ -362,32 +362,32 @@ async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &str) -> Res
     let ttl: i64 = conn.ttl(key).await.map_err(map_redis_error)?;
     let preview = match key_type.as_str() {
         "string" => {
-            let v: String = conn.get(key).await.map_err(map_redis_error)?;
-            v
+            let v: Vec<u8> = conn.get(key).await.map_err(map_redis_error)?;
+            bytes_to_value(v)
         }
         "hash" => {
             let v: Vec<(String, String)> = conn.hgetall(key).await.map_err(map_redis_error)?;
-            format!("{v:?}")
+            Value::Text(format!("{v:?}"))
         }
         "list" => {
             let v: Vec<String> = conn.lrange(key, 0, 20).await.map_err(map_redis_error)?;
-            format!("{v:?}")
+            Value::Text(format!("{v:?}"))
         }
         "set" => {
             let v: Vec<String> = conn.smembers(key).await.map_err(map_redis_error)?;
-            format!("{v:?}")
+            Value::Text(format!("{v:?}"))
         }
         "zset" => {
             let v: Vec<String> = conn.zrange(key, 0, 20).await.map_err(map_redis_error)?;
-            format!("{v:?}")
+            Value::Text(format!("{v:?}"))
         }
-        other => format!("<{other}>"),
+        other => Value::Text(format!("<{other}>")),
     };
     Ok(vec![
         Value::Text(key.to_string()),
         Value::Text(key_type),
         Value::Int(ttl),
-        Value::Text(preview),
+        preview,
     ])
 }
 
