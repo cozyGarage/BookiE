@@ -349,12 +349,34 @@ pub(super) fn read_bundle_file(bytes: &[u8]) -> Result<ParsedBundle, BundleError
     tablepro_storage::parse_bundle(bytes)
 }
 
-/// Bounded read: the same ceiling the parser enforces, applied before
-/// the bytes are in memory, because the path comes from a file chooser
-/// and the file itself is untrusted.
 async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleError> {
-    let bytes = tokio::fs::read(path).await.map_err(|_| BundleError::NotABundle)?;
+    let bytes = read_bounded(path, tablepro_storage::MAX_BUNDLE_BYTES).await?;
     read_bundle_file(&bytes)
+}
+
+async fn read_bounded(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, BundleError> {
+    use tokio::io::AsyncReadExt;
+    let file = tokio::fs::File::open(path).await.map_err(|_| BundleError::NotABundle)?;
+    let metadata = file.metadata().await.map_err(|_| BundleError::NotABundle)?;
+    if !metadata.is_file() {
+        return Err(BundleError::NotABundle);
+    }
+    let too_large = |got: u64| BundleError::TooLarge {
+        got: usize::try_from(got).unwrap_or(usize::MAX),
+        limit,
+    };
+    if metadata.len() > limit as u64 {
+        return Err(too_large(metadata.len()));
+    }
+    let mut bytes = Vec::new();
+    file.take(limit as u64 + 1)
+        .read_to_end(&mut bytes)
+        .await
+        .map_err(|_| BundleError::NotABundle)?;
+    if bytes.len() > limit {
+        return Err(too_large(bytes.len() as u64));
+    }
+    Ok(bytes)
 }
 
 async fn plan_from_body(body: &tablepro_storage::BundleBody) -> Result<PendingImport, String> {
@@ -486,5 +508,38 @@ mod tests {
         let stamp = today_stamp();
         assert_eq!(stamp.len(), 10);
         assert_eq!(stamp.matches('-').count(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_file_over_the_limit_is_refused_before_it_is_read() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("big.bundle");
+        std::fs::File::create(&path).unwrap().set_len(17).unwrap();
+        let error = read_bounded(&path, 16).await.unwrap_err();
+        assert!(
+            matches!(error, BundleError::TooLarge { got: 17, limit: 16 }),
+            "{error:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_directory_or_missing_path_is_not_a_bundle() {
+        let directory = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            read_bounded(directory.path(), 16).await,
+            Err(BundleError::NotABundle)
+        ));
+        assert!(matches!(
+            read_bounded(&directory.path().join("missing"), 16).await,
+            Err(BundleError::NotABundle)
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_file_at_the_limit_is_read_whole() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("ok.bundle");
+        std::fs::write(&path, [7u8; 16]).unwrap();
+        assert_eq!(read_bounded(&path, 16).await.unwrap(), vec![7u8; 16]);
     }
 }

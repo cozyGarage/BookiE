@@ -14,7 +14,7 @@ pub(super) fn located_message(message: &str, sql: &str, position: Option<usize>)
     };
     let line = line.to_string();
     let column = column.to_string();
-    let place = crate::tr!("Line {line}, column {column}")
+    let place = crate::tr!("Line {line}, column {column} of this statement")
         .replace("{line}", &line)
         .replace("{column}", &column);
     format!("{message}\n{place}")
@@ -48,7 +48,10 @@ mod tests {
     #[test]
     fn the_message_keeps_its_text_and_gains_a_location_line() {
         let located = located_message("syntax error at or near \"x\"", "SELECT x x", Some(10));
-        assert_eq!(located, "syntax error at or near \"x\"\nLine 1, column 10");
+        assert_eq!(
+            located,
+            "syntax error at or near \"x\"\nLine 1, column 10 of this statement"
+        );
         assert_eq!(located_message("boom", "SELECT 1", None), "boom");
     }
 }

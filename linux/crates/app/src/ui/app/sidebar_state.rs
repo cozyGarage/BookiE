@@ -24,9 +24,13 @@ impl App {
             &self.table_search.text(),
         );
         self.sidebar_factory.widget().invalidate_filter();
+        self.sync_sidebar_selection();
     }
 
     pub(super) fn toggle_sidebar_group(&mut self, key: &str) {
+        if !self.table_search.text().is_empty() {
+            return;
+        }
         self.sidebar_collapsed.borrow_mut().toggle(key);
         let collapsed = self.sidebar_collapsed.borrow().is_collapsed(key);
         let row = self.sidebar_nodes.borrow().iter().position(|node| node.key == key);
