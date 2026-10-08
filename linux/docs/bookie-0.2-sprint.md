@@ -5,7 +5,7 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `004ec1cb6` on `linux` (PR #340; fetched 2026-10-08). Since PR #315,
+Code baseline: `5da4a55c4` on `linux` (PR #342; fetched 2026-10-08). Since PR #315,
 PRs #316, #319, #321–#323, #328–#330 refreshed architecture/B3/B4 documentation;
 PRs #317–#320 added Redis binary-value, binary-key and SCAN page-boundary
 coverage; PRs #322 and #328 recorded mutation audits; PR #324 added enum-leaf
@@ -14,7 +14,7 @@ metadata coverage; PR #325 added PostgreSQL timestamp-array JSON export under
 shared exporter mutation results. PR #331 adds SQLite STRICT `ANY` computed
 `iif()` native storage-class and typed CSV round-trip coverage; PR #333 adds
 declared SQLite BOOLEAN/temporal and BLOB-affinity runtime decoder contracts,
-PR #334 refreshes the known-issues baseline; PR #335 adds malformed temporal text fallback coverage; and PR #338 extends the schema-aware PostgreSQL domain-over-enum contract to 302 layers; PR #340 adds a 512-layer stress case. Earlier B3 work added
+PR #334 refreshes the known-issues baseline; PR #335 adds malformed temporal text fallback coverage; and PR #338 extends the schema-aware PostgreSQL domain-over-enum contract to 302 layers; PR #340 adds a 512-layer stress case, and PR #342 checks direct enum-domain query values and result metadata at both depths. Earlier B3 work added
 PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
 nested null-filter parity (#312), and a MySQL lost-ack no-replay contract
 (#315). These tests preserve native type/value oracles and verify refused
@@ -23,7 +23,7 @@ validation are in the changelog and owning boards.
 
 The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
 the focused MongoDB selector passed against MongoDB 7. The MySQL lost-ack
-selector passed against its Docker fixture on PR #315. On PR #333, SonarCloud, security, preflight, and the development Flatpak passed; the default Flatpak and GTK fast checks were still running at the last status check. On PR #335, the local quick gate and focused mutation/test checks passed; hosted preflight, security and Flatpak checks were in progress when checked. On PR #338, the Docker-backed 302-layer contract and local docs checks passed; SonarCloud and both security jobs passed, while preflight and Flatpak remained in progress. On PR #340, the 302/512-layer Docker contract and local docs checks passed; SonarCloud passed and preflight, security, and Flatpak were in progress when checked. PR #331 local validation is recorded in its [evidence comment](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990), PR #333 mutation/test evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/333#issuecomment-6053147574), PR #335 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/335#issuecomment-6053236106), PR #338 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/338#issuecomment-6053281386), and PR #340 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/340#issuecomment-6053311277).
+selector passed against its Docker fixture on PR #315. PR #333 completed its preflight, GTK fast checks, both Flatpak builds, security checks, SonarCloud, and Linux regression gate successfully; Docker and installed acceptance jobs were skipped by workflow conditions. On PR #335, the local quick gate and focused mutation/test checks passed; hosted preflight, security and Flatpak checks were in progress when checked. On PR #338, the Docker-backed 302-layer contract and local docs checks passed; SonarCloud and both security jobs passed, while preflight and Flatpak remained in progress. On PR #340, the 302/512-layer Docker contract and local docs checks passed; SonarCloud and both security jobs passed, while preflight and Flatpak were still running. On PR #342, the direct-query contract passed locally and SonarCloud passed; other hosted jobs were queued or running when checked. PR #331 local validation is recorded in its [evidence comment](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990), PR #333 mutation/test evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/333#issuecomment-6053147574), PR #335 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/335#issuecomment-6053236106), PR #338 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/338#issuecomment-6053281386), PR #340 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/340#issuecomment-6053311277), and PR #342 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/342#issuecomment-6053339776).
 These runs do not establish B4 acceptance on a selected frozen candidate.
 The local focused B4 rollback layer passed on clean documentation-only commit
 `73f8ce935`; its tested source files match `684ea40f`. Commands, results and
