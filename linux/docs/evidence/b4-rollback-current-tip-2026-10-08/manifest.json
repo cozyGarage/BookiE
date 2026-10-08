@@ -54,12 +54,13 @@
     "run_id": 37797466945,
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37797466945",
     "source_commit": "c3122d97459685060f1cf3474b55e1a11b961abe",
-    "status_at_recording": "pending",
-    "note": "No jobs had started at last check. This run is not acceptance evidence."
+    "status_at_recording": "in_progress",
+    "b4_rollback_job": "success",
+    "b4_rollback_job_id": 113398752913,
+    "note": "The B4 rollback acceptance job passed both focused MySQL and PostgreSQL selectors on c3122d9. Other Build Linux jobs were still running; this evidence is specific to the completed B4 rollback job."
   },
   "not_established": [
     "frozen-candidate acceptance",
-    "hosted B4 rollback acceptance for c3122d9",
     "optional/vendor MySQL-family engines and broader side effects",
     "installed distribution package and native Wayland acceptance"
   ]

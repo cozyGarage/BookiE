@@ -27,7 +27,8 @@ cargo test --locked -p tablepro-driver-postgres --test integration rollback_fail
 ```
 
 The current Build Linux run [#37797466945](https://github.com/cozyGarage/BookiE/actions/runs/37797466945)
-was pending with no jobs started when recorded, so hosted rollback acceptance
-remains open. These selectors are not frozen-candidate acceptance. Optional
-vendor engines, broader side effects, and installed package/native Wayland
-acceptance also remain open.
+passed its B4 rollback acceptance job (job 113398752913) on `c3122d9`. Other
+jobs in that workflow were still running when recorded. This is hosted
+current-tip evidence, not frozen-candidate acceptance. Optional vendor engines,
+broader side effects, and installed package/native Wayland acceptance also
+remain open.
