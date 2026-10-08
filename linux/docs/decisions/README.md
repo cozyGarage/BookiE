@@ -49,6 +49,7 @@ Other options and why they were rejected.
 | [0012](0012-sidebar-object-tree.md) | Show database objects in a collapsible sidebar tree | Accepted | A `GtkListView` over a `GtkTreeListModel` with real group rows, lazy catalog groups and saved collapse state |
 | [0013](0013-multiple-query-result-sets.md) | Preserve every result set from a query | Accepted | Ordered result batches keep SQL Server's later sets, with one shared budget, guard masking/audit, UI tabs and MCP output |
 | [0014](0014-full-table-export-snapshot.md) | Full table exports use one read snapshot | Accepted | Paged exports must read one guarded database snapshot or refuse before publishing a file |
+| [0015](0015-database-snapshots.md) | Database snapshots and restore | Proposed | Per-engine native snapshots behind a capability flag, generated names, one guarded and audited operation per action, a safety copy on restore |
 
 Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted
 means the architecture choice is recorded; implementation and runtime acceptance

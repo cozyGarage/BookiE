@@ -4,6 +4,28 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 i
 0.2.0. Implementation is authorized; no 0.2 release is approved.
 
 
+## 0.2.0 readiness: 2026-10-08
+
+No 0.2 release is approved. Before a frozen candidate SHA, these stay open
+(owner in brackets; details in the [ledger](known-issues.md)):
+
+- B3 [B3]: the broader type, consumer and configuration matrix, PERF-10 memory
+  reduction (the preview is display-only; full values are still held), PERF-3
+  MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
+- B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
+  remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
+  (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
+- Desktop acceptance [maintainer]: PKG-1 native Wayland on Arch, PKG-2
+  Debian/GNOME, PKG-4 Flathub submission and screenshots, PKG-8 the Flatpak
+  file-access decision, TEST-6 the 107-item manual checklist.
+- B7: a frozen SHA, the affected gates green on Forgejo at that SHA (the
+  acceptance gate since 2026-10-08), installed checks on Arch and Debian, and the
+  30-attempt soak (Forgejo nightly `gtk-soak`).
+
+Feature gaps against other clients are in
+[the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless
+the maintainer adds it.
+
 ## Current continuation plan: 2026-10-08
 
 Code baseline: `0bb8e34354d13e3ab9911b9db710eddb02115170` on `linux`, checked

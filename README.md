@@ -87,7 +87,7 @@ Container-backed driver tests and more setup details are in [`linux/docs/testing
 
 ## Contributing
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md). Pull requests for current development target the `linux` branch.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md), which apply to people and coding agents alike. Pull requests for current development target the `linux` branch and are accepted on a green Forgejo gate run.
 
 ## Changelog
 

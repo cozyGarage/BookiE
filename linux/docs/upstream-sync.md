@@ -100,7 +100,7 @@ well as SHA from now on; upstream `5730238f5` is the commit now called
 SQLite in dev-env`.
 
 **Only 200 of the 1,017 touch `linux/`.** The other 817 are Apple targets, the
-plugin system, iOS sync and AI chat, all excluded by `CLAUDE.md`. Upstream now
+plugin system, iOS sync and AI chat, all excluded by `AGENTS.md`. Upstream now
 ships database engines as versioned plugins (`plugin-teradata`, `plugin-trino`,
 `plugin-typesense`, `plugin-weaviate` tags). That is the opposite of
 [ADR 0001](decisions/0001-no-plugin-system.md) and of compile-time driver

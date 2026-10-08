@@ -214,7 +214,7 @@ Do not weaken assertions, ignore survivors, retry into green, raise size baselin
 or count a missing fixture as passed. Preserve unrelated changes.
 ```
 
-An agent must read `CLAUDE.md`, inspect status and confirm the SHA before editing.
+An agent must read `AGENTS.md`, inspect status and confirm the SHA before editing.
 If the environment is blocked, return the failing prerequisite and evidence;
 do not replace a real server test with a mock and claim equivalent coverage.
 All reports must distinguish local results, hosted results and installed acceptance.

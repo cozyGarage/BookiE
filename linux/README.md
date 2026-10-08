@@ -153,12 +153,14 @@ Start with [the documentation entry point](docs/README.md), then the active spri
 |---|---|
 | Architecture and crate boundaries | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Roadmap | [ROADMAP.md](ROADMAP.md) |
-| Production audit | [docs/production-audit.md](docs/archive/production-audit.md) |
+| User guide | [docs/user-guide.md](docs/user-guide.md) |
+| Feature comparison with other clients | [docs/0.2-feature-comparison.md](docs/0.2-feature-comparison.md) |
+| Production audit (historical) | [docs/archive/production-audit.md](docs/archive/production-audit.md) |
 | Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Supported distros, Rust toolchain, Arch package, Flathub, accessibility | [docs/platforms.md](docs/platforms.md) |
-| Historical September stabilization evidence | [docs/stabilization-2026-09.md](docs/archive/stabilization-2026-09.md) |
+| Historical September stabilization evidence | [docs/archive/stabilization-2026-09.md](docs/archive/stabilization-2026-09.md) |
 | Ignored-test inventory | [docs/ignored-tests.md](docs/ignored-tests.md) |
-| Whole-app macOS 0.72 gaps | [docs/upstream-adoption.md](docs/archive/upstream-adoption.md) |
+| Whole-app macOS 0.72 gaps (historical) | [docs/archive/upstream-adoption.md](docs/archive/upstream-adoption.md) |
 | Optional upstream reference review | [docs/upstream-sync.md](docs/upstream-sync.md) |
 | Adding a database driver | [docs/adding-drivers.md](docs/adding-drivers.md) |
 | Driver maturity | [docs/adding-drivers.md#driver-maturity](docs/adding-drivers.md#driver-maturity) |
@@ -168,7 +170,7 @@ Start with [the documentation entry point](docs/README.md), then the active spri
 | Storage | [docs/storage.md](docs/storage.md) |
 | Error handling | [docs/error-handling.md](docs/error-handling.md) |
 | Testing | [docs/testing.md](docs/testing.md) |
-| Latest regression audit | [docs/regression-audit-2026-09-29.md](docs/archive/regression-audit-2026-09-29.md) |
+| Regression audit 2026-09-29 (historical) | [docs/archive/regression-audit-2026-09-29.md](docs/archive/regression-audit-2026-09-29.md) |
 | Architecture decisions | [docs/decisions/](docs/decisions/) |
 
 ## License
