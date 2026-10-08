@@ -4,8 +4,9 @@
 
 ### Added
 - PostgreSQL enum-leaf metadata and schema-aware write/filter contracts now
-  include 302- and 512-layer domain-over-enum cases; 512 stress-checks recursive
-  metadata handling beyond the prior 301-layer proof. Deeper chains remain open.
+  include direct `pg_typeof()` query projections plus 302- and 512-layer
+  domain-over-enum cases; 512 stress-checks recursive metadata handling beyond
+  the prior 301-layer proof. Deeper chains remain open.
 - SQLite declared DATE/TIME/DATETIME/TIMESTAMP columns now have a regression
   contract proving invalid calendar/clock strings remain exact text when typed
   decoding fails.
