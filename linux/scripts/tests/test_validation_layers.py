@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -128,6 +129,15 @@ class LayerRunnerTests(unittest.TestCase):
         self.assertIn("run-test-layer.py harness", contracts)
         for script in ["preflight.sh", "ci-local.sh"]:
             self.assertIn("scripts/test-harness.sh", (ROOT / "scripts" / script).read_text())
+
+    def test_driver_layer_timeout_fits_hosted_integration_job(self):
+        workflow = (ROOT.parent / ".github/workflows/build-linux.yml").read_text()
+        integration = re.search(r"(?ms)^  integration:\n(.*?)(?=^  [a-z][a-z-]*:\n)", workflow)
+        self.assertIsNotNone(integration)
+        job_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", integration.group(1))
+        self.assertIsNotNone(job_timeout)
+        layer_timeout = runner.catalog()["drivers"]["steps"][0]["timeout_seconds"]
+        self.assertGreaterEqual(int(job_timeout.group(1)) * 60, layer_timeout + 300)
 
     def test_local_scripts_run_every_script_test(self):
         harness = (ROOT / "scripts/test-harness.sh").read_text()

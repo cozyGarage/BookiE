@@ -37,18 +37,22 @@ out. The focused MySQL and PostgreSQL cases above completed on this candidate.
 
 - [Build Linux dispatch #37708183936](https://github.com/cozyGarage/BookiE/actions/runs/37708183936) checked out PR #286 head `a056bf1715cd134224caf9c3215d617ae9b5ebb6`, not the frozen SHA above. It passed preflight, Fast GTK, Clippy, Driver TLS, PostgreSQL release, optional DuckDB, and B4 rollback. The hosted GTK safety job ran the staged release binary under Xvfb/private D-Bus and passed encrypted credential restoration with the explicit “Replace saved passwords” checked-state assertion. All seven PostgreSQL SSH GTK scenarios also passed against the staged release binary, including audited refusals, stale-session recovery, and multi-hop trust/decline/changed-key cases. MySQL rollback passed nine cases and the PostgreSQL rollback-failure case passed one case. The broad driver integration tier again timed out during dependency compilation before tests ran. PR #286 head includes non-B4 B3 parser/ClickHouse changes and test/CI updates, so this is hosted evidence for that exact PR head, not an exact-SHA rerun of `7eea6f09`.
 
+- [Build Linux push run #37711722439](https://github.com/cozyGarage/BookiE/actions/runs/37711722439) tested current Linux commit `1e1a30dc75e1d775b616cca77fdcd75490ed0a06`. PostgreSQL release, Driver TLS, optional DuckDB, focused B4 rollback, and staged-release GTK safety all passed. GTK diagnostics confirm `encrypted_bundle_round_trip_restores_credentials` passed; the seven PostgreSQL SSH GTK scenarios passed, including multi-hop trust and stale-session recovery. The broad driver integration layer again timed out while compiling before tests: its internal budget was 30 minutes even though the job allowed 45. This PR raises the layer budget to 45 minutes and the job budget to 55 minutes; the full driver matrix remains unverified until rerun.
+
 ## Remaining acceptance
 
 B4-11 and B4-12 scoped rollback contracts passed locally on the frozen
-candidate and in hosted run #37708183936; broader storage-engine or PostgreSQL
+candidate and in hosted runs #37708183936 and #37711722439; broader storage-engine or PostgreSQL
 side-effect claims remain outside those exact tests. B4-7, B4-16, and B4-17's
 seven PostgreSQL SSH GTK scenarios passed hosted on the staged release binary
 at PR #286 head `a056bf1`; B4-22's hosted GTK safety rerun passed encrypted
 credential restoration after the checked-state assertion was added. These
-hosted results do not make that PR head identical to frozen SHA `7eea6f09` and
-do not count as distribution-package installation on native Wayland. B4-9
-remains unverified because broad hosted driver integration timed out during
-dependency compilation before tests ran. B4-21's Samba AD fixture passed
+hosted results do not make the PR #286 head identical to frozen SHA `7eea6f09`
+and do not count as distribution-package installation on native Wayland. The
+newer current-Linux run corroborates the GTK, SSH and rollback results at
+`1e1a30dc`; it did not execute the broad driver tests because the internal
+30-minute layer budget expired during compilation. B4-9 remains unverified
+until that matrix completes and installed acceptance is exercised. B4-21's Samba AD fixture passed
 locally, but Windows AD interoperability is not established. B4-7, B4-16,
 B4-17 and B4-22 still need the applicable installed package/native Wayland
 acceptance. Local Arch package acceptance could not start because the host
