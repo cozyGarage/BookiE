@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "branch": "linux",
+  "source_commit": "ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9",
+  "scope": "B4-21 SQL Server Kerberos authentication over verified TLS using the opt-in Samba AD fixture",
+  "fixture": "Samba AD domain1.sink.test, SQL Server 2022, client and SQL Server in isolated Docker network",
+  "command": "bash scripts/test-mssql-kerberos.sh",
+  "target_cache_note": "The successful rerun reused the configured BookiE Cargo target cache outside /tmp after an initial attempt on an intermediate SHA hit the /tmp quota during compilation before tests started.",
+  "result": "passed: 2 tests, 0 failures",
+  "tests": [
+    {
+      "name": "kerberos_ticket_connects_over_verified_tls_and_executes_query",
+      "result": "passed",
+      "assertion": "Kerberos ticket authenticated as DOMAIN1\\bookiekerb, VerifyFull TLS succeeded, and SELECT SYSTEM_USER returned the expected principal"
+    },
+    {
+      "name": "kerberos_refuses_an_unregistered_sql_server_spn",
+      "result": "passed",
+      "assertion": "unregistered MSSQLSvc SPN was rejected as an integrated-authentication error with encryption still required"
+    }
+  ],
+  "hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37794837722,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37794837722",
+    "source_commit": "ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9",
+    "status_at_recording": "pending"
+  },
+  "not_established": [
+    "Windows Active Directory interoperability",
+    "installed distribution package and native Wayland behavior",
+    "Kerberos interoperability beyond the pinned Samba AD and SQL Server fixture"
+  ]
+}
