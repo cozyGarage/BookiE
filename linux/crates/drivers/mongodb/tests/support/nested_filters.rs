@@ -93,3 +93,81 @@ async fn nested_json_and_mql_filters_match_dotted_fields_and_array_elements() {
         assert_eq!(ids, vec![Value::Int(1), Value::Int(4)], "query: {query}");
     }
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn null_filters_distinguish_missing_and_explicit_null_like_native_mongodb() {
+    use futures::TryStreamExt;
+    use mongodb::bson::{Bson, Document, doc};
+
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client.database("appdb").collection::<Document>("null_filter_contract");
+    collection
+        .insert_many([
+            doc! { "_id": 1_i32 },
+            doc! { "_id": 2_i32, "profile": {} },
+            doc! { "_id": 3_i32, "profile": { "region": Bson::Null } },
+            doc! { "_id": 4_i32, "profile": { "region": "eu" } },
+        ])
+        .await
+        .expect("seed missing, explicit-null and ordinary nested values");
+
+    let connection = MongodbDriver
+        .connect(super::opts(&host, port, "appdb"))
+        .await
+        .expect("connect driver");
+    let cases = [
+        (
+            doc! { "profile.region": Bson::Null },
+            r#"{"profile.region":null}"#,
+            vec![1, 2, 3],
+        ),
+        (
+            doc! { "profile.region": { "$exists": false } },
+            r#"{"profile.region":{"$exists":false}}"#,
+            vec![1, 2],
+        ),
+        (
+            doc! { "profile.region": { "$type": "null" } },
+            r#"{"profile.region":{"$type":"null"}}"#,
+            vec![3],
+        ),
+    ];
+
+    for (native_filter, filter, expected_ids) in cases {
+        let native = collection
+            .find(native_filter)
+            .sort(doc! { "_id": 1 })
+            .await
+            .expect("run native filter oracle")
+            .try_collect::<Vec<Document>>()
+            .await
+            .expect("collect native filter oracle");
+        let native_ids = native
+            .iter()
+            .map(|document| i64::from(document.get_i32("_id").expect("native id")))
+            .collect::<Vec<_>>();
+        assert_eq!(native_ids, expected_ids, "native filter: {filter}");
+
+        for query in [filter.to_string(), format!("db.null_filter_contract.find({filter})")] {
+            let result = connection.query(&query).await.expect("run null filter");
+            let id_index = result
+                .columns
+                .iter()
+                .position(|column| column.name == "_id")
+                .expect("_id metadata");
+            let ids = result
+                .rows
+                .iter()
+                .map(|row| match row.get(id_index) {
+                    Some(Value::Int(id)) => *id,
+                    other => panic!("unexpected MongoDB _id value: {other:?}"),
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(ids, native_ids, "query: {query}");
+        }
+    }
+}
