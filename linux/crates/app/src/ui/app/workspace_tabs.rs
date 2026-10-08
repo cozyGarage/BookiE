@@ -721,6 +721,7 @@ impl App {
                 WorkspaceTab::Structure(slot) => slot.page.clone(),
                 WorkspaceTab::Table(slot) => slot.page.clone(),
             }) {
+                self.recent_pages.borrow_mut().forget(&page);
                 tab_view.close_page_finish(&page, false);
             }
             self.close_tab_after_session_cleanup(id, sender);
@@ -775,6 +776,7 @@ impl App {
             WorkspaceTab::Structure(s) => s.page.clone(),
             WorkspaceTab::Table(s) => s.page.clone(),
         };
+        self.recent_pages.borrow_mut().forget(&page);
         tab_view.close_page_finish(&page, true);
         drop(removed);
         self.persist_workspace_state();
@@ -964,7 +966,10 @@ impl App {
         }
         self.workspace_outer_stack.set_visible_child_name("empty");
         self.workspace_tab_view = None;
-        self.workspace_tabs.borrow_mut().clear();
+        let closed_tabs = std::mem::take(&mut *self.workspace_tabs.borrow_mut());
+        drop(closed_tabs);
+        *self.recent_pages.borrow_mut() = Default::default();
+        self.recent_walk.borrow_mut().take();
     }
 
     pub(super) fn cancel_all_editor_runs(&self) {
