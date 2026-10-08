@@ -666,8 +666,7 @@ mod tests {
     async fn browse_pages_reuse_the_census_until_refresh() {
         use mongodb::bson::{Document, doc};
         use std::sync::{Arc, Mutex};
-        use testcontainers::ImageExt;
-        use testcontainers::runners::AsyncRunner;
+        use testcontainers::{ImageExt, runners::AsyncRunner};
         use testcontainers_modules::mongo::Mongo;
 
         let container = Mongo::default().with_tag("7").start().await.unwrap();
@@ -689,7 +688,8 @@ mod tests {
             }
         }));
         let client = Client::with_options(options).unwrap();
-        let coll = client.database("appdb").collection::<Document>("browse_pages");
+        let database = client.database("appdb");
+        let coll = database.collection::<Document>("browse_pages");
         coll.insert_many([doc! { "value": 1 }, doc! { "value": 2 }])
             .await
             .unwrap();
@@ -707,6 +707,7 @@ mod tests {
             assert_eq!(commands[2].get_i64("limit").unwrap(), 1);
             assert_eq!(commands[2].get_i64("skip").unwrap(), 1);
         }
+        assert_empty_collection_and_zero_limit_contract(&connection, &database, &finds).await;
 
         connection.fetch_columns(None, "browse_pages").await.unwrap();
         assert_eq!(finds.lock().unwrap().len(), 4);
@@ -722,6 +723,24 @@ mod tests {
             assert_eq!(commands[5].get_i64("limit").unwrap(), 1);
         }
         assert_paged_find_queries_reuse_census(&connection, &finds).await;
+    }
+
+    async fn assert_empty_collection_and_zero_limit_contract(
+        connection: &MongodbConnection,
+        database: &mongodb::Database,
+        finds: &std::sync::Arc<std::sync::Mutex<Vec<mongodb::bson::Document>>>,
+    ) {
+        database.create_collection("empty_columns").await.unwrap();
+        let columns = connection.fetch_columns(None, "empty_columns").await.unwrap();
+        assert!(
+            columns
+                .iter()
+                .any(|column| column.name == "_id" && column.data_type == "ObjectId")
+        );
+        let page = connection.fetch_rows(None, "browse_pages", 0, 0).await.unwrap();
+        assert!(page.rows.is_empty());
+        let commands = finds.lock().unwrap();
+        assert_eq!(commands.len(), 3);
     }
 
     async fn assert_paged_find_queries_reuse_census(
