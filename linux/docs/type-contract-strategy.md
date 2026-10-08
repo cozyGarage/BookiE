@@ -28,14 +28,14 @@ to ordinary scalar results.
 
 ## Current evidence and next targets
 
-PERF-9 now has a local implementation candidate: saved hidden non-key columns
+Draft [PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements PERF-9: saved hidden non-key columns
 are removed from SQL browse projections while primary keys and hidden filter or
 sort columns remain usable. Projected rows distinguish unfetched cells from SQL
 NULL; full-row copy, row JSON and current-page export refuse incomplete rows,
 and the inspector labels them “Not fetched.” Pending edits disable projection.
 Native SQLite tests assert the visible projection and the hidden stored value;
 planner, keyset mapping, sparse-row, row-search and app-library regressions pass
-on the working branch. This does not close UI-14b: installed GTK acceptance and
+in the candidate. Local preflight passed; GitHub validation is pending. This does not close UI-14b: installed GTK acceptance and
 the complete on-demand value path in PERF-10 remain open. After hiding columns,
 refresh the browse page for the reduced SELECT to take effect.
 
