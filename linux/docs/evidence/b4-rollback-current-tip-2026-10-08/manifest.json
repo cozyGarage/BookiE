@@ -57,14 +57,34 @@
     "status_at_recording": "completed",
     "b4_rollback_job": "success",
     "b4_rollback_job_id": 113398752913,
-    "note": "Build Linux #37797466945 completed successfully on c3122d9. The B4 rollback acceptance job passed both focused MySQL and PostgreSQL selectors (job 113398752913).",
+    "note": "Build Linux #37797466945 completed successfully on c3122d9. The B4 rollback acceptance job passed both focused MySQL and PostgreSQL selectors (job 113398752913). The same rollback selector passed again in Build Linux #37806196821 on `896f1b3` (job 113416172631).",
     "status": "completed",
     "conclusion": "success",
     "run_conclusion": "success"
   },
   "not_established": [
-    "frozen-candidate acceptance",
+    "full frozen-candidate qualification beyond the focused PostgreSQL selector",
     "optional/vendor MySQL-family engines and broader side effects",
     "installed distribution package and native Wayland acceptance"
-  ]
+  ],
+  "current_fork_linux_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37806196821,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37806196821",
+    "source_commit": "896f1b316dbf9c3c46b5bc6f6efd999281e491a0",
+    "status": "completed",
+    "conclusion": "success",
+    "b4_rollback_job": "success",
+    "b4_rollback_job_id": 113416172631,
+    "note": "The focused B4 rollback acceptance job passed on the subsequent fork/linux source SHA."
+  },
+  "latest_fork_linux_run": {
+    "run_id": 37844691724,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37844691724",
+    "source_commit": "ae3a1e00a47c876076dec7bedff7c9efc02c445e",
+    "status_at_recording": "in_progress",
+    "active_jobs": [
+      "Preflight and sandbox tier (no GTK app)"
+    ]
+  }
 }
