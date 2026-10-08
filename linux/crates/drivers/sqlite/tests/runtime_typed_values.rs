@@ -122,6 +122,40 @@ async fn blob_affinity_values_are_decoded_by_their_runtime_storage_class() {
 }
 
 #[tokio::test]
+async fn declared_enum_values_follow_sqlite_numeric_affinity_and_keep_runtime_kinds() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    connection.execute("CREATE TABLE enum_like (value ENUM)").await.unwrap();
+    connection
+        .execute("INSERT INTO enum_like VALUES ('queued'), ('3.5'), ('7'), (X'00FF'), (NULL)")
+        .await
+        .unwrap();
+
+    let result = connection
+        .query("SELECT value, typeof(value), quote(value) FROM enum_like ORDER BY rowid")
+        .await
+        .unwrap();
+    assert_eq!(result.columns[0].data_type, "ENUM");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Text("queued".into()),
+                Value::Text("text".into()),
+                Value::Text("'queued'".into())
+            ],
+            vec![Value::Float(3.5), Value::Text("real".into()), Value::Text("3.5".into())],
+            vec![Value::Int(7), Value::Text("integer".into()), Value::Text("7".into())],
+            vec![
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into()),
+                Value::Text("X'00FF'".into())
+            ],
+            vec![Value::Null, Value::Text("null".into()), Value::Text("NULL".into())],
+        ]
+    );
+}
+
+#[tokio::test]
 async fn invalid_declared_temporal_values_remain_text() {
     let connection = SqliteDriver.connect(memory_options()).await.unwrap();
     connection

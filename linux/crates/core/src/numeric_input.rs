@@ -29,6 +29,19 @@ pub fn is_numeric_input(text: &str) -> bool {
     }
 }
 
+pub fn sqlite_declared_type_has_numeric_affinity(data_type: &str) -> bool {
+    if data_type.trim().eq_ignore_ascii_case("ANY") {
+        // SQLite gives ANY different affinity in STRICT tables, and the
+        // current column metadata does not report whether the table is STRICT.
+        return false;
+    }
+    let data_type = data_type.to_ascii_uppercase();
+    !data_type.is_empty()
+        && !["INT", "CHAR", "CLOB", "TEXT", "BLOB", "REAL", "FLOA", "DOUB"]
+            .iter()
+            .any(|marker| data_type.contains(marker))
+}
+
 pub fn sqlite_affinity_decimal(text: &str) -> Option<rust_decimal::Decimal> {
     let text = text.trim();
     let decimal = if text.contains(['e', 'E']) {
@@ -68,5 +81,25 @@ mod tests {
         assert!(sqlite_affinity_decimal("1e999").is_none());
         assert!(sqlite_affinity_decimal("1e-400").is_none());
         assert!(sqlite_affinity_decimal("0.123456789012345678901234567890123").is_none());
+    }
+
+    #[test]
+    fn sqlite_declared_types_follow_native_affinity_precedence() {
+        for data_type in ["ENUM", "BOOLEAN", "DATE", "STRING", "NUMERIC", "DECIMAL"] {
+            assert!(sqlite_declared_type_has_numeric_affinity(data_type), "{data_type}");
+        }
+        for data_type in [
+            "INTEGER",
+            "VARCHAR(20)",
+            "CLOB",
+            "TEXT",
+            "BLOB",
+            "REAL",
+            "DOUBLE",
+            "ANY",
+        ] {
+            assert!(!sqlite_declared_type_has_numeric_affinity(data_type), "{data_type}");
+        }
+        assert!(!sqlite_declared_type_has_numeric_affinity(""));
     }
 }

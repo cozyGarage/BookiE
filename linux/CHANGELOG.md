@@ -26,6 +26,11 @@
 - SQLite declared DATE/TIME/DATETIME/TIMESTAMP columns now have a regression
   contract proving invalid calendar/clock strings remain exact text when typed
   decoding fails.
+- SQLite columns declared `ENUM` now follow NUMERIC-affinity parsing in grid
+  edits and typed CSV import. Native `typeof()`/`quote()` tests retain TEXT,
+  INTEGER, REAL, BLOB and NULL kinds, while unsafe numeric inputs are refused.
+  STRICT `ANY` keeps its conservative text behavior because table strictness is
+  not available in the column metadata.
 - SQLite result decoding now has native runtime contracts for declared BOOLEAN and temporal columns, SQL NULL, and BLOB-affinity TEXT/INTEGER/REAL/BLOB values. Scoped mutation triage caught 7 of 15 variants; 5 fall back to the same runtime decoder and are equivalent, 3 were unviable, with no timeouts. Broader TEST-2 mutation coverage remains open.
 - SQLite STRICT `ANY` computed `iif()` now has a native `typeof()` and typed
   CSV round-trip case for INTEGER, REAL, formula-shaped TEXT, BLOB and SQL NULL.

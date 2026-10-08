@@ -820,7 +820,11 @@ def scenarios(ui):
         ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
         ui.run_sql("BEGIN")
         ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
-        ui.run_sql("INSERT INTO session_tunnel_loss_probe VALUES (1)")
+        # Observe the insert result before issuing the SELECT. The GTK action
+        # starts query work asynchronously, so dispatching both back-to-back
+        # can let the SELECT race ahead of the INSERT on a loaded runner.
+        ui.run_sql("INSERT INTO session_tunnel_loss_probe VALUES (1) RETURNING id")
+        ui.wait_for_node(name="1", role=pyatspi.ROLE_LABEL)
         ui.run_sql("SELECT id FROM session_tunnel_loss_probe WHERE id = 1")
         ui.wait_for_node(name="1", role=pyatspi.ROLE_LABEL)
         assert psql("SELECT count(*) FROM public.session_tunnel_loss_probe") == "0"

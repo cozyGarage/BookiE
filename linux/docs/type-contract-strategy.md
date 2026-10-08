@@ -1051,6 +1051,18 @@ Its Docker and local CI results are recorded in the [PR validation comment](http
 This closes only that identifier boundary; other identifier forms and
 transaction/session `search_path` permutations remain open.
 
+SQLite columns declared `ENUM` follow SQLite's NUMERIC affinity rather than a
+constrained enum type. The runtime contract keeps text labels, numeric
+INTEGER/REAL values, BLOB bytes and SQL NULL distinct against native
+`typeof()`/`quote()` output. Grid and typed CSV input parse numeric-looking
+values through the same affinity safeguards as declared NUMERIC columns and
+refuse values that SQLite would store imprecisely
+([driver test](../crates/drivers/sqlite/tests/runtime_typed_values.rs), [grid
+test](../crates/app/src/ui/browse_tab/tests.rs), [CSV
+test](../crates/core/src/import/cell/tests/sqlite_affinity.rs)). `ANY` remains
+on its conservative text path because metadata does not distinguish STRICT and
+ordinary tables.
+
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage
 classes; SQL NULL uses the export's explicit collision-free marker. Untagged

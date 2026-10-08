@@ -1,4 +1,5 @@
 use super::grid_render::column_layout_matches;
+use super::value_parse::parse_input_for_grid_cell;
 use super::{BrowsePageRequest, PageRequestTracker, RowCountRequestTracker, columns_for_browse_page};
 use tablepro_core::{ColumnInfo, QueryResult, Value};
 use uuid::Uuid;
@@ -31,6 +32,29 @@ fn only_the_latest_browse_page_request_is_accepted() {
 
     assert!(!tracker.accepts(older, 0));
     assert!(tracker.accepts(newer, 0));
+}
+
+#[test]
+fn sqlite_grid_parses_unknown_numeric_affinity_values_without_losing_precision() {
+    let enum_column = column("value", "ENUM", false);
+    assert_eq!(
+        parse_input_for_grid_cell("queued", Some(&enum_column), "sqlite", None),
+        Ok(Value::Text("queued".into()))
+    );
+    assert_eq!(
+        parse_input_for_grid_cell("3.5", Some(&enum_column), "sqlite", None),
+        Ok(Value::Decimal(rust_decimal::Decimal::new(35, 1)))
+    );
+    for unsafe_number in ["1e999", "1e-400", "0.123456789012345678901234567890123"] {
+        assert!(
+            parse_input_for_grid_cell(unsafe_number, Some(&enum_column), "sqlite", None).is_err(),
+            "unsafe SQLite NUMERIC-affinity input must be refused: {unsafe_number}"
+        );
+    }
+    assert_eq!(
+        parse_input_for_grid_cell("3.5", Some(&enum_column), "postgres", None),
+        Ok(Value::Text("3.5".into()))
+    );
 }
 
 #[test]

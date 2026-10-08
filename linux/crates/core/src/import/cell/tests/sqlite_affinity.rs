@@ -38,3 +38,34 @@ fn sqlite_numeric_affinity_text_fallback_does_not_apply_to_other_drivers() {
         );
     }
 }
+
+#[test]
+fn sqlite_unrecognized_numeric_affinity_types_parse_numeric_values_safely() {
+    let options = CsvImportOptions::default();
+    let target = column("value", "ENUM");
+    let strict_any = column("any_value", "ANY");
+    assert_eq!(
+        value_for("42", &strict_any, &options, "sqlite"),
+        Ok(Value::Text("42".into())),
+        "without table strictness metadata, ANY keeps its conservative text import"
+    );
+    assert_eq!(
+        value_for("queued", &target, &options, "sqlite"),
+        Ok(Value::Text("queued".into()))
+    );
+    assert_eq!(
+        value_for("3.5", &target, &options, "sqlite"),
+        Ok(Value::Decimal(Decimal::new(35, 1)))
+    );
+    for unsafe_number in ["1e999", "1e-400", "0.123456789012345678901234567890123"] {
+        assert_eq!(
+            value_for(unsafe_number, &target, &options, "sqlite"),
+            Err(CellError::NotANumber),
+            "unsafe SQLite NUMERIC-affinity input must be refused: {unsafe_number}"
+        );
+    }
+    assert_eq!(
+        value_for("3.5", &target, &options, "postgres"),
+        Ok(Value::Text("3.5".into()))
+    );
+}
