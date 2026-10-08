@@ -380,7 +380,13 @@ async fn mariadb_aria_nontransactional_effects_survive_failed_batches() {
     conn.execute("CREATE TABLE aria_trigger_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
         .await
         .unwrap();
-    conn.execute("CREATE TABLE aria_trigger_effects (id INT PRIMARY KEY) ENGINE=Aria TRANSACTIONAL=0")
+    conn.execute(
+        "CREATE TABLE aria_trigger_effects (operation VARCHAR(8) NOT NULL, id INT NOT NULL, \
+         PRIMARY KEY (operation, id)) ENGINE=Aria TRANSACTIONAL=0",
+    )
+    .await
+    .unwrap();
+    conn.execute("INSERT INTO aria_trigger_parent VALUES (1), (2)")
         .await
         .unwrap();
     let fixture = sqlx::mysql::MySqlPoolOptions::new()
@@ -394,46 +400,72 @@ async fn mariadb_aria_nontransactional_effects_survive_failed_batches() {
         )
         .await
         .unwrap();
-    sqlx::raw_sql(
-        "CREATE TRIGGER aria_parent_after_insert AFTER INSERT ON aria_trigger_parent \
-         FOR EACH ROW INSERT INTO aria_trigger_effects VALUES (NEW.id)",
-    )
-    .execute(&fixture)
-    .await
-    .unwrap();
-    fixture.close().await;
-
-    conn.execute("INSERT INTO aria_trigger_parent VALUES (1)")
+    for (trigger, event, operation, row_id) in [
+        ("aria_parent_after_insert", "INSERT", "insert", "NEW.id"),
+        ("aria_parent_after_update", "UPDATE", "update", "NEW.id"),
+        ("aria_parent_after_delete", "DELETE", "delete", "OLD.id"),
+    ] {
+        sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+            "CREATE TRIGGER {trigger} AFTER {event} ON aria_trigger_parent \
+             FOR EACH ROW INSERT INTO aria_trigger_effects VALUES ('{operation}', {row_id})"
+        )))
+        .execute(&fixture)
         .await
         .unwrap();
-    let trigger_batch = vec![
-        ("INSERT INTO aria_trigger_parent VALUES (2)".into(), vec![]),
-        ("INSERT INTO aria_trigger_parent VALUES (1)".into(), vec![]),
+    }
+    fixture.close().await;
+
+    let trigger_cases = [
+        (
+            "INSERT",
+            "INSERT INTO aria_trigger_parent VALUES (3)",
+            "INSERT INTO aria_trigger_parent VALUES (1)",
+            vec![vec![Value::Text("insert".into()), Value::Int(3)]],
+        ),
+        (
+            "UPDATE",
+            "UPDATE aria_trigger_parent SET id = 4 WHERE id = 1",
+            "INSERT INTO aria_trigger_parent VALUES (2)",
+            vec![
+                vec![Value::Text("insert".into()), Value::Int(3)],
+                vec![Value::Text("update".into()), Value::Int(4)],
+            ],
+        ),
+        (
+            "DELETE",
+            "DELETE FROM aria_trigger_parent WHERE id = 1",
+            "INSERT INTO aria_trigger_parent VALUES (2)",
+            vec![
+                vec![Value::Text("delete".into()), Value::Int(1)],
+                vec![Value::Text("insert".into()), Value::Int(3)],
+                vec![Value::Text("update".into()), Value::Int(4)],
+            ],
+        ),
     ];
-    let error = conn
-        .execute_in_transaction(&trigger_batch)
-        .await
-        .expect_err("duplicate parent key must fail the trigger batch");
-    assert!(
-        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
-        "got {error:?}"
-    );
-    assert_eq!(
-        conn.query("SELECT id FROM aria_trigger_parent ORDER BY id")
-            .await
-            .unwrap()
-            .rows,
-        vec![vec![Value::Int(1)]],
-        "the InnoDB parent row rolls back"
-    );
-    assert_eq!(
-        conn.query("SELECT id FROM aria_trigger_effects ORDER BY id")
-            .await
-            .unwrap()
-            .rows,
-        vec![vec![Value::Int(1)], vec![Value::Int(2)]],
-        "the Aria TRANSACTIONAL=0 trigger side effect survives rollback"
-    );
+    for (operation, statement, failing_statement, expected_effects) in trigger_cases {
+        let trigger_batch = vec![(statement.into(), vec![]), (failing_statement.into(), vec![])];
+        let error = conn.execute_in_transaction(&trigger_batch).await.unwrap_err();
+        assert!(
+            matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+            "{operation} batch must fail at statement 1, got {error:?}"
+        );
+        assert_eq!(
+            conn.query("SELECT id FROM aria_trigger_parent ORDER BY id")
+                .await
+                .unwrap()
+                .rows,
+            vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+            "the InnoDB parent {operation} rolls back"
+        );
+        assert_eq!(
+            conn.query("SELECT operation, id FROM aria_trigger_effects ORDER BY operation, id")
+                .await
+                .unwrap()
+                .rows,
+            expected_effects,
+            "the Aria TRANSACTIONAL=0 {operation} trigger effect survives rollback"
+        );
+    }
 }
 
 #[tokio::test]
