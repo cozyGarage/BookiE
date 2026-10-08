@@ -323,6 +323,63 @@ async fn mysql_failed_batch_keeps_direct_updates_and_deletes_on_nontransactional
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mariadb_aria_nontransactional_effects_survive_failed_batches() {
+    let (_container, opts) = start_mariadb().await;
+    let conn = connect(opts).await;
+    let table = "aria_nontransactional_effects";
+    conn.execute(&format!(
+        "CREATE TABLE {table} (id INT PRIMARY KEY, value INT NOT NULL) ENGINE=Aria TRANSACTIONAL=0"
+    ))
+    .await
+    .unwrap();
+    conn.execute(&format!("INSERT INTO {table} VALUES (1, 10), (2, 20)"))
+        .await
+        .unwrap();
+
+    let cases = [
+        (
+            "UPDATE",
+            format!("UPDATE {table} SET value = 11 WHERE id = 1"),
+            vec![vec![Value::Int(1), Value::Int(11)], vec![Value::Int(2), Value::Int(20)]],
+        ),
+        (
+            "DELETE",
+            format!("DELETE FROM {table} WHERE id = 2"),
+            vec![vec![Value::Int(1), Value::Int(11)]],
+        ),
+        (
+            "INSERT",
+            format!("INSERT INTO {table} VALUES (3, 30)"),
+            vec![vec![Value::Int(1), Value::Int(11)], vec![Value::Int(3), Value::Int(30)]],
+        ),
+    ];
+
+    for (operation, statement, expected_rows) in cases {
+        let batch = vec![
+            (statement, vec![]),
+            (format!("INSERT INTO {table} VALUES (1, 99)"), vec![]),
+        ];
+        let result = conn.execute_in_transaction(&batch).await;
+        let Err(error) = result else {
+            panic!("duplicate key must fail the {operation} batch");
+        };
+        assert!(
+            matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+            "{operation} failure must identify statement 1, got {error:?}"
+        );
+        assert_eq!(
+            conn.query(&format!("SELECT id, value FROM {table} ORDER BY id"))
+                .await
+                .unwrap()
+                .rows,
+            expected_rows,
+            "the Aria TRANSACTIONAL=0 {operation} effect must survive rollback"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts.clone()).await;

@@ -1,0 +1,23 @@
+BookiE B4-11 and B4-12 rollback extension, 2026-10-08
+
+Test commit: `1f2b047bbba83c59698889798611ae82b1c50517`.
+
+`mariadb_aria_nontransactional_effects_survive_failed_batches` passed against
+MariaDB 11.8.9 using the `mariadb:11` test fixture. It creates an Aria table
+with `TRANSACTIONAL=0`, then verifies that direct INSERT, UPDATE and DELETE
+effects remain after a later duplicate-key statement fails and the driver
+attempts rollback. Each failure identifies statement index 1.
+
+The full local B4 rollback layer passed:
+- MySQL atomicity selector: 12 passed, 0 failed, including the new Aria case.
+- PostgreSQL backend-termination rollback-failure selector: 1 passed, 0 failed.
+
+Commands:
+- `CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 cargo test --locked -p tablepro-driver-mysql --test integration mariadb_aria_nontransactional_effects_survive_failed_batches -- --include-ignored --test-threads=1`
+- `CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 python3 scripts/run-test-layer.py b4-rollback`
+
+Layer report: `/tmp/bookie-b4-aria/linux/target/quality/20261008T120021537624Z-layers/report.json`.
+The report records both layer steps as passed. The current hosted target run
+#37776466311 is pending with no jobs started, so hosted frozen-candidate
+acceptance remains open. Windows AD, installed package/native Wayland, and the
+remaining optional/vendor engine coverage are not established by this run.
