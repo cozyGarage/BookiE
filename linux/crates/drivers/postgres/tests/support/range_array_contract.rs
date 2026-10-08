@@ -30,7 +30,9 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
              (1, ARRAY['[1,5)'::custom_range_array_contract.int_range, \
                       '(10,20]'::custom_range_array_contract.int_range, \
                       'empty'::custom_range_array_contract.int_range, NULL], 'target'), \
-             (2, ARRAY['[30,40)'::custom_range_array_contract.int_range], 'sibling')",
+             (2, ARRAY['[30,40)'::custom_range_array_contract.int_range], 'sibling'), \
+             (3, ARRAY[]::custom_range_array_contract.int_range[], 'empty array'), \
+             (4, NULL, 'SQL NULL array')",
         )
         .await
         .unwrap();
@@ -82,8 +84,29 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
                         encode(array_send(value), 'hex'), sibling \
                         FROM custom_range_array_contract.rows ORDER BY id";
     let before = connection.query(snapshot_sql).await.unwrap();
+    assert_eq!(before.rows.len(), 4);
     assert_eq!(before.rows[0][2], source.rows[0][3]);
     assert_eq!(before.rows[1][4], Value::Text("sibling".into()));
+    let empty_array = connection
+        .query(
+            "SELECT value, value IS NULL, cardinality(value) \
+             FROM custom_range_array_contract.rows WHERE id = 3",
+        )
+        .await
+        .unwrap();
+    assert!(matches!(&empty_array.rows[0][0], Value::Undecodable(name) if name.ends_with("[]")));
+    assert_eq!(empty_array.rows[0][1], Value::Bool(false));
+    assert_eq!(empty_array.rows[0][2], Value::Int(0));
+    let null_array = connection
+        .query(
+            "SELECT value, value IS NULL, cardinality(value) \
+             FROM custom_range_array_contract.rows WHERE id = 4",
+        )
+        .await
+        .unwrap();
+    assert_eq!(null_array.rows[0][0], Value::Null);
+    assert_eq!(null_array.rows[0][1], Value::Bool(true));
+    assert_eq!(null_array.rows[0][2], Value::Null);
     assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
     assert!(
         connection
