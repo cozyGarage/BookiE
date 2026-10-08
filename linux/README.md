@@ -13,16 +13,16 @@ The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHou
 
 Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/adding-drivers.md#driver-maturity](docs/adding-drivers.md#driver-maturity), and [docs/production-audit.md](docs/archive/production-audit.md) for current limits.
 
-The Linux client remains under development toward 0.2.0. B3 type/value consumer coverage is still expanding; B4 and installed desktop qualification remain open. The [active sprint](docs/bookie-0.2-sprint.md) records current implementation and acceptance. Installable 0.1.4 packages are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4); they do not qualify the 0.2.0 source. Wayland soak remains an operator check after install.
+The Linux client remains under development toward 0.2.0. B3 type/value consumer coverage is still expanding; B4 and installed desktop qualification remain open. The [active sprint](docs/bookie-0.2-sprint.md) records current implementation and acceptance. Installable 0.1.5 packages are on the [linux-v0.1.5 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5); they do not qualify the 0.2.0 source. Wayland soak remains an operator check after install.
 
 ## Linux versions
 
-BookiE 0.1.4 (tag `linux-v0.1.4`) targets:
+BookiE 0.1.5 (tag `linux-v0.1.5`) targets:
 
 | Distro | Arch | Artifact | Package name | Launch |
 |---|---|---|---|---|
-| Debian / Ubuntu with the required GNOME 50 libraries | amd64 | `tablepro_0.1.4-1_amd64.deb` | `tablepro` | `bookie` |
-| Arch Linux / Omarchy | x86_64 | `bookie-0.1.4-1-x86_64.pkg.tar.zst` | `bookie` | `bookie` |
+| Debian / Ubuntu with the required GNOME 50 libraries | amd64 | `tablepro_0.1.5-1_amd64.deb` | `tablepro` | `bookie` |
+| Arch Linux / Omarchy | x86_64 | `bookie-0.1.5-1-x86_64.pkg.tar.zst` | `bookie` | `bookie` |
 
 `tablepro` and `tablepro-agentd` remain aliases. Application ID and XDG paths stay `com.tablepro.linux` / `tablepro`.
 
@@ -70,7 +70,7 @@ Table browsing fetches bounded pages from the database, and GTK creates row obje
 sudo apt install -y build-essential pkg-config libgtk-4-dev libadwaita-1-dev \
   libgtksourceview-5-dev libssl-dev libsecret-1-dev libkrb5-dev libsqlite3-dev clang
 
-# Fedora (build from source only; no 0.1.4 package)
+# Fedora (build from source only; no 0.1.5 package)
 sudo dnf install -y gcc pkg-config gtk4-devel libadwaita-devel \
   gtksourceview5-devel openssl-devel libsecret-devel krb5-devel clang
 
@@ -137,7 +137,7 @@ If native development packages are unavailable, `scripts/dev-env.sh` can use Deb
 
 ## Packaging
 
-The current package is BookiE 0.1.4. Download it from the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4), or see [the release evidence](docs/archive/release-0.1.4.md) and [packaging/README.md](packaging/README.md). To rebuild the Arch package from a clean commit:
+The current package is BookiE 0.1.5. Download it from the [linux-v0.1.5 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5), or see [the release evidence](docs/archive/release-0.1.4.md) and [packaging/README.md](packaging/README.md). To rebuild the Arch package from a clean commit:
 
 ```bash
 TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.5 ./scripts/build-arch-rc.sh

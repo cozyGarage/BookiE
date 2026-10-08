@@ -1,91 +1,50 @@
 # BookiE 0.2 active sprint
 
-Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
+Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 is released); target
 0.2.0. Implementation is authorized; no 0.2 release is approved.
+
 
 ## Current continuation plan: 2026-10-08
 
 Code baseline: `1e76bab2f9620cb5261571ecb4d74c4f81743333` on `linux`, checked
-2026-10-08. Code changes include PR #289 result header types and key markers, PR #346 result-footer statistics, PR #347's
-failed-statement copy action, PR #348's connection-coloured workspace tab strip,
-PR #349's deferral of the single action table, PR #354 ClickHouse lost-ack coverage, and PR #355
-SQL Server lost-ack coverage. PRs #357 and #358 fix GTK soak workflow setup. PR #359 makes SQLite honor affinity for enum-like declared types, and PR #360 serializes the GTK tunnel-loss transaction assertions.
-PR #344 adds
-PostgreSQL domain-array projections and PR #350 records the frozen-candidate
-PostgreSQL rollback rerun. Since PR #315,
-PRs #316, #319, #321–#323, #328–#330 refreshed architecture/B3/B4 documentation;
-PRs #317–#320 added Redis binary-value, binary-key and SCAN page-boundary
-coverage; PRs #322 and #328 recorded mutation audits; PR #324 added enum-leaf
-metadata coverage; PR #325 added PostgreSQL timestamp-array JSON export under
-`SQL, DMY`; PR #326 bounded JSON field-name mutation loops; and PR #327 recorded
-shared exporter mutation results. PR #331 adds SQLite STRICT `ANY` computed
-`iif()` native storage-class and typed CSV round-trip coverage; PR #333 adds
-declared SQLite BOOLEAN/temporal and BLOB-affinity runtime decoder contracts,
-PR #334 refreshes the known-issues baseline; PR #335 adds malformed temporal
-text fallback coverage; PR #338 extends the schema-aware PostgreSQL
-domain-over-enum contract to 302 layers; PR #340 adds a 512-layer stress case;
-and PR #342 checks direct enum-domain query values and result metadata at both
-depths. PR #344 adds domain-array projections at 302 and 512 layers and raises
-the bounded SQLx type-resolution cap to support those cases. PR #345 adds a
-Redis committed-write lost-ack contract across reconnect. PR #354 adds a
-ClickHouse committed INSERT lost-ack contract with independent native and
-materialized-view oracles. PR #355 adds SQL Server lost-ack coverage. Its
-focused Docker test, strict MSSQL Clippy, formatting, ignored-test inventory and
-documentation checks passed locally, and its hosted PR checks passed. The PR
-workflow skips Docker driver integration on pull requests; post-merge
-merge-tier run `37752816805` finished successfully (see the
-[PR #355 evidence comment](https://github.com/cozyGarage/BookiE/pull/355#issuecomment-6055451200)).
-Earlier B3 work added
-PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
-nested null-filter parity (#312), and a MySQL lost-ack no-replay contract
-(#315). These tests preserve native type/value oracles and verify refused
-writes or unsaved edits do not alter database state. Details and dated
-validation are in the changelog and owning boards.
+2026-10-08. Merged since the 0.1.5 release, by lane:
 
-The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
-the focused MongoDB selector passed against MongoDB 7. The MySQL lost-ack
-selector passed against its Docker fixture on PR #315. PRs #333 and #335 passed
-preflight, GTK fast checks, both Flatpak builds, security, SonarCloud and the
-Linux regression gate; Docker and installed acceptance jobs were skipped by
-workflow conditions. PRs #338 and #340 passed preflight, GTK fast checks, both
-Flatpak builds, security, SonarCloud and the regression gate; Docker and
-installed acceptance were skipped because those PRs did not select the owning
-test layers. PR #342 passed preflight, both Flatpak builds, security, SonarCloud
-and the regression gate; GTK fast checks were still running when checked.
-PR #343 post-merge passed preflight, both Flatpak builds, security, SonarCloud,
-GTK fast checks and the regression gate; Docker and installed jobs were skipped
-by workflow conditions. PR #344 passed its focused Docker contract locally and
-all required hosted checks. Its first hosted run hit a transient Docker Hub
-`mongo:7` image-stream error in an unrelated isolated test; the exact test passed
-locally and the failed CI jobs passed on rerun. PR #345 passed the local Docker
-lost-ack test, strict Clippy, formatting, docs checks and ordinary Redis
-integration tier; all required hosted checks passed after syncing the branch to
-PR #344. These runs do not establish B4 acceptance on a selected frozen
-candidate. PR #331 local validation is recorded in its [evidence
-comment](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990),
-PR #333 mutation/test evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/333#issuecomment-6053147574),
-PR #335 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/335#issuecomment-6053236106),
-PR #338 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/338#issuecomment-6053281386),
-PR #340 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/340#issuecomment-6053311277),
-PR #342 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/342#issuecomment-6053339776),
-PR #344 local run details are in its [evidence comment](https://github.com/cozyGarage/BookiE/pull/344#issuecomment-6053519593),
-and PR #345 Redis lost-ack details are in its [evidence comment](https://github.com/cozyGarage/BookiE/pull/345#issuecomment-6053620744).
-These runs do not establish B4 acceptance on a selected frozen candidate.
-The local focused B4 rollback layer passed on clean documentation-only commit
-`73f8ce935`; its tested source files match `684ea40f`. Commands, results and
-source hashes are in the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
-PR #337 added failed-batch INSERT coverage across InnoDB, MyISAM, MEMORY, CSV
-and ARCHIVE. PR #353 then added direct UPDATE and DELETE coverage across InnoDB,
-MyISAM, MEMORY and CSV. Its local Docker rollback layer passed; hosted PR checks
-passed, while the B4 Docker job was skipped by the PR workflow condition. The
-post-merge Build Linux run on `32b170f` was cancelled, so it has no hosted result. See the [PR #337
-evidence comment](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536)
-and [PR #353](https://github.com/cozyGarage/BookiE/pull/353).
-PR #312 skipped its B4-specific job because it only changed MongoDB tests.
-These focused cases do not close B3: the broader
-engine/type/consumer/configuration matrix, mutation triage, performance rows and
-installed grid acceptance remain open. See the [B4 board](b4-task-board.md)
-for its remaining package/Wayland and Windows AD acceptance.
+- **UX:** result headers show type and key markers (#289), selection sum and
+  average (#346), a Copy error button (#347), a connection-coloured workspace
+  tab strip (#348). The single action table is deferred behind the drift tests
+  (#349, docs only).
+- **B3 values and drivers:** PostgreSQL range refusal and enum grid coverage
+  (#305–#311), MongoDB nested null-filter parity (#312), SQLite STRICT `ANY`
+  computed `iif()` (#331), declared BOOLEAN/temporal and BLOB-affinity decoders
+  (#333), malformed temporal text fallback (#335), schema-aware domain-over-enum
+  at 302 and 512 layers (#338, #340), direct enum-domain query metadata (#342),
+  domain-array projections and a higher bounded type-resolution cap (#344),
+  enum-leaf metadata (#324), timestamp-array JSON export under `SQL, DMY` (#325),
+  SQLite affinity for enum-like declared types (#359).
+- **B3/B4 lost-ack and rollback:** MySQL lost-ack no-replay (#315), Redis (#345),
+  ClickHouse (#354), SQL Server (#355); MySQL failed-batch INSERT (#337) and
+  direct UPDATE/DELETE (#353) across storage engines; frozen-candidate
+  PostgreSQL rollback rerun (#350); Redis binary-value, binary-key and SCAN
+  page-boundary coverage (#317–#320).
+- **Mutation audits and test hygiene:** #322, #326–#328.
+- **CI:** GTK soak setup (#357, #358), serialized GTK tunnel-loss assertions
+  (#360), Forgejo parallel merge tier (#288).
+
+The PR workflow skips Docker driver integration; the post-merge merge-tier run
+`37752816805` passed. Post-merge Build Linux run `37743149992` on `32b170f` was
+cancelled, so that SHA has no hosted result. None of these runs establish B4
+acceptance on a selected frozen candidate. Per-PR commands and results are in
+the PR evidence comments: [#314](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028),
+[#331](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990),
+[#333](https://github.com/cozyGarage/BookiE/pull/333#issuecomment-6053147574),
+[#335](https://github.com/cozyGarage/BookiE/pull/335#issuecomment-6053236106),
+[#337](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536),
+[#338](https://github.com/cozyGarage/BookiE/pull/338#issuecomment-6053281386),
+[#340](https://github.com/cozyGarage/BookiE/pull/340#issuecomment-6053311277),
+[#342](https://github.com/cozyGarage/BookiE/pull/342#issuecomment-6053339776),
+[#344](https://github.com/cozyGarage/BookiE/pull/344#issuecomment-6053519593),
+[#345](https://github.com/cozyGarage/BookiE/pull/345#issuecomment-6053620744),
+[#355](https://github.com/cozyGarage/BookiE/pull/355#issuecomment-6055451200).
 
 B3 remains open for the broader engine/type/consumer/configuration matrix,
 mutation triage and installed grid acceptance. B4 still needs the remaining
