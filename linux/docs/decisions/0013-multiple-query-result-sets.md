@@ -5,10 +5,10 @@
 
 ## Context
 
-The core `QueryResult` describes one tabular result. SQL Server can return
-several result sets for one batch, but its driver currently retains only the
-first while draining the rest. The later data is then unavailable to the
-editor, policy masking, MCP and export consumers (TEST-10).
+The core `QueryResult` describes one tabular result. At the time this decision
+was written, SQL Server could return several result sets for one batch, but its
+driver retained only the first while draining the rest. The later data was
+unavailable to the editor, policy masking, MCP and export consumers (TEST-10).
 
 ## Decision
 
@@ -34,6 +34,12 @@ contract. Reaching a batch budget marks the batch truncated but still drains
 the response so the connection is reusable and late errors remain visible.
 
 ## Consequences
+
+PR #228 implements this decision. The SQL Server batch API collects ordered
+sets under one shared budget; the guard, editor, MCP and JSON export retain the
+sets, while CSV refuses multi-set output. Docker tests cover ordering, an empty
+first set, late errors, truncation and connection reuse. Current acceptance
+status is recorded in TEST-10 in the [known-issues ledger](../known-issues.md).
 
 - Existing browse, paging and single-result consumers keep using `QueryResult`.
 - Existing query callers retain their first-set behavior; callers that need all
