@@ -3,9 +3,6 @@ name: lab-ci
 on:
   push:
     branches: ["**"]
-    paths-ignore:
-      - "**.md"
-      - "linux/docs/**"
 
 concurrency:
   group: lab-ci-${{ github.ref }}

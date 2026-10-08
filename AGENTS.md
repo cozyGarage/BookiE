@@ -79,10 +79,13 @@ owner table, and each lane edits only its own files.
 6. **Documentation-only changes skip CI.** A change that touches only `*.md`
    files and `linux/docs/` is pushed straight to `linux` after
    `python3 linux/scripts/check-doc-links.py`, `check-known-issues.py` and
-   `inventory-ignored-tests.py --check` pass. Forgejo and the heavy GitHub
-   workflows ignore such pushes; the cheap `linux-ci-contracts` harness still
-   checks them on GitHub. `forgejo-gate.sh` runs the same checks and exits
-   without queueing a run. A change that touches any other file takes the full
+   `inventory-ignored-tests.py --check` pass. The heavy GitHub workflows ignore
+   such pushes; the cheap `linux-ci-contracts` harness still checks them on
+   GitHub. `forgejo-gate.sh` runs the same checks and exits without queueing a
+   run. Do not use a Forgejo `paths-ignore` filter: Forgejo reads the changed
+   files of a merge commit as none, so every branch that merged `linux` would
+   silently get no run. Do not push a documentation-only tip to Forgejo's
+   `linux`; the next code merge carries it. A change that touches any other file takes the full
    path above.
 7. **One gate at a time.** The gate script holds a host lock, so queued gates
    wait for each other. Overlapping runs starve the installed GTK jobs of CPU and
