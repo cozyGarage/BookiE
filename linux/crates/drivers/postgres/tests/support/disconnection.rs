@@ -32,10 +32,7 @@ async fn postgres_proxy_dropping_update_ack(
                 });
                 let mut buffer = [0; 8192];
                 let mut tail = Vec::new();
-                loop {
-                    let Ok(read) = server_read.read(&mut buffer).await else {
-                        break;
-                    };
+                while let Ok(read) = server_read.read(&mut buffer).await {
                     if read == 0 {
                         break;
                     }
