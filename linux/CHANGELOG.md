@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Concurrent MongoDB first-page requests now share one schema census and retain the union of types observed across pages.
 - MongoDB browse performs a complete type census on initial load and refresh, then reuses it across pages and invalidates it after driver writes.
 - MongoDB paged `find` queries reuse the same connection-local type census instead of rescanning the collection for each page.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
@@ -143,6 +144,7 @@
 - The headless agent now replaces a cached connection after a driver panic or an unusable-connection fault instead of reusing it because its health check still answers.
 
 ### Added
+- Concurrent MongoDB first-page requests now share one schema census and retain the union of types observed across pages.
 
 - Loaded results can be exported as Markdown, HTML, XML, SQL INSERT statements, or an Excel workbook, alongside CSV and JSON. Statement export is offered only for connections whose engine can express SQL literals, and an Excel export exceeding worksheet limits leaves any existing destination untouched. Workbooks preserve fractional seconds, timezone-bearing timestamps and dates outside 1900–9999 as exact text; ordinary supported dates and whole-second times remain native spreadsheet cells. Empty text is refused with CSV/JSON alternatives instead of being silently collapsed into NULL, preserving any existing destination. XML and HTML preserve carriage returns when parsed. XML refuses unsupported XML 1.0 characters and HTML refuses NUL characters with a row/column error instead of replacing or dropping them.
 - Saved queries have a management dialog (Ctrl+Shift+D): search them, open one in a new editor tab, rename it, or delete it. Until now a saved query could only be reached through the quick switcher and could not be removed.
@@ -336,6 +338,7 @@
 - Documentation now tracks the stabilization evidence, ignored-test inventory and whole-app gaps through macOS 0.72
 
 ### Added
+- Concurrent MongoDB first-page requests now share one schema census and retain the union of types observed across pages.
 
 - Jump to Column searches browse/result metadata, distinguishes duplicate names by ordinal, and supports Ctrl+Shift+J.
 - BookiE display name and original book icon; new package commands retain legacy aliases.

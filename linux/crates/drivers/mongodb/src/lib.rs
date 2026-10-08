@@ -232,7 +232,13 @@ impl MongodbConnection {
         if let Some(columns) = self.columns.read().await.get(table).cloned() {
             return Ok(columns);
         }
-        self.fetch_columns(None, table).await
+        let mut cache = self.columns.write().await;
+        if let Some(columns) = cache.get(table) {
+            return Ok(columns.clone());
+        }
+        let columns = self.census_columns(table).await?;
+        cache.insert(table.into(), columns.clone());
+        Ok(columns)
     }
 
     async fn invalidate_columns(&self, table: &str) {
@@ -263,8 +269,9 @@ impl Connection for MongodbConnection {
     }
 
     async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        let mut cache = self.columns.write().await;
         let columns = self.census_columns(table).await?;
-        self.columns.write().await.insert(table.into(), columns.clone());
+        cache.insert(table.into(), columns.clone());
         Ok(columns)
     }
 
@@ -289,8 +296,13 @@ impl Connection for MongodbConnection {
                 docs.push(doc);
             }
         }
+        let mut cache = self.columns.write().await;
+        if let Some(cached) = cache.get(table) {
+            columns = cached.clone();
+        }
         merge_page_types(&mut columns, &docs);
-        self.columns.write().await.insert(table.into(), columns.clone());
+        cache.insert(table.into(), columns.clone());
+        drop(cache);
         let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
         Ok(QueryResult {
             columns,
@@ -723,6 +735,87 @@ mod tests {
             assert_eq!(commands[5].get_i64("limit").unwrap(), 1);
         }
         assert_paged_find_queries_reuse_census(&connection, &finds).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires docker"]
+    async fn concurrent_first_pages_share_one_census() {
+        use mongodb::bson::{Document, doc};
+        use std::sync::{Arc, Mutex};
+        use testcontainers::{ImageExt, runners::AsyncRunner};
+        use testcontainers_modules::mongo::Mongo;
+
+        let container = Mongo::default().with_tag("7").start().await.unwrap();
+        let host = container.get_host().await.unwrap().to_string();
+        let port = container.get_host_port_ipv4(27017).await.unwrap();
+        let mut options = ClientOptions::parse(format!("mongodb://{host}:{port}/appdb"))
+            .await
+            .unwrap();
+        let finds = Arc::new(Mutex::new(Vec::<Document>::new()));
+        options.command_event_handler = Some(mongodb::event::EventHandler::callback({
+            let finds = finds.clone();
+            move |event: mongodb::event::command::CommandEvent| {
+                if let mongodb::event::command::CommandEvent::Started(event) = event
+                    && event.command_name == "find"
+                    && event.command.get_str("find").ok() == Some("concurrent_cold_pages")
+                {
+                    finds.lock().unwrap().push(event.command);
+                }
+            }
+        }));
+        let client = Client::with_options(options).unwrap();
+        let coll = client.database("appdb").collection::<Document>("concurrent_cold_pages");
+        coll.insert_many([doc! { "value": 1 }, doc! { "value": 2 }])
+            .await
+            .unwrap();
+        let connection = Arc::new(MongodbConnection::new(client, "appdb".into()));
+
+        let (first, second) = tokio::join!(
+            connection.fetch_rows(None, "concurrent_cold_pages", 0, 1),
+            connection.fetch_rows(None, "concurrent_cold_pages", 1, 1),
+        );
+        assert_eq!(first.unwrap().rows.len(), 1);
+        assert_eq!(second.unwrap().rows.len(), 1);
+        {
+            let commands = finds.lock().unwrap();
+            assert_eq!(commands.len(), 3);
+            assert_eq!(
+                commands.iter().filter(|command| command.get("limit").is_none()).count(),
+                1
+            );
+            assert!(
+                commands
+                    .iter()
+                    .filter(|command| command.get("limit").is_some())
+                    .all(|command| { command.get_i64("limit").unwrap() == 1 })
+            );
+        }
+        assert_concurrent_page_types_are_merged(&connection, &coll).await;
+    }
+
+    async fn assert_concurrent_page_types_are_merged(
+        connection: &MongodbConnection,
+        coll: &mongodb::Collection<Document>,
+    ) {
+        coll.update_one(doc! { "value": 1 }, doc! { "$set": { "left_only": true } })
+            .await
+            .unwrap();
+        coll.update_one(doc! { "value": 2 }, doc! { "$set": { "right_only": true } })
+            .await
+            .unwrap();
+        let (first, second) = tokio::join!(
+            connection.fetch_rows(None, "concurrent_cold_pages", 0, 1),
+            connection.fetch_rows(None, "concurrent_cold_pages", 1, 1),
+        );
+        first.unwrap();
+        second.unwrap();
+        let columns = connection.columns.read().await;
+        let names: Vec<_> = columns["concurrent_cold_pages"]
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect();
+        assert!(names.contains(&"left_only"));
+        assert!(names.contains(&"right_only"));
     }
 
     async fn assert_empty_collection_and_zero_limit_contract(
