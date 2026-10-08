@@ -1,6 +1,6 @@
 # Architecture
 
-TablePro is a Linux-only Rust workspace rooted in `linux/`. GTK4 and Relm4 provide the desktop UI. Domain, policy, storage, SSH, MCP, and database drivers are separate crates so they can be tested without starting the application.
+BookiE is a Linux-only Rust workspace rooted in `linux/`, forked from TablePro. GTK4 and Relm4 provide the desktop UI. Domain, policy, storage, SSH, MCP, and database drivers are separate crates so they can be tested without starting the application.
 
 The architecture description below reflects the current `linux` branch. The [cross-session consistency review](docs/archive/architecture-consistency-review-2026-10-03.md) is a dated source snapshot, useful for its document authority, evidence limits and then-open risks. Accepted [decisions](docs/decisions/README.md) constrain implementation; the [active sprint](docs/bookie-0.2-sprint.md) owns delivery sequencing and current acceptance.
 
