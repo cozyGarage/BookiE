@@ -117,6 +117,19 @@ impl ColumnWidthStore {
         })
     }
 
+    pub fn forget_connection(&self, connection_id: Uuid) -> Result<(), String> {
+        let key = connection_id.to_string();
+        self.file.update(|map| {
+            map.remove(&key);
+        })?;
+        self.hidden.update(|map| {
+            map.remove(&key);
+        })?;
+        self.order.update(|map| {
+            map.remove(&key);
+        })
+    }
+
     pub fn flush(&self) -> Result<(), String> {
         self.file.flush()?;
         self.hidden.flush()?;
@@ -127,6 +140,25 @@ impl ColumnWidthStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn forgetting_a_connection_drops_its_widths_hidden_columns_and_order_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ColumnWidthStore::load_in(dir.path());
+        let (gone, kept) = (Uuid::new_v4(), Uuid::new_v4());
+        for id in [gone, kept] {
+            store.save(id, "t", "c", 120).unwrap();
+            store.set_hidden(id, "t", "c", true).unwrap();
+            store.set_column_order(id, "t", vec!["c".into()]).unwrap();
+        }
+        store.forget_connection(gone).unwrap();
+        assert_eq!(store.load(gone, "t", "c"), None);
+        assert!(store.hidden_columns(gone, "t").is_empty());
+        assert!(store.column_order(gone, "t").is_empty());
+        assert_eq!(store.load(kept, "t", "c"), Some(120));
+        assert!(store.hidden_columns(kept, "t").contains("c"));
+        assert_eq!(store.column_order(kept, "t"), vec!["c".to_string()]);
+    }
 
     #[test]
     fn separately_opened_stores_do_not_share_state() {

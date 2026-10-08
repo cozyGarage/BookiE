@@ -31,6 +31,7 @@ pub struct HistoryDialog {
     /// scheduled one, so we send a single SQL search per pause —
     /// matches GNOME Files' search debounce.
     filter_debounce: std::rc::Rc<std::cell::RefCell<Option<gtk::glib::SourceId>>>,
+    search_generation: std::cell::Cell<u64>,
 
     selection_bar: gtk::Revealer,
     selection_label: gtk::Label,
@@ -80,7 +81,7 @@ pub enum HistoryDialogOutput {
 
 #[derive(Debug)]
 pub enum HistoryDialogCmd {
-    Loaded(Vec<Entry>),
+    Loaded(u64, Vec<Entry>),
     Cleared,
     ExportReady(String, String),
     ExportFailed(String),
@@ -396,6 +397,7 @@ impl Component for HistoryDialog {
             filter_window,
             filter_source,
             filter_debounce: std::rc::Rc::new(std::cell::RefCell::new(None)),
+            search_generation: std::cell::Cell::new(0),
             selection_bar,
             selection_label,
             connections,
@@ -443,23 +445,21 @@ impl Component for HistoryDialog {
                     entry.pinned = pinned;
                 }
                 let history = self.history.clone();
-                relm4::spawn(async move {
+                self.run_search_after(sender, async move {
                     if let Err(e) = history.set_pinned(id, pinned).await {
                         tracing::warn!(error = %e, "history set_pinned failed");
                     }
                 });
-                sender.input(HistoryDialogInput::Refresh);
             }
 
             HistoryDialogInput::Delete(id) => {
                 self.selected_ids.remove(&id);
                 let history = self.history.clone();
-                relm4::spawn(async move {
+                self.run_search_after(sender, async move {
                     if let Err(e) = history.delete(id).await {
                         tracing::warn!(error = %e, "history delete failed");
                     }
                 });
-                sender.input(HistoryDialogInput::Refresh);
             }
 
             HistoryDialogInput::ToggleSelected(id, on) => {
@@ -525,12 +525,11 @@ impl Component for HistoryDialog {
                     return;
                 }
                 let history = self.history.clone();
-                relm4::spawn(async move {
+                self.run_search_after(sender, async move {
                     if let Err(e) = history.delete_many(&ids).await {
                         tracing::warn!(error = %e, "history delete_many failed");
                     }
                 });
-                sender.input(HistoryDialogInput::Refresh);
             }
 
             HistoryDialogInput::ExportSelectedSql => self.export_selected("sql", sender),
@@ -599,7 +598,12 @@ impl Component for HistoryDialog {
 
     fn update_cmd(&mut self, msg: Self::CommandOutput, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
-            HistoryDialogCmd::Loaded(entries) => self.render_entries(entries, &sender),
+            HistoryDialogCmd::Loaded(generation, entries)
+                if crate::services::request_generation::is_current(generation, self.search_generation.get()) =>
+            {
+                self.render_entries(entries, &sender)
+            }
+            HistoryDialogCmd::Loaded(..) => {}
             HistoryDialogCmd::Cleared => {
                 self.selected_ids.clear();
                 sender.input(HistoryDialogInput::Refresh);
@@ -620,18 +624,27 @@ impl HistoryDialog {
     /// Run the search immediately. Triggered by Refresh (initial load
     /// + after any mutation) and by the debounced timeout firing.
     fn run_search(&self, sender: ComponentSender<Self>) {
+        self.run_search_after(sender, async {});
+    }
+
+    fn run_search_after(
+        &self,
+        sender: ComponentSender<Self>,
+        mutation: impl std::future::Future<Output = ()> + Send + 'static,
+    ) {
+        let generation = self.search_generation.get().wrapping_add(1);
+        self.search_generation.set(generation);
         let filter = self.build_filter();
         let history = self.history.clone();
         sender.command(move |out, shutdown| {
             shutdown
                 .register(async move {
-                    match history.search(filter).await {
-                        Ok(entries) => out.send(HistoryDialogCmd::Loaded(entries)).ok(),
-                        Err(e) => {
-                            tracing::warn!(error = %e, "history search failed");
-                            out.send(HistoryDialogCmd::Loaded(Vec::new())).ok()
-                        }
-                    }
+                    mutation.await;
+                    let entries = history.search(filter).await.unwrap_or_else(|e| {
+                        tracing::warn!(error = %e, "history search failed");
+                        Vec::new()
+                    });
+                    out.send(HistoryDialogCmd::Loaded(generation, entries)).ok()
                 })
                 .drop_on_shutdown()
         });

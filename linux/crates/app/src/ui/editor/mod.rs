@@ -117,7 +117,6 @@ pub enum SqlEditorInput {
     },
     Run,
     RunWithParameters {
-        generation: u64,
         sql: String,
         statements: Vec<String>,
         error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy,
@@ -661,12 +660,12 @@ impl SimpleComponent for SqlEditor {
             }
 
             SqlEditorInput::RunWithParameters {
-                generation,
                 sql,
                 statements,
                 error_policy,
                 values,
             } => {
+                let generation = self.run_generation.begin();
                 self.execute_sql(generation, sql, statements, error_policy, values, sender);
             }
 
@@ -889,10 +888,6 @@ impl SqlEditor {
         if self.session_teardown_active {
             return;
         }
-        if let Some(token) = self.cancel_token.take() {
-            token.cancel();
-        }
-        let generation = self.run_generation.begin();
         let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
         let (statements, error_policy) = if single_statement {
             (
@@ -910,6 +905,7 @@ impl SqlEditor {
         };
         let names = crate::services::query_parameters::statement_names(&sql, &driver_id);
         if names.is_empty() {
+            let generation = self.run_generation.begin();
             self.execute_sql(
                 generation,
                 sql,
@@ -931,7 +927,6 @@ impl SqlEditor {
         };
         crate::ui::parameters_dialog::present(&window, &names, move |values| {
             sender.input(SqlEditorInput::RunWithParameters {
-                generation,
                 sql: sql.clone(),
                 statements: statements.clone(),
                 error_policy,
