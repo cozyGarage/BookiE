@@ -21,6 +21,8 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - name: Install pinned workflow validator
+        env:
+          GOTOOLCHAIN: go1.25.12
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
       - name: Validate Linux workflows and embedded shell
         run: |

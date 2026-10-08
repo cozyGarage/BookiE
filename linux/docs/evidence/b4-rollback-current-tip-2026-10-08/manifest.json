@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "branch": "docs/b4-7-17-ssh-current-tip",
+  "source_commit": "c3122d97459685060f1cf3474b55e1a11b961abe",
+  "test_commit": "c74cd104690d4f438e654e11b0970c1a6f1f8228",
+  "tested_code_scope": "Rust and test sources match fork/linux at c3122d97459685060f1cf3474b55e1a11b961abe; the test worktree commit differs only by documentation changes.",
+  "scope": [
+    "B4-11 MySQL failed-batch atomicity, storage engines and side effects",
+    "B4-12 PostgreSQL backend-termination rollback failure"
+  ],
+  "results": {
+    "mysql_atomic": {
+      "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 64,
+      "covered": [
+        "lost-connection rollback failure",
+        "implicit-commit batch refusal",
+        "MariaDB Aria TRANSACTIONAL=0 direct INSERT, UPDATE and DELETE side effects",
+        "Aria trigger side effects surviving rollback of an InnoDB parent",
+        "nontransactional MySQL engine behavior",
+        "nontransactional trigger and session-variable side effects",
+        "result limits"
+      ]
+    },
+    "postgres_rollback_failure": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend -- --include-ignored --test-threads=1",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 221,
+      "verified": [
+        "TransactionRollbackFailed is reported after backend termination",
+        "table and trigger rows are absent after reconnect",
+        "PostgreSQL identity sequence advancement persists"
+      ]
+    }
+  },
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "7fc10ff0bd668e31f1bc98586ff2016ccbbf2079b80ce4c7c1553099b41d89c9",
+    "crates/drivers/postgres/tests/support/rollback_failure.rs": "6bd69e560aaee54a04fc02c4ec6b2ac8b84b49b7dca17d8ee5783c684cdb4811",
+    "scripts/test-layers.json": "b8010276325e55deb959f89c0d071bd6e746100658fe8cde79aba357bba8007b"
+  },
+  "environment": {
+    "cargo_target_dir": "/home/trung/.cache/bookie-b4-target-0d5",
+    "database_fixtures": "Testcontainers MySQL and PostgreSQL; MariaDB 11 fixture for Aria",
+    "execution": "local Linux; selectors run sequentially"
+  },
+  "hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37797466945,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37797466945",
+    "source_commit": "c3122d97459685060f1cf3474b55e1a11b961abe",
+    "status_at_recording": "in_progress",
+    "b4_rollback_job": "success",
+    "b4_rollback_job_id": 113398752913,
+    "note": "The B4 rollback acceptance job passed both focused MySQL and PostgreSQL selectors on c3122d9. Other Build Linux jobs were still running; this evidence is specific to the completed B4 rollback job."
+  },
+  "not_established": [
+    "frozen-candidate acceptance",
+    "optional/vendor MySQL-family engines and broader side effects",
+    "installed distribution package and native Wayland acceptance"
+  ]
+}
