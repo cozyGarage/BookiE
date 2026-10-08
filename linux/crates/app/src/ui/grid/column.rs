@@ -4,11 +4,10 @@ use tablepro_core::{ColumnInfo, Value};
 
 use super::context_menu::GridMenus;
 use super::display::{
-    FULL_EDIT_TEXT_SLOT, POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_text_for_bind,
+    CellView, FULL_EDIT_TEXT_SLOT, POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view,
     value_to_full_edit_text,
 };
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
-use super::presentation::cell_allows_inline_edit;
 pub(super) use super::presentation::column_is_editable as is_cell_editable;
 use super::types::{classify_editor_kind, is_bool_type};
 use super::{GridMsg, TabGridContext};
@@ -101,7 +100,6 @@ pub(super) fn build_column(
 
     let editable_for_bind = editable && sender.is_some();
     let column_info = info.clone();
-    let column_auto_filled = info.is_auto_increment || info.is_generated;
     let tab_ctx_for_bind = tab_ctx.clone();
     factory.connect_bind(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
@@ -131,12 +129,13 @@ pub(super) fn build_column(
         let preview = matches!(&value, Value::Undecodable(kind) if kind == "not fetched")
             .then(|| row.cell_preview(idx))
             .flatten();
-        let is_null = matches!(value, Value::Null);
-        let inline_editable = editable_for_bind && cell_allows_inline_edit(&column_info, &value);
-        let text = preview
+        let view = preview
             .as_ref()
-            .map(super::display::preview_to_display_text)
-            .unwrap_or_else(|| cell_text_for_bind(&value, editable_for_bind, column_auto_filled));
+            .map(CellView::from_preview)
+            .unwrap_or_else(|| cell_view(&value, &column_info));
+        let is_null = view.is_null;
+        let inline_editable = editable_for_bind && view.inline_editable;
+        let text = view.text_for_bind(editable_for_bind);
 
         let pending_classes: Vec<&'static str> = if let Some(_tab_id) = tab_ctx_for_bind.tab_id {
             if row.draft_id().is_some() {
@@ -176,14 +175,14 @@ pub(super) fn build_column(
         let Some(child) = item.child() else { return };
         if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
             label.set_inline_editable(inline_editable);
-            label.set_text(&text);
-            apply_cell_tooltip(label.upcast_ref(), &text, is_null);
+            label.set_text(text.as_ref());
+            apply_cell_tooltip(label.upcast_ref(), text.as_ref(), is_null);
             if is_null && !editable_for_bind {
                 label.add_css_class("dim-label");
             } else {
                 label.remove_css_class("dim-label");
             }
-            if is_null && (editable_for_bind || column_auto_filled) {
+            if is_null && (editable_for_bind || view.auto_filled) {
                 label.add_css_class("tp-null-sentinel");
             } else {
                 label.remove_css_class("tp-null-sentinel");
@@ -203,31 +202,12 @@ pub(super) fn build_column(
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
             checkbox.set_sensitive(inline_editable);
             SUPPRESS_SLOT.set(&checkbox, true);
-            match value {
-                Value::Bool(true) => {
-                    checkbox.set_inconsistent(false);
-                    checkbox.set_active(true);
-                }
-                Value::Bool(false) => {
-                    checkbox.set_inconsistent(false);
-                    checkbox.set_active(false);
-                }
-                Value::Int(1) if column_info.data_type.eq_ignore_ascii_case("bit(1)") => {
-                    checkbox.set_inconsistent(false);
-                    checkbox.set_active(true);
-                }
-                Value::Int(0) if column_info.data_type.eq_ignore_ascii_case("bit(1)") => {
-                    checkbox.set_inconsistent(false);
-                    checkbox.set_active(false);
-                }
-                Value::Null => {
-                    checkbox.set_inconsistent(true);
-                    checkbox.set_active(false);
-                }
-                _ => {
-                    checkbox.set_inconsistent(true);
-                    checkbox.set_active(false);
-                }
+            if let Some(checked) = view.checked {
+                checkbox.set_inconsistent(false);
+                checkbox.set_active(checked);
+            } else {
+                checkbox.set_inconsistent(true);
+                checkbox.set_active(false);
             }
             SUPPRESS_SLOT.set(&checkbox, false);
             clear_pending_classes(checkbox.upcast_ref());
@@ -238,8 +218,8 @@ pub(super) fn build_column(
             POSITION_SLOT.set(&checkbox, item.position());
             ROW_KEY_SLOT.set(&checkbox, pk_values.clone());
         } else if let Ok(label) = child.downcast::<gtk4::Label>() {
-            label.set_text(&text);
-            apply_cell_tooltip(label.upcast_ref(), &text, is_null);
+            label.set_text(text.as_ref());
+            apply_cell_tooltip(label.upcast_ref(), text.as_ref(), is_null);
             if is_null {
                 label.add_css_class("dim-label");
             } else {

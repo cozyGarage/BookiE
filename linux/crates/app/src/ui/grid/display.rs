@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use gtk4::prelude::*;
 
-use tablepro_core::Value;
+use tablepro_core::{ColumnInfo, Value};
 
 const DISPLAY_TEXT_MAX_CHARS: usize = 10_000;
 const DISPLAY_TEXT_BYTES_THRESHOLD: usize = DISPLAY_TEXT_MAX_CHARS * 4;
@@ -15,6 +17,56 @@ pub(crate) fn readonly_null_sentinel() -> String {
 
 pub(crate) fn auto_filled_sentinel() -> String {
     crate::tr!("(auto)")
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct CellView {
+    pub(super) display_text: String,
+    pub(super) is_null: bool,
+    pub(super) inline_editable: bool,
+    pub(super) auto_filled: bool,
+    pub(super) checked: Option<bool>,
+}
+
+impl CellView {
+    pub(super) fn text_for_bind(&self, editing_available: bool) -> Cow<'_, str> {
+        if self.is_null && !self.auto_filled && editing_available && self.inline_editable {
+            Cow::Owned(editable_null_sentinel())
+        } else {
+            Cow::Borrowed(&self.display_text)
+        }
+    }
+
+    pub(super) fn from_preview(preview: &crate::ui::row_object::CellPreview) -> Self {
+        Self {
+            display_text: preview_to_display_text(preview),
+            is_null: false,
+            inline_editable: false,
+            auto_filled: false,
+            checked: None,
+        }
+    }
+}
+
+pub(super) fn cell_view(value: &Value, column: &ColumnInfo) -> CellView {
+    let is_null = matches!(value, Value::Null);
+    let auto_filled = column.is_auto_increment || column.is_generated;
+    CellView {
+        display_text: if is_null && auto_filled {
+            auto_filled_sentinel()
+        } else {
+            value_to_display_text(value)
+        },
+        is_null,
+        inline_editable: super::presentation::cell_allows_inline_edit(column, value),
+        auto_filled,
+        checked: match value {
+            Value::Bool(checked) => Some(*checked),
+            Value::Int(1) if column.data_type.eq_ignore_ascii_case("bit(1)") => Some(true),
+            Value::Int(0) if column.data_type.eq_ignore_ascii_case("bit(1)") => Some(false),
+            _ => None,
+        },
+    }
 }
 
 fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
@@ -64,13 +116,6 @@ pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPrevi
     }
 }
 
-pub fn value_to_edit_text(value: &Value) -> String {
-    match value {
-        Value::Null => String::new(),
-        other => value_to_display_text(other),
-    }
-}
-
 pub(crate) fn value_to_full_edit_text(value: &Value) -> String {
     match value {
         Value::Null => String::new(),
@@ -80,21 +125,6 @@ pub(crate) fn value_to_full_edit_text(value: &Value) -> String {
 
 pub(super) fn value_is_inline_editable(value: &Value) -> bool {
     !matches!(value, Value::Bytes(_) | Value::Undecodable(_))
-}
-
-pub(super) fn cell_text_for_bind(value: &Value, column_editable: bool, column_auto_filled: bool) -> String {
-    let is_null = matches!(value, Value::Null);
-    if is_null && column_auto_filled {
-        auto_filled_sentinel()
-    } else if column_editable && value_is_inline_editable(value) {
-        if is_null {
-            editable_null_sentinel()
-        } else {
-            value_to_edit_text(value)
-        }
-    } else {
-        value_to_display_text(value)
-    }
 }
 
 pub(super) fn truncate_for_display(s: &str) -> String {
@@ -184,6 +214,22 @@ pub fn focused_cell_identity(widget: &impl IsA<gtk4::Widget>) -> Option<(u32, us
 mod tests {
     use super::*;
 
+    fn metadata(data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: "value".into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
     #[test]
     fn display_text_primitive_variants() {
         assert_eq!(value_to_display_text(&Value::Null), "NULL");
@@ -240,20 +286,70 @@ mod tests {
     #[test]
     fn bind_text_for_an_undecodable_cell_in_an_editable_column_stays_display_text() {
         let value = Value::Undecodable("NUMERIC".into());
-        assert_eq!(cell_text_for_bind(&value, true, false), "<undecodable NUMERIC>");
-        assert_ne!(cell_text_for_bind(&value, true, false), editable_null_sentinel());
+        let view = cell_view(&value, &metadata("NUMERIC"));
+        assert!(!view.inline_editable);
+        assert_eq!(view.text_for_bind(true), "<undecodable NUMERIC>");
+        assert_ne!(view.text_for_bind(true), editable_null_sentinel());
     }
 
     #[test]
     fn bind_text_for_bytes_in_an_editable_column_stays_display_text() {
         let binary = Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01]);
-        assert_eq!(cell_text_for_bind(&binary, true, false), "<4 bytes>");
+        assert_eq!(cell_view(&binary, &metadata("text")).text_for_bind(true), "<4 bytes>");
         let utf8 = Value::Bytes(b"hello world".to_vec());
-        assert_eq!(cell_text_for_bind(&utf8, true, false), "hello world");
-        assert_eq!(cell_text_for_bind(&Value::Text("hello".into()), true, false), "hello");
-        assert_eq!(cell_text_for_bind(&Value::Null, true, false), editable_null_sentinel());
-        assert_eq!(cell_text_for_bind(&Value::Null, false, false), "NULL");
-        assert_eq!(cell_text_for_bind(&Value::Null, true, true), auto_filled_sentinel());
+        assert_eq!(cell_view(&utf8, &metadata("text")).text_for_bind(true), "hello world");
+        assert_eq!(
+            cell_view(&Value::Text("hello".into()), &metadata("text")).text_for_bind(true),
+            "hello"
+        );
+    }
+
+    #[test]
+    fn cell_view_keeps_null_distinct_from_text_and_obeys_column_editability() {
+        let text_column = metadata("text");
+        let null = cell_view(&Value::Null, &text_column);
+        assert!(null.is_null);
+        assert!(null.inline_editable);
+        assert_eq!(null.text_for_bind(true), "<NULL>");
+        assert_eq!(null.text_for_bind(false), "NULL");
+        let text_null = cell_view(&Value::Text("NULL".into()), &text_column);
+        assert!(!text_null.is_null);
+        assert_eq!(text_null.text_for_bind(true), "NULL");
+
+        let mut protected_column = text_column;
+        protected_column.primary_key = true;
+        assert!(!cell_view(&Value::Null, &protected_column).inline_editable);
+    }
+
+    #[test]
+    fn cell_view_keeps_server_generated_null_and_preview_display_semantics() {
+        let mut generated_column = metadata("text");
+        generated_column.is_generated = true;
+        let generated = cell_view(&Value::Null, &generated_column);
+        assert_eq!(generated.text_for_bind(true), "(auto)");
+        assert_eq!(generated.text_for_bind(false), "(auto)");
+
+        let preview = crate::ui::row_object::CellPreview {
+            value: Value::Text("sample".into()),
+            byte_count: 9000,
+        };
+        let view = CellView::from_preview(&preview);
+        assert!(!view.inline_editable);
+        assert_eq!(view.text_for_bind(true), "sample… (9000 bytes total)");
+    }
+
+    #[test]
+    fn cell_view_maps_only_boolean_and_bit_one_values_to_checkbox_states() {
+        let boolean = metadata("boolean");
+        assert_eq!(cell_view(&Value::Bool(true), &boolean).checked, Some(true));
+        assert_eq!(cell_view(&Value::Bool(false), &boolean).checked, Some(false));
+        assert_eq!(cell_view(&Value::Int(1), &boolean).checked, None);
+
+        let bit = metadata("BIT(1)");
+        assert_eq!(cell_view(&Value::Int(1), &bit).checked, Some(true));
+        assert_eq!(cell_view(&Value::Int(0), &bit).checked, Some(false));
+        assert_eq!(cell_view(&Value::Int(2), &bit).checked, None);
+        assert_eq!(cell_view(&Value::Null, &bit).checked, None);
     }
 
     #[test]
@@ -293,25 +389,6 @@ mod tests {
         let json = serde_json::json!({"a": 1, "b": [2, 3]});
         let text = value_to_display_text(&Value::Json(json));
         assert!(text.contains("\"a\":1"));
-    }
-
-    #[test]
-    fn edit_text_distinguishes_null_from_text_null() {
-        assert_eq!(value_to_edit_text(&Value::Null), "");
-        assert_eq!(value_to_edit_text(&Value::Text("NULL".into())), "NULL");
-        assert_eq!(value_to_edit_text(&Value::Int(0)), "0");
-    }
-
-    #[test]
-    fn edit_text_keeps_extended_variants_visible() {
-        let date = chrono::NaiveDate::from_ymd_opt(2026, 4, 26).unwrap();
-        assert_eq!(value_to_edit_text(&Value::Date(date)), "2026-04-26");
-
-        let id = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
-        assert_eq!(
-            value_to_edit_text(&Value::Uuid(id)),
-            "550e8400-e29b-41d4-a716-446655440000"
-        );
     }
 
     #[test]
