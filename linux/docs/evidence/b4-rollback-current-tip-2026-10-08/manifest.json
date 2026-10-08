@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "project": "BookiE Linux",
+  "candidate_commit": "9be3d1c86e89d7f70fd6e346ab4dccc9813052f8",
+  "source_commit": "9be3d1c86e89d7f70fd6e346ab4dccc9813052f8",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "4a2d66cd79acad8e61c948d52378726a88d536da4eb3d9253384ccaf22a01314",
+    "crates/drivers/postgres/tests/integration.rs": "acbca07ab58f726bc9dc6dfa0e47df694132fbc381d36f1052ef0cd71e522336"
+  },
+  "working_tree": "clean; tracked_diff_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "purpose": "Recheck the focused MySQL atomicity and PostgreSQL rollback-failure layer on the current fork/linux tip. This is not the final frozen B3+B4 candidate.",
+  "result": "passed",
+  "mysql_atomic": {
+    "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+    "result": "9 passed, 0 failed",
+    "coverage": "InnoDB transactional rollback; MyISAM, MEMORY, CSV and ARCHIVE trigger effects across failed INSERT, UPDATE and DELETE; AUTO_INCREMENT and trigger session-variable effects.",
+    "log": "b4-rollback-1.txt",
+    "sha256": "3bd0c5dbeebdc6a72f09006f00b9d197c18c08640324249343ed10d9b9c23e5b"
+  },
+  "postgres_rollback_failure": {
+    "command": "cargo test --locked -p tablepro-driver-postgres --test integration rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend -- --include-ignored --test-threads=1",
+    "result": "1 passed, 0 failed",
+    "assertions": "Reports TransactionRollbackFailed; transactional parent and trigger rows roll back; identity and trigger sequence advances remain.",
+    "log": "b4-rollback-2.txt",
+    "sha256": "e89273f957ef0f290335d46f7f4be01fb45fe310f62c27827a5780e99d250aec"
+  },
+  "runner_report": {
+    "path": "report.json",
+    "sha256": "9a12e2600089068c1a5348574fd7ba9af2952850cf4191af5698b71034b33f87"
+  },
+  "hosted_boundary": "The Build Linux run for this tip was cancelled; no hosted B4 rollback result is claimed here. The final candidate remains to be frozen after B3 closes."
+}
