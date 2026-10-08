@@ -55,6 +55,12 @@ labels plus the literal `NULL` label; `Map(String, Nullable(Enum16))` keeps an
 empty label, SQL NULL and the literal `NULL` distinct. Both use the same native
 JSON/export oracle and explicit refusal/preservation checks for lossy writes
 ([test](../crates/drivers/clickhouse/tests/support/nested_values.rs)).
+The same contract now covers the two complementary map values,
+`Map(String, Enum16)` and `Map(String, Nullable(Enum8))`, completing all four
+Enum8/Enum16 nullable/non-nullable pairings. The new cases include signed
+Enum16 endpoints, the Enum8 high endpoint, and empty-label versus SQL NULL
+versus literal `NULL`; they use the same native JSON, JSON/CSV/XLSX, and
+lossy-write refusal/postcondition checks.
 `Array(Enum16)` and `Array(Nullable(Enum16))` now cover their signed endpoints,
 SQL NULL versus the literal `NULL` label where nullable, the same native JSON
 and export oracles, and lossy SQL, binding and grid-write refusal in that
