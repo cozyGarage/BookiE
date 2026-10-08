@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "commit": "2a787710879c2a78181c808672a00c99c9f1df06",
+  "working_tree": "M linux/crates/drivers/mysql/tests/shared/mysql_atomic.rs",
+  "tracked_diff_sha256": "6d814eb4098e343551b62e685b490d8953480b0223ce23b2b80ed1e92f753c8d",
+  "started_utc": "2026-10-08T05:40:13.036053+00:00",
+  "status": "passed",
+  "layers": {
+    "b4-rollback": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-driver-mysql",
+            "--test",
+            "integration",
+            "mysql_atomic",
+            "--",
+            "--include-ignored",
+            "--test-threads=1"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "b4-rollback-1.log",
+          "exit_code": 0,
+          "seconds": 111.772
+        },
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-driver-postgres",
+            "--test",
+            "integration",
+            "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
+            "--",
+            "--include-ignored",
+            "--test-threads=1"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "b4-rollback-2.log",
+          "exit_code": 0,
+          "seconds": 14.603
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-08T05:42:19.411812+00:00"
+}
