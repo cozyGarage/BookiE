@@ -261,6 +261,18 @@ enough elements).
       as a value that reads like a hexadecimal escape (for example not
       `\x10 bytes`).
 
+## Result headers, selection statistics, error copy and connection strip
+
+- [ ] Browse a table: each column header shows its name, a key marker for
+      primary and foreign keys, and the lower-case type beneath it, in light
+      and dark.
+- [ ] Select several rows of a numeric column: the selection badge tooltip
+      lists the column's sum and average. A text column is not listed.
+- [ ] Run a failing statement in the editor: Copy error places the exact error
+      text on the clipboard.
+- [ ] Tag a connection red and open it: the strip above the workspace tabs is
+      red in light and dark. Change the tag: the strip follows without a restart.
+
 ## Carried over from the earlier sprint
 
 - [ ] `cell_editor.rs`: in-place cell editing in light and dark. Held since the

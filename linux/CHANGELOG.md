@@ -16,6 +16,7 @@
   its reply dropped returns `Disconnected`, reconnects for a later read, and
   leaves both target and independent audit keys at one execution.
 - A failed statement in the SQL editor offers a Copy error button.
+- Selecting several rows shows each numeric column's sum and average in the selection badge tooltip, with NULLs skipped.
 - A connection's colour tag now also paints a strip above its workspace tabs, so a window shows which connection it belongs to.
 - PostgreSQL enum-leaf metadata and schema-aware write/filter contracts now
   include direct `pg_typeof()` query projections plus 302- and 512-layer

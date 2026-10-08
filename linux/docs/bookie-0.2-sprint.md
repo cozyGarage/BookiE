@@ -5,8 +5,8 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `d61a26ae4a5022b26264513afbd104acbd8bf27e` on `linux`, checked
-2026-10-08. Code changes include PR #346 result-footer statistics, PR #347's
+Code baseline: `0807b7de6605a1b65319e251438ac581aefa3d6a` on `linux`, checked
+2026-10-08. Code changes include PR #289 result header types and key markers, PR #346 result-footer statistics, PR #347's
 failed-statement copy action, PR #348's connection-coloured workspace tab strip,
 PR #349's action registry, PR #354 ClickHouse lost-ack coverage, and PR #355
 SQL Server lost-ack coverage. PRs #357 and #358 fix GTK soak workflow setup.
