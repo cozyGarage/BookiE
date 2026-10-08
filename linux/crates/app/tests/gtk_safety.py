@@ -1353,12 +1353,19 @@ def choose_export_format(label, keys):
         time.sleep(POLL_SECONDS)
     else:
         raise AssertionError(f"export format is not keyboard reachable: {accessible_snapshot()}")
-    press_x11_key("space")
-    wait_for_node(name=label)
-    for key in keys:
-        press_x11_key(key)
-    press_x11_key("Return")
-    wait_within(combo, name=label)
+    for attempt in range(3):
+        press_x11_key("space")
+        wait_for_node(name=label)
+        time.sleep(0.5)
+        for key in keys:
+            press_x11_key(key)
+        press_x11_key("Return")
+        try:
+            wait_within(combo, name=label, timeout=8)
+            break
+        except AssertionError:
+            if attempt == 2 or find_node(name="Format", role=pyatspi.ROLE_COMBO_BOX) is None:
+                raise
     wait_for_node(name="CSV options", present=False)
     invoke(wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="Export Results", role=FILE_CHOOSER_ROLES)
