@@ -2,13 +2,20 @@
   "schema_version": 1,
   "date": "2026-10-08",
   "branch": "docs/b4-7-17-ssh-current-tip",
-  "source_commit": "7744d5b079634242dd14a513e7636b8b2467d5c6",
+  "source_commit": "79e4aa0d5643ea0e99a0b100b002809ea8aef54f",
+  "source_sha256": {
+    "scripts/test-postgres-release.sh": "f1b865d96403ec596514e0edb2480ad0be3b906e4ab1523289e32621abd30b45",
+    "crates/agentd/tests/g5_system_openssh.rs": "2372e36200dd606c4ace21c4482f05ee32c9ce625c68fce3ea98ef05f14ce840",
+    "crates/agentd/tests/mtls.rs": "824a8317fe83354e159edb1c1bb75724a8b208ed21a4d07fa8b878bc7bbeb9a5",
+    "crates/release-tests/tests/agent_transport.rs": "45d982e581435b6b70470cbd364c9a4baeba9d4c21b7bd5f1e55993587d77c3a",
+    "crates/app/tests/gtk_safety.py": "181ab6d4b30f99a7299d855c91027cc2ba8524a9984eb3c55194e04cfdbcae2c"
+  },
   "scope": [
     "B4-7 SSH audit terminal outcomes",
     "B4-16 tunnel-loss stale-session retirement",
     "B4-17 native multi-hop, cancellation and GTK trust flow"
   ],
-  "result": "The SSH layer passed on fork/linux source ca1dc6002; the PostgreSQL release layer passed at PR head 7744d5b (same B4 code as base linux 60e3f26, documentation-only difference). test-postgres-release returned exit code 0.",
+  "result": "The SSH layer passed on fork/linux source ca1dc6002; the PostgreSQL release layer passed at PR head 79e4aa0 after rebasing onto fork/linux c3122d9. test-postgres-release returned exit code 0.",
   "ssh_layer": {
     "command": "bash scripts/test-ssh.sh",
     "result": "22 passed, 0 failed",
@@ -22,7 +29,7 @@
     ]
   },
   "postgres_release_layer": {
-    "command": "CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 bash scripts/test-postgres-release.sh",
+    "command": "rtk proxy env CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 bash scripts/test-postgres-release.sh",
     "result": "passed with exit code 0; system OpenSSH, agentd mTLS, release integration, and seven selected GTK SSH trust/audit/reconnect scenarios passed",
     "agentd_system_openssh": "agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust passed",
     "agentd_mtls": "3 passed: untrusted certificate refusal, saved client certificate session, saved SSH route client certificate session",
@@ -52,9 +59,9 @@
   },
   "latest_tip_hosted": {
     "workflow": "Build Linux",
-    "run_id": 37796530008,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37796530008",
-    "source_commit": "60e3f2666df21b04cb448c8dfe3b9b777dc61a9e",
+    "run_id": 37797466945,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37797466945",
+    "source_commit": "c3122d97459685060f1cf3474b55e1a11b961abe",
     "status_at_recording": "pending"
   },
   "current_pr_hosted": {
@@ -62,10 +69,7 @@
     "run_id": 37797072636,
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37797072636",
     "source_commit": "7744d5b079634242dd14a513e7636b8b2467d5c6",
-    "status_at_recording": "in progress",
-    "preflight": "passed",
-    "fast_gtk": "in progress",
-    "b4_rollback_tls_postgres_release": "skipped because the PR changes documentation only"
+    "status_at_recording": "superseded after fork/linux advanced; all 11 reported PR checks passed on the earlier head, while B4 rollback/TLS/PostgreSQL release jobs were skipped because the change was documentation-only"
   },
   "not_established": [
     "frozen-candidate acceptance",
@@ -73,5 +77,5 @@
     "Windows Active Directory interoperability",
     "saved jump-chain editing; UI-1b remains open"
   ],
-  "environment_note": "Tests ran from the PR worktree at 7744d5b using the shared Cargo target cache. The B4 source files match fork/linux 60e3f26; only documentation differs from that base. The PostgreSQL GTK runner emitted a D-Bus disconnect message during shutdown after all selected scenarios passed; the script exited 0. These are local Xvfb/Docker results, not frozen-candidate or installed Wayland acceptance."
+  "environment_note": "Tests ran from the PR worktree at 79e4aa0 using the shared Cargo target cache, after rebasing onto fork/linux c3122d9 (PR #396). The PostgreSQL GTK runner emitted a D-Bus disconnect message during shutdown after all selected scenarios passed; the script exited 0. These are local Xvfb/Docker results, not frozen-candidate or installed Wayland acceptance."
 }
