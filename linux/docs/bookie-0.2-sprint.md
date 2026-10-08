@@ -5,7 +5,7 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `5da4a55c4` on `linux` (PR #342; fetched 2026-10-08). Since PR #315,
+Code baseline: `e6a73b3d9` on `linux` (PR #343; fetched 2026-10-08). Since PR #315,
 PRs #316, #319, #321–#323, #328–#330 refreshed architecture/B3/B4 documentation;
 PRs #317–#320 added Redis binary-value, binary-key and SCAN page-boundary
 coverage; PRs #322 and #328 recorded mutation audits; PR #324 added enum-leaf
@@ -14,7 +14,12 @@ metadata coverage; PR #325 added PostgreSQL timestamp-array JSON export under
 shared exporter mutation results. PR #331 adds SQLite STRICT `ANY` computed
 `iif()` native storage-class and typed CSV round-trip coverage; PR #333 adds
 declared SQLite BOOLEAN/temporal and BLOB-affinity runtime decoder contracts,
-PR #334 refreshes the known-issues baseline; PR #335 adds malformed temporal text fallback coverage; and PR #338 extends the schema-aware PostgreSQL domain-over-enum contract to 302 layers; PR #340 adds a 512-layer stress case, and PR #342 checks direct enum-domain query values and result metadata at both depths. Earlier B3 work added
+PR #334 refreshes the known-issues baseline; PR #335 adds malformed temporal
+text fallback coverage; PR #338 extends the schema-aware PostgreSQL
+domain-over-enum contract to 302 layers; PR #340 adds a 512-layer stress case;
+and PR #342 checks direct enum-domain query values and result metadata at both
+depths. PR #344 adds domain-array projections at 302 and 512 layers and raises
+the bounded SQLx type-resolution cap to support those cases. Earlier B3 work added
 PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
 nested null-filter parity (#312), and a MySQL lost-ack no-replay contract
 (#315). These tests preserve native type/value oracles and verify refused
@@ -23,11 +28,34 @@ validation are in the changelog and owning boards.
 
 The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
 the focused MongoDB selector passed against MongoDB 7. The MySQL lost-ack
-selector passed against its Docker fixture on PR #315. PR #333 completed its preflight, GTK fast checks, both Flatpak builds, security checks, SonarCloud, and Linux regression gate successfully; Docker and installed acceptance jobs were skipped by workflow conditions. On PR #335, the local quick gate and focused mutation/test checks passed; hosted preflight, security and Flatpak checks were in progress when checked. On PR #338, the Docker-backed 302-layer contract and local docs checks passed; SonarCloud and both security jobs passed, while preflight and Flatpak remained in progress. On PR #340, the 302/512-layer Docker contract and local docs checks passed; SonarCloud and both security jobs passed, while preflight and Flatpak were still running. On PR #342, the direct-query contract passed locally and SonarCloud passed; other hosted jobs were queued or running when checked. PR #331 local validation is recorded in its [evidence comment](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990), PR #333 mutation/test evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/333#issuecomment-6053147574), PR #335 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/335#issuecomment-6053236106), PR #338 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/338#issuecomment-6053281386), PR #340 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/340#issuecomment-6053311277), and PR #342 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/342#issuecomment-6053339776).
+selector passed against its Docker fixture on PR #315. PRs #333 and #335 passed
+preflight, GTK fast checks, both Flatpak builds, security, SonarCloud and the
+Linux regression gate; Docker and installed acceptance jobs were skipped by
+workflow conditions. PRs #338 and #340 passed preflight, GTK fast checks, both
+Flatpak builds, security, SonarCloud and the regression gate; Docker and
+installed acceptance were skipped because those PRs did not select the owning
+test layers. PR #342 passed preflight, both Flatpak builds, security, SonarCloud
+and the regression gate; GTK fast checks were still running when checked.
+PR #343 post-merge passed preflight, development Flatpak, security, SonarCloud
+and the regression gate; default Flatpak and GTK fast checks were still running.
+Its Docker and installed jobs were skipped by workflow conditions. PR #344's
+focused Docker contract and docs checks pass locally; hosted checks were in
+progress when checked. These runs do not establish B4 acceptance on a selected
+frozen candidate. PR #331 local validation is recorded in its [evidence
+comment](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990),
+PR #333 mutation/test evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/333#issuecomment-6053147574),
+PR #335 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/335#issuecomment-6053236106),
+PR #338 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/338#issuecomment-6053281386),
+PR #340 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/340#issuecomment-6053311277),
+PR #342 evidence in its [discussion](https://github.com/cozyGarage/BookiE/pull/342#issuecomment-6053339776),
+and PR #344 local run details in its [evidence comment](https://github.com/cozyGarage/BookiE/pull/344#issuecomment-6053519593).
 These runs do not establish B4 acceptance on a selected frozen candidate.
 The local focused B4 rollback layer passed on clean documentation-only commit
 `73f8ce935`; its tested source files match `684ea40f`. Commands, results and
 source hashes are in the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
+PR #337 is the open B4-11 direct-DML follow-up. Its Docker rollback layer passed
+locally; SonarCloud passed after syncing the branch to the current `linux` tip.
+Hosted preflight, GTK fast checks, workflow lint, harness, security, SonarCloud and both Flatpak builds passed on head `96628dd`. The B4 Docker job was skipped by its PR workflow condition; local run details are in the [PR #337 evidence comment](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536).
 PR #312 skipped its B4-specific job because it only changed MongoDB tests.
 These focused cases do not close B3: the broader
 engine/type/consumer/configuration matrix, mutation triage, performance rows and
@@ -125,7 +153,7 @@ not prove a distribution-package installation or native Wayland session.
 | B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Repeat on the selected frozen SHA, confirm hosted results, and complete installed-package/native Wayland acceptance. |
 | B4-22 | Keep UNVERIFIED. The GTK bundle export/import and encrypted credential round-trip have local and earlier hosted evidence; obtain acceptance on the selected frozen candidate, hosted SHA, and installed package/native Wayland. |
 | B4-12 | Repeat PostgreSQL backend-termination rollback-failure acceptance on the selected frozen candidate; preserve `TransactionRollbackFailed`, row rollback, and sequence side-effect assertions with exact SHA. Prior candidate/hosted evidence remains historical. |
-| B4-11 | Extend MySQL failed-batch rollback coverage to the additional storage engines and side-effect patterns requested. Existing proof is bounded to InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, DML trigger effects, AUTO_INCREMENT, and one session-variable effect. |
+| B4-11 | [PR #337 local rollback evidence](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536) adds direct failed-batch INSERT coverage on InnoDB, MyISAM, MEMORY, CSV and ARCHIVE; the full layer passed 10 MySQL atomicity tests and the PostgreSQL rollback-failure selector. Optional/vendor-specific engines and broader side effects remain open. |
 | B4-17 | Reconcile existing `ssh-gtk-*` artifacts before rerunning: they already show both-hop trust prompts, routed query, second-hop decline without learning, changed-key refusal, and terminal audit outcomes. They use staged release binaries under Xvfb/AT-SPI. Close only after selected-candidate/hosted evidence and the required installed-package/native Wayland trust flow. |
 | B4-21 | Keep Windows AD interoperability open. Samba AD Kerberos+TLS fixtures are useful local coverage but do not establish interoperability with Windows AD; candidate acceptance is also outstanding. |
 | UI-1b | Keep refusing edits to saved SSH jump chains. Implement the per-hop secret editor design across persistence, transport identity, bundle compatibility and GTK before enabling chain editing. |
