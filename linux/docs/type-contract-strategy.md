@@ -980,8 +980,9 @@ invalid-label refusal and rollback with a same-named shadow enum in
 This is a tested boundary case, not a maximum-depth claim; deeper chains remain
 open.
 
-An October 8 follow-up runs the same schema-aware read, keyed-write, draft/filter,
-invalid-label, NULL, and rollback contract at 302 and 512 domain layers. The 512
+An October 8 follow-up runs the same schema-aware read, direct enum-domain
+projection, keyed-write, draft/filter, invalid-label, NULL, and rollback contract
+at 302 and 512 domain layers. The 512
 case stress-checks recursive metadata handling; neither point is a maximum-depth claim ([test source](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs)).
 
 A restricted PostgreSQL session now verifies enum parameter inference after
