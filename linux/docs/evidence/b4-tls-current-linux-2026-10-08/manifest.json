@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "scope": "B4-9 current-Linux driver TLS verification matrix",
+  "source_commit": "a47b1fbf7103a420f33ec846c15b026a79301d5b",
+  "engine": "Docker Compose fixtures for MongoDB, Redis, MySQL, SQL Server and ClickHouse",
+  "command": "CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-7eff CARGO_INCREMENTAL=0 bash scripts/test-driver-tls.sh",
+  "result": "passed twice on the same source SHA; full.log records the second warm-build run",
+  "test_results": {
+    "clickhouse_tls": { "passed": 6, "failed": 0 },
+    "mongodb_tls": { "passed": 5, "failed": 0 },
+    "mssql_tls": { "passed": 9, "failed": 0 },
+    "mysql_tls": { "passed": 16, "failed": 0 },
+    "plaintext_regression": { "passed": 7, "failed": 0 },
+    "redis_tls": { "passed": 5, "failed": 0 },
+    "total": { "passed": 48, "failed": 0 }
+  },
+  "prior_failure": {
+    "source_commit": "98134709ed521674676a46b579cc5dfa57f418d4",
+    "result": "four MongoDB TLS tests received ConnectionRefused while MongoDB containers reported healthy",
+    "follow_up": "not reproduced in two complete TLS runs on a47b1fb; the original cause remains undetermined"
+  },
+  "log": {
+    "path": "full.txt",
+    "sha256": "0f45929ae1c0c4d73553d15eeab4e4c81cd09c64bd509702b749fd673e519ab9"
+  },
+  "not_established": [
+    "Frozen-candidate acceptance",
+    "Hosted acceptance on this exact source SHA",
+    "Distribution-package installation and native Wayland acceptance",
+    "Windows AD interoperability"
+  ]
+}

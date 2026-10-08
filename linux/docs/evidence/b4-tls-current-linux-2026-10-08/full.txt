@@ -1,0 +1,586 @@
+wrote driver-tls materials to /tmp/bookie-b4-tls-a47b/linux/tests/fixtures/driver-tls/materials
+ Image tablepro-driver-tls-mongo Building 
+ Image tablepro-driver-tls-mysql-mtls Building 
+ Image tablepro-driver-tls-ssh-bastion Building 
+ Image tablepro-driver-tls-mysql-mtls-ssh Building 
+ Image tablepro-driver-tls-redis Building 
+ Image tablepro-driver-tls-clickhouse Building 
+ Image tablepro-driver-tls-mssql Building 
+ Image tablepro-driver-tls-mysql-ssh Building 
+ Image tablepro-driver-tls-mssql-plain Building 
+ Image tablepro-driver-tls-mysql Building 
+ Image tablepro-driver-tls-mssql-ssh Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 5.87kB done
+#1 DONE 0.0s
+
+#2 [mysql-mtls-ssh internal] load build definition from Dockerfile
+#2 transferring dockerfile: 300B done
+#2 DONE 0.0s
+
+#3 [clickhouse internal] load build definition from Dockerfile
+#3 transferring dockerfile: 405B done
+#3 DONE 0.0s
+
+#4 [mssql-plain internal] load build definition from Dockerfile
+#4 transferring dockerfile: 766B done
+#4 DONE 0.0s
+
+#5 [redis internal] load build definition from Dockerfile
+#5 transferring dockerfile: 305B done
+#5 DONE 0.0s
+
+#6 [ssh-bastion internal] load build definition from Dockerfile
+#6 transferring dockerfile: 974B done
+#6 DONE 0.1s
+
+#7 [mongo internal] load build definition from Dockerfile
+#7 transferring dockerfile: 240B done
+#7 DONE 0.1s
+
+#8 [mysql-mtls internal] load metadata for docker.io/library/mysql:8.4
+#8 DONE 0.0s
+
+#9 [mssql internal] load .dockerignore
+#9 transferring context: 2B done
+#9 DONE 0.0s
+
+#10 [mssql internal] load metadata for mcr.microsoft.com/mssql/server:2022-latest
+#10 DONE 0.0s
+
+#11 [mssql internal] load build context
+#11 DONE 0.0s
+
+#12 [mysql-mtls-ssh internal] load build context
+#12 DONE 0.0s
+
+#13 [clickhouse internal] load metadata for docker.io/clickhouse/clickhouse-server:24.8-alpine
+#13 DONE 0.1s
+
+#14 [mysql-mtls-ssh 1/5] FROM docker.io/library/mysql:8.4@sha256:85b9bf2e29cf836ecb8c2a15a935d4ba0c606631dff1dd79531a11983c638f2a
+#14 resolve docker.io/library/mysql:8.4@sha256:85b9bf2e29cf836ecb8c2a15a935d4ba0c606631dff1dd79531a11983c638f2a 0.1s done
+#14 DONE 0.1s
+
+#9 [mongo internal] load .dockerignore
+#9 transferring context: 2B done
+#9 DONE 0.0s
+
+#15 [redis internal] load metadata for docker.io/library/redis:7-alpine
+#15 DONE 0.1s
+
+#16 [ssh-bastion internal] load metadata for docker.io/library/alpine:3.22
+#16 DONE 0.1s
+
+#17 [mongo internal] load metadata for docker.io/library/mongo:7
+#17 DONE 0.1s
+
+#18 [ssh-bastion internal] load build context
+#18 DONE 0.0s
+
+#19 [mongo internal] load build context
+#19 DONE 0.0s
+
+#11 [mssql internal] load build context
+#11 transferring context: 3.43kB done
+#11 DONE 0.0s
+
+#20 [clickhouse 1/6] FROM docker.io/clickhouse/clickhouse-server:24.8-alpine@sha256:b002e56ed5c16e224c312527f6fcba7e77216fec5d7a88a7828f59efc614feb5
+#20 resolve docker.io/clickhouse/clickhouse-server:24.8-alpine@sha256:b002e56ed5c16e224c312527f6fcba7e77216fec5d7a88a7828f59efc614feb5 0.1s done
+#20 DONE 0.1s
+
+#21 [mssql-ssh 1/6] FROM mcr.microsoft.com/mssql/server:2022-latest@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb
+#21 resolve mcr.microsoft.com/mssql/server:2022-latest@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb 0.0s done
+#21 CACHED
+
+#22 [redis 1/5] FROM docker.io/library/redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+#22 resolve docker.io/library/redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2 0.1s done
+#22 DONE 0.1s
+
+#23 [mssql-ssh 2/6] COPY materials/server.crt /certs/server.crt
+#23 ...
+
+#12 [mysql-mtls-ssh internal] load build context
+#12 transferring context: 4.55kB done
+#12 DONE 0.0s
+
+#24 [clickhouse internal] load build context
+#24 transferring context: 5.16kB done
+#24 DONE 0.0s
+
+#22 [redis 1/5] FROM docker.io/library/redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+#22 CACHED
+
+#20 [clickhouse 1/6] FROM docker.io/clickhouse/clickhouse-server:24.8-alpine@sha256:b002e56ed5c16e224c312527f6fcba7e77216fec5d7a88a7828f59efc614feb5
+#20 CACHED
+
+#14 [mysql-mtls-ssh 1/5] FROM docker.io/library/mysql:8.4@sha256:85b9bf2e29cf836ecb8c2a15a935d4ba0c606631dff1dd79531a11983c638f2a
+#14 CACHED
+
+#18 [ssh-bastion internal] load build context
+#18 transferring context: 193B done
+#18 DONE 0.0s
+
+#19 [mongo internal] load build context
+#19 transferring context: 4.50kB done
+#19 DONE 0.0s
+
+#25 [ssh-bastion 1/3] FROM docker.io/library/alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
+#25 resolve docker.io/library/alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8 0.1s done
+#25 CACHED
+
+#26 [mongo 1/4] FROM docker.io/library/mongo:7@sha256:b6421fd6d1c5ded6377b397d8983e2f82e2100dc5123332dcfda2065a472be5b
+#26 resolve docker.io/library/mongo:7@sha256:b6421fd6d1c5ded6377b397d8983e2f82e2100dc5123332dcfda2065a472be5b 0.1s done
+#26 CACHED
+
+#27 [clickhouse 2/6] COPY materials/server.crt /certs/server.crt
+#27 DONE 0.3s
+
+#28 [mysql 2/5] COPY materials/server.crt /certs/server.crt
+#28 DONE 0.3s
+
+#23 [mssql-ssh 2/6] COPY materials/server.crt /certs/server.crt
+#23 DONE 0.4s
+
+#29 [redis 2/5] COPY materials/server.crt /certs/server.crt
+#29 DONE 0.3s
+
+#30 [ssh-bastion 2/3] COPY materials/ssh_client.pub /tmp/ssh_client.pub
+#30 DONE 0.3s
+
+#31 [mongo 2/4] COPY materials/server.pem /certs/server.pem
+#31 DONE 0.3s
+
+#32 [mysql-mtls 3/5] COPY materials/server.key /certs/server.key
+#32 ...
+
+#33 [clickhouse 3/6] COPY materials/server.key /certs/server.key
+#33 DONE 0.2s
+
+#34 [mssql-ssh 3/6] COPY materials/server.key /certs/server.key
+#34 DONE 0.2s
+
+#32 [mysql-mtls-ssh 3/5] COPY materials/server.key /certs/server.key
+#32 DONE 0.2s
+
+#35 [mongo 3/4] COPY materials/ca.crt /certs/ca.crt
+#35 DONE 0.2s
+
+#36 [redis 3/5] COPY materials/server.key /certs/server.key
+#36 DONE 0.2s
+
+#37 [mysql-ssh 4/5] COPY materials/ca.crt /certs/ca.crt
+#37 DONE 0.2s
+
+#38 [clickhouse 4/6] COPY materials/ca.crt /certs/ca.crt
+#38 DONE 0.2s
+
+#39 [mssql-plain 4/6] COPY mssql/entrypoint.sh /fixture/entrypoint.sh
+#39 DONE 0.2s
+
+#40 [redis 4/5] COPY materials/ca.crt /certs/ca.crt
+#40 DONE 0.2s
+
+#41 [mysql-ssh 5/5] RUN chown -R mysql:mysql /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#41 ...
+
+#42 [mongo 4/4] RUN chown -R mongodb:mongodb /certs     && chmod 600 /certs/server.pem     && chmod 644 /certs/ca.crt
+#42 DONE 0.4s
+
+#43 [mssql 5/6] COPY mssql/setup.sql /fixture/setup.sql
+#43 DONE 0.2s
+
+#44 [clickhouse 5/6] COPY clickhouse/tls.xml /etc/clickhouse-server/config.d/tls.xml
+#44 DONE 0.2s
+
+#45 [redis 5/5] RUN chown -R redis:redis /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#45 DONE 0.4s
+
+#46 [mssql-ssh 6/6] RUN chown -R mssql:root /certs /fixture     && chmod 400 /certs/server.key     && chmod 444 /certs/server.crt     && chmod 500 /fixture/entrypoint.sh     && if [ "1" = "1" ]; then       /opt/mssql/bin/mssql-conf set network.tlscert /certs/server.crt       && /opt/mssql/bin/mssql-conf set network.tlskey /certs/server.key       && /opt/mssql/bin/mssql-conf set network.forceencryption 1;     fi
+#46 ...
+
+#41 [mysql-ssh 5/5] RUN chown -R mysql:mysql /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#41 DONE 0.4s
+
+#47 [mongo] exporting to image
+#47 exporting layers 0.3s done
+#47 exporting manifest sha256:e3cde773c6ca02fef3f4d2024a80036cddff870944d42d3c726baab20a487c09 0.1s done
+#47 exporting config sha256:b0ad8f8339bff03f40822ccf8126b53c57a219292fb37269c5f954c8ef731de5 0.0s done
+#47 ...
+
+#48 [clickhouse 6/6] RUN chown -R clickhouse:clickhouse /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#48 DONE 0.5s
+
+#49 [mssql-plain 6/6] RUN chown -R mssql:root /certs /fixture     && chmod 400 /certs/server.key     && chmod 444 /certs/server.crt     && chmod 500 /fixture/entrypoint.sh     && if [ "0" = "1" ]; then       /opt/mssql/bin/mssql-conf set network.tlscert /certs/server.crt       && /opt/mssql/bin/mssql-conf set network.tlskey /certs/server.key       && /opt/mssql/bin/mssql-conf set network.forceencryption 1;     fi
+#49 DONE 0.5s
+
+#47 [mongo] exporting to image
+#47 exporting attestation manifest sha256:4893d0337561eba1debf8effd3767df73b311399967bc437152f33d09ad2b7fe 0.1s done
+#47 exporting manifest list sha256:12061ff2221ac131eddbbd2558604ff6c4827e340a0590f46f3e54c84e5af29b
+#47 exporting manifest list sha256:12061ff2221ac131eddbbd2558604ff6c4827e340a0590f46f3e54c84e5af29b 0.2s done
+#47 naming to docker.io/library/tablepro-driver-tls-mongo:latest 0.0s done
+#47 unpacking to docker.io/library/tablepro-driver-tls-mongo:latest
+#47 ...
+
+#50 [ssh-bastion 3/3] RUN apk add --no-cache openssh-server     && adduser -D -s /bin/sh tunnel     && echo 'tunnel:fixture-only' | chpasswd     && mkdir -p /home/tunnel/.ssh /run/sshd     && chown -R tunnel:tunnel /home/tunnel/.ssh     && chmod 700 /home/tunnel/.ssh     && printf '%s\n'       'PermitRootLogin no'       'PasswordAuthentication no'       'KbdInteractiveAuthentication no'       'PubkeyAuthentication yes'       'AllowTcpForwarding local'       'AllowStreamLocalForwarding yes'       'PermitOpen mysql-ssh.tablepro.test:3306 mysql-mtls-ssh.tablepro.test:3306 mssql-ssh.tablepro.test:1433'       'X11Forwarding no'       'AllowAgentForwarding no'       > /etc/ssh/sshd_config
+#50 0.302 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/APKINDEX.tar.gz
+#50 0.555 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/APKINDEX.tar.gz
+#50 1.017 (1/3) Installing openssh-keygen (10.0_p1-r10)
+#50 1.068 (2/3) Installing openssh-server-common (10.0_p1-r10)
+#50 1.090 (3/3) Installing openssh-server (10.0_p1-r10)
+#50 1.195 Executing busybox-1.37.0-r20.trigger
+#50 1.202 OK: 10 MiB in 19 packages
+#50 1.299 chpasswd: password for 'tunnel' changed
+#50 DONE 1.6s
+
+#46 [mssql-ssh 6/6] RUN chown -R mssql:root /certs /fixture     && chmod 400 /certs/server.key     && chmod 444 /certs/server.crt     && chmod 500 /fixture/entrypoint.sh     && if [ "1" = "1" ]; then       /opt/mssql/bin/mssql-conf set network.tlscert /certs/server.crt       && /opt/mssql/bin/mssql-conf set network.tlskey /certs/server.key       && /opt/mssql/bin/mssql-conf set network.forceencryption 1;     fi
+#46 0.629 SQL Server needs to be restarted in order to apply this setting. Please run
+#46 0.629 'systemctl restart mssql-server.service'.
+#46 0.629 Note that sp_reload_mssqlconf can be used to apply a limited subset of settings without restarting the service.
+#46 0.723 SQL Server needs to be restarted in order to apply this setting. Please run
+#46 0.723 'systemctl restart mssql-server.service'.
+#46 0.723 Note that sp_reload_mssqlconf can be used to apply a limited subset of settings without restarting the service.
+#46 0.867 SQL Server needs to be restarted in order to apply this setting. Please run
+#46 0.867 'systemctl restart mssql-server.service'.
+#46 0.867 Note that sp_reload_mssqlconf can be used to apply a limited subset of settings without restarting the service.
+#46 DONE 1.1s
+
+#51 [mssql-ssh] exporting to image
+#51 ...
+
+#47 [mongo] exporting to image
+#47 unpacking to docker.io/library/tablepro-driver-tls-mongo:latest 0.5s done
+#47 DONE 1.5s
+
+#52 [mysql-mtls-ssh] exporting to image
+#52 exporting layers 0.7s done
+#52 exporting manifest sha256:03ac5be7ac73fd63439367510232f5ebd9b6d33b715c73e54fce464b2a2839fc 0.1s done
+#52 exporting config sha256:65f95399ed2c4cf053bcbb0ff35995eba03c945688569d1ea3db2b2c5c0cae85 0.1s done
+#52 exporting attestation manifest sha256:7dcb88d78e5ce83979c9028d825209fb4a9535f6ae6eac743d5756923a53db32 0.1s done
+#52 exporting manifest list sha256:86eca5e0a04d50998c5a3630f98f0378e211ca6918f8a227a9c04e5e087402bc 0.1s done
+#52 naming to docker.io/library/tablepro-driver-tls-mysql-mtls-ssh:latest 0.0s done
+#52 unpacking to docker.io/library/tablepro-driver-tls-mysql-mtls-ssh:latest
+#52 ...
+
+#53 [redis] exporting to image
+#53 exporting layers 0.7s done
+#53 exporting manifest sha256:4e9b64837bb2e62bfa0689ff1a8742c8cffc4e21f3655293d6956ec454f59f00 0.1s done
+#53 exporting config sha256:70d83efcff47e5347d88d7a9d4f5b0ad0816615dfe90ca4b71ca6e59987bd945 0.1s done
+#53 exporting attestation manifest sha256:e1d26ed3223dc389fd5be16adf324185ea53ba0d3b8043326d1f26389f4311d8 0.1s done
+#53 exporting manifest list sha256:42a8b7678e466856ecdc666e3bb57b03af9ee52084f0901840ab06110a820fc4 0.1s done
+#53 naming to docker.io/library/tablepro-driver-tls-redis:latest 0.0s done
+#53 unpacking to docker.io/library/tablepro-driver-tls-redis:latest 0.4s done
+#53 DONE 1.8s
+
+#52 [mysql-mtls-ssh] exporting to image
+#52 unpacking to docker.io/library/tablepro-driver-tls-mysql-mtls-ssh:latest 0.4s done
+#52 DONE 1.8s
+
+#54 [mysql-mtls] exporting to image
+#54 exporting layers 0.7s done
+#54 exporting manifest sha256:36fc4d28ab1adaa6b64f2d95e8c51c3ba84a5a95e9a49c0f88fa52b889e6015c 0.1s done
+#54 exporting config sha256:f8901d5b262d8be377f7d35c6fc4b606abff195f69c0de15ee1f36cb0f2a6956 0.1s done
+#54 exporting attestation manifest sha256:d6fd46330c10182a87ca3a5a9828a705484e97deb3f00cd83fff2b85716ce702 0.1s done
+#54 exporting manifest list sha256:edb6f4b642348f201bdfcd0788fe132d5f894b8a8317112a980c99c789ff396d 0.1s done
+#54 naming to docker.io/library/tablepro-driver-tls-mysql-mtls:latest 0.0s done
+#54 unpacking to docker.io/library/tablepro-driver-tls-mysql-mtls:latest 0.4s done
+#54 DONE 1.8s
+
+#55 [mysql-ssh] exporting to image
+#55 exporting layers 0.7s done
+#55 exporting manifest sha256:e55b75a8b8e52ba180541b279d75d32a7b6bbac5548c0211f7df035c9d3a6e61 0.1s done
+#55 exporting config sha256:a83a68973c680d4aab9659376aebc02e88b8678c85eb1dd6dbe108c2545f759b 0.1s done
+#55 exporting attestation manifest sha256:14dbef19d4e3aa5773926f857709aaae7393b637d523ef7cf3dcddc60b2bcbb7 0.1s done
+#55 exporting manifest list sha256:2301b567338e8eff7cc75cb01e3f1a3141eb8350c0396251ac74b6d4f69b9fb1 0.1s done
+#55 naming to docker.io/library/tablepro-driver-tls-mysql-ssh:latest 0.0s done
+#55 unpacking to docker.io/library/tablepro-driver-tls-mysql-ssh:latest 0.4s done
+#55 DONE 1.8s
+
+#56 [mysql] exporting to image
+#56 exporting layers 0.7s done
+#56 exporting manifest sha256:18cff6d4c37db76673ce5b501e1118d41a4c757a36380abcd81f1458a9a75385 0.1s done
+#56 exporting config sha256:3873e598137cf09f1510ed5c7a22c64705eb1d2d6aafde1a6aba98460c6188ef 0.1s done
+#56 exporting attestation manifest sha256:de33b1d8f9d41649d8c767b5c7edd838dfc23832c589e0779cf817c2b2fd510d 0.1s done
+#56 exporting manifest list sha256:a200ab4be6c649ce5b18bc4ad456e8c0881a4bda85228a74f1734fb5b0f2ce8d 0.1s done
+#56 naming to docker.io/library/tablepro-driver-tls-mysql:latest 0.0s done
+#56 unpacking to docker.io/library/tablepro-driver-tls-mysql:latest 0.4s done
+#56 DONE 1.8s
+
+#57 [mongo] resolving provenance for metadata file
+#57 DONE 0.0s
+
+#51 [mssql-ssh] exporting to image
+#51 exporting layers 0.5s done
+#51 exporting manifest sha256:74024c1ace4e2d9154bfd9d5a87350a7e3e7da335b87014bce3dd48d13f90e2c 0.1s done
+#51 exporting config sha256:4f4b7ceb60ba0387b1b163ef4a768c55a831a8edb7a4c6f38557127d0c655bc7 0.1s done
+#51 exporting attestation manifest sha256:647be742f1e09ae86425b8dcdeef4b239f5168006fa8c02d310b8cdf7cd38e5e 0.1s done
+#51 exporting manifest list sha256:dbc7bec12ccab7cc9f57c4c027b2773c3f785df7b3a8478a54ecf3f67a34b874 0.1s done
+#51 naming to docker.io/library/tablepro-driver-tls-mssql-ssh:latest 0.0s done
+#51 unpacking to docker.io/library/tablepro-driver-tls-mssql-ssh:latest
+#51 unpacking to docker.io/library/tablepro-driver-tls-mssql-ssh:latest 0.3s done
+#51 DONE 1.2s
+
+#58 [mssql] exporting to image
+#58 exporting layers 0.5s done
+#58 exporting manifest sha256:fcf03e67a8eac1af42251a75a73cc0eb93519fac88684fa2ea6c4e486ef489a9 0.1s done
+#58 exporting config sha256:dc88f610724e50fe36908b9d2c9584fe13cd83f32145bf59d8dff89cec7c4a0b 0.1s done
+#58 exporting attestation manifest sha256:10f5633709476b41e19c1acc3f3ff3efaf07f95cee89b142d3f8b5245e853dc7 0.1s done
+#58 exporting manifest list sha256:37b4ce2f22ee909eb0834e62f07393143001f0e59c9824ebff88b69672c8ec43 0.1s done
+#58 naming to docker.io/library/tablepro-driver-tls-mssql:latest 0.0s done
+#58 unpacking to docker.io/library/tablepro-driver-tls-mssql:latest 0.3s done
+#58 DONE 1.2s
+
+#59 [mssql-plain] exporting to image
+#59 exporting layers 0.9s done
+#59 exporting manifest sha256:7f0ac3c927e09311ecdfd2017a4ee228791181844196dfc93ae6cac5894aa6d9 0.1s done
+#59 exporting config sha256:6e48afc4c7d0596fbd14eac8934a7738188eb07c7c3f21990662bae778c29795 0.1s done
+#59 exporting attestation manifest sha256:2875d93b443b215d3bb395f86d17f253ca9a49807ae35a2c76169d7ff5c314a0 0.1s done
+#59 exporting manifest list sha256:e56a82bd674f3d881b792fa2e8e9abbab3fc2fdc45e432cdfacc854ee2f6223f 0.1s done
+#59 naming to docker.io/library/tablepro-driver-tls-mssql-plain:latest 0.0s done
+#59 unpacking to docker.io/library/tablepro-driver-tls-mssql-plain:latest 0.5s done
+#59 DONE 1.7s
+
+#60 [clickhouse] exporting to image
+#60 exporting layers 0.9s done
+#60 exporting manifest sha256:bcd944fb54739d7c325c5b639c7e2d6c67dcbdc6a0e5680d6cb85d7cf1ba78f7 0.1s done
+#60 exporting config sha256:6794fb351211b5122ffd446ebed0af92c0d1378eeeb515df0e71359df6cb5422 0.1s done
+#60 exporting attestation manifest sha256:86c5d6e4e419bd2e44b1d2f3ac5b3d38122070f947ee3951b4138410d57b0dda 0.1s done
+#60 exporting manifest list sha256:bbdcd147cc0329c2f380f67bb5f279ff0860b0ae26c612ff682b000acbd9a8d1 0.1s done
+#60 naming to docker.io/library/tablepro-driver-tls-clickhouse:latest 0.0s done
+#60 unpacking to docker.io/library/tablepro-driver-tls-clickhouse:latest 0.5s done
+#60 DONE 1.7s
+
+#61 [ssh-bastion] exporting to image
+#61 exporting layers 0.8s done
+#61 exporting manifest sha256:6acb8d60fc16d993b45773dfffb102225b1f098c95f0c57217859bfe52946d51 0.0s done
+#61 exporting config sha256:84b14258f8f610592501f247d6f0e33aa2ab2e55cf38ba5419a6a191ca77d349 0.1s done
+#61 exporting attestation manifest sha256:89c22635c7c12128047d27e3fa104efe360af17083954812a7569b94a0775bb0 0.1s done
+#61 exporting manifest list sha256:aca7fd03852bbaf846008665a1797caee5b287c11ff172c8fc660c28d1f10f6f 0.0s done
+#61 naming to docker.io/library/tablepro-driver-tls-ssh-bastion:latest 0.0s done
+#61 unpacking to docker.io/library/tablepro-driver-tls-ssh-bastion:latest 0.2s done
+#61 DONE 1.3s
+
+#62 [redis] resolving provenance for metadata file
+#62 DONE 0.5s
+
+#63 [ssh-bastion] resolving provenance for metadata file
+#63 DONE 0.1s
+
+#64 [mssql-plain] resolving provenance for metadata file
+#64 DONE 0.2s
+
+#65 [mysql-ssh] resolving provenance for metadata file
+#65 DONE 0.4s
+
+#66 [mssql-ssh] resolving provenance for metadata file
+#66 DONE 0.1s
+
+#67 [mysql] resolving provenance for metadata file
+#67 DONE 0.3s
+
+#68 [mysql-mtls-ssh] resolving provenance for metadata file
+#68 DONE 0.2s
+
+#69 [mssql] resolving provenance for metadata file
+#69 DONE 0.1s
+
+#70 [mysql-mtls] resolving provenance for metadata file
+#70 DONE 0.3s
+
+#71 [clickhouse] resolving provenance for metadata file
+#71 DONE 0.0s
+ Image tablepro-driver-tls-redis Built 
+ Image tablepro-driver-tls-ssh-bastion Built 
+ Image tablepro-driver-tls-mysql-ssh Built 
+ Image tablepro-driver-tls-clickhouse Built 
+ Image tablepro-driver-tls-mysql Built 
+ Image tablepro-driver-tls-mssql-plain Built 
+ Image tablepro-driver-tls-mssql Built 
+ Image tablepro-driver-tls-mongo Built 
+ Image tablepro-driver-tls-mysql-mtls-ssh Built 
+ Image tablepro-driver-tls-mssql-ssh Built 
+ Image tablepro-driver-tls-mysql-mtls Built 
+ Network tablepro-driver-tls_fixture Creating 
+ Network tablepro-driver-tls_fixture Creating 
+ Network tablepro-driver-tls_fixture Created 
+ Network tablepro-driver-tls_fixture Created 
+ Container tablepro-driver-tls-mongo-1 Creating 
+ Container tablepro-driver-tls-mysql-1 Creating 
+ Container tablepro-driver-tls-redis-1 Creating 
+ Container tablepro-driver-tls-mysql-plain-1 Creating 
+ Container tablepro-driver-tls-mssql-1 Creating 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Creating 
+ Container tablepro-driver-tls-mysql-mtls-1 Creating 
+ Container tablepro-driver-tls-ssh-bastion-1 Creating 
+ Container tablepro-driver-tls-clickhouse-1 Creating 
+ Container tablepro-driver-tls-mysql-ssh-1 Creating 
+ Container tablepro-driver-tls-redis-plain-1 Creating 
+ Container tablepro-driver-tls-clickhouse-plain-1 Creating 
+ Container tablepro-driver-tls-mongo-plain-1 Creating 
+ Container tablepro-driver-tls-mssql-ssh-1 Creating 
+ Container tablepro-driver-tls-mssql-plain-1 Creating 
+ Container tablepro-driver-tls-mssql-ssh-1 Created 
+ Container tablepro-driver-tls-ssh-bastion-1 Created 
+ Container tablepro-driver-tls-redis-1 Created 
+ Container tablepro-driver-tls-mssql-plain-1 Created 
+ Container tablepro-driver-tls-clickhouse-plain-1 Created 
+ Container tablepro-driver-tls-mssql-1 Created 
+ Container tablepro-driver-tls-mongo-1 Created 
+ Container tablepro-driver-tls-mysql-ssh-1 Created 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Created 
+ Container tablepro-driver-tls-clickhouse-1 Created 
+ Container tablepro-driver-tls-mysql-plain-1 Created 
+ Container tablepro-driver-tls-mysql-mtls-1 Created 
+ Container tablepro-driver-tls-mysql-1 Created 
+ Container tablepro-driver-tls-redis-plain-1 Created 
+ Container tablepro-driver-tls-mongo-plain-1 Created 
+ Container tablepro-driver-tls-mysql-ssh-1 Starting 
+ Container tablepro-driver-tls-clickhouse-plain-1 Starting 
+ Container tablepro-driver-tls-mongo-plain-1 Starting 
+ Container tablepro-driver-tls-mysql-plain-1 Starting 
+ Container tablepro-driver-tls-ssh-bastion-1 Starting 
+ Container tablepro-driver-tls-clickhouse-1 Starting 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Starting 
+ Container tablepro-driver-tls-redis-plain-1 Starting 
+ Container tablepro-driver-tls-mysql-mtls-1 Starting 
+ Container tablepro-driver-tls-redis-1 Starting 
+ Container tablepro-driver-tls-mongo-1 Starting 
+ Container tablepro-driver-tls-mssql-1 Starting 
+ Container tablepro-driver-tls-mysql-1 Starting 
+ Container tablepro-driver-tls-mssql-plain-1 Starting 
+ Container tablepro-driver-tls-mssql-ssh-1 Starting 
+ Container tablepro-driver-tls-mysql-ssh-1 Started 
+ Container tablepro-driver-tls-clickhouse-plain-1 Started 
+ Container tablepro-driver-tls-mongo-plain-1 Started 
+ Container tablepro-driver-tls-mysql-plain-1 Started 
+ Container tablepro-driver-tls-ssh-bastion-1 Started 
+ Container tablepro-driver-tls-clickhouse-1 Started 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Started 
+ Container tablepro-driver-tls-redis-plain-1 Started 
+ Container tablepro-driver-tls-mysql-mtls-1 Started 
+ Container tablepro-driver-tls-redis-1 Started 
+ Container tablepro-driver-tls-mongo-1 Started 
+ Container tablepro-driver-tls-mssql-1 Started 
+ Container tablepro-driver-tls-mysql-1 Started 
+ Container tablepro-driver-tls-mssql-plain-1 Started 
+ Container tablepro-driver-tls-mssql-ssh-1 Started 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Waiting 
+ Container tablepro-driver-tls-redis-1 Waiting 
+ Container tablepro-driver-tls-clickhouse-1 Waiting 
+ Container tablepro-driver-tls-ssh-bastion-1 Waiting 
+ Container tablepro-driver-tls-redis-plain-1 Waiting 
+ Container tablepro-driver-tls-mysql-mtls-1 Waiting 
+ Container tablepro-driver-tls-mongo-1 Waiting 
+ Container tablepro-driver-tls-mysql-ssh-1 Waiting 
+ Container tablepro-driver-tls-mssql-plain-1 Waiting 
+ Container tablepro-driver-tls-clickhouse-plain-1 Waiting 
+ Container tablepro-driver-tls-mssql-1 Waiting 
+ Container tablepro-driver-tls-mongo-plain-1 Waiting 
+ Container tablepro-driver-tls-mysql-plain-1 Waiting 
+ Container tablepro-driver-tls-mssql-ssh-1 Waiting 
+ Container tablepro-driver-tls-mysql-1 Waiting 
+ Container tablepro-driver-tls-ssh-bastion-1 Healthy 
+ Container tablepro-driver-tls-redis-plain-1 Healthy 
+ Container tablepro-driver-tls-redis-1 Healthy 
+ Container tablepro-driver-tls-clickhouse-plain-1 Healthy 
+ Container tablepro-driver-tls-clickhouse-1 Healthy 
+ Container tablepro-driver-tls-mongo-plain-1 Healthy 
+ Container tablepro-driver-tls-mongo-1 Healthy 
+ Container tablepro-driver-tls-mysql-mtls-1 Healthy 
+ Container tablepro-driver-tls-mssql-1 Healthy 
+ Container tablepro-driver-tls-mssql-plain-1 Healthy 
+ Container tablepro-driver-tls-mysql-ssh-1 Healthy 
+ Container tablepro-driver-tls-mysql-plain-1 Healthy 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Healthy 
+ Container tablepro-driver-tls-mysql-1 Healthy 
+ Container tablepro-driver-tls-mssql-ssh-1 Healthy 
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.65s
+     Running unittests src/lib.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/tablepro_driver_tls_tests-f9f8d6343a417a65)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/clickhouse_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/clickhouse_tls-ebb54f91badc45e6)
+
+running 6 tests
+test a_plaintext_mode_does_not_reach_the_https_port ... ok
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test a_verifying_mode_without_an_authority_is_refused ... ok
+test an_encrypt_only_mode_connects_without_an_authority ... ok
+test verify_full_rejects_an_ip_endpoint_absent_from_the_certificate ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/mongodb_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/mongodb_tls-36276e8ff927b11c)
+
+running 5 tests
+test a_plaintext_mode_is_refused_by_a_tls_only_server ... ok
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test a_verifying_mode_without_an_authority_is_refused ... ok
+test verifying_modes_reject_an_ip_endpoint_absent_from_the_certificate ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.18s
+
+     Running tests/mssql_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/mssql_tls-ef8a99d37636eebe)
+
+running 9 tests
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test an_encrypt_only_mode_connects_without_an_authority ... ok
+test the_server_forces_encryption_and_dropping_tunnel_closes_forward ... ok
+test verify_ca_accepts_the_fixture_authority ... ok
+test verify_full_rejects_an_ip_endpoint_absent_from_the_certificate ... ok
+test verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query ... ok
+test verify_full_through_ssh_rejects_a_wrong_or_local_identity ... ok
+test verify_full_through_ssh_rejects_an_untrusted_authority ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+     Running tests/mysql_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/mysql_tls-61de4dadf1bb9933)
+
+running 16 tests
+test a_plaintext_mode_is_refused_by_a_tls_only_server ... ok
+test a_rotated_valid_client_identity_connects ... ok
+test a_server_requiring_a_client_certificate_accepts_a_valid_identity ... ok
+test a_server_requiring_a_client_certificate_accepts_the_identity_through_ssh ... ok
+test a_server_requiring_a_client_certificate_rejects_a_missing_identity ... ok
+test a_server_requiring_a_client_certificate_rejects_an_untrusted_identity ... ok
+test a_tls_rejection_does_not_fall_back_to_plaintext_and_dropping_tunnel_cleans_up ... ok
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test a_verifying_mode_without_an_authority_is_refused ... ok
+test an_encrypt_only_mode_connects_without_an_authority ... ok
+test verify_ca_accepts_the_fixture_authority ... ok
+test verify_full_rejects_an_ip_endpoint_absent_from_the_certificate ... ok
+test verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query ... ok
+test verify_full_through_ssh_rejects_a_wrong_or_local_identity ... ok
+test verify_full_through_ssh_rejects_an_untrusted_authority ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.74s
+
+     Running tests/plaintext_regression.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/plaintext_regression-a7702fdf9272f350)
+
+running 7 tests
+test a_verifying_clickhouse_client_will_not_fall_back_to_plaintext ... ok
+test a_verifying_mongodb_client_will_not_fall_back_to_plaintext ... ok
+test a_verifying_mssql_client_will_not_fall_back_to_plaintext ... ok
+test a_verifying_mysql_client_will_not_fall_back_to_plaintext ... ok
+test a_verifying_redis_client_will_not_fall_back_to_plaintext ... ok
+test mongodb_still_connects_to_a_server_without_encryption ... ok
+test redis_still_connects_to_a_server_without_encryption ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.17s
+
+     Running tests/redis_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/redis_tls-0838f6aa7fb163d3)
+
+running 5 tests
+test a_plaintext_mode_is_refused_by_a_tls_only_server ... ok
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test a_verifying_mode_without_an_authority_is_refused ... ok
+test verifying_modes_reject_an_ip_endpoint_absent_from_the_certificate ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
