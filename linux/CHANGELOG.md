@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Evidence validation now accepts wrapper-script runs that list multiple test
+  names and manifests that pair one source digest with `source_file`.
 - Redis now has a Docker-backed lost-ack contract: a committed Lua write with
   its reply dropped returns `Disconnected`, reconnects for a later read, and
   leaves both target and independent audit keys at one execution.
