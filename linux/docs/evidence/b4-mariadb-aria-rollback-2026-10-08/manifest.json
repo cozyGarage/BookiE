@@ -2,44 +2,47 @@
   "schema_version": 1,
   "date": "2026-10-08",
   "branch": "b4/mysql-aria-rollback",
-  "test_commit": "1f2b047bbba83c59698889798611ae82b1c50517",
-  "source_base": "0bb8e34354d13e3ab9911b9db710eddb02115170",
+  "test_commit": "5211e6a33187c4e4499fe192399361e063d1c852",
+  "source_base": "30f9d379ed90939124d03323537e4febd07493d8",
   "scope": [
     "B4-11 MariaDB Aria nontransactional side effects",
     "B4-12 PostgreSQL backend-termination rollback failure"
   ],
-  "result": "local B4 rollback layer passed: 12 MySQL atomicity tests and 1 PostgreSQL rollback-failure selector",
+  "result": "local B4 rollback layer passed: 12 MySQL atomicity tests and 1 PostgreSQL rollback-failure selector; the Aria test also proves an Aria AFTER INSERT trigger side effect survives while the InnoDB parent row rolls back",
   "mariadb_aria": {
     "container_tag": "mariadb:11",
     "observed_version": "11.8.9-MariaDB-ubu2404",
     "table_engine": "Aria",
     "table_option": "TRANSACTIONAL=0",
     "verified_effects": [
-      "INSERT",
-      "UPDATE",
-      "DELETE"
+      "direct INSERT",
+      "direct UPDATE",
+      "direct DELETE",
+      "AFTER INSERT trigger write to Aria while the InnoDB parent transaction rolls back"
     ],
     "failure": "duplicate-key statement at index 1",
-    "test": "mariadb_aria_nontransactional_effects_survive_failed_batches"
+    "test": "mariadb_aria_nontransactional_effects_survive_failed_batches",
+    "trigger_result": "InnoDB parent rows after failed batch: [1]; Aria trigger side effects after failed batch: [1, 2]"
   },
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37776917323,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37776917323",
-    "source_commit": "9961e60da9ca58ea62533242c31a5caa39c1e17f",
+    "run_id": 37777911341,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37777911341",
+    "source_commit": "30f9d379ed90939124d03323537e4febd07493d8",
     "status": "pending",
     "conclusion": null,
-    "note": "Current target run has no jobs started; it includes the Aria regression and PostgreSQL rollback selector."
+    "note": "This target run predates follow-up test commit 5211e6a and is pending; hosted acceptance for the trigger regression remains open."
   },
-  "local_report": "/tmp/bookie-b4-aria/linux/target/quality/20261008T120021537624Z-layers/report.json",
+  "local_report": "/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
   "summary": {
     "path": "focused.txt",
-    "sha256": "b4878ffcc5c2b605a9f32c098e03e6ecd79846f18a8928a19d69ed1731222e63"
+    "sha256": "8eef59cfa9ae3aaf840ede3a0bcb9b0907879d2be33f3ef5a9657acfdcd4b35f"
   },
   "not_established": [
-    "Hosted acceptance on this test commit",
+    "Hosted acceptance on the follow-up test commit",
     "Other optional/vendor MySQL-family engines and side-effect patterns",
     "Windows Active Directory interoperability",
     "Installed distribution package and native Wayland flows"
-  ]
+  ],
+  "local_evidence_note": "The layer report was generated from base commit 9961e60 with the Aria trigger test as the sole tracked source modification (SHA-256 3cf8fafd527ddd7f151aea7f40741a6c7095f0ed97da92960c972fe3c897566c); that exact test is committed as 5211e6a."
 }

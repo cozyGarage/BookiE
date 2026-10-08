@@ -1,23 +1,23 @@
 BookiE B4-11 and B4-12 rollback extension, 2026-10-08
 
-Test commit: `1f2b047bbba83c59698889798611ae82b1c50517`.
+Follow-up test commit: `5211e6a33187c4e4499fe192399361e063d1c852` on BookiE `fork/linux` base `30f9d379ed90939124d03323537e4febd07493d8`.
 
 `mariadb_aria_nontransactional_effects_survive_failed_batches` passed against
-MariaDB 11.8.9 using the `mariadb:11` test fixture. It creates an Aria table
-with `TRANSACTIONAL=0`, then verifies that direct INSERT, UPDATE and DELETE
-effects remain after a later duplicate-key statement fails and the driver
-attempts rollback. Each failure identifies statement index 1.
+MariaDB 11.8.9 using the `mariadb:11` test fixture. It verifies direct Aria
+`TRANSACTIONAL=0` INSERT, UPDATE and DELETE effects after a later duplicate-key
+statement fails. It also creates an InnoDB parent and an Aria side-effect table,
+then verifies that a failed batch rolls the parent rows back to `[1]` while the
+Aria `AFTER INSERT` trigger effects remain `[1, 2]`. The failure is statement
+index 1.
 
 The full local B4 rollback layer passed:
-- MySQL atomicity selector: 12 passed, 0 failed, including the new Aria case.
+- MySQL atomicity selector: 12 passed, 0 failed, including the direct and trigger Aria coverage.
 - PostgreSQL backend-termination rollback-failure selector: 1 passed, 0 failed.
 
 Commands:
 - `CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 cargo test --locked -p tablepro-driver-mysql --test integration mariadb_aria_nontransactional_effects_survive_failed_batches -- --include-ignored --test-threads=1`
 - `CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 python3 scripts/run-test-layer.py b4-rollback`
 
-Layer report: `/tmp/bookie-b4-aria/linux/target/quality/20261008T120021537624Z-layers/report.json`.
-The report records both layer steps as passed. The current hosted target run
-#37776917323 is pending with no jobs started, so hosted frozen-candidate
-acceptance remains open. Windows AD, installed package/native Wayland, and the
-remaining optional/vendor engine coverage are not established by this run.
+Layer report: `/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json`. It was generated from base `9961e60` with the Aria test as its sole tracked source modification; the exact tested test change is commit `5211e6a`.
+
+Current target Build Linux run [#37777911341](https://github.com/cozyGarage/BookiE/actions/runs/37777911341) is pending on `30f9d37` and predates follow-up commit `5211e6a`; hosted acceptance for this trigger regression remains open. Flatpak [#37777911507](https://github.com/cozyGarage/BookiE/actions/runs/37777911507) is in progress; Linux CI contracts [#37777911374](https://github.com/cozyGarage/BookiE/actions/runs/37777911374) and Linux Security [#37777911360](https://github.com/cozyGarage/BookiE/actions/runs/37777911360) passed on the same target. Windows AD, installed package/native Wayland, and optional/vendor engine coverage remain unestablished.
