@@ -102,25 +102,36 @@ and rerun for any later source tip.
 
 The hosted Build Linux run for `8e5d1b18` was
 [cancelled](https://github.com/cozyGarage/BookiE/actions/runs/37723088254) as
-`linux` advanced. PR #315 moved the branch to `2865860e`. At the latest check,
-Linux Security passed ([#37726420646](https://github.com/cozyGarage/BookiE/actions/runs/37726420646)),
-Build Linux is queued ([#37726420652](https://github.com/cozyGarage/BookiE/actions/runs/37726420652)),
-and Flatpak is running ([#37726420626](https://github.com/cozyGarage/BookiE/actions/runs/37726420626)).
+`linux` advanced. PRs #316–#318 then moved `linux` to `abd81f5e`. At the
+2026-10-08 check, Linux Security passed
+([#37727402518](https://github.com/cozyGarage/BookiE/actions/runs/37727402518));
+Build Linux and Linux test quality were pending
+([#37727402580](https://github.com/cozyGarage/BookiE/actions/runs/37727402580),
+[#37727402604](https://github.com/cozyGarage/BookiE/actions/runs/37727402604));
+the default Flatpak build was in progress and the development build passed
+([#37727402559](https://github.com/cozyGarage/BookiE/actions/runs/37727402559)).
 PR #312 skipped its B4 rollback job because it only changed MongoDB tests. The
 focused `b4-rollback` layer passed locally on documentation-only commit
 `73f8ce935`; the tested source files match `684ea40f`. See the [PR #314 evidence
 comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
-These checks do not establish hosted B4 acceptance. The completed local GTK
-runs use a staged release binary under Xvfb, not a distribution package
-installed on the target Wayland desktop.
+Those results do not establish hosted acceptance on a selected frozen
+candidate. GTK runs using a staged release binary under Xvfb do not establish
+distribution-package installation or native Wayland acceptance.
+A combined local B4 run on clean source `98134709` passed rollback, security
+policy, SSH, PostgreSQL release, SQL Server Kerberos and GTK safety. Its TLS
+layer failed four MongoDB TLS cases with `ConnectionRefused` while the
+ClickHouse TLS cases passed; a focused MongoDB fixture rerun is still needed
+before classifying this as transient fixture behavior or a regression.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-9, B4-16, B4-22 | Local candidate layers passed on `7eff6f26`; obtain hosted acceptance for the selected frozen SHA and installed package acceptance | Build Linux on current tip `2865860e` is queued. Installed acceptance means a distribution package on the target desktop; Xvfb with a staged binary does not satisfy it |
-| B4-12 | Backend-termination rollback-failure selector passed on frozen candidate `7eea6f09`, hosted run `37708183936`, and the source-pinned rerun on `684ea40f`; see the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028) | The current hosted Build Linux run has not reached a B4-specific result; repeat on the final frozen candidate |
-| B4-11 | The nine-test MySQL atomicity group passed on source `684ea40f`; see the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028) | Existing scope covers InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, failed INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT and a trigger session-variable effect; untested engines and side effects remain open |
-| B4-17 | Native SSH and GTK trust/query, second-hop decline and changed-key refusal passed on `7eff6f26`; see the [PR #310 evidence comments](https://github.com/cozyGarage/BookiE/pull/310#issuecomment-6051740646) | Hosted execution of these exact GTK flows and distribution-package/native Wayland trust acceptance remain open |
-| B4-21 | Local Samba Kerberos+TLS fixture passed on `7eff6f26`; retain the separate hosted TLS evidence | Windows AD interoperability is still unverified; Samba AD is not equivalent to Windows AD |
+| B4-7, B4-16 | Re-run affected layers on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | On `abd81f5e`, Security passed; Build Linux and Linux test quality were pending; default Flatpak was in progress. All three acceptance gates remain open |
+| B4-9 | Re-run the TLS matrix on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | The local combined run on `98134709` failed four MongoDB TLS cases with `ConnectionRefused`; ClickHouse TLS passed. Focused MongoDB fixture rerun is pending, so cause remains undetermined |
+| B4-22 | Run GTK export/import audit and encrypted credential round-trip on the selected frozen SHA; confirm hosted result and installed-package/native Wayland acceptance | Prior local and hosted GTK results are SHA-scoped; later hosted run on `8e5d1b18` was cancelled |
+| B4-12 | Repeat `a_batch_reports_rollback_failure_after_postgres_terminates_its_backend` on the selected frozen candidate and retain exact SHA/results | Prior frozen-candidate and hosted results remain historical; next candidate acceptance is open |
+| B4-11 | Extend failed-batch tests to the additional MySQL storage engines and side-effect patterns requested | Existing nine-test scope covers InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, failed INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT and one trigger session-variable effect; untested engines/effects remain open |
+| B4-17 | Reuse the existing `ssh-gtk-*` evidence for GTK trust prompts on both hops, routed query, second-hop decline without learning, changed-key refusal and terminal audit outcomes; run selected-candidate/hosted acceptance and installed-package/native Wayland trust flow | Existing manifests run staged release binaries under Xvfb/AT-SPI, not a distribution-package installation. Hosted flows exist for earlier SHA `a056bf1`; installed trust acceptance remains open |
+| B4-21 | Preserve Samba Kerberos+VerifyFull TLS proof, then perform Windows AD interoperability and candidate acceptance | Samba AD does not establish Windows AD interoperability; both Windows AD and selected-candidate acceptance remain open |
 | UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | Proposal only; implementation and acceptance are open |
 
 ## Remaining tasks
