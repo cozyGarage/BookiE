@@ -137,21 +137,24 @@ owners; do not create a second completion cache, exporter or type policy.
 
 ## B4 acceptance worklist (2026-10-08)
 
-This is the next acceptance slice on current `linux` tip `32b170f`. Prior runs
-remain useful evidence for their exact SHAs, but do not substitute for current
-frozen-candidate, hosted or installed acceptance where required. The SSH GTK
-artifacts below prove staged release-binary behavior under Xvfb/AT-SPI; they do
-not prove a distribution-package installation or native Wayland session.
+This is the next acceptance slice on current `fork/linux` tip `896f1b3`.
+Build Linux #37797466945 completed successfully on `c3122d9`, including B4
+rollback, PostgreSQL release, driver TLS, driver/SSH integration, installed GTK
+safety smoke and the regression gate. Build Linux #37806196821 is running on
+`896f1b3`; preflight passed and the B4 rollback, PostgreSQL release, TLS, GTK and optional DuckDB jobs are running. These hosted results do
+not substitute for exact frozen-candidate or native Wayland acceptance. The SSH
+GTK artifacts below prove staged release-binary behavior under Xvfb/AT-SPI; they
+do not prove a distribution-package installation or native Wayland session.
 
 | Item | Current evidence and action |
 | --- | --- |
-| B4-7, B4-16 | Keep UNVERIFIED. Run affected layers on the selected frozen candidate, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance. Post-merge Build Linux run `37743149992` on `32b170f` was cancelled; the B4 rollback job has not started. |
-| B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Repeat on the selected frozen SHA, confirm hosted results, and complete installed-package/native Wayland acceptance. |
-| B4-22 | Keep UNVERIFIED. The GTK bundle export/import and encrypted credential round-trip have local and earlier hosted evidence; obtain acceptance on the selected frozen candidate, hosted SHA, and installed package/native Wayland. |
-| B4-12 | The focused PostgreSQL backend-termination case passed again on frozen candidate `7eea6f09d7154f03400e82cec7c16215488b2115`; see the [PR discussion](https://github.com/cozyGarage/BookiE/pull/350#issuecomment-6054276678). Exact-candidate hosted coverage and a rerun on any next selected candidate remain open. |
-| B4-11 | [PR #337](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536) covers direct failed-batch INSERTs on InnoDB, MyISAM, MEMORY, CSV and ARCHIVE. [PR #353](https://github.com/cozyGarage/BookiE/pull/353) adds direct UPDATE and DELETE coverage on InnoDB, MyISAM, MEMORY and CSV. The local rollback layer passed; other storage engines and additional side-effect patterns remain open. |
-| B4-17 | Reconcile existing `ssh-gtk-*` artifacts before rerunning: they already show both-hop trust prompts, routed query, second-hop decline without learning, changed-key refusal, and terminal audit outcomes. They use staged release binaries under Xvfb/AT-SPI. Close only after selected-candidate/hosted evidence and the required installed-package/native Wayland trust flow. |
-| B4-21 | Keep Windows AD interoperability open. Samba AD Kerberos+TLS fixtures are useful local coverage but do not establish interoperability with Windows AD; candidate acceptance is also outstanding. |
+| B4-7, B4-16 | Keep UNVERIFIED. Local SSH/GTK trust, audit and tunnel-loss scenarios passed on `c3122d9`; Build Linux #37797466945 completed on that SHA, including the PostgreSQL release fixture and driver/SSH integration. Frozen-candidate and installed-package/native Wayland acceptance remain open. |
+| B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). Hosted Driver TLS passed on `c3122d9` in successful Build Linux run #37797466945. The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Frozen-candidate and installed-package/native Wayland acceptance remain open. |
+| B4-22 | Keep UNVERIFIED. Five bundle/export GTK scenarios passed locally with a staged `a7f14fa` binary. Build Linux #37797466945 passed a generic installed GTK safety smoke on `c3122d9`, not the bundle flow. Obtain frozen-candidate bundle acceptance and installed-package/native Wayland evidence. |
+| B4-12 | The focused PostgreSQL backend-termination case passed locally on candidate `a7f14fa` and in hosted B4 rollback job 113398752913 on `c3122d9` in Build Linux #37797466945. Hosted evidence is not on the selected candidate SHA; frozen-candidate rollback acceptance remains open. |
+| B4-11 | Existing direct failed-batch coverage includes INSERTs on InnoDB, MyISAM, MEMORY, CSV and ARCHIVE ([PR #337](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536)); UPDATE and DELETE on InnoDB, MyISAM, MEMORY and CSV ([PR #353](https://github.com/cozyGarage/BookiE/pull/353)); and the added Aria direct DML and trigger side effect. The 12-case local selector and hosted B4 rollback job passed on `c3122d9`; other engines and additional side effects remain open. |
+| B4-17 | Existing `ssh-gtk-*` artifacts show both-hop trust prompts, routed query, second-hop decline without learning, changed-key refusal and terminal audit outcomes using staged release binaries under Xvfb/AT-SPI. Build Linux #37797466945 passed the PostgreSQL release and driver/SSH integration jobs on `c3122d9`; the installed GTK safety smoke is not native SSH trust acceptance. Close only after selected-candidate and installed-package/native Wayland trust flow. |
+| B4-21 | Keep Windows AD interoperability open. Samba AD Kerberos+TLS fixtures are useful local coverage but do not establish interoperability with Windows AD; candidate and distribution-package acceptance are also outstanding. |
 | UI-1b | Keep refusing edits to saved SSH jump chains. Implement the per-hop secret editor design across persistence, transport identity, bundle compatibility and GTK before enabling chain editing. |
 
 Recheck the remote tip before each candidate run; do not reuse a stale SHA or
