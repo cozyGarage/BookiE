@@ -50,8 +50,8 @@ trap cleanup EXIT
 port="$(docker port "$container" 5432/tcp | head -n1)"
 port="${port##*:}"
 attempt=0
-until docker exec "$container" pg_isready --username=postgres --dbname=bookie_test >/dev/null 2>&1 \
-  && docker exec "$container" psql --username=postgres --dbname=bookie_test --command='SELECT 1' >/dev/null 2>&1; do
+until docker exec "$container" pg_isready --host=127.0.0.1 --username=postgres --dbname=bookie_test >/dev/null 2>&1 \
+  && docker exec "$container" psql --host=127.0.0.1 --username=postgres --dbname=bookie_test --command='SELECT 1' >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   if (( attempt >= 90 )); then
     docker logs "$container" >&2
