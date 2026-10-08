@@ -124,6 +124,30 @@ jobs:
         run: |
           cd src/linux && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
 
+  gtk-ubuntu:
+    runs-on: ubuntu-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-ubuntu-${{ matrix.shard }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Installed GTK end-to-end suite on native Ubuntu 24.04, one third
+        run: |
+          cd src/linux && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
+
   driver:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
