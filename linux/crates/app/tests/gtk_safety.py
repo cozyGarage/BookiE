@@ -41,6 +41,8 @@ POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID = "ee8f8451-05cf-4c21-8c7f-f37c8c96e251
 WAIT_SECONDS = 15
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
+SWITCH_ROLES = tuple(role for role in (getattr(pyatspi, "ROLE_SWITCH", None), pyatspi.ROLE_TOGGLE_BUTTON) if role is not None)
+PASSPHRASE_ROLES = (pyatspi.ROLE_PASSWORD_TEXT, pyatspi.ROLE_TEXT)
 SETTLE_SECONDS = 3.0
 
 
@@ -1270,17 +1272,17 @@ def encrypted_bundle_round_trip_restores_credentials(_database, base):
         choose_import_bundle(bundle_path)
 
     open_import_dialog()
-    wait_for_node(name="Passphrase", role=pyatspi.ROLE_PASSWORD_TEXT)
+    wait_for_node(name="Passphrase", role=PASSPHRASE_ROLES)
     set_text_by_name("Passphrase", "incorrect passphrase")
     invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node_containing("wrong", timeout=WAIT_SECONDS)
     wait_for_node(name="Imported SQLite Review", present=False)
 
-    wait_for_node(name="Passphrase", role=pyatspi.ROLE_PASSWORD_TEXT)
+    wait_for_node(name="Passphrase", role=PASSPHRASE_ROLES)
     set_text_by_name("Passphrase", passphrase)
     invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="Safety SQLite")
-    replace = wait_for_node(name="Replace saved passwords", role=pyatspi.ROLE_SWITCH)
+    replace = wait_for_node(name="Replace saved passwords", role=SWITCH_ROLES)
     assert not replace.getState().contains(pyatspi.STATE_CHECKED), "credential replacement should start disabled"
     extents = replace.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
     gtk_ux.x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
@@ -1720,7 +1722,7 @@ def a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile(dat
     restart(empty_second_profile, empty=True)
     assert not second_config.exists() or not json.loads(second_config.read_text(encoding="utf-8"))["connections"]
     choose_import_bundle(bundle_path)
-    wait_for_node(name="Passphrase", role=pyatspi.ROLE_PASSWORD_TEXT)
+    wait_for_node(name="Passphrase", role=PASSPHRASE_ROLES)
     set_text_by_name("Passphrase", passphrase)
     invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name=CONNECTION_NAME)
