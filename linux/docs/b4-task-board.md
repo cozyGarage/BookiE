@@ -93,8 +93,9 @@ not qualify 0.2.0.
 ### Next B4 acceptance run
 
 Earlier candidate reports remain historical and are preserved below. Candidate
-`1c197ff` is the current acceptance checkpoint; rerun the B4 matrix if a later
-source SHA is selected. Remaining work is limited to platform acceptance,
+`1c197ff` is the current code acceptance checkpoint; `00731e0` is a docs-only
+descendant and its hosted candidate run is pending. Rerun the B4 matrix if a later
+source SHA changes application or driver code. Remaining work is limited to platform acceptance,
 additional MySQL engine/side-effect coverage, Windows AD interoperability, and
 the UI-1b per-hop credential implementation.
 
