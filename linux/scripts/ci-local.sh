@@ -87,6 +87,8 @@ run_release() {
   "$ROOT/scripts/test-postgres-release.sh"
   echo "==> Installed GTK safety flows"
   "$ROOT/scripts/test-gtk-safety.sh"
+  echo "==> ClickHouse Enum16 GTK edit"
+  python3 scripts/run-test-layer.py gtk-clickhouse
   echo "==> MySQL-backed GTK approval dialog"
   python3 scripts/run-test-layer.py gtk-mysql-approval
   echo "==> MongoDB-backed GTK cursor and edit contract"

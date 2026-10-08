@@ -28,6 +28,8 @@ MYSQL_CONNECTION_NAME = "Safety MySQL"
 MYSQL_CONNECTION_ID = "c38e2d93-4314-4c18-b192-08f164386e09"
 MONGODB_CONNECTION_NAME = "Safety MongoDB"
 MONGODB_CONNECTION_ID = "d87c89b2-3e9c-4c36-9662-c75c69f513ab"
+CLICKHOUSE_CONNECTION_NAME = "Safety ClickHouse"
+CLICKHOUSE_CONNECTION_ID = "31e33a85-4cbd-42ec-8f54-c66be5630f17"
 POSTGRES_CONNECTION_NAME = "Safety PostgreSQL"
 POSTGRES_CONNECTION_ID = "0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11"
 POSTGRES_MTLS_CONNECTION_NAME = "PostgreSQL mTLS"
@@ -650,6 +652,24 @@ def write_fixture(base, audit_available=True, environment="prod"):
                 "port": int(mongodb_port),
                 "database": "bookie_test",
                 "username": "",
+                "use_tls": False,
+                "tls_mode": "disabled",
+                "read_only": False,
+                "auth_mode": "password",
+                "environment": environment,
+            }
+        )
+    clickhouse_port = os.environ.get("TABLEPRO_GTK_CLICKHOUSE_PORT")
+    if clickhouse_port:
+        connections["connections"].append(
+            {
+                "id": CLICKHOUSE_CONNECTION_ID,
+                "name": CLICKHOUSE_CONNECTION_NAME,
+                "driver_id": "clickhouse",
+                "host": os.environ.get("TABLEPRO_GTK_CLICKHOUSE_HOST", "127.0.0.1"),
+                "port": int(clickhouse_port),
+                "database": "default",
+                "username": "default",
                 "use_tls": False,
                 "tls_mode": "disabled",
                 "read_only": False,
