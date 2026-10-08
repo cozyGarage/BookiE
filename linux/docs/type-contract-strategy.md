@@ -248,7 +248,7 @@ a separate zero-row projection retains UUID metadata too ([scalar evidence](evid
 [mixed projection evidence](evidence/duckdb-uuid-mixed-projection-results-2026-10-06/manifest.json)).
 
 The PostgreSQL `timestamp[]` DateStyle case now extends typed rebinding to
-canonical CSV output and SQL replay after switching from `SQL, DMY` to
+canonical JSON/CSV output and SQL replay after switching from `SQL, DMY` to
 `ISO, MDY`; typed CSV import now restores the same source after that session
 change, with native type/JSON/wire checks and an untouched sibling
 ([test](../crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_timestamp_dmy.rs)).

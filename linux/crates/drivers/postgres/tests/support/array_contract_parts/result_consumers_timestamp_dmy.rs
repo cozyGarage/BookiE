@@ -74,6 +74,23 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     let csv = std::fs::read_to_string(directory.path().join("timestamp-array-dmy.csv")).unwrap();
     let import_options = tablepro_core::import::CsvImportOptions::default();
     let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+
+    let json_path = directory.path().join("timestamp-array-dmy.json");
+    tablepro_core::export::write_result_file(
+        &json_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(json_path).unwrap()).unwrap();
+    assert_eq!(json[0]["value"], *driver_text);
+
     transaction
         .execute(
             "INSERT INTO timestamp_array_dmy_csv_target \
@@ -183,4 +200,3 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     );
     transaction.rollback().await.unwrap();
 }
-
