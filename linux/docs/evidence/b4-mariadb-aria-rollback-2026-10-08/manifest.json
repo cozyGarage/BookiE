@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "branch": "b4/mysql-aria-rollback",
+  "test_commit": "1f2b047bbba83c59698889798611ae82b1c50517",
+  "source_base": "0bb8e34354d13e3ab9911b9db710eddb02115170",
+  "scope": [
+    "B4-11 MariaDB Aria nontransactional side effects",
+    "B4-12 PostgreSQL backend-termination rollback failure"
+  ],
+  "result": "local B4 rollback layer passed: 12 MySQL atomicity tests and 1 PostgreSQL rollback-failure selector",
+  "mariadb_aria": {
+    "container_tag": "mariadb:11",
+    "observed_version": "11.8.9-MariaDB-ubu2404",
+    "table_engine": "Aria",
+    "table_option": "TRANSACTIONAL=0",
+    "verified_effects": [
+      "INSERT",
+      "UPDATE",
+      "DELETE"
+    ],
+    "failure": "duplicate-key statement at index 1",
+    "test": "mariadb_aria_nontransactional_effects_survive_failed_batches"
+  },
+  "hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37774162145,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37774162145",
+    "source_commit": "bd4ff0fdb656cb26dda55a465551ed1e87fb870c",
+    "status": "queued",
+    "conclusion": null,
+    "note": "The current push run has no jobs started; it predates this test commit."
+  },
+  "local_report": "/tmp/bookie-b4-aria/linux/target/quality/20261008T120021537624Z-layers/report.json",
+  "summary": {
+    "path": "focused.txt",
+    "sha256": "92e4c9f4f21adedc00c7d4120f7598b98aff6b2cdc743baa2cce983507abd097"
+  },
+  "not_established": [
+    "Hosted acceptance on this test commit",
+    "Other optional/vendor MySQL-family engines and side-effect patterns",
+    "Windows Active Directory interoperability",
+    "Installed distribution package and native Wayland flows"
+  ]
+}
