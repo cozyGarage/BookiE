@@ -117,11 +117,11 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
 }
 
 fn mongo_host_authority(host: &str) -> Result<String, DriverError> {
-    let bracketed = host.starts_with('[') || host.ends_with(']');
     let ip_host = host
         .strip_prefix('[')
         .and_then(|value| value.strip_suffix(']'))
         .unwrap_or(host);
+    let bracketed = ip_host != host;
     if let Ok(address) = ip_host.parse::<std::net::IpAddr>() {
         return Ok(match address {
             std::net::IpAddr::V4(address) if !bracketed => address.to_string(),
