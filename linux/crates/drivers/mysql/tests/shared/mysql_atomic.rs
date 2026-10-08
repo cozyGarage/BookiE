@@ -223,9 +223,7 @@ async fn mysql_failed_batch_keeps_direct_inserts_on_nontransactional_engines() {
         conn.execute(&format!("CREATE TABLE {table} (id INT NOT NULL) ENGINE={engine}"))
             .await
             .unwrap();
-        conn.execute(&format!("INSERT INTO {table} VALUES (1)"))
-            .await
-            .unwrap();
+        conn.execute(&format!("INSERT INTO {table} VALUES (1)")).await.unwrap();
 
         let missing_table = format!("missing_direct_{name}_target");
         let batch = vec![

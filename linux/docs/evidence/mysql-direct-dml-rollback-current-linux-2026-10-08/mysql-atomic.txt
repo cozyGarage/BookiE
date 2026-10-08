@@ -1,4 +1,5 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+   Compiling tablepro-driver-mysql v0.1.0 (/tmp/bookie-b4-mysql-direct-dml/linux/crates/drivers/mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.37s
      Running tests/integration.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/integration-901ab74c5204a70b)
 
 running 10 tests
@@ -13,5 +14,5 @@ test mysql_atomic::mysql_failed_batch_keeps_direct_inserts_on_nontransactional_e
 test mysql_atomic::mysql_transaction_queries_are_bounded_and_mark_truncation ... ok
 test mysql_atomic::mysql_transaction_queries_obey_result_byte_budget_and_remain_usable ... ok
 
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 64 filtered out; finished in 111.45s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 64 filtered out; finished in 110.53s
 

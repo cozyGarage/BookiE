@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "commit": "2a787710879c2a78181c808672a00c99c9f1df06",
-  "working_tree": "M linux/crates/drivers/mysql/tests/shared/mysql_atomic.rs",
-  "tracked_diff_sha256": "6d814eb4098e343551b62e685b490d8953480b0223ce23b2b80ed1e92f753c8d",
-  "started_utc": "2026-10-08T05:40:13.036053+00:00",
+  "commit": "d3db686c99c32f8abb483370e909c3654228893b",
+  "working_tree": "M linux/crates/drivers/mysql/tests/shared/mysql_atomic.rs\n M linux/docs/b4-task-board.md\n M linux/docs/bookie-0.2-sprint.md\n M linux/docs/evidence/mysql-direct-dml-rollback-current-linux-2026-10-08/manifest.json\n M linux/docs/known-issues.md",
+  "tracked_diff_sha256": "0d89e3a43a4aa9befac1f5545fe4d0034b7d426a2f8d42f2760913e7a6b0bb43",
+  "started_utc": "2026-10-08T05:44:02.355585+00:00",
   "status": "passed",
   "layers": {
     "b4-rollback": {
@@ -28,7 +28,7 @@
           "status": "passed",
           "log": "b4-rollback-1.log",
           "exit_code": 0,
-          "seconds": 111.772
+          "seconds": 113.982
         },
         {
           "argv": [
@@ -49,10 +49,10 @@
           "status": "passed",
           "log": "b4-rollback-2.log",
           "exit_code": 0,
-          "seconds": 14.603
+          "seconds": 2.27
         }
       ]
     }
   },
-  "finished_utc": "2026-10-08T05:42:19.411812+00:00"
+  "finished_utc": "2026-10-08T05:45:58.608611+00:00"
 }

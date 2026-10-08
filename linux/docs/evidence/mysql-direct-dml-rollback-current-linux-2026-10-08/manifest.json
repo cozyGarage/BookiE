@@ -2,12 +2,14 @@
   "schema_version": 1,
   "date": "2026-10-08",
   "scope": "B4-11 direct DML side effects after a failed MySQL batch",
-  "source_commit": "2a787710879c2a78181c808672a00c99c9f1df06",
+  "source_commit": "d3db686c99c32f8abb483370e909c3654228893b",
+  "worktree_state": "source and documentation were modified locally when the B4 rollback layer ran; the layer report records the tracked diff fingerprint, and the tested source hash pins the MySQL test file",
+  "tracked_diff_sha256": "0d89e3a43a4aa9befac1f5545fe4d0034b7d426a2f8d42f2760913e7a6b0bb43",
   "tested_source_sha256": {
-    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "fdda3703211463532526ead3087a4f5ca47f6770c63f02afa921b399c4cab2f8"
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "11a4a1e063ac568d10b0daffc949c4f7718c69d50e7ed7a0e99a653a3b952797"
   },
   "commands": [
-    "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic::mysql_failed_batch_keeps_direct_inserts_on_nontransactional_engines -- --include-ignored --exact --test-threads=1",
+    "cargo fmt --all -- --check",
     "python3 scripts/run-test-layer.py b4-rollback"
   ],
   "result": "passed",
@@ -18,16 +20,16 @@
   },
   "layer_report": {
     "path": "layer-report.json",
-    "sha256": "efc6f06a000361ce4198be76e29ee384da8c56b1da2668f78d35e4196e5b7bab"
+    "sha256": "e7787124da5f1926cf86f160e8c90cb5785d37ff98fa9bac42070034f92b4527"
   },
   "logs": {
     "mysql_atomic": {
       "path": "mysql-atomic.txt",
-      "sha256": "a7fc8e834b94342b8f9eadc44dfc719dd258a356b1b2f418a94ec8f3408ff4a0"
+      "sha256": "aa12932d3035fcc9aab609f4be7572205165b91fa3cfa6427b3d884de3a71712"
     },
     "postgres_rollback": {
       "path": "postgres-rollback.txt",
-      "sha256": "d6c77eaa953b86502ff78566cc5c420f92031d8e0997993c1a0b19c6f7cab254"
+      "sha256": "353e6268b6a82e08c0b69586ad2190fb897b1afa136b169ac335a5f8fed7976d"
     }
   },
   "not_established": [
