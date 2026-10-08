@@ -655,4 +655,79 @@ mod tests {
             .unwrap();
         assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes)]]);
     }
+
+    #[tokio::test]
+    #[ignore = "requires docker"]
+    async fn postgres_value_query_refetches_by_enum_and_domain_composite_key() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+        use testcontainers::ImageExt;
+        use testcontainers::runners::AsyncRunner;
+        use testcontainers_modules::postgres::Postgres;
+
+        let container = Postgres::default().with_tag("16-alpine").start().await.unwrap();
+        let connection = drivers_postgres::PgDriver
+            .connect(ConnectOptions {
+                host: container.get_host().await.unwrap().to_string(),
+                port: container.get_host_port_ipv4(5432).await.unwrap(),
+                database: "postgres".into(),
+                username: "postgres".into(),
+                password: secrecy::SecretString::new("postgres".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+        for sql in [
+            "CREATE TYPE value_preview_state AS ENUM ('ready')",
+            "CREATE DOMAIN value_preview_tenant AS text CHECK (VALUE <> '')",
+            "CREATE TABLE value_preview_records (state value_preview_state, tenant value_preview_tenant, payload bytea, PRIMARY KEY (state, tenant))",
+            "INSERT INTO value_preview_records VALUES ('ready', 'tenant '' OR 1=1 --', decode(repeat('ab', 9000), 'hex'))",
+        ] {
+            connection.execute_controlled(sql, &control).await.unwrap();
+        }
+        let columns = connection
+            .fetch_columns_controlled(None, "value_preview_records", &control)
+            .await
+            .unwrap();
+        assert!(columns[0].enum_type.is_some());
+        assert!(columns[1].domain_type.is_some());
+        let native = connection
+            .query_controlled(
+                "SELECT pg_typeof(state)::text, state::text, pg_typeof(tenant)::text, tenant::text, octet_length(payload), encode(substring(payload from 1 for 8), 'hex') FROM value_preview_records",
+                &control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            native.rows,
+            vec![vec![
+                Value::Text("value_preview_state".into()),
+                Value::Text("ready".into()),
+                Value::Text("value_preview_tenant".into()),
+                Value::Text("tenant ' OR 1=1 --".into()),
+                Value::Int(9000),
+                Value::Text("abababababababab".into()),
+            ]]
+        );
+
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "value_preview_records",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: None,
+        };
+        let query = target
+            .value_query(
+                2,
+                &[Value::Text("ready".into()), Value::Text("tenant ' OR 1=1 --".into())],
+            )
+            .unwrap();
+        let fetched = connection
+            .query_params_controlled(&query.sql, &query.params, &control)
+            .await
+            .unwrap();
+        assert_eq!(fetched.rows, vec![vec![Value::Bytes(vec![0xab; 9000])]]);
+    }
 }
