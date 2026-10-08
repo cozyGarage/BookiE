@@ -1051,6 +1051,12 @@ Its Docker and local CI results are recorded in the [PR validation comment](http
 This closes only that identifier boundary; other identifier forms and
 transaction/session `search_path` permutations remain open.
 
+SQLite columns declared `ENUM` follow SQLite's NUMERIC affinity rather than a
+constrained enum type. The focused runtime contract keeps text labels, numeric
+INTEGER/REAL values, BLOB bytes and SQL NULL distinct, checked against native
+`typeof()` and `quote()` output
+([test](../crates/drivers/sqlite/tests/runtime_typed_values.rs)).
+
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage
 classes; SQL NULL uses the export's explicit collision-free marker. Untagged

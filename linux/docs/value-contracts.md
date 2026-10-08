@@ -108,6 +108,11 @@ See [testing](testing.md) and
 
 ## Case lookup
 
+SQLite's declared `ENUM` pseudo-type is covered as SQLite NUMERIC affinity:
+native `typeof()` and `quote()` oracles distinguish text labels, numeric
+INTEGER/REAL values, BLOB bytes and SQL NULL in the driver result
+([test](../crates/drivers/sqlite/tests/runtime_typed_values.rs)).
+
 Detailed native oracles, exact selectors and dated results are preserved in
 [value-contract history](archive/value-contract-history.md). Use these starting points,
 then search that ledger/test for the specific type and consumer; one starting
