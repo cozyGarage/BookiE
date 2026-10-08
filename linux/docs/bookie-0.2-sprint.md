@@ -30,8 +30,7 @@ The local focused B4 rollback layer passed on clean documentation-only commit
 source hashes are in the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
 PR #337 is the open B4-11 direct-DML follow-up. Its Docker rollback layer passed
 locally; SonarCloud passed after syncing the branch to the current `linux` tip.
-Preflight, Flatpak, workflow lint and harness checks are queued. Local run details
-are in the [PR #337 evidence comment](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536).
+Hosted preflight, GTK fast checks, workflow lint, harness, security, SonarCloud and both Flatpak builds passed on head `96628dd`. The B4 Docker job was skipped by its PR workflow condition; local run details are in the [PR #337 evidence comment](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536).
 PR #312 skipped its B4-specific job because it only changed MongoDB tests.
 These focused cases do not close B3: the broader
 engine/type/consumer/configuration matrix, mutation triage, performance rows and
