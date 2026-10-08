@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- SQLite result decoding now has native runtime contracts for declared BOOLEAN and temporal columns, SQL NULL, and BLOB-affinity TEXT/INTEGER/REAL/BLOB values. Scoped mutation triage caught 7 of 15 variants; 5 fall back to the same runtime decoder and are equivalent, 3 were unviable, with no timeouts. Broader TEST-2 mutation coverage remains open.
 - SQLite STRICT `ANY` computed `iif()` now has a native `typeof()` and typed
   CSV round-trip case for INTEGER, REAL, formula-shaped TEXT, BLOB and SQL NULL.
   The focused app test passed on system SQLite 3.53.4; [PR #331 validation](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990)
