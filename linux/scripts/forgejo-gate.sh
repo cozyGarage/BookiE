@@ -13,6 +13,27 @@ timeout_minutes="${FORGEJO_GATE_TIMEOUT_MINUTES:-60}"
 export GIT_ASKPASS="${GIT_ASKPASS:-$HOME/.config/forgejo/askpass.sh}"
 sha="$(git rev-parse "$branch")"
 token="$(cat "$token_file")"
+
+docs_only() {
+  git fetch --quiet "$remote" linux || return 1
+  local changed
+  changed="$(git diff --name-only "$remote/linux...$sha")"
+  [ -n "$changed" ] && [ -z "$(printf '%s\n' "$changed" | grep -vE '(\.md$|^linux/docs/)')" ]
+}
+if docs_only; then
+  (cd "$(git rev-parse --show-toplevel)/linux" &&
+    python3 scripts/inventory-ignored-tests.py --check &&
+    python3 scripts/check-doc-links.py &&
+    python3 scripts/check-known-issues.py)
+  echo "documentation only: no Forgejo run is needed for $sha; the documentation checks passed"
+  exit 0
+fi
+
+exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate.lock}"
+if ! flock -n 9; then
+  echo "another gate is running on this host; waiting for it to finish"
+  flock 9
+fi
 latest_run_id() {
   curl -fsS -H "Authorization: token $token" "$api/actions/runs?limit=1" | python3 -c '
 import json, sys
