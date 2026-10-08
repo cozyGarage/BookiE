@@ -18,6 +18,7 @@ import gtk_parameters
 import gtk_xml
 import gtk_ux
 import gtk_input
+import gtk_shard
 
 APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
@@ -1849,6 +1850,7 @@ def main():
         scenarios = [scenario for scenario in scenarios if scenario.__name__ in names]
         if {scenario.__name__ for scenario in scenarios} != names:
             raise SystemExit(f"unknown GTK scenario in: {selected}")
+    scenarios = gtk_shard.select(scenarios, os.environ.get("TABLEPRO_GTK_SHARD", ""))
     for scenario in scenarios:
         run_scenario(binary, scenario)
         print(f"passed: {scenario.__name__}")
