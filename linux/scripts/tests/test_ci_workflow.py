@@ -184,6 +184,14 @@ class CiWorkflowTests(unittest.TestCase):
         )
         self.assertIn("scripts/test-postgres-release.sh", ledger)
 
+    def test_postgres_release_gtk_uses_the_staged_release_binary(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        release = workflow.split("  postgres-release:\n", 1)[1].split("  duckdb:\n", 1)[0]
+        self.assertIn("timeout-minutes: 45", release)
+        self.assertIn("cargo build --locked --release -p tablepro-app", release)
+        self.assertIn("target/release/tablepro-app target/installed/usr/bin/tablepro", release)
+        self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", release)
+
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "linux/scripts/test-postgres-release.sh").read_text()
         default_scenarios = next(

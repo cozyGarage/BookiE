@@ -426,7 +426,7 @@ jobs:
   postgres-release:
     if: github.event_name != 'pull_request'
     name: PostgreSQL release fixture (docker)
-    timeout-minutes: 30
+    timeout-minutes: 45
     runs-on: ubuntu-24.04
     needs: preflight
     defaults:
@@ -470,9 +470,15 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-postgres-release
+      - name: Build staged release GTK binary
+        run: cargo build --locked --release -p tablepro-app
+      - name: Stage release binary for installed GTK scenarios
+        run: install -Dm755 target/release/tablepro-app target/installed/usr/bin/tablepro
       - name: Verify docker is available
         run: docker compose version
       - name: PostgreSQL TLS, SSH, lock, and reconnect fixture
+        env:
+          TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro
         run: python3 scripts/run-test-layer.py postgres-release
 
       - name: Upload validation evidence
