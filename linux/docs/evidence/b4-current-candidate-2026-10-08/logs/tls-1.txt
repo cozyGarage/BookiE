@@ -1,0 +1,1037 @@
+wrote driver-tls materials to /tmp/bookie-b4-frozen-7eff/linux/tests/fixtures/driver-tls/materials
+ Image tablepro-driver-tls-mysql Building 
+ Image tablepro-driver-tls-mssql Building 
+ Image tablepro-driver-tls-ssh-bastion Building 
+ Image tablepro-driver-tls-mysql-ssh Building 
+ Image tablepro-driver-tls-mssql-ssh Building 
+ Image tablepro-driver-tls-mysql-mtls-ssh Building 
+ Image tablepro-driver-tls-clickhouse Building 
+ Image tablepro-driver-tls-redis Building 
+ Image tablepro-driver-tls-mysql-mtls Building 
+ Image tablepro-driver-tls-mssql-plain Building 
+ Image tablepro-driver-tls-mongo Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 5.93kB done
+#1 DONE 0.0s
+
+#2 [mssql-plain internal] load build definition from Dockerfile
+#2 transferring dockerfile: 766B done
+#2 DONE 0.0s
+
+#3 [ssh-bastion internal] load build definition from Dockerfile
+#3 transferring dockerfile: 974B done
+#3 DONE 0.0s
+
+#4 [redis internal] load build definition from Dockerfile
+#4 transferring dockerfile: 305B done
+#4 DONE 0.0s
+
+#5 [mongo internal] load build definition from Dockerfile
+#5 transferring dockerfile: 240B done
+#5 DONE 0.1s
+
+#6 [mysql internal] load build definition from Dockerfile
+#6 transferring dockerfile: 300B done
+#6 DONE 0.1s
+
+#7 [mssql-ssh internal] load metadata for mcr.microsoft.com/mssql/server:2022-latest
+#7 DONE 0.0s
+
+#8 [clickhouse internal] load build definition from Dockerfile
+#8 transferring dockerfile: 405B done
+#8 DONE 0.1s
+
+#9 [mssql internal] load .dockerignore
+#9 transferring context: 2B done
+#9 DONE 0.0s
+
+#10 [mssql internal] load build context
+#10 DONE 0.0s
+
+#11 [mssql 1/6] FROM mcr.microsoft.com/mssql/server:2022-latest@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb
+#11 resolve mcr.microsoft.com/mssql/server:2022-latest@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb 0.1s done
+#11 DONE 0.1s
+
+#9 [clickhouse internal] load .dockerignore
+#9 transferring context: 2B done
+#9 DONE 0.0s
+
+#12 [ssh-bastion internal] load metadata for docker.io/library/alpine:3.22
+#12 DONE 0.1s
+
+#13 [ssh-bastion internal] load build context
+#13 DONE 0.0s
+
+#14 [redis internal] load metadata for docker.io/library/redis:7-alpine
+#14 DONE 0.1s
+
+#15 [mysql-ssh internal] load build context
+#15 DONE 0.0s
+
+#16 [mongo internal] load metadata for docker.io/library/mongo:7
+#16 DONE 0.1s
+
+#17 [mongo internal] load build context
+#17 DONE 0.0s
+
+#18 [mysql-mtls-ssh internal] load metadata for docker.io/library/mysql:8.4
+#18 DONE 0.1s
+
+#19 [clickhouse internal] load metadata for docker.io/clickhouse/clickhouse-server:24.8-alpine
+#19 DONE 0.1s
+
+#20 [clickhouse internal] load build context
+#20 DONE 0.0s
+
+#10 [mssql-plain internal] load build context
+#10 transferring context: 3.43kB done
+#10 DONE 0.0s
+
+#21 [mysql-ssh 1/5] FROM docker.io/library/mysql:8.4@sha256:85b9bf2e29cf836ecb8c2a15a935d4ba0c606631dff1dd79531a11983c638f2a
+#21 resolve docker.io/library/mysql:8.4@sha256:85b9bf2e29cf836ecb8c2a15a935d4ba0c606631dff1dd79531a11983c638f2a
+#21 resolve docker.io/library/mysql:8.4@sha256:85b9bf2e29cf836ecb8c2a15a935d4ba0c606631dff1dd79531a11983c638f2a 0.1s done
+#21 CACHED
+
+#11 [mssql 1/6] FROM mcr.microsoft.com/mssql/server:2022-latest@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb
+#11 CACHED
+
+#13 [ssh-bastion internal] load build context
+#13 transferring context: 193B done
+#13 DONE 0.0s
+
+#15 [mysql-mtls-ssh internal] load build context
+#15 transferring context: 4.55kB done
+#15 DONE 0.0s
+
+#22 [ssh-bastion 1/3] FROM docker.io/library/alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
+#22 resolve docker.io/library/alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8 0.1s done
+#22 CACHED
+
+#23 [redis 1/5] FROM docker.io/library/redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+#23 resolve docker.io/library/redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2 0.1s done
+#23 CACHED
+
+#17 [mongo internal] load build context
+#17 transferring context: 4.50kB done
+#17 DONE 0.0s
+
+#24 [mongo 1/4] FROM docker.io/library/mongo:7@sha256:b6421fd6d1c5ded6377b397d8983e2f82e2100dc5123332dcfda2065a472be5b
+#24 resolve docker.io/library/mongo:7@sha256:b6421fd6d1c5ded6377b397d8983e2f82e2100dc5123332dcfda2065a472be5b 0.1s done
+#24 CACHED
+
+#20 [clickhouse internal] load build context
+#20 transferring context: 5.15kB done
+#20 DONE 0.0s
+
+#25 [mysql-ssh 2/5] COPY materials/server.crt /certs/server.crt
+#25 ...
+
+#26 [clickhouse 1/6] FROM docker.io/clickhouse/clickhouse-server:24.8-alpine@sha256:b002e56ed5c16e224c312527f6fcba7e77216fec5d7a88a7828f59efc614feb5
+#26 resolve docker.io/clickhouse/clickhouse-server:24.8-alpine@sha256:b002e56ed5c16e224c312527f6fcba7e77216fec5d7a88a7828f59efc614feb5 0.1s done
+#26 CACHED
+
+#27 [mssql 2/6] COPY materials/server.crt /certs/server.crt
+#27 ...
+
+#28 [ssh-bastion 2/3] COPY materials/ssh_client.pub /tmp/ssh_client.pub
+#28 DONE 0.3s
+
+#27 [mssql-ssh 2/6] COPY materials/server.crt /certs/server.crt
+#27 DONE 0.4s
+
+#29 [redis 2/5] COPY materials/server.crt /certs/server.crt
+#29 DONE 0.4s
+
+#30 [mongo 2/4] COPY materials/server.pem /certs/server.pem
+#30 DONE 0.4s
+
+#25 [mysql-mtls-ssh 2/5] COPY materials/server.crt /certs/server.crt
+#25 DONE 0.4s
+
+#31 [clickhouse 2/6] COPY materials/server.crt /certs/server.crt
+#31 DONE 0.3s
+
+#32 [mysql-mtls 3/5] COPY materials/server.key /certs/server.key
+#32 DONE 0.2s
+
+#33 [mssql 3/6] COPY materials/server.key /certs/server.key
+#33 DONE 0.2s
+
+#34 [redis 3/5] COPY materials/server.key /certs/server.key
+#34 DONE 0.2s
+
+#35 [mongo 3/4] COPY materials/ca.crt /certs/ca.crt
+#35 DONE 0.2s
+
+#36 [clickhouse 3/6] COPY materials/server.key /certs/server.key
+#36 DONE 0.2s
+
+#37 [mysql-mtls 4/5] COPY materials/ca.crt /certs/ca.crt
+#37 DONE 0.2s
+
+#38 [mssql-ssh 4/6] COPY mssql/entrypoint.sh /fixture/entrypoint.sh
+#38 DONE 0.2s
+
+#39 [redis 4/5] COPY materials/ca.crt /certs/ca.crt
+#39 DONE 0.2s
+
+#40 [clickhouse 4/6] COPY materials/ca.crt /certs/ca.crt
+#40 DONE 0.2s
+
+#41 [mysql-mtls-ssh 5/5] RUN chown -R mysql:mysql /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#41 ...
+
+#42 [mssql-ssh 5/6] COPY mssql/setup.sql /fixture/setup.sql
+#42 DONE 0.2s
+
+#43 [mongo 4/4] RUN chown -R mongodb:mongodb /certs     && chmod 600 /certs/server.pem     && chmod 644 /certs/ca.crt
+#43 DONE 0.4s
+
+#44 [clickhouse 5/6] COPY clickhouse/tls.xml /etc/clickhouse-server/config.d/tls.xml
+#44 DONE 0.2s
+
+#45 [redis 5/5] RUN chown -R redis:redis /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#45 DONE 0.4s
+
+#46 [mongo] exporting to image
+#46 exporting layers
+#46 ...
+
+#41 [mysql-mtls-ssh 5/5] RUN chown -R mysql:mysql /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#41 DONE 0.4s
+
+#46 [mongo] exporting to image
+#46 exporting layers 0.3s done
+#46 exporting manifest sha256:693416a92df09d6a01c75001d1635b52cbde8c7cd2f3de958cc6224a0635216a
+#46 ...
+
+#47 [clickhouse 6/6] RUN chown -R clickhouse:clickhouse /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#47 DONE 0.5s
+
+#46 [mongo] exporting to image
+#46 exporting manifest sha256:693416a92df09d6a01c75001d1635b52cbde8c7cd2f3de958cc6224a0635216a 0.1s done
+#46 exporting config sha256:7a7996fa723b342bee55b4845b25259de83515ba06a023a296d0c2cce1132400
+#46 ...
+
+#48 [mssql-plain 6/6] RUN chown -R mssql:root /certs /fixture     && chmod 400 /certs/server.key     && chmod 444 /certs/server.crt     && chmod 500 /fixture/entrypoint.sh     && if [ "0" = "1" ]; then       /opt/mssql/bin/mssql-conf set network.tlscert /certs/server.crt       && /opt/mssql/bin/mssql-conf set network.tlskey /certs/server.key       && /opt/mssql/bin/mssql-conf set network.forceencryption 1;     fi
+#48 DONE 0.5s
+
+#46 [mongo] exporting to image
+#46 exporting config sha256:7a7996fa723b342bee55b4845b25259de83515ba06a023a296d0c2cce1132400 0.1s done
+#46 exporting attestation manifest sha256:b651b0774606359d2a3d626c646e86dae1d5ac0a8490ce743d0c46d5e0abaf4c
+#46 exporting attestation manifest sha256:b651b0774606359d2a3d626c646e86dae1d5ac0a8490ce743d0c46d5e0abaf4c 0.1s done
+#46 exporting manifest list sha256:f628e9aefe5db8ca35f961bae40012d95c3ad0d53438db41650176a7ddda1d63
+#46 exporting manifest list sha256:f628e9aefe5db8ca35f961bae40012d95c3ad0d53438db41650176a7ddda1d63 0.1s done
+#46 naming to docker.io/library/tablepro-driver-tls-mongo:latest 0.0s done
+#46 unpacking to docker.io/library/tablepro-driver-tls-mongo:latest
+#46 ...
+
+#49 [ssh-bastion 3/3] RUN apk add --no-cache openssh-server     && adduser -D -s /bin/sh tunnel     && echo 'tunnel:fixture-only' | chpasswd     && mkdir -p /home/tunnel/.ssh /run/sshd     && chown -R tunnel:tunnel /home/tunnel/.ssh     && chmod 700 /home/tunnel/.ssh     && printf '%s\n'       'PermitRootLogin no'       'PasswordAuthentication no'       'KbdInteractiveAuthentication no'       'PubkeyAuthentication yes'       'AllowTcpForwarding local'       'AllowStreamLocalForwarding yes'       'PermitOpen mysql-ssh.tablepro.test:3306 mysql-mtls-ssh.tablepro.test:3306 mssql-ssh.tablepro.test:1433'       'X11Forwarding no'       'AllowAgentForwarding no'       > /etc/ssh/sshd_config
+#49 0.299 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/APKINDEX.tar.gz
+#49 0.556 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/APKINDEX.tar.gz
+#49 1.008 (1/3) Installing openssh-keygen (10.0_p1-r10)
+#49 1.057 (2/3) Installing openssh-server-common (10.0_p1-r10)
+#49 1.077 (3/3) Installing openssh-server (10.0_p1-r10)
+#49 1.179 Executing busybox-1.37.0-r20.trigger
+#49 1.189 OK: 10 MiB in 19 packages
+#49 1.293 chpasswd: password for 'tunnel' changed
+#49 DONE 1.6s
+
+#50 [mssql-ssh 6/6] RUN chown -R mssql:root /certs /fixture     && chmod 400 /certs/server.key     && chmod 444 /certs/server.crt     && chmod 500 /fixture/entrypoint.sh     && if [ "1" = "1" ]; then       /opt/mssql/bin/mssql-conf set network.tlscert /certs/server.crt       && /opt/mssql/bin/mssql-conf set network.tlskey /certs/server.key       && /opt/mssql/bin/mssql-conf set network.forceencryption 1;     fi
+#50 0.505 SQL Server needs to be restarted in order to apply this setting. Please run
+#50 0.505 'systemctl restart mssql-server.service'.
+#50 0.505 Note that sp_reload_mssqlconf can be used to apply a limited subset of settings without restarting the service.
+#50 0.611 SQL Server needs to be restarted in order to apply this setting. Please run
+#50 0.611 'systemctl restart mssql-server.service'.
+#50 0.611 Note that sp_reload_mssqlconf can be used to apply a limited subset of settings without restarting the service.
+#50 0.717 SQL Server needs to be restarted in order to apply this setting. Please run
+#50 0.717 'systemctl restart mssql-server.service'.
+#50 0.717 Note that sp_reload_mssqlconf can be used to apply a limited subset of settings without restarting the service.
+#50 DONE 0.9s
+
+#51 [mssql] exporting to image
+#51 ...
+
+#46 [mongo] exporting to image
+#46 unpacking to docker.io/library/tablepro-driver-tls-mongo:latest 0.6s done
+#46 DONE 1.5s
+
+#52 [mysql-ssh] exporting to image
+#52 exporting layers 0.6s done
+#52 exporting manifest sha256:f149768186567eae16b5c50cedb40b33af71f9de7b8d361a17a52775fe0f0472 0.1s done
+#52 exporting config sha256:431f04ec65feddf5c4d2d8a28007a308d8ee935bc2d0e896e61fede347f41f05 0.1s done
+#52 exporting attestation manifest sha256:15543ab17cb2c63b3069b82999b103f020bbccf950b1fc28a9a646df7149104a 0.1s done
+#52 exporting manifest list sha256:cbe4ed60f582e5fe7c2480a3012a740d8807204315109ce4d1fa28664ed1123b 0.1s done
+#52 naming to docker.io/library/tablepro-driver-tls-mysql-ssh:latest 0.0s done
+#52 unpacking to docker.io/library/tablepro-driver-tls-mysql-ssh:latest
+#52 ...
+
+#53 [redis] exporting to image
+#53 exporting layers 0.6s done
+#53 exporting manifest sha256:8ed973bfb67b2629b49d2c7a179eaea4c02a46a1df18cc6e9f544971853a8b85 0.1s done
+#53 exporting config sha256:700680a9550e5c3daa1518df08698ae2292d92357f684950512c7326178d73b4 0.1s done
+#53 exporting attestation manifest sha256:016d708398c04fd7c0baeff96b87d92f1f143a4e731cb14cdf08f1065318daff 0.1s done
+#53 exporting manifest list sha256:28dbfb3a269c1c7802a9f531dae694cf7cb4929dc43cbe2c92d9da84ebed1bf4 0.1s done
+#53 naming to docker.io/library/tablepro-driver-tls-redis:latest 0.0s done
+#53 unpacking to docker.io/library/tablepro-driver-tls-redis:latest 0.4s done
+#53 DONE 1.7s
+
+#52 [mysql-ssh] exporting to image
+#52 unpacking to docker.io/library/tablepro-driver-tls-mysql-ssh:latest 0.4s done
+#52 DONE 1.7s
+
+#54 [mysql-mtls-ssh] exporting to image
+#54 exporting layers 0.6s done
+#54 exporting manifest sha256:84da4a6f0f11f9e12bdb80f81468a4ce5592989a1b670f32f833c3eb3010c75d 0.1s done
+#54 exporting config sha256:6b98eac01f9c8e91c35a60bae73bdc61cb2d03535b1cd807e5d1c63a87042c30 0.1s done
+#54 exporting attestation manifest sha256:ce22fdad4e7f0e9dcdc2eb145ff9141a11dbfa269a556d733936be90911652f6 0.1s done
+#54 exporting manifest list sha256:a6cfe6b5a681ab5cdeb3bec40a07d5293df3855cd70016b7063c0c83ccae9d45 0.1s done
+#54 naming to docker.io/library/tablepro-driver-tls-mysql-mtls-ssh:latest 0.0s done
+#54 unpacking to docker.io/library/tablepro-driver-tls-mysql-mtls-ssh:latest 0.4s done
+#54 DONE 1.7s
+
+#55 [mysql-mtls] exporting to image
+#55 exporting layers 0.6s done
+#55 exporting manifest sha256:9d1ad7f11bbcf33f78814484e24a560faf68db12768ecf50ac6fb2de02a0e3ae 0.1s done
+#55 exporting config sha256:be9c151417f7fab10717efe1848da7b08fa5cbfb8e8d02c0bcb29b2fd11c8626 0.1s done
+#55 exporting attestation manifest sha256:9ff303229df8b201f10159773cdf1447f365ff37417846cb75aaa745ed56085d 0.1s done
+#55 exporting manifest list sha256:65fda01d87bc4cc87e034083b05f5dc8bc5d1414e1ac4f1c047a2cc5fa1ddf63 0.1s done
+#55 naming to docker.io/library/tablepro-driver-tls-mysql-mtls:latest 0.0s done
+#55 unpacking to docker.io/library/tablepro-driver-tls-mysql-mtls:latest 0.4s done
+#55 DONE 1.7s
+
+#56 [mysql] exporting to image
+#56 exporting layers 0.7s done
+#56 exporting manifest sha256:781df462b00e01e9ae6c695585cdabb80bdd3785f35cd1d6c4f5caf15d8b1952 0.1s done
+#56 exporting config sha256:7e73e8993825e5fe4e06262055bd3bc1e73ca193377ee3614d29aba21f5c351a 0.1s done
+#56 exporting attestation manifest sha256:7978fc1babf7000567f247b8d13dc55e5ded161c8b0969a8394b01e6cd44026e 0.1s done
+#56 exporting manifest list sha256:9b902884dcdf1c663ca2ad922546f3f1f5a2d3cfaa4211415eb2531222fb7098 0.1s done
+#56 naming to docker.io/library/tablepro-driver-tls-mysql:latest 0.0s done
+#56 unpacking to docker.io/library/tablepro-driver-tls-mysql:latest 0.4s done
+#56 DONE 1.7s
+
+#51 [mssql] exporting to image
+#51 exporting layers 0.6s done
+#51 exporting manifest sha256:08fff2f9b4388eb22439408868a79167e67c7d68f94e1ddae13635c979307fe8 0.1s done
+#51 exporting config sha256:1c7999968a946b106694cc61b01a38d6831481a5b642eb70c7cd91c0d5bcd8e2 0.1s done
+#51 exporting attestation manifest sha256:142d553cbea63a887db09e051914f86c3ab7f299c8a8755bf59c14c07b9d7fec 0.1s done
+#51 exporting manifest list sha256:92a8458e340faa98465c6bdf6121771f0c16b067dbd3fa87a87b54e51ceb922b 0.1s done
+#51 naming to docker.io/library/tablepro-driver-tls-mssql:latest 0.0s done
+#51 unpacking to docker.io/library/tablepro-driver-tls-mssql:latest
+#51 unpacking to docker.io/library/tablepro-driver-tls-mssql:latest 0.4s done
+#51 DONE 1.4s
+
+#57 [mssql-plain] exporting to image
+#57 exporting layers 0.9s done
+#57 exporting manifest sha256:7f067a4f075839c56a6e42e53b33f51cb93e236d5364f59d31f85999ab42c6c9 0.1s done
+#57 exporting config sha256:5143cd26bd0a6e08382cefce0c566b21bfa69b1ae0018115651ba32e93e5ed67 0.0s done
+#57 exporting attestation manifest sha256:32614b97231e6e2eb6cac4413f7070383aa9800e28526a2f55c2bd7e685c489c 0.1s done
+#57 exporting manifest list sha256:89a3ea6e9eb0fd0492d39645662684c2efc67406e89f627891e60db1b6697e0b 0.1s done
+#57 naming to docker.io/library/tablepro-driver-tls-mssql-plain:latest 0.0s done
+#57 unpacking to docker.io/library/tablepro-driver-tls-mssql-plain:latest 0.6s done
+#57 DONE 1.9s
+
+#58 [clickhouse] exporting to image
+#58 exporting layers 0.9s done
+#58 exporting manifest sha256:10a39d8e534947387721b89796f98b75b2c20b36f317e666ebfbc514ab7396fd 0.1s done
+#58 exporting config sha256:42e9c4c428baf9399a6880e5c053df4a6f8a9fd9d19494d1e560f0ddbef94a37 0.0s done
+#58 exporting attestation manifest sha256:512119f68f1caea6bc9dfe3b81bc34a87ddce16bedf9a9f3bec7779db98a764c 0.1s done
+#58 exporting manifest list sha256:e1063194b5864238b6e17149027ffd3104b44467faf43845033a3a2b5ee51320 0.1s done
+#58 naming to docker.io/library/tablepro-driver-tls-clickhouse:latest 0.0s done
+#58 unpacking to docker.io/library/tablepro-driver-tls-clickhouse:latest 0.6s done
+#58 DONE 1.9s
+
+#59 [mssql-ssh] exporting to image
+#59 exporting layers 0.6s done
+#59 exporting manifest sha256:bfa83109c6f24899a7fb5572a9f3e8f68dbef928b325b84616a319831a1ca979 0.1s done
+#59 exporting config sha256:7e36f4a86373104eb0d79c8dc5dfb4c4ffa23cfb453df703fbaa226d030027b2 0.1s done
+#59 exporting attestation manifest sha256:947614e8f6cdd08c6522dd82048ef65f57b6690f7f3960c4e527f7a78c6a4bb7 0.1s done
+#59 exporting manifest list sha256:8a5d9951530693d82e60f52459183bccb1dd270284a7546d37de622f810c12bc 0.1s done
+#59 naming to docker.io/library/tablepro-driver-tls-mssql-ssh:latest 0.0s done
+#59 unpacking to docker.io/library/tablepro-driver-tls-mssql-ssh:latest 0.4s done
+#59 DONE 1.4s
+
+#60 [ssh-bastion] exporting to image
+#60 exporting layers 0.9s done
+#60 exporting manifest sha256:591e751b8c838bbc1008428c02f2bd1ad79bdc01a74fc49901bb08280b555ad4 0.0s done
+#60 exporting config sha256:897f2e4e2b61aa5dd132bfb4a0da6d0958e385ed4b496df83973468f0efc53b1 0.1s done
+#60 exporting attestation manifest sha256:818b6bc01f9b5faad5a7b7b895201bd98d1e149ac8ea22638b27ac0b78f411cb 0.1s done
+#60 exporting manifest list sha256:d80834fad963e6be3f30e6fdcc6557bdb2518d85c265eb0f3ffcdd4144fa2aa9 0.1s done
+#60 naming to docker.io/library/tablepro-driver-tls-ssh-bastion:latest 0.0s done
+#60 unpacking to docker.io/library/tablepro-driver-tls-ssh-bastion:latest 0.1s done
+#60 DONE 1.4s
+
+#61 [mysql-ssh] resolving provenance for metadata file
+#61 DONE 0.4s
+
+#62 [ssh-bastion] resolving provenance for metadata file
+#62 DONE 0.1s
+
+#63 [mongo] resolving provenance for metadata file
+#63 DONE 0.6s
+
+#64 [redis] resolving provenance for metadata file
+#64 DONE 0.5s
+
+#65 [mysql] resolving provenance for metadata file
+#65 DONE 0.3s
+
+#66 [clickhouse] resolving provenance for metadata file
+#66 DONE 0.1s
+
+#67 [mssql-plain] resolving provenance for metadata file
+#67 DONE 0.2s
+
+#68 [mysql-mtls-ssh] resolving provenance for metadata file
+#68 DONE 0.3s
+
+#69 [mysql-mtls] resolving provenance for metadata file
+#69 DONE 0.4s
+
+#70 [mssql] resolving provenance for metadata file
+#70 DONE 0.2s
+
+#71 [mssql-ssh] resolving provenance for metadata file
+#71 DONE 0.0s
+ Image tablepro-driver-tls-mysql-ssh Built 
+ Image tablepro-driver-tls-redis Built 
+ Image tablepro-driver-tls-mysql Built 
+ Image tablepro-driver-tls-clickhouse Built 
+ Image tablepro-driver-tls-mongo Built 
+ Image tablepro-driver-tls-mssql Built 
+ Image tablepro-driver-tls-mssql-plain Built 
+ Image tablepro-driver-tls-mysql-mtls Built 
+ Image tablepro-driver-tls-mysql-mtls-ssh Built 
+ Image tablepro-driver-tls-ssh-bastion Built 
+ Image tablepro-driver-tls-mssql-ssh Built 
+ Network tablepro-driver-tls_fixture Creating 
+ Network tablepro-driver-tls_fixture Creating 
+ Network tablepro-driver-tls_fixture Created 
+ Network tablepro-driver-tls_fixture Created 
+ Container tablepro-driver-tls-ssh-bastion-1 Creating 
+ Container tablepro-driver-tls-redis-1 Creating 
+ Container tablepro-driver-tls-clickhouse-plain-1 Creating 
+ Container tablepro-driver-tls-mssql-1 Creating 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Creating 
+ Container tablepro-driver-tls-mongo-plain-1 Creating 
+ Container tablepro-driver-tls-mongo-1 Creating 
+ Container tablepro-driver-tls-mysql-1 Creating 
+ Container tablepro-driver-tls-redis-plain-1 Creating 
+ Container tablepro-driver-tls-mssql-plain-1 Creating 
+ Container tablepro-driver-tls-mssql-ssh-1 Creating 
+ Container tablepro-driver-tls-mysql-plain-1 Creating 
+ Container tablepro-driver-tls-mysql-mtls-1 Creating 
+ Container tablepro-driver-tls-mysql-ssh-1 Creating 
+ Container tablepro-driver-tls-clickhouse-1 Creating 
+ Container tablepro-driver-tls-mssql-1 Created 
+ Container tablepro-driver-tls-ssh-bastion-1 Created 
+ Container tablepro-driver-tls-mssql-ssh-1 Created 
+ Container tablepro-driver-tls-mssql-plain-1 Created 
+ Container tablepro-driver-tls-redis-1 Created 
+ Container tablepro-driver-tls-clickhouse-plain-1 Created 
+ Container tablepro-driver-tls-mysql-mtls-1 Created 
+ Container tablepro-driver-tls-mysql-plain-1 Created 
+ Container tablepro-driver-tls-mysql-1 Created 
+ Container tablepro-driver-tls-mongo-1 Created 
+ Container tablepro-driver-tls-mongo-plain-1 Created 
+ Container tablepro-driver-tls-mysql-ssh-1 Created 
+ Container tablepro-driver-tls-redis-plain-1 Created 
+ Container tablepro-driver-tls-clickhouse-1 Created 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Created 
+ Container tablepro-driver-tls-mongo-plain-1 Starting 
+ Container tablepro-driver-tls-mssql-1 Starting 
+ Container tablepro-driver-tls-mysql-plain-1 Starting 
+ Container tablepro-driver-tls-ssh-bastion-1 Starting 
+ Container tablepro-driver-tls-clickhouse-plain-1 Starting 
+ Container tablepro-driver-tls-redis-plain-1 Starting 
+ Container tablepro-driver-tls-mysql-mtls-1 Starting 
+ Container tablepro-driver-tls-clickhouse-1 Starting 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Starting 
+ Container tablepro-driver-tls-mssql-plain-1 Starting 
+ Container tablepro-driver-tls-mssql-ssh-1 Starting 
+ Container tablepro-driver-tls-mongo-1 Starting 
+ Container tablepro-driver-tls-mysql-1 Starting 
+ Container tablepro-driver-tls-mysql-ssh-1 Starting 
+ Container tablepro-driver-tls-redis-1 Starting 
+ Container tablepro-driver-tls-mongo-plain-1 Started 
+ Container tablepro-driver-tls-mssql-1 Started 
+ Container tablepro-driver-tls-mysql-plain-1 Started 
+ Container tablepro-driver-tls-ssh-bastion-1 Started 
+ Container tablepro-driver-tls-clickhouse-plain-1 Started 
+ Container tablepro-driver-tls-redis-plain-1 Started 
+ Container tablepro-driver-tls-mysql-mtls-1 Started 
+ Container tablepro-driver-tls-clickhouse-1 Started 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Started 
+ Container tablepro-driver-tls-mssql-plain-1 Started 
+ Container tablepro-driver-tls-mssql-ssh-1 Started 
+ Container tablepro-driver-tls-mongo-1 Started 
+ Container tablepro-driver-tls-mysql-1 Started 
+ Container tablepro-driver-tls-mysql-ssh-1 Started 
+ Container tablepro-driver-tls-redis-1 Started 
+ Container tablepro-driver-tls-clickhouse-plain-1 Waiting 
+ Container tablepro-driver-tls-mysql-1 Waiting 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Waiting 
+ Container tablepro-driver-tls-mysql-plain-1 Waiting 
+ Container tablepro-driver-tls-mssql-1 Waiting 
+ Container tablepro-driver-tls-clickhouse-1 Waiting 
+ Container tablepro-driver-tls-mysql-mtls-1 Waiting 
+ Container tablepro-driver-tls-mssql-ssh-1 Waiting 
+ Container tablepro-driver-tls-redis-plain-1 Waiting 
+ Container tablepro-driver-tls-mongo-plain-1 Waiting 
+ Container tablepro-driver-tls-ssh-bastion-1 Waiting 
+ Container tablepro-driver-tls-mysql-ssh-1 Waiting 
+ Container tablepro-driver-tls-mssql-plain-1 Waiting 
+ Container tablepro-driver-tls-redis-1 Waiting 
+ Container tablepro-driver-tls-mongo-1 Waiting 
+ Container tablepro-driver-tls-ssh-bastion-1 Healthy 
+ Container tablepro-driver-tls-redis-plain-1 Healthy 
+ Container tablepro-driver-tls-redis-1 Healthy 
+ Container tablepro-driver-tls-clickhouse-plain-1 Healthy 
+ Container tablepro-driver-tls-mongo-plain-1 Healthy 
+ Container tablepro-driver-tls-clickhouse-1 Healthy 
+ Container tablepro-driver-tls-mongo-1 Healthy 
+ Container tablepro-driver-tls-mysql-mtls-1 Healthy 
+ Container tablepro-driver-tls-mssql-plain-1 Healthy 
+ Container tablepro-driver-tls-mssql-1 Healthy 
+ Container tablepro-driver-tls-mysql-mtls-ssh-1 Healthy 
+ Container tablepro-driver-tls-mssql-ssh-1 Healthy 
+ Container tablepro-driver-tls-mysql-ssh-1 Healthy 
+ Container tablepro-driver-tls-mysql-plain-1 Healthy 
+ Container tablepro-driver-tls-mysql-1 Healthy 
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.25
+   Compiling cfg-if v1.0.5
+   Compiling libc v0.2.189
+   Compiling typenum v1.20.1
+   Compiling subtle v2.6.1
+   Compiling rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling cmov v0.5.4
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling autocfg v1.5.1
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.12
+   Compiling pin-project-lite v0.2.17
+   Compiling const-oid v0.10.2
+   Compiling memchr v2.8.3
+   Compiling futures-core v0.3.34
+   Compiling cpufeatures v0.3.1
+   Compiling equivalent v1.0.2
+   Compiling pkg-config v0.3.34
+   Compiling ctutils v0.4.2
+   Compiling portable-atomic v1.15.0
+   Compiling log v0.4.34
+   Compiling version_check v0.9.5
+   Compiling critical-section v1.2.0
+   Compiling futures-sink v0.3.34
+   Compiling futures-io v0.3.34
+   Compiling futures-task v0.3.34
+   Compiling futures-channel v0.3.34
+   Compiling stable_deref_trait v1.2.1
+   Compiling smallvec v1.16.1
+   Compiling slab v0.4.12
+   Compiling cpubits v0.1.1
+   Compiling num-traits v0.2.19
+   Compiling base64ct v1.8.3
+   Compiling litemap v0.8.3
+   Compiling writeable v0.6.4
+   Compiling dunce v1.0.5
+   Compiling generic-array v0.14.7
+   Compiling bitflags v2.13.2
+   Compiling icu_normalizer_data v2.3.0
+   Compiling allocator-api2 v0.2.21
+   Compiling fs_extra v1.3.0
+   Compiling pem-rfc7468 v1.0.0
+   Compiling icu_properties_data v2.3.0
+   Compiling utf8_iter v1.0.4
+   Compiling foldhash v0.2.0
+   Compiling itoa v1.0.18
+   Compiling thiserror v2.0.20
+   Compiling aws-lc-rs v1.18.1
+   Compiling percent-encoding v2.3.2
+   Compiling hashbrown v0.17.1
+   Compiling untrusted v0.7.1
+   Compiling form_urlencoded v1.2.2
+   Compiling zmij v1.0.23
+   Compiling scopeguard v1.2.0
+   Compiling syn v2.0.119
+   Compiling syn v3.0.6
+   Compiling serde_json v1.0.151
+   Compiling untrusted v0.9.0
+   Compiling vcpkg v0.2.15
+   Compiling rustls v0.23.45
+   Compiling parking v2.2.1
+   Compiling crc32fast v1.5.2
+   Compiling once_cell v1.21.4
+   Compiling rustversion v1.0.23
+   Compiling crossbeam-utils v0.8.23
+   Compiling tracing-core v0.1.36
+   Compiling simd-adler32 v0.3.10
+   Compiling jobserver v0.1.35
+   Compiling fastrand v2.5.0
+   Compiling rust_decimal v1.43.0
+   Compiling zerocopy v0.8.57
+   Compiling winnow v1.0.4
+   Compiling iana-time-zone v0.1.65
+   Compiling indexmap v2.14.2
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling cc v1.4.6
+   Compiling digest v0.10.7
+   Compiling event-listener v5.4.2
+   Compiling lock_api v0.4.14
+   Compiling adler2 v2.0.1
+   Compiling arrayvec v0.7.8
+   Compiling parking_lot_core v0.9.12
+   Compiling errno v0.3.14
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.3
+   Compiling getrandom v0.2.17
+   Compiling rustix v1.1.5
+   Compiling signal-hook-registry v1.4.8
+   Compiling semver v1.0.28
+   Compiling miniz_oxide v0.9.1
+   Compiling ff v0.14.0
+   Compiling glob v0.3.4
+   Compiling zlib-rs v0.6.8
+   Compiling linux-raw-sys v0.12.1
+   Compiling rustc_version v0.4.1
+   Compiling object v0.39.1
+   Compiling num-integer v0.1.47
+   Compiling either v1.18.0
+   Compiling getrandom v0.3.4
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling cmake v0.1.58
+   Compiling uuid v1.26.1
+   Compiling parking_lot v0.12.5
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling clang-sys v1.9.1
+   Compiling group v0.14.0
+   Compiling winnow v0.7.15
+   Compiling bumpalo v3.20.3
+   Compiling base16ct v1.0.0
+   Compiling byteorder v1.5.0
+   Compiling hex v0.4.3
+   Compiling cpufeatures v0.2.17
+   Compiling zopfli v0.8.3
+   Compiling crunchy v0.2.4
+   Compiling typed-path v0.12.3
+   Compiling regex-syntax v0.8.11
+   Compiling ryu v1.0.23
+   Compiling minimal-lexical v0.2.1
+   Compiling serde_bytes v0.11.19
+   Compiling aws-lc-sys v0.45.0
+   Compiling ring v0.17.14
+   Compiling nom v7.1.3
+   Compiling toml_edit v0.25.15+spec-1.1.0
+   Compiling csv-core v0.1.13
+   Compiling libloading v0.8.9
+   Compiling bindgen v0.72.1
+   Compiling base64 v0.22.1
+   Compiling unicode_categories v0.1.1
+   Compiling endi v1.1.1
+   Compiling tiny-keccak v2.0.2
+   Compiling proc-macro-crate v3.5.0
+   Compiling itertools v0.13.0
+   Compiling csv v1.4.0
+   Compiling regex-automata v0.4.18
+   Compiling sqlformat v0.5.0
+   Compiling synstructure v0.14.0
+   Compiling stacker v0.1.25
+   Compiling rand_core v0.9.5
+   Compiling sha2 v0.10.9
+   Compiling event-listener-strategy v0.5.4
+   Compiling rustc-hash v2.1.3
+   Compiling cexpr v0.6.0
+   Compiling flate2 v1.1.10
+   Compiling data-encoding v2.11.1
+   Compiling shlex v1.3.0
+   Compiling openssl-sys v0.9.117
+   Compiling curve25519-dalek v5.0.0
+   Compiling zip v8.6.0
+   Compiling hashbrown v0.16.1
+   Compiling cfg_aliases v0.2.2
+   Compiling crc-catalog v2.5.0
+   Compiling crc v3.4.0
+   Compiling nix v0.31.3
+   Compiling const-random-macro v0.1.16
+   Compiling futures-intrusive v0.5.0
+   Compiling crossbeam-queue v0.3.14
+   Compiling block-padding v0.3.3
+   Compiling keccak v0.2.2
+   Compiling regex v1.13.1
+   Compiling const-random v0.1.18
+   Compiling inout v0.1.4
+   Compiling spin v0.9.9
+   Compiling httparse v1.10.1
+   Compiling ident_case v1.0.1
+   Compiling zeroize_derive v1.5.0
+   Compiling tracing-attributes v0.1.31
+   Compiling zerocopy-derive v0.8.57
+   Compiling enumflags2_derive v0.7.12
+   Compiling ar_archive_writer v0.5.3
+   Compiling hashlink v0.11.1
+   Compiling serde_derive v1.0.229
+   Compiling zerofrom-derive v0.1.8
+   Compiling tokio-macros v2.7.2
+   Compiling yoke-derive v0.8.3
+   Compiling zeroize v1.9.0
+   Compiling futures-macro v0.3.34
+   Compiling hybrid-array v0.4.15
+   Compiling zerovec-derive v0.11.6
+   Compiling displaydoc v0.2.7
+   Compiling der v0.8.2
+   Compiling thiserror-impl v2.0.20
+   Compiling rustls-pki-types v1.15.1
+   Compiling tracing v0.1.44
+   Compiling async-trait v0.1.92
+   Compiling futures-util v0.3.34
+   Compiling zerofrom v0.1.8
+   Compiling webpki-roots v1.0.9
+   Compiling yoke v0.8.3
+   Compiling psm v0.1.32
+   Compiling tempfile v3.27.0
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling block-padding v0.4.2
+   Compiling zerotrie v0.2.5
+   Compiling crypto-bigint v0.7.5
+   Compiling zerovec v0.11.8
+   Compiling inout v0.2.2
+   Compiling recursive-proc-macro-impl v0.1.1
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling spki v0.8.0
+   Compiling sec1 v0.8.1
+   Compiling pkcs1 v0.8.0-rc.4
+   Compiling recursive v0.1.1
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling digest v0.11.3
+   Compiling cipher v0.5.2
+   Compiling icu_collections v2.3.0
+   Compiling universal-hash v0.6.1
+   Compiling icu_locale_core v2.3.0
+   Compiling aead v0.6.1
+   Compiling hmac v0.13.0
+   Compiling sha2 v0.11.0
+   Compiling polyval v0.7.3
+   Compiling aes v0.9.3
+   Compiling ctr v0.10.1
+   Compiling pbkdf2 v0.13.0
+   Compiling salsa20 v0.11.0
+   Compiling cbc v0.2.1
+   Compiling ghash v0.6.0
+   Compiling chacha20 v0.10.2
+   Compiling signature v3.0.0
+   Compiling hkdf v0.13.0
+   Compiling sha1 v0.11.0
+   Compiling blowfish v0.10.0
+   Compiling poly1305 v0.9.1
+   Compiling blake2 v0.11.0
+   Compiling rand v0.10.2
+   Compiling macro_magic_core_macros v0.5.1
+   Compiling aes-gcm v0.11.1
+   Compiling derive-syn-parse v0.2.0
+   Compiling openssl-probe v0.2.1
+   Compiling strsim v0.11.1
+   Compiling icu_provider v2.3.1
+   Compiling scrypt v0.12.0
+   Compiling pkcs5 v0.8.1
+   Compiling libm v0.2.16
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling num-bigint v0.5.1
+   Compiling tinyvec v1.13.3
+   Compiling macro_magic_core v0.5.1
+   Compiling pkcs8 v0.11.0
+   Compiling bytes v1.12.1
+   Compiling chrono v0.4.45
+   Compiling zvariant_utils v4.2.0
+   Compiling futures-executor v0.3.34
+   Compiling secrecy v0.10.3
+   Compiling enumflags2 v0.7.12
+   Compiling zcheapstr v1.1.0
+   Compiling futures v0.3.34
+   Compiling ed25519 v3.0.0
+   Compiling serde_spanned v0.6.9
+   Compiling ipnet v2.12.2
+   Compiling toml_datetime v0.6.11
+   Compiling darling_core v0.24.1
+   Compiling bcrypt-pbkdf v0.11.0
+   Compiling ed25519-dalek v3.0.0
+   Compiling tokio v1.53.1
+   Compiling http v1.5.0
+   Compiling elliptic-curve v0.14.1
+   Compiling primefield v0.14.0
+   Compiling crypto-primes v0.7.2
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling wnaf v0.14.1
+   Compiling rfc6979 v0.6.0
+   Compiling ecdsa v0.17.0
+   Compiling ssh-encoding v0.3.0
+   Compiling primeorder v0.14.0
+   Compiling zvariant_derive v5.15.0
+   Compiling argon2 v0.6.0
+   Compiling url v2.5.8
+   Compiling ppv-lite86 v0.2.21
+   Compiling rust_xlsxwriter v0.99.1
+   Compiling zvariant v5.15.0
+   Compiling p256 v0.14.0
+   Compiling p521 v0.14.0
+   Compiling p384 v0.14.0
+   Compiling ssh-cipher v0.3.0
+   Compiling http-body v1.1.0
+   Compiling rand_chacha v0.9.0
+   Compiling sha3 v0.11.0
+   Compiling sqlparser v0.58.0
+   Compiling rsa v0.10.0-rc.18
+   Compiling rand v0.9.5
+   Compiling kem v0.3.0
+   Compiling module-lattice v0.2.3
+   Compiling cipher v0.4.4
+   Compiling serde_repr v0.1.21
+   Compiling flume v0.12.0
+   Compiling async-recursion v1.1.1
+   Compiling async-broadcast v0.7.2
+   Compiling num-bigint v0.4.8
+   Compiling num-iter v0.1.46
+   Compiling hmac v0.12.1
+   Compiling futures-lite v2.6.1
+   Compiling atoi v2.0.0
+   Compiling ordered-stream v0.2.0
+   Compiling num-bigint-dig v0.9.1
+   Compiling toml_write v0.1.2
+   Compiling crossbeam-epoch v0.9.21
+   Compiling openssl v0.10.81
+   Compiling foreign-types-shared v0.1.1
+   Compiling radium v0.7.0
+   Compiling try-lock v0.2.5
+   Compiling sponge-cursor v0.1.0
+   Compiling dotenvy v0.15.7
+   Compiling want v0.3.1
+   Compiling sha3 v0.12.0
+   Compiling foreign-types v0.3.2
+   Compiling russh-cryptovec v0.62.0
+   Compiling toml_edit v0.22.27
+   Compiling ml-kem v0.3.2
+   Compiling prefix-trie v0.8.4
+   Compiling darling_macro v0.24.1
+   Compiling macro_magic_macros v0.5.1
+   Compiling libsqlite3-sys v0.37.0
+   Compiling zbus_names v4.3.4
+   Compiling num-rational v0.4.2
+   Compiling openssl-macros v0.1.1
+   Compiling enum_dispatch v0.3.13
+   Compiling delegate v0.13.5
+   Compiling generic-array v1.4.5
+   Compiling zbus_macros v5.19.0
+   Compiling num-complex v0.4.6
+   Compiling ahash v0.8.12
+   Compiling unicode-segmentation v1.13.3
+   Compiling hex-literal v1.1.0
+   Compiling atomic-waker v1.1.2
+   Compiling rand_core v0.6.4
+   Compiling md5 v0.8.1
+   Compiling num-conv v0.2.2
+   Compiling thiserror v1.0.69
+   Compiling tap v1.0.1
+   Compiling time-core v0.1.9
+   Compiling native-tls v0.2.18
+   Compiling wyz v0.5.1
+   Compiling password-hash v0.5.0
+   Compiling tokio-util v0.7.19
+   Compiling tokio-stream v0.1.19
+   Compiling russh-util v0.52.0
+   Compiling time-macros v0.2.32
+   Compiling convert_case v0.10.0
+   Compiling num v0.4.3
+   Compiling hyper v1.11.1
+   Compiling toml v0.8.23
+   Compiling hickory-proto v0.26.3
+   Compiling darling v0.24.1
+   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/core)
+   Compiling ssh-key v0.7.0-rc.11
+   Compiling hkdf v0.12.4
+   Compiling pbkdf2 v0.12.2
+   Compiling aes v0.8.4
+   Compiling cbc v0.1.2
+   Compiling multiversion-macros v0.9.0
+   Compiling thiserror-impl v1.0.69
+   Compiling crossbeam-channel v0.5.17
+   Compiling rustc_version_runtime v0.3.0
+   Compiling encoding_rs v0.8.41
+   Compiling md-5 v0.10.6
+   Compiling blake2 v0.10.6
+   Compiling tower-service v0.3.3
+   Compiling funty v2.0.0
+   Compiling powerfmt v0.2.0
+   Compiling tagptr v0.2.0
+   Compiling deranged v0.5.8
+   Compiling unicode-xid v0.2.6
+   Compiling argon2 v0.5.3
+   Compiling moka v0.12.16
+   Compiling hyper-util v0.1.20
+   Compiling derive_more-impl v2.1.1
+   Compiling serde_with_macros v3.23.0
+   Compiling bitvec v1.1.1
+   Compiling multiversion v0.9.0
+   Compiling macro_magic v0.5.1
+   Compiling zbus v5.19.0
+   Compiling unicode-normalization v0.1.25
+   Compiling typed-builder-macro v0.22.0
+   Compiling serde_derive_internals v0.29.1
+   Compiling hickory-net v0.26.3
+   Compiling time v0.3.55
+   Compiling core_detect v1.0.0
+   Compiling multiversion_no_op v1.0.0
+   Compiling simdutf8 v0.1.5
+   Compiling resolv-conf v0.7.6
+   Compiling unicode-bidi v0.3.18
+   Compiling unicode-properties v0.1.4
+   Compiling async-native-tls v0.4.0
+   Compiling clickhouse-macros v0.3.0
+   Compiling serde_with v3.23.0
+   Compiling mongodb-internal-macros v3.9.1
+   Compiling derive_more v2.1.1
+   Compiling stringprep v0.1.5
+   Compiling combine v4.6.8
+   Compiling typed-builder v0.22.0
+   Compiling http-body-util v0.1.5
+   Compiling half v2.7.1
+   Compiling hickory-resolver v0.26.3
+   Compiling clickhouse-types v0.1.3
+   Compiling asynchronous-codec v0.6.2
+   Compiling rustls-native-certs v0.8.4
+   Compiling md-5 v0.11.0
+   Compiling derive-where v1.7.0
+   Compiling async-lock v3.4.2
+   Compiling arc-swap v1.9.2
+   Compiling backon v1.6.0
+   Compiling bstr v1.13.1
+   Compiling connection-string v0.2.0
+   Compiling bnum v0.13.0
+   Compiling take_mut v0.2.2
+   Compiling pretty-hex v0.3.0
+   Compiling arcstr v1.2.0
+   Compiling jiff-core v0.1.1
+   Compiling tablepro-policy v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/policy)
+   Compiling xxhash-rust v0.8.18
+   Compiling tiberius v0.12.3 (https://github.com/tiberius-rs/tiberius?rev=c1d2e741ee6fe0935091826d91fb5886b6a4082a#c1d2e741)
+   Compiling bson v2.15.0
+   Compiling jiff v0.2.37
+   Compiling tablepro-driver-mssql v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/drivers/mssql)
+   Compiling ashpd v0.13.13
+   Compiling oo7 v0.6.0
+   Compiling rustls-webpki v0.103.15
+   Compiling russh v0.63.3
+   Compiling tokio-rustls v0.26.5
+   Compiling sqlx-core v0.9.0
+   Compiling hyper-rustls v0.27.9
+   Compiling mongodb v3.9.1 (/tmp/bookie-b4-frozen-7eff/linux/vendor/mongodb)
+   Compiling redis v1.7.0 (/tmp/bookie-b4-frozen-7eff/linux/vendor/redis)
+   Compiling clickhouse v0.15.2
+   Compiling tablepro-ssh v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/ssh)
+   Compiling sqlx-mysql v0.9.0 (/tmp/bookie-b4-frozen-7eff/linux/vendor/sqlx-mysql)
+   Compiling sqlx-sqlite v0.9.0
+   Compiling tablepro-driver-clickhouse v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/drivers/clickhouse)
+   Compiling sqlx v0.9.0
+   Compiling tablepro-storage v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/storage)
+   Compiling tablepro-driver-mysql v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/drivers/mysql)
+   Compiling tablepro-transport v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/transport)
+   Compiling tablepro-driver-tls-tests v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/driver-tls-tests)
+   Compiling tablepro-driver-redis v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/drivers/redis)
+   Compiling tablepro-driver-mongodb v0.1.0 (/tmp/bookie-b4-frozen-7eff/linux/crates/drivers/mongodb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 12s
+     Running unittests src/lib.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/tablepro_driver_tls_tests-f9f8d6343a417a65)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/clickhouse_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/clickhouse_tls-ebb54f91badc45e6)
+
+running 6 tests
+test a_plaintext_mode_does_not_reach_the_https_port ... ok
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test a_verifying_mode_without_an_authority_is_refused ... ok
+test an_encrypt_only_mode_connects_without_an_authority ... ok
+test verify_full_rejects_an_ip_endpoint_absent_from_the_certificate ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/mongodb_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/mongodb_tls-36276e8ff927b11c)
+
+running 5 tests
+test a_plaintext_mode_is_refused_by_a_tls_only_server ... ok
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test a_verifying_mode_without_an_authority_is_refused ... ok
+test verifying_modes_reject_an_ip_endpoint_absent_from_the_certificate ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.17s
+
+     Running tests/mssql_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/mssql_tls-ef8a99d37636eebe)
+
+running 9 tests
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test an_encrypt_only_mode_connects_without_an_authority ... ok
+test the_server_forces_encryption_and_dropping_tunnel_closes_forward ... ok
+test verify_ca_accepts_the_fixture_authority ... ok
+test verify_full_rejects_an_ip_endpoint_absent_from_the_certificate ... ok
+test verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query ... ok
+test verify_full_through_ssh_rejects_a_wrong_or_local_identity ... ok
+test verify_full_through_ssh_rejects_an_untrusted_authority ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+     Running tests/mysql_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/mysql_tls-61de4dadf1bb9933)
+
+running 16 tests
+test a_plaintext_mode_is_refused_by_a_tls_only_server ... ok
+test a_rotated_valid_client_identity_connects ... ok
+test a_server_requiring_a_client_certificate_accepts_a_valid_identity ... ok
+test a_server_requiring_a_client_certificate_accepts_the_identity_through_ssh ... ok
+test a_server_requiring_a_client_certificate_rejects_a_missing_identity ... ok
+test a_server_requiring_a_client_certificate_rejects_an_untrusted_identity ... ok
+test a_tls_rejection_does_not_fall_back_to_plaintext_and_dropping_tunnel_cleans_up ... ok
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test a_verifying_mode_without_an_authority_is_refused ... ok
+test an_encrypt_only_mode_connects_without_an_authority ... ok
+test verify_ca_accepts_the_fixture_authority ... ok
+test verify_full_rejects_an_ip_endpoint_absent_from_the_certificate ... ok
+test verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query ... ok
+test verify_full_through_ssh_rejects_a_wrong_or_local_identity ... ok
+test verify_full_through_ssh_rejects_an_untrusted_authority ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.73s
+
+     Running tests/plaintext_regression.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/plaintext_regression-a7702fdf9272f350)
+
+running 7 tests
+test a_verifying_clickhouse_client_will_not_fall_back_to_plaintext ... ok
+test a_verifying_mongodb_client_will_not_fall_back_to_plaintext ... ok
+test a_verifying_mssql_client_will_not_fall_back_to_plaintext ... ok
+test a_verifying_mysql_client_will_not_fall_back_to_plaintext ... ok
+test a_verifying_redis_client_will_not_fall_back_to_plaintext ... ok
+test mongodb_still_connects_to_a_server_without_encryption ... ok
+test redis_still_connects_to_a_server_without_encryption ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.16s
+
+     Running tests/redis_tls.rs (/home/trung/.cache/bookie-b4-target-7eff/debug/deps/redis_tls-0838f6aa7fb163d3)
+
+running 5 tests
+test a_plaintext_mode_is_refused_by_a_tls_only_server ... ok
+test a_verifying_mode_connects_with_the_fixture_authority ... ok
+test a_verifying_mode_naming_the_wrong_authority_is_refused ... ok
+test a_verifying_mode_without_an_authority_is_refused ... ok
+test verifying_modes_reject_an_ip_endpoint_absent_from_the_certificate ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
+

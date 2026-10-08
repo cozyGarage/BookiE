@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "project": "BookiE Linux",
+  "run_window_utc": "2026-10-08T03:10:47Z to 2026-10-08T03:37:32Z",
+  "candidate_commit": "7eff6f26cd06d6bd4d1df022bf944831294b4ef4",
+  "working_tree": "clean; tracked_diff_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "candidate_layers": {
+    "b4-rollback": {
+      "result": "passed",
+      "details": [
+        "Nine MySQL mysql_atomic integration tests passed, including failed-batch rollback, MyISAM/MEMORY/CSV/ARCHIVE effects, INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT, and a trigger session-variable side effect.",
+        "The PostgreSQL backend-termination rollback_failure selector passed; the driver reported TransactionRollbackFailed, table writes rolled back, and identity/trigger sequence allocations remained advanced."
+      ],
+      "logs": [
+        "logs/b4-rollback-1.txt",
+        "logs/b4-rollback-2.txt"
+      ]
+    },
+    "security-policy": {
+      "result": "passed",
+      "command": "cargo test --locked -p tablepro-policy -p tablepro-mcp --lib --tests",
+      "log": "logs/security-policy-1.txt"
+    },
+    "tls": {
+      "result": "passed",
+      "command": "bash scripts/test-driver-tls.sh",
+      "log": "logs/tls-1.txt"
+    },
+    "ssh": {
+      "result": "passed; 22 Docker-backed tests",
+      "command": "bash scripts/test-ssh.sh",
+      "log": "logs/ssh-1.txt"
+    },
+    "postgres-release": {
+      "result": "passed",
+      "command": "bash scripts/test-postgres-release.sh",
+      "gtk_scenarios": [
+        "postgres_saved_mtls_connection_authenticates_and_queries",
+        "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+        "postgres_ssh_setup_failure_is_durably_audited",
+        "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+        "postgres_ssh_multihop_trusts_both_hops_and_queries",
+        "postgres_ssh_second_hop_decline_does_not_learn_key",
+        "postgres_ssh_changed_second_hop_key_is_refused"
+      ],
+      "log": "logs/postgres-release-1.txt"
+    },
+    "mssql-kerberos": {
+      "result": "passed; 2 Samba AD fixture tests",
+      "command": "bash scripts/test-mssql-kerberos.sh",
+      "boundary": "Samba AD fixture results do not establish Windows AD interoperability.",
+      "log": "logs/mssql-kerberos-1.txt"
+    },
+    "ui": {
+      "result": "passed; 50 GTK safety scenarios",
+      "command": "bash scripts/test-gtk-safety.sh",
+      "binary": {
+        "path": "target/installed/usr/bin/tablepro (staged test path)",
+        "sha256": "7fd65a6bb2e2454a76abf5a64f42c94dbee9aa448ea3f5e188e13d46a7aa4fce"
+      },
+      "log": "logs/ui-1.txt"
+    }
+  },
+  "evidence_files": {
+    "layer-report.json": "8f0b957e75c2f9bff5b87f6f83e4c2811cd0caf4050b39737242c2875b640c4c",
+    "logs/b4-rollback-1.txt": "7672bef1f4e241d9ca5c384b4079456bc1896ab82b95229f44db4596ed956e5c",
+    "logs/b4-rollback-2.txt": "51a52b133f584d5a6003fc92b0e3abbc98f64696372cedeb5460b47250c771fa",
+    "logs/security-policy-1.txt": "e9aa18fa1f9557d4eb92fb20e7b020d1c0d0400a5ddc9501126497c43c9c5db7",
+    "logs/tls-1.txt": "a3a0d1b90f9d270ec0c948f5365f4b06acee0a48ef660594ca41413c892184f1",
+    "logs/ssh-1.txt": "1b0896c30f9cc4fffb35497ccc300109b4212295743758d1ade7fbed9371d878",
+    "logs/postgres-release-1.txt": "1b801e4f509e3d531a617a89f118bca11edd88b138a4c5b781c54295506d6ceb",
+    "logs/mssql-kerberos-1.txt": "9f4b4dcb0a23574112466674d46821c34fcc320b0419ee0c6c61ddd98cd9c457",
+    "logs/ui-1.txt": "586f4b55cdcc411b5274ffed864e7c3e92a0448d8cd52fb53e5fbd86ecb6a284"
+  },
+  "latest_tip_followup": {
+    "candidate_commit": "8e5d1b187e0d79750991dabfbcc38f1b2cfb4d5f",
+    "result": "The b4-rollback layer passed on the newer linux tip after PR #308 changed PostgreSQL integration tests. Nine MySQL atomicity tests and the PostgreSQL backend-termination rollback-failure selector passed.",
+    "hosted_run": {
+      "url": "https://github.com/cozyGarage/BookiE/actions/runs/37723088254",
+      "status": "cancelled after linux advanced during concurrent PR merges; does not establish hosted B4 acceptance"
+    },
+    "logs": [
+      "logs/latest-tip-8e5/b4-rollback-1.txt",
+      "logs/latest-tip-8e5/b4-rollback-2.txt",
+      "logs/latest-tip-8e5/report.json"
+    ],
+    "report_sha256": "d645e0d940a91343a0d00bbf609d4c186f1e40879adbc9a2b4aee1a99933d24a",
+    "log_sha256": {
+      "logs/latest-tip-8e5/b4-rollback-1.txt": "bbbb1b60be7107bff275cef07ab50d76a0cbf33d6366e137b774b7425f44c0a3",
+      "logs/latest-tip-8e5/b4-rollback-2.txt": "b82c2a23e370e706217d837f2fb03184ccbb2f1733ffe818e6375364b25a55c9"
+    }
+  },
+  "not_established": [
+    "Hosted execution of the B4 candidate layers on the exact candidate SHA. The Build Linux runs for 7eff6f26 and 8e5d1b18 were superseded/cancelled as linux advanced.",
+    "Distribution-package installation and native Wayland acceptance; the GTK run used an Xvfb staged release binary.",
+    "Windows AD interoperability; only the local Samba AD fixture ran.",
+    "MySQL behavior for engines and side effects outside the explicit tested contract."
+  ],
+  "subsequent_remote_tip": {
+    "commit": "f5ff9f9263ffd7426a45c8842b129cbb5e8a9b07",
+    "change": "PR #308 added PostgreSQL range integration tests; PR #309 added GTK enum grid tests and documentation. The B4 rollback layer was rerun on 8e5d1b18; the other local layers remain pinned to 7eff6f26 because these later changes do not touch their B4 code paths. The final release candidate remains to be frozen after B3 closes.",
+    "hosted_build_run": {
+      "url": "https://github.com/cozyGarage/BookiE/actions/runs/37723730584",
+      "status_at_review": "pending; no jobs had started yet"
+    }
+  }
+}
