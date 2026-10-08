@@ -1,0 +1,24 @@
+BookiE B4-7/B4-16/B4-17 hosted PostgreSQL release evidence, 2026-10-08
+
+Build Linux run #37854177911 tested commit
+`f073844461d11291b7eb9ae094e175bdd5a6ea7a`. The PostgreSQL release job
+(#113578648625) passed `bash scripts/test-postgres-release.sh` with exit code 0
+in 348.463 seconds. The uploaded layer report identifies a clean source tree
+at the tested commit.
+
+The GTK SSH scenarios reported passed:
+
+- `postgres_ssh_unknown_host_key_decline_is_durably_audited`
+- `postgres_ssh_setup_failure_is_durably_audited`
+- `postgres_ssh_tunnel_loss_retires_session_and_reconnects`
+- `postgres_ssh_multihop_trusts_both_hops_and_queries`
+- `postgres_ssh_second_hop_decline_does_not_learn_key`
+- `postgres_ssh_changed_second_hop_key_is_refused`
+- `postgres_saved_mtls_connection_authenticates_and_queries`
+
+This run predates PR #411, which replaces synthetic Escape input with the
+accessible Cancel action in the refusal scenarios. It therefore does not
+establish hosted execution of that updated test input, frozen-candidate or
+installed-package qualification, or native Wayland trust acceptance. The
+overall Build Linux run was still active in unrelated jobs when this report was
+captured.
