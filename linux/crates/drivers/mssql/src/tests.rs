@@ -9,7 +9,7 @@ fn terminal_session_kill_is_disconnected_but_sql_errors_are_preserved() {
     ));
     assert!(matches!(
         map_server_error(245, "conversion failed", 2),
-        DriverError::Query { message, sqlstate }
+        DriverError::Query { message, sqlstate, .. }
             if message == "conversion failed" && sqlstate.as_deref() == Some("2")
     ));
 }

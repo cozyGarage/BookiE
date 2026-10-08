@@ -66,7 +66,12 @@ pub(crate) async fn run_statements(
 
             Err(e) => {
                 aborted = stops_on_error;
-                StatementOutcomeKind::Error(crate::ui::error_text::driver_message(&e))
+                let position = match &e {
+                    DriverError::Query { position, .. } if bound.sql == sql => *position,
+                    _ => None,
+                };
+                let message = crate::ui::error_text::driver_message(&e);
+                StatementOutcomeKind::Error(super::error_location::located_message(&message, &bound.sql, position))
             }
         };
         out.push(StatementOutcome {

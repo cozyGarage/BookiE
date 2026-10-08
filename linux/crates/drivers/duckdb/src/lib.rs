@@ -592,6 +592,7 @@ fn map_duck_error(err: duckdb::Error) -> DriverError {
     DriverError::Query {
         message: err.to_string(),
         sqlstate: None,
+        position: None,
     }
 }
 

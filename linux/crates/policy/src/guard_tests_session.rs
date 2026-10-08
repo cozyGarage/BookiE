@@ -31,6 +31,7 @@ impl tablepro_core::Session for ScriptedSession {
             return Err(DriverError::Query {
                 message: "deferred foreign key constraint violated".into(),
                 sqlstate: Some("23503".into()),
+                position: None,
             });
         }
         if !self.failed_once && self.script.fail_once_on == Some(sql) {

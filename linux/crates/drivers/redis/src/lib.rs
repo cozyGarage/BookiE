@@ -234,10 +234,7 @@ impl Connection for RedisConnection {
         let mut conn = self.conn.lock().await;
         let args = split_redis_cli(trimmed);
         if args.is_empty() {
-            return Err(DriverError::Query {
-                message: "empty Redis command".into(),
-                sqlstate: None,
-            });
+            return Err(DriverError::query("empty Redis command"));
         }
         if is_redis_stream_command(&args) {
             return Err(DriverError::Unsupported(
@@ -637,10 +634,9 @@ fn bytes_to_value(bytes: Vec<u8>) -> Value {
 
 fn parse_db_name(table: &str) -> Result<u8, DriverError> {
     let stripped = table.strip_prefix("db").unwrap_or(table);
-    stripped.parse::<u8>().map_err(|_| DriverError::Query {
-        message: format!("invalid Redis database name: {table}"),
-        sqlstate: None,
-    })
+    stripped
+        .parse::<u8>()
+        .map_err(|_| DriverError::query(format!("invalid Redis database name: {table}")))
 }
 
 /// Minimal Redis CLI tokenizer: splits on whitespace, respects double quotes.
@@ -747,10 +743,7 @@ fn map_redis_error_in_context(err: RedisError, connecting: bool, verifies_cert: 
             DriverError::Disconnected
         }
     } else {
-        DriverError::Query {
-            message: msg,
-            sqlstate: None,
-        }
+        DriverError::query(msg)
     }
 }
 

@@ -1,5 +1,6 @@
 mod completion;
 mod diagnostics;
+mod error_location;
 mod find_bar;
 mod finish_notice;
 pub(crate) mod open_file;

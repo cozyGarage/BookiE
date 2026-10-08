@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- A failed PostgreSQL statement in the SQL editor shows the line and column of the error.
 - SQL Server now has a Docker-backed lost-ack contract: an independent
   connection observes an UPDATE and audit row committed before SQL Server is
   stopped during a delayed batch response; after restart both rows remain
