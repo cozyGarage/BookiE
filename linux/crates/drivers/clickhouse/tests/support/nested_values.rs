@@ -48,6 +48,14 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             r#"Map(String, Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127)))"#,
         ),
         (
+            r#"CAST(map(CAST('low' AS Enum8('low' = -128, 'high' = 127)), 'NULL', CAST('high' AS Enum8('low' = -128, 'high' = 127)), '東京') AS Map(Enum8('low' = -128, 'high' = 127), String))"#,
+            r#"Map(Enum8('low' = -128, 'high' = 127), String)"#,
+        ),
+        (
+            r#"CAST(map(CAST('low' AS Enum16('low' = -32768, 'high' = 32767)), 'O''Brien', CAST('high' AS Enum16('low' = -32768, 'high' = 32767)), 'NULL') AS Map(Enum16('low' = -32768, 'high' = 32767), String))"#,
+            r#"Map(Enum16('low' = -32768, 'high' = 32767), String)"#,
+        ),
+        (
             "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))",
             "Array(Nullable(UInt128))",
         ),

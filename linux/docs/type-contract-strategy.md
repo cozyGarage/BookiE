@@ -61,6 +61,9 @@ Enum8/Enum16 nullable/non-nullable pairings. The new cases include signed
 Enum16 endpoints, the Enum8 high endpoint, and empty-label versus SQL NULL
 versus literal `NULL`; they use the same native JSON, JSON/CSV/XLSX, and
 lossy-write refusal/postcondition checks.
+Enum8 and Enum16 map keys also retain signed endpoint labels through the native
+JSON, JSON/CSV/XLSX consumers; SQL, binding and keyed grid writes retain the
+explicit refusal behavior and leave the stored row unchanged in the same test.
 `Array(Enum16)` and `Array(Nullable(Enum16))` now cover their signed endpoints,
 SQL NULL versus the literal `NULL` label where nullable, the same native JSON
 and export oracles, and lossy SQL, binding and grid-write refusal in that
