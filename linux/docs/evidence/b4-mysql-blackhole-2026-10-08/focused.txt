@@ -1,0 +1,14 @@
+Source: 3d64a98882006e6c1f459822906a854382f33ab7
+Fixture: testcontainers MySQL 8.1 (MySQL 8.0 BLACKHOLE availability separately confirmed)
+
+Focused selector:
+mysql_atomic::mysql_failed_batch_blackhole_trigger_sink_discards_rows_but_runs_with_trigger
+Result: 1 passed, 0 failed, 76 filtered out.
+
+Full rollback selector:
+cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1
+Result: 13 passed, 0 failed, 64 filtered out.
+
+Assertions: the batch fails at statement index 1; the InnoDB parent row rolls back; the
+MyISAM trigger witness persists, proving the trigger ran; the BLACKHOLE trigger sink
+does not retain rows. Existing matrix coverage passed in the same full selector.
