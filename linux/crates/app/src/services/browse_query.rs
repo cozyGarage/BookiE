@@ -1,5 +1,7 @@
 //! Pure SQL planning shared by browse page and count requests.
 //! Native unfiltered fetches stay available for non-SQL drivers.
+use std::collections::HashSet;
+
 use tablepro_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build_filter_where, keyset_where_clause};
 
 pub(crate) struct BrowseTarget<'a> {
@@ -8,12 +10,14 @@ pub(crate) struct BrowseTarget<'a> {
     pub table: &'a str,
     pub columns: &'a [ColumnInfo],
     pub filter: &'a FilterSet,
+    pub hidden_columns: Option<&'a HashSet<String>>,
 }
 
 #[derive(Debug)]
 pub(crate) struct BoundQuery {
     pub sql: String,
     pub params: Vec<Value>,
+    pub projected_columns: Option<Vec<usize>>,
 }
 
 #[derive(Debug)]
@@ -33,6 +37,7 @@ impl BrowseTarget<'_> {
         let mut query = BoundQuery {
             sql: format!("SELECT {projection} FROM {target}"),
             params: Vec::new(),
+            projected_columns: None,
         };
         if let Some((clause, params)) = filter {
             query.sql.push_str(" WHERE ");
@@ -53,7 +58,9 @@ impl BrowseTarget<'_> {
         sort: Option<(usize, bool)>,
         cursor: Option<&[Value]>,
     ) -> Result<PageQuery, String> {
-        let mut query = self.filtered_query("*")?;
+        let (projection, projected) = self.projection();
+        let mut query = self.filtered_query(&projection)?;
+        query.projected_columns = projected;
         // These drivers use their native page readers; SQL ordering by the
         // inferred key would force an otherwise-unfiltered browse through the
         // SQL query path, which their command grammar does not support.
@@ -81,7 +88,7 @@ impl BrowseTarget<'_> {
             query.params.extend(params);
             0
         } else {
-            if self.filter.is_empty() && order.is_none() {
+            if self.filter.is_empty() && order.is_none() && query.projected_columns.is_none() {
                 return Ok(PageQuery::Native);
             }
             offset
@@ -95,6 +102,39 @@ impl BrowseTarget<'_> {
                 actual_offset,
             ));
         Ok(PageQuery::Sql(query))
+    }
+
+    fn projection(&self) -> (String, Option<Vec<usize>>) {
+        let projected = self.projected_columns();
+        let sql = projected.as_ref().map_or_else(
+            || "*".to_owned(),
+            |indices| {
+                indices
+                    .iter()
+                    .map(|&index| tablepro_core::sql_dialect::quote_ident(self.driver_id, &self.columns[index].name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            },
+        );
+        (sql, projected)
+    }
+
+    fn projected_columns(&self) -> Option<Vec<usize>> {
+        let hidden = self.hidden_columns?;
+        if hidden.is_empty()
+            || matches!(self.driver_id, "mongodb" | "redis")
+            || !self.columns.iter().any(|column| column.primary_key)
+        {
+            return None;
+        }
+        let mut required = HashSet::new();
+        for (index, column) in self.columns.iter().enumerate() {
+            if !hidden.contains(&column.name) || column.primary_key {
+                required.insert(index);
+            }
+        }
+        (required.len() < self.columns.len())
+            .then(|| (0..self.columns.len()).filter(|i| required.contains(i)).collect())
     }
 }
 
@@ -173,6 +213,114 @@ mod tests {
     fn table_without_pk_or_sort_has_no_promised_order() {
         assert_eq!(resolved_order_by("postgres", &[column("name", false)], None), None);
     }
+
+    #[test]
+    fn hidden_filter_column_stays_in_predicate_but_not_projection() {
+        let columns = vec![
+            column("tenant", true),
+            column("name", false),
+            column("status", false),
+            column("secret", false),
+        ];
+        let filter = FilterSet {
+            rules: vec![FilterRule {
+                column: "status".into(),
+                op: FilterOp::Eq,
+                value: Some(FilterValue::Single("ready".into())),
+            }],
+            ..Default::default()
+        };
+        let hidden: HashSet<String> = ["status", "secret"].map(str::to_owned).into();
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "items",
+            columns: &columns,
+            filter: &filter,
+            hidden_columns: Some(&hidden),
+        };
+
+        let PageQuery::Sql(page) = target.page(0, 100, None, None).unwrap() else {
+            panic!("expected projected SQL")
+        };
+        assert_eq!(
+            page.sql,
+            "SELECT \"tenant\", \"name\" FROM \"items\" WHERE \"status\" = $1 ORDER BY \"tenant\" ASC LIMIT 100 OFFSET 0"
+        );
+        assert_eq!(page.projected_columns, Some(vec![0, 1]));
+        assert_eq!(page.params, vec![Value::Text("ready".into())]);
+    }
+
+    #[test]
+    fn hidden_sort_column_stays_in_order_clause_and_composite_keys_stay_projected() {
+        let columns = vec![
+            column("tenant", true),
+            column("id", true),
+            column("name", false),
+            column("rank", false),
+            column("secret", false),
+        ];
+        let hidden: HashSet<String> = ["tenant", "rank", "secret"].map(str::to_owned).into();
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "items",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: Some(&hidden),
+        };
+
+        let PageQuery::Sql(page) = target.page(0, 100, Some((3, true)), None).unwrap() else {
+            panic!("expected projected SQL")
+        };
+        assert!(page.sql.starts_with("SELECT \"tenant\", \"id\", \"name\" FROM"));
+        assert_eq!(page.projected_columns, Some(vec![0, 1, 2]));
+        assert!(
+            page.sql
+                .ends_with("ORDER BY \"rank\" ASC, \"tenant\" ASC, \"id\" ASC LIMIT 100 OFFSET 0")
+        );
+    }
+
+    #[test]
+    fn hidden_projection_falls_back_without_a_key() {
+        let columns = vec![column("name", false), column("secret", false)];
+        let hidden: HashSet<String> = ["secret"].map(str::to_owned).into();
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "items",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: Some(&hidden),
+        };
+        assert_eq!(target.projected_columns(), None);
+    }
+
+    #[test]
+    fn hidden_raw_filter_column_stays_in_sql_but_not_projection() {
+        let columns = vec![column("id", true), column("name", false), column("secret", false)];
+        let filter = FilterSet {
+            extra_sql: Some("secret <> ''".into()),
+            ..Default::default()
+        };
+        let hidden: HashSet<String> = ["secret"].map(str::to_owned).into();
+        let target = BrowseTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "items",
+            columns: &columns,
+            filter: &filter,
+            hidden_columns: Some(&hidden),
+        };
+
+        let PageQuery::Sql(page) = target.page(0, 100, None, None).unwrap() else {
+            panic!("expected projected SQL")
+        };
+        assert!(page.sql.starts_with("SELECT \"id\", \"name\" FROM"));
+        assert!(page.sql.contains("secret <> ''"));
+        assert_eq!(page.projected_columns, Some(vec![0, 1]));
+    }
+
     #[test]
     fn invalid_filter_refuses_both_page_and_count() {
         let filter = FilterSet {
@@ -189,6 +337,7 @@ mod tests {
             table: "items",
             columns: &[],
             filter: &filter,
+            hidden_columns: None,
         };
         assert!(target.count().unwrap_err().contains("missing"));
         assert!(target.page(0, 100, None, None).unwrap_err().contains("missing"));
@@ -211,6 +360,7 @@ mod tests {
             table: "items",
             columns: &columns,
             filter: &filter,
+            hidden_columns: None,
         };
         let count = target.count().unwrap();
         let PageQuery::Sql(page) = target.page(10_000, 100, None, Some(&[Value::Int(50)])).unwrap() else {
@@ -236,8 +386,61 @@ mod tests {
                 table: "stats",
                 columns: &columns,
                 filter: &FilterSet::default(),
+                hidden_columns: None,
             };
             assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
         }
+    }
+
+    #[tokio::test]
+    async fn sqlite_hidden_projection_keeps_the_primary_key_and_leaves_hidden_values_stored() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+        let directory = tempfile::tempdir().unwrap();
+        let connection = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: directory.path().join("projection.db").to_string_lossy().into_owned(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let control = crate::services::operation_control::bounded(30);
+        connection
+            .execute_controlled(
+                "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, secret TEXT)",
+                &control,
+            )
+            .await
+            .unwrap();
+        connection
+            .execute_controlled("INSERT INTO items VALUES (7, 'Ada', 'still stored')", &control)
+            .await
+            .unwrap();
+
+        let columns = vec![column("id", true), column("name", false), column("secret", false)];
+        let hidden: HashSet<String> = ["secret"].map(str::to_owned).into();
+        let target = BrowseTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: "items",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: Some(&hidden),
+        };
+        let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
+            panic!("expected projected SQL")
+        };
+        assert_eq!(query.projected_columns, Some(vec![0, 1]));
+        let projected = connection
+            .query_params_controlled(&query.sql, &query.params, &control)
+            .await
+            .unwrap();
+        assert_eq!(projected.rows, vec![vec![Value::Int(7), Value::Text("Ada".into())]]);
+
+        let native = connection
+            .query_controlled("SELECT secret FROM items WHERE id = 7", &control)
+            .await
+            .unwrap();
+        assert_eq!(native.rows, vec![vec![Value::Text("still stored".into())]]);
     }
 }

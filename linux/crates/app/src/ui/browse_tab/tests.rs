@@ -1,6 +1,8 @@
 use super::grid_render::column_layout_matches;
 use super::value_parse::parse_input_for_grid_cell;
-use super::{BrowsePageRequest, PageRequestTracker, RowCountRequestTracker, columns_for_browse_page};
+use super::{
+    BrowsePageRequest, PageRequestTracker, RowCountRequestTracker, columns_for_browse_page, projection_for_loaded_page,
+};
 use tablepro_core::{ColumnInfo, QueryResult, Value};
 use uuid::Uuid;
 
@@ -32,6 +34,16 @@ fn only_the_latest_browse_page_request_is_accepted() {
 
     assert!(!tracker.accepts(older, 0));
     assert!(tracker.accepts(newer, 0));
+}
+
+#[test]
+fn an_empty_page_uses_full_schema_headers_without_a_sparse_row_map() {
+    let result = QueryResult {
+        columns: Vec::new(),
+        rows: Vec::new(),
+        truncated: false,
+    };
+    assert_eq!(projection_for_loaded_page(&result, Some(vec![0, 2])), None);
 }
 
 #[test]

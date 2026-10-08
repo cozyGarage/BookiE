@@ -18,12 +18,16 @@ pub(crate) fn inspector_fields(columns: &[ColumnInfo], cells: &[Value]) -> Vec<I
         .iter()
         .enumerate()
         .map(|(index, column)| {
-            let value = cells.get(index).unwrap_or(&Value::Null);
+            let value = cells.get(index);
             InspectorField {
                 name: column.name.clone(),
                 data_type: column.data_type.clone(),
-                text: value_to_display_text(value),
-                is_null: matches!(value, Value::Null),
+                text: match value {
+                    None => crate::tr!("Not fetched"),
+                    Some(Value::Undecodable(kind)) if kind == "not fetched" => crate::tr!("Not fetched"),
+                    Some(value) => value_to_display_text(value),
+                },
+                is_null: matches!(value, Some(Value::Null)),
             }
         })
         .collect()
@@ -149,13 +153,14 @@ mod tests {
     }
 
     #[test]
-    fn every_column_gets_a_field_with_its_own_text_and_a_marker_for_null() {
+    fn every_column_distinguishes_sql_null_from_a_missing_value() {
         let columns = [column("id", "int"), column("name", "text"), column("extra", "text")];
         let fields = inspector_fields(&columns, &[Value::Int(7), Value::Null]);
         assert_eq!(fields.len(), 3);
         assert_eq!((fields[0].name.as_str(), fields[0].text.as_str()), ("id", "7"));
         assert!(fields[1].is_null);
-        assert!(fields[2].is_null, "a missing cell reads as NULL");
+        assert!(!fields[2].is_null);
+        assert_eq!(fields[2].text, "Not fetched");
         assert_eq!(fields[1].data_type, "text");
     }
 
