@@ -186,6 +186,7 @@ fn resolved_order_by(driver_id: &str, columns: &[ColumnInfo], sort: Option<(usiz
 mod tests {
     use super::*;
     use tablepro_core::{FilterOp, FilterRule, FilterValue};
+
     fn column(name: &str, primary_key: bool) -> ColumnInfo {
         ColumnInfo {
             name: name.into(),
@@ -200,6 +201,37 @@ mod tests {
             enum_type: None,
             domain_type: None,
         }
+    }
+
+    async fn guarded_value_refetch(
+        connection: std::sync::Arc<dyn tablepro_core::Connection>,
+        driver_id: &str,
+        query: &BoundQuery,
+        control: &tablepro_core::OperationControl,
+    ) -> tablepro_core::QueryResult {
+        use tablepro_core::{Connection, Environment};
+        use tablepro_policy::{
+            AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal,
+        };
+
+        PolicyGuard::new(
+            connection,
+            GuardContext {
+                connection_id: uuid::Uuid::new_v4(),
+                connection_name: format!("{driver_id} value refetch"),
+                driver_id: driver_id.into(),
+                environment: Environment::Local,
+                read_only: true,
+                principal: Principal::human_gui(),
+                policy: std::sync::Arc::new(PolicyConfig::default()),
+                approval: std::sync::Arc::new(DenyApprovalSink),
+                audit: std::sync::Arc::new(NullAuditSink),
+                audit_state: std::sync::Arc::new(AuditState::new()),
+            },
+        )
+        .query_params_controlled(&query.sql, &query.params, control)
+        .await
+        .unwrap()
     }
 
     #[test]
@@ -593,11 +625,7 @@ mod tests {
 
     #[tokio::test]
     async fn sqlite_value_query_refetches_the_exact_blob_for_a_composite_key() {
-        use std::sync::Arc;
-        use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment};
-        use tablepro_policy::{
-            AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal,
-        };
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
 
         let directory = tempfile::tempdir().unwrap();
         let connection = drivers_sqlite::SqliteDriver
@@ -659,25 +687,7 @@ mod tests {
             .unwrap();
         assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes.clone())]]);
 
-        let guard = PolicyGuard::new(
-            Arc::from(connection),
-            GuardContext {
-                connection_id: uuid::Uuid::new_v4(),
-                connection_name: "SQLite value refetch".into(),
-                driver_id: "sqlite".into(),
-                environment: Environment::Local,
-                read_only: true,
-                principal: Principal::human_gui(),
-                policy: Arc::new(PolicyConfig::default()),
-                approval: Arc::new(DenyApprovalSink),
-                audit: Arc::new(NullAuditSink),
-                audit_state: Arc::new(AuditState::new()),
-            },
-        );
-        let guarded = guard
-            .query_params_controlled(&query.sql, &query.params, &control)
-            .await
-            .unwrap();
+        let guarded = guarded_value_refetch(std::sync::Arc::from(connection), "sqlite", &query, &control).await;
         assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
     }
 
@@ -730,7 +740,9 @@ mod tests {
             .query_params_controlled(&query.sql, &query.params, &control)
             .await
             .unwrap();
-        assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes)]]);
+        assert_eq!(fetched.rows, vec![vec![Value::Bytes(bytes.clone())]]);
+        let guarded = guarded_value_refetch(std::sync::Arc::from(connection), "mysql", &query, &control).await;
+        assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
     }
 
     async fn insert_mysql_value_preview_rows(
@@ -863,5 +875,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(fetched.rows, vec![vec![Value::Bytes(vec![0xab; 9000])]]);
+        let guarded = guarded_value_refetch(std::sync::Arc::from(connection), "postgres", &query, &control).await;
+        assert_eq!(guarded.rows, vec![vec![Value::Bytes(vec![0xab; 9000])]]);
     }
 }

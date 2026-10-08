@@ -54,8 +54,9 @@ the MySQL test also checks `LONGBLOB`, byte length and the native hex prefix. A
 Docker PostgreSQL 16 test uses catalog enum/domain key metadata, confirms both
 native types with `pg_typeof`, and refetches the same-size BLOB through the
 typed composite key. The SQLite test also runs the same parameterized refetch
-through `PolicyGuard` and compares the exact bytes. MySQL and PostgreSQL service
-tests still call drivers directly. Other-driver native checks, installed GTK
+through `PolicyGuard` and compares the exact bytes. MySQL and PostgreSQL also
+run the same guarded query; the Docker cases retain native storage and key-type
+oracles. Other-driver native checks, installed GTK
 acceptance and memory profiling remain open under PERF-10.
 
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
