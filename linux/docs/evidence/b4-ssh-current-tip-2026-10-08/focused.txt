@@ -1,10 +1,10 @@
 BookiE B4-7/B4-16/B4-17 exact-tip SSH evidence, 2026-10-08
 
-Source: `fork/linux` commit `ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9`.
+The SSH-only layer below ran on `fork/linux` commit `ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9`. The PostgreSQL release layer was rerun at PR head `7744d5b079634242dd14a513e7636b8b2467d5c6`; its B4 source files match base `fork/linux` commit `60e3f2666df21b04cb448c8dfe3b9b777dc61a9e`, with documentation-only changes on top.
 
 `bash scripts/test-ssh.sh` passed 22 tests: 10 built-in agent-auth and 12 system OpenSSH session tests. Coverage includes two-hop reachability, cancellation while the second-hop trust prompt is pending, second-hop key change, and system OpenSSH ProxyJump.
 
-`bash scripts/test-postgres-release.sh` returned exit code 0. The system OpenSSH agentd trust fixture passed, and all seven selected GTK SSH trust/audit/reconnect scenarios reported passed:
+`CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 bash scripts/test-postgres-release.sh` returned exit code 0. The system OpenSSH agentd trust fixture passed, all three agentd mTLS tests passed, the release integration test suite completed successfully, and all seven selected GTK SSH trust/audit/reconnect scenarios reported passed:
 
 - `postgres_ssh_unknown_host_key_decline_is_durably_audited`
 - `postgres_ssh_setup_failure_is_durably_audited`

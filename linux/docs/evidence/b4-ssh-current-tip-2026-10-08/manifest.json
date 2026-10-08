@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "date": "2026-10-08",
-  "branch": "linux",
-  "source_commit": "ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9",
+  "branch": "docs/b4-7-17-ssh-current-tip",
+  "source_commit": "7744d5b079634242dd14a513e7636b8b2467d5c6",
   "scope": [
     "B4-7 SSH audit terminal outcomes",
     "B4-16 tunnel-loss stale-session retirement",
     "B4-17 native multi-hop, cancellation and GTK trust flow"
   ],
-  "result": "Both local layers passed on the exact fork/linux source SHA; test-postgres-release returned exit code 0.",
+  "result": "The SSH layer passed on fork/linux source ca1dc6002; the PostgreSQL release layer passed at PR head 7744d5b (same B4 code as base linux 60e3f26, documentation-only difference). test-postgres-release returned exit code 0.",
   "ssh_layer": {
     "command": "bash scripts/test-ssh.sh",
     "result": "22 passed, 0 failed",
@@ -22,9 +22,10 @@
     ]
   },
   "postgres_release_layer": {
-    "command": "bash scripts/test-postgres-release.sh",
-    "result": "passed; seven selected GTK SSH trust/audit/reconnect scenarios reported passed",
+    "command": "CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5 bash scripts/test-postgres-release.sh",
+    "result": "passed with exit code 0; system OpenSSH, agentd mTLS, release integration, and seven selected GTK SSH trust/audit/reconnect scenarios passed",
     "agentd_system_openssh": "agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust passed",
+    "agentd_mtls": "3 passed: untrusted certificate refusal, saved client certificate session, saved SSH route client certificate session",
     "gtk_scenarios": [
       "postgres_ssh_unknown_host_key_decline_is_durably_audited",
       "postgres_ssh_setup_failure_is_durably_audited",
@@ -56,11 +57,21 @@
     "source_commit": "60e3f2666df21b04cb448c8dfe3b9b777dc61a9e",
     "status_at_recording": "pending"
   },
+  "current_pr_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37797072636,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37797072636",
+    "source_commit": "7744d5b079634242dd14a513e7636b8b2467d5c6",
+    "status_at_recording": "in progress",
+    "preflight": "passed",
+    "fast_gtk": "in progress",
+    "b4_rollback_tls_postgres_release": "skipped because the PR changes documentation only"
+  },
   "not_established": [
     "frozen-candidate acceptance",
     "distribution-package installation and native Wayland trust flow",
     "Windows Active Directory interoperability",
     "saved jump-chain editing; UI-1b remains open"
   ],
-  "environment_note": "An attempted additional worktree could not be created under the /tmp quota; tests ran from the existing clean worktree at the exact source commit using the shared Cargo target cache. The PostgreSQL GTK runner emitted a D-Bus disconnect message during shutdown after all selected scenarios passed; the script exited 0."
+  "environment_note": "Tests ran from the PR worktree at 7744d5b using the shared Cargo target cache. The B4 source files match fork/linux 60e3f26; only documentation differs from that base. The PostgreSQL GTK runner emitted a D-Bus disconnect message during shutdown after all selected scenarios passed; the script exited 0. These are local Xvfb/Docker results, not frozen-candidate or installed Wayland acceptance."
 }
