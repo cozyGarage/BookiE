@@ -108,6 +108,15 @@ See [testing](testing.md) and
 
 ## Case lookup
 
+SQLite's declared `ENUM` pseudo-type is covered as SQLite NUMERIC affinity:
+native `typeof()`/`quote()` oracles distinguish text labels, numeric
+INTEGER/REAL values, BLOB bytes and SQL NULL. Grid and typed CSV parsing also
+preserve numeric affinity and refuse unsafe numeric inputs
+([driver test](../crates/drivers/sqlite/tests/runtime_typed_values.rs), [grid
+test](../crates/app/src/ui/browse_tab/tests.rs), [CSV
+test](../crates/core/src/import/cell/tests/sqlite_affinity.rs)). Declared `ANY`
+retains its conservative text path because metadata omits STRICT table status.
+
 Detailed native oracles, exact selectors and dated results are preserved in
 [value-contract history](archive/value-contract-history.md). Use these starting points,
 then search that ledger/test for the specific type and consumer; one starting

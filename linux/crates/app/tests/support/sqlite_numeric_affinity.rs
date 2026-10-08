@@ -16,13 +16,13 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
         .execute(
             "CREATE TABLE flexible (\
                  id INTEGER PRIMARY KEY, integer_amount INTEGER, \
-                 real_amount REAL, numeric_amount NUMERIC\
+                 real_amount REAL, numeric_amount NUMERIC, enum_like ENUM\
              )",
         )
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO flexible VALUES (1, 1, 1.5, 1), (2, 2, 2.5, 2)")
+        .execute("INSERT INTO flexible VALUES (1, 1, 1.5, 1, 'queued'), (2, 2, 2.5, 2, '2.5')")
         .await
         .unwrap();
     let columns = connection.fetch_columns(None, "flexible").await.unwrap();
@@ -45,6 +45,36 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
         "flexible",
         &columns,
         &[(integer_index, decimal)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[update]).await.unwrap();
+
+    let enum_index = columns.iter().position(|column| column.name == "enum_like").unwrap();
+    let enum_value = parse_input_for_grid_cell(
+        "4.25",
+        Some(&columns[enum_index]),
+        "sqlite",
+        Some(&before.rows[0][enum_index]),
+    )
+    .unwrap();
+    assert_eq!(enum_value, Value::Decimal("4.25".parse().unwrap()));
+    assert!(
+        parse_input_for_grid_cell(
+            "1e999",
+            Some(&columns[enum_index]),
+            "sqlite",
+            Some(&Value::Text("queued".into()))
+        )
+        .is_err(),
+        "numeric overflow must not be passed to SQLite as text and coerced by affinity"
+    );
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "sqlite",
+        None,
+        "flexible",
+        &columns,
+        &[(enum_index, enum_value)],
         &[Value::Int(1)],
     )
     .unwrap();
@@ -100,7 +130,8 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
         .query(
             "SELECT id, typeof(integer_amount), integer_amount, \
                     typeof(real_amount), real_amount, \
-                    typeof(numeric_amount), numeric_amount \
+                    typeof(numeric_amount), numeric_amount, \
+                    typeof(enum_like), quote(enum_like) \
              FROM flexible ORDER BY id",
         )
         .await
@@ -116,6 +147,8 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
                 Value::Text("not numeric".into()),
                 Value::Text("text".into()),
                 Value::Text("not numeric".into()),
+                Value::Text("real".into()),
+                Value::Text("4.25".into()),
             ],
             vec![
                 Value::Int(2),
@@ -125,6 +158,8 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
                 Value::Float(2.5),
                 Value::Text("integer".into()),
                 Value::Int(2),
+                Value::Text("real".into()),
+                Value::Text("2.5".into()),
             ],
         ]
     );

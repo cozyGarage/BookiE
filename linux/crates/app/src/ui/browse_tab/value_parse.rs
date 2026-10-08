@@ -144,6 +144,21 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     if let Some(result) = parse_special_driver_input(trimmed, col, driver_id) {
         return result;
     }
+    if driver_id == "sqlite"
+        && col.is_some_and(|column| {
+            classify_type(&column.data_type.to_ascii_lowercase()) == TypeKind::Text
+                && tablepro_core::sqlite_declared_type_has_numeric_affinity(&column.data_type)
+        })
+    {
+        if let Some(value) = tablepro_core::sqlite_affinity_decimal(text) {
+            return Ok(Value::Decimal(value));
+        }
+        return if tablepro_core::is_numeric_input(text) {
+            Err(crate::tr!("Invalid number"))
+        } else {
+            Ok(Value::Text(text.to_owned()))
+        };
+    }
     match parse_input_for_column(text, col) {
         Err(error) => match sqlite_numeric_affinity_fallback(text, col, driver_id) {
             Some(value) => Ok(value),
