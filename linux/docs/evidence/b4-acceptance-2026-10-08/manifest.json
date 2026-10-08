@@ -3,11 +3,11 @@
   "date": "2026-10-08",
   "branch": "linux",
   "source_commit": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
-  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip 8b35c18 changes GTK harnesses, fixture scripts and documentation only relative to that runtime; no application or driver implementation code changed.",
+  "source_note": "Exact B4 runtime candidate tested on a7f14fa. Current fork/linux tip d5a8308 adds GTK harness, fixture, packaging and documentation changes only relative to that runtime; no application or driver implementation code changed.",
   "local_tracked_diff": "none",
   "local_worktree_note": "The layer report records an untracked linux/target symlink used only to relocate generated quality/build artifacts outside /tmp; no tracked source diff.",
   "scope": "B4 acceptance for rollback, TLS, SSH audit and multi-hop trust, GTK bundle flows, and SQL Server Kerberos fixture",
-  "result": "all seven local B4 layers passed on a7f14fa; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa; current-tip hosted acceptance is queued",
+  "result": "all seven local B4 layers passed on a7f14fa; five selected B4-22 GTK scenarios passed with a staged release binary from a7f14fa; current-tip Build Linux acceptance is pending",
   "release_binary": {
     "build_source": "a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200",
     "staged_path": "/home/trung/.cache/bookie-b4-target-0d5/installed/usr/bin/tablepro",
@@ -25,10 +25,10 @@
   ],
   "hosted": {
     "workflow": "Build Linux",
-    "run_id": 37774595671,
-    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37774595671",
-    "source_commit": "8b35c186bdb1ff5bf49bff7ea08e3f7f8639d9a3",
-    "status": "queued",
+    "run_id": 37775494283,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37775494283",
+    "source_commit": "d5a830856932540928c14809cf904afb32bfc59a",
+    "status": "pending",
     "conclusion": null
   },
   "earlier_hosted": {
@@ -44,9 +44,9 @@
   ],
   "summary": {
     "path": "focused.txt",
-    "sha256": "3220d554ea4081f32cf2b1f98b82f02b0c87ab1b5c6f283c3c02ba10d21db9ed"
+    "sha256": "4a9fbc08252674471f2bf96d5a462ef2b1a4968f56ea0ee991296b014b435985"
   },
-  "branch_head_at_update": "8b35c186bdb1ff5bf49bff7ea08e3f7f8639d9a3",
+  "branch_head_at_update": "d5a830856932540928c14809cf904afb32bfc59a",
   "runtime_diff_since_tested_commit": [
     "linux/crates/app/tests/gtk_safety.py",
     "linux/crates/app/tests/gtk_ux.py",
@@ -54,6 +54,7 @@
     "linux/docs/known-issues.md",
     "linux/docs/type-contract-strategy.md",
     "linux/scripts/test-deb-package.sh",
+    "linux/scripts/test-flatpak-window.sh",
     "linux/scripts/test-gtk-mysql.sh"
   ],
   "local_bundle_gtk": {
@@ -130,5 +131,14 @@
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37772724483",
     "source_commit": "0bb8e34354d13e3ab9911b9db710eddb02115170",
     "status": "cancelled"
+  },
+  "flatpak_packaging": {
+    "workflow": "Flatpak Linux (packaging only)",
+    "run_id": 37775494301,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37775494301",
+    "source_commit": "d5a830856932540928c14809cf904afb32bfc59a",
+    "status": "in_progress",
+    "scope": "default and development Flatpak builds; PR #380 adds an AT-SPI Flatpak window check",
+    "conclusion": null
   }
 }
