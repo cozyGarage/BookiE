@@ -5,52 +5,24 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Integrated baseline: `c1efc8f63` on `linux`. PR #301 added the PostgreSQL
-custom-range-array refusal contract and its documented consumer outcomes; its
-hosted checks and post-merge Linux regression gate passed. PR #302 updates GTK
-accessibility selectors for typed result headers. Recent foundation work also
-includes PR #293's sprint-doc refresh, #289's result-header type and
-primary-key markers, #294's ClickHouse Enum8/Enum16 map-key checks, #295's B4
-checkpoint reconciliation, #296's MongoDB native collection browsing, #298's
-integration-budget update and PR-comment evidence, and #300's installed
-ClickHouse enum grid scenario. PR #288 split hosted CI tiers; #290 completed
-ClickHouse Enum8/Enum16 map-value pairings; #291 added MySQL/MariaDB ENUM/SET
-XLSX checks.
-Earlier baseline work includes PR #280
-ClickHouse Map(Enum) consumer
-coverage, #282/#284 PostgreSQL lost-ack non-replay and its regression proxy
-Clippy fix, #285 ClickHouse mutation results, and #286 hosted rollback plus
-release-binary SSH checks.
-Recent B3 merges cover SQL Server server-owned values and mutation batches
-(#224–#225), multiple result sets (#228), MongoDB census cost/cancellation and
-nested filters (#229, #231, #234, #247), ClickHouse enum values (#242),
-PostgreSQL quoted-enum edits under a restricted role and shadowed local
-`search_path` (#249), MongoDB stale-grid ABA value-based edit/delete behavior
-(#251), the scoped MongoDB mutation audit (#252), PostgreSQL optimistic enum,
-enum-array and domain cast coverage (#253, #255), the MongoDB one-million-
-document census profile (#257), and ClickHouse Enum8 signed-endpoint, zero-code,
-and undeclared-label refusal coverage for both widths, plus nullable Enum16
-consumer coverage (#260–#263, #267, #269).
-Nested `Array(Enum8)` and `Array(Nullable(Enum8))` result/export and
-write-refusal cases are covered in #271 and #273.
-`Array(Enum16)` and `Array(Nullable(Enum16))` now extend that matrix with the
-signed endpoints, SQL NULL versus the literal `NULL` label where nullable,
-native JSON, JSON/CSV/XLSX consumers, and type-less SQL, bind and grid-write
-refusal. PR #277 also covers empty Enum8/Enum16 labels and nullable Enum8 versus
-SQL NULL, plus Enum8/Enum16 tuple values through native JSON and export refusal
-checks.
-PR #236 reconciles the SQL Server matrix; #248 adds MySQL update/delete effect
-coverage across engines. These are focused cases, not milestone closure.
+Code baseline: `4d1fa5aaa` on `linux`. Recent focused B3 work added native
+consumer checks for custom PostgreSQL range arrays (#305) and a separate custom
+range scalar refusal contract (#306). The contracts prove native type/value
+preservation and refuse lossy writes without changing target or sibling rows.
+PR #304 refreshed B4 acceptance docs and keeps B4 closure behind B3. PR #301's
+array contract and #302's typed result-header accessibility selectors are also
+integrated. Earlier implementation details and dated validation are in the
+changelog and owning boards.
 
-At this baseline, the full local driver integration tier passed, plus optional
-DuckDB driver and app-contract suites. This does not close B3: remaining work is
-the listed consumer/configuration matrix, mutation triage, performance rows and
-installed grid acceptance. Hosted run #37708183936 passed the focused MySQL and
-PostgreSQL rollback layer, seven release-binary PostgreSQL SSH GTK scenarios,
-and the installed GTK safety suite including encrypted credential restoration.
-The broad driver integration tier timed out during dependency compilation
-before tests ran. See the [B4 board](b4-task-board.md) for scoped results and
-remaining package/Wayland and Windows AD acceptance.
+The local `scripts/ci-local.sh quick` gate passed at `4d1fa5aaa`, including
+formatting, non-GTK Clippy, workspace unit/integration checks and guards. The
+focused PostgreSQL range scalar/array Docker checks and strict integration
+Clippy passed. Hosted Linux test quality, Build Linux, Security and Flatpak
+checks for this baseline are still running; reconcile their results before
+recording hosted acceptance. These focused cases do not close B3: the broader
+engine/type/consumer/configuration matrix, mutation triage, performance rows and
+installed grid acceptance remain open. See the [B4 board](b4-task-board.md)
+for its remaining package/Wayland and Windows AD acceptance.
 
 B3 remains open for the broader engine/type/consumer/configuration matrix,
 mutation triage and installed grid acceptance. B4 still needs the remaining
