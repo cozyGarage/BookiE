@@ -7,6 +7,7 @@ token_file="${FORGEJO_TOKEN_FILE:-$HOME/.config/forgejo/token}"
 api="${FORGEJO_API:-http://192.168.1.246:3000/api/v1/repos/trung/bookie}"
 timeout_minutes="${FORGEJO_GATE_TIMEOUT_MINUTES:-60}"
 
+export GIT_ASKPASS="${GIT_ASKPASS:-$HOME/.config/forgejo/askpass.sh}"
 sha="$(git rev-parse "$branch")"
 git push --quiet "$remote" "$branch:$branch"
 token="$(cat "$token_file")"
