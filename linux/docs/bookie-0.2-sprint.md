@@ -5,15 +5,16 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Integrated baseline: `19816c0ab` on `linux`. PR #293 refreshed the sprint
-documentation; PR #289 then added result-header type and primary-key markers;
-PR #294 adds ClickHouse Enum8/Enum16 map-key consumer checks. PR #288 splits
-hosted CI tiers and shards the Linux regression gate, #290 completes ClickHouse
-Enum8/Enum16 map-value pairings, and #291 adds MySQL/MariaDB ENUM/SET XLSX
-consumer checks. PR #295 reconciles the B4 hosted-candidate checkpoint. PR #296
-remains under hosted validation for MongoDB native collection browsing, and
-#298 extends the driver-integration budget and moves the B4 checkpoint evidence
-from the repository into its PR comment; validation is in progress.
+Integrated baseline: `e4e42f7d1` on `linux`. PR #293 refreshed the sprint
+documentation; PR #289 added result-header type and primary-key markers; PR
+#294 added ClickHouse Enum8/Enum16 map-key consumer checks; and PR #295
+reconciled the B4 hosted-candidate checkpoint. PR #296 fixed MongoDB native
+collection browsing. PR #298 extends the driver-integration budget and moves
+the B4 checkpoint evidence from the repository into its PR comment; PR #300
+adds a native ClickHouse Enum16 GTK grid-edit scenario. Both are under hosted
+validation. PR #288 splits hosted CI tiers and shards the Linux regression
+gate, #290 completes ClickHouse Enum8/Enum16 map-value pairings, and #291 adds
+MySQL/MariaDB ENUM/SET XLSX consumer checks.
 Earlier baseline work includes PR #280
 ClickHouse Map(Enum) consumer
 coverage, #282/#284 PostgreSQL lost-ack non-replay and its regression proxy
