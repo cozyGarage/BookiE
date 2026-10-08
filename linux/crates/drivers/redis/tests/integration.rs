@@ -268,7 +268,11 @@ async fn browsing_another_database_does_not_leak_into_later_queries() {
 
     conn.query("SET home_key 1").await.expect("seed db0");
 
-    conn.fetch_rows(None, "db2", 0, 10).await.expect("browse db2");
+    let empty_page = tokio::time::timeout(std::time::Duration::from_secs(5), conn.fetch_rows(None, "db2", 0, 10))
+        .await
+        .expect("an empty SCAN must stop at its terminal cursor")
+        .expect("browse db2");
+    assert!(empty_page.rows.is_empty());
 
     let result = conn
         .query("GET home_key")
@@ -345,6 +349,81 @@ async fn value_contract_browsing_binary_keys_preserves_the_native_bytes() {
             Value::Text("value".into()),
         ]
     );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_redis_scan_keeps_fetching_until_the_requested_page_is_full() {
+    use std::collections::HashSet;
+
+    const KEY_COUNT: usize = 2048;
+    let (_container, host, port) = start_redis().await;
+    let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
+    let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
+
+    let mut seed = redis::cmd("MSET");
+    for index in 0..KEY_COUNT {
+        seed.arg(format!("scan_page_{index:04}")).arg("value");
+    }
+    seed.query_async::<()>(&mut native_connection)
+        .await
+        .expect("seed keys across multiple SCAN batches");
+
+    let (mut cursor, first_batch): (u64, Vec<String>) = redis::cmd("SCAN")
+        .arg(0)
+        .arg("MATCH")
+        .arg("scan_page_*")
+        .arg("COUNT")
+        .arg(100)
+        .query_async(&mut native_connection)
+        .await
+        .expect("inspect the native first SCAN batch");
+    assert_ne!(cursor, 0, "the fixture must require more than one SCAN batch");
+    let first_batch_len = first_batch.len();
+    assert!(first_batch_len < KEY_COUNT);
+
+    let mut native_keys: HashSet<String> = first_batch.into_iter().collect();
+    while cursor != 0 {
+        let (next, batch): (u64, Vec<String>) = redis::cmd("SCAN")
+            .arg(cursor)
+            .arg("MATCH")
+            .arg("scan_page_*")
+            .arg("COUNT")
+            .arg(100)
+            .query_async(&mut native_connection)
+            .await
+            .expect("read the next native SCAN batch");
+        native_keys.extend(batch);
+        cursor = next;
+    }
+    assert_eq!(native_keys.len(), KEY_COUNT, "native SCAN must census the fixture");
+
+    let requested = first_batch_len + 1;
+    assert!(requested <= KEY_COUNT);
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        connection.fetch_rows(None, "db0", 0, requested as u64),
+    )
+    .await
+    .expect("browse must stop after collecting the requested page")
+    .unwrap();
+
+    assert_eq!(result.rows.len(), requested);
+    let observed: HashSet<String> = result
+        .rows
+        .iter()
+        .map(|row| match row.first() {
+            Some(Value::Text(key)) => key.clone(),
+            other => panic!("Redis browse key must be text, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(observed.len(), result.rows.len(), "a page must not repeat keys");
+    assert!(
+        observed.is_subset(&native_keys),
+        "every browsed key must exist natively"
+    );
+    assert!(result.rows.iter().all(|row| row[3] == Value::Text("value".into())));
 }
 
 #[tokio::test]
