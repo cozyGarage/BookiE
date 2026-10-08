@@ -31,13 +31,13 @@ pub(super) struct GridMenus {
 pub(super) fn install_grid_context_menus(
     column_view: &gtk::ColumnView,
     sender: relm4::Sender<GridMsg>,
-    result: &QueryResult,
+    result_columns: &[ColumnInfo],
+    truncated: bool,
     driver_id: String,
     filterable: bool,
 ) -> GridMenus {
     let context: Rc<RefCell<Option<CellContext>>> = Rc::new(RefCell::new(None));
-    let columns = Rc::new(result.columns.clone());
-    let truncated = result.truncated;
+    let columns = Rc::new(result_columns.to_vec());
     let editable_menu = build_menu(true, true, true, filterable);
     let readonly_menu = build_menu(false, false, true, filterable);
     let empty_menu = gio::Menu::new();
@@ -136,8 +136,11 @@ pub(super) fn install_grid_context_menus(
                 let context = context.borrow();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
-                let clause =
-                    export::render_in_clause(&driver_id, &rows_for_menu(&view, position(slot)), slot.col_index);
+                let Some(rows) = values_for_column_menu(&view, position(slot), slot.col_index) else {
+                    sender.send(GridMsg::IncompleteRowData).ok();
+                    return;
+                };
+                let clause = export::render_in_clause(&driver_id, &rows, 0);
                 if clause.skipped > 0 {
                     let message = crate::tr!("Skipped {n} NULL, binary or unsupported values.")
                         .replace("{n}", &clause.skipped.to_string());
@@ -180,7 +183,8 @@ pub(super) fn install_grid_context_menus(
                 let context = context.borrow();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
-                let Some(row) = row_at(&view, position(slot)) else {
+                let Some(row) = complete_row_at(&view, position(slot)) else {
+                    sender.send(GridMsg::IncompleteRowData).ok();
                     return;
                 };
                 let json = serde_json::to_string_pretty(&export::row_to_json(&columns, &row)).unwrap_or_default();
@@ -195,18 +199,26 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("export")
             .activate(move |_, _, _| {
                 let Some(view) = view.upgrade() else { return };
-                sender
-                    .send(GridMsg::ExportResults(export_snapshot(&view, &columns, truncated)))
-                    .ok();
+                if let Some(result) = export_snapshot(&view, &columns, truncated) {
+                    sender.send(GridMsg::ExportResults(result)).ok();
+                } else {
+                    sender.send(GridMsg::IncompleteRowData).ok();
+                }
             })
             .build()
     };
     let copy_row_action = {
         let context = context.clone();
         let sender = sender.clone();
+        let view = column_view.downgrade();
         gio::ActionEntry::builder("copy-row-insert")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.borrow().as_ref() {
+                    let Some(view) = view.upgrade() else { return };
+                    if complete_row_at(&view, position(slot)).is_none() {
+                        sender.send(GridMsg::IncompleteRowData).ok();
+                        return;
+                    }
                     sender
                         .send(GridMsg::CopyRowAsInsert {
                             row_position: position(slot),
@@ -257,9 +269,16 @@ pub(super) fn install_grid_context_menus(
     let filter_action = filter_by_value_action(context.clone(), sender.clone(), column_view, columns.clone());
     let duplicate_row_action = {
         let context = context.clone();
+        let sender = sender.clone();
+        let view = column_view.downgrade();
         gio::ActionEntry::builder("duplicate-row")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.borrow().as_ref() {
+                    let Some(view) = view.upgrade() else { return };
+                    if complete_row_at(&view, position(slot)).is_none() {
+                        sender.send(GridMsg::IncompleteRowData).ok();
+                        return;
+                    }
                     sender
                         .send(GridMsg::DuplicateRow {
                             row_position: position(slot),
@@ -429,12 +448,11 @@ where
             let context = context.borrow();
             let Some(slot) = context.as_ref() else { return };
             let Some(view) = view.upgrade() else { return };
-            sender
-                .send(GridMsg::CopyToClipboard(render(
-                    &columns,
-                    &rows_for_menu(&view, position(slot)),
-                )))
-                .ok();
+            let Some(rows) = rows_for_menu(&view, position(slot)) else {
+                sender.send(GridMsg::IncompleteRowData).ok();
+                return;
+            };
+            sender.send(GridMsg::CopyToClipboard(render(&columns, &rows))).ok();
         })
         .build()
 }
@@ -549,17 +567,36 @@ fn row_at(view: &gtk::ColumnView, position: u32) -> Option<Vec<Value>> {
         .ok()
         .map(|row| row.cells_clone())
 }
-fn rows_for_menu(view: &gtk::ColumnView, clicked: u32) -> Vec<Vec<Value>> {
-    let positions = view
-        .model()
+fn complete_row_at(view: &gtk::ColumnView, position: u32) -> Option<Vec<Value>> {
+    let row = view
+        .model()?
+        .item(position)?
+        .downcast::<crate::ui::row_object::RowObject>()
+        .ok()?;
+    row.complete_cells()
+}
+fn rows_for_menu(view: &gtk::ColumnView, clicked: u32) -> Option<Vec<Vec<Value>>> {
+    complete_rows(
+        selected_row_positions(view, clicked)
+            .into_iter()
+            .map(|position| complete_row_at(view, position)),
+    )
+}
+fn values_for_column_menu(view: &gtk::ColumnView, clicked: u32, column: usize) -> Option<Vec<Vec<Value>>> {
+    selected_row_positions(view, clicked)
+        .into_iter()
+        .map(|position| row_at(view, position)?.get(column).cloned().map(|value| vec![value]))
+        .collect()
+}
+fn selected_row_positions(view: &gtk::ColumnView, clicked: u32) -> Vec<u32> {
+    view.model()
         .and_then(|model| model.downcast::<gtk::MultiSelection>().ok())
         .map(|selection| selected_positions(&selection))
         .filter(|positions| !positions.is_empty())
-        .unwrap_or_else(|| vec![clicked]);
-    positions
-        .into_iter()
-        .filter_map(|position| row_at(view, position))
-        .collect()
+        .unwrap_or_else(|| vec![clicked])
+}
+fn complete_rows(rows: impl Iterator<Item = Option<Vec<Value>>>) -> Option<Vec<Vec<Value>>> {
+    rows.collect()
 }
 fn selected_positions(selection: &gtk::MultiSelection) -> Vec<u32> {
     let bitset = selection.selection();
@@ -575,19 +612,26 @@ fn select_row_for_menu(view: &gtk::ColumnView, position: u32) {
         selection.select_item(position, true);
     }
 }
-fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bool) -> QueryResult {
-    QueryResult {
+fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bool) -> Option<QueryResult> {
+    Some(QueryResult {
         columns: columns.to_vec(),
-        rows: (0..view.model().map(|model| model.n_items()).unwrap_or(0))
-            .filter_map(|position| row_at(view, position))
-            .collect(),
+        rows: complete_rows((0..view.model()?.n_items()).map(|position| complete_row_at(view, position)))?,
         truncated,
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn export_rows_refuse_an_incomplete_page() {
+        assert!(complete_rows([Some(vec![Value::Int(1)]), None].into_iter()).is_none());
+        assert_eq!(
+            complete_rows([Some(vec![Value::Int(1)])].into_iter()),
+            Some(vec![vec![Value::Int(1)]])
+        );
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]

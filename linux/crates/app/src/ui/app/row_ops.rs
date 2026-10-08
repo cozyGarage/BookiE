@@ -136,7 +136,12 @@ impl App {
                 model.schema().map(str::to_owned),
             )
         };
-        let Some(row) = row else { return };
+        let Some(row) = row else {
+            self.show_toast(&crate::tr!(
+                "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
+            ));
+            return;
+        };
         let sql = match tablepro_core::sql_literal::build_insert_literal(
             &driver_id,
             schema.as_deref(),

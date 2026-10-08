@@ -36,6 +36,7 @@ fn page_future(
         table: &plan.table,
         columns: &plan.columns,
         filter: &plan.filter,
+        hidden_columns: None,
     };
     let query = target
         .page(offset, EXPORT_PAGE_ROWS, plan.sort, None)

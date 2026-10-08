@@ -36,55 +36,11 @@ pub(super) fn columns_for_browse_page(
     loaded_columns.to_vec()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BrowsePageRequest {
-    pub id: Uuid,
-    pub offset: u64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BrowseRowCountRequest(Uuid);
-
-#[derive(Debug)]
-pub struct BrowseLoadFailure {
-    pub request: Option<BrowsePageRequest>,
-    pub message: String,
-}
-
-#[derive(Debug, Default)]
-struct PageRequestTracker {
-    latest: std::cell::Cell<Option<Uuid>>,
-}
-
-#[derive(Debug, Default)]
-struct RowCountRequestTracker {
-    latest: std::cell::Cell<Option<Uuid>>,
-}
-
-impl RowCountRequestTracker {
-    fn begin(&self) -> BrowseRowCountRequest {
-        let request = BrowseRowCountRequest(Uuid::new_v4());
-        self.latest.set(Some(request.0));
-        request
-    }
-
-    fn accepts(&self, request: BrowseRowCountRequest) -> bool {
-        self.latest.get() == Some(request.0)
-    }
-}
-
-impl PageRequestTracker {
-    fn begin(&self, offset: u64) -> BrowsePageRequest {
-        let request = BrowsePageRequest {
-            id: Uuid::new_v4(),
-            offset,
-        };
-        self.latest.set(Some(request.id));
-        request
-    }
-
-    fn accepts(&self, request: BrowsePageRequest, current_offset: u64) -> bool {
-        self.latest.get() == Some(request.id) && request.offset == current_offset
+fn projection_for_loaded_page(result: &QueryResult, projection: Option<Vec<usize>>) -> Option<Vec<usize>> {
+    if result.rows.is_empty() && result.columns.is_empty() {
+        None
+    } else {
+        projection
     }
 }
 
@@ -126,6 +82,7 @@ pub struct BrowseTab {
     /// driver that doesn't report foreign keys or a table with none.
     foreign_keys: Vec<ForeignKeyInfo>,
     current_result: Option<std::sync::Arc<QueryResult>>,
+    current_projection: Option<Vec<usize>>,
     /// Last row's primary-key values from the most recent page. Used
     /// for keyset seek when offset exceeds `KEYSET_OFFSET_THRESHOLD`.
     keyset_cursor: Option<Vec<tablepro_core::Value>>,
@@ -216,6 +173,7 @@ pub enum BrowseTabInput {
     RowsLoaded {
         request: BrowsePageRequest,
         result: QueryResult,
+        projected_columns: Option<Vec<usize>>,
     },
     /// Schema columns for the current table arrived (governs editability).
     ColumnsLoaded(Vec<ColumnInfo>),
@@ -308,6 +266,8 @@ pub enum BrowseTabInput {
         row_position: u32,
     },
     GridCopyToClipboard(String),
+    IncompleteRowData,
+    ProjectionFailure,
     GridShowRowAsJson(String),
     GridExportResults(QueryResult),
     /// Ctrl+Z on this tab. Pops one entry off the change tracker's
@@ -421,6 +381,7 @@ pub enum BrowseTabOutput {
 
 mod chrome;
 mod grid_render;
+mod requests;
 mod row_ops;
 mod selection;
 #[cfg(test)]
@@ -428,12 +389,21 @@ mod tests;
 mod value_parse;
 
 use chrome::*;
+pub use requests::{BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
+use requests::{PageRequestTracker, RowCountRequestTracker};
 use selection::*;
 use value_parse::*;
 
 impl BrowseTab {
     pub fn snapshot(&self) -> Option<QueryResult> {
-        self.current_result.as_deref().cloned()
+        let mut result = self.current_result.as_deref()?.clone();
+        if self.current_projection.is_some() {
+            if !result.rows.is_empty() {
+                return None;
+            }
+            result.columns = self.current_columns.clone();
+        }
+        Some(result)
     }
 
     /// Cell values for the row at `position` in the live grid, which
@@ -443,7 +413,15 @@ impl BrowseTab {
     /// 1 (the first persisted row on screen) would read fetch-order row 1
     /// instead of row 0.
     pub fn row_cells_at(&self, position: u32) -> Option<Vec<Value>> {
-        self.row_object_at(position).map(|row| row.cells_clone())
+        self.row_object_at(position)?.complete_cells()
+    }
+
+    pub fn has_unfetched_columns(&self) -> bool {
+        self.current_projection.as_ref().is_some_and(|_| {
+            self.current_result
+                .as_ref()
+                .is_some_and(|result| !result.rows.is_empty())
+        })
     }
 
     pub fn columns(&self) -> &[ColumnInfo] {
@@ -851,6 +829,8 @@ impl SimpleComponent for BrowseTab {
                 row_key,
             },
             GridMsg::CopyToClipboard(text) => BrowseTabInput::GridCopyToClipboard(text),
+            GridMsg::IncompleteRowData => BrowseTabInput::IncompleteRowData,
+            GridMsg::ProjectionFailure => BrowseTabInput::ProjectionFailure,
             GridMsg::ShowRowAsJson(text) => BrowseTabInput::GridShowRowAsJson(text),
             GridMsg::ExportResults(result) => BrowseTabInput::GridExportResults(result),
             GridMsg::CopyRowAsInsert { row_position } => BrowseTabInput::GridCopyRowAsInsert { row_position },
@@ -885,6 +865,7 @@ impl SimpleComponent for BrowseTab {
             current_columns: Vec::new(),
             foreign_keys: Vec::new(),
             current_result: None,
+            current_projection: None,
             keyset_cursor: None,
             current_selection: None,
             current_total_rows: None,
@@ -952,7 +933,11 @@ impl SimpleComponent for BrowseTab {
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
-            BrowseTabInput::RowsLoaded { request, result } => {
+            BrowseTabInput::RowsLoaded {
+                request,
+                result,
+                projected_columns,
+            } => {
                 if !self.page_requests.accepts(request, self.current_offset) {
                     return;
                 }
@@ -965,12 +950,15 @@ impl SimpleComponent for BrowseTab {
                 // information_schema (via ColumnsLoaded) already gave
                 // us the authoritative column list — substitute it in
                 // so the headers render even when the page is empty.
+                let projected_columns = projection_for_loaded_page(&result, projected_columns);
                 let mut result = result;
                 if result.columns.is_empty() && !self.current_columns.is_empty() {
                     result.columns = self.current_columns.clone();
                 }
                 self.current_columns = columns_for_browse_page(&self.driver_id, &self.current_columns, Some(&result));
-                self.keyset_cursor = extract_keyset_cursor(&self.current_columns, &result);
+                self.keyset_cursor =
+                    extract_keyset_cursor(&self.current_columns, &result, projected_columns.as_deref());
+                self.current_projection = projected_columns;
                 self.current_result = Some(std::sync::Arc::new(result));
                 // Defer rendering until columns are also loaded — the
                 // QueryResult's ColumnInfo lacks `primary_key` /
@@ -1171,6 +1159,12 @@ impl SimpleComponent for BrowseTab {
                 self.handle_grid_copy_row_as_insert(row_position, sender)
             }
             BrowseTabInput::GridCopyToClipboard(text) => self.handle_grid_copy_to_clipboard(text, sender),
+            BrowseTabInput::IncompleteRowData => {
+                let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                    "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
+                )));
+            }
+            BrowseTabInput::ProjectionFailure => self.show_projection_error(),
             BrowseTabInput::GridShowRowAsJson(text) => {
                 let _ = sender.output(BrowseTabOutput::ShowRowAsJson(text));
             }
