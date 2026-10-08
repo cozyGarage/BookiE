@@ -47,6 +47,10 @@ of a generic string round trip. Missing evidence never becomes a pass.
    vocabulary; record that distinction instead of pretending it is catalog DDL.
    Preserve column/row order, duplicate aliases, zero-row metadata and explicit
    truncation. A sampled schema does not prove collection-wide completeness.
+   MongoDB browse columns come from a complete census at initial load and F5;
+   pages reuse that connection-local type union, merge newly observed page
+   types, and driver writes invalidate it. External changes are refreshed at
+   F5 or incorporated when a page observes them.
 3. Choose a carrier that can represent the engine's semantics exactly. Do not
    force every engine into the narrowest shared scalar. Existing exact text,
    bytes and tagged JSON/Extended JSON fallbacks remain valid when their native

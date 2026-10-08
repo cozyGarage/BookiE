@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 
 mod codec;
@@ -81,7 +81,7 @@ impl DatabaseDriver for MongodbDriver {
             .run_command(doc! { "ping": 1 })
             .await
             .map_err(|err| map_mongo_connect_error(err, verifies_cert))?;
-        Ok(Box::new(MongodbConnection { client, database_name }))
+        Ok(Box::new(MongodbConnection::new(client, database_name)))
     }
 }
 
@@ -183,6 +183,7 @@ fn tls_for(config: &tablepro_core::TlsConfig, service_host: &str) -> Tls {
 struct MongodbConnection {
     client: Client,
     database_name: String,
+    columns: tokio::sync::RwLock<HashMap<String, Vec<ColumnInfo>>>,
 }
 
 fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (Vec<Vec<Value>>, bool) {
@@ -199,37 +200,42 @@ fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (Vec<Vec<
 }
 
 impl MongodbConnection {
+    fn new(client: Client, database_name: String) -> Self {
+        Self {
+            client,
+            database_name,
+            columns: tokio::sync::RwLock::new(HashMap::new()),
+        }
+    }
+
     fn db(&self) -> Database {
         self.client.database(&self.database_name)
     }
 
-    async fn columns_and_page(
-        &self,
-        table: &str,
-        page: Option<(u64, u64)>,
-    ) -> Result<(Vec<ColumnInfo>, Vec<Document>), DriverError> {
+    async fn census_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         let coll = self.db().collection::<Document>(table);
         let mut cursor = coll.find(doc! {}).await.map_err(map_mongo_error)?;
         let mut types = BTreeMap::new();
-        let mut page_docs = Vec::new();
-        let page_end = page.map(|(offset, limit)| offset.saturating_add(limit));
-        let mut position = 0u64;
         while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
             for (key, value) in &doc {
                 observe_bson_type(&mut types, key, value);
             }
-            if let (Some((offset, _)), Some(end)) = (page, page_end)
-                && position >= offset
-                && position < end
-            {
-                page_docs.push(doc);
-            }
-            position = position.saturating_add(1);
         }
         if !types.contains_key("_id") {
             types.insert("_id".into(), "ObjectId".into());
         }
-        Ok((columns_from_types(types), page_docs))
+        Ok(columns_from_types(types))
+    }
+
+    async fn page_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        if let Some(columns) = self.columns.read().await.get(table).cloned() {
+            return Ok(columns);
+        }
+        self.fetch_columns(None, table).await
+    }
+
+    async fn invalidate_columns(&self, table: &str) {
+        self.columns.write().await.remove(table);
     }
 }
 
@@ -256,7 +262,9 @@ impl Connection for MongodbConnection {
     }
 
     async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        self.columns_and_page(table, None).await.map(|(columns, _)| columns)
+        let columns = self.census_columns(table).await?;
+        self.columns.write().await.insert(table.into(), columns.clone());
+        Ok(columns)
     }
 
     async fn fetch_rows(
@@ -266,7 +274,22 @@ impl Connection for MongodbConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let (columns, docs) = self.columns_and_page(table, Some((offset, limit))).await?;
+        let mut columns = self.page_columns(table).await?;
+        let coll = self.db().collection::<Document>(table);
+        let mut docs = Vec::new();
+        if limit > 0 {
+            let mut cursor = coll
+                .find(doc! {})
+                .skip(offset)
+                .limit(limit.min(i64::MAX as u64) as i64)
+                .await
+                .map_err(map_mongo_error)?;
+            while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
+                docs.push(doc);
+            }
+        }
+        merge_page_types(&mut columns, &docs);
+        self.columns.write().await.insert(table.into(), columns.clone());
         let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
         Ok(QueryResult {
             columns,
@@ -324,6 +347,7 @@ impl Connection for MongodbConnection {
                 .insert_one(doc)
                 .await
                 .map_err(map_mongo_error)?;
+            self.invalidate_columns(&coll).await;
             return Ok(ExecResult { rows_affected: 1 });
         }
         if let Some((coll, filter)) = parse_delete_many(trimmed) {
@@ -333,6 +357,7 @@ impl Connection for MongodbConnection {
                 .delete_many(filter)
                 .await
                 .map_err(map_mongo_error)?;
+            self.invalidate_columns(&coll).await;
             return Ok(ExecResult {
                 rows_affected: result.deleted_count,
             });
@@ -343,6 +368,7 @@ impl Connection for MongodbConnection {
                 .drop()
                 .await
                 .map_err(map_mongo_error)?;
+            self.invalidate_columns(&coll).await;
             return Ok(ExecResult { rows_affected: 0 });
         }
         Err(DriverError::Unsupported(
@@ -358,6 +384,7 @@ impl Connection for MongodbConnection {
                 .update_one(update.filter, doc! { "$set": update.set })
                 .await
                 .map_err(map_mongo_error)?;
+            self.invalidate_columns(&update.collection).await;
             return Ok(ExecResult {
                 rows_affected: result.matched_count,
             });
@@ -369,6 +396,7 @@ impl Connection for MongodbConnection {
                 .delete_one(delete.filter)
                 .await
                 .map_err(map_mongo_error)?;
+            self.invalidate_columns(&delete.collection).await;
             return Ok(ExecResult {
                 rows_affected: result.deleted_count,
             });
@@ -502,10 +530,7 @@ mod tests {
     async fn open_session_is_refused() {
         let client_opts = ClientOptions::parse("mongodb://127.0.0.1:27017").await.unwrap();
         let client = Client::with_options(client_opts).unwrap();
-        let conn = MongodbConnection {
-            client,
-            database_name: "test".into(),
-        };
+        let conn = MongodbConnection::new(client, "test".into());
 
         match conn.open_session().await {
             Err(DriverError::Unsupported(_)) => {}
@@ -527,10 +552,7 @@ mod tests {
         };
         let client_opts = build_client_options(&opts).await.unwrap();
         let client = Client::with_options(client_opts).unwrap();
-        let conn = MongodbConnection {
-            client,
-            database_name: "test".into(),
-        };
+        let conn = MongodbConnection::new(client, "test".into());
         let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(50));
 
         let result = conn.list_tables_controlled(&control).await;
@@ -553,10 +575,7 @@ mod tests {
         };
         let client_opts = build_client_options(&opts).await.unwrap();
         let client = Client::with_options(client_opts).unwrap();
-        let conn = MongodbConnection {
-            client,
-            database_name: "test".into(),
-        };
+        let conn = MongodbConnection::new(client, "test".into());
         let token = tokio_util::sync::CancellationToken::new();
         let control = tablepro_core::OperationControl::new(token.clone(), None);
         let operation = tokio::spawn(async move { conn.list_tables_controlled(&control).await });
@@ -572,6 +591,66 @@ mod tests {
             }
             other => panic!("expected unknown cancelled outcome, not disconnection: {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires docker"]
+    async fn browse_pages_reuse_the_census_until_refresh() {
+        use mongodb::bson::{Document, doc};
+        use std::sync::{Arc, Mutex};
+        use testcontainers::ImageExt;
+        use testcontainers::runners::AsyncRunner;
+        use testcontainers_modules::mongo::Mongo;
+
+        let container = Mongo::default().with_tag("7").start().await.unwrap();
+        let host = container.get_host().await.unwrap().to_string();
+        let port = container.get_host_port_ipv4(27017).await.unwrap();
+        let mut options = ClientOptions::parse(format!("mongodb://{host}:{port}/appdb"))
+            .await
+            .unwrap();
+        let finds = Arc::new(Mutex::new(Vec::<Document>::new()));
+        options.command_event_handler = Some(mongodb::event::EventHandler::callback({
+            let finds = finds.clone();
+            move |event: mongodb::event::command::CommandEvent| {
+                if let mongodb::event::command::CommandEvent::Started(event) = event
+                    && event.command_name == "find"
+                    && event.command.get_str("find").ok() == Some("browse_pages")
+                {
+                    finds.lock().unwrap().push(event.command);
+                }
+            }
+        }));
+        let client = Client::with_options(options).unwrap();
+        let coll = client.database("appdb").collection::<Document>("browse_pages");
+        coll.insert_many([doc! { "value": 1 }, doc! { "value": 2 }])
+            .await
+            .unwrap();
+        let connection = MongodbConnection::new(client, "appdb".into());
+
+        connection.fetch_columns(None, "browse_pages").await.unwrap();
+        assert_eq!(finds.lock().unwrap().len(), 1);
+        connection.fetch_rows(None, "browse_pages", 0, 1).await.unwrap();
+        connection.fetch_rows(None, "browse_pages", 1, 1).await.unwrap();
+        {
+            let commands = finds.lock().unwrap();
+            assert_eq!(commands.len(), 3);
+            assert_eq!(commands[0].get("limit"), None);
+            assert_eq!(commands[1].get_i64("limit").unwrap(), 1);
+            assert_eq!(commands[2].get_i64("limit").unwrap(), 1);
+            assert_eq!(commands[2].get_i64("skip").unwrap(), 1);
+        }
+
+        connection.fetch_columns(None, "browse_pages").await.unwrap();
+        assert_eq!(finds.lock().unwrap().len(), 4);
+        connection
+            .execute(r#"db.browse_pages.insertOne({"fresh": true})"#)
+            .await
+            .unwrap();
+        connection.fetch_rows(None, "browse_pages", 0, 1).await.unwrap();
+        let commands = finds.lock().unwrap();
+        assert_eq!(commands.len(), 6);
+        assert_eq!(commands[4].get("limit"), None);
+        assert_eq!(commands[5].get_i64("limit").unwrap(), 1);
     }
 
     #[test]
