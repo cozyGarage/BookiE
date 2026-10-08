@@ -102,11 +102,11 @@ and rerun for any later source tip.
 
 The hosted Build Linux run for `8e5d1b18` was
 [cancelled](https://github.com/cozyGarage/BookiE/actions/runs/37723088254) as
-`linux` advanced through PRs #316–#328 to `b9558847`. At the 2026-10-08
+`linux` advanced through PRs #316–#330 to `c61589a8`. At the 2026-10-08
 check, Linux Security passed, Build Linux was pending and Flatpak was in progress
-([Build Linux](https://github.com/cozyGarage/BookiE/actions/runs/37731585825),
-[Flatpak](https://github.com/cozyGarage/BookiE/actions/runs/37731585817),
-[Linux Security](https://github.com/cozyGarage/BookiE/actions/runs/37731585823)).
+([Build Linux](https://github.com/cozyGarage/BookiE/actions/runs/37731821035),
+[Flatpak](https://github.com/cozyGarage/BookiE/actions/runs/37731820902),
+[Linux Security](https://github.com/cozyGarage/BookiE/actions/runs/37731821000)).
 PR #312 skipped its B4 rollback job because it only changed MongoDB tests. The
 focused `b4-rollback` layer passed locally on documentation-only commit
 `73f8ce935`; the tested source files match `684ea40f`. See the [PR #314 evidence
@@ -119,13 +119,14 @@ policy, SSH, PostgreSQL release, SQL Server Kerberos and GTK safety. Its TLS
 layer failed four MongoDB TLS cases with `ConnectionRefused` while the
 ClickHouse TLS cases passed. The full TLS script then passed twice on
 `a47b1fb`, including all five MongoDB tests; the retained
-[48-test evidence](evidence/b4-tls-current-linux-2026-10-08/manifest.json)
-records the second run. The original cause remains undetermined.
+[48-test evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352)
+contains the manifest and complete second-run log. The original cause remains
+undetermined.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-16 | Re-run affected layers on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | On `b9558847`, Linux Security passed; Build Linux was pending and Flatpak was in progress. All three acceptance gates remain open |
-| B4-9 | Re-run the TLS matrix on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | The full local matrix passed twice on `a47b1fb` (48/48); the earlier MongoDB refusal on `98134709` did not recur, and its cause remains undetermined |
+| B4-7, B4-16 | Re-run affected layers on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | On `c61589a8`, Linux Security passed; Build Linux was pending and Flatpak was in progress. All three acceptance gates remain open |
+| B4-9 | Re-run the TLS matrix on the selected frozen SHA, confirm hosted results for that SHA, then complete installed-package/native Wayland acceptance | The full local matrix passed twice on `a47b1fb` (48/48); the earlier MongoDB refusal on `98134709` did not recur, and its cause remains undetermined. See [PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352) |
 | B4-22 | Run GTK export/import audit and encrypted credential round-trip on the selected frozen SHA; confirm hosted result and installed-package/native Wayland acceptance | Prior local and hosted GTK results are SHA-scoped; later hosted run on `8e5d1b18` was cancelled |
 | B4-12 | Repeat `a_batch_reports_rollback_failure_after_postgres_terminates_its_backend` on the selected frozen candidate and retain exact SHA/results | Prior frozen-candidate and hosted results remain historical; next candidate acceptance is open |
 | B4-11 | Extend failed-batch tests to the additional MySQL storage engines and side-effect patterns requested | Existing nine-test scope covers InnoDB, MyISAM, MEMORY, CSV, ARCHIVE, failed INSERT/UPDATE/DELETE trigger effects, AUTO_INCREMENT and one trigger session-variable effect; untested engines/effects remain open |
