@@ -46,10 +46,24 @@ table in the same commit.
 
 | Owner | Open rows | Next |
 | --- | --- | --- |
-| B3 (types, values, drivers, result paths) | UI-19, UI-20, TEST-2, TEST-12, PERF-3, PERF-4, PERF-7, PERF-9, PERF-10 | PERF-7, PERF-9, PERF-10 and UI-19 touch the grid files the UX lane also edits (`RowStore`, row inspector, find in rows): rebase on `linux` first |
+| B3 (types, values, drivers, result paths) | UI-19, UI-20, TEST-2, TEST-12, PERF-3, PERF-4, PERF-7, PERF-9, PERF-10 | 2026-10-08 handoff: B3 implements PERF-9/10; UI-19 is deferred (C). UI-14b's hidden-column projection is PERF-9/B3; UX retains column order/find. See B3/UX handoff below |
 | B4 (transport, guard, audit, SSH, rollback) | B4-7, B4-9, B4-11, B4-12, B4-16, B4-17, B4-21, B4-22, UI-1b, UI-13b, TEST-15, PERF-2, PERF-8 | A guard read-snapshot session start (read-only `BEGIN`, audited as a read) unblocks UI-13b and the cursor paging in ADR 0011 (PERF-8, PERF-2). Frozen-candidate, hosted and installed acceptance remains open for B4 rows where listed. UI-1b has a [secrets-per-hop proposal](proposals/ui-1b-ssh-jump-chain-editor.md); implementation and GTK acceptance remain open. TEST-15 has independent row/audit coverage for PostgreSQL, MySQL, Redis, ClickHouse and SQL Server (#355); the SQL Server merge-tier Docker run passed in Build Linux run [37752816805](https://github.com/cozyGarage/BookiE/actions/runs/37752816805). Other driver and session write paths remain open |
-| UX lane (app layer, packaging, lab) | UI-10, UI-11, UI-14b, UI-15b, UI-18, UI-21, UI-34, UI-24, PKG-2, PKG-4, PKG-6, PKG-8, TEST-7 | UI-11 collapsible sidebar tree, UI-18 one action table, PKG-6 upgrade and rollback, TEST-7 two-profile installed run, PKG-4 on the lab guests |
+| UX lane (app layer, packaging, lab) | UI-10, UI-11, UI-14b, UI-15b, UI-18, UI-21, UI-34, UI-24, PKG-2, PKG-4, PKG-6, PKG-8, TEST-7 | UX implements UI-11 per ADR 0012; UI-14b column order/find only. UI-18 one action table, PKG-6 upgrade and rollback, TEST-7 two-profile installed run, PKG-4 on the lab guests. See B3/UX handoff below |
 | The maintainer (needs a person or a decision) | PKG-1, DOC-3, DOC-5, TEST-6 | PKG-1: run the Wayland recipe in the row on a real desktop. DOC-3: Orca and high contrast. TEST-6: the manual checklist. DOC-5: compare clients on lab VMs |
+
+### B3/UX handoff, 2026-10-08
+
+| Row | Decision | B3 may edit | UX may edit |
+| --- | --- | --- | --- |
+| PERF-9 / UI-14b hidden-column projection | B: B3 implements; UX reviews | `services/browse_query.rs`, `ui/grid/column_visibility.rs`, `ui/row_store.rs`, `ui/row_object.rs`, `ui/row_inspector.rs`, affected grid consumers (`ui/grid/column.rs`, `export.rs`, `context_menu.rs`, `row_find.rs`) and their contract tests | No implementation files for projection; review the interface and behavior |
+| PERF-10 value preview and guarded full-value fetch | B: B3 implements under ADR 0007 | Core value/result types, drivers, guarded policy read path, `ui/grid/types.rs`, `display.rs`, `value_viewer.rs` and contract tests/evidence | No value-path implementation files; review the presentation after the contract is agreed |
+| UI-19 estimated row count | C: defer | No edits until B3 agrees count semantics and driver capability behavior | No edits until that decision |
+| UI-11 collapsible object tree | A: UX implements; B3 has no objection | No UI-11 implementation files | `ui/app/init_sidebar.rs`, `ui/sidebar_row.rs`, `ui/app/connection.rs`, `ui/app/workspace_chrome.rs`, workspace collapse-state code and related sidebar tests; add UX-owned files as needed |
+
+For PERF-9/10, preserve ADR 0007 outcomes and native stored-value oracles, and add
+the regression at the lowest applicable tier in the same commit. UX works only
+in `~/Projects/tablepro-ux2`; these file boundaries apply there. Neither lane
+edits the other lane's files without a ledger entry.
 
 ## UI (app layer)
 
