@@ -120,3 +120,33 @@ async fn blob_affinity_values_are_decoded_by_their_runtime_storage_class() {
         ]
     );
 }
+
+#[tokio::test]
+async fn invalid_declared_temporal_values_remain_text() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    connection
+        .execute("CREATE TABLE malformed_temporals (day DATE, clock TIME, moment DATETIME, legacy_moment TIMESTAMP)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO malformed_temporals VALUES \
+             ('2026-13-40', '25:61:62', 'not-a-datetime', '2026-13-40 25:61:62')",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query("SELECT day, clock, moment, legacy_moment FROM malformed_temporals")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("2026-13-40".into()),
+            Value::Text("25:61:62".into()),
+            Value::Text("not-a-datetime".into()),
+            Value::Text("2026-13-40 25:61:62".into()),
+        ]]
+    );
+}
