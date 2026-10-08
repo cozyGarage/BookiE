@@ -6,6 +6,96 @@ use crate::{connect, start_pg};
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_deep_enum_domain_refuses_incompatible_typed_assignments() {
+    let (_container, options) = start_pg().await;
+    let setup = connect(options.clone()).await;
+    let schema = "value_contract_enum_integer_depth";
+    setup.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
+    setup
+        .execute(&format!("CREATE TYPE {schema}.state AS ENUM ('ready', 'paused')"))
+        .await
+        .unwrap();
+    let mut base = "state".to_owned();
+    for level in 1..=64 {
+        let domain = format!("state_domain_{level}");
+        setup
+            .execute(&format!("CREATE DOMAIN {schema}.{domain} AS {schema}.{base}"))
+            .await
+            .unwrap();
+        base = domain;
+    }
+    setup
+        .execute(&format!(
+            "CREATE TABLE {schema}.rows (id integer PRIMARY KEY, state {schema}.{base})"
+        ))
+        .await
+        .unwrap();
+    setup
+        .execute(&format!("INSERT INTO {schema}.rows VALUES (1, 'ready')"))
+        .await
+        .unwrap();
+    drop(setup);
+
+    let connection = connect(options).await;
+    assert_incompatible_enum_assignments_refused(connection.as_ref(), schema).await;
+}
+
+async fn assert_incompatible_enum_assignments_refused(connection: &dyn tablepro_core::Connection, schema: &str) {
+    let date = chrono::NaiveDate::from_ymd_opt(2000, 1, 2).unwrap();
+    let time = chrono::NaiveTime::from_hms_opt(12, 34, 56).unwrap();
+    let timestamp = chrono::NaiveDateTime::new(date, time);
+    let timestamp_tz = chrono::DateTime::parse_from_rfc3339("2000-01-02T12:34:56+00:00")
+        .unwrap()
+        .to_utc();
+    let cases = [
+        (Value::Bool(true), "TRUE"),
+        (Value::Int(1), "1"),
+        (Value::Float(1.5), "1.5::double precision"),
+        (Value::Bytes(vec![1]), "decode('01', 'hex')"),
+        (Value::Decimal("1.25".parse().unwrap()), "1.25::numeric"),
+        (Value::Date(date), "DATE '2000-01-02'"),
+        (Value::Time(time), "TIME '12:34:56'"),
+        (Value::DateTime(timestamp), "TIMESTAMP '2000-01-02 12:34:56'"),
+        (
+            Value::TimestampTz(timestamp_tz),
+            "TIMESTAMPTZ '2000-01-02 12:34:56+00:00'",
+        ),
+        (
+            Value::Uuid(uuid::Uuid::nil()),
+            "'00000000-0000-0000-0000-000000000000'::uuid",
+        ),
+        (Value::Json(serde_json::json!({})), "'{}'::jsonb"),
+    ];
+    let sqlstate = |error: tablepro_core::DriverError| match error {
+        tablepro_core::DriverError::Query {
+            sqlstate: Some(sqlstate),
+            ..
+        } => sqlstate,
+        other => panic!("expected a native query refusal, got {other:?}"),
+    };
+    for (value, literal) in cases {
+        let native = connection
+            .execute(&format!("UPDATE {schema}.rows SET state = {literal} WHERE id = 1"))
+            .await
+            .unwrap_err();
+        let parameterized = connection
+            .execute_params(&format!("UPDATE {schema}.rows SET state = $1 WHERE id = 1"), &[value])
+            .await
+            .unwrap_err();
+        assert_eq!(sqlstate(parameterized), sqlstate(native), "literal {literal}");
+    }
+    assert_eq!(
+        connection
+            .query(&format!("SELECT state::text FROM {schema}.rows WHERE id = 1"))
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text("ready".into())]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values() {
     let (_container, options) = start_pg().await;
     let setup = connect(options.clone()).await;
