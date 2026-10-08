@@ -163,13 +163,7 @@ fn build_outcome_widget(
                 .build()
                 .upcast()
         }
-        StatementOutcomeKind::Error(msg) => adw::StatusPage::builder()
-            .title(crate::tr!("Statement {n} failed").replace("{n}", &(idx + 1).to_string()))
-            .description(msg)
-            .icon_name("dialog-error-symbolic")
-            .vexpand(true)
-            .build()
-            .upcast(),
+        StatementOutcomeKind::Error(msg) => error_page(idx, msg).upcast(),
         StatementOutcomeKind::NotRun => adw::StatusPage::builder()
             .title(crate::tr!("Statement {n} not run").replace("{n}", &(idx + 1).to_string()))
             .description(crate::tr!("Skipped because an earlier statement failed."))
@@ -178,6 +172,23 @@ fn build_outcome_widget(
             .build()
             .upcast(),
     }
+}
+
+fn error_page(idx: usize, message: &str) -> adw::StatusPage {
+    let copy = gtk::Button::builder()
+        .label(crate::tr!("Copy error"))
+        .halign(gtk::Align::Center)
+        .css_classes(["pill"])
+        .build();
+    let text = message.to_string();
+    copy.connect_clicked(move |button| button.clipboard().set_text(&text));
+    adw::StatusPage::builder()
+        .title(crate::tr!("Statement {n} failed").replace("{n}", &(idx + 1).to_string()))
+        .description(message)
+        .icon_name("dialog-error-symbolic")
+        .child(&copy)
+        .vexpand(true)
+        .build()
 }
 
 fn build_result_set_widget(
@@ -590,6 +601,17 @@ mod tests {
             matches!(outcomes[2].kind, StatementOutcomeKind::Rows(_)),
             "a later batch must still run after an earlier batch's error under ContinueNextBatch"
         );
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_failed_statement_offers_a_copy_button() {
+        use relm4::gtk::prelude::*;
+        relm4::adw::init().unwrap();
+        let page = super::error_page(0, "syntax error at position 8");
+        let button = page.child().unwrap().downcast::<relm4::gtk::Button>().unwrap();
+        assert_eq!(button.label().as_deref(), Some("Copy error"));
+        assert_eq!(page.description().as_deref(), Some("syntax error at position 8"));
     }
 
     #[test]

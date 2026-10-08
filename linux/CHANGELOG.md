@@ -11,6 +11,7 @@
 - Redis now has a Docker-backed lost-ack contract: a committed Lua write with
   its reply dropped returns `Disconnected`, reconnects for a later read, and
   leaves both target and independent audit keys at one execution.
+- A failed statement in the SQL editor offers a Copy error button.
 - PostgreSQL enum-leaf metadata and schema-aware write/filter contracts now
   include direct `pg_typeof()` query projections plus 302- and 512-layer
   domain-over-enum cases. Array projections of the outer domain also preserve
