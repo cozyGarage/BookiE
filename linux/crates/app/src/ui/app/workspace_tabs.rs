@@ -227,6 +227,7 @@ impl App {
 
         self.workspace_root = Some(tab_overview);
         self.workspace_tab_view = Some(tab_view);
+        self.apply_connection_strip();
     }
 
     /// Restore workspace tabs from disk for the just-connected database.

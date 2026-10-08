@@ -24,6 +24,24 @@ pub fn connection_color_css_class(name: &str) -> Option<&'static str> {
         .map(|(_, class)| *class)
 }
 
+pub const CONNECTION_STRIP_CLASSES: &[&str] = &[
+    "tp-strip-blue",
+    "tp-strip-teal",
+    "tp-strip-green",
+    "tp-strip-yellow",
+    "tp-strip-orange",
+    "tp-strip-red",
+    "tp-strip-purple",
+    "tp-strip-brown",
+];
+
+/// CSS class that paints the workspace tab strip in a palette colour.
+pub fn connection_strip_class(name: &str) -> Option<&'static str> {
+    let known = connection_color(name)?;
+    let index = CONNECTION_COLORS.iter().position(|color| *color == known)?;
+    CONNECTION_STRIP_CLASSES.get(index).copied()
+}
+
 const CONNECTION_COLOR_CLASSES: &[(&str, &str)] = &[
     ("blue", "tp-color-blue"),
     ("teal", "tp-color-teal"),
@@ -38,6 +56,16 @@ const CONNECTION_COLOR_CLASSES: &[(&str, &str)] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_palette_colour_has_a_strip_class() {
+        assert_eq!(CONNECTION_COLORS.len(), CONNECTION_STRIP_CLASSES.len());
+        for (color, class) in CONNECTION_COLORS.iter().zip(CONNECTION_STRIP_CLASSES) {
+            assert_eq!(connection_strip_class(color), Some(*class));
+            assert_eq!(*class, format!("tp-strip-{color}"));
+        }
+        assert_eq!(connection_strip_class("red; background: url(x)"), None);
+    }
 
     #[test]
     fn the_palette_has_no_duplicates() {

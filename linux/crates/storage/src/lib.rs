@@ -20,7 +20,9 @@ pub use connection_bundle::{
     collect_bundle_secrets, export_encrypted, export_plaintext, forget_imported_secrets, parse_bundle, plan_import,
     store_bundle_secrets,
 };
-pub use connection_color::{CONNECTION_COLORS, connection_color, connection_color_css_class};
+pub use connection_color::{
+    CONNECTION_COLORS, CONNECTION_STRIP_CLASSES, connection_color, connection_color_css_class, connection_strip_class,
+};
 pub use connection_organization::{
     ConnectionOrganization, ConnectionOrganizationIndex, MAX_LABEL_LEN, MAX_ORGANIZED_CONNECTIONS,
     MAX_TAGS_PER_CONNECTION, arrange_connections, connection_matches_filter, load_organization, save_organization,
