@@ -1,0 +1,33 @@
+BookiE B4-11 and B4-12 current-tip rollback selectors, 2026-10-08
+
+The current `fork/linux` code tip used for these selectors is
+`c3122d97459685060f1cf3474b55e1a11b961abe` (PR #396). Both runs used the
+rebased documentation evidence worktree at `c74cd104690d4f438e654e11b0970c1a6f1f8228`;
+its Rust and test sources match `fork/linux` at `c3122d9`, and its only
+differences from that source tip are documentation files.
+
+Results:
+
+- MySQL atomicity selector: 12 passed, 0 failed, 0 ignored, 64 filtered.
+  This includes the MariaDB Aria `TRANSACTIONAL=0` direct INSERT, UPDATE and
+  DELETE cases, an Aria trigger side effect surviving rollback of an InnoDB
+  parent, nontransactional MySQL engine/trigger/session side effects, lost
+  connection rollback failure, implicit-commit refusal and result limits.
+- PostgreSQL backend-termination rollback-failure selector: 1 passed,
+  0 failed, 0 ignored, 221 filtered. It verifies `TransactionRollbackFailed`,
+  absence of table and trigger rows after reconnect, and persistent identity
+  sequence advancement.
+
+Commands (run sequentially with
+`CARGO_TARGET_DIR=/home/trung/.cache/bookie-b4-target-0d5`):
+
+```sh
+cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1
+cargo test --locked -p tablepro-driver-postgres --test integration rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend -- --include-ignored --test-threads=1
+```
+
+The current Build Linux run [#37797466945](https://github.com/cozyGarage/BookiE/actions/runs/37797466945)
+was pending with no jobs started when recorded, so hosted rollback acceptance
+remains open. These selectors are not frozen-candidate acceptance. Optional
+vendor engines, broader side effects, and installed package/native Wayland
+acceptance also remain open.
