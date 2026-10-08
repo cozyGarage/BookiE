@@ -33,15 +33,16 @@ out. The focused MySQL and PostgreSQL cases above completed on this candidate.
 ## Hosted candidate evidence
 
 - [Linux Security dispatch #37703162399](https://github.com/cozyGarage/BookiE/actions/runs/37703162399) passed both security-policy and supply-chain jobs. Run logs confirm the tested SHA was `7eea6f09d7154f03400e82cec7c16215488b2115`.
-- [Build Linux dispatch #37703159104](https://github.com/cozyGarage/BookiE/actions/runs/37703159104) was dispatched with the same pinned SHA. Preflight, Driver TLS, PostgreSQL release, Fast GTK and scheduled Clippy passed. Driver integration and optional DuckDB remained in progress at the latest check. Hosted Installed GTK safety smoke failed: 10 scenarios passed, but `encrypted_bundle_round_trip_restores_credentials` reported that confirmed encrypted import did not restore the bundled database credential. The local staged-binary run passed that scenario, so the discrepancy remains unresolved; the hosted diagnostics artifact is retained outside the repository in the candidate cache. Do not treat installed GTK acceptance as passed.
+- [Build Linux dispatch #37703159104](https://github.com/cozyGarage/BookiE/actions/runs/37703159104) checked out the same pinned SHA and completed. Preflight, Driver TLS, PostgreSQL release, Fast GTK, scheduled Clippy, and optional DuckDB passed. Driver integration timed out after its 30-minute budget while compiling the workspace; its tests did not execute. Installed GTK safety failed: 10 scenarios passed, but `encrypted_bundle_round_trip_restores_credentials` reported that confirmed encrypted import did not restore the bundled database credential. The test does not verify that its coordinate click actually enabled “Replace saved passwords.” The local staged-binary scenario passed five times; a strengthened local version that asserts the switch becomes checked also passed five times. This narrows the discrepancy but does not resolve it in hosted acceptance. The downloaded diagnostics artifact is retained outside the repository in the candidate cache. The Linux regression gate failed because the driver integration and GTK jobs failed.
 
 ## Remaining acceptance
 
 B4-7, B4-9, B4-11, B4-12, B4-16, B4-17 and B4-22 remain open pending final
 hosted candidate results and the applicable installed acceptance. The MySQL
 and PostgreSQL focused rollback cases passed locally; hosted driver integration
-remains in progress. The hosted installed GTK failure also leaves B4-22 open,
-despite the successful local staged-binary rerun. B4-21's Samba AD fixture
+timed out during compilation before running tests. The hosted installed GTK
+failure also leaves B4-22 open, despite the successful local staged-binary
+reruns. B4-21's Samba AD fixture
 passes locally, but Windows AD
 interoperability is not tested by that fixture or by hosted CI. Native Wayland
 and distribution-package installation/upgrade acceptance are separate from the
