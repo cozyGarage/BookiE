@@ -888,10 +888,12 @@ def scenarios(ui):
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        choose_menu_item(13)
+        choose_menu_item(14)
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
+        assert ui.find_node(name="Approve once") is None, "a plain grid delete asked for approval"
+        ui.wait_for_node(name="1 unsaved change", present=False)
         wait_for_oracle(oracle, "SELECT count(*) FROM people", "1")
         wait_for_oracle(oracle, "SELECT id FROM people", "1")
         assert ui.find_node(name="Approve once") is None, "a plain grid delete asked for approval"
@@ -1070,6 +1072,49 @@ def scenarios(ui):
     def mysql_grid_edit_and_delete_commit_to_the_server(database, base):
         grid_edit_and_delete_commit_to_the_server(ui.MYSQL_CONNECTION_NAME, "bookie_test.people", mysql)
 
+    def mysql_enum_set_grid_edit_preserves_native_values_and_siblings(database, base):
+        ui.open_saved_connection(ui.MYSQL_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.MYSQL_CONNECTION_NAME} — BookiE")
+        ui.invoke_named_action_within("bookie_test.enum_grid", "Open enum_grid")
+        ui.wait_for_node(name="ready", role=pyatspi.ROLE_LABEL)
+        click_cell("ready", count=2)
+        for key in "done":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        click_cell("read", count=2)
+        for key in "read":
+            ui.press_x11_key(key)
+        ui.press_x11_key("comma")
+        for key in "write":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="2 unsaved changes")
+
+        query = (
+            "SELECT CONCAT_WS(':', id, IFNULL(CAST(state + 0 AS CHAR), '<SQL_NULL>'), "
+            "IFNULL(HEX(state), '<SQL_NULL>'), IF(state IS NULL, '1', '0'), "
+            "IFNULL(CONCAT('[', state, ']'), '<SQL_NULL>'), "
+            "IFNULL(CAST(permissions + 0 AS CHAR), '<SQL_NULL>'), "
+            "IFNULL(HEX(permissions), '<SQL_NULL>'), IF(permissions IS NULL, '1', '0'), "
+            "IFNULL(CONCAT('[', permissions, ']'), '<SQL_NULL>'), sibling) "
+            "FROM enum_grid ORDER BY id"
+        )
+        before = "\n".join((
+            "1:1:7265616479:0:[ready]:1:72656164:0:[read]:target",
+            "2:3:4E554C4C:0:[NULL]:4:4E554C4C:0:[NULL]:literal NULL",
+            "3:<SQL_NULL>:<SQL_NULL>:1:<SQL_NULL>:<SQL_NULL>:<SQL_NULL>:1:<SQL_NULL>:SQL NULL",
+            "4:4::0:[]:0::0:[]:empty",
+            "5:1:7265616479:0:[ready]:3:726561642C7772697465:0:[read,write]:sibling",
+        ))
+        after = before.replace("1:1:7265616479:0:[ready]:1:72656164:0:[read]:target",
+                              "1:2:646F6E65:0:[done]:3:726561642C7772697465:0:[read,write]:target")
+        actual = mysql(query)
+        assert actual == before, ("pending enum/set edits changed native rows", actual, before)
+        ui.press_x11_key("s", ("Control_L",))
+        wait_for_oracle(mysql, query, after)
+        assert ui.find_node(name="Approve once") is None, "a plain enum/set grid edit asked for approval"
+        ui.wait_for_node(name="2 unsaved changes", present=False)
+
     result = [
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
         find_bar_replaces_every_match_in_the_editor,
@@ -1093,6 +1138,7 @@ def scenarios(ui):
         result.append(profile_large_result_in_the_grid)
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
+        result.append(mysql_enum_set_grid_edit_preserves_native_values_and_siblings)
     if os.environ.get("TABLEPRO_GTK_MONGODB_CONTAINER"):
         result.append(mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row)
     if os.environ.get("TABLEPRO_GTK_CLICKHOUSE_CONTAINER"):

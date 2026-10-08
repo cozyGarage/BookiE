@@ -36,6 +36,11 @@ and backslash-underscore labels retain their declared text. Docker coverage
 checks this against MySQL's reported column type and native enum ordinal/bytes
 ([test](../crates/app/tests/support/mysql_enum_set_contract.rs)).
 This pins the parser boundary; it does not expand MySQL ENUM/SET support.
+The GTK MySQL fixture now also edits an ENUM label and a multi-member SET
+through the grid, proves both remain pending until Save, and checks native
+ordinals, bytes, SQL NULL, empty and literal `NULL` values, plus untouched
+sibling rows ([scenario](../scripts/test-gtk-mysql.sh)). This local Xvfb
+scenario does not replace installed Wayland acceptance.
 
 [PR #369](https://github.com/cozyGarage/BookiE/pull/369) extends the PostgreSQL
 enum-domain recursion contract to a tested 513-layer point and awaits
