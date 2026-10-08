@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex, OnceLock},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use tablepro_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
@@ -6,6 +9,10 @@ use tablepro_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
 /// GTK approval sink. Posts a modal `adw::AlertDialog` on the glib main
 /// context and parks the async caller until the user responds.
 pub struct GtkApprovalSink;
+
+const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
+const MAX_SQL_PREVIEW_CHARS: usize = 16_384;
+static APPROVAL_DIALOG: OnceLock<Arc<tokio::sync::Semaphore>> = OnceLock::new();
 
 const DENY_RESPONSE: &str = "deny";
 const APPROVE_ONCE_RESPONSE: &str = "once";
@@ -30,11 +37,32 @@ fn outcome_for_response(response: &str) -> ApprovalOutcome {
     ApprovalOutcome::Deny
 }
 
+fn truncate_sql(sql: &str) -> String {
+    let mut chars = sql.chars();
+    let preview: String = chars.by_ref().take(MAX_SQL_PREVIEW_CHARS).collect();
+    if chars.next().is_some() {
+        format!("{preview}\n\n… SQL truncated after {MAX_SQL_PREVIEW_CHARS} characters")
+    } else {
+        preview
+    }
+}
+
 #[async_trait]
 impl ApprovalSink for GtkApprovalSink {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
+        // The deadline includes time spent waiting behind another dialog, so
+        // a burst of agent writes cannot build an unbounded modal queue.
+        let deadline = tokio::time::Instant::now() + APPROVAL_TIMEOUT;
+        let gate = APPROVAL_DIALOG
+            .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(1)))
+            .clone();
+        let permit = match tokio::time::timeout_at(deadline, gate.acquire_owned()).await {
+            Ok(Ok(permit)) => permit,
+            _ => return ApprovalOutcome::Deny,
+        };
         let (tx, rx) = tokio::sync::oneshot::channel::<ApprovalOutcome>();
         let tx = Arc::new(Mutex::new(Some(tx)));
+        let permit = Arc::new(Mutex::new(Some(permit)));
 
         let heading = format!("Approve write: {}", req.connection_name);
         let targets = if req.facts.tables.is_empty() {
@@ -43,14 +71,13 @@ impl ApprovalSink for GtkApprovalSink {
             req.facts.tables.join(", ")
         };
         let mut body = format!(
-            "Rule: {}\n{}\n\nPrincipal: {}\nEnvironment: {}\nClass: {:?}\nTargets: {}\n\n{}",
+            "Rule: {}\n{}\n\nPrincipal: {}\nEnvironment: {}\nClass: {:?}\nTargets: {}",
             req.rule,
             req.reason,
             req.principal.label(),
             req.environment.display_name(),
             req.facts.class,
             targets,
-            req.sql
         );
         if let Some(preview) = &req.preview {
             body.push_str("\n\n");
@@ -63,11 +90,42 @@ impl ApprovalSink for GtkApprovalSink {
         let heading_c = heading.clone();
         let body_c = body.clone();
         let tx_c = tx.clone();
+        let permit_c = permit.clone();
+        let sql_c = truncate_sql(&req.sql);
+        let connection_id = req.connection_id;
         glib::MainContext::default().invoke(move || {
             use relm4::adw::prelude::*;
             use relm4::{adw, gtk};
 
-            let dialog = adw::AlertDialog::builder().heading(&heading_c).body(&body_c).build();
+            if tokio::time::Instant::now() >= deadline {
+                if let Ok(mut guard) = tx.lock()
+                    && let Some(sender) = guard.take()
+                {
+                    let _ = sender.send(ApprovalOutcome::Deny);
+                }
+                if let Ok(mut permit) = permit_c.lock() {
+                    permit.take();
+                }
+                return;
+            }
+
+            let sql_view = gtk::TextView::builder()
+                .editable(false)
+                .cursor_visible(false)
+                .monospace(true)
+                .wrap_mode(gtk::WrapMode::WordChar)
+                .build();
+            sql_view.buffer().set_text(&sql_c);
+            let sql_scroll = gtk::ScrolledWindow::builder()
+                .min_content_height(180)
+                .max_content_height(360)
+                .child(&sql_view)
+                .build();
+            let dialog = adw::AlertDialog::builder()
+                .heading(&heading_c)
+                .body(&body_c)
+                .extra_child(&sql_scroll)
+                .build();
             dialog.add_response(DENY_RESPONSE, "Deny");
             dialog.add_response(APPROVE_ONCE_RESPONSE, "Approve once");
             dialog.set_response_appearance(DENY_RESPONSE, adw::ResponseAppearance::Destructive);
@@ -75,14 +133,54 @@ impl ApprovalSink for GtkApprovalSink {
             dialog.set_default_response(Some(DENY_RESPONSE));
             dialog.set_close_response(CLOSE_RESPONSE);
 
+            let timer = Arc::new(Mutex::new(None::<glib::SourceId>));
+            let timer_response = timer.clone();
+            let permit_response = permit_c.clone();
+
             dialog.connect_response(None, move |_dlg, response| {
+                if let Ok(mut timer) = timer_response.lock()
+                    && let Some(source) = timer.take()
+                {
+                    source.remove();
+                }
                 let outcome = outcome_for_response(response);
                 if let Ok(mut guard) = tx_c.lock()
                     && let Some(sender) = guard.take()
                 {
                     let _ = sender.send(outcome);
                 }
+                if let Ok(mut permit) = permit_response.lock() {
+                    permit.take();
+                }
             });
+
+            let dialog_timeout = dialog.clone();
+            let tx_timeout = tx.clone();
+            let permit_timeout = permit_c.clone();
+            let timer_timeout = timer.clone();
+            let source = glib::timeout_add_local_once(
+                deadline.saturating_duration_since(tokio::time::Instant::now()),
+                move || {
+                    // This one-shot source is already firing; clear its ID so
+                    // force_close cannot try to remove the active source via
+                    // the response callback.
+                    if let Ok(mut timer) = timer_timeout.lock() {
+                        timer.take();
+                    }
+                    if let Ok(mut guard) = tx_timeout.lock()
+                        && let Some(sender) = guard.take()
+                    {
+                        let _ = sender.send(ApprovalOutcome::Deny);
+                    }
+                    dialog_timeout.force_close();
+                    if let Ok(mut permit) = permit_timeout.lock() {
+                        permit.take();
+                    }
+                },
+            );
+            if let Ok(mut timer) = timer.lock() {
+                *timer = Some(source);
+            }
 
             // Prefer the window that actually owns the connection this
             // statement runs on -- active_window() answers with whatever
@@ -90,7 +188,7 @@ impl ApprovalSink for GtkApprovalSink {
             // be a different connection than the one being approved.
             let application = gtk::Application::default();
             let window = preferred_approval_window(
-                crate::services::window_registry::window_for(req.connection_id).filter(|window| window.is_visible()),
+                crate::services::window_registry::window_for(connection_id).filter(|window| window.is_visible()),
                 application.active_window(),
                 application.windows().into_iter().find(|window| window.is_visible()),
                 gtk::Window::list_toplevels()
@@ -102,10 +200,18 @@ impl ApprovalSink for GtkApprovalSink {
                 dialog.present(Some(&window));
                 return;
             }
+            if let Ok(mut timer) = timer.lock()
+                && let Some(source) = timer.take()
+            {
+                source.remove();
+            }
             if let Ok(mut guard) = tx.lock()
                 && let Some(sender) = guard.take()
             {
                 let _ = sender.send(ApprovalOutcome::Deny);
+            }
+            if let Ok(mut permit) = permit_c.lock() {
+                permit.take();
             }
         });
 
@@ -130,6 +236,15 @@ mod tests {
     #[test]
     fn approve_once_response_allows_one_operation() {
         assert_eq!(outcome_for_response(APPROVE_ONCE_RESPONSE), ApprovalOutcome::AllowOnce);
+    }
+
+    #[test]
+    fn approval_sql_preview_is_bounded_and_marks_truncation() {
+        let sql = "x".repeat(MAX_SQL_PREVIEW_CHARS + 5);
+        let preview = truncate_sql(&sql);
+        assert!(preview.starts_with(&"x".repeat(MAX_SQL_PREVIEW_CHARS)));
+        assert!(preview.contains("SQL truncated after 16384 characters"));
+        assert_eq!(truncate_sql("short query"), "short query");
     }
 
     #[test]

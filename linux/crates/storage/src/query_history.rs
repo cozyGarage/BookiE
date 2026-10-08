@@ -498,24 +498,6 @@ impl HistoryStore {
         Ok(affected as usize)
     }
 
-    pub async fn known_connections(&self) -> Result<Vec<(Uuid, String)>, StorageError> {
-        let pool = &self.pool;
-        let rows = sqlx::query(
-            "SELECT DISTINCT connection_id, connection_name FROM history ORDER BY connection_name COLLATE NOCASE",
-        )
-        .fetch_all(pool)
-        .await?;
-        let mut out = Vec::with_capacity(rows.len());
-        for row in rows {
-            let id_str: String = row.try_get("connection_id")?;
-            let name: String = row.try_get("connection_name")?;
-            if let Ok(id) = Uuid::parse_str(&id_str) {
-                out.push((id, name));
-            }
-        }
-        Ok(out)
-    }
-
     pub async fn fetch_by_ids(&self, ids: &[i64]) -> Result<Vec<Entry>, StorageError> {
         if ids.is_empty() {
             return Ok(Vec::new());
