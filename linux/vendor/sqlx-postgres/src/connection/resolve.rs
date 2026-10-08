@@ -402,9 +402,8 @@ impl TypeResolver {
         let mut missing_dependencies = HashMap::<Oid, Vec<TypeResolverRow>>::new();
 
         // Iteratively resolve types until all are resolved, or we hit a dead-end.
-        // We statically cap the number of iterations in case we somehow encounter a circular type
-        // dependency, which I *assume* Postgres should forbid.
-        for _ in 0..64 {
+        // Keep circular type metadata bounded while resolving 512-level domain arrays.
+        for _ in 0..1024 {
             if self.query.is_empty() {
                 break;
             }

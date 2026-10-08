@@ -982,8 +982,10 @@ open.
 
 An October 8 follow-up runs the same schema-aware read, direct enum-domain
 projection, keyed-write, draft/filter, invalid-label, NULL, and rollback contract
-at 302 and 512 domain layers. The 512
-case stress-checks recursive metadata handling; neither point is a maximum-depth claim ([test source](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs)).
+at 302 and 512 domain layers. It also projects an array of each outer domain,
+checking the exact array value and `pg_typeof` metadata. The 512 case
+stress-checks recursive metadata handling; neither point is a maximum-depth
+claim ([test source](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs)).
 
 A restricted PostgreSQL session now verifies enum parameter inference after
 `SET ROLE` with a same-named shadow enum first in `search_path`. The target-only

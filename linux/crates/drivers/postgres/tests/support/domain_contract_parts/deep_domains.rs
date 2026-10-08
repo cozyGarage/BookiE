@@ -752,6 +752,25 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
             Value::Text(format!("{schema}.state_domain_{levels}")),
         ]]
     );
+    if levels >= 302 {
+        let domain_array = format!("{schema}.{base_type}[]");
+        let array_projected = connection
+            .query(&format!(
+                "SELECT ARRAY[status, NULL]::{domain_array}, \
+                 pg_typeof(ARRAY[status, NULL]::{domain_array})::text \
+                 FROM {schema}.rows WHERE id = 1"
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("domain array projection failed at {levels} layers: {error:?}"));
+        assert_eq!(array_projected.columns[0].data_type, domain_array);
+        assert_eq!(
+            array_projected.rows,
+            vec![vec![
+                Value::Text("{\"ready\",NULL}".into()),
+                Value::Text(format!("{schema}.{base_type}[]")),
+            ]]
+        );
+    }
     let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(&schema),
