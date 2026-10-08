@@ -167,6 +167,7 @@
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- The time shown for a statement no longer includes the wait for your approval on a guarded connection.
 
 - Ctrl+Tab switches to the most recently used tab, and back again, instead of the next tab in the strip.
 - MongoDB B3 coverage pins a BSON String-to-Decimal128 change between `run_find` metadata census and page retrieval; the returned column is `mixed` and preserves canonical Extended JSON.
