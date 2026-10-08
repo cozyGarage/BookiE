@@ -280,9 +280,8 @@ each). The current scroll profile is recorded separately in the action plan.
 
 ## Test environment
 
-The lab Forgejo (VM 250 on pmox-lab03, `http://10.61.0.11:3000`, reachable from the
-office LAN at `http://192.168.1.246:3000`, repository `trung/bookie`) is the
-acceptance gate since 2026-10-08. It runs `.forgejo/workflows/ci.yml` on every
+The lab Forgejo (an internal instance; its address and repository are set through
+`FORGEJO_API` and the `forgejo` git remote) is the acceptance gate since 2026-10-08. It runs `.forgejo/workflows/ci.yml` on every
 branch push and `.forgejo/workflows/nightly.yml` each night, on three Debian 13
 executors (`exec-a`, `exec-b`, `exec-c`: 10 vCPU and about 20 GB each, Forgejo
 runner capacity 3, label `debian-host`, Docker with the userland proxy off).
