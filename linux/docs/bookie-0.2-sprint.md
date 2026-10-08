@@ -5,17 +5,22 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Code baseline: `684ea40f` on `linux` (PR #312). Recent B3 work added
+Code baseline: `2865860e` on `linux` (PR #315). Recent B3 work added
 PostgreSQL range refusal contracts and enum grid coverage (#305–#311), MongoDB
-nested null-filter parity (#312), and moved B4 candidate logs into PR comments
-(#310). These tests preserve native type/value oracles and verify refused
+nested null-filter parity (#312), and a MySQL lost-ack no-replay contract
+(#315). These tests preserve native type/value oracles and verify refused
 writes or unsaved edits do not alter database state. Details and dated
 validation are in the changelog and owning boards.
 
 The local `scripts/ci-local.sh quick` gate passed on the PR #312 working tree;
-the focused MongoDB selector passed against MongoDB 7. At `684ea40f`, hosted
-Linux Security passed, Build Linux is queued, and both Flatpak variants are
-running. These focused cases do not close B3: the broader
+the focused MongoDB selector passed against MongoDB 7. The MySQL lost-ack
+selector passed against its Docker fixture on PR #315. At `2865860e`, Linux
+Security passed, Build Linux is queued and both Flatpak variants are running.
+The local focused B4 rollback layer passed on clean documentation-only commit
+`73f8ce935`; its tested source files match `684ea40f`. Commands, results and
+source hashes are in the [PR #314 evidence comment](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028).
+PR #312 skipped its B4-specific job because it only changed MongoDB tests.
+These focused cases do not close B3: the broader
 engine/type/consumer/configuration matrix, mutation triage, performance rows and
 installed grid acceptance remain open. See the [B4 board](b4-task-board.md)
 for its remaining package/Wayland and Windows AD acceptance.
