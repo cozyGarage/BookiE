@@ -26,10 +26,10 @@ async fn a_lost_eval_ack_is_not_replayed_after_redis_reconnects() {
             let upstream = upstream.clone();
             let target_requests = Arc::clone(&observed_requests);
             tokio::spawn(async move {
-                if let Err(error) = proxy_connection(client, &upstream, target_requests).await {
-                    if error.kind() != io::ErrorKind::UnexpectedEof {
-                        panic!("Redis reply proxy failed: {error}");
-                    }
+                if let Err(error) = proxy_connection(client, &upstream, target_requests).await
+                    && error.kind() != io::ErrorKind::UnexpectedEof
+                {
+                    panic!("Redis reply proxy failed: {error}");
                 }
             });
         }
