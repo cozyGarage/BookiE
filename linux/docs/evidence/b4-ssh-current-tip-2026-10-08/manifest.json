@@ -36,6 +36,10 @@
     ],
     "gtk_environment": "local Xvfb with private D-Bus and AT-SPI"
   },
+  "shared_transport": {
+    "test": "shared_transport_records_builtin_unknown_and_changed_host_key_refusals",
+    "result": "passed as part of scripts/test-postgres-release.sh"
+  },
   "hosted": {
     "workflow": "Build Linux",
     "run_id": 37794837722,

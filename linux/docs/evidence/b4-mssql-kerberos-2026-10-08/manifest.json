@@ -25,6 +25,15 @@
     "run_id": 37794837722,
     "url": "https://github.com/cozyGarage/BookiE/actions/runs/37794837722",
     "source_commit": "ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9",
+    "status": "cancelled",
+    "conclusion": "cancelled",
+    "note": "Cancelled before any jobs started when linux advanced. Security and Flatpak packaging passed on this source SHA."
+  },
+  "latest_tip_hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37796530008,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37796530008",
+    "source_commit": "60e3f2666df21b04cb448c8dfe3b9b777dc61a9e",
     "status_at_recording": "pending"
   },
   "not_established": [
