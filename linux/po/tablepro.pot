@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.6-dev\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/TablePro/issues\n"
-"POT-Creation-Date: 2026-10-07 17:52+0200\n"
+"POT-Creation-Date: 2026-10-07 18:28+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -126,6 +126,17 @@ msgstr ""
 
 #: crates/app/src/services/quick_switcher.rs:81
 msgid "Command"
+msgstr ""
+
+#: crates/app/src/services/sidebar_tree.rs:102
+#: crates/app/src/ui/app/init_sidebar.rs:202 crates/app/src/ui/app/mod.rs:378
+#: crates/app/src/ui/app/workspace_chrome.rs:86
+msgid "Tables"
+msgstr ""
+
+#: crates/app/src/services/sidebar_tree.rs:103
+#: crates/app/src/ui/app/init_sidebar.rs:149
+msgid "Views"
 msgstr ""
 
 #: crates/app/src/ui/activity_dialog.rs:26
@@ -692,15 +703,6 @@ msgstr ""
 #: crates/app/src/ui/app/init_sidebar.rs:122
 msgid ""
 "Nothing matches the current search, or this connection has no tables yet."
-msgstr ""
-
-#: crates/app/src/ui/app/init_sidebar.rs:149
-msgid "Views"
-msgstr ""
-
-#: crates/app/src/ui/app/init_sidebar.rs:202 crates/app/src/ui/app/mod.rs:378
-#: crates/app/src/ui/app/workspace_chrome.rs:86
-msgid "Tables"
 msgstr ""
 
 #: crates/app/src/ui/app/init_sidebar.rs:224

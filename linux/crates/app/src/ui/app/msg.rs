@@ -158,6 +158,7 @@ pub enum AppMsg {
     },
     ShowToast(String),
     BrowseTabDirtyChanged(Uuid, bool),
+    ToggleSidebarGroup(String),
     NewTableTab {
         schema: Option<String>,
     },

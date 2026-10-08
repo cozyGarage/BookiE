@@ -96,6 +96,7 @@ mod tests {
                     file: None,
                 }],
                 active_idx: 0,
+                ..Default::default()
             },
         );
         atomic_write_json(&path, &state).unwrap();
@@ -136,6 +137,7 @@ mod tests {
                     file: Some("/home/me/report.sql".into()),
                 }],
                 active_idx: 0,
+                ..Default::default()
             },
         );
         state.connections.insert(
@@ -147,6 +149,7 @@ mod tests {
                     file: None,
                 }],
                 active_idx: 0,
+                ..Default::default()
             },
         );
         atomic_write_json(&path, &state).unwrap();
@@ -182,6 +185,7 @@ mod tests {
                     file: None,
                 }],
                 active_idx: 0,
+                ..Default::default()
             },
         );
         atomic_write_json(&path, &state).unwrap();

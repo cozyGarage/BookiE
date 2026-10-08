@@ -1,7 +1,6 @@
 use relm4::adw::prelude::*;
 use relm4::{Component, ComponentController, ComponentSender, adw};
 
-use tablepro_core::TableInfo;
 use tablepro_storage::SavedConnection;
 use uuid::Uuid;
 
@@ -112,6 +111,7 @@ impl App {
             "workspace ready"
         );
         self.sidebar_views = views;
+        self.restore_sidebar_collapse();
         self.repopulate_sidebar(&tables);
         self.rebuild_schema_buffer();
         self.refresh_window_title();
@@ -231,8 +231,8 @@ impl App {
         self.disconnect_action.set_enabled(false);
         self.refresh_window_title();
         self.table_search.set_text("");
-        self.sidebar_schemas.borrow_mut().clear();
-        self.sidebar_kinds.borrow_mut().clear();
+        self.sidebar_nodes.borrow_mut().clear();
+        self.sidebar_visible.borrow_mut().clear();
         self.sidebar_views.clear();
         self.sidebar_factory.guard().clear();
         self.show_welcome_page(sender);
@@ -707,44 +707,6 @@ impl App {
         self.show_toast(&crate::tr!(
             "Connection switch stopped because changes could not be saved."
         ));
-    }
-
-    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo]) {
-        self.sidebar_tables = tables.to_vec();
-        {
-            let mut schemas = self.sidebar_schemas.borrow_mut();
-            schemas.clear();
-            schemas.extend(tables.iter().map(|t| t.schema.clone()));
-            schemas.extend(self.sidebar_views.iter().map(|t| t.schema.clone()));
-        }
-        {
-            let mut kinds = self.sidebar_kinds.borrow_mut();
-            kinds.clear();
-            kinds.extend(std::iter::repeat_n(
-                crate::ui::sidebar_row::SidebarObjectKind::Table,
-                tables.len(),
-            ));
-            kinds.extend(std::iter::repeat_n(
-                crate::ui::sidebar_row::SidebarObjectKind::View,
-                self.sidebar_views.len(),
-            ));
-        }
-        let mut guard = self.sidebar_factory.guard();
-        guard.clear();
-        for table in tables {
-            guard.push_back(crate::ui::sidebar_row::SidebarRowInit {
-                info: table.clone(),
-                kind: crate::ui::sidebar_row::SidebarObjectKind::Table,
-            });
-        }
-        for view in &self.sidebar_views {
-            guard.push_back(crate::ui::sidebar_row::SidebarRowInit {
-                info: view.clone(),
-                kind: crate::ui::sidebar_row::SidebarObjectKind::View,
-            });
-        }
-        drop(guard);
-        self.sidebar_factory.widget().invalidate_headers();
     }
 
     /// Surfaces connection health via `adw::Banner` only when degraded —
