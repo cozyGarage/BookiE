@@ -40,6 +40,14 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             r#"Map(String, Nullable(Enum16('' = -32768, 'NULL' = 0, 'high' = 32767)))"#,
         ),
         (
+            r#"CAST(map('min', CAST('low' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), 'zero', CAST('NULL' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), 'max', CAST('high' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))) AS Map(String, Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))"#,
+            r#"Map(String, Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))"#,
+        ),
+        (
+            r#"CAST(map('empty', CAST('' AS Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127))), 'sql_null', CAST(NULL AS Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127))), 'literal_null', CAST('NULL' AS Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127))), 'endpoint', CAST('high' AS Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127)))) AS Map(String, Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127))))"#,
+            r#"Map(String, Nullable(Enum8('' = -128, 'NULL' = 0, 'high' = 127)))"#,
+        ),
+        (
             "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))",
             "Array(Nullable(UInt128))",
         ),
