@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "branch": "fork/linux",
+  "source_commit": "102ef48017f10c7a63c271608b98d3b05b449795",
+  "candidate_source_commit": "5db1cfe5f15ac258472ac04c82f9083ca2ea81aa",
+  "candidate_pin": "Build Linux workflow_dispatch ref input pinned to the full source SHA",
+  "hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37865445368,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37865445368",
+    "run_status_at_capture": "in_progress",
+    "job_results": [
+      {
+        "scope": "B4-11 and B4-12 MySQL/PostgreSQL rollback",
+        "job_id": 113612202222,
+        "job": "B4 rollback acceptance (docker)",
+        "status": "success",
+        "artifact": "regression-b4-rollback-37865445368-1",
+        "mysql_selector": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+        "mysql_result": "14 passed, 0 failed, 66 filtered",
+        "postgres_selector": "cargo test --locked -p tablepro-driver-postgres --test integration rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend -- --include-ignored --test-threads=1",
+        "postgres_result": "1 passed, 0 failed, 223 filtered"
+      },
+      {
+        "scope": "B4-9 TLS matrix",
+        "job_id": 113612202242,
+        "job": "Driver TLS fixture (docker)",
+        "status": "success",
+        "artifact": "regression-driver-tls-37865445368-1",
+        "test_groups": [6, 5, 9, 16, 7, 5],
+        "total_tests_passed": 48
+      },
+      {
+        "scope": "B4-7, B4-16, B4-17 PostgreSQL SSH and mTLS GTK flows",
+        "job_id": 113612202124,
+        "job": "PostgreSQL release fixture (docker)",
+        "status": "success",
+        "artifact": "regression-postgres-release-37865445368-1",
+        "gtk_ssh_scenarios": [
+          "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+          "postgres_ssh_setup_failure_is_durably_audited",
+          "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+          "postgres_ssh_multihop_trusts_both_hops_and_queries",
+          "postgres_ssh_second_hop_decline_does_not_learn_key",
+          "postgres_ssh_changed_second_hop_key_is_refused",
+          "postgres_saved_mtls_connection_authenticates_and_queries"
+        ]
+      },
+      {
+        "scope": "B4-22 bundle audit GTK flows",
+        "job_id": 113615016428,
+        "job": "Installed GTK safety smoke",
+        "status": "success",
+        "artifact": "gtk-safety-37865445368-1",
+        "scenario_results": "53 passed, 0 failed",
+        "bundle_scenarios": [
+          "bundle_export_records_sanitized_audit_outcome",
+          "bundle_import_records_sanitized_audit_outcome",
+          "encrypted_bundle_round_trip_restores_credentials",
+          "a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile"
+        ]
+      }
+    ]
+  },
+  "not_established": [
+    "Overall Build Linux workflow conclusion at evidence capture; driver integration was still running",
+    "Distribution-package installation or native Wayland acceptance",
+    "Windows Active Directory interoperability",
+    "Optional/vendor MySQL-family storage engines and side effects outside the listed fixtures"
+  ],
+  "follow_up_hosted_run": {
+    "workflow": "Build Linux",
+    "run_id": 37867814390,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37867814390",
+    "candidate_source_commit": "102ef48017f10c7a63c271608b98d3b05b449795",
+    "run_status_at_capture": "in_progress",
+    "completed_jobs": {
+      "B4 rollback acceptance (docker)": {
+        "status": "success",
+        "artifact": "regression-b4-rollback-37867814390-1",
+        "mysql_result": "14 passed, 0 failed",
+        "postgres_result": "1 passed, 0 failed"
+      },
+      "Driver TLS fixture (docker)": {
+        "status": "success",
+        "total_tests_passed": 48
+      },
+      "PostgreSQL release fixture (docker)": {
+        "status": "success",
+        "artifact": "regression-postgres-release-37867814390-1",
+        "ssh_mtls_scenarios": "7 passed",
+        "mysql_approval_step": {
+          "name": "MySQL human-approval dialog regression",
+          "job_id": 113620086800,
+          "status": "success",
+          "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database"
+        }
+      }
+    },
+    "jobs_still_running_at_capture": [
+      "Driver integration tests (docker)",
+      "Installed GTK safety smoke"
+    ],
+    "interpretation": "At this capture, the MySQL approval scenario had passed once; this did not determine the root cause of the two earlier operator-reported failures."
+  },
+  "final_run_status": {
+    "status": "completed",
+    "conclusion": "success",
+    "run_url": "https://github.com/cozyGarage/BookiE/actions/runs/37867814390",
+    "driver_integration_job_id": 113620876864,
+    "driver_integration_artifact": "regression-integration-37867814390-1",
+    "driver_integration_layer": "passed; 462 tests across 13 test-result groups; 0 failures",
+    "driver_integration_duration_seconds": 1721.849,
+    "uploaded_report_sha256": "6f26cb0d525c23c42f2fc10011842b379cc798c764ed13b6001bafe9c35b3abf",
+    "uploaded_log_sha256": "17048af8789845189060337fe8e8784f7c7cd9019206f4ce5d5cce8b05535bc1"
+  },
+  "subsequent_completed_jobs": [
+    {
+      "job_id": 113622881096,
+      "job": "Installed GTK safety smoke",
+      "status": "success",
+      "artifact": "gtk-safety-37867814390-1",
+      "regression_artifact": "regression-gtk-safety-37867814390-1",
+      "scenario_results": "53 passed, 0 failed",
+      "b4_22_scenarios": [
+        "bundle_export_records_sanitized_audit_outcome",
+        "bundle_import_records_sanitized_audit_outcome",
+        "encrypted_bundle_round_trip_restores_credentials",
+        "a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile"
+      ]
+    },
+    {
+      "job_id": 113620876864,
+      "job": "Driver integration tests (docker)",
+      "status": "success",
+      "artifact": "regression-integration-37867814390-1",
+      "layer": "drivers",
+      "result": "462 passed across 13 test-result groups; 0 failed",
+      "duration_seconds": 1721.849,
+      "ssh_result_groups": {
+        "agent_auth": "10 passed, 0 failed",
+        "openssh_session": "12 passed, 0 failed"
+      }
+    }
+  ],
+  "summary": "focused.txt"
+}
