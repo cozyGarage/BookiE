@@ -47,7 +47,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-port="$(docker port "$container" 27017/tcp | head -n1)"
+port="$(docker port "$container" 27017/tcp | sed -n 1p)"
 port="${port##*:}"
 attempt=0
 until docker exec "$container" mongosh --quiet --eval 'db.adminCommand("ping").ok' | rg -q '^1$'; do

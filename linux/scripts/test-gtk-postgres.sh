@@ -47,7 +47,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-port="$(docker port "$container" 5432/tcp | head -n1)"
+port="$(docker port "$container" 5432/tcp | sed -n 1p)"
 port="${port##*:}"
 attempt=0
 until docker exec "$container" pg_isready --host=127.0.0.1 --username=postgres --dbname=bookie_test >/dev/null 2>&1 \
