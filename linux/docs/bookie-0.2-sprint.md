@@ -24,8 +24,8 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 
 ## Current continuation: 2026-10-09
 
-The merged `linux` baseline is `59a9298f3935f6d4a64d656063b7e5e98e538732`
-(PR #449); PRs #441–#449 are merged. PR #443 adds SQL Server
+The merged `linux` baseline is `3b903b826bf487ef7fad6eacb3a5b67c4c8b8bd1`
+(PR #450); PRs #441–#450 are merged. PR #443 adds SQL Server
 `decimal(38,38)` preservation and refuses lossy `sql_variant` values. Its full
 MSSQL run passed 77 tests; the full local value-contract tier passed 428 tests
 with no missing suites, and unpiped preflight passed. The scoped SQL Server
@@ -37,11 +37,15 @@ preflight and all 11 required hosted checks passed. PR #449 adds
 scalar-parameter behavior at 63, 64 and deeper enum-domain levels; its Docker
 contract, unpiped preflight and all 11 required hosted checks passed. A focused
 17-variant MySQL `decode_by_type` audit on the current source caught all 16
-buildable mutants across native selectors; one was build-unviable. The invalid
-UTF-8 ENUM/SET byte fallback now has MySQL and MariaDB regressions. Merged topic branches have
-been deleted.
+buildable mutants across native selectors; one was build-unviable. PR #450 adds
+MySQL and MariaDB invalid-UTF-8 ENUM/SET result regressions. Its GitHub checks
+passed, but Docker driver integration was skipped and Forgejo run 85 was
+disrupted by executor restarts. A follow-up worktree adds native stored-value
+oracles; both MySQL and MariaDB charset selectors and unpiped local preflight
+pass there. The follow-up is not yet published or Forgejo-gated. Merged topic
+branches have been deleted.
 
-B3 remains open after #449: continue the wider engine/type/consumer/configuration
+B3 remains open after #450: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
 and B7 remain open as listed above; keep the sequence B3 → B4 → installed
 Arch/Wayland → Debian/GNOME → B7. The merged baseline is not release-qualified.

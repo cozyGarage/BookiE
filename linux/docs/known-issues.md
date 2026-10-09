@@ -19,14 +19,19 @@ Rules:
   acceptance.
 
 Reconciled against BookiE `fork/linux` tip
-`20d67d7da51b12b49ede28813cabb088affa861d` (PR #448), checked 2026-10-09
-13:30 UTC. PRs #392 and #441–#448 are merged. PR #443's full MSSQL run passed
-77 tests, and the local full value-contract tier passed 428 tests with no
-missing suites. Unpiped preflight and all required hosted checks passed for
-PRs #445–#448. PostgreSQL vector-capacity and deep-enum expression regressions
-caught their scoped mutations; PR #448's Docker contract and all 11 required
-hosted checks passed. The broader B3 engine/type/consumer matrix and installed
-acceptance remain open. This is a status snapshot, not a release qualification.
+`3b903b826bf487ef7fad6eacb3a5b67c4c8b8bd1` (PR #450), checked 2026-10-09.
+PRs #392 and #441–#450 are merged. PR #443's full MSSQL run passed 77 tests,
+and the local full value-contract tier passed 428 tests with no missing suites.
+Unpiped preflight and all required hosted checks passed for PRs #445–#449.
+PostgreSQL vector-capacity and deep-enum expression regressions caught their
+scoped mutations; PRs #448 and #449 passed their Docker contracts and all 11
+required hosted checks. PR #450's GitHub checks passed, but its Docker driver
+integration job was skipped and Forgejo run 85 was disrupted by executor
+restarts. Its follow-up worktree now has passing MySQL and MariaDB charset
+selectors plus unpiped preflight; the native stored-value oracle and Forgejo
+gate are not yet on a published commit. The broader B3 engine/type/consumer
+matrix and installed acceptance remain open. This is a status snapshot, not a
+release qualification.
 Older audits remain historical; this ledger and the
 [active sprint](bookie-0.2-sprint.md) own current status.
 ## Owners and handoff
