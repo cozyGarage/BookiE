@@ -73,7 +73,6 @@ glob = "0.3"
 libc = "0.2"
 
 [patch.crates-io]
-tiberius = { git = "https://github.com/tiberius-rs/tiberius", rev = "7fd75bb7070fe6ea41374698abf78928bb983bda" }
 sqlx-mysql = { path = "vendor/sqlx-mysql" }
 sqlx-postgres = { path = "vendor/sqlx-postgres" }
 mongodb = { path = "vendor/mongodb" }
