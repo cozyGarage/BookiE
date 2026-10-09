@@ -7,6 +7,7 @@
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
 - Arbitrary SQL result grids now preview long text, JSON and binary cells with byte counts; View Value reads the complete value from the guarded result already in memory.
+- Previewed grid cells no longer keep a second full value in each cell widget.
 - ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
 - DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.
 - MySQL and MariaDB CHAR results now have `PAD_CHAR_TO_FULL_LENGTH` coverage for padding, VARCHAR, empty values and NULL.

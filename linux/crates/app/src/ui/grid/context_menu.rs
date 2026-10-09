@@ -6,7 +6,7 @@ use gtk4::{self as gtk, gio, glib};
 use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use super::GridMsg;
-use super::display::{FULL_EDIT_TEXT_SLOT, POSITION_SLOT, ROW_KEY_SLOT, VALUE_SLOT};
+use super::display::{FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
 use super::editing::enter_edit_mode;
 use super::export;
 use super::value_viewer;
@@ -590,7 +590,7 @@ fn previewed_cell_text(row: Option<&crate::ui::row_object::RowObject>, col: usiz
 }
 
 fn copy_value_text(widget: &gtk::Widget, row: Option<&crate::ui::row_object::RowObject>, col: usize) -> String {
-    if !matches!(VALUE_SLOT.cloned(widget), Some(Value::Null)) {
+    if !IS_NULL_SLOT.get(widget).unwrap_or(false) {
         if let Some(text) = FULL_EDIT_TEXT_SLOT.cloned(widget) {
             return text;
         }
@@ -687,7 +687,7 @@ mod tests {
         let editor = crate::ui::cell_editor::CellEditor::new();
         editor.set_inline_editable(true);
         editor.set_text("pending preview");
-        VALUE_SLOT.set(&editor, Value::Text(pending.clone()));
+        IS_NULL_SLOT.set(&editor, false);
         FULL_EDIT_TEXT_SLOT.set(&editor, pending.clone());
         assert_eq!(
             copy_value_text(editor.upcast_ref(), Some(&keyless), 0),
@@ -698,7 +698,7 @@ mod tests {
         let draft_value = "draft".repeat(1_200);
         let draft = crate::ui::row_object::RowObject::new_draft(1, vec![Value::Text(draft_value.clone())]);
         editor.set_text("draft preview");
-        VALUE_SLOT.set(&editor, Value::Text(draft_value.clone()));
+        IS_NULL_SLOT.set(&editor, false);
         FULL_EDIT_TEXT_SLOT.set(&editor, draft_value.clone());
         assert_eq!(copy_value_text(editor.upcast_ref(), Some(&draft), 0), draft_value);
     }

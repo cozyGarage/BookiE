@@ -199,7 +199,7 @@ pub(super) const SUPPRESS_SLOT: WidgetSlot<bool> = WidgetSlot::new("tp-suppress-
 pub(super) const POPOVER_SLOT: WidgetSlot<gtk4::Popover> = WidgetSlot::new("tp-popover");
 pub(super) const PREEDIT_SLOT: WidgetSlot<bool> = WidgetSlot::new("tp-preedit-active");
 pub(super) const FULL_EDIT_TEXT_SLOT: WidgetSlot<String> = WidgetSlot::new("tp-full-edit-text");
-pub(super) const VALUE_SLOT: WidgetSlot<Value> = WidgetSlot::new("tp-cell-value");
+pub(super) const IS_NULL_SLOT: WidgetSlot<bool> = WidgetSlot::new("tp-cell-is-null");
 
 pub fn focused_cell_identity(widget: &impl IsA<gtk4::Widget>) -> Option<(u32, usize, Vec<Value>)> {
     let root = widget.root()?;
