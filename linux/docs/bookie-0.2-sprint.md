@@ -13,8 +13,9 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
   reduction (the preview is display-only; full values are still held), PERF-3
   MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
   TEST-29's fast and durable test-container paths are in PR #457. The focused
-  same-session MySQL/MariaDB tests and local preflight pass. Local commit
-  `559ba69` restores the duplicate-key failure scenario; it is not pushed yet.
+  same-session MySQL/MariaDB tests and local preflight pass. Local commits
+  `559ba69` and `c0eb82f` restore the duplicate-key failure scenario and wait
+  for authenticated MongoDB readiness; neither is pushed yet.
   Forgejo run 99 is still draining on the older published head `ab4b273`; its
   MongoDB authentication and PostgreSQL query-plan jobs failed.
 - B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
@@ -71,9 +72,10 @@ Forgejo run 99 is still running on `ab4b273`: `driver (mongodb)` failed because
 the bad-credentials test got `ConnectionRefused` before authentication, and
 `pg-release` failed because policy redacted the wildcard query plan. Postgres
 e2e and both distro-floor jobs are still running. Local commit `559ba69` keeps
-the duplicate-key failure cases in the dedicated sessions; it is not pushed
-while the UX gate is active, and needs its own serialized gate afterward. Run
-97 was canceled as a duplicate.
+the duplicate-key failure cases in the dedicated sessions, and `c0eb82f` adds
+a bounded readiness check that passes locally. They are not pushed while the
+UX gate is active and need their own serialized gate afterward. Run 97 was
+canceled as a duplicate.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
