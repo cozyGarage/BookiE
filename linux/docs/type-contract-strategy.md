@@ -1073,6 +1073,13 @@ checking the exact array value and `pg_typeof` metadata. The 512 case
 stress-checks recursive metadata handling; neither point is a maximum-depth
 claim ([test source](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs)).
 
+Scalar enum parameter contexts now have a native comparison at the 63/64-domain
+boundary: `COALESCE` and `CASE` preserve PostgreSQL's inferred enum result type
+and value for text labels, the literal `NULL` label, empty text and SQL NULL,
+while the source column retains its outer domain type. The test runs with the
+target schema absent from a `search_path` led by a same-named shadow enum
+([test](../crates/drivers/postgres/tests/support/domain_depth_boundary_contract.rs)).
+
 A restricted PostgreSQL session now verifies enum parameter inference after
 `SET ROLE` with a same-named shadow enum first in `search_path`. The target-only
 label and SQL NULL retain the qualified target enum type; a shadow-only label
