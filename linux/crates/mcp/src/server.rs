@@ -409,41 +409,10 @@ fn http_router(bridge: Arc<McpBridge>) -> axum::Router {
                     let cancellation = bridge.request_cancellation();
                     let request_cancellation = cancellation.clone();
                     let (response_tx, response_rx) = tokio::sync::oneshot::channel();
-                    let operation = async move {
-                        crate::bridge::scope_request_cancellation(request_cancellation, async move {
-                            if !origin_is_allowed(&headers) {
-                                return (
-                                    StatusCode::FORBIDDEN,
-                                    Json(json!({
-                                        "jsonrpc": "2.0",
-                                        "id": null,
-                                        "error": {"code": -32000, "message": "forbidden origin"}
-                                    })),
-                                )
-                                    .into_response();
-                            }
-                            let id = body.get("id").cloned().unwrap_or(JsonValue::Null);
-                            let method = body.get("method").and_then(|m| m.as_str()).unwrap_or("");
-                            let params = body.get("params").cloned().unwrap_or(json!({}));
-                            let result = match method {
-                                "tools/call" => handle_tool_call(&bridge, params).await,
-                                "tools/list" => handle_tools_list(&bridge, &params),
-                                "initialize" => match initialize_result(&params) {
-                                    Ok(result) => Ok(result),
-                                    Err(message) => {
-                                        return Json(json_rpc_error(&id, -32602, message)).into_response();
-                                    }
-                                },
-                                other => Err(format!("unsupported method: {other}")),
-                            };
-                            let response = match result {
-                                Ok(r) => json!({"jsonrpc": "2.0", "id": id, "result": r}),
-                                Err(e) => json_rpc_error(&id, -32000, e),
-                            };
-                            Json(response).into_response()
-                        })
-                        .await
-                    };
+                    let operation = crate::bridge::scope_request_cancellation(
+                        request_cancellation,
+                        process_http_request(bridge, headers, body),
+                    );
                     tokio::spawn(supervise_disconnect_aware(response_tx, cancellation, operation));
                     response_rx.await.unwrap_or_else(|_| {
                         (
@@ -459,6 +428,40 @@ fn http_router(bridge: Arc<McpBridge>) -> axum::Router {
         // default, so the sql argument (and everything else in the body)
         // is bounded the same way regardless of which transport carried it.
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
+}
+
+async fn process_http_request(bridge: Arc<McpBridge>, headers: HeaderMap, body: JsonValue) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    use axum::{Json, http::StatusCode};
+
+    if !origin_is_allowed(&headers) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "jsonrpc": "2.0",
+                "id": null,
+                "error": {"code": -32000, "message": "forbidden origin"}
+            })),
+        )
+            .into_response();
+    }
+    let id = body.get("id").cloned().unwrap_or(JsonValue::Null);
+    let method = body.get("method").and_then(|m| m.as_str()).unwrap_or("");
+    let params = body.get("params").cloned().unwrap_or(json!({}));
+    let result = match method {
+        "tools/call" => handle_tool_call(&bridge, params).await,
+        "tools/list" => handle_tools_list(&bridge, &params),
+        "initialize" => match initialize_result(&params) {
+            Ok(result) => Ok(result),
+            Err(message) => return Json(json_rpc_error(&id, -32602, message)).into_response(),
+        },
+        other => Err(format!("unsupported method: {other}")),
+    };
+    let response = match result {
+        Ok(result) => json!({"jsonrpc": "2.0", "id": id, "result": result}),
+        Err(error) => json_rpc_error(&id, -32000, error),
+    };
+    Json(response).into_response()
 }
 
 async fn supervise_disconnect_aware<T, F>(
@@ -788,11 +791,12 @@ mod tests {
         tokio::time::timeout(std::time::Duration::from_secs(5), audit.recorded.notified())
             .await
             .expect("disconnect should produce a terminal audit record");
-        let events = audit.events.lock().expect("audit events");
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].phase, AuditRecordPhase::Outcome);
-        assert_eq!(events[0].terminal_status, AuditTerminalStatus::Cancelled);
-        drop(events);
+        {
+            let events = audit.events.lock().expect("audit events");
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].phase, AuditRecordPhase::Outcome);
+            assert_eq!(events[0].terminal_status, AuditTerminalStatus::Cancelled);
+        }
         assert_eq!(
             executions.load(Ordering::SeqCst),
             0,
