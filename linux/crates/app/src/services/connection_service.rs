@@ -196,6 +196,10 @@ pub async fn establish_classified_with_cancellation(
         })
 }
 
+pub fn was_cancelled(token: Option<&tokio_util::sync::CancellationToken>) -> bool {
+    token.is_some_and(tokio_util::sync::CancellationToken::is_cancelled)
+}
+
 pub fn is_permanent_failure(error: &TransportError) -> bool {
     use tablepro_core::DriverError;
     match error {
@@ -241,6 +245,15 @@ fn message(error: TransportError) -> String {
 #[cfg(test)]
 mod failure_tests {
     use super::*;
+    #[test]
+    fn a_connect_is_cancelled_only_when_its_token_was_cancelled() {
+        let token = tokio_util::sync::CancellationToken::new();
+        assert!(!was_cancelled(None));
+        assert!(!was_cancelled(Some(&token)));
+        token.cancel();
+        assert!(was_cancelled(Some(&token)));
+    }
+
     use tablepro_core::DriverError;
     use tablepro_storage::KeyringFailure;
 

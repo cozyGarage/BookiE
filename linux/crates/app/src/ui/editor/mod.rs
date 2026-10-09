@@ -665,8 +665,7 @@ impl SimpleComponent for SqlEditor {
                 error_policy,
                 values,
             } => {
-                let generation = self.run_generation.begin();
-                self.execute_sql(generation, sql, statements, error_policy, values, sender);
+                self.execute_sql(sql, statements, error_policy, values, sender);
             }
 
             SqlEditorInput::ToggleLineComment => {
@@ -905,15 +904,7 @@ impl SqlEditor {
         };
         let names = crate::services::query_parameters::statement_names(&sql, &driver_id);
         if names.is_empty() {
-            let generation = self.run_generation.begin();
-            self.execute_sql(
-                generation,
-                sql,
-                statements,
-                error_policy,
-                std::collections::HashMap::new(),
-                sender,
-            );
+            self.execute_sql(sql, statements, error_policy, std::collections::HashMap::new(), sender);
             return;
         }
         let Some(window) = self
@@ -937,16 +928,12 @@ impl SqlEditor {
 
     fn execute_sql(
         &mut self,
-        generation: u64,
         trimmed: String,
         statements: Vec<String>,
         error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy,
         parameter_values: std::collections::HashMap<String, tablepro_core::Value>,
         sender: ComponentSender<Self>,
     ) {
-        if !self.run_generation.accepts(generation) {
-            return;
-        }
         if self.session_ending() {
             self.status.set_label(&crate::tr!("Waiting for session to finish"));
             return;
@@ -963,9 +950,7 @@ impl SqlEditor {
             self.status.set_label(&crate::tr!("no active connection"));
             return;
         };
-        if !self.run_generation.start(generation) {
-            return;
-        };
+        let generation = self.run_generation.start_new();
 
         if let Some(prev) = self.cancel_token.take() {
             prev.cancel();
