@@ -42,8 +42,8 @@ MySQL and MariaDB invalid-UTF-8 ENUM/SET result regressions. Its GitHub checks
 passed, but Docker driver integration was skipped and Forgejo run 85 was
 disrupted by executor restarts. A follow-up branch adds native stored-value
 oracles and shared MariaDB fixtures for the serial full suite. Both charset
-selectors and all 31 serial `value_contract` tests passed locally using one
-MySQL and one MariaDB container; unpiped preflight passed. The branch was
+selectors and all 88 serialized MySQL integration tests passed locally using
+one MySQL and one MariaDB container (66.36 s); unpiped preflight passed. The branch was
 published at `f29743c`; Forgejo run 88 tests that pre-#452 tip. The current
 run reports a PostgreSQL test failure: a disconnect regression checked for its
 tagged backend before it was visible in `pg_stat_activity`. Commit `b98ce22`
