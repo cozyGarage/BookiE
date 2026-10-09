@@ -742,6 +742,12 @@ and a `MAP` containing a `UHUGEINT` struct. Native `typeof()` and JSON oracles
 verify values and SQL NULL elements, while SQL literal rendering and parameter
 rebinding both refuse the undecodable results
 ([evidence](evidence/duckdb-nested-collection-refusal-results-2026-10-06/manifest.json)).
+The `LIST<ENUM>` refusal contract also distinguishes an empty enum list from a
+SQL NULL list: DuckDB's native type and `to_json()` return `[]` and NULL,
+while BookiE retains `Undecodable("LIST")` and `Value::Null` respectively; the
+empty list remains refused for SQL literals and parameter rebinding
+([test](../crates/app/tests/support/duckdb_enum_contract.rs)). This extends the
+refusal boundary only; nested DuckDB values remain unsupported.
 
 ClickHouse's nested consumer contract adds
 `Map(UInt8, Array(Tuple(String, Nullable(UInt128))))`, including a UInt128 above
