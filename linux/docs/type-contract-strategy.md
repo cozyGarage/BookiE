@@ -48,12 +48,14 @@ in the candidate. Local preflight passed; GitHub validation is pending. This doe
 the complete on-demand value path in PERF-10 remain open. After hiding columns,
 refresh the browse page for the reduced SELECT to take effect.
 
-The core result budget now tests admission exactly at the cell and row limits,
-and first-result selection preserves truncation reported by either the batch or
-its first set. A focused `cargo-mutants` run on query source SHA
-`21e0d7f1673f2b528bc29e42421ebb25a3a3638e45207ddeefe7737e1db3e18f` caught all
-14 generated variants with no misses, unviable mutants or timeouts. This closes
-one TEST-2 slice; the broader mutation audit remains open.
+The core result budget tests exact byte, cell and row limits; owned text, byte
+and recursive JSON memory accounting; retained rows across result sets; and
+first-result truncation from either the batch or its first set. A full-file
+`cargo-mutants` run on query source SHA-256
+`ef3bb83d9461c146fceff51cf0ae4c61dc47daff8bcdc9018f2230249325fb69` tested all
+35 generated variants: 33 were caught and 2 constructor replacements were
+unviable, with no missed or timed-out mutants. This closes the scoped result
+budget mutation audit; broader TEST-2 coverage remains open.
 
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete

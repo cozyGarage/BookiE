@@ -225,8 +225,8 @@ pub struct ExecResult {
 #[cfg(test)]
 mod tests {
     use super::{
-        ColumnInfo, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBatch,
-        QueryResultBudget, Value,
+        ColumnInfo, MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult,
+        QueryResultBatch, QueryResultBudget, Value,
     };
 
     #[test]
@@ -256,6 +256,7 @@ mod tests {
 
     #[test]
     fn result_budget_caps_cells_and_dynamic_value_storage() {
+        assert_eq!(MAX_QUERY_RESULT_BYTES, 67_108_864);
         let row = vec![Value::Text("x".into())];
         let mut byte_budget = QueryResultBudget {
             bytes: super::MAX_QUERY_RESULT_BYTES - super::row_size(&row),
@@ -312,5 +313,88 @@ mod tests {
 
             assert!(batch.into_first().truncated);
         }
+    }
+
+    #[test]
+    fn value_size_counts_owned_text_bytes_and_json_storage() {
+        let text = String::with_capacity(32);
+        let text_capacity = text.capacity();
+        assert_eq!(super::value_size(&Value::Text(text)), text_capacity);
+        let undecodable = String::from("wide");
+        let undecodable_capacity = undecodable.capacity();
+        assert_eq!(
+            super::value_size(&Value::Undecodable(undecodable)),
+            undecodable_capacity
+        );
+
+        let bytes = vec![0; 24];
+        let byte_capacity = bytes.capacity();
+        assert_eq!(super::value_size(&Value::Bytes(bytes)), byte_capacity);
+
+        let json_string = String::with_capacity(48);
+        let json_capacity = json_string.capacity();
+        assert_eq!(
+            super::value_size(&Value::Json(serde_json::Value::String(json_string))),
+            json_capacity
+        );
+    }
+
+    #[test]
+    fn json_heap_size_counts_strings_nested_arrays_and_object_keys() {
+        let string = String::with_capacity(20);
+        let string_capacity = string.capacity();
+        assert_eq!(
+            super::json_heap_size(&serde_json::Value::String(string)),
+            string_capacity
+        );
+
+        let nested = String::with_capacity(30);
+        let nested_capacity = nested.capacity();
+        let mut array = Vec::with_capacity(3);
+        array.push(serde_json::Value::String(nested));
+        let array_size = array.capacity() * std::mem::size_of::<serde_json::Value>() + nested_capacity;
+        assert_eq!(super::json_heap_size(&serde_json::Value::Array(array)), array_size);
+
+        let key = String::with_capacity(12);
+        let key_capacity = key.capacity();
+        let value = String::with_capacity(40);
+        let value_capacity = value.capacity();
+        let mut object = serde_json::Map::new();
+        object.insert(key, serde_json::Value::String(value));
+        let object_size = std::mem::size_of::<(String, serde_json::Value)>() + key_capacity + value_capacity;
+        assert_eq!(super::json_heap_size(&serde_json::Value::Object(object)), object_size);
+    }
+
+    #[test]
+    fn row_size_counts_container_and_owned_value_storage() {
+        let text = String::with_capacity(64);
+        let text_capacity = text.capacity();
+        let row = [Value::Text(text)];
+
+        assert_eq!(
+            super::row_size(&row),
+            std::mem::size_of::<Value>() + std::mem::size_of::<Vec<Value>>() + text_capacity
+        );
+    }
+
+    #[test]
+    fn retained_rows_sums_all_result_sets() {
+        let batch = QueryResultBatch {
+            result_sets: vec![
+                QueryResult {
+                    columns: Vec::new(),
+                    rows: vec![Vec::new(), Vec::new()],
+                    truncated: false,
+                },
+                QueryResult {
+                    columns: Vec::new(),
+                    rows: vec![Vec::new()],
+                    truncated: false,
+                },
+            ],
+            truncated: false,
+        };
+
+        assert_eq!(batch.retained_rows(), 3);
     }
 }
