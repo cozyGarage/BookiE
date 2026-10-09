@@ -16,7 +16,7 @@ use crate::audit::{
     AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome,
 };
 use crate::blast_radius::count_sql_for_mutation;
-use crate::classify::{StatementFacts, classify};
+use crate::classify::{StatementClass, StatementFacts, classify};
 use crate::config::PolicyConfig;
 use crate::mask::apply_masking;
 use crate::principal::Principal;
@@ -160,7 +160,10 @@ impl PolicyGuard {
         }
 
         self.require_governed_write_available()?;
-        let estimated_rows = if facts.contains_mutating_dml && env_policy.blast_radius_max_rows.is_some() {
+        let estimated_rows = if facts.contains_mutating_dml
+            && facts.class != StatementClass::Administrative
+            && env_policy.blast_radius_max_rows.is_some()
+        {
             match enforced_rows {
                 Some(rows) => Some(rows),
                 None => self.estimate_blast_radius(sql, &facts, control).await?,
