@@ -70,15 +70,19 @@ fn decode_vector(bytes: &[u8], expected_oid: u32) -> Option<String> {
         return None;
     }
     let length = usize::try_from(reader.integer()?).ok()?;
-    if reader.integer()? != 0 || length > reader.remaining.len() / 4 {
+    if reader.integer()? != 0 {
         return None;
     }
-    let mut elements = Vec::with_capacity(length);
+    let mut elements = Vec::with_capacity(vector_capacity(length, reader.remaining.len())?);
     for _ in 0..length {
         let length = reader.integer()?;
         elements.push(element_text(oid, false, read_bounded_element(&mut reader, length)?)?);
     }
     reader.remaining.is_empty().then(|| elements.join(" "))
+}
+
+fn vector_capacity(length: usize, payload_bytes: usize) -> Option<usize> {
+    (length <= payload_bytes / 4).then_some(length)
 }
 
 struct Reader<'a> {
@@ -353,6 +357,13 @@ mod tests {
             assert_eq!(decode_vector(&words(&header), 21), None, "{header:?}");
         }
         assert_eq!(decode_vector(&[empty.clone(), vec![0]].concat(), 21), None);
+    }
+
+    #[test]
+    fn value_contract_vector_capacity_is_bounded_by_element_length_words() {
+        assert_eq!(vector_capacity(2, 8), Some(2));
+        assert_eq!(vector_capacity(3, 8), None);
+        assert_eq!(vector_capacity(usize::MAX, 8), None);
     }
 
     #[test]
