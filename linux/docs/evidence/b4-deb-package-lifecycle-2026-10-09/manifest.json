@@ -22,7 +22,7 @@
   },
   "log_sha256": {
     "deb-test.log": "774ce02fdfd8d35b0ba625d1c238c94089726b3557425cf4cebf0593077466e8",
-    "installed-gtk.log": "c70d33f9fd48e8b08585792c6db89238e9031e912a44ce354f4f025e46ac1716"
+    "installed-gtk.log": "7fd5502871137c2ffbefacda8aa320eb7d3a98bd6540c5cb03580842f9f8132e"
   },
   "installed_gtk": {
     "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database",
