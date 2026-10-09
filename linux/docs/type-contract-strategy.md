@@ -297,7 +297,9 @@ bindings leave target and sibling rows unchanged
 ([test](../crates/drivers/postgres/tests/support/unsupported_builtin_array_contract.rs)).
 The same explicit-refusal and preservation contract now covers built-in
 `json[]` and `jsonb[]`, with native array text, JSON, and wire snapshots in the
-same test file.
+same test file. Empty arrays remain visibly undecodable with their native type,
+while whole-array SQL NULL remains `Value::Null` for both types
+(`value_contract_empty_json_arrays_refuse_but_sql_null_stays_null`).
 PostgreSQL geometric arrays `point[]`, `line[]`, `lseg[]`, `box[]`, `path[]`,
 `polygon[]`, and `circle[]` now share an explicit-refusal contract. It checks
 native type/text/JSON/wire oracles, SQL-literal and parameter refusal, and

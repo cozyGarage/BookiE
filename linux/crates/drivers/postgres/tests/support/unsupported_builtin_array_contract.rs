@@ -233,3 +233,43 @@ async fn value_contract_json_array_refusal_preserves_target_and_sibling_rows() {
     assert_eq!(after.rows[0][7], Value::Text("target".into()));
     assert_eq!(after.rows[1][7], Value::Text("sibling".into()));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_empty_json_arrays_refuse_but_sql_null_stays_null() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+
+    for native_type in ["json[]", "jsonb[]"] {
+        let empty = connection
+            .query(&format!(
+                "SELECT value, pg_typeof(value)::text, value::text, array_to_json(value)::text \
+                 FROM (SELECT ARRAY[]::{native_type} AS value) source"
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            &empty.rows[0][0],
+            Value::Undecodable(name) if name.eq_ignore_ascii_case(native_type)
+        ));
+        assert_eq!(empty.rows[0][1], Value::Text(native_type.into()));
+        assert_eq!(empty.rows[0][2], Value::Text("{}".into()));
+        assert_eq!(empty.rows[0][3], Value::Text("[]".into()));
+        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &empty.rows[0][0]).is_err());
+        assert!(
+            connection
+                .query_params("SELECT $1", std::slice::from_ref(&empty.rows[0][0]))
+                .await
+                .is_err()
+        );
+
+        let null = connection
+            .query(&format!(
+                "SELECT NULL::{native_type}, pg_typeof(NULL::{native_type})::text"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(null.rows[0][0], Value::Null);
+        assert_eq!(null.rows[0][1], Value::Text(native_type.into()));
+    }
+}
