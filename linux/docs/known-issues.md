@@ -27,11 +27,12 @@ PostgreSQL vector-capacity and deep-enum expression regressions caught their
 scoped mutations; PRs #448 and #449 passed their Docker contracts and all 11
 required hosted checks. PR #450's GitHub checks passed, but its Docker driver
 integration job was skipped and Forgejo run 85 was disrupted by executor
-restarts. Its follow-up worktree now has passing MySQL and MariaDB charset
-selectors plus unpiped preflight; the native stored-value oracle and Forgejo
-gate are not yet on a published commit. The broader B3 engine/type/consumer
-matrix and installed acceptance remain open. This is a status snapshot, not a
-release qualification.
+restarts. Its follow-up branch adds native stored-value oracles and serial
+MariaDB fixture reuse. Both charset selectors and all 31 serial
+`value_contract` tests passed locally using one MySQL and one MariaDB container;
+unpiped preflight passed. The follow-up is not yet published or Forgejo-gated.
+The broader B3 engine/type/consumer matrix and installed acceptance remain
+open. This is a status snapshot, not a release qualification.
 Older audits remain historical; this ledger and the
 [active sprint](bookie-0.2-sprint.md) own current status.
 ## Owners and handoff

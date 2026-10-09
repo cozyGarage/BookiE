@@ -40,10 +40,11 @@ contract, unpiped preflight and all 11 required hosted checks passed. A focused
 buildable mutants across native selectors; one was build-unviable. PR #450 adds
 MySQL and MariaDB invalid-UTF-8 ENUM/SET result regressions. Its GitHub checks
 passed, but Docker driver integration was skipped and Forgejo run 85 was
-disrupted by executor restarts. A follow-up worktree adds native stored-value
-oracles; both MySQL and MariaDB charset selectors and unpiped local preflight
-pass there. The follow-up is not yet published or Forgejo-gated. Merged topic
-branches have been deleted.
+disrupted by executor restarts. A follow-up branch adds native stored-value
+oracles and shared MariaDB fixtures for the serial full suite. Both charset
+selectors and all 31 serial `value_contract` tests passed locally using one
+MySQL and one MariaDB container; unpiped preflight passed. The follow-up is not
+yet published or Forgejo-gated. Merged topic branches have been deleted.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
