@@ -111,7 +111,7 @@ impl PolicyGuard {
     ) -> Result<Authorization, DriverError> {
         let facts = classify(sql, &self.ctx.driver_id);
         if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
-            return self.resolve_authorization(sql, facts, decision, None).await;
+            return self.resolve_authorization(sql, facts, decision, None, control).await;
         }
         self.authorize_classified(sql, facts, control).await
     }
@@ -124,7 +124,7 @@ impl PolicyGuard {
     ) -> Result<Authorization, DriverError> {
         let facts = classify(sql, &self.ctx.driver_id);
         if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
-            return self.resolve_authorization(sql, facts, decision, None).await;
+            return self.resolve_authorization(sql, facts, decision, None, control).await;
         }
         self.authorize_with_bound(sql, facts, enforced_rows, control).await
     }
@@ -156,7 +156,7 @@ impl PolicyGuard {
             self.ctx.read_only,
             &env_policy,
         ) {
-            return self.resolve_authorization(sql, facts, decision, None).await;
+            return self.resolve_authorization(sql, facts, decision, None, control).await;
         }
 
         self.require_governed_write_available()?;
@@ -175,7 +175,8 @@ impl PolicyGuard {
             &env_policy,
             estimated_rows,
         );
-        self.resolve_authorization(sql, facts, decision, estimated_rows).await
+        self.resolve_authorization(sql, facts, decision, estimated_rows, control)
+            .await
     }
 
     async fn resolve_authorization(
@@ -184,6 +185,7 @@ impl PolicyGuard {
         facts: StatementFacts,
         decision: Decision,
         estimated_rows: Option<u64>,
+        control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
         match decision {
             Decision::Allow { .. } => Ok(Authorization {
@@ -221,25 +223,55 @@ impl PolicyGuard {
                 ref reason,
                 ref preview,
             } => {
-                let outcome = self
-                    .ctx
-                    .approval
-                    .request(ApprovalRequest {
-                        principal: self.ctx.principal.clone(),
-                        environment: self.ctx.environment,
-                        connection_id: self.ctx.connection_id,
-                        connection_name: self.ctx.connection_name.clone(),
-                        sql: sql.to_string(),
-                        facts: facts.clone(),
-                        rule: rule.clone(),
-                        reason: reason.clone(),
-                        preview: preview.clone(),
-                        estimated_rows,
-                    })
-                    .await;
+                let approval = self.ctx.approval.request(ApprovalRequest {
+                    principal: self.ctx.principal.clone(),
+                    environment: self.ctx.environment,
+                    connection_id: self.ctx.connection_id,
+                    connection_name: self.ctx.connection_name.clone(),
+                    sql: sql.to_string(),
+                    facts: facts.clone(),
+                    rule: rule.clone(),
+                    reason: reason.clone(),
+                    preview: preview.clone(),
+                    estimated_rows,
+                    cancellation: control.map(|control| control.cancellation_token().clone()),
+                });
+                tokio::pin!(approval);
+                let outcome = match control {
+                    Some(control) => tokio::select! {
+                        biased;
+                        _ = control.cancellation_token().cancelled() => None,
+                        outcome = &mut approval => Some(outcome),
+                    },
+                    None => Some(approval.await),
+                };
                 let preview_state = match preview {
                     Some(value) => AuditPreviewState::Available(value.clone()),
                     None => AuditPreviewState::Unavailable,
+                };
+                let Some(outcome) = outcome else {
+                    let operation = self.operation(
+                        sql,
+                        None,
+                        &facts,
+                        &decision,
+                        AuditApprovalOutcome::Denied,
+                        preview_state,
+                    );
+                    let audit_result = self
+                        .record_outcome(
+                            &operation,
+                            AuditOutcome {
+                                terminal_status: AuditTerminalStatus::Cancelled,
+                                transaction_outcome: AuditTransactionOutcome::NotApplicable,
+                                rows_affected: None,
+                                error_category: Some(AuditErrorCategory::Cancelled),
+                                duration_ms: 0,
+                            },
+                        )
+                        .await;
+                    self.handle_non_execution_audit_failure(audit_result)?;
+                    return Err(DriverError::Cancelled);
                 };
                 match outcome {
                     ApprovalOutcome::AllowOnce => Ok(Authorization {

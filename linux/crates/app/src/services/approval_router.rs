@@ -64,6 +64,7 @@ mod tests {
             reason: "test".into(),
             preview: None,
             estimated_rows: None,
+            cancellation: None,
         }
     }
 

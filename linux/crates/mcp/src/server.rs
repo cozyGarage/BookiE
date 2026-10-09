@@ -406,36 +406,52 @@ fn http_router(bridge: Arc<McpBridge>) -> axum::Router {
             post(move |headers: HeaderMap, Json(body): Json<JsonValue>| {
                 let bridge = bridge.clone();
                 async move {
-                    if !origin_is_allowed(&headers) {
-                        return (
-                            StatusCode::FORBIDDEN,
-                            Json(json!({
-                                "jsonrpc": "2.0",
-                                "id": null,
-                                "error": {"code": -32000, "message": "forbidden origin"}
-                            })),
-                        )
-                            .into_response();
-                    }
-                    let id = body.get("id").cloned().unwrap_or(JsonValue::Null);
-                    let method = body.get("method").and_then(|m| m.as_str()).unwrap_or("");
-                    let params = body.get("params").cloned().unwrap_or(json!({}));
-                    let result = match method {
-                        "tools/call" => handle_tool_call(&bridge, params).await,
-                        "tools/list" => handle_tools_list(&bridge, &params),
-                        "initialize" => match initialize_result(&params) {
-                            Ok(result) => Ok(result),
-                            Err(message) => {
-                                return Json(json_rpc_error(&id, -32602, message)).into_response();
+                    let cancellation = bridge.request_cancellation();
+                    let request_cancellation = cancellation.clone();
+                    let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+                    let operation = async move {
+                        crate::bridge::scope_request_cancellation(request_cancellation, async move {
+                            if !origin_is_allowed(&headers) {
+                                return (
+                                    StatusCode::FORBIDDEN,
+                                    Json(json!({
+                                        "jsonrpc": "2.0",
+                                        "id": null,
+                                        "error": {"code": -32000, "message": "forbidden origin"}
+                                    })),
+                                )
+                                    .into_response();
                             }
-                        },
-                        other => Err(format!("unsupported method: {other}")),
+                            let id = body.get("id").cloned().unwrap_or(JsonValue::Null);
+                            let method = body.get("method").and_then(|m| m.as_str()).unwrap_or("");
+                            let params = body.get("params").cloned().unwrap_or(json!({}));
+                            let result = match method {
+                                "tools/call" => handle_tool_call(&bridge, params).await,
+                                "tools/list" => handle_tools_list(&bridge, &params),
+                                "initialize" => match initialize_result(&params) {
+                                    Ok(result) => Ok(result),
+                                    Err(message) => {
+                                        return Json(json_rpc_error(&id, -32602, message)).into_response();
+                                    }
+                                },
+                                other => Err(format!("unsupported method: {other}")),
+                            };
+                            let response = match result {
+                                Ok(r) => json!({"jsonrpc": "2.0", "id": id, "result": r}),
+                                Err(e) => json_rpc_error(&id, -32000, e),
+                            };
+                            Json(response).into_response()
+                        })
+                        .await
                     };
-                    let response = match result {
-                        Ok(r) => json!({"jsonrpc": "2.0", "id": id, "result": r}),
-                        Err(e) => json_rpc_error(&id, -32000, e),
-                    };
-                    Json(response).into_response()
+                    tokio::spawn(supervise_disconnect_aware(response_tx, cancellation, operation));
+                    response_rx.await.unwrap_or_else(|_| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({"error": "MCP request task stopped before producing a response"})),
+                        )
+                            .into_response()
+                    })
                 }
             }),
         )
@@ -445,10 +461,44 @@ fn http_router(bridge: Arc<McpBridge>) -> axum::Router {
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
 }
 
+async fn supervise_disconnect_aware<T, F>(
+    mut response: tokio::sync::oneshot::Sender<T>,
+    cancellation: tokio_util::sync::CancellationToken,
+    operation: F,
+) where
+    F: std::future::Future<Output = T>,
+{
+    tokio::pin!(operation);
+    tokio::select! {
+        biased;
+        _ = response.closed() => {
+            cancellation.cancel();
+            let _ = operation.await;
+        }
+        result = &mut operation => {
+            let _ = response.send(result);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use axum::http::HeaderValue;
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
+    use tablepro_core::{ColumnInfo, Connection, DriverError, Environment, ExecResult, QueryResult, TableInfo, Value};
+    use tablepro_policy::{
+        ApprovalOutcome, ApprovalRequest, ApprovalSink, AuditError, AuditEvent, AuditRecordPhase, AuditSink,
+        AuditState, AuditTerminalStatus, GuardContext, PolicyConfig, PolicyGuard, Principal,
+    };
+    use tokio::{
+        io::AsyncWriteExt,
+        net::{TcpListener, TcpStream},
+        sync::Notify,
+    };
 
     fn headers_with_origin(origin: &str) -> HeaderMap {
         let mut headers = HeaderMap::new();
@@ -504,6 +554,253 @@ mod tests {
         shutdown.cancel();
         let result = task.await.unwrap();
         assert!(result.is_ok(), "{result:?}");
+    }
+
+    #[tokio::test]
+    async fn a_disconnected_http_caller_cancels_but_does_not_drop_its_operation() {
+        let (response_tx, response_rx) = tokio::sync::oneshot::channel::<()>();
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        let observed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let operation_cancellation = cancellation.clone();
+        let operation_observed = observed.clone();
+        let task = tokio::spawn(supervise_disconnect_aware(
+            response_tx,
+            cancellation.clone(),
+            async move {
+                operation_cancellation.cancelled().await;
+                operation_observed.store(true, std::sync::atomic::Ordering::SeqCst);
+            },
+        ));
+
+        drop(response_rx);
+        task.await.expect("request supervisor should finish after cancellation");
+
+        assert!(cancellation.is_cancelled());
+        assert!(observed.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    struct PendingApproval {
+        requested: Arc<Notify>,
+    }
+
+    #[async_trait::async_trait]
+    impl ApprovalSink for PendingApproval {
+        async fn request(&self, _request: ApprovalRequest) -> ApprovalOutcome {
+            self.requested.notify_one();
+            std::future::pending().await
+        }
+    }
+
+    struct RecordingAudit {
+        events: std::sync::Mutex<Vec<AuditEvent>>,
+        recorded: Notify,
+    }
+
+    #[async_trait::async_trait]
+    impl AuditSink for RecordingAudit {
+        async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
+            self.events.lock().expect("audit events").push(event);
+            self.recorded.notify_one();
+            Ok(())
+        }
+    }
+
+    struct WriteProbeConnection {
+        executions: Arc<AtomicUsize>,
+    }
+
+    #[async_trait::async_trait]
+    impl Connection for WriteProbeConnection {
+        async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+            Ok(Vec::new())
+        }
+        async fn fetch_columns(&self, _schema: Option<&str>, _table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+            Ok(Vec::new())
+        }
+        async fn fetch_rows(
+            &self,
+            _schema: Option<&str>,
+            _table: &str,
+            _offset: u64,
+            _limit: u64,
+        ) -> Result<QueryResult, DriverError> {
+            Ok(QueryResult {
+                columns: Vec::new(),
+                rows: Vec::new(),
+                truncated: false,
+            })
+        }
+        async fn query(&self, _sql: &str) -> Result<QueryResult, DriverError> {
+            Ok(QueryResult {
+                columns: Vec::new(),
+                rows: Vec::new(),
+                truncated: false,
+            })
+        }
+        async fn execute(&self, _sql: &str) -> Result<ExecResult, DriverError> {
+            self.executions.fetch_add(1, Ordering::SeqCst);
+            Ok(ExecResult { rows_affected: 1 })
+        }
+        async fn execute_params(&self, sql: &str, _params: &[Value]) -> Result<ExecResult, DriverError> {
+            self.execute(sql).await
+        }
+        async fn execute_in_transaction(&self, _statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+            Ok(Vec::new())
+        }
+        async fn ping(&self) -> Result<(), DriverError> {
+            Ok(())
+        }
+        async fn close(self: Box<Self>) -> Result<(), DriverError> {
+            Ok(())
+        }
+    }
+
+    struct ApprovalProvider {
+        saved: tablepro_storage::SavedConnection,
+        connection: Arc<dyn Connection>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::bridge::ConnectionProvider for ApprovalProvider {
+        async fn list_saved_connections(&self) -> Result<Vec<tablepro_storage::SavedConnection>, String> {
+            Ok(vec![self.saved.clone()])
+        }
+        async fn connection(
+            &self,
+            _connection_id: uuid::Uuid,
+            _principal: Principal,
+        ) -> Result<Arc<dyn Connection>, String> {
+            Ok(self.connection.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn disconnecting_during_agent_approval_records_cancellation_and_never_executes() {
+        let connection_id = uuid::Uuid::new_v4();
+        let saved = serde_json::from_value(serde_json::json!({
+            "id": connection_id,
+            "name": "approval fixture",
+            "driver_id": "sqlite",
+            "host": "",
+            "port": 0,
+            "database": ":memory:",
+            "username": "",
+        }))
+        .expect("saved connection fixture");
+        let requested = Arc::new(Notify::new());
+        let audit = Arc::new(RecordingAudit {
+            events: Mutex::new(Vec::new()),
+            recorded: Notify::new(),
+        });
+        let executions = Arc::new(AtomicUsize::new(0));
+        let guarded: Arc<dyn Connection> = Arc::new(PolicyGuard::new(
+            Arc::new(WriteProbeConnection {
+                executions: executions.clone(),
+            }),
+            GuardContext {
+                connection_id,
+                connection_name: "approval fixture".into(),
+                driver_id: "sqlite".into(),
+                environment: Environment::Local,
+                read_only: false,
+                principal: Principal::Agent {
+                    token: "test-token".into(),
+                    client: Some("disconnect test".into()),
+                    model: None,
+                },
+                policy: Arc::new(PolicyConfig::default()),
+                approval: Arc::new(PendingApproval {
+                    requested: requested.clone(),
+                }),
+                audit: audit.clone(),
+                audit_state: Arc::new(AuditState::new()),
+            },
+        ));
+        let directory = tempfile::tempdir().unwrap();
+        let tokens = Arc::new(crate::tokens::TokenStore::open(directory.path().join("tokens.json")).unwrap());
+        let (_, plaintext) = tokens
+            .issue(
+                "disconnect test".into(),
+                crate::auth::TokenPermissions::ReadWrite,
+                vec![connection_id],
+                None,
+            )
+            .unwrap();
+        let bridge = Arc::new(McpBridge::new(
+            Arc::new(ApprovalProvider {
+                saved,
+                connection: guarded,
+            }),
+            tokens,
+        ));
+
+        let probe = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = probe.local_addr().unwrap();
+        drop(probe);
+        let shutdown = tokio_util::sync::CancellationToken::new();
+        let server_shutdown = shutdown.clone();
+        let server = tokio::spawn(async move {
+            serve_streamable_http_until(
+                bridge,
+                McpServerConfig {
+                    bind_host: "127.0.0.1".into(),
+                    bind_port: address.port(),
+                },
+                server_shutdown,
+            )
+            .await
+        });
+        let mut stream = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                match TcpStream::connect(address).await {
+                    Ok(stream) => break stream,
+                    Err(_) => tokio::time::sleep(std::time::Duration::from_millis(10)).await,
+                }
+            }
+        })
+        .await
+        .expect("MCP listener should start");
+        let body = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "execute_write",
+                "arguments": {
+                    "connection_id": connection_id,
+                    "sql": "INSERT INTO jobs(id) VALUES (1)",
+                    "preview": false,
+                    "token": plaintext,
+                }
+            }
+        })
+        .to_string();
+        let request = format!(
+            "POST /mcp HTTP/1.1\r\nHost: {address}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: keep-alive\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(request.as_bytes()).await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), requested.notified())
+            .await
+            .expect("write should reach human approval");
+        drop(stream);
+
+        tokio::time::timeout(std::time::Duration::from_secs(5), audit.recorded.notified())
+            .await
+            .expect("disconnect should produce a terminal audit record");
+        let events = audit.events.lock().expect("audit events");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].phase, AuditRecordPhase::Outcome);
+        assert_eq!(events[0].terminal_status, AuditTerminalStatus::Cancelled);
+        drop(events);
+        assert_eq!(
+            executions.load(Ordering::SeqCst),
+            0,
+            "cancelled write must not reach the driver"
+        );
+
+        shutdown.cancel();
+        assert!(server.await.expect("server task").is_ok());
     }
 
     /// H-adjacent finding: tools/list disclosed the full tool catalogue to
