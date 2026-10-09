@@ -206,10 +206,11 @@ JSON and `array_send` comparisons cover full-host and network prefixes,
 malformed-prefix refusal, CIDR host-bit refusal and target/sibling preservation.
 The built-in OID census includes element OIDs 869 (`inet`) and 650 (`cidr`)
 ([evidence](evidence/postgres-network-array-roundtrip-results-2026-10-06/manifest.json)).
-The `inet[]` XLSX writer preserves the driver's quoted array text as a string
-cell; Gnumeric and Calc XLSX/ODS/XLSX round trips retained it exactly, while a
-native PostgreSQL query separately checks the stored type, text and JSON values.
-Regression: `value_contract_inet_array_xlsx_preserves_native_network_text`.
+The `inet[]` and `cidr[]` XLSX writers preserve the driver's quoted array text
+as string cells; Gnumeric and Calc XLSX/ODS/XLSX round trips retained each
+exactly, while native PostgreSQL queries separately check stored type, text and
+JSON values. Regressions: `value_contract_inet_array_xlsx_preserves_native_network_text`
+and `value_contract_cidr_array_xlsx_preserves_native_network_text`.
 
 PostgreSQL arbitrary query results have Docker regressions that cross the shared
 64 MiB decoded-result budget, verify retained row order and payloads, assert
