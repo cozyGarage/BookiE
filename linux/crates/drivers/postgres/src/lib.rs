@@ -124,6 +124,9 @@ impl DatabaseDriver for PgDriver {
         if let Some(name) = &opts.application_name {
             pg_opts = pg_opts.application_name(name);
         }
+        if opts.read_only {
+            pg_opts = pg_opts.options([("default_transaction_read_only", "on")]);
+        }
         let cancellation_options = pg_opts.clone();
         let session_options = pg_opts.clone();
         let pool = PgPoolOptions::new()
