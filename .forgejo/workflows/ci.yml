@@ -39,6 +39,7 @@ jobs:
           bash scripts/check-bounded-operations.sh
           bash scripts/check-panic-sites.sh
           python3 scripts/check-function-size.py
+          python3 scripts/check-comment-lines.py
           cargo fmt --all -- --check
 
   clippy:
