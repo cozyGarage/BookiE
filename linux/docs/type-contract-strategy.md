@@ -30,9 +30,13 @@ The core Markdown exporter at source SHA-256
 `dc0e5b79166eb2f23d75708f9e62ac06189b0b0ea29330a24fdea9511ac34b0d` was
 mutation-audited across `render_markdown`, its header/separator/row/value
 formatters, cell escaping and the streaming writer. All 14 generated variants
-were caught by the existing renderer and writer tests; no missed, unviable or
-timed-out mutants remained. This adds another focused consumer slice to TEST-2,
-not a claim that the broader core/package audit is complete.
+were caught by the existing renderer and writer tests. The HTML exporter at
+source SHA-256
+`94a7b3ff2660e04862c7d97fc741cd4307f9422a3413a3f8dbc26f439b7f69ad` generated
+7 variants across escaping and streaming output; all 7 were caught. Both
+unmutated baselines passed, with no missed, unviable or timed-out mutants. These
+add focused consumer slices to TEST-2, not a claim that the broader core/package
+audit is complete.
 
 A dedicated PostgreSQL session binds enum text and SQL NULL while the target
 schema is absent from `search_path` and a same-named shadow enum is the only
