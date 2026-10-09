@@ -8,6 +8,8 @@ mod catalog_effect;
 mod classify;
 pub use catalog_effect::{CatalogEffect, catalog_effect};
 mod config;
+mod effects;
+mod effects_classification;
 mod guard;
 mod mask;
 mod principal;
