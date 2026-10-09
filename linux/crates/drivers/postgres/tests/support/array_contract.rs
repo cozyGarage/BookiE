@@ -129,6 +129,7 @@ include!("array_contract_parts/xml_array_file_exports.rs");
 include!("array_contract_parts/result_consumers_numeric.rs");
 include!("array_contract_parts/result_consumers_temporal.rs");
 include!("array_contract_parts/result_consumers_timestamp_dmy.rs");
+include!("array_contract_parts/result_consumers_timestamptz_timezone.rs");
 include!("array_contract_parts/network_array_consumers.rs");
 include!("array_contract_parts/citext_array_consumers.rs");
 include!("array_contract_parts/bit_array_consumers.rs");
