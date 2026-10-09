@@ -5,6 +5,19 @@ use crate::classify::{StatementClass, StatementFacts, is_administrative_function
 use crate::effects::Effects;
 use sqlparser::ast::{CopySource, CopyTarget, Set, Statement};
 
+pub(crate) fn merge_script_class(current: StatementClass, next: StatementClass) -> StatementClass {
+    if current == StatementClass::Administrative || next == StatementClass::Administrative {
+        return StatementClass::Administrative;
+    }
+    if current == StatementClass::Select {
+        return next;
+    }
+    if next == StatementClass::Select || current == next {
+        return current;
+    }
+    StatementClass::Other
+}
+
 pub(crate) fn statement_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
     read_effects(stmt, facts)
         .union(write_effects(stmt, facts))
