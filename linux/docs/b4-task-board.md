@@ -81,6 +81,17 @@ not activate AT-SPI; this is incomplete, not acceptance. The headless Wayland
 runner could not start because `gnome-shell` is unavailable on the test host.
 See the [run notes](evidence/b4-current-linux-tip-2026-10-09/README.md).
 
+On exact `fork/linux` source `2ef1df8`,
+`bash scripts/test-arch-package-container.sh` built and validated Arch package
+`0.1.6-1` (SHA-256
+`709d61f931efc7b833e3a9f45f02a5f17927213b3c122e098ffddae5328e1ee8`). The
+container test upgraded `0.1.5-1` to `0.1.6-1`, verified the installed
+executables, and removed the package while preserving user-data sentinels. It
+does not cover package-installed B4 UI flows or native Wayland; those rows stay
+open. The packaging output also contains a `namcap` PKGBUILD environment
+diagnostic despite an overall exit code of zero. See the [Arch package
+lifecycle manifest](evidence/b4-arch-package-lifecycle-2026-10-09/manifest.json).
+
 ## Previous pinned B4 acceptance checkpoint (2026-10-09; linux tip 4bcec064)
 
 At this checkpoint, `fork/linux` was `4bcec064d1dc4a8f4905f92f40461e4c215ed23b`
