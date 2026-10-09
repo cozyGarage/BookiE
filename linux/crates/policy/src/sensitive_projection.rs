@@ -1,4 +1,4 @@
-use sqlparser::ast::{DescribeAlias, Expr, Query, SelectItem, SetExpr, Statement, TableFactor};
+use sqlparser::ast::{Expr, Query, SelectItem, SetExpr, Statement, TableFactor};
 use sqlparser::parser::Parser;
 
 use crate::classify::dialect_for;
@@ -13,14 +13,6 @@ pub fn sensitive_projection(sql: &str, driver_id: &str, patterns: &[String], out
             [Statement::Query(query)] => select_projection_sensitivity(query, patterns)
                 .filter(|positions| positions.len() == output_columns)
                 .unwrap_or_else(|| vec![true; output_columns]),
-            [
-                Statement::Explain {
-                    describe_alias: DescribeAlias::Explain,
-                    analyze: false,
-                    statement,
-                    ..
-                },
-            ] if matches!(statement.as_ref(), Statement::Query(_)) => vec![false; output_columns],
             _ => vec![true; output_columns],
         },
         Err(_) => vec![true; output_columns],
@@ -117,14 +109,14 @@ mod tests {
     }
 
     #[test]
-    fn a_plain_explain_of_a_query_keeps_plan_output_visible() {
+    fn a_plain_explain_of_a_query_keeps_plan_output_redacted() {
         let positions = sensitive_projection(
             "EXPLAIN SELECT * FROM cards WHERE pan = '4111111111111111'",
             "postgres",
             &sensitive_patterns(),
             1,
         );
-        assert_eq!(positions, vec![false]);
+        assert_eq!(positions, vec![true]);
     }
 
     #[test]
