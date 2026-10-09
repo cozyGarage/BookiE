@@ -24,21 +24,25 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 
 ## Current continuation: 2026-10-09
 
-The merged `linux` baseline is `24a89c3b9f8a34f787dece5ba429591fc3bd087a`
-(PR #444); PRs #441–#444 are merged. PR #443 adds SQL Server
+The merged `linux` baseline is `20d67d7da51b12b49ede28813cabb088affa861d`
+(PR #448); PRs #441–#448 are merged. PR #443 adds SQL Server
 `decimal(38,38)` preservation and refuses lossy `sql_variant` values. Its full
 MSSQL run passed 77 tests; the full local value-contract tier passed 428 tests
-with no missing suites, and unpiped preflight passed. All 11 hosted checks
-passed, including SonarCloud, Flatpak default/development, and GTK parser tests.
-The scoped SQL Server codec mutation audit tested 38 variants: 32 caught, 6
-build-unviable, none missed or timed out. Its local and remote branches are
-deleted.
+with no missing suites, and unpiped preflight passed. The scoped SQL Server
+codec mutation audit tested 38 variants: 32 caught, 6 build-unviable, none
+missed or timed out. PR #448 adds deep PostgreSQL enum expression and array
+result boundaries through 4,096 domain layers; its Docker contract, local
+preflight and all 11 required hosted checks passed. Focused MySQL decoder
+mutations deleting the BIT and DECIMAL branches were caught by native contracts
+on the current source. The active B3 follow-up pins PostgreSQL `array_remove`
+and `array_position` scalar-parameter behavior at 63, 64 and deeper enum-domain
+levels; its focused Docker contract passed 1/1 on the working branch. Merged
+topic branches have been deleted.
 
-B3 remains open after #443: continue the wider engine/type/consumer/configuration
-matrix and mutation triage, then complete installed grid acceptance. B4 and B7
-remain open as listed above; keep the sequence B3 → B4 → installed Arch/Wayland
-→ Debian/GNOME → B7. The #443 branch is review work and does not qualify the
-merged release baseline.
+B3 remains open after #448: continue the wider engine/type/consumer/configuration
+matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
+and B7 remain open as listed above; keep the sequence B3 → B4 → installed
+Arch/Wayland → Debian/GNOME → B7. The merged baseline is not release-qualified.
 
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless

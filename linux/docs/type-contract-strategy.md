@@ -137,6 +137,15 @@ The expression assertions are in
 the depth matrix remains in
 `../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs`.
 
+The same sampled 63-to-4,096-layer shadowed-path matrix now distinguishes scalar
+array-function parameters: `array_remove(ARRAY[status], $1)` preserves the
+native enum parameter and exact array value at 63 layers, then refuses at 64
+and deeper; `array_position(ARRAY[status, NULL], $1)` retains the enum
+parameter type and PostgreSQL's NULL-element matching semantics through 4,096
+layers. Both text and SQL NULL are checked against the expected result and
+`pg_typeof`; the Docker contract is
+`value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path`.
+
 ClickHouse Enum8 now covers its signed endpoints and zero (`-128`, `0`, `127`)
 in the existing native contract. Parameter insertion, result label decoding,
 native Int8 casts, CSV import and SQL-literal replay all preserve the labels;
