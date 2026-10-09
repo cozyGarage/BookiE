@@ -1,7 +1,11 @@
 # Proposal: send the vendored patches upstream
 
-Status: proposed. Filing issues or pull requests upstream is a separate decision
-for the maintainer.
+Status: first four issues filed on 2026-10-10 with the maintainer's approval:
+[sqlx SCRAM](https://github.com/transact-rs/sqlx/issues/4451),
+[sqlx quoted `NULL`](https://github.com/transact-rs/sqlx/issues/4452),
+[sqlx `ENUM`/`SET`](https://github.com/transact-rs/sqlx/issues/4453) and
+[mongodb SCRAM](https://github.com/mongodb/mongo-rust-driver/issues/1819).
+The hostname option, multirange codes and the resolution depth are not filed yet.
 
 BookiE carries four patched crates in `linux/vendor/` (about 125,000 lines, more
 than the application's own code). The patches themselves are about 540 lines of
