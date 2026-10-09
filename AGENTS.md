@@ -100,6 +100,9 @@ owner table, and each lane edits only its own files.
    the merge tier there. Forgejo runs the merge tier on its own executors. Do not re-run a Forgejo
    job to learn what GitHub already reported, and do not trust a skipped GitHub
    job as a pass.
+   CodeQL and SonarCloud run on GitHub as reference scans, not gates: fix real
+   findings in small pull requests and mark wrong ones "False positive" or
+   "Won't fix" with a reason (see validation-playbook, SonarCloud triage).
 9. **Merge only on GitHub.** Forgejo is the gate, not the merge target: never merge a
    pull request on Forgejo, and never push to Forgejo's `linux` by hand. A Forgejo
    merge makes its `linux` diverge from GitHub's, and the sync (which only

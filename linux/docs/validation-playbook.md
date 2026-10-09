@@ -148,13 +148,17 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 
 ## Hosted checks
 
-Build Linux owns required regression jobs and its final `Linux regression gate`.
-Each migrated layer job uploads reports even after failure. Missing artifacts
+Build Linux owns the cheap-tier regression jobs and its final `Linux regression gate`; its merge-tier jobs run on its weekly schedule and on dispatch, not on pushes. Each migrated layer job uploads reports even after failure. Missing artifacts
 fail visibly. Linux Security runs policy tests and supply-chain checks in
 independent jobs, including when a GTK build fails. Linux CI contracts tests the
 validation infrastructure without waiting for a Rust build. Linux test quality
-owns mutation/coverage. Security and quality results are separate from the Build
-regression gate; review all of them at the same SHA.
+owns mutation/coverage. CodeQL (Rust, Python, workflow files) and SonarCloud run
+as reference scans. Security, quality and scan results are separate from the
+Build regression gate; review all of them at the same SHA.
+
+Scan findings are advice, not a gate. Fix a real finding in a small pull
+request. Mark a wrong one "False positive" or "Won't fix" in the tool with a one-line reason,
+and record the reasoning here when it is a framework pattern others will meet again.
 
 Actions are pinned to commits. Jobs use read-only repository permissions and
 ordinary `pull_request`, not privileged execution of PR code. Test fixtures use
@@ -271,10 +275,10 @@ No workflow here automatically publishes a release or waives an acceptance gate.
 Confirm a framework-specific finding against the native platform before changing source.
 
 Automatic Analysis (Autoscan) and CI analysis cannot both run for
-`cozyGarage_BookiE`. To use the Sonar Rust GitHub Actions workflow, a project
-admin must open the project dashboard, go to **Administration → Analysis
-Method**, and turn **Automatic Analysis** off, then re-run the workflow. Leaving
-Autoscan on keeps non-Rust findings but blocks CI Rust analysis.
+`cozyGarage_BookiE`. Automatic Analysis is off and the `SONAR_TOKEN` repository
+secret is set, so the `sonar-rust` workflow analyses Rust, Python and the
+other files on pushes and pull requests to `linux`. Pull requests from forks
+have no secret and skip the scan.
 
 ### GTK CSS node selectors
 
