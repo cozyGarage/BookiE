@@ -270,6 +270,12 @@ No workflow here automatically publishes a release or waives an acceptance gate.
 
 Confirm a framework-specific finding against the native platform before changing source.
 
+Automatic Analysis (Autoscan) and CI analysis cannot both run for
+`cozyGarage_BookiE`. To use the Sonar Rust GitHub Actions workflow, a project
+admin must open the project dashboard, go to **Administration → Analysis
+Method**, and turn **Automatic Analysis** off, then re-run the workflow. Leaving
+Autoscan on keeps non-Rust findings but blocks CI Rust analysis.
+
 ### GTK CSS node selectors
 
 SonarCloud reports eight “Unknown type selector” findings on
