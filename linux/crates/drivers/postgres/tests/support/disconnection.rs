@@ -137,8 +137,16 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
 async fn a_committed_write_with_a_lost_ack_is_not_replayed_after_reconnect() {
     use std::sync::atomic::Ordering;
 
-    let (_container, opts) = start_pg().await;
+    let (_container, opts) = super::shared_container::start_pg_durable().await;
     let observer = connect(opts.clone()).await;
+    assert_eq!(
+        observer
+            .query("SELECT current_setting('fsync'), current_setting('synchronous_commit'), current_setting('full_page_writes')")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text("on".into()), Value::Text("on".into()), Value::Text("on".into())]],
+    );
     observer
         .execute("CREATE TABLE lost_ack_target (id integer PRIMARY KEY, value integer NOT NULL)")
         .await
@@ -296,6 +304,7 @@ async fn a_restarted_postgres_server_restores_the_existing_pool() {
     let host_port = port_probe.local_addr().expect("test port address").port();
     drop(port_probe);
     let container = Postgres::default()
+        .with_fsync_enabled()
         .with_tag("16-alpine")
         .with_mapped_port(host_port, 5432.tcp())
         .start()

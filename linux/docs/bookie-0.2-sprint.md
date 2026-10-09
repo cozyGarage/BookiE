@@ -12,6 +12,8 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 - B3 [B3]: the broader type, consumer and configuration matrix, PERF-10 memory
   reduction (the preview is display-only; full values are still held), PERF-3
   MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
+  TEST-29's fast and durable test-container paths are implemented locally; its
+  serialized hosted gate is pending.
 - B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
   remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
   (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
@@ -55,6 +57,12 @@ preflight passed on the current head. Ubuntu and Debian also failed GTK safety w
 needs separate UI follow-up. The updated local head still needs its own gate;
 run 88 predates the current B3 fix and the #451/#452 merges.
 Merged topic branches have been deleted.
+
+For TEST-29, the local full PostgreSQL integration binary passed 234/234 in
+133.16 seconds and the MySQL/MariaDB binary passed 90/90 in 55.50 seconds.
+SQL Server's DDL batch, durable lost-ack and restart tests, and fast-fixture wide
+numeric test passed. Forgejo run 93 was cancelled while UX's serialized gates
+were active; this B3 change has not been pushed or gated yet.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4

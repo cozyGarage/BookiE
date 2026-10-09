@@ -3,7 +3,7 @@ use std::sync::{LazyLock, Mutex as StdMutex};
 use drivers_mysql::MysqlDriver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use testcontainers::ImageExt;
-use testcontainers::core::{IntoContainerPort, WaitFor};
+use testcontainers::core::{ExecCommand, IntoContainerPort, Mount, WaitFor};
 use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -31,11 +31,29 @@ pub(crate) struct MariaDbTestDatabase {
     _test_lock: Option<MutexGuard<'static, ()>>,
 }
 
+async fn assert_tmpfs<I: testcontainers::Image>(container: &ContainerAsync<I>, path: &str) {
+    let mut result = container.exec(ExecCommand::new(["cat", "/proc/mounts"])).await.unwrap();
+    let mounts = String::from_utf8(result.stdout_to_vec().await.unwrap()).unwrap();
+    assert!(mounts.lines().any(|line| {
+        let fields = line.split_whitespace().collect::<Vec<_>>();
+        fields.get(1) == Some(&path) && fields.get(2) == Some(&"tmpfs")
+    }));
+}
+
 pub(crate) async fn start_mysql() -> (TestDatabase, ConnectOptions) {
+    start_mysql_with_durability(false).await
+}
+
+pub(crate) async fn start_mysql_durable() -> (TestDatabase, ConnectOptions) {
+    start_mysql_with_durability(true).await
+}
+
+async fn start_mysql_with_durability(durable: bool) -> (TestDatabase, ConnectOptions) {
     if can_reuse_server(
         &std::env::args().skip(1).collect::<Vec<_>>(),
         std::env::var_os("TABLEPRO_TEST_RUN_ID").is_some(),
-    ) {
+    ) && !durable
+    {
         let test_lock = TEST_LOCK.lock().await;
         let server = SERVER.get_or_init(start_shared_server).await;
         reset_server(server).await;
@@ -47,7 +65,7 @@ pub(crate) async fn start_mysql() -> (TestDatabase, ConnectOptions) {
             test_options(&server.options),
         );
     }
-    let (container, server) = create_server().await;
+    let (container, server) = create_server(durable).await;
     (
         TestDatabase {
             _container: Some(container),
@@ -101,7 +119,7 @@ fn can_reuse_server(args: &[String], runner_cleans_container: bool) -> bool {
 }
 
 async fn start_shared_server() -> Server {
-    let (container, server) = create_server().await;
+    let (container, server) = create_server(false).await;
     *CONTAINER.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(container);
     server
 }
@@ -114,10 +132,20 @@ async fn start_shared_mariadb() -> Server {
     server
 }
 
-async fn create_server() -> (ContainerAsync<Mysql>, Server) {
-    let image = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"]);
+async fn create_server(durable: bool) -> (ContainerAsync<Mysql>, Server) {
+    let image = Mysql::default().with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test");
+    let image = if durable {
+        image.with_cmd(["--default-authentication-plugin=mysql_native_password"])
+    } else {
+        image
+            .with_cmd([
+                "--default-authentication-plugin=mysql_native_password",
+                "--innodb-flush-log-at-trx-commit=0",
+                "--innodb-doublewrite=0",
+                "--sync-binlog=0",
+            ])
+            .with_mount(Mount::tmpfs_mount("/var/lib/mysql"))
+    };
     let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
         Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
         Err(_) => image,
@@ -155,7 +183,14 @@ async fn create_mariadb_server() -> (ContainerAsync<GenericImage>, Server) {
         .with_exposed_port(3306.tcp())
         .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
         .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
-        .with_env_var("MARIADB_DATABASE", "test");
+        .with_env_var("MARIADB_DATABASE", "test")
+        .with_cmd([
+            "mariadbd",
+            "--innodb-flush-log-at-trx-commit=0",
+            "--innodb-doublewrite=0",
+            "--sync-binlog=0",
+        ])
+        .with_mount(Mount::tmpfs_mount("/var/lib/mysql"));
     let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
         Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
         Err(_) => image,
@@ -295,4 +330,46 @@ fn shared_server_requires_a_serial_complete_selection() {
         &["specific_test".into(), "--test-threads=1".into()],
         true
     ));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mysql_disposable_storage_disables_durable_flushes() {
+    let (container, server) = create_server(false).await;
+    let fixture = TestDatabase {
+        _container: Some(container),
+        _test_lock: None,
+    };
+    let options = test_options(&server.options);
+    let connection = MysqlDriver.connect(options).await.unwrap();
+    assert_eq!(
+        connection
+            .query("SELECT @@GLOBAL.innodb_flush_log_at_trx_commit, @@GLOBAL.innodb_doublewrite, @@GLOBAL.sync_binlog")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(0), Value::Text("OFF".into()), Value::Int(0)]],
+    );
+    assert_tmpfs(fixture._container.as_ref().unwrap(), "/var/lib/mysql").await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mariadb_disposable_storage_disables_durable_flushes() {
+    let (container, server) = create_mariadb_server().await;
+    let fixture = MariaDbTestDatabase {
+        _container: Some(container),
+        _test_lock: None,
+    };
+    let options = test_options(&server.options);
+    let connection = MysqlDriver.connect(options).await.unwrap();
+    assert_eq!(
+        connection
+            .query("SELECT @@GLOBAL.innodb_flush_log_at_trx_commit, @@GLOBAL.innodb_doublewrite, @@GLOBAL.sync_binlog")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(0), Value::Text("OFF".into()), Value::Int(0)]],
+    );
+    assert_tmpfs(fixture._container.as_ref().unwrap(), "/var/lib/mysql").await;
 }
