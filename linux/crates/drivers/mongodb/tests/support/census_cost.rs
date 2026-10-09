@@ -24,18 +24,36 @@ async fn value_contract_mongodb_census_scan_cost_profile() {
             .await
             .expect("seed census cost fixture");
 
-        let mut samples = Vec::with_capacity(5);
+        let mut census_samples = Vec::with_capacity(5);
         for _ in 0..5 {
             let started = Instant::now();
-            let page = connection.fetch_rows(None, &collection_name, 0, 50).await.unwrap();
-            samples.push(started.elapsed());
-            assert_eq!(page.rows.len(), 50);
+            let columns = connection.fetch_columns(None, &collection_name).await.unwrap();
+            census_samples.push(started.elapsed());
+            assert!(columns.iter().any(|column| column.name == "value"));
         }
-        samples.sort_unstable();
+        for offset in [0, size as u64 / 2, size as u64 - 50] {
+            let mut page_samples = Vec::with_capacity(5);
+            for _ in 0..5 {
+                let started = Instant::now();
+                let page = connection.fetch_rows(None, &collection_name, offset, 50).await.unwrap();
+                page_samples.push(started.elapsed());
+                assert_eq!(page.rows.len(), 50);
+            }
+            page_samples.sort_unstable();
+            println!(
+                "warm_page rows={size} offset={offset} samples_us={:?} median_us={}",
+                page_samples.iter().map(|sample| sample.as_micros()).collect::<Vec<_>>(),
+                page_samples[2].as_micros(),
+            );
+        }
+        census_samples.sort_unstable();
         println!(
-            "census rows={size} page_rows=50 samples_us={:?} median_us={}",
-            samples.iter().map(|sample| sample.as_micros()).collect::<Vec<_>>(),
-            samples[2].as_micros()
+            "census rows={size} samples_us={:?} median_us={}",
+            census_samples
+                .iter()
+                .map(|sample| sample.as_micros())
+                .collect::<Vec<_>>(),
+            census_samples[2].as_micros(),
         );
     }
 }

@@ -652,6 +652,23 @@ impl SimpleComponent for App {
             AppMsg::RowCountLoaded(tab_id, request, count) => self.on_browse_row_count_loaded(tab_id, request, count),
             AppMsg::RowCountFailed(tab_id, request) => self.on_browse_row_count_failed(tab_id, request),
             AppMsg::FetchBrowsePage(tab_id) => self.fetch_browse_page(tab_id, sender),
+            AppMsg::FetchBrowseCellValue(tab_id, request, col_index, column_name, row_key) => {
+                self.fetch_browse_cell_value(tab_id, request, col_index, column_name, row_key, sender)
+            }
+            AppMsg::BrowseCellValueLoaded(tab_id, request, col_index, column_name, result) => {
+                self.dispatch_to_tab(
+                    tab_id,
+                    match result {
+                        Ok(value) => BrowseTabInput::CellValueLoaded {
+                            request,
+                            col_index,
+                            column_name,
+                            value,
+                        },
+                        Err(message) => BrowseTabInput::CellValueFailed(request, message),
+                    },
+                );
+            }
             AppMsg::FetchBrowseColumns(tab_id) => self.fetch_browse_columns(tab_id, sender),
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
             AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(),

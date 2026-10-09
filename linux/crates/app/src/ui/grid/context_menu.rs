@@ -6,7 +6,7 @@ use gtk4::{self as gtk, gio, glib};
 use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use super::GridMsg;
-use super::display::{POSITION_SLOT, ROW_KEY_SLOT};
+use super::display::{FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
 use super::editing::enter_edit_mode;
 use super::export;
 use super::value_viewer;
@@ -59,10 +59,13 @@ pub(super) fn install_grid_context_menus(
     let copy_value_action = {
         let context = context.clone();
         let sender = sender.clone();
+        let view = column_view.downgrade();
         gio::ActionEntry::builder("copy-value")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.borrow().as_ref() {
-                    sender.send(GridMsg::CopyToClipboard(cell_text(&slot.widget))).ok();
+                    let row = view.upgrade().and_then(|view| row_object_at(&view, position(slot)));
+                    let text = copy_value_text(&slot.widget, row.as_ref(), slot.col_index);
+                    sender.send(GridMsg::CopyToClipboard(text)).ok();
                 }
             })
             .build()
@@ -158,12 +161,41 @@ pub(super) fn install_grid_context_menus(
     };
     let view_value_action = {
         let context = context.clone();
+        let sender = sender.clone();
         let view = column_view.downgrade();
         gio::ActionEntry::builder("view-value")
             .activate(move |_, _, _| {
                 let context = context.borrow();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if row_object_at(&view, position(slot))
+                    .and_then(|row| row.cell_preview(slot.col_index))
+                    .is_some()
+                {
+                    let (_, row_key) = cell_row_identity(&slot.widget);
+                    if row_key.is_empty() {
+                        let Some(value) = view
+                            .model()
+                            .and_then(|model| model.downcast::<gtk::MultiSelection>().ok())
+                            .and_then(|selection| selection.model())
+                            .and_then(|model| model.downcast::<crate::ui::row_store::RowStore>().ok())
+                            .and_then(|store| store.source_value_at(position(slot), slot.col_index))
+                        else {
+                            return;
+                        };
+                        let copy_text = super::display::value_to_full_edit_text(&value);
+                        value_viewer::present(&view, &slot.column_name, &value, copy_text);
+                    } else {
+                        sender
+                            .send(GridMsg::FetchCellValue {
+                                col_index: slot.col_index,
+                                column_name: slot.column_name.clone(),
+                                row_key,
+                            })
+                            .ok();
+                    }
+                    return;
+                }
                 let Some(value) = row_at(&view, position(slot)).and_then(|row| row.into_iter().nth(slot.col_index))
                 else {
                     return;
@@ -551,6 +583,24 @@ fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {
         ROW_KEY_SLOT.cloned(widget).unwrap_or_default(),
     )
 }
+fn previewed_cell_text(row: Option<&crate::ui::row_object::RowObject>, col: usize) -> Option<String> {
+    let row = row?;
+    row.cell_preview(col)?;
+    Some(super::display::value_to_full_edit_text(&row.cell_value(col)))
+}
+
+fn copy_value_text(widget: &gtk::Widget, row: Option<&crate::ui::row_object::RowObject>, col: usize) -> String {
+    if !IS_NULL_SLOT.get(widget).unwrap_or(false) {
+        if let Some(text) = FULL_EDIT_TEXT_SLOT.cloned(widget) {
+            return text;
+        }
+        if let Some(text) = previewed_cell_text(row, col) {
+            return text;
+        }
+    }
+    cell_text(widget)
+}
+
 fn cell_text(widget: &gtk::Widget) -> String {
     if let Some(label) = widget.downcast_ref::<crate::ui::cell_editor::CellEditor>() {
         label.text().to_string()
@@ -561,11 +611,13 @@ fn cell_text(widget: &gtk::Widget) -> String {
     }
 }
 fn row_at(view: &gtk::ColumnView, position: u32) -> Option<Vec<Value>> {
+    row_object_at(view, position).map(|row| row.cells_clone())
+}
+fn row_object_at(view: &gtk::ColumnView, position: u32) -> Option<crate::ui::row_object::RowObject> {
     view.model()?
         .item(position)?
         .downcast::<crate::ui::row_object::RowObject>()
         .ok()
-        .map(|row| row.cells_clone())
 }
 fn complete_row_at(view: &gtk::ColumnView, position: u32) -> Option<Vec<Value>> {
     let row = view
@@ -623,6 +675,47 @@ fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn copying_a_previewed_cell_copies_the_full_value() {
+        gtk::init().unwrap();
+        let full = "original".repeat(1_200);
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Text(full.clone())]);
+        row.preview_values_from_result();
+        let editor = crate::ui::cell_editor::CellEditor::new();
+        editor.set_text("preview text");
+        IS_NULL_SLOT.set(&editor, false);
+
+        assert_eq!(copy_value_text(editor.upcast_ref(), Some(&row), 0), full);
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn copy_value_keeps_keyless_previews_pending_edits_and_drafts_whole() {
+        gtk::init().unwrap();
+        let original = "original".repeat(1_200);
+        let keyless = crate::ui::row_object::RowObject::new(vec![Value::Text(original)]);
+        keyless.preview_values_from_result();
+        let pending = "pending".repeat(1_200);
+        let editor = crate::ui::cell_editor::CellEditor::new();
+        editor.set_inline_editable(true);
+        editor.set_text("pending preview");
+        IS_NULL_SLOT.set(&editor, false);
+        FULL_EDIT_TEXT_SLOT.set(&editor, pending.clone());
+        assert_eq!(
+            copy_value_text(editor.upcast_ref(), Some(&keyless), 0),
+            pending,
+            "a pending edit on a keyless query must copy the current full value"
+        );
+
+        let draft_value = "draft".repeat(1_200);
+        let draft = crate::ui::row_object::RowObject::new_draft(1, vec![Value::Text(draft_value.clone())]);
+        editor.set_text("draft preview");
+        IS_NULL_SLOT.set(&editor, false);
+        FULL_EDIT_TEXT_SLOT.set(&editor, draft_value.clone());
+        assert_eq!(copy_value_text(editor.upcast_ref(), Some(&draft), 0), draft_value);
+    }
 
     #[test]
     fn export_rows_refuse_an_incomplete_page() {
