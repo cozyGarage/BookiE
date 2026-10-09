@@ -705,6 +705,14 @@ SHA-256 `c8d853991ffdda28bef3e3753e8c28355e07140a533c36be391b56de31165fb2`.
 The `workbook` selector caught all 31 generated mutations in 53 seconds,
 including numeric precision, temporal range, and cell-coordinate boundaries.
 
+XML escaping and element-name validation were audited at source SHA-256
+`572bd45d6a3a095ce820a311b6434852d78082fb6a4071efb735c5a83fb511ea`.
+The `xml` selector caught 38 of 39 generated mutations; one was build-unviable.
+The run exposed an untested reserved-prefix boundary, so
+`valid_names_with_only_one_reserved_prefix_letter_are_not_prefixed` now checks
+valid names with `x`, `m`, or `l` outside the reserved `xml` prefix. The final
+rerun had no misses or timeouts; all eight XML unit tests pass.
+
 SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
 ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
 Native `typeof()` and `hex()` check both the source expression and restored
