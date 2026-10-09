@@ -4,10 +4,8 @@ use std::io::Write;
 #[test]
 fn stale_run_generations_cannot_finish_newer_runs() {
     let mut generations = RunGeneration::default();
-    let first = generations.begin();
-    assert!(generations.start(first));
-    let second = generations.begin();
-    assert!(generations.start(second));
+    let first = generations.start_new();
+    let second = generations.start_new();
 
     let first_terminal = generations.finish(first).unwrap();
     assert!(!first_terminal.replace_ui);
@@ -21,10 +19,8 @@ fn stale_run_generations_cannot_finish_newer_runs() {
 #[test]
 fn newer_run_can_finish_ui_without_reporting_idle_before_superseded_run() {
     let mut generations = RunGeneration::default();
-    let first = generations.begin();
-    assert!(generations.start(first));
-    let second = generations.begin();
-    assert!(generations.start(second));
+    let first = generations.start_new();
+    let second = generations.start_new();
 
     let second_terminal = generations.finish(second).unwrap();
     assert!(second_terminal.replace_ui);
@@ -32,6 +28,15 @@ fn newer_run_can_finish_ui_without_reporting_idle_before_superseded_run() {
     let first_terminal = generations.finish(first).unwrap();
     assert!(!first_terminal.replace_ui);
     assert!(first_terminal.became_idle);
+}
+
+#[test]
+fn only_a_started_run_can_replace_the_visible_results() {
+    let mut generations = RunGeneration::default();
+    let running = generations.start_new();
+    assert!(generations.accepts(running));
+    assert!(generations.finish(running).unwrap().replace_ui);
+    assert!(generations.finish(running).is_none());
 }
 
 #[test]
