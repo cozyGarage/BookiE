@@ -17,7 +17,7 @@ review, not a line-by-line security audit of every diff. No application tests,
 containers, hosted jobs or installed desktop checks were rerun during this review.
 Existing results below belong to their recorded revisions and environments.
 
-The [active continuation plan](../bookie-0.2-sprint.md#current-continuation-plan-2026-10-03)
+The [active continuation plan](../bookie-0.2-sprint.md#current-continuation)
 owns new work. This file archives delivered changes and their remaining limits;
 it does not close B3, B4 or approve a release.
 
