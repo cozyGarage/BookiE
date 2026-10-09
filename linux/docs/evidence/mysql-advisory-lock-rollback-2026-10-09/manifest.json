@@ -23,5 +23,14 @@
   ],
   "log_sha256": {
     "run.log": "2cf19a5109c3f074962133bf3e88d8dff4203f35210377c6a6c352315cbb9e56"
+  },
+  "rebase_validation": {
+    "checkout_commit": "b936be28e0455e303fb18b78e82c1db0ccdc7aec",
+    "base_commit": "fb6ddc14a27f9512ac8a133058ba7fe3126579e8",
+    "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+    "result": "18 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; 188.31 seconds; exit code 0",
+    "log": "rebase-run.log",
+    "log_sha256": "86de4031a0470b1cd9736d0db64047916ded70724efcd4f9a1de96cdedb0e224",
+    "log_normalization": "The final extra blank line was removed; test output lines are unchanged."
   }
 }

@@ -67,6 +67,7 @@
     "Windows Active Directory interoperability"
   ],
   "log_sha256": {
-    "run.log": "77e5fde696e73e92c392455139c9c2056968db58ce4e9ca27ca4e4defad3de65"
-  }
+    "run.log": "54b7cc932e421c5223c2232bdbcb565deae2454e49e2e3e2692dcf6f9df49416"
+  },
+  "log_normalization": "Trailing spaces from Docker Compose progress lines were removed; other log content is unchanged."
 }
