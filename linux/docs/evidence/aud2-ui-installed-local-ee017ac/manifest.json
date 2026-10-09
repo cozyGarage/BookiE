@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "scope": "Local installed GTK acceptance for GUI approval and MCP HTTP disconnect cancellation",
+  "source_commit": "ee017acb145a5b7e8a12eff05f2f65ff1742454f",
+  "binary_path": "/home/trung/.local/opt/bookie-fork-linux-ee017ac/bookie",
+  "binary_sha256": "9251c929336286b3123ec52ecc9e81e67c6119d82ef1118ede6d7a0769dc15c1",
+  "build": "cargo build --release --locked -p tablepro-app --bin tablepro-app",
+  "runtime": "User-local release executable; GTK 4 under Xvfb X11 with private D-Bus and GTK AT-SPI automation",
+  "results": [
+    {
+      "scenario": "mcp_client_disconnect_cancels_pending_approval",
+      "result": "passed",
+      "checks": [
+        "Agent write displayed the human approval prompt",
+        "Closing the HTTP client closed the prompt",
+        "SQLite remained unchanged",
+        "One cancelled terminal audit outcome was recorded without the token"
+      ],
+      "log": "mcp-disconnect.log"
+    },
+    {
+      "scenario": "unparseable_routine_requests_human_approval",
+      "result": "passed",
+      "log": "sqlite-approval.log"
+    },
+    {
+      "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database",
+      "fixture": "Docker MySQL 8.0",
+      "result": "passed",
+      "log": "mysql-approval.log"
+    }
+  ],
+  "source_sha256": {
+    "crates/app/tests/gtk_safety.py": "2ffbc8c802c22c74e39aea88ecac56a87a9bc7c2219d316dc414ec02ab3aaf5c",
+    "scripts/test-gtk-mysql-approval.sh": "27ffda727809f426c64d4493c09c44b4d8a980255678e495f211858302b477a9"
+  },
+  "not_established": [
+    "Hosted GTK acceptance for the new disconnect scenario",
+    "Distro-package acceptance",
+    "Automated interaction through the desktop computer-use connector, which exposed no controllable app surface"
+  ]
+}
