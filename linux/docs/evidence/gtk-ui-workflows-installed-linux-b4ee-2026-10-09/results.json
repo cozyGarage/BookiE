@@ -1,0 +1,267 @@
+[
+  {
+    "scenario": "a_browse_tab_reads_the_new_connection_after_a_switch",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "a_second_launch_raises_the_window_and_exits_cleanly",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "alt_arrows_jump_between_statements",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "approve_once_prompts_again",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "audit_failure_denies",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "audit_journal_loss_after_connection_denies_mutation",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "browse_edit_cell_and_save_persists_to_the_database",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "bundle_export_records_sanitized_audit_outcome",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "bundle_import_records_sanitized_audit_outcome",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "cancelled_parameters_never_execute_and_retry_uses_new_values",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "cancelled_workbook_export_preserves_existing_file",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "columns_dialog_hides_a_column_and_keeps_the_last_one",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "committed_editor_ddl_refreshes_sidebar",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "connect_dialog_cancel_stops_a_hanging_connection",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "ctrl_slash_toggles_a_comment_in_the_editor",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "ctrl_tab_returns_to_the_most_recently_used_tab",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "current_page_csv_export_is_pk_ordered",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "current_page_json_export_preserves_values",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "current_page_workbook_preserves_typed_values",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "dismissed_approval_denies",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "editing_a_saved_connection_prefills_it_and_saves_the_new_name",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "encrypted_bundle_round_trip_restores_credentials",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "failed_switch_preserves_the_old_workspace",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "favorite_round_trips_through_open_quickly",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "find_bar_replaces_every_match_in_the_editor",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "find_in_loaded_rows_lists_matches_and_selects_one",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "holding_ctrl_while_pressing_tab_walks_deeper_into_the_history",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "interactive_controls_have_accessible_names",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "jump_to_column_keyboard_search",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "malformed_sql_is_blocked_before_approval",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "named_parameter_binds_a_value",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "new_connection_form_keeps_title_and_help_text_visible",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "pending_edits_gate_a_connection_switch",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "repeated_parameters_preserve_wide_ids_and_sql_like_text",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "restart_restores_active_editor_and_connection",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "restart_with_a_deleted_connection_opens_the_welcome_list",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "row_inspector_lists_every_column_of_the_selected_row",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "running_query_is_cancelled_before_switch",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "session_transaction_label_and_toggle_off_confirmation",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "sidebar_tables_group_collapses_and_expands",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "sql_character_warnings_leave_query_unchanged",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "successful_switch_keeps_database_ownership",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "switched_connection_keeps_workspace_tabs_after_debounce",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "switching_one_window_leaves_the_other_windows_edits",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "test_connection_reports_failure_in_the_dialog",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "test_connection_reports_success_in_the_dialog",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "two_windows_hold_two_connections",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "unparseable_routine_requests_human_approval",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "view_value_opens_the_whole_cell_with_pretty_json",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "workbook_empty_text_shows_error_without_creating_file",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "xml_export_preserves_line_endings_and_null_distinctions",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "xml_export_refuses_illegal_text_without_publishing",
+    "status": "passed",
+    "error": null
+  }
+]
