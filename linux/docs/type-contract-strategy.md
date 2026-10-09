@@ -700,6 +700,11 @@ choose their output in separate functions.
 The 68 matching core tests passed on the baseline; the scoped mutant run took
 80 seconds and had no surviving behavior change.
 
+XLSX cell encoding and coordinate validation were mutation-audited at source
+SHA-256 `c8d853991ffdda28bef3e3753e8c28355e07140a533c36be391b56de31165fb2`.
+The `workbook` selector caught all 31 generated mutations in 53 seconds,
+including numeric precision, temporal range, and cell-coordinate boundaries.
+
 SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
 ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
 Native `typeof()` and `hex()` check both the source expression and restored
