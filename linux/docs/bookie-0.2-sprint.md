@@ -4,7 +4,7 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 i
 0.2.0. Implementation is authorized; no 0.2 release is approved.
 
 
-## 0.2.0 readiness: 2026-10-08
+## 0.2.0 readiness: 2026-10-09
 
 No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 (owner in brackets; details in the [ledger](known-issues.md)):
@@ -22,11 +22,29 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
   acceptance gate since 2026-10-08), installed checks on Arch and Debian, and the
   30-attempt soak (Forgejo nightly `gtk-soak`).
 
+## Current continuation: 2026-10-09
+
+The merged `linux` baseline is `762c4b1a8efd17aaba508eb5cb57904a62d7f41b`
+(PR #441). PR #442 is also merged. B3 PR #443 is open at
+`38d10ecf302b54108ec47ae7143d2d4d8db3d13e`, based on that `linux` tip, for
+SQL Server `decimal(38,38)` preservation and refusal of lossy `sql_variant`
+values. Its full MSSQL local run passed 77 tests and unpiped local preflight
+passed. At the time of this update, workflow lint, harness, resolve-ref,
+SonarCloud and supply-chain checks passed; the Flatpak default/development and
+security-policy checks were still running. Wait for all required hosted checks
+before merging.
+
+B3 remains open after #443: continue the wider engine/type/consumer/configuration
+matrix and mutation triage, then complete installed grid acceptance. B4 and B7
+remain open as listed above; keep the sequence B3 → B4 → installed Arch/Wayland
+→ Debian/GNOME → B7. The #443 branch is review work and does not qualify the
+merged release baseline.
+
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless
 the maintainer adds it.
 
-## Current continuation plan: 2026-10-08
+## Historical continuation snapshot: 2026-10-08
 
 Code baseline: `0bb8e34354d13e3ab9911b9db710eddb02115170` on `linux`, checked
 2026-10-08.
