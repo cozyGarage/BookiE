@@ -15,11 +15,13 @@ pub(crate) async fn start_mssql_durable() -> (ContainerAsync<MssqlServer>, Conne
 }
 
 async fn start_mssql_with_durability(durable: bool) -> (ContainerAsync<MssqlServer>, ConnectOptions) {
+    let image = MssqlServer::default()
+        .with_accept_eula()
+        .with_startup_timeout(std::time::Duration::from_secs(180));
     let container = if durable {
-        MssqlServer::default().with_accept_eula().start().await
+        image.start().await
     } else {
-        MssqlServer::default()
-            .with_accept_eula()
+        image
             .with_mount(Mount::tmpfs_mount("/var/opt/mssql").with_mode(0o1777))
             .start()
             .await
