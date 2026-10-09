@@ -105,6 +105,7 @@
 
 ### Fixed
 
+- A read-scoped agent can read a query plan again; EXPLAIN results are no longer fully redacted by fail-closed masking while ordinary result rows stay masked
 - The window opens without waiting for old query history to be pruned at startup
 - Undoing or redoing one of several edits to the same cell keeps the earlier edit pending against the value stored in the database, so saving no longer drops it or reports a changed row
 - A table's column and foreign key lists from a superseded refresh are no longer applied after a newer refresh started

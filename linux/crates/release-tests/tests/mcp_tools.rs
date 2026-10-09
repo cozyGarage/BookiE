@@ -150,6 +150,10 @@ async fn a_read_scoped_agent_can_read_a_query_plan() {
         .expect("plan_rows array");
     assert!(!plan.is_empty(), "postgres must return plan rows");
     let text = plan.iter().map(|row| row.to_string()).collect::<String>();
+    assert!(
+        !text.contains("***REDACTED***"),
+        "a read-scoped explain plan must stay usable, not fail-closed masked: {text}"
+    );
     assert!(text.contains("Scan"), "plan should describe a scan: {text}");
 }
 

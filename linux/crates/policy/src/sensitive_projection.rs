@@ -13,6 +13,7 @@ pub fn sensitive_projection(sql: &str, driver_id: &str, patterns: &[String], out
             [Statement::Query(query)] => select_projection_sensitivity(query, patterns)
                 .filter(|positions| positions.len() == output_columns)
                 .unwrap_or_else(|| vec![true; output_columns]),
+            [Statement::Explain { .. } | Statement::ExplainTable { .. }] => vec![false; output_columns],
             _ => vec![true; output_columns],
         },
         Err(_) => vec![true; output_columns],
@@ -113,6 +114,108 @@ mod tests {
         assert_eq!(
             sensitive_projection("SELECT * FROM cards", "postgres", &sensitive_patterns(), 2),
             vec![true; 2]
+        );
+    }
+
+    #[test]
+    fn an_explain_of_a_wildcard_select_keeps_plan_columns_usable() {
+        let patterns = sensitive_patterns();
+        for sql in [
+            "EXPLAIN SELECT * FROM release_items WHERE amount > 5",
+            "EXPLAIN (VERBOSE) SELECT * FROM release_items",
+            "EXPLAIN QUERY PLAN SELECT * FROM release_items",
+        ] {
+            let driver = if sql.contains("QUERY PLAN") {
+                "sqlite"
+            } else {
+                "postgres"
+            };
+            assert_eq!(
+                sensitive_projection(sql, driver, &patterns, 1),
+                vec![false],
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_explain_table_keeps_plan_columns_usable() {
+        assert_eq!(
+            sensitive_projection("EXPLAIN release_items", "mysql", &sensitive_patterns(), 3),
+            vec![false; 3]
+        );
+    }
+
+    #[test]
+    fn an_explain_plan_is_not_fully_redacted_while_data_rows_still_mask() {
+        let patterns = sensitive_patterns();
+        let plan_positions =
+            sensitive_projection("EXPLAIN SELECT * FROM release_items WHERE amount > 5", "postgres", &patterns, 1);
+        let plan = tablepro_core::QueryResult {
+            columns: vec![tablepro_core::ColumnInfo {
+                name: "QUERY PLAN".into(),
+                data_type: "text".into(),
+                nullable: true,
+                primary_key: false,
+                is_auto_increment: false,
+                default_value: None,
+                is_generated: false,
+                comment: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            }],
+            rows: vec![vec![tablepro_core::Value::Text(
+                "Seq Scan on release_items  (cost=0.00..1.03 rows=1 width=40)".into(),
+            )]],
+            truncated: false,
+        };
+        let masked_plan = crate::mask::apply_masking(plan, &patterns, Some(&plan_positions));
+        match &masked_plan.rows[0][0] {
+            tablepro_core::Value::Text(text) => assert!(text.contains("Scan"), "{text}"),
+            other => panic!("plan cell must remain text, got {other:?}"),
+        }
+
+        let data_positions = sensitive_projection("SELECT * FROM cards", "postgres", &patterns, 2);
+        let data = tablepro_core::QueryResult {
+            columns: vec![
+                tablepro_core::ColumnInfo {
+                    name: "id".into(),
+                    data_type: "int".into(),
+                    nullable: false,
+                    primary_key: true,
+                    is_auto_increment: false,
+                    default_value: None,
+                    is_generated: false,
+                    comment: None,
+                    collation: None,
+                    enum_type: None,
+                    domain_type: None,
+                },
+                tablepro_core::ColumnInfo {
+                    name: "label".into(),
+                    data_type: "text".into(),
+                    nullable: true,
+                    primary_key: false,
+                    is_auto_increment: false,
+                    default_value: None,
+                    is_generated: false,
+                    comment: None,
+                    collation: None,
+                    enum_type: None,
+                    domain_type: None,
+                },
+            ],
+            rows: vec![vec![
+                tablepro_core::Value::Int(1),
+                tablepro_core::Value::Text("secret-row".into()),
+            ]],
+            truncated: false,
+        };
+        let masked_data = crate::mask::apply_masking(data, &patterns, Some(&data_positions));
+        assert_eq!(
+            masked_data.rows[0][1],
+            tablepro_core::Value::Text("***REDACTED***".into())
         );
     }
 

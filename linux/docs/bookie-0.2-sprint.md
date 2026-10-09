@@ -49,11 +49,11 @@ These failed or incomplete runs stay open until re-proven on a current SHA:
 | Signal | Owner | Note |
 | --- | --- | --- |
 | Forgejo run 101: two PostgreSQL driver failures | B3 | Local follow-up `8e586fb` pins the enum oracle to one session; await exact-head gate |
-| `pg-release` query-plan vs fail-closed masking (`***REDACTED***`) | B4 / AUD-9 | Product intent vs release fixture unresolved |
+| `pg-release` query-plan vs fail-closed masking (`***REDACTED***`) | B4 / AUD-9 | Product fix on `b4/explain-plan-read-scope`: EXPLAIN projections stay usable; await postgres-release / Forgejo re-proof |
 | Forgejo run 88 GTK waits: `open_editor`, `audit_failure_denies` | UX | Cause unclassified; run 88 predates #451/#452 |
 | TEST-28 native Ubuntu AT-SPI grid / Columns UI | UX | Container distro-floor passes; native job is the broken surface |
 | Build Linux on `c2f3f78b9`: Docker Hub `toomanyrequests` | lab | Infrastructure; last fully green Build Linux was `0d36a65d7` (#455) |
-| Build Linux on `57fd504ab`: plan rows fully redacted | B4 | Same query-plan / masking mismatch as above |
+| Build Linux on `57fd504ab`: plan rows fully redacted | B4 | Same query-plan / masking mismatch; fix on `b4/explain-plan-read-scope`, await re-proof |
 
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless
