@@ -154,10 +154,7 @@ impl BrowseTab {
                 return;
             };
             if let Ok(label) = focused.dynamic_cast::<crate::ui::cell_editor::CellEditor>() {
-                if label.text().as_str() == crate::ui::grid::editable_null_sentinel() {
-                    label.set_text("");
-                }
-                label.start_editing();
+                crate::ui::grid::enter_cell_edit_mode(&label);
             }
             // Bool draft (CheckButton focused) needs no edit-mode
             // dance; clicking / Space toggles natively.
@@ -242,6 +239,9 @@ impl BrowseTab {
             tab_id: Some(self.tab_id),
             pk_col_indices,
             projected_columns: self.current_projection.clone(),
+            preview_long_values: self.driver_id != "redis",
+            preview_redis_strings: self.driver_id == "redis",
+            preview_result_values: false,
             foreign_key_columns,
         };
         let (column_view, selection) = build_column_view(
@@ -313,8 +313,29 @@ impl BrowseTab {
         result: &std::sync::Arc<QueryResult>,
         store: &crate::ui::row_store::RowStore,
     ) -> bool {
+        let key_indices = self
+            .current_columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| column.primary_key.then_some(index))
+            .collect();
         if let Some(indices) = &self.current_projection {
-            if let Err(error) = store.replace_projected(result.clone(), indices.clone(), self.current_columns.len()) {
+            let replaced = if self.driver_id == "redis" {
+                store.replace_projected_with_redis_string_previews(
+                    result.clone(),
+                    indices.clone(),
+                    self.current_columns.len(),
+                    key_indices,
+                )
+            } else {
+                store.replace_projected_with_previews(
+                    result.clone(),
+                    indices.clone(),
+                    self.current_columns.len(),
+                    key_indices,
+                )
+            };
+            if let Err(error) = replaced {
                 tracing::error!(%error, "projected browse refresh does not match the table schema");
                 store.replace_shared(std::sync::Arc::new(QueryResult {
                     columns: self.current_columns.clone(),
@@ -324,7 +345,11 @@ impl BrowseTab {
                 return false;
             }
         } else {
-            store.replace_shared(result.clone());
+            if self.driver_id == "redis" {
+                store.replace_shared_with_redis_string_previews(result.clone(), key_indices);
+            } else {
+                store.replace_shared_with_previews(result.clone(), key_indices);
+            }
         }
         self.reprepend_drafts();
         true
@@ -429,7 +454,7 @@ fn inspected_row(
         .item(bits.nth(0))?
         .downcast::<crate::ui::row_object::RowObject>()
         .ok()?;
-    Some(row.with_cells(|cells| crate::ui::row_inspector::inspector_fields(columns, cells)))
+    Some(crate::ui::row_inspector::inspector_fields_for_row(columns, &row))
 }
 
 fn selection_tooltip(selection: &gtk::MultiSelection, columns: &[ColumnInfo]) -> Option<String> {

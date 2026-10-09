@@ -406,6 +406,26 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_bit_arrays_decode_binary_elements_and_refuse_nul_text() {
+        for (oid, value, expected) in [
+            (BIT_OID, &[0, 0, 0, 5, 0b1010_0000][..], "{\"10100\"}"),
+            (VARBIT_OID, &[0, 0, 0, 3, 0b1010_0000][..], "{\"101\"}"),
+        ] {
+            assert_eq!(
+                decode_binary(&wire(oid, &[(1, 1)], &[Some(value)]), oid, false).as_deref(),
+                Some(expected)
+            );
+        }
+        for oid in [19, 25, 1042, 1043] {
+            assert_eq!(
+                decode_binary(&wire(oid, &[(1, 1)], &[Some(b"a\0b")]), oid, false),
+                None,
+                "OID {oid}"
+            );
+        }
+    }
+
+    #[test]
     fn value_contract_array_null_empty_and_escaped_text_stay_distinct() {
         assert_eq!(decode_binary(&wire(25, &[], &[]), 25, false).as_deref(), Some("{}"));
         let bytes = wire(

@@ -158,11 +158,20 @@ fn status_text(query: &str, shown: usize) -> String {
 
 fn show_matches(widgets: &FindWidgets, model: &gtk::SelectionModel, names: &[String]) -> Vec<u32> {
     let query = widgets.search.text();
+    let row_store = model
+        .downcast_ref::<gtk::MultiSelection>()
+        .and_then(|selection| selection.model())
+        .and_then(|model| model.downcast::<crate::ui::row_store::RowStore>().ok());
     let found = matching_rows(
         model.n_items(),
         |position| {
             let item = model.item(position)?.downcast::<RowObject>().ok()?;
-            Some(item.loaded_cells())
+            Some(
+                row_store
+                    .as_ref()
+                    .and_then(|store| store.cells_for_search(position))
+                    .unwrap_or_else(|| item.loaded_cells()),
+            )
         },
         &query,
         MAX_MATCHES,
@@ -290,6 +299,23 @@ mod tests {
     fn a_missing_projected_cell_is_not_a_search_match() {
         let found = matching_rows(1, |_| Some(vec![Some(Value::Int(1)), None]), "not fetched", 10);
         assert!(found.is_empty());
+    }
+
+    #[test]
+    fn a_long_cell_remains_searchable_beyond_its_visible_preview() {
+        let text = format!("{}needle", "x".repeat(9000));
+        let result = std::sync::Arc::new(tablepro_core::QueryResult {
+            columns: Vec::new(),
+            rows: vec![vec![Value::Int(1), Value::Text(text)]],
+            truncated: false,
+        });
+        let store = crate::ui::row_store::RowStore::from_shared_with_previews(result, vec![0]);
+
+        let found = matching_rows(1, |position| store.cells_for_search(position), "needle", 10);
+        assert_eq!(
+            found.iter().map(|hit| (hit.position, hit.column)).collect::<Vec<_>>(),
+            vec![(0, 1)]
+        );
     }
 
     #[test]

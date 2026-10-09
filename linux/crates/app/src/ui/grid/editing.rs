@@ -6,8 +6,8 @@ use sourceview5::prelude::*;
 use super::GridMsg;
 use super::context_menu::{GridMenus, attach_cell_gesture};
 use super::display::{
-    COLUMN_SLOT, EditSnapshot, FULL_EDIT_TEXT_SLOT, POPOVER_SLOT, POSITION_SLOT, PREEDIT_SLOT, ROW_KEY_SLOT,
-    SNAPSHOT_SLOT, SUPPRESS_SLOT, editable_null_sentinel,
+    COLUMN_SLOT, EditSnapshot, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT, PREEDIT_SLOT,
+    ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT,
 };
 use super::types::CellEditorKind;
 use crate::ui::cell_editor::CellEditor;
@@ -16,9 +16,8 @@ pub(super) fn enter_edit_mode(label: &CellEditor) {
     if !label.is_inline_editable() {
         return;
     }
-    if label.text().as_str() == editable_null_sentinel() {
-        label.set_text("");
-        label.start_editing();
+    if IS_NULL_SLOT.get(label).unwrap_or(false) {
+        label.start_editing_with("");
         return;
     }
     match FULL_EDIT_TEXT_SLOT.cloned(label) {

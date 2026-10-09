@@ -7,9 +7,12 @@ use secrecy::ExposeSecret;
 use tokio::sync::Mutex;
 
 use tablepro_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
-    QueryResult, QueryResultBudget, TableInfo, Value, error_chain_text, looks_like_tls_failure,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
+    MAX_QUERY_RESULT_BYTES, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, TableInfo, Value, error_chain_text,
+    looks_like_tls_failure,
 };
+
+mod value;
 
 pub struct RedisDriver;
 
@@ -208,18 +211,20 @@ impl Connection for RedisConnection {
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
         let db = parse_db_name(table)?;
-        // A non-reconnecting, operation-local connection cannot leak SELECT state
-        // into commands, or reconnect mid-page onto the configured database.
-        let mut conn = tokio::time::timeout(CONNECT_TIMEOUT, self.browse_client.get_multiplexed_async_connection())
-            .await
-            .map_err(|_| DriverError::TimedOut)?
-            .map_err(map_redis_error)?;
-        redis::cmd("SELECT")
-            .arg(db)
-            .query_async::<()>(&mut conn)
-            .await
-            .map_err(map_redis_error)?;
+        let mut conn = value::browse_connection(self, db).await?;
         fetch_page(&mut conn, offset, limit).await
+    }
+
+    async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
+        if params.is_empty() {
+            return self.query(sql).await;
+        }
+        let Some(query) = value::parse_value_query(sql, params) else {
+            return Err(DriverError::Unsupported(
+                "Redis bound reads support the Value column for one key".into(),
+            ));
+        };
+        value::fetch_string_value(self, query).await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {

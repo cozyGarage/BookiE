@@ -83,7 +83,7 @@ fn capped(text: String) -> String {
     format!("{}\n\n{note}", &text[..end])
 }
 
-pub(super) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: &Value, copy_text: String) {
+pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: &Value, copy_text: String) {
     let view = gtk::TextView::builder()
         .editable(false)
         .cursor_visible(false)

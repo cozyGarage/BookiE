@@ -37,16 +37,55 @@ row are asserted in
 
 ## Current evidence and next targets
 
-Merged [PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements PERF-9: saved hidden non-key columns
-are removed from SQL browse projections while primary keys and hidden filter or
-sort columns remain usable. Projected rows distinguish unfetched cells from SQL
-NULL; full-row copy, row JSON and current-page export refuse incomplete rows,
-and the inspector labels them “Not fetched.” Pending edits disable projection.
-Native SQLite tests assert the visible projection and the hidden stored value;
-planner, keyset mapping, sparse-row, row-search and app-library regressions pass
-in the candidate. Local preflight passed; GitHub validation is pending. This does not close UI-14b: installed GTK acceptance and
-the complete on-demand value path in PERF-10 remain open. After hiding columns,
-refresh the browse page for the reduced SELECT to take effect.
+Merged [PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements
+PERF-9: saved hidden non-key columns are removed from SQL browse projections
+while primary keys and hidden filter or sort columns remain usable. Projected
+rows distinguish unfetched cells from SQL NULL; full-row copy, row JSON and
+current-page export refuse incomplete rows, and the inspector labels them “Not
+fetched.” Pending edits disable projection. Native SQLite tests assert the
+visible projection and the hidden stored value; planner, keyset mapping,
+sparse-row, row-search and app regressions passed with the required GitHub
+checks. The release-binary PostgreSQL Xvfb scenario
+`postgres_hidden_projection_refresh_and_edit_preserve_hidden_value` now covers
+hide, refresh, inspector, edit/sibling preservation and unhide; distribution
+Wayland/GNOME acceptance remains open under UI-14b. After hiding columns, refresh
+the browse page for the reduced SELECT to take effect.
+
+SQL-backed browse rows now keep an 8 KiB text/JSON/binary sample and original
+byte count in each materialized grid row. View Value refetches one column using
+the complete primary key through the policy-guarded connection; the query caps
+at two rows and refuses missing or ambiguous matches. PostgreSQL enum/domain
+key casts have planner regressions. Arbitrary SQL editor result grids now use the
+same typed 8 KiB preview and byte count. View Value reads the exact full value
+from the already-returned guarded result instead of rerunning arbitrary SQL.
+The result still retains full values, so this does not reduce shared-result
+memory. MongoDB refetches selected fields
+by `_id`; Redis string refetch binds arbitrary key bytes. Local SQLite and
+Docker MySQL service tests refetch a 9,000-byte BLOB by
+composite key and compare its exact returned bytes with native storage oracles;
+the MySQL test also checks `LONGBLOB`, byte length and the native hex prefix. A
+Docker PostgreSQL 16 test uses catalog enum/domain key metadata, confirms both
+native types with `pg_typeof`, and refetches the same-size BLOB through the
+typed composite key. The SQLite test also runs the same parameterized refetch
+through `PolicyGuard` and compares the exact bytes. MySQL and PostgreSQL also
+run the same guarded query; the Docker cases retain native storage and key-type
+oracles. SQL Server now covers the guarded refetch with a composite VARBINARY/
+BIGINT key and checks the 9,000-byte payload against native `DATALENGTH` and
+`fn_varbintohexstr` results (`mssql_value_query_refetches_the_exact_blob_for_a_composite_key`).
+DuckDB now has a feature-gated app-service contract that refetches a 9,000-byte
+BLOB through `PolicyGuard` using a hostile composite key; native storage class,
+length and prefix checks prove the value before refetch. ClickHouse also checks
+a guarded 12,000-byte String refetch with native type/length/prefix oracles.
+MongoDB browse cells now also preview long text, binary and structured values
+and refetch one selected field through a bound `_id` query under `PolicyGuard`.
+Its Docker app-service contract binds an ObjectId and checks exact 9,000-byte
+text, generic binary and nested BSON document values against native MongoDB
+storage. MongoDB browse and paged find requests sort by unique _id before
+applying skip/limit, so page boundaries remain deterministic. Redis string
+refetch binds arbitrary key bytes and checks an exact
+9,000-byte value through `PolicyGuard` against native Redis GET. Arbitrary SQL,
+shared result memory, installed GTK and memory profiling remain open under
+PERF-10.
 
 The core result budget tests exact byte, cell and row limits; owned text, byte
 and recursive JSON memory accounting; retained rows across result sets; and
