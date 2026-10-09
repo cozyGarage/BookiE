@@ -965,7 +965,7 @@ async fn mysql_failed_multirow_insert_preserves_only_nontransactional_trigger_ef
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mysql_rollback_preserves_trigger_session_variable_effects() {
+async fn mysql_batch_rollback_preserves_trigger_session_variable_effects() {
     let (_container, opts) = start_mysql().await;
     let mut session = sqlx::MySqlConnection::connect_with(
         &sqlx::mysql::MySqlConnectOptions::new()
@@ -995,6 +995,10 @@ async fn mysql_rollback_preserves_trigger_session_variable_effects() {
         .execute(&mut session)
         .await
         .unwrap();
+    sqlx::query("INSERT INTO session_effect_parent VALUES (1)")
+        .execute(&mut session)
+        .await
+        .expect_err("the duplicate key must fail the batch");
     sqlx::raw_sql("ROLLBACK").execute(&mut session).await.unwrap();
     assert_eq!(
         sqlx::query("SELECT id FROM session_effect_parent ORDER BY id")
@@ -1017,7 +1021,7 @@ async fn mysql_rollback_preserves_trigger_session_variable_effects() {
     );
 }
 
-async fn assert_rollback_preserves_last_insert_id(opts: &ConnectOptions) {
+async fn assert_failed_batch_preserves_last_insert_id(opts: &ConnectOptions) {
     let mut session = sqlx::MySqlConnection::connect_with(
         &sqlx::mysql::MySqlConnectOptions::new()
             .host(&opts.host)
@@ -1049,6 +1053,10 @@ async fn assert_rollback_preserves_last_insert_id(opts: &ConnectOptions) {
         .execute(&mut session)
         .await
         .unwrap();
+    sqlx::query("INSERT INTO rollback_last_insert_id VALUES (1)")
+        .execute(&mut session)
+        .await
+        .expect_err("the duplicate key must fail the batch");
     sqlx::raw_sql("ROLLBACK").execute(&mut session).await.unwrap();
     assert_eq!(
         sqlx::query("SELECT id FROM rollback_last_insert_id ORDER BY id")
@@ -1073,16 +1081,16 @@ async fn assert_rollback_preserves_last_insert_id(opts: &ConnectOptions) {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mysql_rollback_preserves_last_insert_id_session_state() {
+async fn mysql_failed_batch_preserves_last_insert_id_session_state() {
     let (_container, opts) = start_mysql().await;
-    assert_rollback_preserves_last_insert_id(&opts).await;
+    assert_failed_batch_preserves_last_insert_id(&opts).await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mariadb_rollback_preserves_last_insert_id_session_state() {
+async fn mariadb_failed_batch_preserves_last_insert_id_session_state() {
     let (_container, opts) = start_mariadb().await;
-    assert_rollback_preserves_last_insert_id(&opts).await;
+    assert_failed_batch_preserves_last_insert_id(&opts).await;
 }
 
 #[tokio::test]
