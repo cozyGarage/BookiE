@@ -327,8 +327,9 @@ untouched sibling row
 ([test](../crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_text.rs)).
 `timestamptz[]` also rebinds across an `America/Los_Angeles` to UTC session
 change, including the repeated DST-overlap wall-clock time with distinct `-04`
-and `-05` offsets. The test compares native type, JSON and wire output after
-rebinding, and confirms the wire bytes match the original session
+and `-05` offsets. CSV import under UTC preserves native type, JSON, wire bytes
+and an untouched sibling row. The test compares native type, JSON and wire
+output after rebinding, and confirms the wire bytes match the original session
 (`value_contract_timestamptz_array_rebinding_preserves_instants_after_timezone_change`).
 Other temporal-array session/consumer combinations remain open.
 
