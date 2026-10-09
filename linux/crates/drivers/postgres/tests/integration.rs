@@ -9,7 +9,6 @@ use uuid::Uuid;
 
 use drivers_postgres::PgDriver;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
-use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
 use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::postgres::Postgres;
@@ -18,6 +17,9 @@ use tokio_util::sync::CancellationToken;
 
 #[path = "support/wire_round_trip.rs"]
 mod wire_round_trip;
+
+#[path = "support/shared_container.rs"]
+mod shared_container;
 
 #[path = "support/connection_contracts.rs"]
 mod connection_contracts;
@@ -122,29 +124,8 @@ async fn an_unavailable_postgres_server_is_classified_as_connection_refused() {
         .expect("PostgreSQL setup refusal remains distinct from established disconnect");
 }
 
-async fn start_pg() -> (ContainerAsync<Postgres>, ConnectOptions) {
-    // Pin to Postgres 16: the introspection query in `fetch_columns`
-    // reads `pg_attribute.attgenerated`, which was added in PG 12.
-    // testcontainers-modules's default tag is older and breaks the
-    // generated-column flag query. PG 11 hit upstream EOL in Nov 2023
-    // so production deployments shouldn't be older than this anyway.
-    let container = Postgres::default()
-        .with_tag("16-alpine")
-        .start()
-        .await
-        .expect("start postgres container");
-    let host = container.get_host().await.expect("host").to_string();
-    let port = container.get_host_port_ipv4(5432).await.expect("port");
-    let opts = ConnectOptions {
-        host,
-        port,
-        database: "postgres".into(),
-        username: "postgres".into(),
-        password: secrecy::SecretString::new("postgres".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
-        ..Default::default()
-    };
-    (container, opts)
+async fn start_pg() -> (shared_container::TestDatabase, ConnectOptions) {
+    shared_container::start_pg().await
 }
 
 async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
