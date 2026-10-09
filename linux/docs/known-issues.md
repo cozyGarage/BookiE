@@ -19,10 +19,10 @@ Rules:
   acceptance.
 
 Reconciled against BookiE `fork/linux` tip
-`682769abe60f624f2644b6f74472be8fca3883b0` (PR #443), checked 2026-10-09
-11:14 UTC. PRs #392 and #441–#443 are merged; their local and remote branches
-have been removed. PR #443's full MSSQL run passed 77 tests, and the local full
-value-contract tier passed 428 tests with no missing suites. Unpiped preflight,
+`24a89c3b9f8a34f787dece5ba429591fc3bd087a` (PR #444), checked 2026-10-09
+11:18 UTC. PRs #392 and #441–#444 are merged. PR #443's full MSSQL run passed
+77 tests, and the local full value-contract tier passed 428 tests with no
+missing suites. Unpiped preflight,
 all 11 hosted checks, and the SQL Server codec mutation audit passed (38
 mutants: 32 caught, 6 build-unviable, none missed or timed out). The broader B3
 engine/type/consumer matrix and installed acceptance remain open. This is a

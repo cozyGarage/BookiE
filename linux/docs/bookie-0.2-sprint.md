@@ -24,8 +24,8 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 
 ## Current continuation: 2026-10-09
 
-The merged `linux` baseline is `682769abe60f624f2644b6f74472be8fca3883b0`
-(PR #443). PRs #441 and #442 are also merged. PR #443 adds SQL Server
+The merged `linux` baseline is `24a89c3b9f8a34f787dece5ba429591fc3bd087a`
+(PR #444); PRs #441–#444 are merged. PR #443 adds SQL Server
 `decimal(38,38)` preservation and refuses lossy `sql_variant` values. Its full
 MSSQL run passed 77 tests; the full local value-contract tier passed 428 tests
 with no missing suites, and unpiped preflight passed. All 11 hosted checks
