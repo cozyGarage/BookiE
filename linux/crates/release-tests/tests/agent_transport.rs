@@ -28,6 +28,7 @@ fn verifying_options(fixture: &Fixture) -> tablepro_core::ConnectOptions {
         forwarded_socket_dir: None,
         application_name: None,
         connect_timeout_secs: None,
+        read_only: false,
     }
 }
 

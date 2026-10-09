@@ -14,6 +14,7 @@ mod guard;
 mod mask;
 mod principal;
 mod rules;
+mod select_writes;
 mod sensitive_projection;
 mod transaction_control;
 

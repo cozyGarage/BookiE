@@ -9,7 +9,7 @@ owns B3 and B4–B6 completion. A green layer certifies only its named scope.
 
 ## Current desktop target
 
-The [current continuation](bookie-0.2-sprint.md#current-continuation-plan-2026-10-03)
+The [current continuation](bookie-0.2-sprint.md#current-continuation)
 orders B3, B4, then Arch/Omarchy/Hyprland native Wayland UI acceptance.
 GNOME desktop on Debian is the required installed/package phase after Arch;
 current B3/B4 implementation does not require that VM. GNOME 50 in the layer catalog
@@ -265,25 +265,6 @@ Wayland, on the host or an Arch VM with Hyprland. GNOME/Debian VM qualification
 is the required next phase after Arch. Xvfb and widget passes cannot certify
 either native Wayland target.
 No workflow here automatically publishes a release or waives an acceptance gate.
-
-## Initial implementation evidence, 2026-09-27
-
-Local reports below are working-tree evidence based on `1b771214d`, not hosted
-results for the later commit. Paths are relative to `linux/target/quality/`.
-
-| Report directory | Result |
-| --- | --- |
-| `20260926T233834145290Z-layers` | 28 Python runner/workflow tests, standalone function-size regression and actionlint/ShellCheck passed for six Linux workflows |
-| `20260926T233421164175Z-layers` | Non-GTK preflight, four isolated GTK widget tests and seven Secret Service tests passed |
-| `20260926T232651996488Z-layers` | Policy/MCP tests, cargo-deny 0.20.2 and cargo-audit 0.22.2 passed |
-| `20260926T233820141351Z-layers` | Arch candidate validator passed; Debian validator explicitly blocked by missing `dpkg-deb`; aggregate failed |
-
-The runner has 13 focused regression tests, including false-success output,
-empty execution, missing tools, timeouts, cancellation, later-layer evidence and
-checkout contention. The broader harness totals 28 unittest cases. Existing
-server/TLS/release/UI suites were wired to retained reports; they were not all
-rerun locally for this infrastructure change. Hosted workflow execution and
-installed-package/Wayland acceptance remain separate evidence.
 
 ## SonarCloud triage
 

@@ -61,9 +61,13 @@ pub fn run() {
         runtime.block_on(async {
             match tablepro_storage::query_history::HistoryStore::open_default().await {
                 Ok(store) => {
-                    if let Err(e) = store.prune_older_than(prefs.history_retention_days).await {
-                        tracing::warn!(error = %e, "history prune failed");
-                    }
+                    let pruning = store.clone();
+                    let retention_days = prefs.history_retention_days;
+                    tokio::spawn(async move {
+                        if let Err(e) = pruning.prune_older_than(retention_days).await {
+                            tracing::warn!(error = %e, "history prune failed");
+                        }
+                    });
                     Some(store)
                 }
                 Err(e) => {

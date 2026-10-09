@@ -105,6 +105,10 @@
 
 ### Fixed
 
+- The window opens without waiting for old query history to be pruned at startup
+- Undoing or redoing one of several edits to the same cell keeps the earlier edit pending against the value stored in the database, so saving no longer drops it or reports a changed row
+- A table's column and foreign key lists from a superseded refresh are no longer applied after a newer refresh started
+- Saving the window layout no longer waits for a slow disk read at startup, so the window stays responsive while saved tabs load
 - Pressing Cancel while a connection is finishing no longer opens that connection anyway
 - Refreshing, closing or pressing Kill twice in the activity dialog no longer cancels a Kill that is already running, so its result is always shown
 - A run that cannot start (the session is closing or the connection is gone) no longer hides the result of the query still running in that editor
@@ -141,6 +145,10 @@
 
 ### Security
 
+- `SELECT … INTO` is now treated as a write, so read-only connections and agent read access refuse it instead of letting it create a table
+- The row-count estimate that guards large writes no longer runs a side-effecting function in your WHERE clause before you approve the statement; such statements ask for approval without an estimate
+- A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server
+- A SQLite, PostgreSQL, MySQL or MariaDB connection marked read-only is now read-only in the database engine itself, so a statement the safety checks mistake for a read still cannot change data; a read-only SQLite connection no longer creates a missing file
 - Importing a connection bundle now refuses a file over 16 MiB, or anything that is not a regular file, before reading it.
 - Driver panic messages, which can contain query text or credentials, are no longer written to the logs or the terminal; only the location is. Set `TABLEPRO_DEBUG_PANICS=1` to print them while developing.
 
