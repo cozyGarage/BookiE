@@ -84,6 +84,13 @@ at capture. This hosted pass does not resolve why the operator observed two
 earlier empty-dialog failures; the root cause remains open. See the [follow-up
 acceptance note](evidence/b4-hosted-acceptance-2026-10-09/focused.txt).
 
+The native SSH suites were also rerun locally on the same exact source SHA with
+`bash scripts/test-ssh.sh`: 10 `agent_auth` and 12 `openssh_session` tests
+passed, including native multi-hop, second-hop cancellation, host-key refusal,
+agent authentication and OpenSSH forwarding. Distribution-package and native
+Wayland trust-flow acceptance remain open. See the [native SSH evidence
+manifest](evidence/b4-ssh-native-current-2026-10-09/manifest.json).
+
 ## Exact-SHA B4 acceptance checkpoint (2026-10-08)
 
 Earlier B4 layers passed on runtime SHA `a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200`,
