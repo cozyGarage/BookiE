@@ -38,10 +38,13 @@ async fn a_read_only_flat_file_connection_reads_only_the_selected_file() {
     let sibling_csv = dir.path().join("private.csv");
     let sibling_json = dir.path().join("private.json");
     let sibling_parquet = dir.path().join("private.parquet");
+    let unrelated_dir = tempfile::tempdir().unwrap();
+    let unrelated_text = unrelated_dir.path().join("unrelated.txt");
     std::fs::write(&selected, "id,label\n7,selected\n").unwrap();
     std::fs::write(&sibling_text, "sibling secret").unwrap();
     std::fs::write(&sibling_csv, "id\n99\n").unwrap();
     std::fs::write(&sibling_json, "[{\"id\":99}]").unwrap();
+    std::fs::write(&unrelated_text, "unrelated secret").unwrap();
     let fixture = duckdb::Connection::open_in_memory().unwrap();
     fixture
         .execute(
@@ -71,14 +74,30 @@ async fn a_read_only_flat_file_connection_reads_only_the_selected_file() {
         vec![vec![Value::Int(7), Value::Text("selected".into())]]
     );
 
-    for path in [&sibling_text, &sibling_csv, &sibling_json, &sibling_parquet] {
+    let selected_path = escape_duckdb_literal(selected.to_str().unwrap());
+    assert_eq!(
+        connection
+            .query(&format!("SELECT id FROM read_csv('{selected_path}')"))
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(7)]]
+    );
+
+    for path in [
+        &sibling_text,
+        &sibling_csv,
+        &sibling_json,
+        &sibling_parquet,
+        &unrelated_text,
+    ] {
         let path = escape_duckdb_literal(path.to_str().unwrap());
         let sql = if path.ends_with(".txt") {
             format!("SELECT * FROM read_text('{path}')")
         } else if path.ends_with(".csv") {
-            format!("SELECT * FROM read_csv_auto('{path}')")
+            format!("SELECT * FROM read_csv('{path}')")
         } else if path.ends_with(".json") {
-            format!("SELECT * FROM read_json_auto('{path}')")
+            format!("SELECT * FROM read_json('{path}')")
         } else {
             format!("SELECT * FROM read_parquet('{path}')")
         };

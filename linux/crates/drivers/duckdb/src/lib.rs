@@ -214,8 +214,6 @@ fn escape_duckdb_literal(value: &str) -> String {
 
 struct DuckdbConnection {
     conn: Arc<Mutex<DuckConnection>>,
-    // DuckDB reopens view sources by path. Keep the selected file descriptor
-    // alive so `/proc/self/fd/N` continues to identify the same file object.
     _selected_file: Option<File>,
 }
 
