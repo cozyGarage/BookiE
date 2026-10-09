@@ -593,7 +593,7 @@ Total: 659 declarations. App server: 35; Driver: 475; GTK: 24; Helper: 2; Keyrin
 | [a_composite_keyset_seeks_past_the_last_seen_pair](../crates/release-tests/tests/browse_filters.rs) | Release | requires the postgres release fixture | `scripts/test-postgres-release.sh` |
 | [postgres_patterns_search_non_text_columns_without_changing_comparisons](../crates/release-tests/tests/browse_filters.rs) | Release | requires the postgres release fixture | `scripts/test-postgres-release.sh` |
 | [capped_stream_preserves_columns_values_and_connection_reuse](../crates/release-tests/tests/browse_filters.rs) | Release | requires the postgres release fixture | `scripts/test-postgres-release.sh` |
-| [a_read_scoped_agent_can_read_a_query_plan](../crates/release-tests/tests/mcp_tools.rs) | Release | requires the postgres release fixture | `scripts/test-postgres-release.sh` |
+| [a_read_scoped_agent_cannot_read_a_query_plan](../crates/release-tests/tests/mcp_tools.rs) | Release | requires the postgres release fixture | `scripts/test-postgres-release.sh` |
 | [explain_analyze_is_denied_and_leaves_the_table_intact](../crates/release-tests/tests/mcp_tools.rs) | Release | requires the postgres release fixture | `scripts/test-postgres-release.sh` |
 | [explain_analyze_stays_denied_on_a_read_only_connection_with_write_scope](../crates/release-tests/tests/mcp_tools.rs) | Release | requires the postgres release fixture | `scripts/test-postgres-release.sh` |
 | [csv_export_escapes_values_read_from_the_database](../crates/release-tests/tests/mcp_tools.rs) | Release | requires the postgres release fixture | `scripts/test-postgres-release.sh` |
