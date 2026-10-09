@@ -231,6 +231,16 @@ mod tests {
     }
 
     #[test]
+    fn a_numeric_value_at_decimals_maximum_scale_still_decodes_as_decimal() {
+        let numeric = tiberius::numeric::Numeric::new_with_scale(1, Decimal::MAX_SCALE as u8);
+        let column_data = ColumnData::Numeric(Some(numeric));
+        assert_eq!(
+            column_data_to_value(&column_data),
+            Value::Decimal(Decimal::new(1, Decimal::MAX_SCALE))
+        );
+    }
+
+    #[test]
     fn a_temporal_column_the_driver_cannot_convert_is_not_reported_as_null() {
         let failed: Result<Option<NaiveDate>, &str> = Err("out of range");
         assert_eq!(
