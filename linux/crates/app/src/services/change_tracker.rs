@@ -192,7 +192,7 @@ impl TabChangeTracker {
             .get(&key)
             .map(|e| e.prev_value.clone())
             .unwrap_or(original.clone());
-        if prev_value == new {
+        if KeyValue::from(&prev_value) == KeyValue::from(&new) {
             // User reverted to the original value — drop the edit.
             self.updates.remove(&key);
         } else {
