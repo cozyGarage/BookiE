@@ -687,6 +687,9 @@ Dialect-specific SQL string quoting was mutation-audited at source SHA-256
 The MySQL, ClickHouse and PostgreSQL `string_literal`/`quote_literal` slice
 generated ten mutants; the `backslash` regression selector caught all ten in
 15 seconds.
+On that same source fingerprint, the ClickHouse `DateTime64` precision and
+range slice generated 27 mutants; the `clickhouse_datetime64` regression
+selector caught all 27 in 46 seconds.
 
 SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
 ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
