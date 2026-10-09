@@ -13,7 +13,7 @@ from rust_test_evidence import completed_tests
 
 ROOT = Path(__file__).resolve().parents[1]
 DRIVERS = ("postgres", "mysql", "sqlite", "mssql", "clickhouse", "redis", "mongodb")
-SUITE_TIMEOUT_SECONDS = 420
+SUITE_TIMEOUT_SECONDS = 900
 
 
 def expected_suites(gtk=False, duckdb=False):

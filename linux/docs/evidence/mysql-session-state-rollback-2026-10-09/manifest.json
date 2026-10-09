@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "scope": "B4-11 MySQL-family session state after failed DML batch rollback",
+  "branch": "b4/mysql-session-state-rollback-20261009",
+  "base_commit": "82fe4b369978be8537d5be7fd0f177a68030b2bf",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "ef243b0535ddc933286c50fd192fabd327eb8198692bb86811444aa0c1fd99e7"
+  },
+  "fixtures": [
+    "MySQL 8.1 testcontainers fixture",
+    "MariaDB 11 testcontainers fixture"
+  ],
+  "cases": [
+    "A transactional InnoDB INSERT calls LAST_INSERT_ID(73), then a duplicate-key INSERT fails the batch.",
+    "The InnoDB row from the failed batch is absent after rollback.",
+    "LAST_INSERT_ID() remains 73 on the pooled connection after rollback."
+  ],
+  "validation": {
+    "format": "cargo fmt --all -- --check passed",
+    "focused": {
+      "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target cargo test -p tablepro-driver-mysql --test integration failed_batch_preserves_last_insert_id_session_state -- --ignored --nocapture",
+      "result": "2 passed, 82 filtered out, 9.91 seconds"
+    },
+    "full_mysql_atomic_module": {
+      "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target cargo test -p tablepro-driver-mysql --test integration mysql_atomic:: -- --ignored --nocapture --test-threads=1",
+      "result": "16 passed, 68 filtered out, 176.36 seconds"
+    }
+  },
+  "remaining": [
+    "Optional/vendor MySQL-family engines and other session or external side effects remain untested.",
+    "Hosted B4-11 acceptance remains separate."
+  ]
+}

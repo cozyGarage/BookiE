@@ -1,0 +1,49 @@
+    Finished `release` profile [optimized] target(s) in 0.35s
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.8' (uid=1000 pid=2878150 comm="/home/trung/Projects/tablepro/linux/target/install")
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.8' (uid=1000 pid=2878150 comm="/home/trung/Projects/tablepro/linux/target/install")
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.11' (uid=1000 pid=2878221 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.11' (uid=1000 pid=2878221 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.896: Choosing gtk.portal for org.freedesktop.impl.portal.Lockdown via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.896: The preferred method to match portal implementations to desktop environments is to use the portals.conf(5) configuration file
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.11' (uid=1000 pid=2878221 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.947: Choosing gtk.portal for org.freedesktop.impl.portal.Access via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.954: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.954: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.954: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.954: Choosing gtk.portal for org.freedesktop.impl.portal.Settings via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.955: Choosing gtk.portal for org.freedesktop.impl.portal.FileChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.956: Choosing gtk.portal for org.freedesktop.impl.portal.AppChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.956: Choosing gtk.portal for org.freedesktop.impl.portal.Print via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.957: Choosing gtk.portal for org.freedesktop.impl.portal.Notification via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.958: Choosing gtk.portal for org.freedesktop.impl.portal.Inhibit via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.960: Failed to connect to PipeWire: Couldn't connect to PipeWire
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.960: Choosing gtk.portal for org.freedesktop.impl.portal.Account via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.961: Choosing gtk.portal for org.freedesktop.impl.portal.Email via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.962: Choosing gnome-keyring.portal for org.freedesktop.impl.portal.Secret via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:2878221): xdg-desktop-portal-WARNING **: 03:36:41.962: Choosing gtk.portal for org.freedesktop.impl.portal.DynamicLauncher via the deprecated UseIn key
+dbus-daemon[2877435]: [session uid=1000 pid=2877435 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+
+(process:2878149): dbind-WARNING **: 03:36:42.050: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+passed: mysql_unparseable_routine_dialog_denial_preserves_database
+A connection to the bus can't be made

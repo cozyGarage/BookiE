@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "source_commit": "102ef48017f10c7a63c271608b98d3b05b449795",
+  "test_command": "bash scripts/test-ssh.sh",
+  "environment": "Local Linux host with Docker-backed SSH fixtures",
+  "log_sha256": {
+    "ssh.log": "cfb93e7c31b99093d257273d7f2ae781f1bd81d9d2a77941858dde27149ee626"
+  },
+  "results": [
+    {
+      "suite": "agent_auth",
+      "result": "10 passed, 0 failed",
+      "duration_seconds": 101.98
+    },
+    {
+      "suite": "openssh_session",
+      "result": "12 passed, 0 failed",
+      "duration_seconds": 25.28
+    }
+  ],
+  "scope": [
+    "two-hop ProxyJump reaches the target",
+    "second-hop host-key change is detected",
+    "cancellation during second-hop trust does not learn the key",
+    "declined built-in host keys are not learned",
+    "SSH agent and passphrase-protected key authentication",
+    "OpenSSH forwarding and shutdown behavior"
+  ],
+  "remaining": "Distribution-package installation and native Wayland trust-flow acceptance remain open."
+}

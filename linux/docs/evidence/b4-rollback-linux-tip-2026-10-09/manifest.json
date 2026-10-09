@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "branch": "fork/linux",
+  "source_commit": "731378bff2f6ee3f7d3c20ac5b5332403692327f",
+  "product_source_commit": "fc180933437d186a0125ee6f80375a39677de6ee",
+  "checkout_note": "The checked-out commit is a documentation-only branch on current fork/linux; production code matches product_source_commit.",
+  "layer": "b4-rollback",
+  "result": "passed",
+  "mysql_result": "14 passed, 0 failed",
+  "postgres_result": "1 passed, 0 failed",
+  "test": "mysql_atomic::mariadb_aria_nontransactional_effects_survive_failed_batches",
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-mysql --test integration mariadb_aria_nontransactional_effects_survive_failed_batches -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "mariadb-aria-focused.log"
+    }
+  },
+  "files": [
+    "mariadb-aria-focused.log",
+    "mysql-atomic.log",
+    "postgres-rollback-failure.log",
+    "layer-report.json"
+  ],
+  "log_sha256": {
+    "mariadb-aria-focused.log": "1de22f0f1ee972c9af1eec0b940738f5524b03827816651a02267b469ec85f05",
+    "mysql-atomic.log": "00be828690e637773de8d0c460fa4e93ae9c7291f0f24c272d02a3f3a305bf1e",
+    "postgres-rollback-failure.log": "4a158cde7d458e575681eb3bd1a4d303181436ff72310806863cecdc096815eb",
+    "layer-report.json": "738aa91a98f35dfa8a14efc5a3d1d4dac798e073b49a78d8b659020a42aa8718"
+  }
+}

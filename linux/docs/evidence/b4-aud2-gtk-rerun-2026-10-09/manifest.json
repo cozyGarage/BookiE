@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "branch": "fork/linux",
+  "source_commit": "102ef48017f10c7a63c271608b98d3b05b449795",
+  "case": "AUD-2 MySQL unparseable routine human approval dialog",
+  "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database",
+  "result": "1 passed, 0 failed",
+  "environment": "Local Linux, MySQL 8.0 Docker fixture, isolated D-Bus session, Xvfb, explicit AT-SPI bus launcher, GTK_A11Y=atspi",
+  "command": "bash scripts/test-gtk-mysql-approval.sh",
+  "harness": "The GTK safety harness ran the named scenario against the installed development binary. Runtime profile, D-Bus session, and XDG directories were isolated under /tmp.",
+  "log_sha256": {
+    "gtk-mysql-approval.log": "da27c8dab5f4002502a9912acba9291b7c14848265a659ff52baaf301ab002f4"
+  },
+  "observations": [
+    "The named scenario found and denied the unparseable CREATE PROCEDURE approval request, verified the denied routine was absent, then approved a second request and verified that routine existed.",
+    "This is one successful local rerun. The operator's two earlier gtk-server failures remain unexplained; this result does not establish that the intermittent failure is fixed."
+  ],
+  "cause_review": {
+    "pr_407": "Documentation and acceptance evidence only; no runtime source changes.",
+    "pr_408": "MySQL rollback integration test and evidence only; no statement classification or approval-path source changes.",
+    "conclusion": "Neither suspected PR contains a runtime change that could alter this statement's classification or approval dialog path."
+  },
+  "not_established": [
+    "Root cause of gtk-server runs 55 and 56",
+    "Windows or distribution-package acceptance",
+    "Client-disconnect audit behavior"
+  ]
+}
