@@ -166,6 +166,13 @@ class CiWorkflowTests(unittest.TestCase):
             commands[1],
         )
 
+    def test_mysql_approval_dialog_runs_in_hosted_installed_gtk_acceptance(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  duckdb:\n", 1)[0]
+        self.assertIn("Build staged release GTK binary", acceptance)
+        self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", acceptance)
+        self.assertIn("bash scripts/test-gtk-mysql-approval.sh", acceptance)
+
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         hosted = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
