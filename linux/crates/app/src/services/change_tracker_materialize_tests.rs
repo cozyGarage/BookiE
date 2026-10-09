@@ -338,6 +338,7 @@ fn an_edit_back_to_the_identical_value_is_dropped() {
         assert_eq!(tracker.pending_count(), 0);
     }
 }
+<<<<<<< HEAD
 
 fn only_update(tracker: &TabChangeTracker) -> Vec<Value> {
     let (statements, _) = materialize(tracker);
@@ -386,3 +387,5 @@ fn redoing_after_undoing_everything_restores_the_first_edit() {
 
     assert_eq!(only_update(&tracker), vec![text("b"), Value::Int(1), text("a")]);
 }
+=======
+>>>>>>> fix/superseded-reads
