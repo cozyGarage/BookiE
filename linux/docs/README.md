@@ -75,6 +75,9 @@ them live in the ledger. The
 [changelog engineering history index](../CHANGELOG.md#historical-engineering-records)
 locates dated records.
 
+- [Sprint history](archive/bookie-0.2-history.md) (includes 2026-10-08/09 continuation snapshots)
+- [B4 history](archive/b4-history.md) (includes superseded tip checkpoints)
+- [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 - [Release audit, October 3](archive/release-audit-2026-10-03.md)
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md)
 - [App layer audit](archive/app-layer-external-audit-2026-10-06.md): GUI gaps and the TablePro and dbx comparison

@@ -76,7 +76,8 @@ impl DatabaseDriver for SqliteDriver {
         };
         let connect_opts = SqliteConnectOptions::from_str(&url)
             .map_err(map_sqlx_error)?
-            .create_if_missing(true);
+            .create_if_missing(!opts.read_only)
+            .read_only(opts.read_only && !in_memory);
         let session_options = (!in_memory).then(|| connect_opts.clone());
         let pool = SqlitePoolOptions::new()
             .max_connections(4)
@@ -940,6 +941,53 @@ mod tests {
             database: path.to_string(),
             ..Default::default()
         }
+    }
+
+    #[tokio::test]
+    async fn a_read_only_connection_cannot_write_even_when_sql_tries() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("ro.db");
+        let writer = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+        writer
+            .execute("CREATE TABLE foo (id INTEGER PRIMARY KEY)")
+            .await
+            .unwrap();
+        writer.execute("INSERT INTO foo VALUES (1)").await.unwrap();
+        drop(writer);
+
+        let reader = SqliteDriver
+            .connect(ConnectOptions {
+                read_only: true,
+                ..opts_for(path.to_str().unwrap())
+            })
+            .await
+            .unwrap();
+        assert_eq!(reader.query("SELECT id FROM foo").await.unwrap().rows.len(), 1);
+        for sql in [
+            "INSERT INTO foo VALUES (2)",
+            "CREATE TABLE bar (id INTEGER)",
+            "DROP TABLE foo",
+            "PRAGMA query_only = OFF",
+        ] {
+            let outcome = reader.execute(sql).await;
+            let wrote = outcome.is_ok() && reader.query("SELECT id FROM foo").await.unwrap().rows.len() != 1;
+            assert!(!wrote, "{sql} must not change a read-only database");
+        }
+        assert_eq!(reader.query("SELECT id FROM foo").await.unwrap().rows.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_read_only_connection_does_not_create_a_missing_file() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("missing.db");
+        let outcome = SqliteDriver
+            .connect(ConnectOptions {
+                read_only: true,
+                ..opts_for(path.to_str().unwrap())
+            })
+            .await;
+        assert!(outcome.is_err());
+        assert!(!path.exists());
     }
 
     #[tokio::test]

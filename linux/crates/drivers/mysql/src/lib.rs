@@ -75,13 +75,14 @@ impl DatabaseDriver for MysqlDriver {
         let mysql_opts = mysql_connect_options(&opts);
         let cancellation_options = mysql_opts.clone();
         let session_options = mysql_opts.clone();
+        let read_only = opts.read_only;
         let pool = MySqlPoolOptions::new()
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
-            .after_connect(|connection, _| Box::pin(set_utc_timezone(connection)))
-            .before_acquire(|connection, _| {
+            .after_connect(move |connection, _| Box::pin(prepare_session(connection, read_only)))
+            .before_acquire(move |connection, _| {
                 Box::pin(async move {
-                    set_utc_timezone(connection).await?;
+                    prepare_session(connection, read_only).await?;
                     Ok(true)
                 })
             })
@@ -100,6 +101,7 @@ impl DatabaseDriver for MysqlDriver {
             pool,
             cancellation_pool,
             session_options,
+            read_only,
         }))
     }
 }
@@ -108,6 +110,7 @@ struct MysqlConnection {
     pool: Pool<MySql>,
     cancellation_pool: Pool<MySql>,
     session_options: MySqlConnectOptions,
+    read_only: bool,
 }
 
 #[async_trait]
@@ -399,7 +402,7 @@ impl Connection for MysqlConnection {
     }
 
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
-        session::open(&self.session_options, self.cancellation_pool.clone()).await
+        session::open(&self.session_options, self.cancellation_pool.clone(), self.read_only).await
     }
 
     async fn begin(&self) -> Result<Box<dyn tablepro_core::Transaction>, DriverError> {
@@ -516,6 +519,16 @@ impl tablepro_core::Transaction for MysqlTransaction {
 
 async fn set_utc_timezone(connection: &mut sqlx::MySqlConnection) -> Result<(), sqlx::Error> {
     sqlx::query("SET time_zone = '+00:00'").execute(connection).await?;
+    Ok(())
+}
+
+async fn prepare_session(connection: &mut sqlx::MySqlConnection, read_only: bool) -> Result<(), sqlx::Error> {
+    set_utc_timezone(connection).await?;
+    if read_only {
+        sqlx::query("SET SESSION TRANSACTION READ ONLY")
+            .execute(connection)
+            .await?;
+    }
     Ok(())
 }
 

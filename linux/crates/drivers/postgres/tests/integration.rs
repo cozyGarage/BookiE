@@ -21,6 +21,9 @@ mod wire_round_trip;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
+#[path = "support/read_only_session.rs"]
+mod read_only_session;
+
 #[path = "support/connection_contracts.rs"]
 mod connection_contracts;
 

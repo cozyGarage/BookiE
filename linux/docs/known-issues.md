@@ -18,33 +18,19 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against BookiE `fork/linux` tip
-`3b903b826bf487ef7fad6eacb3a5b67c4c8b8bd1` (PR #450), checked 2026-10-09.
-PRs #392 and #441–#450 are merged. PR #443's full MSSQL run passed 77 tests,
-and the local full value-contract tier passed 428 tests with no missing suites.
-Unpiped preflight and all required hosted checks passed for PRs #445–#449.
-PostgreSQL vector-capacity and deep-enum expression regressions caught their
-scoped mutations; PRs #448 and #449 passed their Docker contracts and all 11
-required hosted checks. PR #450's GitHub checks passed, but its Docker driver
-integration job was skipped and Forgejo run 85 was disrupted by executor
-restarts. Its follow-up branch adds native stored-value oracles and serial
-MariaDB fixture reuse. Both charset selectors and all 88 serialized MySQL
-integration tests passed locally using one MySQL and one MariaDB container
-(66.36 s); unpiped preflight passed. The branch was published at `f29743c`; Forgejo run 88
-failed on that pre-#452 tip. The PostgreSQL failure was a disconnect-test race:
-its one-shot `pg_stat_activity` lookup ran before the tagged backend was
-visible. Ubuntu and Debian also failed GTK safety waits for `open_editor` and
-`audit_failure_denies`; the cause remains unclassified and needs separate UI
-follow-up.
-Commit `b98ce22` adds bounded polling to the backend-termination fixtures; the
-local PostgreSQL disconnection module passed 10/10 tests, the full serialized
-PostgreSQL integration binary passed 234/234 in 120.91 s with one server, and
-unpiped preflight passed on the current head. Run 88 predates the current B3 fix
-and #451/#452 merges; the updated local head still needs its own gate.
-The broader B3 engine/type/consumer matrix and installed acceptance remain
-open. This is a status snapshot, not a release qualification.
-Older audits remain historical; this ledger and the
-[active sprint](bookie-0.2-sprint.md) own current status.
+Status snapshot checked 2026-10-09 against tip after PRs #441–#458 (docs tip
+`ca1080a55`; nearest code tip `c2f3f78b9`). This ledger and the
+[active sprint](bookie-0.2-sprint.md) own current status; PR-by-PR continuation
+is in [sprint history](archive/bookie-0.2-history.md#archived-from-active-sprint-on-2026-10-09-consolidation).
+Not a release qualification.
+
+Retest indicators (also listed on the sprint): Forgejo run 101 PostgreSQL
+driver failures; `pg-release` query-plan vs fail-closed masking; Forgejo run 88
+GTK waits for `open_editor` and `audit_failure_denies` (pre-#451/#452 tip);
+TEST-28 native Ubuntu AT-SPI; Build Linux Docker Hub rate limits near
+`c2f3f78b9`. Commit `b98ce22` addressed the earlier disconnect-test race from
+run 88; that specific race is not the open retest.
+
 ## Owners and handoff
 
 Every open row has one owner. `scripts/check-known-issues.py` fails when an
@@ -138,7 +124,7 @@ edits the other lane's files without a ledger entry.
 | B4-8 | ~~F7: isolated GTK Session, BEGIN, label, toggle-off confirm~~ | DONE | AT-SPI scenario `session_transaction_label_and_toggle_off_confirmation` (SQLite): Session on, BEGIN shows the transaction label, toggling off asks, Cancel keeps the session and the label, Roll Back returns the plain label. Runs in the installed suite on Arch, Ubuntu 24.04 and Debian 13 | gtk-installed |
 | B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | OPEN | Merged tip `97e5f55` passed the local PostgreSQL release fixture, including saved mTLS over SSH and the TLS identity selectors. The previous MongoDB refusal cause remains undetermined. Distribution-package and native Wayland acceptance remain open; see [current-tip evidence](evidence/b4-current-linux-tip-2026-10-09/manifest.json) and [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) | manual |
 | B4-10 | ~~I1: the Debian package has no askpass build or install~~ | DONE | `scripts/build-deb.sh` builds and installs `tablepro-askpass`; `test_deb_package.py` rejects a builder or package without it, and `scripts/test-deb-package.sh` checks the installed binary | sandbox |
-| B4-11 | MySQL failed-batch rollback across additional storage engines and side effects | OPEN | On merged tip `97e5f55`, the local `mysql_atomic` selector passed all 18 tests serially (190.07 s), covering the current MySQL/MariaDB engine and side-effect matrix including advisory locks. The exact-source hosted Build Linux job [B4 rollback acceptance (docker)](https://github.com/cozyGarage/BookiE/actions/runs/37955330433) also passed its focused MySQL/PostgreSQL rollback step. Optional/vendor engines and other side-effect classes remain open. `LAST_INSERT_ID()` after a failed statement is undefined and excluded as an oracle; PR #457 replaces the pooled assertions with pinned-connection manual rollback semantics tests. See [current-tip evidence](evidence/b4-current-linux-tip-2026-10-09/manifest.json), [advisory-lock evidence](evidence/mysql-advisory-lock-rollback-2026-10-09/manifest.json), and [session-state evidence](evidence/mysql-session-state-rollback-2026-10-09/manifest.json) | driver-docker |
+| B4-11 | MySQL failed-batch rollback across additional storage engines and side effects | OPEN | On the current tree tip `ca1080a` (nearest code tip `c2f3f78b9`), the serial `mysql_atomic` selector passed 18/18 with Docker MySQL and MariaDB fixtures; source hashes and result are in the [current-tip rerun manifest](evidence/mysql-atomic-linux-c2f3f78-2026-10-09/manifest.json). Coverage includes MyISAM, MEMORY, CSV, ARCHIVE, BLACKHOLE, MariaDB Aria, direct/update/delete trigger effects, auto-increment allocation, trigger session variables, `LAST_INSERT_ID()` on the pinned session, and advisory locks. The exact-source hosted Build Linux rollback job also passed on an earlier candidate. Optional/vendor engines and other effect classes remain open; frozen-candidate, hosted, package-installed and native acceptance are separate. Earlier pooled `LAST_INSERT_ID()` observations were invalid because they could use a different connection; the pinned-session tests now provide the relevant oracle. See [advisory-lock evidence](evidence/mysql-advisory-lock-rollback-2026-10-09/manifest.json) and [session-state evidence](evidence/mysql-session-state-rollback-2026-10-09/manifest.json) | driver-docker |
 | B4-12 | ~~PostgreSQL rollback-failure acceptance on a frozen candidate~~ | DONE | Exact-SHA hosted dispatch `102ef480` passed the backend-termination rollback-failure selector (1 test); the selector also passed locally with the current product source `fc180933`. See [current hosted evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [current linux-tip rollback evidence](evidence/b4-rollback-linux-tip-2026-10-09/manifest.json) | driver-docker |
 | B4-13 | ~~U4: reconnect retried every error forever~~ | DONE | `is_permanent_failure` tests; `a_credential_failure_ends_the_retry_loop_and_reports_the_reason`; `ConnectionHealth::Failed` shown in the banner. Raw error text still goes through `error_text` only | unit |
 | B4-14 | ~~U5: saved mTLS transport and consumer support~~ | DONE | PostgreSQL server requiring client cert: direct/SSH shared transport, missing/untrusted/rotated identities, GTK saved-connection query, agentd direct + saved SSH and untrusted-cert refusal. MySQL driver fixture: direct/SSH, missing/untrusted/rotated identities. `scripts/test-postgres-release.sh` and `scripts/test-driver-tls.sh` pass locally; installed/package/hosted acceptance remains separate | driver-docker + gtk-widget |
@@ -235,7 +221,7 @@ edits the other lane's files without a ledger entry.
 | AUD-3 | ~~MongoDB `columns_and_page` scanned the whole collection for every page, and the connection URI used an unvalidated host~~ | DONE | Browse metadata now uses a stable `_id`-ordered 128-document sample; page reads use server-side skip/limit and merge their types into the sample. URI construction rejects empty hosts, URL delimiters, percent escapes, commas, whitespace and malformed IPv6, while bracketing valid IPv6 literals. MongoDB Docker suite passed 41/41; host-validation and credential-encoding unit tests passed. The bounded profile measured 5-run debug medians of 2.029/2.140/2.333/2.253 ms at 1k/10k/100k/1m documents on MongoDB 7, Docker 29.7.2, Ryzen 7 5800U/16 CPUs | driver-docker |
 | AUD-4 | ~~Unused dependencies and dead public items~~ | DONE | Removed in [PR #402](https://github.com/cozyGarage/BookiE/pull/402): confirmed-unused `mcp` thiserror/futures, `ssh` futures/serde, `storage` tablepro-ssh, `agentd` secrecy, `app` anyhow, and the listed dead public items. `ssh` serde_json was already dev-only and remains for tests. Checks passed for `tablepro-app`, `tablepro-agentd`, and `tablepro-driver-tls-tests`. A full-workspace check hit local disk quota while compiling `aws-lc` | package checks |
 | AUD-5 | About 4,700 `//` comment lines in `src/` (worst: `browse_tab/mod.rs`, `structure_tab/mod.rs`, `workspace_tabs.rs`, `row_ops.rs`, `app/mod.rs`) and 16 `#[allow]` attributes with no stated reason | OPEN | Audit 2026-10-08. CLAUDE.md allows only comments about an external system. Sweep `app/src/ui/**` and `app/src/services/**` first, keep GTK and driver-quirk comments, and consider a CI check that fails on new comment lines | unit |
-| AUD-6 | Blocking work on the GTK thread: the workspace store holds `memory_lock` across a flush and file read that the persist timer also takes, startup blocks on the history database, and the window state file is read and written synchronously | OPEN | Audit 2026-10-08, `services/workspace_state.rs` (`prefetch_connections_coordinated`), `lib.rs` (~61), `services/window_state.rs`. Fix: hold the lock only to publish into the cache, move the history open and window-state IO off the GTK thread | unit |
+| AUD-6 | Blocking work on the GTK thread: the workspace store holds `memory_lock` across a flush and file read that the persist timer also takes, startup blocks on the history database, and the window state file is read and written synchronously | OPEN | Audit 2026-10-08, `services/workspace_state.rs` (`prefetch_connections_coordinated`), `lib.rs` (~61), `services/window_state.rs`. The lock part is fixed (a save no longer waits for a prefetch's flush and file read; the prefetch publishes only ids not saved meanwhile). The startup history prune now runs in the background. Remaining: the history database open itself and the window-state file IO on the GTK thread | unit |
 | AUD-7 | ~~Stale results can overwrite newer state: the history dialog's search and mutations are unordered and its `Loaded` has no request id, `ColumnsLoaded`, `ForeignKeysLoaded` and `StructureDataLoaded` carry only a tab id, `begin_run` cancels the running query before a parse error or a dismissed parameters dialog, and the per-table column files never shrink~~ | DONE | The history dialog runs each pin or delete in the same command as the search that follows it, and drops a search result whose generation is no longer current (`request_generation::is_current`). Columns, foreign-key and structure reads are covered by AUD-1: a newer read cancels the older one and a cancelled read reports nothing. A run's generation now starts only when it is dispatched, so a parse error or a dismissed parameters dialog no longer cancels or hides the running query. Deleting a connection drops its column widths, hidden columns and order (`forgetting_a_connection_drops_its_widths_hidden_columns_and_order_only`). Entries for tables dropped on the server stay until the connection is deleted | unit |
 | AUD-8 | ~~Bundle import read the whole chosen file before checking the 16 MiB limit, so a huge file, `/dev/zero` or a FIFO could exhaust memory or hang~~ | DONE | Audit 2026-10-08. The read now opens the file, refuses anything that is not a regular file or is over the limit, and reads at most the limit plus one byte (`a_file_over_the_limit_is_refused_before_it_is_read`, `a_directory_or_missing_path_is_not_a_bundle`, `a_file_at_the_limit_is_read_whole`) | unit |
 | AUD-10 | A read-only DuckDB connection can still read local files through reader functions such as `read_text`; the engine-level read-only mode now exists for SQLite, PostgreSQL and MySQL only | OPEN | Review 2026-10-08, S3. DuckDB needs `enable_external_access=false`, which also breaks the driver's own CSV, Parquet and JSON flat-file flow, so that flow needs an explicit design (allow only the selected path) first. See [the policy proposal](proposals/policy-effects-and-verdict.md#duckdb-read-only-s3) | driver |

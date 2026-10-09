@@ -41,6 +41,7 @@ mod tests {
     fn effects_match_legacy_write_facts_without_changing_legacy_classes() {
         for (sql, driver) in [
             ("SELECT * FROM users", "postgres"),
+            ("SELECT * INTO backup FROM users", "postgres"),
             ("INSERT INTO users(id) VALUES (1)", "postgres"),
             ("UPDATE users SET id = 2 WHERE id = 1", "postgres"),
             ("DELETE FROM users WHERE id = 1", "postgres"),

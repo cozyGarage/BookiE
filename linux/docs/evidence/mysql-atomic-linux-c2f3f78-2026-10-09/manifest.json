@@ -22,6 +22,20 @@
     "Side-effect classes beyond those named in this test group",
     "Frozen-candidate, hosted, distribution-package or installed acceptance"
   ],
+  "latest_validation": {
+    "date": "2026-10-10",
+    "source_commit": "ca1080a55c9a47fb0d241d92395820864836491f",
+    "code_tip": "c2f3f78b954ef0c7cb7d8956f035aa08edc71c7f",
+    "source_sha256": {
+      "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "11fd671e4e36849fd3ab8e61f7fcf8b7ddf492c0ffad3ca1729b256b24fb9244",
+      "crates/drivers/mysql/tests/shared/mysql_atomic_parts/advisory_lock.rs": "1709621fa0836cd7fc975bfc394d39543c23e798704d28a16bc0087995b7851a",
+      "crates/drivers/mysql/tests/integration.rs": "e67c543f33e87cbe3c9f29ddef74f23a3ca07f4573671266c5f7ac8c65c3a636"
+    },
+    "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target rtk cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+    "runtime": "Local Linux host with Docker MySQL and MariaDB fixtures",
+    "result": "18 passed; 0 failed; 0 ignored; 72 filtered out; 125.51 seconds; exit code 0",
+    "limitation": "The source tree tip is two documentation commits after the nearest code tip; the test source hashes match the code-tip run above. This does not establish optional/vendor engines, other effect classes, frozen-candidate, hosted, package-installed or native acceptance."
+  },
   "log_sha256": {
     "mysql-atomic.txt": "e1c09bfd6c9afc1d2d1da4b1b6eb8e97e873d48a464f46d942df459e25b67efd"
   }
