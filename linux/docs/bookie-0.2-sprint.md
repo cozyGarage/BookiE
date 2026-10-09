@@ -12,13 +12,10 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 - B3 [B3]: the broader type, consumer and configuration matrix, PERF-10 memory
   reduction (the preview is display-only; full values are still held), PERF-3
   MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
-  TEST-29's fast and durable test-container paths are in PR #457. The focused
-  same-session MySQL/MariaDB tests and local preflight pass. Local commits
-  `559ba69` and `c0eb82f` restore the duplicate-key failure scenario and wait
-  for authenticated MongoDB readiness; neither is pushed yet.
-  Forgejo run 99 completed red on the older published head `ab4b273`; its
-  PostgreSQL query-plan, MongoDB readiness, Redis TLS and SQL Server startup
-  jobs failed. The final local head is queued behind UX's run 100.
+  TEST-29's fast and durable test-container paths are in PR #457. Local commits
+  `559ba69`, `c0eb82f` and `200bf5e` pin MySQL/MariaDB session assertions and
+  harden MongoDB, Redis TLS and SQL Server fixture startup. Focused tests pass;
+  the final local head awaits a serialized hosted gate.
 - B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
   remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
   (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
@@ -74,10 +71,13 @@ Forgejo run 99 completed red on `ab4b273`: `driver (mongodb)` got
 query plan, `driver-tls` got `ConnectionRefused` from its Redis TLS fixture, and
 one SQL Server testcontainer timed out during startup. MySQL passed 90/90; all
 GTK shards, Postgres e2e and both distro floors passed. Local commit `559ba69`
-keeps the duplicate-key failure cases in dedicated sessions, and `c0eb82f`
-adds a bounded readiness check that passes locally. Current local head
-`9549634` is queued behind UX run 100; it will push and gate only after that run
-releases the shared lock. Run 97 was canceled as a duplicate.
+keeps the duplicate-key failure cases in dedicated sessions; `c0eb82f` waits
+for authenticated MongoDB readiness; `200bf5e` retries the first Redis TLS
+connection and gives SQL Server containers 180 seconds to start. The focused
+MySQL/MariaDB checks pass 4/4, MongoDB auth and the SQL Server timeout case pass,
+and the TLS fixture suite passes 48/48 locally. The final local head is queued
+behind UX run 100; it will push and gate only after that run releases the shared
+lock. Run 97 was canceled as a duplicate.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
