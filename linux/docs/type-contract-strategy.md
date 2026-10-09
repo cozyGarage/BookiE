@@ -217,6 +217,9 @@ cover zero-based bounds, empty strings, NULL elements, byte equality, sibling
 preservation and SQLSTATE `22P02` refusal for malformed bits
 ([result evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json),
 [grid evidence](evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json)).
+Array dimension products are checked against the remaining element-length words
+before decoding; `value_contract_dimension_product_must_fit_element_length_words`
+pins the exact two-element payload boundary at 7 versus 8 bytes.
 
 The built-in `name[]` contract covers empty text, SQL NULL, literal `NULL`,
 commas, quotes, backslashes, Unicode and a 63-byte UTF-8 name. Pooled decoding
