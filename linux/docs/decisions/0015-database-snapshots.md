@@ -1,6 +1,6 @@
 # 0015: Database snapshots and restore
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-10-09); scheduled for 0.2.x, after 0.2.0
 - **Date**: 2026-10-08
 
 ## Context
@@ -46,7 +46,7 @@ snapshots, restore one, delete one. The user never types SQL.
    environment's rules ask for it, an ADR 0010 intent written before and an
    outcome after, with no database names, paths or secrets in events. Long
    operations carry an `OperationControl` (ADR 0005).
-5. **Bounded.** A per-database snapshot limit, a size estimate shown before
+5. **Bounded.** A per-database snapshot limit of 5, a size estimate shown before
    taking a snapshot, and no automatic retention: deleting is explicit.
 
 ## Rationale
