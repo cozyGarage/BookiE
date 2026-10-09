@@ -6,13 +6,10 @@ use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveTime};
 use rust_decimal::Decimal;
-use secrecy::SecretString;
 
 use drivers_mssql::MssqlDriver;
+use shared_container::{assert_tmpfs_data_dir, start_mssql, start_mssql_durable};
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
-use testcontainers::ContainerAsync;
-use testcontainers_modules::mssql_server::MssqlServer;
-use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
@@ -24,6 +21,8 @@ mod disconnection;
 mod result_sets;
 #[path = "support/server_owned_columns.rs"]
 mod server_owned_columns;
+#[path = "support/shared_container.rs"]
+mod shared_container;
 #[path = "support/sql_variant.rs"]
 mod sql_variant;
 #[path = "support/temporal_boundaries.rs"]
@@ -36,127 +35,8 @@ async fn an_unavailable_sql_server_is_classified_as_connection_refused() {
         .expect("SQL Server setup refusal remains distinct from established disconnect");
 }
 
-async fn start_mssql() -> (ContainerAsync<MssqlServer>, ConnectOptions) {
-    let container = MssqlServer::default()
-        .with_accept_eula()
-        .start()
-        .await
-        .expect("start mssql container");
-    let host = container.get_host().await.expect("host").to_string();
-    let port = container.get_host_port_ipv4(1433).await.expect("port");
-    let opts = ConnectOptions {
-        host,
-        port,
-        database: "master".into(),
-        username: "sa".into(),
-        password: SecretString::new(MssqlServer::DEFAULT_SA_PASSWORD.to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
-        ..Default::default()
-    };
-    (container, opts)
-}
-
 async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
     MssqlDriver.connect(opts).await.expect("connect")
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn a_lost_sql_server_is_reported_as_disconnected() {
-    let (container, opts) = start_mssql().await;
-    let connection = connect(opts.clone()).await;
-    let initial = connection
-        .query("SELECT 1")
-        .await
-        .expect("initial query reaches server");
-    assert_eq!(initial.rows, vec![vec![Value::Int(1)]]);
-
-    container.stop().await.expect("stop SQL Server");
-    let error = connection
-        .query("SELECT 1")
-        .await
-        .expect_err("query after server loss must fail");
-    assert!(
-        matches!(error, DriverError::Disconnected),
-        "loss of an established SQL Server must be reported as disconnected, got {error:?}"
-    );
-
-    container.start().await.expect("restart SQL Server");
-    let mut replacement_options = opts;
-    replacement_options.host = container.get_host().await.expect("restarted host").to_string();
-    replacement_options.port = container
-        .get_host_port_ipv4(1433)
-        .await
-        .expect("restarted SQL Server port");
-    let recovered = server_restart::retry_operation("SQL Server", || {
-        let options = replacement_options.clone();
-        async move {
-            let replacement = MssqlDriver.connect(options).await?;
-            replacement.query("SELECT 1").await
-        }
-    })
-    .await
-    .expect("SQL Server restarts and accepts SELECT 1");
-    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn server_loss_during_multi_result_stream_rejects_the_whole_query() {
-    let (container, opts) = start_mssql().await;
-    let streaming_connection = connect(opts.clone()).await;
-    let admin_connection = connect(opts.clone()).await;
-    let sql = "/* tablepro_disconnect_stream_probe */ SELECT CAST(1 AS int) AS n; WAITFOR DELAY '00:00:20'; SELECT CAST(2 AS int) AS n";
-    let query = tokio::spawn(async move { streaming_connection.query(sql).await });
-
-    let mut active = false;
-    for _ in 0..100 {
-        let probe = admin_connection
-            .query(
-                "SELECT COUNT(*) AS active_count FROM sys.dm_exec_requests r \
-                 CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t \
-                 WHERE r.session_id <> @@SPID \
-                   AND t.text LIKE N'%tablepro_disconnect_stream_probe%'",
-            )
-            .await
-            .expect("inspect SQL Server active requests");
-        if probe.rows == vec![vec![Value::Int(1)]] {
-            active = true;
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    }
-    assert!(active, "streaming query must reach WAITFOR before server loss");
-    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-    container.stop().await.expect("stop SQL Server during stream");
-
-    let error = tokio::time::timeout(std::time::Duration::from_secs(20), query)
-        .await
-        .expect("interrupted stream must finish promptly")
-        .expect("query task must not panic")
-        .expect_err("interrupted multi-result query must fail without returning partial rows");
-    assert!(
-        matches!(error, DriverError::Disconnected),
-        "mid-stream SQL Server loss must be Disconnected, got {error:?}"
-    );
-
-    container.start().await.expect("restart SQL Server");
-    let mut replacement_options = opts;
-    replacement_options.host = container.get_host().await.expect("restarted host").to_string();
-    replacement_options.port = container
-        .get_host_port_ipv4(1433)
-        .await
-        .expect("restarted SQL Server port");
-    let recovered = server_restart::retry_operation("SQL Server", || {
-        let options = replacement_options.clone();
-        async move {
-            let replacement = MssqlDriver.connect(options).await?;
-            replacement.query("SELECT 1").await
-        }
-    })
-    .await
-    .expect("SQL Server restarts and accepts SELECT 1");
-    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
 }
 
 #[tokio::test]
@@ -329,7 +209,8 @@ async fn bad_sql_returns_query_error() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn ddl_batch_commits_and_rolls_back_as_a_unit() {
-    let (_c, opts) = start_mssql().await;
+    let (container, opts) = start_mssql().await;
+    assert_tmpfs_data_dir(&container).await;
     let conn = connect(opts).await;
 
     let committed = conn

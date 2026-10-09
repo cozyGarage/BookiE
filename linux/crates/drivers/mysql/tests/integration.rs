@@ -7,9 +7,8 @@ use serde_json::json;
 
 use drivers_mysql::MysqlDriver;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
-use testcontainers::ContainerAsync;
-use testcontainers::core::{IntoContainerPort, WaitFor};
-use testcontainers::{GenericImage, ImageExt};
+use testcontainers::ImageExt;
+use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
@@ -45,25 +44,8 @@ async fn start_mysql() -> (shared_container::TestDatabase, ConnectOptions) {
     shared_container::start_mysql().await
 }
 
-async fn start_mariadb() -> (ContainerAsync<GenericImage>, ConnectOptions) {
-    let container = GenericImage::new("mariadb", "11")
-        .with_exposed_port(3306.tcp())
-        .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
-        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
-        .with_env_var("MARIADB_DATABASE", "test")
-        .start()
-        .await
-        .expect("start mariadb container");
-    let opts = ConnectOptions {
-        host: container.get_host().await.expect("host").to_string(),
-        port: container.get_host_port_ipv4(3306).await.expect("port"),
-        database: "test".into(),
-        username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
-        ..Default::default()
-    };
-    (container, opts)
+async fn start_mariadb() -> (shared_container::MariaDbTestDatabase, ConnectOptions) {
+    shared_container::start_mariadb().await
 }
 
 async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {

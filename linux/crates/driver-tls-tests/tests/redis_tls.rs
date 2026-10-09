@@ -1,5 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::{DatabaseDriver, TlsMode};
+use tablepro_core::{DatabaseDriver, DriverError, TlsMode};
 use tablepro_driver_tls_tests::DriverTlsFixture;
 
 use drivers_redis::RedisDriver;
@@ -8,10 +8,20 @@ use drivers_redis::RedisDriver;
 #[ignore = "requires the driver tls fixture"]
 async fn a_verifying_mode_connects_with_the_fixture_authority() {
     let fixture = DriverTlsFixture::from_env();
-    let connection = RedisDriver
-        .connect(fixture.redis(TlsMode::VerifyFull, Some(fixture.ca_cert.clone())))
-        .await
-        .expect("verify full must succeed against the fixture certificate");
+    let options = fixture.redis(TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
+    let connection = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        loop {
+            match RedisDriver.connect(options.clone()).await {
+                Ok(connection) => break connection,
+                Err(DriverError::ConnectionRefused) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+                Err(error) => panic!("verified Redis TLS connection failed: {error:?}"),
+            }
+        }
+    })
+    .await
+    .expect("Redis TLS fixture must accept connections within 30 seconds");
     connection.ping().await.expect("a verified session must be usable");
 }
 

@@ -8,6 +8,8 @@ use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, Po
 use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
+use crate::effects::Effects;
+use crate::effects_classification::{sql_effects_from_tokens, statement_effects};
 use crate::select_writes::select_writes;
 
 /// Coarse statement class used by policy rules.
@@ -48,6 +50,11 @@ pub struct StatementFacts {
     pub parse_error: Option<String>,
 }
 
+pub(crate) struct StatementAnalysis {
+    pub(crate) facts: StatementFacts,
+    pub(crate) effects: Effects,
+}
+
 impl StatementFacts {
     pub fn unparseable(message: impl Into<String>) -> Self {
         Self {
@@ -69,26 +76,35 @@ pub fn statement_requires_write_capability(sql: &str, driver_id: &str) -> bool {
     classify(sql, driver_id).writes
 }
 
-pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
+pub(crate) fn classify_with_effects(sql: &str, driver_id: &str) -> StatementAnalysis {
     let dialect = dialect_for(driver_id);
     let trimmed = sql.trim();
     if trimmed.is_empty() {
-        return StatementFacts::unparseable("empty SQL");
+        return unparseable_analysis("empty SQL");
     }
 
     if driver_id == "mysql" && sql_contains_mysql_executable_comment(trimmed, dialect.as_ref()) {
-        return StatementFacts::unparseable("MySQL executable comments are not safely classified");
+        return unparseable_analysis("MySQL executable comments are not safely classified");
     }
 
     let statements = match Parser::parse_sql(dialect.as_ref(), trimmed) {
         Ok(s) => s,
-        Err(e) => return StatementFacts::unparseable(e.to_string()),
+        Err(e) => return unparseable_analysis(e.to_string()),
     };
 
     if statements.is_empty() {
-        return StatementFacts::unparseable("no statements parsed");
+        return unparseable_analysis("no statements parsed");
     }
 
+    let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
+    classify_statements(statements, effects, contains_administrative_call)
+}
+
+fn classify_statements(
+    statements: Vec<Statement>,
+    mut effects: Effects,
+    contains_administrative_call: bool,
+) -> StatementAnalysis {
     let is_multi = statements.len() > 1;
     let mut class = StatementClass::Select;
     let mut writes = false;
@@ -98,10 +114,9 @@ pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
     let mut contains_mutating_dml = false;
     let mut contains_unscoped_dml = false;
     let mut contains_unknown_write = false;
-    let contains_administrative_call = sql_contains_administrative_call(trimmed, dialect.as_ref(), driver_id);
-
     for stmt in &statements {
         let facts = classify_statement(stmt);
+        effects = effects.union(statement_effects(stmt, &facts));
         writes |= facts.writes;
         contains_ddl |= facts.contains_ddl;
         contains_mutating_dml |= facts.contains_mutating_dml;
@@ -132,17 +147,33 @@ pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
         class = StatementClass::Other;
     }
 
-    StatementFacts {
-        class,
-        writes,
-        tables,
-        has_where,
-        contains_ddl,
-        contains_mutating_dml,
-        contains_unscoped_dml,
-        contains_unknown_write,
-        is_multi_statement: is_multi,
-        parse_error: None,
+    StatementAnalysis {
+        facts: StatementFacts {
+            class,
+            writes,
+            tables,
+            has_where,
+            contains_ddl,
+            contains_mutating_dml,
+            contains_unscoped_dml,
+            contains_unknown_write,
+            is_multi_statement: is_multi,
+            parse_error: None,
+        },
+        effects,
+    }
+}
+
+pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
+    let analysis = classify_with_effects(sql, driver_id);
+    let _ = analysis.effects;
+    analysis.facts
+}
+
+fn unparseable_analysis(message: impl Into<String>) -> StatementAnalysis {
+    StatementAnalysis {
+        facts: StatementFacts::unparseable(message),
+        effects: Effects::UNKNOWN,
     }
 }
 
@@ -163,58 +194,6 @@ fn sql_contains_mysql_executable_comment(sql: &str, dialect: &dyn Dialect) -> bo
 /// while names inside literals and comments remain harmless. Function names
 /// must be followed by an opening parenthesis; stored procedures are invoked
 /// without one and are matched on the name alone.
-fn sql_contains_administrative_call(sql: &str, dialect: &dyn Dialect, driver_id: &str) -> bool {
-    let Ok(tokens) = Tokenizer::new(dialect, sql).tokenize() else {
-        return false;
-    };
-
-    tokens.iter().enumerate().any(|(index, token)| {
-        let Token::Word(word) = token else {
-            return false;
-        };
-        if is_administrative_procedure_name(driver_id, &word.value) {
-            return true;
-        }
-        if !is_administrative_function_name(&word.value)
-            && !is_engine_administrative_function_name(driver_id, &word.value)
-        {
-            return false;
-        }
-
-        tokens[index + 1..]
-            .iter()
-            .find(|next| !matches!(next, Token::Whitespace(_)))
-            .is_some_and(|next| matches!(next, Token::LParen))
-    })
-}
-
-fn is_engine_administrative_function_name(driver_id: &str, name: &str) -> bool {
-    let lowered = name.to_ascii_lowercase();
-    match driver_id {
-        "mysql" => matches!(lowered.as_str(), "benchmark" | "load_file" | "sleep"),
-        // The fileio and misc loadable extensions turn a SELECT into host
-        // file access or module loading; SELECT writefile('~/.bashrc', ...)
-        // must not classify as a plain read wherever they are loaded.
-        "sqlite" => matches!(
-            lowered.as_str(),
-            "writefile" | "readfile" | "edit" | "load_extension" | "fts3_tokenizer"
-        ),
-        _ => false,
-    }
-}
-
-fn is_administrative_procedure_name(driver_id: &str, name: &str) -> bool {
-    if driver_id != "mssql" {
-        return false;
-    }
-    let lowered = name.to_ascii_lowercase();
-    lowered.starts_with("xp_")
-        || matches!(
-            lowered.as_str(),
-            "sp_addsrvrolemember" | "sp_configure" | "sp_lock" | "sp_password" | "sp_who" | "sp_who2"
-        )
-}
-
 pub(crate) fn dialect_for(driver_id: &str) -> Box<dyn Dialect> {
     match driver_id {
         "postgres" => Box::new(PostgreSqlDialect {}),
@@ -683,7 +662,7 @@ fn is_administrative_function(name: &ObjectName) -> bool {
     is_administrative_function_name(&name.to_string())
 }
 
-fn is_administrative_function_name(name: &str) -> bool {
+pub(crate) fn is_administrative_function_name(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
         "lo_create"

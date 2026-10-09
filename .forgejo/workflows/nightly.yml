@@ -106,6 +106,8 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.run }}"
       - name: Five retry-free installed GTK attempts
         run: |
           cd src/linux
@@ -162,7 +164,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        include:
+          - shard: 1
+            mcp_port_slot: 7
+          - shard: 2
+            mcp_port_slot: 8
+          - shard: 3
+            mcp_port_slot: 9
     steps:
       - name: Check out
         env:
@@ -172,6 +180,8 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Installed GTK end-to-end suite on native Ubuntu 24.04, one third
         run: |
           cd src/linux && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh

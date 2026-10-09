@@ -712,12 +712,14 @@ async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names_a
         )
         .await
         .unwrap();
-    let native_selected = connection
-        .query(
+    let native_selected = session
+        .query_params_controlled(
             "SELECT id, state::text, pg_typeof(state)::text \
              FROM \"EnumCaseTarget\".\"Rows\" \
              WHERE state IS NOT DISTINCT FROM 'target-only'::\"EnumCaseTarget\".\"StateKind\" \
              ORDER BY id",
+            &[],
+            &control,
         )
         .await
         .unwrap();
@@ -778,14 +780,16 @@ async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names_a
         .query_params_controlled("RESET ROLE", &[], &control)
         .await
         .unwrap();
-    session.close().await.unwrap();
-    let native_target_rows = connection
-        .query(
+    let native_target_rows = session
+        .query_params_controlled(
             "SELECT id, state::text, pg_typeof(state)::text, sibling \
              FROM \"EnumCaseTarget\".\"Rows\" ORDER BY id",
+            &[],
+            &control,
         )
         .await
         .unwrap();
+    session.close().await.unwrap();
     assert_eq!(target_rows.rows, native_target_rows.rows);
     assert_eq!(
         target_rows.rows,
