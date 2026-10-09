@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "scope": "B4-11 MySQL and MariaDB advisory-lock side effects after failed DML batch rollback",
+  "source_commit": "b03fbce67c1fadaa9d80b007883b759d52a870b0",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "34def5ff8dadad551e6860f0d1640076398cc8bb0a3806badece200e0943fff8"
+  },
+  "test": "mysql_atomic",
+  "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+  "runtime": "Local Linux host with Docker MySQL and MariaDB fixtures",
+  "result": "18 passed; 0 failed; 0 ignored; 68 filtered out; 171.42 seconds; script exit code 0",
+  "new_assertions": [
+    "GET_LOCK acquired inside a DML batch remains held after a later duplicate-key failure rolls back the InnoDB insert",
+    "The lock remains held on both MySQL and MariaDB until the owning connection pool closes",
+    "Closing the owning pool releases the named lock for a fresh connection"
+  ],
+  "not_established": [
+    "Optional/vendor MySQL engines such as NDB",
+    "Side-effect classes beyond the tested row, trigger, session-variable, LAST_INSERT_ID, auto-increment and advisory-lock effects",
+    "Frozen-candidate and hosted acceptance"
+  ],
+  "log_sha256": {
+    "run.log": "2016f2dc66c0f34f184c6cf39aba326b100a2b01e08d1475608755eb43187398"
+  }
+}
