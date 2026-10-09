@@ -382,10 +382,11 @@ impl App {
                 BrowseTabOutput::FetchColumns => AppMsg::FetchBrowseColumns(tab_id),
                 BrowseTabOutput::FetchRowCount => AppMsg::FetchBrowseRowCount(tab_id),
                 BrowseTabOutput::FetchCellValue {
+                    request,
                     col_index,
                     column_name,
                     row_key,
-                } => AppMsg::FetchBrowseCellValue(tab_id, col_index, column_name, row_key),
+                } => AppMsg::FetchBrowseCellValue(tab_id, request, col_index, column_name, row_key),
                 BrowseTabOutput::StateChanged => AppMsg::WorkspaceTabsChanged,
                 BrowseTabOutput::CopyRowAsInsert { row_position } => AppMsg::CopyRowAsInsert { tab_id, row_position },
                 BrowseTabOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),

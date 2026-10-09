@@ -90,6 +90,7 @@ pub struct BrowseTab {
     current_total_rows: Option<u64>,
     page_requests: PageRequestTracker,
     row_count_requests: RowCountRequestTracker,
+    cell_value_requests: CellValueRequestTracker,
 
     inner_stack: gtk::Stack,
     grid_holder: gtk::Box,
@@ -272,11 +273,12 @@ pub enum BrowseTabInput {
         row_key: Vec<Value>,
     },
     CellValueLoaded {
+        request: BrowseCellValueRequest,
         col_index: usize,
         column_name: String,
         value: Value,
     },
-    CellValueFailed(String),
+    CellValueFailed(BrowseCellValueRequest, String),
     IncompleteRowData,
     ProjectionFailure,
     GridShowRowAsJson(String),
@@ -350,6 +352,7 @@ pub enum BrowseTabOutput {
     /// Tab needs the row count fetched.
     FetchRowCount,
     FetchCellValue {
+        request: BrowseCellValueRequest,
         col_index: usize,
         column_name: String,
         row_key: Vec<Value>,
@@ -407,8 +410,8 @@ mod value_parse;
 mod value_view;
 
 use chrome::*;
-pub use requests::{BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
-use requests::{PageRequestTracker, RowCountRequestTracker};
+pub use requests::{BrowseCellValueRequest, BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
+use requests::{CellValueRequestTracker, PageRequestTracker, RowCountRequestTracker};
 use selection::*;
 use value_parse::*;
 
@@ -857,6 +860,7 @@ impl SimpleComponent for BrowseTab {
             current_total_rows: None,
             page_requests: PageRequestTracker::default(),
             row_count_requests: RowCountRequestTracker::default(),
+            cell_value_requests: CellValueRequestTracker::default(),
             inner_stack,
             grid_holder,
             current_column_view: None,
@@ -1151,12 +1155,15 @@ impl SimpleComponent for BrowseTab {
                 row_key,
             } => self.request_cell_value(col_index, column_name, row_key, sender),
             BrowseTabInput::CellValueLoaded {
+                request,
                 col_index,
                 column_name,
                 value,
-            } => self.show_cell_value(col_index, column_name, value),
-            BrowseTabInput::CellValueFailed(message) => {
-                let _ = sender.output(BrowseTabOutput::ShowToast(message));
+            } => self.show_cell_value(request, col_index, column_name, value),
+            BrowseTabInput::CellValueFailed(request, message) => {
+                if self.cell_value_requests.accepts(request) {
+                    let _ = sender.output(BrowseTabOutput::ShowToast(message));
+                }
             }
             BrowseTabInput::IncompleteRowData => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(

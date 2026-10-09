@@ -26,6 +26,7 @@ impl App {
     pub(super) fn fetch_browse_cell_value(
         &self,
         tab_id: Uuid,
+        request: crate::ui::browse_tab::BrowseCellValueRequest,
         col_index: usize,
         column_name: String,
         row_key: Vec<tablepro_core::Value>,
@@ -34,42 +35,30 @@ impl App {
         let Some((schema, table, columns, driver_id)) = self.browse_cell_value_context(tab_id) else {
             return;
         };
-        if columns.get(col_index).is_none_or(|column| column.name != column_name) {
-            sender.input(AppMsg::BrowseCellValueLoaded(
-                tab_id,
-                col_index,
-                column_name,
-                Err(crate::tr!("The table columns changed before the value could be fetched.").to_string()),
-            ));
-            return;
-        }
-        let target = BrowseTarget {
-            driver_id: &driver_id,
-            schema: schema.as_deref(),
-            table: &table,
-            columns: &columns,
-            filter: &tablepro_core::FilterSet::default(),
-            hidden_columns: None,
-        };
-        let query = match target.value_query(col_index, &row_key) {
+        let query = match browse_cell_value_query(
+            schema.as_deref(),
+            &table,
+            &columns,
+            &driver_id,
+            col_index,
+            &column_name,
+            &row_key,
+        ) {
             Ok(query) => query,
             Err(message) => {
-                sender.input(AppMsg::BrowseCellValueLoaded(
-                    tab_id,
-                    col_index,
-                    column_name,
-                    Err(message),
-                ));
+                self.fail_browse_cell_value(&sender, tab_id, request, col_index, column_name, message);
                 return;
             }
         };
         let Some(conn) = self.window_connection() else {
-            sender.input(AppMsg::BrowseCellValueLoaded(
+            self.fail_browse_cell_value(
+                &sender,
                 tab_id,
+                request,
                 col_index,
                 column_name,
-                Err(crate::tr!("No active connection.").to_string()),
-            ));
+                crate::tr!("No active connection.").to_string(),
+            );
             return;
         };
         let timeout_secs =
@@ -84,10 +73,34 @@ impl App {
                         .await
                         .map_err(|error| crate::ui::error_text::driver_message(&error))
                         .and_then(single_cell_value);
-                    reply.input(AppMsg::BrowseCellValueLoaded(tab_id, col_index, column_name, result));
+                    reply.input(AppMsg::BrowseCellValueLoaded(
+                        tab_id,
+                        request,
+                        col_index,
+                        column_name,
+                        result,
+                    ));
                 })
                 .drop_on_shutdown()
         });
+    }
+
+    fn fail_browse_cell_value(
+        &self,
+        sender: &ComponentSender<Self>,
+        tab_id: Uuid,
+        request: crate::ui::browse_tab::BrowseCellValueRequest,
+        col_index: usize,
+        column_name: String,
+        message: String,
+    ) {
+        sender.input(AppMsg::BrowseCellValueLoaded(
+            tab_id,
+            request,
+            col_index,
+            column_name,
+            Err(message),
+        ));
     }
 
     /// Sidebar click — routes via OpenMode (smart switch / new tab).
@@ -566,6 +579,29 @@ impl App {
     }
 }
 
+fn browse_cell_value_query(
+    schema: Option<&str>,
+    table: &str,
+    columns: &[ColumnInfo],
+    driver_id: &str,
+    col_index: usize,
+    column_name: &str,
+    row_key: &[tablepro_core::Value],
+) -> Result<crate::services::browse_query::BoundQuery, String> {
+    if columns.get(col_index).is_none_or(|column| column.name != column_name) {
+        return Err(crate::tr!("The table columns changed before the value could be fetched.").to_string());
+    }
+    BrowseTarget {
+        driver_id,
+        schema,
+        table,
+        columns,
+        filter: &tablepro_core::FilterSet::default(),
+        hidden_columns: None,
+    }
+    .value_query(col_index, row_key)
+}
+
 fn single_cell_value(result: QueryResult) -> Result<tablepro_core::Value, String> {
     if result.columns.len() != 1 || result.truncated {
         return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
@@ -630,7 +666,7 @@ fn page_fetcher_factory(
 
 #[cfg(test)]
 mod tests {
-    use super::{row_count_from_result, single_cell_value};
+    use super::{browse_cell_value_query, row_count_from_result, single_cell_value};
     use tablepro_core::{ColumnInfo, QueryResult, Value};
 
     fn scalar_result(row: Option<Value>) -> QueryResult {
@@ -702,6 +738,13 @@ mod tests {
         ] {
             assert!(single_cell_value(result).is_err());
         }
+    }
+
+    #[test]
+    fn value_refetch_refuses_a_column_that_changed_since_the_request() {
+        let columns = [column()];
+        let error = browse_cell_value_query(None, "records", &columns, "postgres", 0, "old", &[]).unwrap_err();
+        assert_eq!(error, "The table columns changed before the value could be fetched.");
     }
 
     fn column() -> ColumnInfo {
