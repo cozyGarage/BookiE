@@ -47,6 +47,23 @@ fn truncate_sql(sql: &str) -> String {
     }
 }
 
+async fn acquire_dialog_permit(
+    gate: Arc<tokio::sync::Semaphore>,
+    deadline: tokio::time::Instant,
+    cancellation: Option<tokio_util::sync::CancellationToken>,
+) -> Option<tokio::sync::OwnedSemaphorePermit> {
+    match cancellation {
+        Some(cancellation) => tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => None,
+            permit = tokio::time::timeout_at(deadline, gate.acquire_owned()) => {
+                permit.ok()?.ok()
+            },
+        },
+        None => tokio::time::timeout_at(deadline, gate.acquire_owned()).await.ok()?.ok(),
+    }
+}
+
 #[async_trait]
 impl ApprovalSink for GtkApprovalSink {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
@@ -56,19 +73,8 @@ impl ApprovalSink for GtkApprovalSink {
         let gate = APPROVAL_DIALOG
             .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(1)))
             .clone();
-        let permit = match &req.cancellation {
-            Some(cancellation) => tokio::select! {
-                biased;
-                _ = cancellation.cancelled() => return ApprovalOutcome::Deny,
-                permit = tokio::time::timeout_at(deadline, gate.acquire_owned()) => match permit {
-                    Ok(Ok(permit)) => permit,
-                    _ => return ApprovalOutcome::Deny,
-                },
-            },
-            None => match tokio::time::timeout_at(deadline, gate.acquire_owned()).await {
-                Ok(Ok(permit)) => permit,
-                _ => return ApprovalOutcome::Deny,
-            },
+        let Some(permit) = acquire_dialog_permit(gate, deadline, req.cancellation.clone()).await else {
+            return ApprovalOutcome::Deny;
         };
         let (tx, rx) = tokio::sync::oneshot::channel::<ApprovalOutcome>();
         let tx = Arc::new(Mutex::new(Some(tx)));
@@ -259,6 +265,35 @@ mod tests {
         assert!(preview.starts_with(&"x".repeat(MAX_SQL_PREVIEW_CHARS)));
         assert!(preview.contains("SQL truncated after 16384 characters"));
         assert_eq!(truncate_sql("short query"), "short query");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn waiting_behind_another_approval_denies_at_the_end_to_end_deadline() {
+        let gate = Arc::new(tokio::sync::Semaphore::new(1));
+        let active_dialog = gate.clone().acquire_owned().await.expect("active dialog permit");
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+        let waiting = tokio::spawn(acquire_dialog_permit(gate, deadline, None));
+
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(120)).await;
+
+        assert!(waiting.await.expect("approval queue waiter").is_none());
+        drop(active_dialog);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancellation_while_waiting_for_an_approval_dialog_denies_immediately() {
+        let gate = Arc::new(tokio::sync::Semaphore::new(1));
+        let active_dialog = gate.clone().acquire_owned().await.expect("active dialog permit");
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+        let waiting = tokio::spawn(acquire_dialog_permit(gate, deadline, Some(cancellation.clone())));
+
+        tokio::task::yield_now().await;
+        cancellation.cancel();
+
+        assert!(waiting.await.expect("approval queue waiter").is_none());
+        drop(active_dialog);
     }
 
     #[test]

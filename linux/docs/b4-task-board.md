@@ -59,7 +59,40 @@ checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json) retains
 the earlier candidate evidence. These runs do not establish frozen-candidate
 or installed acceptance; those gates remain open.
 
-## Current pinned B4 acceptance checkpoint (2026-10-09)
+## Current merged-tip B4 checkpoint (2026-10-09)
+
+`fork/linux` is `97e5f55bddacdfef427c51f162917fedcace3a9f` after PR #451.
+PR #451 makes the SSH cancellation fixture deterministic; its rebased focused
+test passed 10/10 locally. On the merged tip, the per-user source build passed
+the 54-scenario GTK safety suite, the MySQL approval-dialog regression, the
+seven PostgreSQL SSH/mTLS GTK scenarios, and the 18-test `mysql_atomic`
+selector. The PostgreSQL release fixture also passed one system OpenSSH test,
+three mTLS tests, and 59 release integration tests. Logs, hashes, exact
+selectors, and scope limits are in the [current-tip evidence](evidence/b4-current-linux-tip-2026-10-09/manifest.json).
+
+This evidence is from a user-local package-layout install, not a package built
+and installed by pacman. The post-merge hosted Build Linux run was still in
+progress when the evidence was captured. Distribution-package and native
+Wayland acceptance and Windows AD interoperability remain open. A separate
+manual launch on the earlier source `3b903b8` produced a GTK/Wayland
+SIGSEGV. An isolated eight-second Wayland smoke on `97e5f55` showed no
+SIGSEGV but did not reach workspace readiness because its D-Bus session could
+not activate AT-SPI; this is incomplete, not acceptance. The headless Wayland
+runner could not start because `gnome-shell` is unavailable on the test host.
+See the [run notes](evidence/b4-current-linux-tip-2026-10-09/README.md).
+
+On exact `fork/linux` source `2ef1df8`,
+`bash scripts/test-arch-package-container.sh` built and validated Arch package
+`0.1.6-1` (SHA-256
+`709d61f931efc7b833e3a9f45f02a5f17927213b3c122e098ffddae5328e1ee8`). The
+container test upgraded `0.1.5-1` to `0.1.6-1`, verified the installed
+executables, and removed the package while preserving user-data sentinels. It
+does not cover package-installed B4 UI flows or native Wayland; those rows stay
+open. The packaging output also contains a `namcap` PKGBUILD environment
+diagnostic despite an overall exit code of zero. See the [Arch package
+lifecycle manifest](evidence/b4-arch-package-lifecycle-2026-10-09/manifest.json).
+
+## Previous pinned B4 acceptance checkpoint (2026-10-09; linux tip 4bcec064)
 
 At this checkpoint, `fork/linux` was `4bcec064d1dc4a8f4905f92f40461e4c215ed23b`
 (PR #419). PR #419 updates test-container reuse/support; it does not change

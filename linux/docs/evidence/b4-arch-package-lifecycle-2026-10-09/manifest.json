@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "scope": "B4 Arch package build and lifecycle smoke",
+  "source_branch": "fork/linux",
+  "source_commit": "2ef1df8e153ee1eb674f92d115a09503959a37b4",
+  "command": "bash scripts/test-arch-package-container.sh",
+  "environment": {
+    "docker_server": "29.7.2",
+    "container_image": "archlinux@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd"
+  },
+  "result": "passed; command exit code 0",
+  "package": {
+    "name": "bookie",
+    "version": "0.1.6-1",
+    "sha256": "709d61f931efc7b833e3a9f45f02a5f17927213b3c122e098ffddae5328e1ee8"
+  },
+  "assertions": [
+    "The Arch package built and passed package validation.",
+    "The package upgraded bookie 0.1.5-1 to bookie 0.1.6-1.",
+    "The installed /usr/bin/bookie and /usr/bin/bookie-agentd executables were present.",
+    "Package removal removed the BookiE executable and preserved the user-data sentinel files."
+  ],
+  "output_note": "namcap printed a PKGBUILD diagnostic that TABLEPRO_RC_COMMIT was unset while evaluating the recipe; package validation and the overall lifecycle script still exited successfully. Review this diagnostic before treating namcap output as clean.",
+  "not_established": [
+    "Package-installed GTK behavior, including SSH host trust, mTLS, rollback and bundle flows",
+    "Native Wayland interaction",
+    "Windows Active Directory interoperability"
+  ]
+}
