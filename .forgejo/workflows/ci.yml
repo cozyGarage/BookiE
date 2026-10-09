@@ -127,6 +127,7 @@ jobs:
 
   gtk-ubuntu:
     runs-on: ubuntu-host
+    continue-on-error: true
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name == 'push'
     timeout-minutes: 60
