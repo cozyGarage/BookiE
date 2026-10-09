@@ -697,6 +697,8 @@ The `csv` selector caught 16 of 19 mutations. The other three are equivalent:
 TSV header presence is controlled by `with_headers`, its explicit NULL marker
 takes precedence over `null_to_empty`, and the RFC 4180 header/row adapters
 choose their output in separate functions.
+The 68 matching core tests passed on the baseline; the scoped mutant run took
+80 seconds and had no surviving behavior change.
 
 SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
 ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
