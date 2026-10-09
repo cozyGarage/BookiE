@@ -39,8 +39,8 @@ follow-up.
 Commit `b98ce22` adds bounded polling to the backend-termination fixtures; the
 local PostgreSQL disconnection module passed 10/10 tests, the full serialized
 PostgreSQL integration binary passed 234/234 in 120.91 s with one server, and
-unpiped preflight passed on the current head. Run 88 does not cover the #452
-merge or this fix; the updated local head still needs its own gate.
+unpiped preflight passed on the current head. Run 88 predates the current B3 fix
+and #451/#452 merges; the updated local head still needs its own gate.
 The broader B3 engine/type/consumer matrix and installed acceptance remain
 open. This is a status snapshot, not a release qualification.
 Older audits remain historical; this ledger and the

@@ -24,8 +24,8 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 
 ## Current continuation: 2026-10-09
 
-The merged `linux` baseline is `3b903b826bf487ef7fad6eacb3a5b67c4c8b8bd1`
-(PR #450); PRs #441–#450 are merged. PR #443 adds SQL Server
+The merged `linux` baseline is `97e5f55bddacdfef427c51f162917fedcace3a9f`
+(PR #451, including #452); PRs #441–#452 are merged. PR #443 adds SQL Server
 `decimal(38,38)` preservation and refuses lossy `sql_variant` values. Its full
 MSSQL run passed 77 tests; the full local value-contract tier passed 428 tests
 with no missing suites, and unpiped preflight passed. The scoped SQL Server
@@ -53,7 +53,7 @@ integration suite passed 234/234 in 120.91 s with one server, and unpiped
 preflight passed on the current head. Ubuntu and Debian also failed GTK safety waits for
 `open_editor` and `audit_failure_denies`; their cause remains unclassified and
 needs separate UI follow-up. The updated local head still needs its own gate;
-run 88 does not cover the fix or the #452 merge.
+run 88 predates the current B3 fix and the #451/#452 merges.
 Merged topic branches have been deleted.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
