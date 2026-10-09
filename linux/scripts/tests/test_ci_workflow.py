@@ -16,6 +16,14 @@ bounded_spec.loader.exec_module(bounded_checker)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_driver_jobs_reuse_and_clean_the_run_scoped_database(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
+        self.assertIn("TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
+        self.assertIn("cleanup-testcontainers.py", driver)
+        self.assertIn("trap cleanup_testcontainers EXIT", driver)
+        self.assertIn("--test-threads=1", driver)
+
     def test_bounded_operation_guard_catches_multiline_calls(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "fixture.rs"

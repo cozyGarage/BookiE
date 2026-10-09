@@ -660,6 +660,10 @@ async fn value_contract_time_array_file_exports_preserve_boundaries_for_calc_rei
 async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reimport() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE TABLE timetz_array_csv_import_target (value timetz[])")
+        .await
+        .unwrap();
     let mut transaction = connection.begin().await.unwrap();
     transaction
         .execute("SET LOCAL TIME ZONE 'America/New_York'")
@@ -739,9 +743,61 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
         |_| {},
     )
     .unwrap();
-    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    let mut csv = csv::Reader::from_path(&csv_path).unwrap();
     assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+
+    transaction
+        .execute(
+            "INSERT INTO timetz_array_csv_import_target \
+             VALUES (ARRAY['01:02:03+00'::timetz])",
+        )
+        .await
+        .unwrap();
+    let sibling = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM timetz_array_csv_import_target",
+        )
+        .await
+        .unwrap();
+    let csv_text = std::fs::read(csv_path).unwrap();
+    let import_options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(&csv_text, &import_options, None).unwrap();
+    let columns = connection
+        .fetch_columns(None, "timetz_array_csv_import_target")
+        .await
+        .unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: Some("public"),
+            table: "timetz_array_csv_import_target",
+            columns: &columns,
+            mapping: &[Some(0)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    transaction
+        .execute_params(&plan.statement, &plan.rows[0])
+        .await
+        .unwrap();
+    let restored = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM timetz_array_csv_import_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows.len(), 2);
+    assert!(restored.rows.contains(&sibling.rows[0]));
+    assert!(restored.rows.contains(&vec![
+        oracle.rows[0][1].clone(),
+        oracle.rows[0][2].clone(),
+        oracle.rows[0][3].clone(),
+    ]));
 
     transaction
         .execute("CREATE TABLE timetz_array_filewriter_target (value timetz[])")

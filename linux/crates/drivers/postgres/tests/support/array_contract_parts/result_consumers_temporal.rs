@@ -152,6 +152,10 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants() {
 async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_non_utc_session() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE TABLE timestamptz_array_csv_import_target (value timestamptz[])")
+        .await
+        .unwrap();
     let mut transaction = connection.begin().await.unwrap();
     transaction
         .execute("SET LOCAL TIME ZONE 'America/New_York'")
@@ -228,9 +232,72 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_n
         |_| {},
     )
     .unwrap();
-    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    let mut csv = csv::Reader::from_path(&csv_path).unwrap();
     assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+
+    transaction.execute("SET LOCAL TIME ZONE 'UTC'").await.unwrap();
+    let expected_utc = transaction
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, array_to_json({expression})::text, \
+                    encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    transaction
+        .execute(
+            "INSERT INTO timestamptz_array_csv_import_target \
+             VALUES (ARRAY['1999-01-01 00:00:00+00'::timestamptz])",
+        )
+        .await
+        .unwrap();
+    let sibling = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') \
+             FROM timestamptz_array_csv_import_target",
+        )
+        .await
+        .unwrap();
+    let csv_text = std::fs::read(&csv_path).unwrap();
+    let import_options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(&csv_text, &import_options, None).unwrap();
+    let columns = connection
+        .fetch_columns(None, "timestamptz_array_csv_import_target")
+        .await
+        .unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: Some("public"),
+            table: "timestamptz_array_csv_import_target",
+            columns: &columns,
+            mapping: &[Some(0)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    transaction
+        .execute_params(&plan.statement, &plan.rows[0])
+        .await
+        .unwrap();
+    let csv_restored = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') \
+             FROM timestamptz_array_csv_import_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(csv_restored.rows.len(), 2);
+    assert!(csv_restored.rows.contains(&sibling.rows[0]));
+    assert!(
+        csv_restored.rows.contains(&expected_utc.rows[0]),
+        "CSV import produced {:?}, expected {:?}",
+        csv_restored.rows,
+        expected_utc.rows[0]
+    );
 
     let xlsx_path = directory.path().join("timestamptz-array-non-utc.xlsx");
     tablepro_core::export::write_result_file(
