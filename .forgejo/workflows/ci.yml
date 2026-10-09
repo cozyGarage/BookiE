@@ -121,6 +121,8 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
       - name: Installed GTK end-to-end suite, one third
         run: |
           cd src/linux && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
@@ -241,6 +243,8 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py 4
       - name: PostgreSQL release fixture
         run: |
           cd src/linux && ./scripts/test-postgres-release.sh
@@ -275,7 +279,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        server: [postgres, mysql]
+        include:
+          - server: postgres
+            mcp_port_slot: 5
+          - server: mysql
+            mcp_port_slot: 6
     steps:
       - name: Check out
         env:
@@ -285,6 +293,8 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Real server end to end
         run: |
           cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
@@ -321,7 +331,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        server: [clickhouse, mysql-approval, mongodb]
+        include:
+          - server: clickhouse
+            mcp_port_slot: 7
+          - server: mysql-approval
+            mcp_port_slot: 8
+          - server: mongodb
+            mcp_port_slot: 9
     steps:
       - name: Check out
         env:
@@ -331,6 +347,8 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Installed GTK scenarios against a real server
         run: |
           cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
@@ -367,7 +385,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        base: ["ubuntu:24.04", "debian:13"]
+        include:
+          - base: "ubuntu:24.04"
+            mcp_port_slot: 10
+          - base: "debian:13"
+            mcp_port_slot: 11
     steps:
       - name: Check out
         env:
@@ -377,6 +399,8 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Distro floor
         run: |
           cd src/linux && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ${{ matrix.base }}

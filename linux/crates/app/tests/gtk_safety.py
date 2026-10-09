@@ -41,6 +41,7 @@ POSTGRES_SSH_AUDIT_CONNECTION_ID = "1c971938-9732-433e-a9bf-ae64e94794da"
 POSTGRES_SSH_SETUP_FAILURE_CONNECTION_NAME = "PostgreSQL SSH setup failure"
 POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID = "ee8f8451-05cf-4c21-8c7f-f37c8c96e251"
 MCP_DISCONNECT_TEST_TOKEN = "bookie-gtk-mcp-disconnect-test-token"
+MCP_HTTP_PORT = int(os.environ.get("TABLEPRO_TEST_MCP_HTTP_PORT", "17432"))
 WAIT_SECONDS = float(os.environ.get("TABLEPRO_GTK_WAIT_SECONDS", "15"))
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
@@ -1059,7 +1060,7 @@ def mcp_client_disconnect_cancels_pending_approval(database, base):
     client = None
     while time.monotonic() < deadline:
         try:
-            client = socket.create_connection(("127.0.0.1", 17432), timeout=2)
+            client = socket.create_connection(("127.0.0.1", MCP_HTTP_PORT), timeout=2)
             break
         except OSError:
             time.sleep(POLL_SECONDS)
@@ -1067,8 +1068,8 @@ def mcp_client_disconnect_cancels_pending_approval(database, base):
     try:
         request = (
             b"POST /mcp HTTP/1.1\r\n"
-            b"Host: 127.0.0.1:17432\r\n"
-            b"Content-Type: application/json\r\n"
+            + f"Host: 127.0.0.1:{MCP_HTTP_PORT}\r\n".encode("ascii")
+            + b"Content-Type: application/json\r\n"
             + f"Content-Length: {len(body)}\r\n".encode("ascii")
             + b"Connection: keep-alive\r\n\r\n"
             + body
