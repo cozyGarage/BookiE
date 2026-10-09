@@ -91,8 +91,7 @@ fn legacy_datetime_text(value: tiberius::time::DateTime) -> Option<String> {
     // SQL Server style 126 rounds 1/300-second ticks to the nearest millisecond.
     let milliseconds = (u64::from(value.seconds_fragments()) * 10 + 1) / 3;
     let seconds = u32::try_from(milliseconds / 1_000).ok()?;
-    let nanos = u32::try_from(milliseconds % 1_000).ok()? * 1_000_000;
-    let time = NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanos)?;
+    let time = NaiveTime::from_num_seconds_from_midnight_opt(seconds, 0)?;
     let timestamp = date.and_time(time);
     let base = timestamp.format("%Y-%m-%dT%H:%M:%S");
     let fraction = milliseconds % 1_000;
@@ -207,6 +206,7 @@ mod tests {
                 30,
                 "1.500000000000000000000000000000",
             ),
+            (0, 30, "0.000000000000000000000000000000"),
         ] {
             let numeric = tiberius::numeric::Numeric::new_with_scale(value, scale);
             let column_data = ColumnData::Numeric(Some(numeric));
@@ -227,6 +227,16 @@ mod tests {
         assert_eq!(
             column_data_to_value(&column_data),
             Value::Decimal(rust_decimal::Decimal::new(1234, 2))
+        );
+    }
+
+    #[test]
+    fn a_numeric_value_at_decimals_maximum_scale_still_decodes_as_decimal() {
+        let numeric = tiberius::numeric::Numeric::new_with_scale(1, Decimal::MAX_SCALE as u8);
+        let column_data = ColumnData::Numeric(Some(numeric));
+        assert_eq!(
+            column_data_to_value(&column_data),
+            Value::Decimal(Decimal::new(1, Decimal::MAX_SCALE))
         );
     }
 
@@ -317,6 +327,15 @@ mod tests {
         assert_eq!(
             column_data_to_value_for_type(&ColumnData::SmallDateTime(Some(smalldatetime)), ColumnType::Datetimen),
             Value::DateTime(date.and_hms_opt(3, 4, 0).unwrap())
+        );
+    }
+
+    #[test]
+    fn legacy_datetime_refuses_inexact_ticks_outside_one_day() {
+        let value = tiberius::time::DateTime::new(0, 25_920_002);
+        assert_eq!(
+            column_data_to_value(&ColumnData::DateTime(Some(value))),
+            Value::Undecodable("datetime".into())
         );
     }
 }

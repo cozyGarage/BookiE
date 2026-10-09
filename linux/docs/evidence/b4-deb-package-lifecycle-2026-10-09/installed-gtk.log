@@ -1,0 +1,7 @@
+dbus-daemon[408]: [session uid=1000 pid=408 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.3' (uid=1000 pid=582 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[408]: [session uid=1000 pid=408 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[593]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=595 comm="python3 /src/linux/crates/app/tests/gtk_safety.py")
+dbus-daemon[593]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+passed: mysql_unparseable_routine_dialog_denial_preserves_database
+X connection to :99 broken (explicit kill or server shutdown).

@@ -1019,6 +1019,65 @@ async fn mysql_batch_rollback_preserves_trigger_session_variable_effects() {
     );
 }
 
+async fn assert_failed_batch_preserves_last_insert_id(conn: &dyn Connection) {
+    conn.execute("CREATE TABLE rollback_last_insert_id (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO rollback_last_insert_id VALUES (1)")
+        .await
+        .unwrap();
+    assert_eq!(
+        conn.query("SELECT LAST_INSERT_ID(0)").await.unwrap().rows,
+        vec![vec![Value::Int(0)]],
+        "the fixture starts with a known session value"
+    );
+
+    let batch = vec![
+        (
+            "INSERT INTO rollback_last_insert_id VALUES (LAST_INSERT_ID(73))".into(),
+            vec![],
+        ),
+        ("INSERT INTO rollback_last_insert_id VALUES (1)".into(), vec![]),
+    ];
+    let error = conn
+        .execute_in_transaction(&batch)
+        .await
+        .expect_err("the duplicate key must fail after changing LAST_INSERT_ID()");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+        "the failed statement index must be preserved, got {error:?}"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM rollback_last_insert_id ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "the transactional row is rolled back"
+    );
+    assert_eq!(
+        conn.query("SELECT LAST_INSERT_ID()").await.unwrap().rows,
+        vec![vec![Value::Int(73)]],
+        "LAST_INSERT_ID() is session state and is not restored by transaction rollback"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_failed_batch_preserves_last_insert_id_session_state() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    assert_failed_batch_preserves_last_insert_id(conn.as_ref()).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_failed_batch_preserves_last_insert_id_session_state() {
+    let (_container, opts) = start_mariadb().await;
+    let conn = connect(opts).await;
+    assert_failed_batch_preserves_last_insert_id(conn.as_ref()).await;
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_lost_connection_during_a_batch_reports_rollback_failure() {

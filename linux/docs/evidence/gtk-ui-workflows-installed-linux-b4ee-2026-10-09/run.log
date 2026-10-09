@@ -1,0 +1,171 @@
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1000 pid=3230692 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[3230703]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=3230715 comm="python3 /home/trung/.cache/bookie-b4-linux-b4ee/li")
+dbus-daemon[3230703]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.7' (uid=1000 pid=3230716 comm="/home/trung/.local/opt/bookie-main-b4ee/usr/bin/ta")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.7' (uid=1000 pid=3230716 comm="/home/trung/.local/opt/bookie-main-b4ee/usr/bin/ta")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.10' (uid=1000 pid=3230787 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.10' (uid=1000 pid=3230787 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.335: Choosing gtk.portal for org.freedesktop.impl.portal.Lockdown via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.335: The preferred method to match portal implementations to desktop environments is to use the portals.conf(5) configuration file
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.10' (uid=1000 pid=3230787 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.387: Choosing gtk.portal for org.freedesktop.impl.portal.Access via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.394: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.395: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.395: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.395: Choosing gtk.portal for org.freedesktop.impl.portal.Settings via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.395: Choosing gtk.portal for org.freedesktop.impl.portal.FileChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.396: Choosing gtk.portal for org.freedesktop.impl.portal.AppChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.397: Choosing gtk.portal for org.freedesktop.impl.portal.Print via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.397: Choosing gtk.portal for org.freedesktop.impl.portal.Notification via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.398: Choosing gtk.portal for org.freedesktop.impl.portal.Inhibit via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.401: Failed to connect to PipeWire: Couldn't connect to PipeWire
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.401: Choosing gtk.portal for org.freedesktop.impl.portal.Account via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.402: Choosing gtk.portal for org.freedesktop.impl.portal.Email via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.402: Choosing gnome-keyring.portal for org.freedesktop.impl.portal.Secret via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3230787): xdg-desktop-portal-WARNING **: 05:47:04.403: Choosing gtk.portal for org.freedesktop.impl.portal.DynamicLauncher via the deprecated UseIn key
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+
+(process:3230715): dbind-WARNING **: 05:47:04.490: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:47:17.296: AT-SPI: Error in GetItems, sender=:1.7, error=Object does not exist at path “/org/a11y/atspi/cache”
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.gtk.vfs.UDisks2VolumeMonitor' requested by ':1.33' (uid=1000 pid=3231649 comm="/home/trung/.local/opt/bookie-main-b4ee/usr/bin/ta")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.gtk.vfs.UDisks2VolumeMonitor'
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.gtk.vfs.MTPVolumeMonitor' requested by ':1.33' (uid=1000 pid=3231649 comm="/home/trung/.local/opt/bookie-main-b4ee/usr/bin/ta")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.gtk.vfs.MTPVolumeMonitor'
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='org.gtk.vfs.Metadata' requested by ':1.14' (uid=1000 pid=3230809 comm="/usr/lib/xdg-desktop-portal-gtk")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'org.gtk.vfs.Metadata'
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Activating service name='ca.desrt.dconf' requested by ':1.14' (uid=1000 pid=3230809 comm="/usr/lib/xdg-desktop-portal-gtk")
+dbus-daemon[3230436]: [session uid=1000 pid=3230436 pidfd=5] Successfully activated service 'ca.desrt.dconf'
+
+(process:3230715): dbind-WARNING **: 05:47:54.409: AT-SPI: Error in GetItems, sender=:1.14, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:47:57.513: AT-SPI: Error in GetItems, sender=:1.15, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:48:18.390: AT-SPI: Error in GetItems, sender=:1.19, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:48:22.137: AT-SPI: Error in GetItems, sender=:1.20, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:48:30.850: AT-SPI: Error in GetItems, sender=:1.22, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:48:34.711: AT-SPI: Error in GetItems, sender=:1.23, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:48:40.773: AT-SPI: Error in GetItems, sender=:1.24, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:48:56.463: AT-SPI: Error in GetItems, sender=:1.26, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:49:08.034: AT-SPI: Error in GetItems, sender=:1.29, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:49:15.654: AT-SPI: Error in GetItems, sender=:1.31, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:49:18.887: AT-SPI: Error in GetItems, sender=:1.32, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:49:19.444: AT-SPI: Error in GetItems, sender=:1.33, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:49:23.230: AT-SPI: Error in GetItems, sender=:1.34, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:49:34.577: AT-SPI: Error in GetItems, sender=:1.36, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:49:57.198: AT-SPI: Error in GetItems, sender=:1.38, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:00.610: AT-SPI: Error in GetItems, sender=:1.39, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:08.720: AT-SPI: Error in GetItems, sender=:1.40, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:13.571: AT-SPI: Error in GetItems, sender=:1.41, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:19.093: AT-SPI: Error in GetItems, sender=:1.42, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:29.925: AT-SPI: Error in GetItems, sender=:1.45, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:37.284: AT-SPI: Error in GetItems, sender=:1.47, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:40.216: AT-SPI: Error in GetItems, sender=:1.48, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:47.474: AT-SPI: Error in GetItems, sender=:1.50, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:50:54.371: AT-SPI: Error in GetItems, sender=:1.51, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:51:04.094: AT-SPI: Error in GetItems, sender=:1.54, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:51:12.436: AT-SPI: Error in GetItems, sender=:1.57, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3230715): dbind-WARNING **: 05:51:15.967: AT-SPI: Error in GetItems, sender=:1.58, error=Object does not exist at path “/org/a11y/atspi/cache”
+passed: jump_to_column_keyboard_search
+passed: committed_editor_ddl_refreshes_sidebar
+passed: new_connection_form_keeps_title_and_help_text_visible
+passed: sql_character_warnings_leave_query_unchanged
+passed: malformed_sql_is_blocked_before_approval
+passed: unparseable_routine_requests_human_approval
+passed: dismissed_approval_denies
+passed: approve_once_prompts_again
+passed: audit_failure_denies
+passed: audit_journal_loss_after_connection_denies_mutation
+passed: bundle_export_records_sanitized_audit_outcome
+passed: bundle_import_records_sanitized_audit_outcome
+passed: encrypted_bundle_round_trip_restores_credentials
+passed: named_parameter_binds_a_value
+passed: favorite_round_trips_through_open_quickly
+passed: successful_switch_keeps_database_ownership
+passed: failed_switch_preserves_the_old_workspace
+passed: running_query_is_cancelled_before_switch
+passed: current_page_csv_export_is_pk_ordered
+passed: current_page_json_export_preserves_values
+passed: restart_restores_active_editor_and_connection
+passed: pending_edits_gate_a_connection_switch
+passed: a_browse_tab_reads_the_new_connection_after_a_switch
+passed: two_windows_hold_two_connections
+passed: switched_connection_keeps_workspace_tabs_after_debounce
+passed: switching_one_window_leaves_the_other_windows_edits
+passed: sidebar_tables_group_collapses_and_expands
+passed: restart_with_a_deleted_connection_opens_the_welcome_list
+passed: a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile
+passed: current_page_workbook_preserves_typed_values
+passed: cancelled_workbook_export_preserves_existing_file
+passed: workbook_empty_text_shows_error_without_creating_file
+passed: repeated_parameters_preserve_wide_ids_and_sql_like_text
+passed: cancelled_parameters_never_execute_and_retry_uses_new_values
+passed: xml_export_preserves_line_endings_and_null_distinctions
+passed: xml_export_refuses_illegal_text_without_publishing
+passed: editing_a_saved_connection_prefills_it_and_saves_the_new_name
+passed: find_bar_replaces_every_match_in_the_editor
+passed: view_value_opens_the_whole_cell_with_pretty_json
+passed: columns_dialog_hides_a_column_and_keeps_the_last_one
+passed: ctrl_slash_toggles_a_comment_in_the_editor
+passed: browse_edit_cell_and_save_persists_to_the_database
+passed: test_connection_reports_success_in_the_dialog
+passed: test_connection_reports_failure_in_the_dialog
+passed: connect_dialog_cancel_stops_a_hanging_connection
+passed: a_second_launch_raises_the_window_and_exits_cleanly
+passed: session_transaction_label_and_toggle_off_confirmation
+passed: ctrl_tab_returns_to_the_most_recently_used_tab
+passed: holding_ctrl_while_pressing_tab_walks_deeper_into_the_history
+passed: interactive_controls_have_accessible_names
+passed: alt_arrows_jump_between_statements
+passed: row_inspector_lists_every_column_of_the_selected_row
+passed: find_in_loaded_rows_lists_matches_and_selects_one
+A connection to the bus can't be made
+A connection to the bus can't be made
+A connection to the bus can't be made

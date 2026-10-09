@@ -48,6 +48,15 @@ in the candidate. Local preflight passed; GitHub validation is pending. This doe
 the complete on-demand value path in PERF-10 remain open. After hiding columns,
 refresh the browse page for the reduced SELECT to take effect.
 
+The core result budget tests exact byte, cell and row limits; owned text, byte
+and recursive JSON memory accounting; retained rows across result sets; and
+first-result truncation from either the batch or its first set. A full-file
+`cargo-mutants` run on query source SHA-256
+`ef3bb83d9461c146fceff51cf0ae4c61dc47daff8bcdc9018f2230249325fb69` tested all
+35 generated variants: 33 were caught and 2 constructor replacements were
+unviable, with no missed or timed-out mutants. This closes the scoped result
+budget mutation audit; broader TEST-2 coverage remains open.
+
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete
 label lists, missing quotes, or trailing metadata must refuse the edit rather
@@ -314,6 +323,11 @@ change, with native type/JSON/wire checks and an untouched sibling
 The `timetz[]` case also preserves explicit offsets through an `America/New_York`
 to UTC transition and the JSON/CSV/XLSX/SQL consumer paths
 ([evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
+`timestamptz[]` also rebinds across an `America/Los_Angeles` to UTC session
+change, including the repeated DST-overlap wall-clock time with distinct `-04`
+and `-05` offsets. The test compares native type, JSON and wire output after
+rebinding, and confirms the wire bytes match the original session
+(`value_contract_timestamptz_array_rebinding_preserves_instants_after_timezone_change`).
 Other temporal-array session/consumer combinations remain open.
 
 PostgreSQL inferred enum-array binding now has direct evidence for the
@@ -588,6 +602,19 @@ SQL Server `datetimeoffset(7)` now has an XLSX consumer assertion alongside its
 native-byte, CSV, SQL-literal and keyed-grid contracts. The workbook stores
 positive/negative offsets and calendar-boundary values as exact text cells with
 no formulas ([evidence](evidence/mssql-datetimeoffset-xlsx-consumer-results-2026-10-05/manifest.json)).
+
+SQL Server `decimal(38,0)` and `decimal(38,30)` results outside
+`rust_decimal::Decimal` remain exact `Value::Text`; scale-28 values within its
+mantissa range stay `Value::Decimal`, and SQL NULL stays distinct. Parameter rebinding and CSV
+import using the destination column metadata preserve all three rows, checked
+against native decimal text and row equality in
+`sql_server_numeric_values_outside_rust_decimal_round_trip_as_exact_text`
+(`crates/drivers/mssql/tests/support/wide_numeric.rs`). Positive zero at scale
+30 remains positive exact text through the same consumers. The scale-28 boundary
+is covered in both the codec unit test and native SQL Server fixture. The codec
+mutation slice, run before that test-only addition on source SHA-256
+`e892c28764ff3adf17d27bc9976ab46d9332fc5229302781785c188991d88beb`, tested 37
+variants: 31 were caught, 6 were build-unviable, with no misses or timeouts.
 
 PostgreSQL `date[]` result text stays canonical ISO when fetched under
 `DateStyle = SQL, DMY`; CSV export, parameter rebinding and SQL replay under
@@ -1045,6 +1072,13 @@ at 302 and 512 domain layers. It also projects an array of each outer domain,
 checking the exact array value and `pg_typeof` metadata. The 512 case
 stress-checks recursive metadata handling; neither point is a maximum-depth
 claim ([test source](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs)).
+
+Scalar enum parameter contexts now have a native comparison at the 63/64-domain
+boundary: `COALESCE` and `CASE` preserve PostgreSQL's inferred enum result type
+and value for text labels, the literal `NULL` label, empty text and SQL NULL,
+while the source column retains its outer domain type. The test runs with the
+target schema absent from a `search_path` led by a same-named shadow enum
+([test](../crates/drivers/postgres/tests/support/domain_depth_boundary_contract.rs)).
 
 A restricted PostgreSQL session now verifies enum parameter inference after
 `SET ROLE` with a same-named shadow enum first in `search_path`. The target-only

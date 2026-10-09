@@ -56,9 +56,19 @@ impl ApprovalSink for GtkApprovalSink {
         let gate = APPROVAL_DIALOG
             .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(1)))
             .clone();
-        let permit = match tokio::time::timeout_at(deadline, gate.acquire_owned()).await {
-            Ok(Ok(permit)) => permit,
-            _ => return ApprovalOutcome::Deny,
+        let permit = match &req.cancellation {
+            Some(cancellation) => tokio::select! {
+                biased;
+                _ = cancellation.cancelled() => return ApprovalOutcome::Deny,
+                permit = tokio::time::timeout_at(deadline, gate.acquire_owned()) => match permit {
+                    Ok(Ok(permit)) => permit,
+                    _ => return ApprovalOutcome::Deny,
+                },
+            },
+            None => match tokio::time::timeout_at(deadline, gate.acquire_owned()).await {
+                Ok(Ok(permit)) => permit,
+                _ => return ApprovalOutcome::Deny,
+            },
         };
         let (tx, rx) = tokio::sync::oneshot::channel::<ApprovalOutcome>();
         let tx = Arc::new(Mutex::new(Some(tx)));
@@ -92,6 +102,7 @@ impl ApprovalSink for GtkApprovalSink {
         let tx_c = tx.clone();
         let permit_c = permit.clone();
         let sql_c = truncate_sql(&req.sql);
+        let cancellation = req.cancellation.clone();
         let connection_id = req.connection_id;
         glib::MainContext::default().invoke(move || {
             use relm4::adw::prelude::*;
@@ -160,26 +171,27 @@ impl ApprovalSink for GtkApprovalSink {
             let tx_timeout = tx.clone();
             let permit_timeout = permit_c.clone();
             let timer_timeout = timer.clone();
-            let source = glib::timeout_add_local_once(
-                deadline.saturating_duration_since(tokio::time::Instant::now()),
-                move || {
-                    // This one-shot source is already firing; clear its ID so
-                    // force_close cannot try to remove the active source via
-                    // the response callback.
-                    if let Ok(mut timer) = timer_timeout.lock() {
-                        timer.take();
-                    }
-                    if let Ok(mut guard) = tx_timeout.lock()
-                        && let Some(sender) = guard.take()
-                    {
-                        let _ = sender.send(ApprovalOutcome::Deny);
-                    }
-                    dialog_timeout.force_close();
-                    if let Ok(mut permit) = permit_timeout.lock() {
-                        permit.take();
-                    }
-                },
-            );
+            let source = glib::timeout_add_local(Duration::from_millis(50), move || {
+                let cancelled = cancellation.as_ref().is_some_and(|token| token.is_cancelled());
+                if !cancelled && tokio::time::Instant::now() < deadline {
+                    return glib::ControlFlow::Continue;
+                }
+                // This source is firing; clear its ID so force_close cannot
+                // try to remove the active source via the response callback.
+                if let Ok(mut timer) = timer_timeout.lock() {
+                    timer.take();
+                }
+                if let Ok(mut guard) = tx_timeout.lock()
+                    && let Some(sender) = guard.take()
+                {
+                    let _ = sender.send(ApprovalOutcome::Deny);
+                }
+                dialog_timeout.force_close();
+                if let Ok(mut permit) = permit_timeout.lock() {
+                    permit.take();
+                }
+                glib::ControlFlow::Break
+            });
             if let Ok(mut timer) = timer.lock() {
                 *timer = Some(source);
             }

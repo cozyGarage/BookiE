@@ -1,4 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "support/disconnection.rs"]
+mod disconnection;
 #[path = "support/hostile_scram.rs"]
 mod hostile_scram;
 #[path = "../../shared/server_restart.rs"]
