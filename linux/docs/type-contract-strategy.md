@@ -362,6 +362,11 @@ change, with native type/JSON/wire checks and an untouched sibling
 The `timetz[]` case also preserves explicit offsets through an `America/New_York`
 to UTC transition and the JSON/CSV/XLSX/SQL consumer paths
 ([evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
+`timestamptz[]` also rebinds across an `America/Los_Angeles` to UTC session
+change, including the repeated DST-overlap wall-clock time with distinct `-04`
+and `-05` offsets. The test compares native type, JSON and wire output after
+rebinding, and confirms the wire bytes match the original session
+(`value_contract_timestamptz_array_rebinding_preserves_instants_after_timezone_change`).
 Other temporal-array session/consumer combinations remain open.
 
 PostgreSQL inferred enum-array binding now has direct evidence for the
@@ -636,6 +641,14 @@ SQL Server `datetimeoffset(7)` now has an XLSX consumer assertion alongside its
 native-byte, CSV, SQL-literal and keyed-grid contracts. The workbook stores
 positive/negative offsets and calendar-boundary values as exact text cells with
 no formulas ([evidence](evidence/mssql-datetimeoffset-xlsx-consumer-results-2026-10-05/manifest.json)).
+
+SQL Server `decimal(38,0)` and `decimal(38,30)` results outside
+`rust_decimal::Decimal` remain exact `Value::Text`; an in-range 28-digit value
+stays `Value::Decimal`, and SQL NULL stays distinct. Parameter rebinding and
+CSV import using the destination column metadata preserve both rows, checked
+against native decimal text and row equality in
+`sql_server_numeric_values_outside_rust_decimal_round_trip_as_exact_text`
+(`crates/drivers/mssql/tests/support/wide_numeric.rs`).
 
 PostgreSQL `date[]` result text stays canonical ISO when fetched under
 `DateStyle = SQL, DMY`; CSV export, parameter rebinding and SQL replay under
