@@ -38,7 +38,7 @@ scalar-parameter behavior at 63, 64 and deeper enum-domain levels; its Docker
 contract, unpiped preflight and all 11 required hosted checks passed. A focused
 17-variant MySQL `decode_by_type` audit on the current source caught all 16
 buildable mutants across native selectors; one was build-unviable. The invalid
-UTF-8 ENUM/SET byte fallback now has a regression. Merged topic branches have
+UTF-8 ENUM/SET byte fallback now has MySQL and MariaDB regressions. Merged topic branches have
 been deleted.
 
 B3 remains open after #449: continue the wider engine/type/consumer/configuration
