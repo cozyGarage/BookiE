@@ -245,6 +245,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::context_menu::tests::copying_a_previewed_cell_copies_the_full_value"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::context_menu::tests::copy_value_keeps_keyless_previews_pending_edits_and_drafts_whole"
     ],
     [

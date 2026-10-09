@@ -678,6 +678,20 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
+    fn copying_a_previewed_cell_copies_the_full_value() {
+        gtk::init().unwrap();
+        let full = "original".repeat(1_200);
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Text(full.clone())]);
+        row.preview_values_from_result();
+        let editor = crate::ui::cell_editor::CellEditor::new();
+        editor.set_text("preview text");
+        IS_NULL_SLOT.set(&editor, false);
+
+        assert_eq!(copy_value_text(editor.upcast_ref(), Some(&row), 0), full);
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
     fn copy_value_keeps_keyless_previews_pending_edits_and_drafts_whole() {
         gtk::init().unwrap();
         let original = "original".repeat(1_200);
