@@ -20,6 +20,21 @@ selector passed 18/18 locally on this tree; see the B4-11 row below and the
 The run does not establish optional/vendor engines, frozen-candidate, hosted,
 package-installed or native Wayland acceptance.
 
+## AUD-9 query-plan masking regression (2026-10-10)
+
+PR #456's fail-closed fallback treated plain `EXPLAIN SELECT` as an unknown
+projection and redacted the plan returned by the agent `explain_query` tool.
+The PostgreSQL release fixture reproduced this twice on the post-#456 source;
+the pre-#456 parent passed the same fixture. The fix keeps plan output masked
+for read-scoped agents and aligns the tool description and release test with
+that behavior, because a plan may contain server-generated predicates. The
+full policy suite passed 216 tests with 4 Docker-only tests ignored, and the
+PostgreSQL release fixture passed, including the plain-plan masking regression,
+`EXPLAIN ANALYZE` denial/table-preservation case and seven SSH/mTLS GTK
+scenarios. See the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
+This local result does not establish the Forgejo gate, hosted acceptance or
+frozen-candidate/installed acceptance.
+
 ## Retest indicators (from archived checkpoints)
 
 Keep these as “test again” signals until cleared on a current candidate SHA.
