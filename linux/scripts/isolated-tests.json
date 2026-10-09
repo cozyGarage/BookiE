@@ -133,7 +133,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::tests::value_contract_mongodb_browse_uses_one_find_for_schema_and_page"
+      "ui::browse_tab::tests::value_contract_mongodb_browse_uses_a_bounded_sample_and_page_find"
     ],
     [
       "tablepro-app",

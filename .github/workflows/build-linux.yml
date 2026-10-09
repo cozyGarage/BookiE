@@ -5,11 +5,15 @@ on:
     branches: [main, linux]
     paths:
       - "linux/**"
+      - "!linux/docs/**"
+      - "!**.md"
       - ".github/workflows/build-linux.yml"
   pull_request:
     branches: [main, linux]
     paths:
       - "linux/**"
+      - "!linux/docs/**"
+      - "!**.md"
       - ".github/workflows/build-linux.yml"
   schedule:
     - cron: "13 14 * * 1"
@@ -480,6 +484,11 @@ jobs:
         env:
           TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro
         run: python3 scripts/run-test-layer.py postgres-release
+
+      - name: MySQL human-approval dialog regression
+        env:
+          TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro
+        run: bash scripts/test-gtk-mysql-approval.sh
 
       - name: Upload validation evidence
         if: always()

@@ -123,9 +123,7 @@ async fn a_lost_mongodb_server_is_reported_as_disconnected() {
 async fn connection_loss_during_cursor_get_more_fails_the_whole_query() {
     use mongodb::bson::{Document, doc};
 
-    // MongoDB's failCommand failpoint closes only the getMore socket. The
-    // driver's preceding 50-document schema sample succeeds, then the query
-    // has already received its first batch before the next batch is lost.
+    // Skip the bounded sample's getMore, then close the query page's getMore.
     let container = Mongo::default()
         .with_tag(MONGO_TAG)
         .with_cmd(["mongod", "--setParameter", "enableTestCommands=1", "--bind_ip_all"])
@@ -154,7 +152,7 @@ async fn connection_loss_during_cursor_get_more_fails_the_whole_query() {
         .database("admin")
         .run_command(doc! {
             "configureFailPoint": "failCommand",
-            "mode": { "times": 1 },
+            "mode": { "skip": 1, "times": 1 },
             "data": { "failCommands": ["getMore"], "closeConnection": true }
         })
         .await
@@ -699,7 +697,7 @@ async fn negative_decimal128_csv_formula_marker_round_trips_as_native_decimal128
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn collection_scan_finds_mixed_values_beyond_sample_and_page() {
+async fn bounded_metadata_sample_merges_types_from_the_requested_page() {
     use mongodb::bson::{Decimal128, doc};
 
     let (_container, host, port) = start_mongo().await;
@@ -711,10 +709,10 @@ async fn collection_scan_finds_mixed_values_beyond_sample_and_page() {
         .collection::<mongodb::bson::Document>("late_mixed_values");
     let decimal_text = "12345678901234567890.1234567890123";
     let decimal = decimal_text.parse::<Decimal128>().unwrap();
-    let mut docs = (0..51)
+    let mut docs = (0..128)
         .map(|index| doc! { "_id": index, "value": decimal_text })
         .collect::<Vec<_>>();
-    docs.push(doc! { "_id": 51, "value": decimal });
+    docs.push(doc! { "_id": 128, "value": decimal });
     collection
         .insert_many(docs)
         .await
@@ -726,8 +724,8 @@ async fn collection_scan_finds_mixed_values_beyond_sample_and_page() {
     let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
     assert_eq!(page.rows.len(), 1);
     assert_eq!(page.rows[0][id_index], Value::Int(0));
-    assert_eq!(page.columns[value_index].data_type, "mixed");
-    assert_eq!(page.rows[0][value_index], Value::Json(serde_json::json!(decimal_text)));
+    assert_eq!(page.columns[value_index].data_type, "string");
+    assert_eq!(page.rows[0][value_index], Value::Text(decimal_text.into()));
 
     let query_page = connection
         .query("db.late_mixed_values.find({}).limit(1)")
@@ -738,13 +736,10 @@ async fn collection_scan_finds_mixed_values_beyond_sample_and_page() {
         .iter()
         .position(|column| column.name == "value")
         .unwrap();
-    assert_eq!(query_page.columns[query_value_index].data_type, "mixed");
-    assert_eq!(
-        query_page.rows[0][query_value_index],
-        Value::Json(serde_json::json!(decimal_text))
-    );
+    assert_eq!(query_page.columns[query_value_index].data_type, "string");
+    assert_eq!(query_page.rows[0][query_value_index], Value::Text(decimal_text.into()));
 
-    let late_page = connection.fetch_rows(None, "late_mixed_values", 51, 1).await.unwrap();
+    let late_page = connection.fetch_rows(None, "late_mixed_values", 128, 1).await.unwrap();
     let late_id_index = late_page
         .columns
         .iter()
@@ -755,7 +750,7 @@ async fn collection_scan_finds_mixed_values_beyond_sample_and_page() {
         .iter()
         .position(|column| column.name == "value")
         .unwrap();
-    assert_eq!(late_page.rows[0][late_id_index], Value::Int(51));
+    assert_eq!(late_page.rows[0][late_id_index], Value::Int(128));
     assert_eq!(late_page.columns[late_value_index].data_type, "mixed");
     assert_eq!(
         late_page.rows[0][late_value_index],
@@ -763,7 +758,7 @@ async fn collection_scan_finds_mixed_values_beyond_sample_and_page() {
     );
 
     let late_query = connection
-        .query("db.late_mixed_values.find({}).skip(51).limit(1)")
+        .query("db.late_mixed_values.find({}).skip(128).limit(1)")
         .await
         .unwrap();
     let late_query_value_index = late_query
@@ -777,11 +772,41 @@ async fn collection_scan_finds_mixed_values_beyond_sample_and_page() {
     );
 
     let persisted = collection
-        .find_one(doc! { "_id": 51 })
+        .find_one(doc! { "_id": 128 })
         .await
         .expect("read late native value")
         .expect("late collection document exists");
     assert_eq!(persisted.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn browse_pages_use_stable_id_order_and_zero_limit_returns_no_rows() {
+    use mongodb::bson::doc;
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("out_of_order")
+        .insert_many([
+            doc! { "_id": 3, "value": "third" },
+            doc! { "_id": 1, "value": "first" },
+            doc! { "_id": 2, "value": "second" },
+        ])
+        .await
+        .expect("seed out-of-order documents");
+
+    let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
+    let page = connection.fetch_rows(None, "out_of_order", 1, 1).await.unwrap();
+    let id_index = page.columns.iter().position(|column| column.name == "_id").unwrap();
+    assert_eq!(page.rows[0][id_index], Value::Int(2));
+    assert_eq!(page.rows[0], vec![Value::Int(2), Value::Text("second".into())]);
+
+    let empty = connection.fetch_rows(None, "out_of_order", 0, 0).await.unwrap();
+    assert!(empty.rows.is_empty());
 }
 
 fn excel_column_name(index: usize) -> String {

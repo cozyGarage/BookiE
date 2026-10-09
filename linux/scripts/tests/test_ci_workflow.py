@@ -50,7 +50,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision",
                 "value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity",
                 "value_contract_mongodb_off_page_type_change_during_census_refuses_edit",
-                "value_contract_mongodb_browse_uses_one_find_for_schema_and_page",
+                "value_contract_mongodb_browse_uses_a_bounded_sample_and_page_find",
                 "value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents",
                 "value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values",
                 "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
@@ -165,6 +165,13 @@ class CiWorkflowTests(unittest.TestCase):
             "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
             commands[1],
         )
+
+    def test_mysql_approval_dialog_runs_in_hosted_installed_gtk_acceptance(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  duckdb:\n", 1)[0]
+        self.assertIn("Build staged release GTK binary", acceptance)
+        self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", acceptance)
+        self.assertIn("bash scripts/test-gtk-mysql-approval.sh", acceptance)
 
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

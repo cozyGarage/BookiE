@@ -3,10 +3,10 @@ name: Linux Security
 on:
   push:
     branches: [linux, main]
-    paths: ["linux/**", ".github/workflows/linux-security.yml"]
+    paths: ["linux/**", ".github/workflows/linux-security.yml", "!linux/docs/**", "!**.md"]
   pull_request:
     branches: [linux, main]
-    paths: ["linux/**", ".github/workflows/linux-security.yml"]
+    paths: ["linux/**", ".github/workflows/linux-security.yml", "!linux/docs/**", "!**.md"]
   schedule:
     - cron: "29 5 * * *"
   workflow_dispatch:

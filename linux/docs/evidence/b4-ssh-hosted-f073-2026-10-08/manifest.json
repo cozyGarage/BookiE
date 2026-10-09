@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "branch": "fork/linux",
+  "source_commit": "f073844461d11291b7eb9ae094e175bdd5a6ea7a",
+  "test_commit": "f073844461d11291b7eb9ae094e175bdd5a6ea7a",
+  "scope": [
+    "B4-7 SSH terminal audit outcomes for setup failure and host-key refusal",
+    "B4-16 SSH tunnel-loss stale-session retirement and reconnect",
+    "B4-17 SSH multi-hop trust and decline flows"
+  ],
+  "hosted": {
+    "workflow": "Build Linux",
+    "run_id": 37854177911,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37854177911",
+    "run_status_at_capture": "in_progress",
+    "job": "PostgreSQL release fixture (docker)",
+    "job_id": 113578648625,
+    "job_status": "completed",
+    "job_conclusion": "success",
+    "artifact": "regression-postgres-release-37854177911-1",
+    "layer_report": "postgres-release-1/report.json",
+    "command": "bash scripts/test-postgres-release.sh",
+    "exit_code": 0,
+    "duration_seconds": 348.463,
+    "gtk_ssh_scenarios": [
+      "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+      "postgres_ssh_setup_failure_is_durably_audited",
+      "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+      "postgres_ssh_multihop_trusts_both_hops_and_queries",
+      "postgres_ssh_second_hop_decline_does_not_learn_key",
+      "postgres_ssh_changed_second_hop_key_is_refused",
+      "postgres_saved_mtls_connection_authenticates_and_queries"
+    ]
+  },
+  "not_established": [
+    "Hosted execution of PR #411's accessible Cancel test input",
+    "Frozen-candidate or installed distribution-package qualification",
+    "Native Wayland trust acceptance"
+  ],
+  "summary": "focused.txt"
+}
