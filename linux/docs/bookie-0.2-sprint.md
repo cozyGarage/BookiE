@@ -12,9 +12,11 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 - B3 [B3]: the broader type, consumer and configuration matrix, PERF-10 memory
   reduction (the preview is display-only; full values are still held), PERF-3
   MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
-  TEST-29's fast and durable test-container paths are in PR #457; focused
-  MySQL/MariaDB rollback tests and local preflight pass. The exact-head hosted
-  gate is pending.
+  TEST-29's fast and durable test-container paths are in PR #457. The focused
+  same-session MySQL/MariaDB tests and local preflight pass. Local commit
+  `559ba69` restores the duplicate-key failure scenario; it is not pushed yet.
+  Forgejo run 99 is still draining on the older published head `ab4b273`; its
+  MongoDB authentication and PostgreSQL query-plan jobs failed.
 - B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
   remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
   (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
@@ -62,12 +64,16 @@ Merged topic branches have been deleted.
 For TEST-29, the local full PostgreSQL integration binary passed 234/234 in
 133.16 seconds and the MySQL/MariaDB binary passed 90/90 in 55.50 seconds.
 SQL Server's DDL batch, durable lost-ack and restart tests, and fast-fixture wide
-numeric test passed. PR #457 is open at `8ad09c2f8` with the latest `origin/linux`
-merged; its focused MySQL/MariaDB same-session rollback tests pass 4/4 and
-unpiped preflight passes. GitHub checks are still running. Forgejo run 96 was
-for the older `dc8779b` head and failed the PostgreSQL release-plan test because
-the fail-closed policy masks its wildcard projection; run 97 was canceled as a
-duplicate. The exact PR head still needs its serialized gate.
+numeric test passed. PR #457 is open on GitHub at published head `ab4b273`, with
+the latest `origin/linux` merged. All GitHub checks for that head passed. The
+same-session MySQL/MariaDB checks pass 4/4, and local unpiped preflight passes.
+Forgejo run 99 is still running on `ab4b273`: `driver (mongodb)` failed because
+the bad-credentials test got `ConnectionRefused` before authentication, and
+`pg-release` failed because policy redacted the wildcard query plan. Postgres
+e2e and both distro-floor jobs are still running. Local commit `559ba69` keeps
+the duplicate-key failure cases in the dedicated sessions; it is not pushed
+while the UX gate is active, and needs its own serialized gate afterward. Run
+97 was canceled as a duplicate.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
