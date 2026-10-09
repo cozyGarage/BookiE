@@ -90,6 +90,9 @@ mod quoted_enum_identifier_contract;
 #[path = "support/domain_contract.rs"]
 mod domain_contract;
 
+#[path = "support/deep_enum_array_operator_parameters.rs"]
+mod deep_enum_array_operator_parameters;
+
 #[path = "support/domain_array_file_export_contract.rs"]
 mod domain_array_file_export_contract;
 

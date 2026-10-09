@@ -1055,6 +1055,9 @@ match explicit native type, result and wire-byte controls; invalid enum labels
 retain SQLSTATE 22P02 and stored values remain unchanged. At 64 layers, all
 three parameter forms refuse with the resolvable-depth error and stored values
 remain unchanged ([test](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_enum_array_parameters.rs)).
+Array containment and overlap parameters now have the same 63/64 boundary under
+a shadowed `search_path`: supported parameters match native type and wire-byte
+controls, while 64-layer parameters refuse ([test](../crates/drivers/postgres/tests/support/deep_enum_array_operator_parameters.rs)).
 Other direct query-parameter contexts and session configurations remain open.
 Selected schema-aware result, edit, insert and filter paths pass through 4,096
 domain layers; raw inferred text/NULL contexts have explicit limits. Deep
