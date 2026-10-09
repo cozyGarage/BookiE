@@ -2,14 +2,15 @@
   "schema_version": 1,
   "date": "2026-10-09",
   "scope": "B4-11 MySQL and MariaDB advisory-lock side effects after failed DML batch rollback",
-  "source_commit": "b03fbce67c1fadaa9d80b007883b759d52a870b0",
+  "source_commit": "770fbe35e32db618e3d79d7c459003058cc916c5",
   "source_sha256": {
-    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "34def5ff8dadad551e6860f0d1640076398cc8bb0a3806badece200e0943fff8"
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "2db5e2c451aff1d75d644f12e919961adcbcd9181a6f7366d03495d8f2d62937",
+    "crates/drivers/mysql/tests/shared/mysql_atomic_parts/advisory_lock.rs": "1709621fa0836cd7fc975bfc394d39543c23e798704d28a16bc0087995b7851a"
   },
   "test": "mysql_atomic",
   "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
   "runtime": "Local Linux host with Docker MySQL and MariaDB fixtures",
-  "result": "18 passed; 0 failed; 0 ignored; 68 filtered out; 171.42 seconds; script exit code 0",
+  "result": "18 passed; 0 failed; 0 ignored; 68 filtered out; 174.61 seconds; script exit code 0",
   "new_assertions": [
     "GET_LOCK acquired inside a DML batch remains held after a later duplicate-key failure rolls back the InnoDB insert",
     "The lock remains held on both MySQL and MariaDB until the owning connection pool closes",
@@ -21,6 +22,6 @@
     "Frozen-candidate and hosted acceptance"
   ],
   "log_sha256": {
-    "run.log": "2016f2dc66c0f34f184c6cf39aba326b100a2b01e08d1475608755eb43187398"
+    "run.log": "2cf19a5109c3f074962133bf3e88d8dff4203f35210377c6a6c352315cbb9e56"
   }
 }
