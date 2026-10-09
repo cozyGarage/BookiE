@@ -25,14 +25,14 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 ## Current continuation: 2026-10-09
 
 The merged `linux` baseline is `762c4b1a8efd17aaba508eb5cb57904a62d7f41b`
-(PR #441). PR #442 is also merged. B3 PR #443 is open at
-`38d10ecf302b54108ec47ae7143d2d4d8db3d13e`, based on that `linux` tip, for
-SQL Server `decimal(38,38)` preservation and refusal of lossy `sql_variant`
-values. Its full MSSQL local run passed 77 tests and unpiped local preflight
-passed. At the time of this update, workflow lint, harness, resolve-ref,
-SonarCloud and supply-chain checks passed; the Flatpak default/development and
-security-policy checks were still running. Wait for all required hosted checks
-before merging.
+(PR #441). PR #442 is also merged. B3 PR #443 contains SQL Server
+`decimal(38,38)` preservation and refusal of lossy `sql_variant` values. Its
+code head `38d10ecf302b54108ec47ae7143d2d4d8db3d13e` passed 77 MSSQL tests and
+unpiped local preflight. Workflow lint, harness, resolve-ref, SonarCloud and
+supply-chain checks passed on that code head; Flatpak default/development and
+security-policy checks were still running at the last poll. This status update
+is docs-only commit `030d55f00d1511714cd107459f4bacb9f35145a0`; its hosted gates
+restarted, so wait for checks on the latest head before merging.
 
 B3 remains open after #443: continue the wider engine/type/consumer/configuration
 matrix and mutation triage, then complete installed grid acceptance. B4 and B7
