@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import ctypes
 import csv
+import hashlib
 import json
 import os
 import shutil
 import signal
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -38,6 +40,7 @@ POSTGRES_SSH_AUDIT_CONNECTION_NAME = "PostgreSQL SSH audit refusal"
 POSTGRES_SSH_AUDIT_CONNECTION_ID = "1c971938-9732-433e-a9bf-ae64e94794da"
 POSTGRES_SSH_SETUP_FAILURE_CONNECTION_NAME = "PostgreSQL SSH setup failure"
 POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID = "ee8f8451-05cf-4c21-8c7f-f37c8c96e251"
+MCP_DISCONNECT_TEST_TOKEN = "bookie-gtk-mcp-disconnect-test-token"
 WAIT_SECONDS = float(os.environ.get("TABLEPRO_GTK_WAIT_SECONDS", "15"))
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
@@ -574,7 +577,7 @@ def database_tables(path):
         }
 
 
-def write_fixture(base, audit_available=True, environment="prod"):
+def write_fixture(base, audit_available=True, environment="prod", mcp_token=False):
     home = base / "home"
     config = base / "config"
     data = base / "data"
@@ -601,6 +604,28 @@ def write_fixture(base, audit_available=True, environment="prod"):
 
     tablepro_config = config / storage_dir_name()
     tablepro_config.mkdir(parents=True)
+    if mcp_token:
+        token_config = config / "tablepro"
+        token_config.mkdir(parents=True, exist_ok=True)
+        token_path = token_config / "mcp-tokens.json"
+        token_path.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "c001e8dc-42d0-46eb-9b3c-b34d96d27ec9",
+                        "name": "GTK disconnect acceptance",
+                        "token_hash": hashlib.sha256(MCP_DISCONNECT_TEST_TOKEN.encode("utf-8")).hexdigest(),
+                        "permissions": "read_write",
+                        "connection_allowlist": ["d4f5e246-c40a-4a30-90f2-39e93e94d920"],
+                        "created_at": "2026-10-09T00:00:00Z",
+                        "expires_at": None,
+                        "revoked": False,
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        token_path.chmod(0o600)
     connections = {
         "version": 1,
         "connections": [
@@ -942,6 +967,7 @@ def run_scenario(binary, scenario):
             base,
             audit_available=getattr(scenario, "audit_available", True),
             environment=getattr(scenario, "environment", "prod"),
+            mcp_token=getattr(scenario, "mcp_token", False),
         )
         process = start_application(binary, environment)
         if getattr(scenario, "requires_editor", True):
@@ -1000,6 +1026,87 @@ def dismissed_approval_denies(database, _base):
     press_x11_key("Escape")
     wait_for_node(name="Approve once", present=False)
     assert_database_count_stable(database, 0)
+
+
+def mcp_client_disconnect_cancels_pending_approval(database, base):
+    journal = base / "data" / storage_dir_name() / "audit.jsonl"
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline and not journal.is_file():
+        time.sleep(POLL_SECONDS)
+    assert journal.is_file(), "the approval test requires an available audit journal"
+    initial_records = [
+        json.loads(line)["event"] for line in journal.read_text(encoding="utf-8").splitlines()
+    ]
+    initial_operation_ids = {event["operation_id"] for event in initial_records}
+
+    body = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "execute_write",
+                "arguments": {
+                    "connection_id": "d4f5e246-c40a-4a30-90f2-39e93e94d920",
+                    "sql": "INSERT INTO safety_items(id) VALUES (99)",
+                    "preview": False,
+                    "token": MCP_DISCONNECT_TEST_TOKEN,
+                },
+            },
+        }
+    ).encode("utf-8")
+    deadline = time.monotonic() + WAIT_SECONDS
+    client = None
+    while time.monotonic() < deadline:
+        try:
+            client = socket.create_connection(("127.0.0.1", 17432), timeout=2)
+            break
+        except OSError:
+            time.sleep(POLL_SECONDS)
+    assert client is not None, "the installed app's MCP HTTP listener did not start"
+    try:
+        request = (
+            b"POST /mcp HTTP/1.1\r\n"
+            b"Host: 127.0.0.1:17432\r\n"
+            b"Content-Type: application/json\r\n"
+            + f"Content-Length: {len(body)}\r\n".encode("ascii")
+            + b"Connection: keep-alive\r\n\r\n"
+            + body
+        )
+        client.sendall(request)
+        wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON)
+        wait_for_node_containing("INSERT INTO safety_items(id) VALUES (99)")
+    finally:
+        client.close()
+
+    wait_for_node(name="Approve once", present=False)
+    assert_database_count_stable(database, 0)
+
+    deadline = time.monotonic() + WAIT_SECONDS
+    new_events = []
+    while time.monotonic() < deadline:
+        records = [json.loads(line)["event"] for line in journal.read_text(encoding="utf-8").splitlines()]
+        new_events = [
+            event
+            for event in records
+            if event["operation_id"] not in initial_operation_ids
+            and event.get("principal", {}).get("kind") == "agent"
+        ]
+        if len(new_events) == 1 and new_events[0].get("phase") == "outcome":
+            break
+        time.sleep(POLL_SECONDS)
+
+    assert len(new_events) == 1, f"expected one terminal audit event for the cancelled approval, got {new_events!r}"
+    outcome = new_events[0]
+    assert outcome["phase"] == "outcome"
+    assert outcome["terminal_status"] == "cancelled", outcome
+    assert outcome["approval_outcome"] == "denied", outcome
+    assert outcome["error_category"] == "cancelled", outcome
+    assert MCP_DISCONNECT_TEST_TOKEN not in json.dumps(new_events), "the audit must not contain the MCP token"
+
+
+mcp_client_disconnect_cancels_pending_approval.mcp_token = True
+mcp_client_disconnect_cancels_pending_approval.environment = "dev"
 
 
 def malformed_sql_is_blocked_before_approval(database, _base):
@@ -2008,6 +2115,7 @@ def main():
         malformed_sql_is_blocked_before_approval,
         unparseable_routine_requests_human_approval,
         dismissed_approval_denies,
+        mcp_client_disconnect_cancels_pending_approval,
         approve_once_prompts_again,
         audit_failure_denies,
         audit_journal_loss_after_connection_denies_mutation,
