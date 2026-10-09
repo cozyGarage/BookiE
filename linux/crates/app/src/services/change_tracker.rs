@@ -301,33 +301,6 @@ impl TabChangeTracker {
     /// `prev_value` needed to restore the RowObject's cell, and the
     /// caller would otherwise have to peek `self.redo.back()` after
     /// the call — fragile and bypasses the encapsulation.
-    /// Point the pending edit of a cell at `target`, keeping the value
-    /// the database holds as its guard. That value is the existing edit's
-    /// `prev_value`; with no edit yet, `untouched` is the cell's stored value
-    /// (a redo supplies it, an undo has none because no edit means unchanged).
-    fn set_pending_edit(&mut self, row_key: &RowKey, col: usize, untouched: Option<&Value>, target: &Value) {
-        let key = (row_key.clone(), col);
-        let stored = self
-            .updates
-            .get(&key)
-            .map(|edit| edit.prev_value.clone())
-            .or_else(|| untouched.cloned());
-        match stored {
-            Some(stored) if KeyValue::from(&stored) != KeyValue::from(target) => {
-                self.updates.insert(
-                    key,
-                    CellEdit {
-                        prev_value: stored,
-                        new_value: target.clone(),
-                    },
-                );
-            }
-            _ => {
-                self.updates.remove(&key);
-            }
-        }
-    }
-
     pub fn undo(&mut self) -> Option<UndoOp> {
         let op = self.undo.pop_back()?;
         let row_key = match &op {
@@ -360,6 +333,29 @@ impl TabChangeTracker {
         self.redo.push_back(op.clone());
         self.emit_changed(vec![row_key]);
         Some(op)
+    }
+
+    fn set_pending_edit(&mut self, row_key: &RowKey, col: usize, untouched: Option<&Value>, target: &Value) {
+        let key = (row_key.clone(), col);
+        let stored = self
+            .updates
+            .get(&key)
+            .map(|edit| edit.prev_value.clone())
+            .or_else(|| untouched.cloned());
+        match stored {
+            Some(stored) if KeyValue::from(&stored) != KeyValue::from(target) => {
+                self.updates.insert(
+                    key,
+                    CellEdit {
+                        prev_value: stored,
+                        new_value: target.clone(),
+                    },
+                );
+            }
+            _ => {
+                self.updates.remove(&key);
+            }
+        }
     }
 
     /// Pop one entry off the redo stack, re-apply the tracker's
