@@ -19,17 +19,18 @@ Rules:
   acceptance.
 
 Reconciled against BookiE `fork/linux` tip
-`e697824f92438ea641b0e3b98cdf7d11173ce25a` (PR #403), checked 2026-10-09.
-This refresh includes the AUD-2/AUD-4 fixes in PR #402, B4-12's scoped
-frozen-source rollback result, and current hosted evidence. On `e697824`, Linux
-Security #37849452452 passed, Build Linux #37849452394 is pending, and Flatpak
-#37849452274 is in progress; no completed current-tip Linux CI contracts run was
-visible at this check. PR #408's Build Linux and Flatpak checks are in progress
-while its security and CI-contract checks have passed; its PR-event B4 Docker
-rollback job was skipped.
-Hosted success does not replace the frozen-candidate, installed, or native
-Wayland gates that remain open in the B4 board. Older audits remain historical;
-this ledger and the [active sprint](bookie-0.2-sprint.md) own current status.
+`c437675c90e88a869f74569fcf0bc65d66db3e93` (PR #422), checked 2026-10-09
+02:10 UTC. PRs #419–#422 are merged. For PR #421, hosted preflight, security,
+SonarCloud and the development Flatpak passed; focused B3 tests passed within
+the still-running GTK checks, while default Flatpak remained in progress. Hosted
+driver integration was skipped; its focused PostgreSQL test and full local
+preflight passed. For PR #422, security, supply-chain and SonarCloud passed;
+hosted preflight and both Flatpak builds were still running. Its focused
+PostgreSQL test and full local preflight passed. This is a timestamped CI
+snapshot, not a release qualification. Hosted success does not replace the
+frozen-candidate, installed, or native Wayland gates that remain open in the B4
+board. Older audits remain historical; this ledger and the
+[active sprint](bookie-0.2-sprint.md) own current status.
 ## Owners and handoff
 
 Every open row has one owner. `scripts/check-known-issues.py` fails when an
