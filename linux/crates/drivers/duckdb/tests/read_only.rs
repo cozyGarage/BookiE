@@ -218,3 +218,16 @@ async fn a_read_only_duckdb_database_disables_external_access_and_mutations() {
     );
     assert!(reader.execute("SET enable_external_access = true").await.is_err());
 }
+
+#[tokio::test]
+async fn a_read_only_in_memory_duckdb_connection_is_refused() {
+    let connection = DuckdbDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            read_only: true,
+            ..ConnectOptions::default()
+        })
+        .await;
+
+    assert!(connection.is_err());
+}

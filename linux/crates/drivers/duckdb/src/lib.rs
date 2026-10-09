@@ -71,10 +71,9 @@ fn open_path_with_access(path: &str, read_only: bool) -> Result<(DuckConnection,
         return open_path(path).map(|conn| (conn, None));
     }
     if path.is_empty() || path == ":memory:" {
-        let conn = DuckConnection::open_in_memory().map_err(map_duck_error)?;
-        conn.execute_batch("SET enable_external_access = false; SET lock_configuration = true;")
-            .map_err(map_duck_error)?;
-        return Ok((conn, None));
+        return Err(DriverError::Unsupported(
+            "read-only DuckDB requires a database file or a selected flat file".into(),
+        ));
     }
     if let Some(reader_fn) = flat_file_reader_fn(path) {
         let (conn, file) = open_read_only_flat_file(path, reader_fn)?;
