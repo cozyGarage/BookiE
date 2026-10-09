@@ -735,6 +735,9 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
     if levels >= 1024 {
         assert_deep_enum_array_parameter_contract(connection.as_ref(), &schema, &base_type, levels).await;
     }
+    if levels >= 64 {
+        assert_deep_enum_expression_parameters(connection.as_ref(), &schema, levels).await;
+    }
 
     let columns = connection.fetch_columns(Some(&schema), "rows").await.unwrap();
     assert_eq!(
@@ -1080,7 +1083,7 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
          pg_typeof(ARRAY[status, NULL]::{domain_array})::text \
          FROM {schema}.rows WHERE id = 1"
     );
-    if levels < 1024 {
+    if levels <= 1024 {
         let projected = connection
             .query(&sql)
             .await
@@ -1090,20 +1093,19 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
             projected.rows,
             vec![vec![
                 Value::Text("{\"ready\",NULL}".into()),
-                Value::Text(domain_array),
+                Value::Text(domain_array.clone()),
             ]]
         );
-        return;
+    } else {
+        let error = connection
+            .query(&sql)
+            .await
+            .expect_err(&format!("{levels}-layer enum array decoding must refuse explicitly"));
+        assert!(
+            matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
+            "unexpected {levels}-layer array outcome: {error:?}"
+        );
     }
-
-    let error = connection
-        .query(&sql)
-        .await
-        .expect_err(&format!("{levels}-layer enum array decoding must refuse explicitly"));
-    assert!(
-        matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
-        "unexpected {levels}-layer array outcome: {error:?}"
-    );
     let oracle = connection
         .query(&format!(
             "SELECT stored::text, expected::text, encode(array_send(stored), 'hex'), \

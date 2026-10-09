@@ -26,6 +26,8 @@ include!("domain_contract_parts/array_equality.rs");
 
 include!("domain_contract_parts/deep_domains.rs");
 
+include!("domain_contract_parts/deep_enum_expression_contract.rs");
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_filters_preserve_values_and_type() {
