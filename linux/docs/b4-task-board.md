@@ -61,12 +61,29 @@ or installed acceptance; those gates remain open.
 
 ## Current merged-tip B4 checkpoint (2026-10-09)
 
-`fork/linux` is `c2f3f78b954ef0c7cb7d8956f035aa08edc71c7f` after PR #458.
-That PR computes internal `Effects` alongside the legacy facts and leaves the
-S6–S8 verdict behavior unchanged. The current-tip MySQL rollback rerun passed
-18/18 selectors locally; see the B4-11 row below. This updates source and local
-evidence only; it does not establish frozen-candidate, hosted, package-installed
-or native Wayland acceptance.
+`fork/linux` is `ca1080a55c9a47fb0d241d92395820864836491f`; the latest product
+source remains `c2f3f78b954ef0c7cb7d8956f035aa08edc71c7f` after PR #458, followed
+by documentation-only TEST-28 ledger updates. PR #458 computes internal
+`Effects` alongside the legacy facts and leaves the S6–S8 verdict behavior
+unchanged. The current-tip MySQL rollback rerun passed 18/18 selectors locally;
+see the B4-11 row below. This updates source and local evidence only; it does
+not establish frozen-candidate, hosted, package-installed or native Wayland
+acceptance.
+
+## AUD-9 query-plan masking regression (2026-10-10)
+
+PR #456's fail-closed fallback treated plain `EXPLAIN SELECT` as an unknown
+projection and redacted the plan returned by the agent `explain_query` tool.
+The PostgreSQL release fixture reproduced this twice on the post-#456 source;
+the pre-#456 parent passed the same full fixture. The fix allows output only
+for one plain, non-`ANALYZE` `EXPLAIN` whose inner statement is a query.
+`EXPLAIN ANALYZE`, plans for non-query statements and all other unknown shapes
+remain redacted. The full policy suite passed 216 tests with 4 Docker-only tests
+ignored, and the PostgreSQL release fixture passed, including the query-plan
+MCP regression and seven SSH/mTLS GTK scenarios. See the
+[AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
+This local result does not establish the Forgejo gate, hosted acceptance or
+frozen-candidate/installed acceptance.
 
 ## Previous merged-tip B4 checkpoint (2026-10-09; source `97e5f55`)
 
