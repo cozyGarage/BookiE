@@ -23,4 +23,3 @@ test mysql_atomic::mysql_transaction_queries_are_bounded_and_mark_truncation ...
 test mysql_atomic::mysql_transaction_queries_obey_result_byte_budget_and_remain_usable ... ok
 
 test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 190.79s
-

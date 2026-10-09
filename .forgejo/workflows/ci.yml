@@ -132,6 +132,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
+      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
     strategy:
       fail-fast: false
       matrix:
@@ -147,7 +148,14 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Driver integration
         run: |
-          cd src/linux && cargo test --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
+          cd src/linux
+          cleanup_testcontainers() {
+            python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
+          }
+          trap cleanup_testcontainers EXIT
+          trap 'cleanup_testcontainers; exit 143' TERM
+          trap 'cleanup_testcontainers; exit 130' INT
+          cargo test --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
 
   consumers:
     runs-on: debian-host
