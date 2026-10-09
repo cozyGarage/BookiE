@@ -251,14 +251,12 @@ B3-hot files or core contracts and is scheduled with that owner.
 
 ### Arch runner VM (done)
 
-`bookie-ci` is VMID 260 on `pmox-lab03`: Arch Linux, 10 vCPU, 28 GB RAM, 300 GB
-disk, on `labnet`. It has the GTK 4.22 / libadwaita 1.9 / GtkSourceView 5.20
-stack that Debian 13 lacks, Rust 1.98 and stable, Docker, Xvfb, a D-Bus
-session and Weston. A full debug build takes about two minutes. The lab
-repository holds `scripts/provision-bookie-ci.sh` and
-`scripts/bookie-ci-run.sh <checkout> '<command>'`, which pushes a checkout's
-HEAD and runs the command there with a shared target cache. `ai-lab01` on
-`pmox-lab01` was left alone: that node crashed under sustained full-core load.
+A lab Arch Linux VM (10 vCPU, 28 GB RAM, 300 GB disk) has the GTK 4.22 /
+libadwaita 1.9 / GtkSourceView 5.20 stack that Debian 13 lacks, Rust 1.98 and
+stable, Docker, Xvfb, a D-Bus session and Weston. A full debug build takes about
+two minutes. The lab repository holds a provisioning script and a run script
+that pushes a checkout's HEAD and runs a command there with a shared target
+cache. One lab node was left alone: it crashed under sustained full-core load.
 
 ### Open items
 

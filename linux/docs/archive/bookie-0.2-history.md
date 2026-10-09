@@ -449,7 +449,7 @@ ID from the tables above, with its file scope and dependencies. Luna's returned
 changes need review for cross-consumer and security effects before marking done.
 
 ```text
-Worktree: /home/trung/Projects/tablepro; working branch: linux.
+Working branch: linux.
 Read CLAUDE.md, PLAN.md, docs/bookie-0.2-sprint.md and docs/validation-playbook.md
 (paths under linux/ for docs). Follow the RTK instruction for shell commands.
 Confirm current full HEAD and git status; reviewed baseline was
