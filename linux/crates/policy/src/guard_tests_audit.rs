@@ -1,5 +1,17 @@
 use super::*;
 
+struct WaitingApproval {
+    started: Arc<Notify>,
+}
+
+#[async_trait]
+impl ApprovalSink for WaitingApproval {
+    async fn request(&self, _request: ApprovalRequest) -> ApprovalOutcome {
+        self.started.notify_one();
+        std::future::pending().await
+    }
+}
+
 fn gui_guard(connection: Arc<dyn Connection>, audit: Arc<SequenceAuditSink>, state: Arc<AuditState>) -> PolicyGuard {
     PolicyGuard::new(
         connection,
@@ -87,6 +99,54 @@ async fn post_execution_audit_failure_poisons_shared_state() {
     assert!(first.to_string().contains("operation may have succeeded"));
     assert!(second.to_string().contains("governed writes are disabled"));
     assert_eq!(executes.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn cancelling_a_pending_approval_records_a_terminal_cancelled_outcome() {
+    let started = Arc::new(Notify::new());
+    let executions = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(executions.clone(), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(WaitingApproval {
+                started: started.clone(),
+            }),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    let control = OperationControl::new(cancellation.clone(), None);
+    let operation = tokio::spawn(async move {
+        guard
+            .execute_controlled("CREATE PROCEDURE disconnected() SELECT 1", &control)
+            .await
+    });
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), started.notified())
+        .await
+        .expect("approval request should start");
+    cancellation.cancel();
+
+    assert!(matches!(
+        operation.await.expect("guarded operation should finish"),
+        Err(DriverError::Cancelled)
+    ));
+    assert_eq!(
+        executions.load(Ordering::SeqCst),
+        0,
+        "cancelled approval must not execute SQL"
+    );
+    let events = audit.events.lock().expect("audit events");
+    assert_eq!(events.len(), 1, "cancellation must have exactly one terminal event");
+    assert_eq!(events[0].phase, AuditRecordPhase::Outcome);
+    assert_eq!(events[0].terminal_status, AuditTerminalStatus::Cancelled);
+    assert_eq!(events[0].approval_outcome, AuditApprovalOutcome::Denied);
+    assert_eq!(events[0].error_category, Some(AuditErrorCategory::Cancelled));
 }
 
 #[tokio::test]

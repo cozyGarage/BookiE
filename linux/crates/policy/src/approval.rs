@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::classify::StatementFacts;
 use crate::principal::Principal;
 use tablepro_core::Environment;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApprovalRequest {
@@ -18,6 +19,9 @@ pub struct ApprovalRequest {
     pub reason: String,
     pub preview: Option<String>,
     pub estimated_rows: Option<u64>,
+    /// Runtime-only cancellation scope for interactive approval UI.
+    #[serde(skip)]
+    pub cancellation: Option<CancellationToken>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

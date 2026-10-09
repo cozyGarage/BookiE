@@ -27,6 +27,14 @@ pub trait ConnectionProvider: Send + Sync {
 const MAX_IDENTIFIER_BYTES: usize = 256;
 const PREVIEW_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 
+tokio::task_local! {
+    static REQUEST_CANCELLATION: CancellationToken;
+}
+
+pub(crate) async fn scope_request_cancellation<F: Future>(cancellation: CancellationToken, future: F) -> F::Output {
+    REQUEST_CANCELLATION.scope(cancellation, future).await
+}
+
 pub struct McpBridge {
     provider: Arc<dyn ConnectionProvider>,
     tokens: Arc<TokenStore>,
@@ -103,8 +111,15 @@ impl McpBridge {
         self.shutdown.cancel();
     }
 
+    pub(crate) fn request_cancellation(&self) -> CancellationToken {
+        self.shutdown.child_token()
+    }
+
     fn operation_control(&self) -> OperationControl {
-        operation_control(self.shutdown.child_token(), self.query_timeout_secs)
+        let cancellation = REQUEST_CANCELLATION
+            .try_with(Clone::clone)
+            .unwrap_or_else(|_| self.shutdown.clone());
+        operation_control(cancellation.child_token(), self.query_timeout_secs)
     }
 
     pub fn tokens(&self) -> &TokenStore {
