@@ -141,6 +141,14 @@ The exact driver list and supplementary targets are owned by
 drivers, MCP BSON, policy PostgreSQL sessions, Unix sockets and SSH. Reuse that
 script rather than a copied list that can omit newly registered targets.
 
+The Forgejo driver matrix sets `TABLEPRO_TEST_RUN_ID` and runs each complete
+integration binary serially. PostgreSQL and MySQL then reuse one primary server
+per binary and recreate the `test` database before each test; filtered and exact
+selectors start their own server. MySQL's MariaDB-specific cases still start
+separate MariaDB containers, and deliberate restart tests start their own
+server. So a full-suite runtime estimate should count those cases rather than
+multiply every test by a MySQL or PostgreSQL startup.
+
 These tests require Docker or a compatible Podman API socket. Keep each container handle alive for the full test because dropping it stops the container.
 
 PostgreSQL integration coverage includes controlled cancellation and timeout against a real server. The tests confirm the query appears in `pg_stat_activity`, trigger cancellation or a deadline, confirm the query leaves server activity, and verify that the pool remains usable. Transaction cancellation is followed by rollback and a data check.
