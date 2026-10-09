@@ -48,8 +48,9 @@ published at `f29743c`; Forgejo run 88 failed on that pre-#452 tip. The
 PostgreSQL failure was a disconnect regression checking for its tagged backend
 before it was visible in `pg_stat_activity`. Commit `b98ce22`
 reuses bounded polling in the affected backend-termination tests; the local
-PostgreSQL disconnection module passed 10/10 tests and unpiped preflight passed
-on the current head. Ubuntu and Debian also failed GTK safety waits for
+PostgreSQL disconnection module passed 10/10 tests, its full serialized
+integration suite passed 234/234 in 120.91 s with one server, and unpiped
+preflight passed on the current head. Ubuntu and Debian also failed GTK safety waits for
 `open_editor` and `audit_failure_denies`; their cause remains unclassified and
 needs separate UI follow-up. The updated local head still needs its own gate;
 run 88 does not cover the fix or the #452 merge.
