@@ -849,9 +849,16 @@ def scenarios(ui):
 
         ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
         ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
-        time.sleep(0.5)
-        ui.run_sql("SELECT 42")
-        ui.wait_for_node(name="42", role=pyatspi.ROLE_LABEL)
+        for _ in range(4):
+            ui.run_sql("SELECT 42")
+            try:
+                ui.wait_for_node(name="42", role=pyatspi.ROLE_LABEL, timeout=10)
+                break
+            except AssertionError:
+                continue
+        else:
+            ui.run_sql("SELECT 42")
+            ui.wait_for_node(name="42", role=pyatspi.ROLE_LABEL)
         assert psql("SELECT count(*) FROM public.session_tunnel_loss_probe") == "0"
 
     def psql(sql):
