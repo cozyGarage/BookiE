@@ -64,6 +64,22 @@ pub(super) async fn assert_contract(connection: &dyn Connection) {
     copy_bound_rows(connection, "numeric_bound", &source.rows).await;
     create_copy_table(connection, "numeric_csv").await;
     let columns = connection.fetch_columns(None, "numeric_csv").await.unwrap();
+    let source_columns = connection.fetch_columns(None, "numeric_source").await.unwrap();
+    assert_eq!(
+        source_columns
+            .iter()
+            .map(|column| (column.name.as_str(), column.data_type.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            ("id", "int"),
+            ("wide", "decimal(38,0)"),
+            ("high_scale", "decimal(38,30)"),
+            ("fitting", "decimal(28,4)"),
+            ("nullable", "decimal(38,0)"),
+            ("scale_boundary", "decimal(38,28)"),
+        ],
+        "SQL Server catalog metadata must retain decimal precision and scale"
+    );
     let csv_rows = csv_round_trip(&source, &columns);
     insert_bound_rows(connection, "numeric_csv", &csv_rows).await;
     assert_native_text(connection, "numeric_csv").await;
