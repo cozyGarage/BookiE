@@ -21,7 +21,8 @@ if ! grep -Eq '^[[:space:]]*Version: 0\.1\.5-1$' <<<"$control"; then
   exit 1
 fi
 
-if dpkg-deb -c "$package" | grep -Fq 'tablepro-agentd.service'; then
+package_contents="$(dpkg-deb -c "$package")"
+if grep -Fq 'tablepro-agentd.service' <<<"$package_contents"; then
   echo "the Debian package must not ship the obsolete agentd systemd unit" >&2
   exit 1
 fi

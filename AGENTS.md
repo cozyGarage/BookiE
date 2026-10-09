@@ -76,7 +76,28 @@ owner table, and each lane edits only its own files.
 5. Open the GitHub pull request against `linux`, merge it when the Forgejo gate
    is green (squash, subject `<type>(<scope>): <summary> (#N)`), then sync
    Forgejo's `linux` to GitHub's.
-6. Never leave a background job, container or lab VM change running that you
+6. **Documentation-only changes skip CI.** A change that touches only `*.md`
+   files and `linux/docs/` is pushed straight to `linux` after
+   `python3 linux/scripts/check-doc-links.py`, `check-known-issues.py` and
+   `inventory-ignored-tests.py --check` pass. The heavy GitHub workflows ignore
+   such pushes; the cheap `linux-ci-contracts` harness still checks them on
+   GitHub. `forgejo-gate.sh` runs the same checks and exits without queueing a
+   run. Do not use a Forgejo `paths-ignore` filter: Forgejo reads the changed
+   files of a merge commit as none, so every branch that merged `linux` would
+   silently get no run. Do not push a documentation-only tip to Forgejo's
+   `linux`; the next code merge carries it. A change that touches any other file takes the full
+   path above.
+7. **One gate at a time.** The gate script holds a host lock, so queued gates
+   wait for each other. Overlapping runs starve the installed GTK jobs of CPU and
+   produce accessibility-timeout failures that mean nothing. A GTK or driver
+   failure seen while another run was active is inconclusive until it is
+   re-run alone. Never start a second gate by hand to "speed up".
+8. **Do not repeat work between GitHub and Forgejo.** GitHub runs the cheap tier,
+   security, Flatpak and the workflow and harness contracts on pull requests.
+   Forgejo runs the merge tier on its own executors. Do not re-run a Forgejo
+   job to learn what GitHub already reported, and do not trust a skipped GitHub
+   job as a pass.
+9. Never leave a background job, container or lab VM change running that you
    did not start, and never stop one you did not start. On shared executors,
    stop only your own containers by name.
 

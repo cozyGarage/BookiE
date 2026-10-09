@@ -50,7 +50,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-port="$(docker port "$container" 8123/tcp | head -n1)"
+port="$(docker port "$container" 8123/tcp | sed -n 1p)"
 port="${port##*:}"
 attempt=0
 until docker exec "$container" clickhouse-client --user=default --password=tablepro \
