@@ -328,7 +328,11 @@ fn an_edit_that_changes_only_the_stored_form_of_a_number_is_kept() {
 
 #[test]
 fn an_edit_back_to_the_identical_value_is_dropped() {
-    for value in [Value::Float(f64::NAN), Value::Decimal("1.50".parse().unwrap()), Value::Int(3)] {
+    for value in [
+        Value::Float(f64::NAN),
+        Value::Decimal("1.50".parse().unwrap()),
+        Value::Int(3),
+    ] {
         let mut tracker = TabChangeTracker::new();
         tracker.track_cell_edit(key(1), 1, value.clone(), value);
         assert_eq!(tracker.pending_count(), 0);

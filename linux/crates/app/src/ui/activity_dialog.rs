@@ -181,15 +181,11 @@ pub fn present(
         };
         let text_buf = text_buf.clone();
         let status_l = status_l.clone();
-<<<<<<< HEAD
         let Some(flight) = kill_flight.try_begin() else {
             status_l.set_text(&tr!("A kill is already running."));
             return;
         };
         let token = CancellationToken::new();
-=======
-        let token = crate::services::request_generation::replace_in_flight(&in_flight_for_kill);
->>>>>>> ux/read-tickets
         let timeout_secs = crate::services::operation_control::timeout_for(
             &preferences_for_kill,
             &database_for_kill,
