@@ -51,6 +51,15 @@ impl RunningMcpServer {
     }
 }
 
+const PORT_ENVIRONMENT_VARIABLE: &str = "TABLEPRO_MCP_PORT";
+
+fn configured_port(requested: Option<&str>, default: u16) -> u16 {
+    requested
+        .and_then(|value| value.trim().parse::<u16>().ok())
+        .filter(|port| *port >= 1024)
+        .unwrap_or(default)
+}
+
 pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServer> {
     if !database.audit_available() {
         tracing::error!("MCP server disabled because the required audit journal is unavailable");
@@ -74,7 +83,11 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
         shutdown.clone(),
     ));
     let bridge_http = bridge.clone();
-    let config = tablepro_mcp::McpServerConfig::default();
+    let mut config = tablepro_mcp::McpServerConfig::default();
+    config.bind_port = configured_port(
+        std::env::var(PORT_ENVIRONMENT_VARIABLE).ok().as_deref(),
+        config.bind_port,
+    );
     let server_shutdown = shutdown.clone();
     tracing::info!(host = %config.bind_host, port = config.bind_port, "MCP HTTP server starting");
     let thread = match std::thread::Builder::new().name("tablepro-mcp".into()).spawn(move || {
@@ -134,4 +147,19 @@ pub fn revoke_token(bridge: Option<&Arc<McpBridge>>, id: Uuid) -> Result<(), Str
 
 pub fn list_tokens(bridge: Option<&Arc<McpBridge>>) -> Vec<tablepro_mcp::McpToken> {
     bridge.map(|b| b.tokens().list()).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::configured_port;
+
+    #[test]
+    fn the_listener_port_can_be_overridden_but_never_to_a_privileged_or_invalid_value() {
+        assert_eq!(configured_port(None, 17432), 17432);
+        assert_eq!(configured_port(Some("40123"), 17432), 40123);
+        assert_eq!(configured_port(Some(" 40123 "), 17432), 40123);
+        for rejected in ["", "0", "80", "1023", "65536", "-1", "abc"] {
+            assert_eq!(configured_port(Some(rejected), 17432), 17432, "{rejected}");
+        }
+    }
 }

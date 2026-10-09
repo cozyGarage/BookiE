@@ -577,6 +577,17 @@ def database_tables(path):
         }
 
 
+MCP_PORT = 17432
+
+
+def reserve_loopback_port():
+    global MCP_PORT
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        MCP_PORT = probe.getsockname()[1]
+    return MCP_PORT
+
+
 def write_fixture(base, audit_available=True, environment="prod", mcp_token=False):
     home = base / "home"
     config = base / "config"
@@ -886,6 +897,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
     )
 
     environment = os.environ.copy()
+    environment["TABLEPRO_MCP_PORT"] = str(reserve_loopback_port())
     environment.update(
         {
             "HOME": str(home),
@@ -1059,7 +1071,7 @@ def mcp_client_disconnect_cancels_pending_approval(database, base):
     client = None
     while time.monotonic() < deadline:
         try:
-            client = socket.create_connection(("127.0.0.1", 17432), timeout=2)
+            client = socket.create_connection(("127.0.0.1", MCP_PORT), timeout=2)
             break
         except OSError:
             time.sleep(POLL_SECONDS)
@@ -1067,8 +1079,8 @@ def mcp_client_disconnect_cancels_pending_approval(database, base):
     try:
         request = (
             b"POST /mcp HTTP/1.1\r\n"
-            b"Host: 127.0.0.1:17432\r\n"
-            b"Content-Type: application/json\r\n"
+            + f"Host: 127.0.0.1:{MCP_PORT}\r\n".encode("ascii")
+            + b"Content-Type: application/json\r\n"
             + f"Content-Length: {len(body)}\r\n".encode("ascii")
             + b"Connection: keep-alive\r\n\r\n"
             + body
