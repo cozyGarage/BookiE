@@ -194,7 +194,10 @@ authoritative; [code conventions](linux/docs/code-conventions.md) settles
 function length, parameters, naming and extraction.
 
 - Rust edition 2024, Rust 1.98, line width 120.
-- No comments or doc comments, except the external-system rule above.
+- No comments or doc comments, except the external-system rule above. A Rust
+  file may not gain comment lines (`check-comment-lines.py`, baselines in
+  `linux/comment-line-baselines.txt`); after deleting comments run
+  `python3 linux/scripts/check-comment-lines.py --update` to lower them.
 - Early returns; at most three levels of indentation in a function body.
 - A function body is at most 60 lines (`check-function-size.py`, baselines in
   `linux/function-size-baselines.txt`: lower a count when you split, never raise
