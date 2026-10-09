@@ -314,6 +314,11 @@ change, with native type/JSON/wire checks and an untouched sibling
 The `timetz[]` case also preserves explicit offsets through an `America/New_York`
 to UTC transition and the JSON/CSV/XLSX/SQL consumer paths
 ([evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
+`timestamptz[]` also rebinds across an `America/Los_Angeles` to UTC session
+change, including the repeated DST-overlap wall-clock time with distinct `-04`
+and `-05` offsets. The test compares native type, JSON and wire output after
+rebinding, and confirms the wire bytes match the original session
+(`value_contract_timestamptz_array_rebinding_preserves_instants_after_timezone_change`).
 Other temporal-array session/consumer combinations remain open.
 
 PostgreSQL inferred enum-array binding now has direct evidence for the
