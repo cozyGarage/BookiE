@@ -283,6 +283,7 @@ impl PolicyGuard {
                         reason: format!("import {} rows into {target}", request.row_budget),
                         preview: Some(preview.clone()),
                         estimated_rows: Some(request.row_budget),
+                        cancellation: None,
                     })
                     .await;
                 if outcome == ApprovalOutcome::Deny {
