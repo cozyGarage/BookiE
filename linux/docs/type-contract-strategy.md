@@ -601,10 +601,14 @@ no formulas ([evidence](evidence/mssql-datetimeoffset-xlsx-consumer-results-2026
 SQL Server `decimal(38,0)` and `decimal(38,30)` results outside
 `rust_decimal::Decimal` remain exact `Value::Text`; an in-range 28-digit value
 stays `Value::Decimal`, and SQL NULL stays distinct. Parameter rebinding and
-CSV import using the destination column metadata preserve both rows, checked
+CSV import using the destination column metadata preserve all three rows, checked
 against native decimal text and row equality in
 `sql_server_numeric_values_outside_rust_decimal_round_trip_as_exact_text`
-(`crates/drivers/mssql/tests/support/wide_numeric.rs`).
+(`crates/drivers/mssql/tests/support/wide_numeric.rs`). Positive zero at scale
+30 remains positive exact text through the same consumers. The codec mutation
+slice on source SHA-256 `e892c28764ff3adf17d27bc9976ab46d9332fc5229302781785c188991d88beb`
+tested 37 variants: 31 were caught, 6 were build-unviable, with no misses or
+timeouts.
 
 PostgreSQL `date[]` result text stays canonical ISO when fetched under
 `DateStyle = SQL, DMY`; CSV export, parameter rebinding and SQL replay under

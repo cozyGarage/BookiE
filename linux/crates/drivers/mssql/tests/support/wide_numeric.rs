@@ -18,7 +18,8 @@ pub(super) async fn assert_contract(connection: &dyn Connection) {
               12345678.123456789012345678901234567890, \
               123456789012345678901234.5678, NULL), \
              (2, -99999999999999999999999999999999999999, \
-              -0.000000000000000000000000000001, -0.0001, 0)",
+              -0.000000000000000000000000000001, -0.0001, 0), \
+             (3, 0, 0.000000000000000000000000000000, 0.0000, 0)",
         )
         .await
         .unwrap();
@@ -41,6 +42,13 @@ pub(super) async fn assert_contract(connection: &dyn Connection) {
                 Value::Text("-99999999999999999999999999999999999999".into()),
                 Value::Text("-0.000000000000000000000000000001".into()),
                 Value::Decimal(Decimal::from_str("-0.0001").unwrap()),
+                Value::Decimal(Decimal::ZERO),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Decimal(Decimal::ZERO),
+                Value::Text("0.000000000000000000000000000000".into()),
+                Value::Decimal(Decimal::ZERO),
                 Value::Decimal(Decimal::ZERO),
             ],
         ],
@@ -86,7 +94,7 @@ async fn assert_native_text(connection: &dyn Connection, table: &str) {
         ))
         .await
         .unwrap();
-    assert_eq!(count.rows, vec![vec![Value::Int(2)]]);
+    assert_eq!(count.rows, vec![vec![Value::Int(3)]]);
     let native = connection
         .query(&format!(
             "SELECT CONVERT(varchar(40), wide), CONVERT(varchar(40), high_scale), \
@@ -107,6 +115,12 @@ async fn assert_native_text(connection: &dyn Connection, table: &str) {
                 Value::Text("-99999999999999999999999999999999999999".into()),
                 Value::Text("-0.000000000000000000000000000001".into()),
                 Value::Text("-0.0001".into()),
+                Value::Text("0".into()),
+            ],
+            vec![
+                Value::Text("0".into()),
+                Value::Text("0.000000000000000000000000000000".into()),
+                Value::Text("0.0000".into()),
                 Value::Text("0".into()),
             ],
         ]
