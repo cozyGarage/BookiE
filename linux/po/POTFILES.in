@@ -25,8 +25,10 @@ crates/app/src/ui/app/workspace_chrome.rs
 crates/app/src/ui/app/workspace_close.rs
 crates/app/src/ui/app/workspace_tabs.rs
 crates/app/src/ui/browse_tab/chrome.rs
+crates/app/src/ui/browse_tab/grid_render.rs
 crates/app/src/ui/browse_tab/mod.rs
 crates/app/src/ui/browse_tab/row_ops.rs
+crates/app/src/ui/browse_tab/selection/stats.rs
 crates/app/src/ui/browse_tab/selection.rs
 crates/app/src/ui/browse_tab/value_parse.rs
 crates/app/src/ui/catalog_dialog.rs
@@ -39,11 +41,13 @@ crates/app/src/ui/connection_bundle/import.rs
 crates/app/src/ui/connection_bundle/mod.rs
 crates/app/src/ui/connection_row.rs
 crates/app/src/ui/editor/diagnostics.rs
+crates/app/src/ui/editor/error_location.rs
 crates/app/src/ui/editor/find_bar.rs
 crates/app/src/ui/editor/finish_notice.rs
 crates/app/src/ui/editor/mod.rs
 crates/app/src/ui/editor/open_file.rs
 crates/app/src/ui/editor/outcomes.rs
+crates/app/src/ui/editor/pinned.rs
 crates/app/src/ui/editor/schema.rs
 crates/app/src/ui/editor/session_mode.rs
 crates/app/src/ui/editor/statement_cursor.rs

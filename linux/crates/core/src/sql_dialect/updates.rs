@@ -4,6 +4,63 @@ use super::{
 };
 use crate::{ColumnInfo, Value};
 
+pub fn build_keyed_value_select(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    columns: &[ColumnInfo],
+    value_column: usize,
+    pk_values: &[Value],
+) -> Result<(String, Vec<Value>), BuildSqlError> {
+    let pk_indexes = checked_pk_indexes(columns, pk_values)?;
+    let value_column = columns.get(value_column).ok_or(BuildSqlError::StaleColumns)?;
+    let mut params = Vec::with_capacity(pk_values.len());
+    let where_clause = keyed_value_where_clause(driver_id, columns, &pk_indexes, pk_values, &mut params);
+    let order = pk_indexes
+        .iter()
+        .map(|&index| format!("{} ASC", quote_ident(driver_id, &columns[index].name)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "SELECT {} FROM {} WHERE {where_clause}{}",
+        quote_ident(driver_id, &value_column.name),
+        qualified_table(driver_id, schema, table),
+        super::build_order_and_pagination(driver_id, Some(&order), 2, 0),
+    );
+    Ok((sql, params))
+}
+
+fn keyed_value_where_clause(
+    driver_id: &str,
+    columns: &[ColumnInfo],
+    pk_indexes: &[usize],
+    pk_values: &[Value],
+    params: &mut Vec<Value>,
+) -> String {
+    pk_indexes
+        .iter()
+        .zip(pk_values)
+        .map(|(&index, value)| {
+            let column = &columns[index];
+            let name = quote_ident(driver_id, &column.name);
+            if matches!(value, Value::Null) {
+                return format!("{name} IS NULL");
+            }
+            let placeholder = placeholder_for(driver_id, params.len());
+            let typed = if driver_id == "postgres" {
+                postgres_text_cast_type(column, value)
+                    .map(|type_name| format!("{placeholder}::text::{type_name}"))
+                    .unwrap_or(placeholder)
+            } else {
+                placeholder
+            };
+            params.push(value.clone());
+            format!("{name} = {typed}")
+        })
+        .collect::<Vec<_>>()
+        .join(" AND ")
+}
+
 pub fn build_keyed_update(
     driver_id: &str,
     schema: Option<&str>,
@@ -253,7 +310,8 @@ pub fn build_mongodb_keyed_delete(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_keyed_update, build_mongodb_keyed_delete, build_mongodb_keyed_update, build_optimistic_keyed_update,
+        build_keyed_update, build_keyed_value_select, build_mongodb_keyed_delete, build_mongodb_keyed_update,
+        build_optimistic_keyed_update,
     };
     use crate::{ColumnInfo, Value};
 
@@ -428,5 +486,71 @@ mod tests {
             "UPDATE `records` SET `mood` = SPACE(0), `permissions` = SPACE(0), `note` = ? WHERE `id` = ?"
         );
         assert_eq!(params, vec![Value::Text(String::new()), Value::Int(7)]);
+    }
+
+    #[test]
+    fn keyed_value_select_quotes_target_binds_composite_keys_and_caps_duplicates() {
+        let columns = [column("tenant", true), column("id", true), column("payload", false)];
+        let (sql, params) = build_keyed_value_select(
+            "postgres",
+            Some("odd\"schema"),
+            "records",
+            &columns,
+            2,
+            &[Value::Text("acme".into()), Value::Int(7)],
+        )
+        .unwrap();
+
+        assert_eq!(
+            sql,
+            "SELECT \"payload\" FROM \"odd\"\"schema\".\"records\" WHERE \"tenant\" = $1 AND \"id\" = $2 ORDER BY \"tenant\" ASC, \"id\" ASC LIMIT 2 OFFSET 0"
+        );
+        assert_eq!(params, vec![Value::Text("acme".into()), Value::Int(7)]);
+    }
+
+    #[test]
+    fn keyed_value_select_casts_postgres_enum_and_domain_keys() {
+        let mut enum_key = column("status", true);
+        enum_key.data_type = "status_type".into();
+        enum_key.enum_type = Some(crate::QualifiedTypeName {
+            schema: "app".into(),
+            name: "status_type".into(),
+        });
+        let mut domain_key = column("domain_status", true);
+        domain_key.data_type = "domain_status_type".into();
+        domain_key.domain_type = Some(crate::QualifiedTypeName {
+            schema: "app".into(),
+            name: "domain_status_type".into(),
+        });
+        let columns = [enum_key, domain_key, column("payload", false)];
+        let (sql, params) = build_keyed_value_select(
+            "postgres",
+            None,
+            "records",
+            &columns,
+            2,
+            &[Value::Text("ready".into()), Value::Text("open".into())],
+        )
+        .unwrap();
+
+        assert_eq!(
+            sql,
+            "SELECT \"payload\" FROM \"records\" WHERE \"status\" = $1::text::\"app\".\"status_type\" AND \"domain_status\" = $2::text::\"app\".\"domain_status_type\" ORDER BY \"status\" ASC, \"domain_status\" ASC LIMIT 2 OFFSET 0"
+        );
+        assert_eq!(params, vec![Value::Text("ready".into()), Value::Text("open".into())]);
+    }
+
+    #[test]
+    fn keyed_value_select_requires_a_primary_key_and_existing_column() {
+        let no_key = [column("payload", false)];
+        assert!(matches!(
+            build_keyed_value_select("postgres", None, "records", &no_key, 0, &[]),
+            Err(crate::sql_dialect::BuildSqlError::NoPrimaryKey)
+        ));
+        let keyed = [column("id", true)];
+        assert!(matches!(
+            build_keyed_value_select("postgres", None, "records", &keyed, 1, &[Value::Int(1)]),
+            Err(crate::sql_dialect::BuildSqlError::StaleColumns)
+        ));
     }
 }

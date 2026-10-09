@@ -90,6 +90,7 @@ pub struct BrowseTab {
     current_total_rows: Option<u64>,
     page_requests: PageRequestTracker,
     row_count_requests: RowCountRequestTracker,
+    cell_value_requests: CellValueRequestTracker,
 
     inner_stack: gtk::Stack,
     grid_holder: gtk::Box,
@@ -266,6 +267,18 @@ pub enum BrowseTabInput {
         row_position: u32,
     },
     GridCopyToClipboard(String),
+    GridFetchCellValue {
+        col_index: usize,
+        column_name: String,
+        row_key: Vec<Value>,
+    },
+    CellValueLoaded {
+        request: BrowseCellValueRequest,
+        col_index: usize,
+        column_name: String,
+        value: Value,
+    },
+    CellValueFailed(BrowseCellValueRequest, String),
     IncompleteRowData,
     ProjectionFailure,
     GridShowRowAsJson(String),
@@ -338,6 +351,12 @@ pub enum BrowseTabOutput {
     FetchColumns,
     /// Tab needs the row count fetched.
     FetchRowCount,
+    FetchCellValue {
+        request: BrowseCellValueRequest,
+        col_index: usize,
+        column_name: String,
+        row_key: Vec<Value>,
+    },
     /// Display state changed in a way that should be persisted.
     StateChanged,
     /// Cell context-menu "Copy row as INSERT".
@@ -380,6 +399,7 @@ pub enum BrowseTabOutput {
 }
 
 mod chrome;
+mod grid_messages;
 mod grid_render;
 mod requests;
 mod row_ops;
@@ -387,10 +407,11 @@ mod selection;
 #[cfg(test)]
 mod tests;
 mod value_parse;
+mod value_view;
 
 use chrome::*;
-pub use requests::{BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
-use requests::{PageRequestTracker, RowCountRequestTracker};
+pub use requests::{BrowseCellValueRequest, BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
+use requests::{CellValueRequestTracker, PageRequestTracker, RowCountRequestTracker};
 use selection::*;
 use value_parse::*;
 
@@ -815,39 +836,7 @@ impl SimpleComponent for BrowseTab {
         // shape; the tab's update() then routes them to the App via
         // outputs that App's forwarder tags with this tab's id.
         let grid_input = sender.input_sender().clone();
-        relm4::spawn_local(grid_receiver.forward(grid_input, |msg| match msg {
-            GridMsg::SortChanged(col_idx, ascending) => BrowseTabInput::SortChanged { col_idx, ascending },
-            GridMsg::CellEdited {
-                row_position,
-                col_index,
-                new_value,
-                row_key,
-            } => BrowseTabInput::GridCellEdited {
-                row_position,
-                col_index,
-                new_value,
-                row_key,
-            },
-            GridMsg::CopyToClipboard(text) => BrowseTabInput::GridCopyToClipboard(text),
-            GridMsg::IncompleteRowData => BrowseTabInput::IncompleteRowData,
-            GridMsg::ProjectionFailure => BrowseTabInput::ProjectionFailure,
-            GridMsg::ShowRowAsJson(text) => BrowseTabInput::GridShowRowAsJson(text),
-            GridMsg::ExportResults(result) => BrowseTabInput::GridExportResults(result),
-            GridMsg::CopyRowAsInsert { row_position } => BrowseTabInput::GridCopyRowAsInsert { row_position },
-            GridMsg::SetCellNull {
-                row_position,
-                col_index,
-                row_key,
-            } => BrowseTabInput::GridSetCellNull {
-                row_position,
-                col_index,
-                row_key,
-            },
-            GridMsg::DeleteRowAt { row_position, row_key } => BrowseTabInput::GridDeleteRowAt { row_position, row_key },
-            GridMsg::InsertRow => BrowseTabInput::InsertRow,
-            GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
-            GridMsg::FilterByValue { column, value } => BrowseTabInput::FilterByValue { column, value },
-        }));
+        relm4::spawn_local(grid_receiver.forward(grid_input, grid_messages::to_input));
 
         let model = BrowseTab {
             tab_id: init.tab_id,
@@ -871,6 +860,7 @@ impl SimpleComponent for BrowseTab {
             current_total_rows: None,
             page_requests: PageRequestTracker::default(),
             row_count_requests: RowCountRequestTracker::default(),
+            cell_value_requests: CellValueRequestTracker::default(),
             inner_stack,
             grid_holder,
             current_column_view: None,
@@ -1159,6 +1149,22 @@ impl SimpleComponent for BrowseTab {
                 self.handle_grid_copy_row_as_insert(row_position, sender)
             }
             BrowseTabInput::GridCopyToClipboard(text) => self.handle_grid_copy_to_clipboard(text, sender),
+            BrowseTabInput::GridFetchCellValue {
+                col_index,
+                column_name,
+                row_key,
+            } => self.request_cell_value(col_index, column_name, row_key, sender),
+            BrowseTabInput::CellValueLoaded {
+                request,
+                col_index,
+                column_name,
+                value,
+            } => self.show_cell_value(request, col_index, column_name, value),
+            BrowseTabInput::CellValueFailed(request, message) => {
+                if self.cell_value_requests.accepts(request) {
+                    let _ = sender.output(BrowseTabOutput::ShowToast(message));
+                }
+            }
             BrowseTabInput::IncompleteRowData => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
                     "Some row values were not fetched. Show hidden columns and reload before copying or exporting."

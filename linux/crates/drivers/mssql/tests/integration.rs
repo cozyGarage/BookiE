@@ -24,6 +24,8 @@ mod disconnection;
 mod result_sets;
 #[path = "support/server_owned_columns.rs"]
 mod server_owned_columns;
+#[path = "support/sql_variant.rs"]
+mod sql_variant;
 #[path = "support/temporal_boundaries.rs"]
 mod temporal_boundaries;
 
@@ -1207,60 +1209,6 @@ async fn value_contract_money_values_are_refused_but_server_nulls_remain_null() 
     assert_eq!(result.rows[0][0], Value::Undecodable("money".into()));
     assert_eq!(result.rows[0][2], Value::Undecodable("money".into()));
     assert_eq!(result.rows[1], vec![Value::Null, Value::Null, Value::Null, Value::Null]);
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn sql_variant_result_is_refused_without_panicking_or_reusing_the_connection() {
-    let (_container, options) = start_mssql().await;
-    let conn = connect(options).await;
-    let oracle = conn
-        .query(
-            "SELECT CONVERT(varchar(20), SQL_VARIANT_PROPERTY(value, 'BaseType')) AS base_type, \
-             CONVERT(varchar(40), value) AS exact_text \
-             FROM (VALUES (CONVERT(sql_variant, CONVERT(bigint, 9007199254740993)))) \
-             AS source(value)",
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        oracle.rows,
-        vec![vec![
-            Value::Text("bigint".into()),
-            Value::Text("9007199254740993".into())
-        ]],
-        "the native SQL Server oracle must preserve the value beyond binary64 precision"
-    );
-
-    let result = conn
-        .query("SELECT CONVERT(sql_variant, CONVERT(bigint, 9007199254740993)) AS value")
-        .await;
-    assert!(
-        matches!(result, Err(DriverError::Unsupported(_))),
-        "sql_variant must return an explicit unsupported result, got {result:?}"
-    );
-    assert!(
-        matches!(conn.query("SELECT 1").await, Err(DriverError::Disconnected)),
-        "a TDS stream that panicked during metadata decoding must be retired"
-    );
-
-    let mut session = conn.open_session().await.unwrap();
-    let control = OperationControl::new(tokio_util::sync::CancellationToken::new(), None);
-    let session_result = session
-        .query_params_controlled(
-            "SELECT CONVERT(sql_variant, CONVERT(bigint, 9007199254740993)) AS value",
-            &[],
-            &control,
-        )
-        .await;
-    assert!(
-        matches!(session_result, Err(DriverError::Unsupported(_))),
-        "session sql_variant must also return an explicit refusal: {session_result:?}"
-    );
-    assert!(
-        !session.is_usable(),
-        "a session with an unread TDS stream must be retired"
-    );
 }
 
 const ZONED_STAMPS: [&str; 5] = [

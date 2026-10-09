@@ -398,6 +398,28 @@ async fn commit_without_a_preceding_begin_is_refused() {
 }
 
 #[tokio::test]
+async fn transaction_control_hidden_in_a_script_is_refused_and_never_reaches_the_database() {
+    for script in [
+        "SELECT 1; COMMIT",
+        "BEGIN; UPDATE jobs SET done = true; COMMIT",
+        "SELECT 1; ROLLBACK",
+        "SELECT 1; BEGIN",
+    ] {
+        let h = harness(SessionScript::default(), false);
+        let mut session = h.guard.open_session().await.expect("open session");
+
+        run(&mut session, "BEGIN").await.expect("begin");
+        let error = run(&mut session, script)
+            .await
+            .expect_err("script with transaction control");
+
+        assert!(matches!(error, DriverError::PolicyDenied(_)), "{script}: {error:?}");
+        assert!(session.transaction_open(), "{script}");
+        assert_eq!(*h.script.sent.lock().expect("sent lock"), vec!["BEGIN"], "{script}");
+    }
+}
+
+#[tokio::test]
 async fn a_nested_begin_is_refused() {
     let h = harness(SessionScript::default(), false);
     let mut session = h.guard.open_session().await.expect("open session");

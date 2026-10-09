@@ -4,11 +4,10 @@ use tablepro_core::{ColumnInfo, Value};
 
 use super::context_menu::GridMenus;
 use super::display::{
-    FULL_EDIT_TEXT_SLOT, POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_text_for_bind,
-    value_to_full_edit_text,
+    CellView, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT,
+    SUPPRESS_SLOT, cell_view, value_to_full_edit_text,
 };
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
-use super::presentation::cell_allows_inline_edit;
 pub(super) use super::presentation::column_is_editable as is_cell_editable;
 use super::types::{classify_editor_kind, is_bool_type};
 use super::{GridMsg, TabGridContext};
@@ -101,7 +100,6 @@ pub(super) fn build_column(
 
     let editable_for_bind = editable && sender.is_some();
     let column_info = info.clone();
-    let column_auto_filled = info.is_auto_increment || info.is_generated;
     let tab_ctx_for_bind = tab_ctx.clone();
     factory.connect_bind(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
@@ -110,27 +108,40 @@ pub(super) fn build_column(
         let Some(row) = item.item().and_downcast::<crate::ui::row_object::RowObject>() else {
             return;
         };
-        let raw_value = row.cell_value(idx);
         let pk_values: Vec<Value> = tab_ctx_for_bind
             .pk_col_indices
             .iter()
             .map(|&i| row.cell_value(i))
             .collect();
-        let value = if let Some(tab_id) = tab_ctx_for_bind.tab_id
+        let (edited, updated_value) = if let Some(tab_id) = tab_ctx_for_bind.tab_id
             && row.draft_id().is_none()
         {
             crate::services::change_tracker::with_tab_ref(tab_id, |t| {
                 crate::services::change_tracker::RowKey::from_pk_values(&pk_values)
-                    .map(|key| t.current_cell_value(&key, idx, &raw_value).clone())
-                    .unwrap_or_else(|| raw_value.clone())
+                    .map(|key| {
+                        let edited = t.cell_state(&key, idx) == crate::services::change_tracker::CellState::Modified;
+                        let value = edited.then(|| {
+                            let original = row.cell_value(idx);
+                            t.current_cell_value(&key, idx, &original).clone()
+                        });
+                        (edited, value)
+                    })
+                    .unwrap_or((false, None))
             })
-            .unwrap_or(raw_value)
+            .unwrap_or((false, None))
         } else {
-            raw_value
+            (false, None)
         };
-        let is_null = matches!(value, Value::Null);
-        let inline_editable = editable_for_bind && cell_allows_inline_edit(&column_info, &value);
-        let text = cell_text_for_bind(&value, editable_for_bind, column_auto_filled);
+        let preview = preview_for_bind(&row, idx, edited);
+        let value = value_for_bind(&row, idx, preview.as_ref(), updated_value);
+        let view = match (preview.as_ref(), value.as_ref()) {
+            (Some(preview), _) => CellView::from_preview(preview),
+            (None, Some(value)) => cell_view(value, &column_info),
+            (None, None) => return,
+        };
+        let is_null = view.is_null;
+        let inline_editable = editable_for_bind && view.inline_editable;
+        let text = view.text_for_bind(editable_for_bind);
 
         let pending_classes: Vec<&'static str> = if let Some(_tab_id) = tab_ctx_for_bind.tab_id {
             if row.draft_id().is_some() {
@@ -169,15 +180,16 @@ pub(super) fn build_column(
         let is_pending_delete = pending_classes.contains(&"tp-row-pending-delete");
         let Some(child) = item.child() else { return };
         if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
+            IS_NULL_SLOT.set(&label, view.is_null);
             label.set_inline_editable(inline_editable);
-            label.set_text(&text);
-            apply_cell_tooltip(label.upcast_ref(), &text, is_null);
+            label.set_text(text.as_ref());
+            apply_cell_tooltip(label.upcast_ref(), text.as_ref(), is_null);
             if is_null && !editable_for_bind {
                 label.add_css_class("dim-label");
             } else {
                 label.remove_css_class("dim-label");
             }
-            if is_null && (editable_for_bind || column_auto_filled) {
+            if is_null && (editable_for_bind || view.auto_filled) {
                 label.add_css_class("tp-null-sentinel");
             } else {
                 label.remove_css_class("tp-null-sentinel");
@@ -189,39 +201,20 @@ pub(super) fn build_column(
             label.set_strikethrough(is_pending_delete);
             POSITION_SLOT.set(&label, item.position());
             ROW_KEY_SLOT.set(&label, pk_values.clone());
-            if inline_editable {
-                FULL_EDIT_TEXT_SLOT.set(&label, value_to_full_edit_text(&value));
+            if inline_editable && let Some(value) = &value {
+                FULL_EDIT_TEXT_SLOT.set(&label, value_to_full_edit_text(value));
             } else {
                 FULL_EDIT_TEXT_SLOT.take(&label);
             }
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
             checkbox.set_sensitive(inline_editable);
             SUPPRESS_SLOT.set(&checkbox, true);
-            match value {
-                Value::Bool(true) => {
-                    checkbox.set_inconsistent(false);
-                    checkbox.set_active(true);
-                }
-                Value::Bool(false) => {
-                    checkbox.set_inconsistent(false);
-                    checkbox.set_active(false);
-                }
-                Value::Int(1) if column_info.data_type.eq_ignore_ascii_case("bit(1)") => {
-                    checkbox.set_inconsistent(false);
-                    checkbox.set_active(true);
-                }
-                Value::Int(0) if column_info.data_type.eq_ignore_ascii_case("bit(1)") => {
-                    checkbox.set_inconsistent(false);
-                    checkbox.set_active(false);
-                }
-                Value::Null => {
-                    checkbox.set_inconsistent(true);
-                    checkbox.set_active(false);
-                }
-                _ => {
-                    checkbox.set_inconsistent(true);
-                    checkbox.set_active(false);
-                }
+            if let Some(checked) = view.checked {
+                checkbox.set_inconsistent(false);
+                checkbox.set_active(checked);
+            } else {
+                checkbox.set_inconsistent(true);
+                checkbox.set_active(false);
             }
             SUPPRESS_SLOT.set(&checkbox, false);
             clear_pending_classes(checkbox.upcast_ref());
@@ -232,8 +225,8 @@ pub(super) fn build_column(
             POSITION_SLOT.set(&checkbox, item.position());
             ROW_KEY_SLOT.set(&checkbox, pk_values.clone());
         } else if let Ok(label) = child.downcast::<gtk4::Label>() {
-            label.set_text(&text);
-            apply_cell_tooltip(label.upcast_ref(), &text, is_null);
+            label.set_text(text.as_ref());
+            apply_cell_tooltip(label.upcast_ref(), text.as_ref(), is_null);
             if is_null {
                 label.add_css_class("dim-label");
             } else {
@@ -264,6 +257,7 @@ pub(super) fn build_column(
             POSITION_SLOT.take(&label);
             ROW_KEY_SLOT.take(&label);
             SNAPSHOT_SLOT.take(&label);
+            IS_NULL_SLOT.take(&label);
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
             checkbox.set_sensitive(false);
             POSITION_SLOT.take(&checkbox);
@@ -309,6 +303,25 @@ pub(super) fn build_column(
         column.set_fixed_width(min);
     }
     column
+}
+
+fn preview_for_bind(
+    row: &crate::ui::row_object::RowObject,
+    index: usize,
+    edited: bool,
+) -> Option<crate::ui::row_object::CellPreview> {
+    (!edited).then(|| row.cell_preview(index)).flatten()
+}
+
+fn value_for_bind(
+    row: &crate::ui::row_object::RowObject,
+    index: usize,
+    preview: Option<&crate::ui::row_object::CellPreview>,
+    updated_value: Option<Value>,
+) -> Option<Value> {
+    preview
+        .is_none()
+        .then(|| updated_value.unwrap_or_else(|| row.cell_value(index)))
 }
 
 fn clear_pending_classes(widget: &gtk4::Widget) {
@@ -380,6 +393,27 @@ mod tests {
         let mut c = col("integer", false);
         c.is_auto_increment = true;
         assert!(!is_cell_editable(&c));
+    }
+
+    #[test]
+    fn an_edited_preview_keeps_the_full_value_and_hides_the_preview() {
+        let full = "x".repeat(9_000);
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Int(1), Value::Text(full.clone())]);
+        row.preview_long_values(&[0]);
+        assert!(preview_for_bind(&row, 1, false).is_some());
+        assert!(preview_for_bind(&row, 1, true).is_none());
+        assert_eq!(row.cell_value(1), Value::Text(full));
+    }
+
+    #[test]
+    fn preview_binding_does_not_retain_a_second_full_value() {
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Int(1), Value::Text("x".repeat(9_000))]);
+        row.preview_long_values(&[0]);
+        let preview = row.cell_preview(1).unwrap();
+        assert!(value_for_bind(&row, 1, Some(&preview), None).is_none());
+
+        let edited = Value::Text("pending".repeat(1_200));
+        assert_eq!(value_for_bind(&row, 1, None, Some(edited.clone())), Some(edited));
     }
 
     #[test]
@@ -840,6 +874,42 @@ mod tests {
         );
         cell.stop_editing(false);
 
+        window.close();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn editing_literal_null_sentinel_text_keeps_it_distinct_from_sql_null() {
+        use gtk4::prelude::*;
+        gtk4::init().unwrap();
+        let columns = vec![col("TEXT", false), col("TEXT", false)];
+        let result = tablepro_core::QueryResult {
+            columns: columns.clone(),
+            rows: vec![vec![Value::Text("<NULL>".into()), Value::Null]],
+            truncated: false,
+        };
+        let (sender, _receiver) = relm4::channel::<GridMsg>();
+        let (view, _) = crate::ui::grid::build_column_view(
+            &std::sync::Arc::new(result),
+            &columns,
+            "null_sentinel_text",
+            Some(sender),
+            None,
+            None,
+            None,
+            None,
+            TabGridContext::default(),
+            None,
+            std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
+        );
+        let window = gtk4::Window::builder().child(&view).build();
+        window.present();
+        let editors = wait_for_editors(view.upcast_ref(), 2);
+        for (cell, expected) in editors.iter().zip(["<NULL>", ""]) {
+            super::super::editing::enter_edit_mode(cell);
+            assert_eq!(cell.entry().text().as_str(), expected);
+            cell.stop_editing(false);
+        }
         window.close();
     }
 }

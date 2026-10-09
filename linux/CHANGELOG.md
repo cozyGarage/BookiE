@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
+- Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.
+- SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
+- Arbitrary SQL result grids now preview long text, JSON and binary cells with byte counts; View Value reads the complete value from the guarded result already in memory.
+- Previewed grid cells no longer keep a second full value in each cell widget.
+- Overlapping View Value requests discard stale replies so an older fetch cannot replace the latest requested cell.
+- ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
+- DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.
 - MySQL and MariaDB CHAR results now have `PAD_CHAR_TO_FULL_LENGTH` coverage for padding, VARCHAR, empty values and NULL.
 - The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
@@ -96,6 +104,8 @@
 
 ### Fixed
 
+- Copy Value preserves full previewed, pending and draft cell values; editing literal `<NULL>` text no longer turns it into an empty value.
+- MongoDB connections now reject malformed or URI-shaped host input before constructing the connection URI.
 - Closing a table tab, paging, or disconnecting now stops the slow read it started on the server instead of letting it run to the timeout.
 - PostgreSQL optimistic grid edits cast both new and previously read custom enum, enum-array, and domain values to qualified native types, so stale-row comparisons work across those columns.
 - A PostgreSQL query that returns more rows than the result cap now returns the capped rows promptly and stops the server query, instead of waiting for the server to finish or timing out.
@@ -126,6 +136,7 @@
 
 - `SELECT … INTO` is now treated as a write, so read-only connections and agent read access refuse it instead of letting it create a table
 - The row-count estimate that guards large writes no longer runs a side-effecting function in your WHERE clause before you approve the statement; such statements ask for approval without an estimate
+- A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server
 - Importing a connection bundle now refuses a file over 16 MiB, or anything that is not a regular file, before reading it.
 - Driver panic messages, which can contain query text or credentials, are no longer written to the logs or the terminal; only the location is. Set `TABLEPRO_DEBUG_PANICS=1` to print them while developing.
 
@@ -138,6 +149,7 @@
 - The headless agent now replaces a cached connection after a driver panic or an unusable-connection fault instead of reusing it because its health check still answers.
 
 ### Added
+- Concurrent MongoDB first-page requests now share one schema census and retain the union of types observed across pages.
 
 - Loaded results can be exported as Markdown, HTML, XML, SQL INSERT statements, or an Excel workbook, alongside CSV and JSON. Statement export is offered only for connections whose engine can express SQL literals, and an Excel export exceeding worksheet limits leaves any existing destination untouched. Workbooks preserve fractional seconds, timezone-bearing timestamps and dates outside 1900–9999 as exact text; ordinary supported dates and whole-second times remain native spreadsheet cells. Empty text is refused with CSV/JSON alternatives instead of being silently collapsed into NULL, preserving any existing destination. XML and HTML preserve carriage returns when parsed. XML refuses unsupported XML 1.0 characters and HTML refuses NUL characters with a row/column error instead of replacing or dropping them.
 - Saved queries have a management dialog (Ctrl+Shift+D): search them, open one in a new editor tab, rename it, or delete it. Until now a saved query could only be reached through the quick switcher and could not be removed.
@@ -181,6 +193,8 @@
 
 ### Fixed
 
+- SQL Server `DECIMAL(38,38)` values no longer panic the driver and retain exact text when they exceed the editable decimal range.
+- SQL Server `sql_variant` values keep their native column type and show as undecodable instead of being mislabeled as a base scalar.
 - Browse shortcuts for Left, Right, and space showed keypad keys, and click shortcuts showed Shift and Ctrl alone.
 - New connection opened on the first driver with port 5432, database postgres, and username postgres.
 - Browse shortcuts for Left, Right, and space showed a blank key.
@@ -331,6 +345,7 @@
 - Documentation now tracks the stabilization evidence, ignored-test inventory and whole-app gaps through macOS 0.72
 
 ### Added
+- Concurrent MongoDB first-page requests now share one schema census and retain the union of types observed across pages.
 
 - Jump to Column searches browse/result metadata, distinguishes duplicate names by ordinal, and supports Ctrl+Shift+J.
 - BookiE display name and original book icon; new package commands retain legacy aliases.

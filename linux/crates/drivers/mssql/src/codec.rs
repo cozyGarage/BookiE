@@ -108,6 +108,7 @@ pub(crate) fn column_data_to_value_for_type(cd: &ColumnData<'static>, column_typ
         return value;
     }
     match column_type {
+        ColumnType::SSVariant => Value::Undecodable("sql_variant".into()),
         ColumnType::Money => Value::Undecodable("money".into()),
         ColumnType::Money4 => Value::Undecodable("smallmoney".into()),
         _ => value,
@@ -288,6 +289,18 @@ mod tests {
         );
         assert_eq!(
             column_data_to_value_for_type(&ColumnData::F32(None), ColumnType::Money4),
+            Value::Null
+        );
+    }
+
+    #[test]
+    fn sql_variant_columns_refuse_untyped_values_but_preserve_null() {
+        assert_eq!(
+            column_data_to_value_for_type(&ColumnData::I64(Some(9_007_199_254_740_993)), ColumnType::SSVariant),
+            Value::Undecodable("sql_variant".into())
+        );
+        assert_eq!(
+            column_data_to_value_for_type(&ColumnData::I64(None), ColumnType::SSVariant),
             Value::Null
         );
     }

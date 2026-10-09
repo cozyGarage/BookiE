@@ -11,9 +11,9 @@ mod error;
 mod updates;
 
 pub use error::BuildSqlError;
-
 pub use updates::{
-    build_keyed_update, build_mongodb_keyed_delete, build_mongodb_keyed_update, build_optimistic_keyed_update,
+    build_keyed_update, build_keyed_value_select, build_mongodb_keyed_delete, build_mongodb_keyed_update,
+    build_optimistic_keyed_update,
 };
 
 pub const MAX_IDENT_BYTES: usize = 256;

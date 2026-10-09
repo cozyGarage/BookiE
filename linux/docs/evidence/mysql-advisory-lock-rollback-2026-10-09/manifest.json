@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "scope": "B4-11 MySQL and MariaDB advisory-lock side effects after failed DML batch rollback",
+  "source_commit": "770fbe35e32db618e3d79d7c459003058cc916c5",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "2db5e2c451aff1d75d644f12e919961adcbcd9181a6f7366d03495d8f2d62937",
+    "crates/drivers/mysql/tests/shared/mysql_atomic_parts/advisory_lock.rs": "1709621fa0836cd7fc975bfc394d39543c23e798704d28a16bc0087995b7851a"
+  },
+  "test": "mysql_atomic",
+  "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+  "runtime": "Local Linux host with Docker MySQL and MariaDB fixtures",
+  "result": "18 passed; 0 failed; 0 ignored; 68 filtered out; 174.61 seconds; script exit code 0",
+  "new_assertions": [
+    "GET_LOCK acquired inside a DML batch remains held after a later duplicate-key failure rolls back the InnoDB insert",
+    "The lock remains held on both MySQL and MariaDB until the owning connection pool closes",
+    "Closing the owning pool releases the named lock for a fresh connection"
+  ],
+  "not_established": [
+    "Optional/vendor MySQL engines such as NDB",
+    "Side-effect classes beyond the tested row, trigger, session-variable, LAST_INSERT_ID, auto-increment and advisory-lock effects",
+    "Frozen-candidate and hosted acceptance"
+  ],
+  "log_sha256": {
+    "run.log": "2cf19a5109c3f074962133bf3e88d8dff4203f35210377c6a6c352315cbb9e56"
+  },
+  "rebase_validation": {
+    "checkout_commit": "b936be28e0455e303fb18b78e82c1db0ccdc7aec",
+    "base_commit": "fb6ddc14a27f9512ac8a133058ba7fe3126579e8",
+    "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+    "result": "18 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; 188.31 seconds; exit code 0",
+    "log": "rebase-run.log",
+    "log_sha256": "86de4031a0470b1cd9736d0db64047916ded70724efcd4f9a1de96cdedb0e224",
+    "log_normalization": "The final extra blank line was removed; test output lines are unchanged."
+  },
+  "latest_validation": {
+    "checkout_commit": "e9931e7075c7ad1e0f55d09a49adb03d9faa336c",
+    "base_commit": "5540db7e082e215982edbec73eedef00eadb16ab",
+    "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+    "result": "18 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; 190.79 seconds; exit code 0",
+    "log": "linux-tip-5540db7e-run.log",
+    "log_sha256": "1ebb9d808882134c21771308d3461620f2ac0012a76a844ccaea2fcbb40804c6"
+  }
+}
