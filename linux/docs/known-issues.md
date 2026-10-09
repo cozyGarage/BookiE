@@ -18,33 +18,19 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against BookiE `fork/linux` tip
-`3b903b826bf487ef7fad6eacb3a5b67c4c8b8bd1` (PR #450), checked 2026-10-09.
-PRs #392 and #441–#450 are merged. PR #443's full MSSQL run passed 77 tests,
-and the local full value-contract tier passed 428 tests with no missing suites.
-Unpiped preflight and all required hosted checks passed for PRs #445–#449.
-PostgreSQL vector-capacity and deep-enum expression regressions caught their
-scoped mutations; PRs #448 and #449 passed their Docker contracts and all 11
-required hosted checks. PR #450's GitHub checks passed, but its Docker driver
-integration job was skipped and Forgejo run 85 was disrupted by executor
-restarts. Its follow-up branch adds native stored-value oracles and serial
-MariaDB fixture reuse. Both charset selectors and all 88 serialized MySQL
-integration tests passed locally using one MySQL and one MariaDB container
-(66.36 s); unpiped preflight passed. The branch was published at `f29743c`; Forgejo run 88
-failed on that pre-#452 tip. The PostgreSQL failure was a disconnect-test race:
-its one-shot `pg_stat_activity` lookup ran before the tagged backend was
-visible. Ubuntu and Debian also failed GTK safety waits for `open_editor` and
-`audit_failure_denies`; the cause remains unclassified and needs separate UI
-follow-up.
-Commit `b98ce22` adds bounded polling to the backend-termination fixtures; the
-local PostgreSQL disconnection module passed 10/10 tests, the full serialized
-PostgreSQL integration binary passed 234/234 in 120.91 s with one server, and
-unpiped preflight passed on the current head. Run 88 predates the current B3 fix
-and #451/#452 merges; the updated local head still needs its own gate.
-The broader B3 engine/type/consumer matrix and installed acceptance remain
-open. This is a status snapshot, not a release qualification.
-Older audits remain historical; this ledger and the
-[active sprint](bookie-0.2-sprint.md) own current status.
+Status snapshot checked 2026-10-09 against tip after PRs #441–#458 (docs tip
+`ca1080a55`; nearest code tip `c2f3f78b9`). This ledger and the
+[active sprint](bookie-0.2-sprint.md) own current status; PR-by-PR continuation
+is in [sprint history](archive/bookie-0.2-history.md#archived-from-active-sprint-on-2026-10-09-consolidation).
+Not a release qualification.
+
+Retest indicators (also listed on the sprint): Forgejo run 101 PostgreSQL
+driver failures; `pg-release` query-plan vs fail-closed masking; Forgejo run 88
+GTK waits for `open_editor` and `audit_failure_denies` (pre-#451/#452 tip);
+TEST-28 native Ubuntu AT-SPI; Build Linux Docker Hub rate limits near
+`c2f3f78b9`. Commit `b98ce22` addressed the earlier disconnect-test race from
+run 88; that specific race is not the open retest.
+
 ## Owners and handoff
 
 Every open row has one owner. `scripts/check-known-issues.py` fails when an
