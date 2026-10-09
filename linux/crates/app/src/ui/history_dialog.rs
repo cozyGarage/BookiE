@@ -32,6 +32,7 @@ pub struct HistoryDialog {
     /// matches GNOME Files' search debounce.
     filter_debounce: std::rc::Rc<std::cell::RefCell<Option<gtk::glib::SourceId>>>,
     search_generation: std::cell::Cell<u64>,
+    mutation_order: std::sync::Arc<tokio::sync::Mutex<()>>,
 
     selection_bar: gtk::Revealer,
     selection_label: gtk::Label,
@@ -398,6 +399,7 @@ impl Component for HistoryDialog {
             filter_source,
             filter_debounce: std::rc::Rc::new(std::cell::RefCell::new(None)),
             search_generation: std::cell::Cell::new(0),
+            mutation_order: std::sync::Arc::default(),
             selection_bar,
             selection_label,
             connections,
@@ -636,14 +638,17 @@ impl HistoryDialog {
         self.search_generation.set(generation);
         let filter = self.build_filter();
         let history = self.history.clone();
+        let order = self.mutation_order.clone();
         sender.command(move |out, shutdown| {
             shutdown
                 .register(async move {
-                    mutation.await;
-                    let entries = history.search(filter).await.unwrap_or_else(|e| {
-                        tracing::warn!(error = %e, "history search failed");
-                        Vec::new()
-                    });
+                    let entries = crate::services::ordered_refresh::after_mutation(&order, mutation, async {
+                        history.search(filter).await.unwrap_or_else(|e| {
+                            tracing::warn!(error = %e, "history search failed");
+                            Vec::new()
+                        })
+                    })
+                    .await;
                     out.send(HistoryDialogCmd::Loaded(generation, entries)).ok()
                 })
                 .drop_on_shutdown()

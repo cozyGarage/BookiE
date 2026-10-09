@@ -104,6 +104,12 @@
 
 ### Fixed
 
+- Pressing Cancel while a connection is finishing no longer opens that connection anyway
+- Refreshing, closing or pressing Kill twice in the activity dialog no longer cancels a Kill that is already running, so its result is always shown
+- A run that cannot start (the session is closing or the connection is gone) no longer hides the result of the query still running in that editor
+- Deleting or pinning several history entries in quick succession no longer brings a deleted entry back into the list
+- Refreshing the table list and the editor's column suggestions now cancel the previous request at the database instead of letting it run on after a newer one or a connection change
+- Editing a number so that only its stored form changes (`1.5` to `1.50`, `0` to `-0`) is now saved instead of being dropped as no change
 - Copy Value preserves full previewed, pending and draft cell values; editing literal `<NULL>` text no longer turns it into an empty value.
 - MongoDB connections now reject malformed or URI-shaped host input before constructing the connection URI.
 - Closing a table tab, paging, or disconnecting now stops the slow read it started on the server instead of letting it run to the timeout.

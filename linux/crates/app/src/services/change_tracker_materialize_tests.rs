@@ -312,3 +312,29 @@ fn typed_primary_keys_reach_the_where_clause_unchanged() {
         assert_eq!(statements[1].1, key_values);
     }
 }
+
+#[test]
+fn an_edit_that_changes_only_the_stored_form_of_a_number_is_kept() {
+    let decimal = |text: &str| Value::Decimal(text.parse().unwrap());
+    for (before, after) in [
+        (decimal("1.5"), decimal("1.50")),
+        (Value::Float(0.0), Value::Float(-0.0)),
+    ] {
+        let mut tracker = TabChangeTracker::new();
+        tracker.track_cell_edit(key(1), 1, before, after);
+        assert_eq!(tracker.pending_count(), 1);
+    }
+}
+
+#[test]
+fn an_edit_back_to_the_identical_value_is_dropped() {
+    for value in [
+        Value::Float(f64::NAN),
+        Value::Decimal("1.50".parse().unwrap()),
+        Value::Int(3),
+    ] {
+        let mut tracker = TabChangeTracker::new();
+        tracker.track_cell_edit(key(1), 1, value.clone(), value);
+        assert_eq!(tracker.pending_count(), 0);
+    }
+}
