@@ -2,7 +2,7 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-09; new cases link to their source tests and PR
+and acceptance. Updated 2026-10-10; new cases link to their source tests and PR
 validation comments, while this summary is not itself runtime evidence.
 
 MySQL transaction queries already shared the production result collector; the
@@ -48,6 +48,16 @@ row are asserted in
 `value_contract_enum_parameter_resolves_without_target_schema_in_session_path`.
 
 ## Current evidence and next targets
+
+The SQL Server test fixture now waits for an authenticated `SELECT 1` as `sa`,
+retrying login rejection for at most 60 seconds after the container readiness
+logs. On timeout it includes container stdout/stderr with the fixture password
+redacted. The main integration and wide-numeric targets share this fixture.
+Deterministic retry tests pass; local serial Docker runs passed the main suite
+43/43 in 260.94 seconds and wide-numeric 5/5 in 3.87 seconds, including
+`a_column_comment_round_trips_from_its_extended_property`. This makes the test
+fixture wait for the authenticated state; it does not prove the executor's
+earlier `AuthFailed` was caused by SQL Server's script-upgrade window.
 
 Merged [PR #384](https://github.com/cozyGarage/BookiE/pull/384) implements
 PERF-9: saved hidden non-key columns are removed from SQL browse projections
