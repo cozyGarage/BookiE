@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use drivers_duckdb::DuckdbDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
+use tablepro_core::{ConnectOptions, DatabaseDriver, Value};
 
 fn quote_ident(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
