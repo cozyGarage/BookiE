@@ -27,140 +27,37 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
   acceptance gate since 2026-10-08), installed checks on Arch and Debian, and the
   30-attempt soak (Forgejo nightly `gtk-soak`).
 
-## Current continuation: 2026-10-09
+## Current continuation
 
-The merged `linux` baseline is `97e5f55bddacdfef427c51f162917fedcace3a9f`
-(PR #451, including #452); PRs #441–#452 are merged. PR #443 adds SQL Server
-`decimal(38,38)` preservation and refuses lossy `sql_variant` values. Its full
-MSSQL run passed 77 tests; the full local value-contract tier passed 428 tests
-with no missing suites, and unpiped preflight passed. The scoped SQL Server
-codec mutation audit tested 38 variants: 32 caught, 6 build-unviable, none
-missed or timed out. PR #448 adds deep PostgreSQL enum expression and array
-result boundaries through 4,096 domain layers; its Docker contract, local
-preflight and all 11 required hosted checks passed. PR #449 adds
-`array_remove`, `array_prepend`, `array_position` and `array_positions`
-scalar-parameter behavior at 63, 64 and deeper enum-domain levels; its Docker
-contract, unpiped preflight and all 11 required hosted checks passed. A focused
-17-variant MySQL `decode_by_type` audit on the current source caught all 16
-buildable mutants across native selectors; one was build-unviable. PR #450 adds
-MySQL and MariaDB invalid-UTF-8 ENUM/SET result regressions. Its GitHub checks
-passed, but Docker driver integration was skipped and Forgejo run 85 was
-disrupted by executor restarts. A follow-up branch adds native stored-value
-oracles and shared MariaDB fixtures for the serial full suite. Both charset
-selectors and all 88 serialized MySQL integration tests passed locally using
-one MySQL and one MariaDB container (66.36 s); unpiped preflight passed. The branch was
-published at `f29743c`; Forgejo run 88 failed on that pre-#452 tip. The
-PostgreSQL failure was a disconnect regression checking for its tagged backend
-before it was visible in `pg_stat_activity`. Commit `b98ce22`
-reuses bounded polling in the affected backend-termination tests; the local
-PostgreSQL disconnection module passed 10/10 tests, its full serialized
-integration suite passed 234/234 in 120.91 s with one server, and unpiped
-preflight passed on the current head. Ubuntu and Debian also failed GTK safety waits for
-`open_editor` and `audit_failure_denies`; their cause remains unclassified and
-needs separate UI follow-up. The updated local head still needs its own gate;
-run 88 predates the current B3 fix and the #451/#452 merges.
-Merged topic branches have been deleted.
+Merged `linux` baseline after PRs #441–#458 includes generation-ordered results,
+SQL Server wide decimal / `sql_variant` refusal, deep PostgreSQL enum/array
+contracts, MySQL/MariaDB charset regressions, B4 policy effects dual-compute,
+and SSH/rollback acceptance evidence. Case detail lives on the
+[B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md),
+[value evidence index](value-contracts.md) and [ledger](known-issues.md).
+Dated PR-by-PR continuation notes are in
+[sprint history](archive/bookie-0.2-history.md#archived-from-active-sprint-on-2026-10-09-consolidation).
 
-For TEST-29, the local full PostgreSQL integration binary passed 234/234 in
-133.16 seconds and the MySQL/MariaDB binary passed 90/90 in 55.50 seconds.
-SQL Server's DDL batch, durable lost-ack and restart tests, and fast-fixture wide
-numeric test passed. PR #457 is open on GitHub at published head `e0bb6ce`, with
-the latest `origin/linux` merged. Forgejo run 99 on `ab4b273` completed red:
-MongoDB readiness, PostgreSQL query-plan policy, Redis TLS fixture readiness and
-SQL Server startup failed. The follow-up on `e0bb6ce` passed the MySQL/MariaDB
-suite 90/90, MongoDB and Redis jobs, TLS suite, all GTK shards, Postgres e2e and
-both distro floors; its PostgreSQL driver job failed two cases. The byte-budget
-transaction test took 40 seconds under runner contention but passes alone
-locally in 2.15 seconds. The mixed-case enum oracle used a pooled connection
-with incidental `search_path` state; local commit `8e586fb` now reads the native
-oracle on the dedicated session, and the focused test passes. The separate
-`pg-release` failure remains B4-owned: the test expects a plan for `SELECT *`,
-which policy redacts fail-closed. Local commits `559ba69`, `c0eb82f` and
-`200bf5e` keep the MySQL/MariaDB failure cases on one session, wait for
-authenticated MongoDB readiness, retry Redis TLS connection refusal, and allow
-SQL Server 180 seconds to start. Targeted MySQL/MariaDB checks pass 4/4; the
-driver-TLS fixture suite passes 48/48; unpiped preflight passes. Local commit
-`8e586fb` remains unpushed while its exact-head gate is queued behind UX's next
-gate. Run 97 was canceled as a duplicate.
+Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
+Wayland → B7 qualification**. Review may overlap reserved fixtures; a lane pass
+does not close a milestone. The tip is not release-qualified.
 
-B3 remains open after #450: continue the wider engine/type/consumer/configuration
-matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
-and B7 remain open as listed above; keep the sequence B3 → B4 → installed
-Arch/Wayland → Debian/GNOME → B7. The merged baseline is not release-qualified.
+### Retest indicators (do not drop)
+
+These failed or incomplete runs stay open until re-proven on a current SHA:
+
+| Signal | Owner | Note |
+| --- | --- | --- |
+| Forgejo run 101: two PostgreSQL driver failures | B3 | Local follow-up `8e586fb` pins the enum oracle to one session; await exact-head gate |
+| `pg-release` query-plan vs fail-closed masking (`***REDACTED***`) | B4 / AUD-9 | Product intent vs release fixture unresolved |
+| Forgejo run 88 GTK waits: `open_editor`, `audit_failure_denies` | UX | Cause unclassified; run 88 predates #451/#452 |
+| TEST-28 native Ubuntu AT-SPI grid / Columns UI | UX | Container distro-floor passes; native job is the broken surface |
+| Build Linux on `c2f3f78b9`: Docker Hub `toomanyrequests` | lab | Infrastructure; last fully green Build Linux was `0d36a65d7` (#455) |
+| Build Linux on `57fd504ab`: plan rows fully redacted | B4 | Same query-plan / masking mismatch as above |
 
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless
 the maintainer adds it.
-
-## Historical continuation snapshot: 2026-10-08
-
-Code baseline: `0bb8e34354d13e3ab9911b9db710eddb02115170` on `linux`, checked
-2026-10-08.
-Merged since the 0.1.5 release, by lane:
-
-- **UX:** result headers show type and key markers (#289), selection sum and
-  average (#346), a Copy error button (#347), a connection-coloured workspace
-  tab strip (#348), elapsed time without the approval wait (#364), line and
-  column of PostgreSQL statement errors (#366), pinned results and per-statement
-  gutter marks (#372), a collapsible sidebar tree with counts and saved state
-  (#373), and installed scenarios for restore after a deleted connection and a
-  second-profile bundle import (#375), package upgrade checks from the released
-  0.1.5 deb and Arch package (#377, #381) and a Flatpak window check through
-  AT-SPI (#380). The single action table is deferred
-  behind the drift tests (#349, docs only).
-- **B3 values and drivers:** PostgreSQL range refusal and enum grid coverage
-  (#305–#311), MongoDB nested null-filter parity (#312), SQLite STRICT `ANY`
-  computed `iif()` (#331), declared BOOLEAN/temporal and BLOB-affinity decoders
-  (#333), malformed temporal text fallback (#335), schema-aware domain-over-enum
-  at 302 and 512 layers (#338, #340), direct enum-domain query metadata (#342),
-  domain-array projections and a higher bounded type-resolution cap (#344),
-  enum-leaf metadata (#324), timestamp-array JSON export under `SQL, DMY` (#325),
-  SQLite affinity for enum-like declared types (#359).
-- **B3/B4 lost-ack and rollback:** MySQL lost-ack no-replay (#315), Redis (#345),
-  ClickHouse (#354), SQL Server (#355); MySQL failed-batch INSERT (#337) and
-  direct UPDATE/DELETE (#353) across storage engines; frozen-candidate
-  PostgreSQL rollback rerun (#350); Redis binary-value, binary-key and SCAN
-  page-boundary coverage (#317–#320).
-- **Mutation audits and test hygiene:** #322, #326–#328.
-- **CI:** GTK soak setup (#357, #358), serialized GTK tunnel-loss assertions
-  (#360), Forgejo parallel merge tier (#288).
-
-The PR workflow skips Docker driver integration; the post-merge merge-tier run
-`37752816805` passed. Post-merge Build Linux run `37743149992` on `32b170f` was
-cancelled, so that SHA has no hosted result. None of these runs establish B4
-acceptance on a selected frozen candidate. Per-PR commands and results are in
-the PR evidence comments: [#314](https://github.com/cozyGarage/BookiE/pull/314#issuecomment-6052065028),
-[#331](https://github.com/cozyGarage/BookiE/pull/331#issuecomment-6053023990),
-[#333](https://github.com/cozyGarage/BookiE/pull/333#issuecomment-6053147574),
-[#335](https://github.com/cozyGarage/BookiE/pull/335#issuecomment-6053236106),
-[#337](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536),
-[#338](https://github.com/cozyGarage/BookiE/pull/338#issuecomment-6053281386),
-[#340](https://github.com/cozyGarage/BookiE/pull/340#issuecomment-6053311277),
-[#342](https://github.com/cozyGarage/BookiE/pull/342#issuecomment-6053339776),
-[#344](https://github.com/cozyGarage/BookiE/pull/344#issuecomment-6053519593),
-[#345](https://github.com/cozyGarage/BookiE/pull/345#issuecomment-6053620744),
-[#355](https://github.com/cozyGarage/BookiE/pull/355#issuecomment-6055451200).
-
-[B3 PR #365](https://github.com/cozyGarage/BookiE/pull/365) merged with
-MySQL/MariaDB ENUM/SET malformed-metadata refusal and consumer regressions.
-[PR #369](https://github.com/cozyGarage/BookiE/pull/369) also merged with the
-PostgreSQL 513-layer enum-domain checkpoint; see the [B3 board](type-contract-strategy.md)
-for contract details. B3 remains open for the broader
-engine/type/consumer/configuration matrix,
-mutation triage and installed grid acceptance. B4 still needs the remaining
-privacy, daemon retirement, headless ownership and transport/session acceptance.
-B7 still needs a frozen candidate, installed Arch/Wayland and Debian/GNOME
-acceptance, upgrade/rollback and soak. Case-level evidence belongs on the
-[B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md) and [value
-evidence index](value-contracts.md); do not infer a lane pass or release
-qualification from these merged scenarios.
-
-Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
-Wayland → B7 qualification**. Review/preparation may overlap with reserved
-files and fixtures; a lane pass does not close a milestone.
-
-This sprint keeps milestone order and acceptance status; source-pinned case
-results live in the B3 board and value evidence index.
 
 ## Technical decisions
 
@@ -222,42 +119,6 @@ part of release acceptance. U2–U6 and older-release O1–O3
 are mapped in [main review](archive/upstream-main-review-2026-10-03.md) and
 [older-release review](archive/upstream-older-releases-review-2026-10-03.md). Reuse these
 owners; do not create a second completion cache, exporter or type policy.
-
-## B4 acceptance worklist (2026-10-08)
-
-This is the next acceptance slice on current `fork/linux` tip `e697824`.
-Build Linux #37797466945 completed successfully on `c3122d9`. The later run
-[#37806196821](https://github.com/cozyGarage/BookiE/actions/runs/37806196821)
-completed successfully on `896f1b3`, including B4 rollback, PostgreSQL release,
-Driver TLS, driver/SSH integration, installed GTK safety smoke and the
-regression gate; scheduled Clippy was skipped. Build Linux
-[#37849452394](https://github.com/cozyGarage/BookiE/actions/runs/37849452394)
-is pending on `e697824`; Linux Security #37849452452 passed and Flatpak
-[#37849452274](https://github.com/cozyGarage/BookiE/actions/runs/37849452274)
-is in progress. No completed current-tip Linux CI contracts run was visible.
-The B4 Docker rollback job was skipped on the PR events for #407/#408. Earlier
-Build Linux #37847211229 on `7be233d` and #37844691724 on `ae3a1e0` are historical
-and superseded. Hosted checks do not substitute for exact
-frozen-candidate or native Wayland acceptance. The SSH GTK artifacts below
-prove staged release-binary behavior under Xvfb/AT-SPI; they do not prove a
-distribution-package installation or native Wayland session.
-
-| Item | Current evidence and action |
-| --- | --- |
-| B4-7, B4-16 | Keep UNVERIFIED. Local SSH/GTK trust, audit and tunnel-loss scenarios passed on `c3122d9`; hosted PostgreSQL release and driver/SSH integration passed in #37797466945 and #37806196821. Frozen-candidate and installed-package/native Wayland acceptance remain open. |
-| B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). Hosted Driver TLS passed on `c3122d9` in #37797466945 and `896f1b3` in #37806196821. The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Frozen-candidate and installed-package/native Wayland acceptance remain open. |
-| B4-22 | Keep UNVERIFIED. Five bundle/export GTK scenarios passed locally with a staged `a7f14fa` binary. Build Linux #37806196821 passed a generic installed GTK safety smoke on `896f1b3`, not the bundle flow. Obtain frozen-candidate bundle acceptance and installed-package/native Wayland evidence. |
-| B4-12 | DONE for the scoped frozen-candidate rollback acceptance: the backend-termination selector passed on candidate source `a7f14fa` (1 test) and in hosted B4 rollback jobs #37797466945 and #37806196821. It verifies `TransactionRollbackFailed`, the failing statement index and disconnect errors, absent transactional row/trigger effects after reconnect, and expected sequence advancement. Full-candidate and package qualification remain separate; see [candidate evidence](evidence/b4-rollback-frozen-candidate-2026-10-08/manifest.json). |
-| B4-11 | Existing direct failed-batch coverage includes INSERTs on InnoDB, MyISAM, MEMORY, CSV and ARCHIVE ([PR #337](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536)); UPDATE and DELETE on InnoDB, MyISAM, MEMORY and CSV ([PR #353](https://github.com/cozyGarage/BookiE/pull/353)); and Aria direct DML and trigger effects. PR #408 adds a BLACKHOLE trigger sink; after rebasing onto `e697824`, the full `mysql_atomic` selector passed locally (13 passed, 66 filtered, 143.42 s) on test tree `e267ba0`. Its hosted checks remain in progress and the PR-event Docker rollback job was skipped. Other storage engines and side-effect patterns remain open; see [PR #408](https://github.com/cozyGarage/BookiE/pull/408). |
-| B4-17 | Existing `ssh-gtk-*` artifacts show both-hop trust prompts, routed query, second-hop decline without learning, changed-key refusal and terminal audit outcomes using staged release binaries under Xvfb/AT-SPI. Build Linux #37806196821 passed the PostgreSQL release and driver/SSH integration jobs on `896f1b3`; the installed GTK safety smoke is not native SSH trust acceptance. A staged-candidate Wayland probe did not establish host-key refusal; see [probe evidence](evidence/b4-ssh-native-wayland-2026-10-08/manifest.json). Close only after selected-candidate and installed-package/native Wayland trust flow. |
-| B4-21 | Keep Windows AD interoperability open. Samba AD Kerberos+TLS fixtures are useful local coverage but do not establish interoperability with Windows AD; candidate and distribution-package acceptance are also outstanding. |
-| UI-1b | Keep refusing edits to saved SSH jump chains. Implement the per-hop secret editor design across persistence, transport identity, bundle compatibility and GTK before enabling chain editing. |
-
-Recheck the remote tip before each candidate run; do not reuse a stale SHA or
-reapply work already merged.
-
-The [architecture review](archive/architecture-consistency-review-2026-10-03.md#remaining-source-risks)
-records panic privacy and headless retirement gaps alongside these owners.
 
 ## Arch / Omarchy / Wayland UI packets
 

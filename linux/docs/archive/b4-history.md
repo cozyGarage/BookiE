@@ -500,7 +500,7 @@ candidate, followed by the required Debian phase and the existing B7 process.
 ## September 28 continuation (historical evidence)
 
 Reviewed at `85fecbe0b`. See the [commit archive](sprint-review-2026-09-28.md)
-and [active order / Luna packets](../bookie-0.2-sprint.md#b4-next-order).
+and [active B4 acceptance work](../b4-task-board.md#next-b4-acceptance-run).
 A/B, C1–C5, D, G1/G2/G4 and H have recorded implementation/regression evidence;
 B4 remains open for C6, E, F, G3/G5 and active I tasks. A5's monitor follow-up is F9.
 Existing results apply to their recorded revisions; this review reran no tests.
@@ -665,3 +665,211 @@ Files: driver `src/lib.rs` and tests for the engines named.
 Completed lane tasks are archived evidence, not a request to reimplement them.
 Review current callers and record a failure before changing behavior. Preserve
 one regression and the existing tier ownership for every confirmed fix.
+
+
+---
+
+# Archived B4 dated checkpoints (2026-10-09 consolidation)
+
+Moved from [b4-task-board.md](../b4-task-board.md). These snapshots are source-pinned evidence. Failed or incomplete hosted runs remain retest indicators; open rows stay on the live board and ledger.
+
+## B4 continuation checkpoint (October 3; historical integration snapshot)
+
+| Task | Integrated source | Remaining acceptance |
+| --- | --- | --- |
+| A1–A5, B1–B5, C1–C5, D1–D8, G1/G2/G4, H1–H4 | Prior implementation and regressions retained | Recheck affected cases on the frozen candidate; A5's consumer is F9 |
+| E1/E2, G3, F1/F2/F3 | Merged in #13–#18 | No reimplementation; native/shared policy, verified cache and close-route acceptance at candidate SHA |
+| F5 | Merged as `4b7814f5e` (#19) | Installed retirement/toggle flow |
+| F4/F9 | Merged as `573435766` (#20) | Monitor consumes tunnel closure and swaps live identity; native reconnect and [release-binary GTK stale-session evidence](../evidence/ssh-reconnect-session-gtk-2026-10-07/manifest.json) passed; distribution-package/native Wayland acceptance remains |
+| F6 | Merged as `d1434438e` and follow-up `6e2c5687a` (#22/#23) | GUI defaults to refusal and installs the built-in prompter. Native two-hop success, second-hop key-change refusal, and in-flight cancellation while the second-hop trust prompt is pending passed locally on `f3a1765` via `bash scripts/test-ssh.sh`; the [combined release-binary GTK run](../evidence/ssh-gtk-multihop-2026-10-07/manifest.json) passes all five default PostgreSQL release GTK scenarios, including two-hop success, second-hop decline, changed-key refusal, audit refusal, and saved mTLS. The current [relay image rerun](../evidence/postgres-release-relay-no-expose-2026-10-07/manifest.json) also passed after removing unnecessary EXPOSE metadata. The two-hop success, decline and changed-key flows each record exactly one terminal audit outcome. Frozen-candidate native cancellation and package-installed/native Wayland trust acceptance remain; all seven hosted release-binary PostgreSQL SSH GTK scenarios passed in [run #37708183936](https://github.com/cozyGarage/BookiE/actions/runs/37708183936) at PR #286 head `a056bf1` |
+| F8 | GUI generation split merged as `6346a431c` (#24); daemon generations merged as `09c5351a3` | Policy, GUI and daemon scope uncertainty per connection generation while sharing journal failure. Agentd regressions cover isolation, replacement, late cancellation and shared journal failure; frozen-candidate and installed restart acceptance remain |
+
+This table is the October 3 integration snapshot with later evidence links added
+where useful. The current merged state is summarized below; merges do not imply
+fresh hosted results. Historical reports and original packets are preserved in
+[B4 history](b4-history.md); missing worktree/cache paths remain
+unavailable evidence. The broad release audit is dated
+[October 3](release-audit-2026-10-03.md).
+
+## Latest merged slices (checked 2026-10-07)
+
+| Task | Merge | Local evidence | Hosted state at last check |
+| --- | --- | --- | --- |
+| C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
+| G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
+
+The current `linux` branch tip fetched on 2026-10-07 is `c8c06edd` (PR #201).
+Recent B4 merges include #159 (SSH audit, rollback and Kerberos), #161/#162
+(PostgreSQL GTK fixture setup), #163/#170/#173/#175 (SSH trust-prompt timeout
+and dismissal), #165 (GTK SSH fixture hardening), and #178 (file-chooser
+accessibility wait). PR #181 records fresh merged-linux plaintext bundle-audit
+GTK runs; #182 adds a fresh encrypted-bundle run and corrects the stale I5 GTK
+coverage row. PR #183 adds B3 UI and MSSQL coverage; #184 reconciles the sprint
+baseline. PR #185 fixes bundle chooser interaction and connection-list rebuild
+after its GTK run exposed a fatal-critical regression. The export, plaintext
+import and encrypted retry/credential round-trip GTK scenarios were rerun on
+`3a3d742fe` via `TABLEPRO_GTK_SCENARIO=bundle_export_records_sanitized_audit_outcome,bundle_import_records_sanitized_audit_outcome,encrypted_bundle_round_trip_restores_credentials bash scripts/test-gtk-safety.sh`;
+all three passed on the local host under isolated D-Bus/Xvfb. The harness sets
+`G_DEBUG=fatal-criticals`. The [PR #185 discussion](https://github.com/cozyGarage/BookiE/pull/185)
+records the original failure and fix. Required pull-request checks on #185
+completed successfully; Docker-backed suites and installed GTK safety were
+skipped on the pull-request event. The later push run on #194's merge commit
+([run 37641533809](https://github.com/cozyGarage/BookiE/actions/runs/37641533809))
+was superseded by the #195 push: its installed GTK and driver integration jobs
+were cancelled, and the Linux regression gate reported those cancelled lanes
+as incomplete. This does not establish hosted installed-flow acceptance. The
+[October 7 candidate
+checkpoint](../evidence/b4-candidate-acceptance-2026-10-07/manifest.json) retains
+the earlier candidate evidence. These runs do not establish frozen-candidate
+or installed acceptance; those gates remain open.
+
+## Previous merged-tip B4 checkpoint (2026-10-09; source `97e5f55`)
+
+`fork/linux` is `97e5f55bddacdfef427c51f162917fedcace3a9f` after PR #451.
+PR #451 makes the SSH cancellation fixture deterministic; its rebased focused
+test passed 10/10 locally. On the merged tip, the per-user source build passed
+the 54-scenario GTK safety suite, the MySQL approval-dialog regression, the
+seven PostgreSQL SSH/mTLS GTK scenarios, and the 18-test `mysql_atomic`
+selector. The PostgreSQL release fixture also passed one system OpenSSH test,
+three mTLS tests, and 59 release integration tests. Logs, hashes, exact
+selectors, and scope limits are in the [current-tip evidence](../evidence/b4-current-linux-tip-2026-10-09/manifest.json).
+
+This evidence is from a user-local package-layout install, not a package built
+and installed by pacman. The post-merge hosted Build Linux run was still in
+progress when the evidence was captured. Distribution-package and native
+Wayland acceptance and Windows AD interoperability remain open. A separate
+manual launch on the earlier source `3b903b8` produced a GTK/Wayland
+SIGSEGV. An isolated eight-second Wayland smoke on `97e5f55` showed no
+SIGSEGV but did not reach workspace readiness because its D-Bus session could
+not activate AT-SPI; this is incomplete, not acceptance. The headless Wayland
+runner could not start because `gnome-shell` is unavailable on the test host.
+See the [run notes](../evidence/b4-current-linux-tip-2026-10-09/README.md).
+
+On exact `fork/linux` source `2ef1df8`,
+`bash scripts/test-arch-package-container.sh` built and validated Arch package
+`0.1.6-1` (SHA-256
+`709d61f931efc7b833e3a9f45f02a5f17927213b3c122e098ffddae5328e1ee8`). The
+container test upgraded `0.1.5-1` to `0.1.6-1`, verified the installed
+executables, and removed the package while preserving user-data sentinels. It
+does not cover package-installed B4 UI flows or native Wayland; those rows stay
+open. The packaging output also contains a `namcap` PKGBUILD environment
+diagnostic despite an overall exit code of zero. See the [Arch package
+lifecycle manifest](../evidence/b4-arch-package-lifecycle-2026-10-09/manifest.json).
+
+## Previous pinned B4 acceptance checkpoint (2026-10-09; linux tip 4bcec064)
+
+At this checkpoint, `fork/linux` was `4bcec064d1dc4a8f4905f92f40461e4c215ed23b`
+(PR #419). PR #419 updates test-container reuse/support; it does not change
+application runtime code. Exact-source Build Linux run
+[#37865445368](https://github.com/cozyGarage/BookiE/actions/runs/37865445368)
+was explicitly dispatched against immutable product candidate
+`5db1cfe5f15ac258472ac04c82f9083ca2ea81aa`; its B4 rollback, TLS, PostgreSQL
+release and installed GTK safety jobs completed successfully. The artifact
+reports and exact selectors are in the [candidate manifest](../evidence/b4-hosted-acceptance-2026-10-09/manifest.json).
+This advances B4-7/9/11/12/16/17/22 hosted evidence. On current tip
+`4bcec064`, Debian 13 package lifecycle passed install, reinstall, upgrade,
+downgrade and purge while preserving user data. The MySQL approval dialog GTK
+scenario also passed using `/usr/bin/bookie` from the installed package. See
+the [package evidence](../evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json).
+Other package-installed B4 flows, native Wayland acceptance, and Windows AD
+interoperability remain open. PR #420 has since moved `fork/linux` to
+`525dee3eb00968a1211161d333e244187c4bce31` with the B3 MongoDB bounded-browse
+change. Its Build Linux run [#37872021441](https://github.com/cozyGarage/BookiE/actions/runs/37872021441)
+was queued when this note was updated; no B4 acceptance is inferred for that
+newer tip from the earlier exact-SHA results.
+
+On exact post-PR-427 `fork/linux` source `b4ee463`, the user-local release executable passed the 53-scenario GTK UI workflow suite and all seven PostgreSQL SSH/mTLS scenarios under Xvfb/AT-SPI. The reported `mysql_unparseable_routine_dialog_denial_preserves_database` scenario also passed twice against MySQL 8.0, so the earlier empty-dialog regression was not reproduced at this tip; its historical cause remains unconfirmed. The approval runner needed the same `ATSPI_DBUS_IMPLEMENTATION=dbus-daemon` setup as the sibling MySQL runner; this change adds it and the script passed without an external override. See [GTK workflows](../evidence/gtk-ui-workflows-installed-linux-b4ee-2026-10-09/manifest.json), [SSH flows](../evidence/b4-ssh-installed-linux-tip-b4ee-2026-10-09/manifest.json), and [MySQL approval regression evidence](../evidence/gtk-mysql-approval-linux-b4ee-2026-10-09/manifest.json). These local runs do not establish distro-package or native Wayland acceptance.
+
+PR #417 adds the MySQL human-approval dialog regression to hosted installed
+GTK acceptance. Exact-SHA dispatch [#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390)
+ran against `102ef48017f10c7a63c271608b98d3b05b449795`. Its B4 rollback
+(14 MySQL tests and 1 PostgreSQL rollback-failure test), TLS (48 tests), and
+PostgreSQL release GTK jobs passed. The PostgreSQL release job's MySQL
+human-approval dialog step passed, and all seven SSH/mTLS scenarios passed.
+At the initial capture, installed GTK safety and broad driver-integration jobs
+were still running. Both subsequently passed; the broad integration layer
+passed 462 tests across 13 groups, and the complete workflow concluded
+successfully. This hosted pass does not resolve why the operator observed two
+earlier empty-dialog failures; the root cause remains open. See the [follow-up
+acceptance note](../evidence/b4-hosted-acceptance-2026-10-09/focused.txt).
+
+The native SSH suites were also rerun locally on the same exact source SHA with
+`bash scripts/test-ssh.sh`: 10 `agent_auth` and 12 `openssh_session` tests
+passed, including native multi-hop, second-hop cancellation, host-key refusal,
+agent authentication and OpenSSH forwarding. Distribution-package and native
+Wayland trust-flow acceptance remain open. See the [native SSH evidence
+manifest](../evidence/b4-ssh-native-current-2026-10-09/manifest.json).
+
+The SQL Server Kerberos/TLS fixture also passed locally on `102ef480`:
+`bash scripts/test-mssql-kerberos.sh` ran both verified-TLS ticket
+authentication and unregistered-SPN refusal tests successfully against the
+Samba AD fixture. This does not establish Windows AD interoperability or
+package-installed acceptance. See the [current Kerberos evidence
+manifest](../evidence/b4-mssql-kerberos-current-2026-10-09/manifest.json).
+
+## Exact-SHA B4 acceptance checkpoint (2026-10-08)
+
+Earlier B4 layers passed on runtime SHA `a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200`,
+including rollback, TLS, SSH, PostgreSQL release GTK, Samba Kerberos,
+security-policy and sandbox; its evidence remains in the
+[candidate manifest](../evidence/b4-acceptance-2026-10-08/manifest.json). The
+tested `fork/linux` tip was `ca1dc6002cf269f1eb799fe9f04ce0b8c255a1b9` (PR #388).
+On this exact tip, local SSH, PostgreSQL release and Samba Kerberos fixtures
+passed for B4-7, B4-16, B4-17 and B4-21. The [current-tip SSH evidence](../evidence/b4-ssh-current-tip-2026-10-08/manifest.json)
+records 22 native SSH tests and seven GTK SSH trust/audit scenarios; the
+[Kerberos evidence](../evidence/b4-mssql-kerberos-2026-10-08/manifest.json)
+records both Kerberos selectors passing. These were local fixture/Xvfb runs,
+not distribution-package or native Wayland acceptance. Build Linux run
+[#37794837722](https://github.com/cozyGarage/BookiE/actions/runs/37794837722)
+was cancelled before jobs started; Security and Flatpak packaging passed on
+that source SHA.
+
+At the previous checkpoint, `fork/linux` was
+`c3122d97459685060f1cf3474b55e1a11b961abe` (PR #396). The local PostgreSQL
+release fixture passed after rebasing the evidence branch onto that tip; see
+the [SSH evidence](../evidence/b4-ssh-current-tip-2026-10-08/manifest.json).
+Build Linux run
+[#37797466945](https://github.com/cozyGarage/BookiE/actions/runs/37797466945)
+completed successfully on `c3122d9`. The later run
+[#37806196821](https://github.com/cozyGarage/BookiE/actions/runs/37806196821)
+completed successfully on `896f1b3`, including rollback, PostgreSQL release,
+Driver TLS, integration, installed GTK and regression-gate jobs. The latest
+merged `fork/linux` tip is `e697824f92438ea641b0e3b98cdf7d11173ce25a` (PR #403).
+Linux Security run [#37849452452](https://github.com/cozyGarage/BookiE/actions/runs/37849452452)
+passed; Build Linux run [#37849452394](https://github.com/cozyGarage/BookiE/actions/runs/37849452394)
+is pending and Flatpak run [#37849452274](https://github.com/cozyGarage/BookiE/actions/runs/37849452274)
+is in progress. No completed current-tip Linux CI contracts run was visible at
+this check. Build Linux #37849452394 has not completed its B4 rollback job, so
+the skipped PR-event job on #407 or #408 is not hosted rollback acceptance.
+These runs do not qualify the selected frozen B3+B4 candidate.
+Older hosted and cancelled runs remain historical in the candidate and
+rollback manifests. Distribution-package/native Wayland, Windows AD, optional
+MySQL engines and broader rollback side effects remain open.
+
+The previous local checkpoint is candidate
+`7eea6f09d7154f03400e82cec7c16215488b2115`; see the [candidate results and
+hosted run state](https://github.com/cozyGarage/BookiE/pull/298#issuecomment-6050658653).
+Policy, SSH, TLS, PostgreSQL release, GTK bundle audit, SQL Server Kerberos,
+MySQL atomicity and PostgreSQL rollback-failure checks passed locally on this
+exact source. The initial pinned Build Linux run passed PostgreSQL release,
+Fast GTK, TLS, Clippy, and optional DuckDB, but its driver integration job
+timed out during workspace compilation and its GTK suite exposed an encrypted
+credential restoration failure. The corrected exact-SHA rerun below passed
+GTK safety and release-binary SSH scenarios; driver integration again timed
+out during compilation. See the
+[candidate checkpoint](https://github.com/cozyGarage/BookiE/pull/298#issuecomment-6050658653).
+The prior PostgreSQL release job used a debug application binary. PR #286
+merged at `d5d63a95`; its pinned hosted dispatch on PR commit
+`a056bf1715cd134224caf9c3215d617ae9b5ebb6` passed the focused B4 rollback layer
+(9 MySQL cases and 1 PostgreSQL case), hosted release-binary SSH GTK scenarios,
+and installed GTK safety smoke. The broad driver integration tier exhausted its
+30-minute budget during dependency compilation before tests ran. See the [hosted results
+comment on PR #287](https://github.com/cozyGarage/BookiE/pull/287#issuecomment-6049956346)
+and [candidate workflow](https://github.com/cozyGarage/BookiE/actions/runs/37708183936).
+
+The earlier `0d22bfe9` checkpoint remains available in the
+[PR #258 evidence discussion](https://github.com/cozyGarage/BookiE/pull/258#issuecomment-6048355227).
+Neither checkpoint establishes distribution-package installation on native
+Wayland, upgrade/rollback acceptance or Windows AD interoperability. This does
+not qualify 0.2.0.
+

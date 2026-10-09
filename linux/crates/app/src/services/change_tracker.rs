@@ -317,7 +317,7 @@ impl TabChangeTracker {
                         draft.values[*col] = prev_value.clone();
                     }
                 } else {
-                    self.updates.remove(&(row_key.clone(), *col));
+                    self.set_pending_edit(row_key, *col, None, prev_value);
                 }
                 row_key.clone()
             }
@@ -333,6 +333,29 @@ impl TabChangeTracker {
         self.redo.push_back(op.clone());
         self.emit_changed(vec![row_key]);
         Some(op)
+    }
+
+    fn set_pending_edit(&mut self, row_key: &RowKey, col: usize, untouched: Option<&Value>, target: &Value) {
+        let key = (row_key.clone(), col);
+        let stored = self
+            .updates
+            .get(&key)
+            .map(|edit| edit.prev_value.clone())
+            .or_else(|| untouched.cloned());
+        match stored {
+            Some(stored) if KeyValue::from(&stored) != KeyValue::from(target) => {
+                self.updates.insert(
+                    key,
+                    CellEdit {
+                        prev_value: stored,
+                        new_value: target.clone(),
+                    },
+                );
+            }
+            _ => {
+                self.updates.remove(&key);
+            }
+        }
     }
 
     /// Pop one entry off the redo stack, re-apply the tracker's
@@ -356,13 +379,7 @@ impl TabChangeTracker {
                         draft.values[*col] = new_value.clone();
                     }
                 } else {
-                    self.updates.insert(
-                        (row_key.clone(), *col),
-                        CellEdit {
-                            prev_value: prev_value.clone(),
-                            new_value: new_value.clone(),
-                        },
-                    );
+                    self.set_pending_edit(row_key, *col, Some(prev_value), new_value);
                 }
                 row_key.clone()
             }

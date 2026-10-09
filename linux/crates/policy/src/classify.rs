@@ -10,6 +10,7 @@ use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
 use crate::effects::Effects;
 use crate::effects_classification::{sql_effects_from_tokens, statement_effects};
+use crate::select_writes::select_writes;
 
 /// Coarse statement class used by policy rules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -748,10 +749,7 @@ fn set_expr_writes(body: &SetExpr) -> bool {
         SetExpr::Values(_) => false,
         SetExpr::Query(q) => classify_query(q).writes,
         SetExpr::SetOperation { left, right, .. } => set_expr_writes(left) || set_expr_writes(right),
-        SetExpr::Select(select) => select.projection.iter().any(|item| match item {
-            SelectItem::ExprWithAlias { expr, .. } | SelectItem::UnnamedExpr(expr) => expr_writes(expr),
-            _ => false,
-        }),
+        SetExpr::Select(select) => select_writes(select),
         SetExpr::Table(_) => false,
     }
 }
@@ -779,7 +777,7 @@ fn set_expr_tables(body: &SetExpr) -> Vec<String> {
     }
 }
 
-fn expr_writes(expr: &Expr) -> bool {
+pub(crate) fn expr_writes(expr: &Expr) -> bool {
     match expr {
         Expr::Subquery(q) => classify_query(q).writes,
         Expr::BinaryOp { left, right, .. } => expr_writes(left) || expr_writes(right),
