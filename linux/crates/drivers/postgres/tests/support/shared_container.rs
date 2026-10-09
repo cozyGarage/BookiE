@@ -4,6 +4,7 @@ use drivers_postgres::PgDriver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
+use testcontainers::core::{ExecCommand, Mount};
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use tokio::sync::{Mutex, MutexGuard, OnceCell};
@@ -22,10 +23,19 @@ static CONTAINER: StdMutex<Option<ContainerAsync<Postgres>>> = StdMutex::new(Non
 static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 pub(crate) async fn start_pg() -> (TestDatabase, ConnectOptions) {
+    start_pg_with_durability(false).await
+}
+
+pub(crate) async fn start_pg_durable() -> (TestDatabase, ConnectOptions) {
+    start_pg_with_durability(true).await
+}
+
+async fn start_pg_with_durability(durable: bool) -> (TestDatabase, ConnectOptions) {
     if can_reuse_server(
         &std::env::args().skip(1).collect::<Vec<_>>(),
         std::env::var_os("TABLEPRO_TEST_RUN_ID").is_some(),
-    ) {
+    ) && !durable
+    {
         let test_lock = TEST_LOCK.lock().await;
         let server = SERVER.get_or_init(start_shared_server).await;
         reset_server(server).await;
@@ -37,7 +47,7 @@ pub(crate) async fn start_pg() -> (TestDatabase, ConnectOptions) {
             test_options(&server.options),
         );
     }
-    let (container, server) = create_server().await;
+    let (container, server) = create_server(durable).await;
     (
         TestDatabase {
             _container: Some(container),
@@ -65,13 +75,33 @@ fn can_reuse_server(args: &[String], runner_cleans_container: bool) -> bool {
 }
 
 async fn start_shared_server() -> Server {
-    let (container, server) = create_server().await;
+    let (container, server) = create_server(false).await;
     *CONTAINER.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(container);
     server
 }
 
-async fn create_server() -> (ContainerAsync<Postgres>, Server) {
-    let image = Postgres::default().with_tag("16-alpine");
+async fn create_server(durable: bool) -> (ContainerAsync<Postgres>, Server) {
+    let image = if durable {
+        Postgres::default().with_fsync_enabled()
+    } else {
+        Postgres::default()
+    }
+    .with_tag("16-alpine");
+    let image = if durable {
+        image
+    } else {
+        image
+            .with_cmd([
+                "postgres",
+                "-c",
+                "fsync=off",
+                "-c",
+                "synchronous_commit=off",
+                "-c",
+                "full_page_writes=off",
+            ])
+            .with_mount(Mount::tmpfs_mount("/var/lib/postgresql/data"))
+    };
     let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
         Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
         Err(_) => image,
@@ -138,12 +168,32 @@ async fn value_contract_postgres_fixtures_reset_database_and_role_search_path() 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn postgres_test_database_exists_for_an_exact_test_selection() {
-    let (_fixture, options) = start_pg().await;
+    let (container, server) = create_server(false).await;
+    let fixture = TestDatabase {
+        _container: Some(container),
+        _test_lock: None,
+    };
+    let options = test_options(&server.options);
     let connection = PgDriver.connect(options).await.unwrap();
     assert_eq!(
         connection.query("SELECT current_database()::text").await.unwrap().rows,
         vec![vec![Value::Text("test".into())]],
     );
+    assert_eq!(
+        connection
+            .query("SELECT current_setting('fsync'), current_setting('synchronous_commit'), current_setting('full_page_writes')")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text("off".into()), Value::Text("off".into()), Value::Text("off".into())]],
+    );
+    let container = fixture._container.as_ref().unwrap();
+    let mut mounts = container.exec(ExecCommand::new(["cat", "/proc/mounts"])).await.unwrap();
+    let mounts = String::from_utf8(mounts.stdout_to_vec().await.unwrap()).unwrap();
+    assert!(mounts.lines().any(|line| {
+        let fields = line.split_whitespace().collect::<Vec<_>>();
+        fields.get(1) == Some(&"/var/lib/postgresql/data") && fields.get(2) == Some(&"tmpfs")
+    }));
 }
 
 #[test]

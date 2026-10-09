@@ -26,6 +26,18 @@ contract. The Docker contract catches enum/array-recursion changes; the unit
 guard catches an over-broad classification that would add enum catalog lookups
 to ordinary scalar results.
 
+The core Markdown exporter at source SHA-256
+`dc0e5b79166eb2f23d75708f9e62ac06189b0b0ea29330a24fdea9511ac34b0d` was
+mutation-audited across `render_markdown`, its header/separator/row/value
+formatters, cell escaping and the streaming writer. All 14 generated variants
+were caught by the existing renderer and writer tests. The HTML exporter at
+source SHA-256
+`94a7b3ff2660e04862c7d97fc741cd4307f9422a3413a3f8dbc26f439b7f69ad` generated
+7 variants across escaping and streaming output; all 7 were caught. Both
+unmutated baselines passed, with no missed, unviable or timed-out mutants. These
+add focused consumer slices to TEST-2, not a claim that the broader core/package
+audit is complete.
+
 A dedicated PostgreSQL session binds enum text and SQL NULL while the target
 schema is absent from `search_path` and a same-named shadow enum is the only
 visible type. The test checks assignment, `COALESCE`, and `array_append`
@@ -676,6 +688,48 @@ The exact bounded-progress test selector also catches all ten generated
 cursor-arithmetic variants; this is the focused check for the seven variants
 that timed out when the whole `sql_lex::tests` module was selected
 ([mutation evidence](evidence/sql-lex-cursor-arithmetic-guard-results-2026-10-06/manifest.json)).
+
+The core JSON exporter was mutation-audited at source SHA-256
+`88007bfbfb309030f2f080c2d48bb10012ab4e6e3ac383fa993c2cb1e30678d1`.
+The initial 23-mutant run caught 20; two duplicate-name loop mutations timed
+out because the broad `json` selector also runs a renderer test that invokes
+the same loop directly. Running those three loop mutations against the bounded
+`json_field_names_make_progress_when_duplicate_names_have_gaps` selector caught
+all three in five seconds. Removing the explicit `Value::Null` arm is
+behavior-equivalent: `value_to_text(Value::Null)` returns `None`, which the JSON
+fallback also serializes as null. Final triage: 22 caught, one equivalent, no
+missed or unresolved timed-out mutants.
+
+Dialect-specific SQL string quoting was mutation-audited at source SHA-256
+`589e831e5a7dc2be8b47a03243542559db7a4fa3eefe3750d81070d2ddb7868f`.
+The MySQL, ClickHouse and PostgreSQL `string_literal`/`quote_literal` slice
+generated ten mutants; the `backslash` regression selector caught all ten in
+15 seconds.
+On that same source fingerprint, the ClickHouse `DateTime64` precision and
+range slice generated 27 mutants; the `clickhouse_datetime64` regression
+selector caught all 27 in 46 seconds.
+
+CSV cell formatting was mutation-audited at source SHA-256
+`6db55d319ed07c6dc42248f5cacd3363350b6d79cf706cf0c8ea4e7037f444ca`.
+The `csv` selector caught 16 of 19 mutations. The other three are equivalent:
+TSV header presence is controlled by `with_headers`, its explicit NULL marker
+takes precedence over `null_to_empty`, and the RFC 4180 header/row adapters
+choose their output in separate functions.
+The 68 matching core tests passed on the baseline; the scoped mutant run took
+80 seconds and had no surviving behavior change.
+
+XLSX cell encoding and coordinate validation were mutation-audited at source
+SHA-256 `c8d853991ffdda28bef3e3753e8c28355e07140a533c36be391b56de31165fb2`.
+The `workbook` selector caught all 31 generated mutations in 53 seconds,
+including numeric precision, temporal range, and cell-coordinate boundaries.
+
+XML escaping and element-name validation were audited at source SHA-256
+`572bd45d6a3a095ce820a311b6434852d78082fb6a4071efb735c5a83fb511ea`.
+The `xml` selector caught 38 of 39 generated mutations; one was build-unviable.
+The run exposed an untested reserved-prefix boundary, so
+`valid_names_with_only_one_reserved_prefix_letter_are_not_prefixed` now checks
+valid names with `x`, `m`, or `l` outside the reserved `xml` prefix. The final
+rerun had no misses or timeouts; all eight XML unit tests pass.
 
 SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
 ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.

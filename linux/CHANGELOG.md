@@ -93,6 +93,7 @@
 ### Changed
 - The time shown for a statement no longer includes the wait for your approval on a guarded connection.
 - MongoDB browse pages now use a bounded schema sample and stable `_id` paging instead of scanning the full collection for every page.
+- Disposable database test fixtures use tmpfs and reduced flush syncing; lost-ack, crash and restart tests keep durable storage.
 
 - Ctrl+Tab switches to the most recently used tab, and back again, instead of the next tab in the strip.
 - Create table from CSV now explains that ClickHouse, MongoDB and Redis connections cannot do it, and DuckDB gets its own JSON type name.
