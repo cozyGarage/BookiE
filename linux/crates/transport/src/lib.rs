@@ -173,6 +173,7 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
         forwarded_socket_dir: None,
         application_name: None,
         connect_timeout_secs: saved.connect_timeout_secs,
+        read_only: saved.read_only,
     })
 }
 
