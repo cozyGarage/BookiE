@@ -301,10 +301,14 @@ impl RowStore {
     fn detach_cached_rows(&self) {
         for slot in self.imp().slots.borrow().iter() {
             match slot {
-                Slot::Cached { object, .. } => object.upgrade().map(|row| row.detach_shared()),
-                Slot::Object(row) => Some(row.detach_shared()),
-                Slot::Shared(_) => None,
-            };
+                Slot::Cached { object, .. } => {
+                    if let Some(row) = object.upgrade() {
+                        row.detach_shared();
+                    }
+                }
+                Slot::Object(row) => row.detach_shared(),
+                Slot::Shared(_) => {}
+            }
         }
     }
 
@@ -486,6 +490,19 @@ mod tests {
         assert_eq!(store.materialized(), 0);
         assert_eq!(store.find(&held), None);
         assert_eq!(held.cell_value(0), Value::Int(0));
+        assert_eq!(Arc::strong_count(&old), 1);
+    }
+
+    #[test]
+    fn replacing_shared_rows_preserves_edits_on_held_rows() {
+        let old = shared(2);
+        let store = RowStore::from_shared(old.clone());
+        let held = store.item(0).and_downcast::<RowObject>().unwrap();
+        held.set_cell(0, Value::Int(99));
+
+        store.replace_shared(shared(1));
+
+        assert_eq!(held.cell_value(0), Value::Int(99));
         assert_eq!(Arc::strong_count(&old), 1);
     }
 

@@ -7,7 +7,7 @@ use gtk4::subclass::prelude::*;
 use tablepro_core::{QueryResult, Value};
 
 #[derive(Clone)]
-struct SharedRow {
+pub struct SharedRow {
     result: Weak<QueryResult>,
     source_index: usize,
     projection: Option<Vec<usize>>,
