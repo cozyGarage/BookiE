@@ -629,4 +629,14 @@ mod tests {
         };
         assert!(read_dimensions(&mut reader, 1).is_none());
     }
+
+    #[test]
+    fn value_contract_dimension_product_must_fit_element_length_words() {
+        for (payload_bytes, expected) in [(7, false), (8, true)] {
+            let mut bytes = words(&[2, 1]);
+            bytes.extend(vec![0; payload_bytes]);
+            let mut reader = Reader { remaining: &bytes };
+            assert_eq!(read_dimensions(&mut reader, 1).is_some(), expected, "{payload_bytes}");
+        }
+    }
 }
