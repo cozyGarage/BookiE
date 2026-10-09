@@ -61,9 +61,9 @@ or installed acceptance; those gates remain open.
 
 ## Current pinned B4 acceptance checkpoint (2026-10-09)
 
-`fork/linux` is now `4bcec064d1dc4a8f4905f92f40461e4c215ed23b` (PR #419).
-PR #419 updates test-container reuse/support; it does not change application
-runtime code. Exact-source Build Linux run
+At this checkpoint, `fork/linux` was `4bcec064d1dc4a8f4905f92f40461e4c215ed23b`
+(PR #419). PR #419 updates test-container reuse/support; it does not change
+application runtime code. Exact-source Build Linux run
 [#37865445368](https://github.com/cozyGarage/BookiE/actions/runs/37865445368)
 was explicitly dispatched against immutable product candidate
 `5db1cfe5f15ac258472ac04c82f9083ca2ea81aa`; its B4 rollback, TLS, PostgreSQL
@@ -75,7 +75,11 @@ downgrade and purge while preserving user data. The MySQL approval dialog GTK
 scenario also passed using `/usr/bin/bookie` from the installed package. See
 the [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json).
 Other package-installed B4 flows, native Wayland acceptance, and Windows AD
-interoperability remain open.
+interoperability remain open. PR #420 has since moved `fork/linux` to
+`525dee3eb00968a1211161d333e244187c4bce31` with the B3 MongoDB bounded-browse
+change. Its Build Linux run [#37872021441](https://github.com/cozyGarage/BookiE/actions/runs/37872021441)
+was queued when this note was updated; no B4 acceptance is inferred for that
+newer tip from the earlier exact-SHA results.
 
 PR #417 adds the MySQL human-approval dialog regression to hosted installed
 GTK acceptance. Exact-SHA dispatch [#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390)
