@@ -110,6 +110,12 @@ ordinals, bytes, SQL NULL, empty and literal `NULL` values, plus untouched
 sibling rows ([scenario](../scripts/test-gtk-mysql.sh)). This local Xvfb
 scenario does not replace installed Wayland acceptance.
 
+The MySQL and MariaDB result decoders also have native result-charset contracts
+for ENUM and SET values whose Latin-1 bytes are not valid UTF-8. They preserve
+those raw bytes while an equally unrepresentable VARCHAR remains
+`Undecodable`; these catch removal of the ENUM/SET byte fallback in
+`decode_by_type`.
+
 [PR #369](https://github.com/cozyGarage/BookiE/pull/369) extends the PostgreSQL
 enum-domain recursion contract to a tested 513-layer point and is merged. This
 is a checkpoint, not a maximum-depth claim, and it does not close the broader

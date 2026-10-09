@@ -22,6 +22,9 @@ mod disconnection;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
+#[path = "support/result_charset.rs"]
+mod result_charset;
+
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;
 
@@ -833,28 +836,6 @@ async fn a_copied_insert_survives_a_value_that_could_escape_its_literal() {
         count.rows,
         vec![vec![Value::Int(2)]],
         "the insert must add exactly one row"
-    );
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn a_value_the_driver_cannot_decode_is_reported_rather_than_shown_as_null() {
-    let (_c, opts) = start_mysql().await;
-    let conn = connect(opts).await;
-    let mut session = conn.open_session().await.unwrap();
-    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
-    session
-        .query_params_controlled("SET character_set_results = latin1", &[], &control)
-        .await
-        .unwrap();
-    let result = session
-        .query_params_controlled("SELECT 'ünï' AS latin, CAST(NULL AS SIGNED) AS absent", &[], &control)
-        .await
-        .unwrap();
-    assert_eq!(
-        result.rows,
-        vec![vec![Value::Undecodable("VARCHAR".into()), Value::Null]],
-        "a value that failed to decode must not be indistinguishable from a stored NULL"
     );
 }
 
