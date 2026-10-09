@@ -304,8 +304,46 @@ def scenarios(ui):
         assert "asked it to show its window" in result.stderr, result.stderr
         ui.wait_for_frame_containing(" — BookiE")
 
+    def profile_table_browse_payload(rows, payload_bytes):
+        ui.run_sql("CREATE TABLE profile_cells (id INTEGER PRIMARY KEY, person TEXT NOT NULL, payload TEXT NOT NULL)")
+        ui.wait_for_node_containing("done in", timeout=300)
+        half_bytes = (payload_bytes + 1) // 2
+        ui.run_sql(
+            f"WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < {rows}) "
+            "INSERT INTO profile_cells "
+            f"SELECT x, 'person-' || x, substr(lower(hex(randomblob({half_bytes}))), 1, {payload_bytes}) FROM c"
+        )
+        ui.wait_for_node_containing("done in", timeout=300)
+        before_rss, _ = app_memory_kb()
+        started = time.monotonic()
+        ui.wait_for_node(name="profile_cells")
+        ui.invoke_named_action_within("profile_cells", "Open profile_cells")
+        time.sleep(3)
+        after_load = app_memory_kb()[0] / 1024
+        actual_delta_mb = after_load - before_rss / 1024
+        minimum_delta_mb = payload_bytes / (1024 * 1024) / 2
+        assert actual_delta_mb >= minimum_delta_mb, (
+            f"large table page did not retain the expected payload: delta={actual_delta_mb:.1f} MB, "
+            f"minimum={minimum_delta_mb:.1f} MB"
+        )
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+            out.write(json.dumps({
+                "profile_mode": "table-browse",
+                "rows_requested": rows,
+                "cell_payload_bytes": payload_bytes,
+                "observation_after_open_seconds": round(time.monotonic() - started, 2),
+                "rss_before_mb": round(before_rss / 1024, 1),
+                "rss_delta_mb": round(actual_delta_mb, 1),
+            }) + "\n")
+
     def profile_large_result_in_the_grid(database, base):
         rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
+        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_CELL_BYTES", "0"))
+        if rows < 1 or (payload_bytes != 0 and not 8_193 <= payload_bytes <= 8 * 1024 * 1024):
+            raise ValueError("profile rows and cell payload size are outside their supported bounds")
+        if payload_bytes:
+            profile_table_browse_payload(rows, payload_bytes)
+            return
 
         def rss_sample():
             resident, high_water = app_memory_kb()
@@ -389,6 +427,7 @@ def scenarios(ui):
         })
         line = json.dumps({
             "rows_requested": rows,
+            "cell_payload_bytes": payload_bytes,
             "repetition": int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1")),
             "rows_loaded_inferred": end["visible_rows"][1] if end["visible_rows"] else None,
             "truncated_inferred": bool(end["visible_rows"] and end["visible_rows"][1] < rows),
