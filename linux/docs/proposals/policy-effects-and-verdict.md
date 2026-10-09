@@ -14,8 +14,9 @@ which things are written, not only on what a statement does:
   (S7). Reproduced in part: `COPY ... TO PROGRAM` and `MERGE ... DELETE` are
   allowed in both Local and Staging; `TRUNCATE` is allowed in Local but needs
   approval in Staging.
-- A script's audit class follows its first statement, so swapping `DELETE` and
-  `INSERT` changes the recorded class (S8). Reproduced by B4.
+- A script's audit class depends on write-statement order: `DELETE; INSERT` is
+  classified as `Insert`, while `INSERT; DELETE` is classified as `Delete` (S8).
+  An administrative class dominates. Reproduced by B4.
 - `classify.rs` and the masking walker traverse the same AST separately and have
   drifted (a write the classifier sees, masking misses).
 
