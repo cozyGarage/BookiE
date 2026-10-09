@@ -62,6 +62,13 @@ run_full() {
 }
 
 run_integration() {
+  export TABLEPRO_TEST_RUN_ID="ci-${$}-${RANDOM}"
+  cleanup_testcontainers() {
+    python3 "$ROOT/scripts/cleanup-testcontainers.py" "$TABLEPRO_TEST_RUN_ID"
+  }
+  trap cleanup_testcontainers EXIT
+  trap 'cleanup_testcontainers; exit 143' TERM
+  trap 'cleanup_testcontainers; exit 130' INT
   echo "==> SQL and document/key-value driver integration"
   cargo test --locked --test integration \
     -p tablepro-driver-postgres -p tablepro-driver-mysql -p tablepro-driver-mssql \

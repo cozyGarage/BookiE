@@ -85,3 +85,117 @@ async fn value_contract_inet_and_cidr_array_bindings_and_keyed_edits_preserve_na
     assert_eq!(after_invalid.rows[0][0], inet.rows[0][4]);
     assert_eq!(after_invalid.rows[0][1], cidr.rows[0][4]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_inet_array_xlsx_preserves_native_network_text() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE TABLE inet_array_xlsx (value inet[])")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO inet_array_xlsx VALUES ('[-1:2]={192.0.2.1/24,NULL,2001:db8::1/64,192.0.2.1}'::inet[])")
+        .await
+        .unwrap();
+
+    let result = connection.query("SELECT value FROM inet_array_xlsx").await.unwrap();
+    assert_eq!(result.columns[0].data_type, "INET[]");
+    let Value::Text(array_text) = &result.rows[0][0] else {
+        panic!("inet[] XLSX source must remain text: {:?}", result.rows[0][0]);
+    };
+    assert_eq!(
+        array_text,
+        "[-1:2]={\"192.0.2.1/24\",NULL,\"2001:db8::1/64\",\"192.0.2.1\"}"
+    );
+    let native = connection
+        .query("SELECT pg_typeof(value)::text, value::text, array_to_json(value)::text FROM inet_array_xlsx")
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text("inet[]".into()));
+    assert_eq!(
+        native.rows[0][1],
+        Value::Text("[-1:2]={192.0.2.1/24,NULL,2001:db8::1/64,192.0.2.1}".into())
+    );
+    assert_eq!(native.rows[0][2], Value::Text("[\"192.0.2.1/24\",null,\"2001:db8::1/64\",\"192.0.2.1\"]".into()));
+
+    let directory = tempfile::tempdir().unwrap();
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("inet-array.xlsx"));
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut workbook = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut workbook.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet)
+        .unwrap();
+    let mut strings = String::new();
+    std::io::Read::read_to_string(&mut workbook.by_name("xl/sharedStrings.xml").unwrap(), &mut strings).unwrap();
+    assert!(sheet.contains("<c r=\"A2\" t=\"s\">") && !sheet.contains("<f>"), "{sheet}");
+    assert!(strings.contains(array_text), "{strings}");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_cidr_array_xlsx_preserves_native_network_text() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE TABLE cidr_array_xlsx (value cidr[])")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO cidr_array_xlsx VALUES ('[-1:2]={0.0.0.0/0,NULL,192.0.2.0/24,2001:db8::/32}'::cidr[])")
+        .await
+        .unwrap();
+
+    let result = connection.query("SELECT value FROM cidr_array_xlsx").await.unwrap();
+    assert_eq!(result.columns[0].data_type, "CIDR[]");
+    let Value::Text(array_text) = &result.rows[0][0] else {
+        panic!("cidr[] XLSX source must remain text: {:?}", result.rows[0][0]);
+    };
+    assert_eq!(array_text, "[-1:2]={\"0.0.0.0/0\",NULL,\"192.0.2.0/24\",\"2001:db8::/32\"}");
+    let native = connection
+        .query("SELECT pg_typeof(value)::text, value::text, array_to_json(value)::text FROM cidr_array_xlsx")
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text("cidr[]".into()));
+    assert_eq!(native.rows[0][1], Value::Text("[-1:2]={0.0.0.0/0,NULL,192.0.2.0/24,2001:db8::/32}".into()));
+    assert_eq!(native.rows[0][2], Value::Text("[\"0.0.0.0/0\",null,\"192.0.2.0/24\",\"2001:db8::/32\"]".into()));
+
+    let directory = tempfile::tempdir().unwrap();
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("cidr-array.xlsx"));
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut workbook = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut workbook.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet)
+        .unwrap();
+    let mut strings = String::new();
+    std::io::Read::read_to_string(&mut workbook.by_name("xl/sharedStrings.xml").unwrap(), &mut strings).unwrap();
+    assert!(sheet.contains("<c r=\"A2\" t=\"s\">") && !sheet.contains("<f>"), "{sheet}");
+    assert!(strings.contains(array_text), "{strings}");
+}

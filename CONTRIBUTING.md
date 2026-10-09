@@ -4,9 +4,11 @@ TablePro is a Linux-only Rust project. Current development happens on the `linux
 
 Every shipped feature must remain available without an account, license key, subscription, paid tier, or remote entitlement check.
 
+The rules every change follows (code style, tests, security, commits, the Forgejo gate) are in [`AGENTS.md`](AGENTS.md).
+
 ## Development setup
 
-The workspace requires Rust 1.98. Install GTK4 4.22+, GLib 2.88+, libadwaita 1.9+, GtkSourceView 5.18+, OpenSSL, Secret Service, Kerberos, Clang, `pkg-config`, and standard build tools. Distro-specific package commands are in [`linux/README.md`](linux/README.md).
+The workspace requires Rust 1.98. Install GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (the Ubuntu 24.04 and Debian 13 floor), OpenSSL, Secret Service, Kerberos, Clang, `pkg-config`, and standard build tools. Distro-specific package commands are in [`linux/README.md`](linux/README.md).
 
 ```bash
 git clone https://github.com/<your-name>/TablePro.git

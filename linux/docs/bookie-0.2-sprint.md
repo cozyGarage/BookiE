@@ -4,6 +4,28 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 i
 0.2.0. Implementation is authorized; no 0.2 release is approved.
 
 
+## 0.2.0 readiness: 2026-10-08
+
+No 0.2 release is approved. Before a frozen candidate SHA, these stay open
+(owner in brackets; details in the [ledger](known-issues.md)):
+
+- B3 [B3]: the broader type, consumer and configuration matrix, PERF-10 memory
+  reduction (the preview is display-only; full values are still held), PERF-3
+  MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
+- B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
+  remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
+  (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
+- Desktop acceptance [maintainer]: PKG-1 native Wayland on Arch, PKG-2
+  Debian/GNOME, PKG-4 Flathub submission and screenshots, PKG-8 the Flatpak
+  file-access decision, TEST-6 the 107-item manual checklist.
+- B7: a frozen SHA, the affected gates green on Forgejo at that SHA (the
+  acceptance gate since 2026-10-08), installed checks on Arch and Debian, and the
+  30-attempt soak (Forgejo nightly `gtk-soak`).
+
+Feature gaps against other clients are in
+[the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless
+the maintainer adds it.
+
 ## Current continuation plan: 2026-10-08
 
 Code baseline: `0bb8e34354d13e3ab9911b9db710eddb02115170` on `linux`, checked
@@ -98,7 +120,7 @@ this existing-eight-driver stabilization scope.
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
 | B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. SQLite STRICT `ANY` computed `iif()` now has native storage-class and typed CSV coverage (#331); declared BOOLEAN/temporal decoding, BLOB-affinity runtime classes, malformed temporal text fallback, and enum-like NUMERIC-affinity grid/CSV parsing have focused tests (#333, #335, #359). PostgreSQL domain-over-enum metadata/query coverage now reaches 302 and 512 layers, including arrays (#338, #340, #342, #344); Redis and ClickHouse have committed-write lost-ack contracts (#345, #354, #355). U2 identity-copy behavior is implemented and covered for PostgreSQL, SQL Server and MySQL policy; PostgreSQL enum parameter inference has restricted-role coverage, and PR #249 adds a keyed grid-edit case under shadowed transaction-local `search_path`. The broader engine/type/consumer/configuration matrix, mutation triage, remaining TEST-15 paths and installed grid acceptance remain open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
-| B4 transport/sessions | SSH audit, rollback-failure, Kerberos, GTK trust-flow, prompt-timeout, cross-engine DML regressions and B4-11 failed-batch INSERT/UPDATE/DELETE coverage (#337, #353) are merged. | [Current B4 board](b4-task-board.md): frozen-candidate and hosted/installed acceptance remains open for the listed rows; B4-11 other engines/effects, B4-12 next-candidate rollback proof, B4-21 Windows AD interoperability, and UI-1b chain editing remain |
+| B4 transport/sessions | SSH audit, rollback-failure, Kerberos, GTK trust-flow, prompt-timeout, cross-engine DML regressions and B4-11 failed-batch INSERT/UPDATE/DELETE coverage (#337, #353) are merged. | [Current B4 board](b4-task-board.md): frozen-candidate and hosted/installed acceptance remains open for the listed rows; B4-11 broader engine/effect coverage, B4-21 Windows AD interoperability, and UI-1b chain editing remain. B4-12's scoped frozen-source rollback acceptance is complete; full-candidate and package qualification remain separate |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
 | B7 qualification | Open | Frozen SHA, affected automated gates, both installed desktop targets and retry-free soak; publication separate |
@@ -137,23 +159,31 @@ owners; do not create a second completion cache, exporter or type policy.
 
 ## B4 acceptance worklist (2026-10-08)
 
-This is the next acceptance slice on current `fork/linux` tip `896f1b3`.
-Build Linux #37797466945 completed successfully on `c3122d9`, including B4
-rollback, PostgreSQL release, driver TLS, driver/SSH integration, installed GTK
-safety smoke and the regression gate. Build Linux #37806196821 is running on
-`896f1b3`; preflight passed and the B4 rollback, PostgreSQL release, TLS, GTK and optional DuckDB jobs are running. These hosted results do
-not substitute for exact frozen-candidate or native Wayland acceptance. The SSH
-GTK artifacts below prove staged release-binary behavior under Xvfb/AT-SPI; they
-do not prove a distribution-package installation or native Wayland session.
+This is the next acceptance slice on current `fork/linux` tip `e697824`.
+Build Linux #37797466945 completed successfully on `c3122d9`. The later run
+[#37806196821](https://github.com/cozyGarage/BookiE/actions/runs/37806196821)
+completed successfully on `896f1b3`, including B4 rollback, PostgreSQL release,
+Driver TLS, driver/SSH integration, installed GTK safety smoke and the
+regression gate; scheduled Clippy was skipped. Build Linux
+[#37849452394](https://github.com/cozyGarage/BookiE/actions/runs/37849452394)
+is pending on `e697824`; Linux Security #37849452452 passed and Flatpak
+[#37849452274](https://github.com/cozyGarage/BookiE/actions/runs/37849452274)
+is in progress. No completed current-tip Linux CI contracts run was visible.
+The B4 Docker rollback job was skipped on the PR events for #407/#408. Earlier
+Build Linux #37847211229 on `7be233d` and #37844691724 on `ae3a1e0` are historical
+and superseded. Hosted checks do not substitute for exact
+frozen-candidate or native Wayland acceptance. The SSH GTK artifacts below
+prove staged release-binary behavior under Xvfb/AT-SPI; they do not prove a
+distribution-package installation or native Wayland session.
 
 | Item | Current evidence and action |
 | --- | --- |
-| B4-7, B4-16 | Keep UNVERIFIED. Local SSH/GTK trust, audit and tunnel-loss scenarios passed on `c3122d9`; Build Linux #37797466945 completed on that SHA, including the PostgreSQL release fixture and driver/SSH integration. Frozen-candidate and installed-package/native Wayland acceptance remain open. |
-| B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). Hosted Driver TLS passed on `c3122d9` in successful Build Linux run #37797466945. The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Frozen-candidate and installed-package/native Wayland acceptance remain open. |
-| B4-22 | Keep UNVERIFIED. Five bundle/export GTK scenarios passed locally with a staged `a7f14fa` binary. Build Linux #37797466945 passed a generic installed GTK safety smoke on `c3122d9`, not the bundle flow. Obtain frozen-candidate bundle acceptance and installed-package/native Wayland evidence. |
-| B4-12 | The focused PostgreSQL backend-termination case passed locally on candidate `a7f14fa` and in hosted B4 rollback job 113398752913 on `c3122d9` in Build Linux #37797466945. Hosted evidence is not on the selected candidate SHA; frozen-candidate rollback acceptance remains open. |
-| B4-11 | Existing direct failed-batch coverage includes INSERTs on InnoDB, MyISAM, MEMORY, CSV and ARCHIVE ([PR #337](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536)); UPDATE and DELETE on InnoDB, MyISAM, MEMORY and CSV ([PR #353](https://github.com/cozyGarage/BookiE/pull/353)); and the added Aria direct DML and trigger side effect. The 12-case local selector and hosted B4 rollback job passed on `c3122d9`; other engines and additional side effects remain open. |
-| B4-17 | Existing `ssh-gtk-*` artifacts show both-hop trust prompts, routed query, second-hop decline without learning, changed-key refusal and terminal audit outcomes using staged release binaries under Xvfb/AT-SPI. Build Linux #37797466945 passed the PostgreSQL release and driver/SSH integration jobs on `c3122d9`; the installed GTK safety smoke is not native SSH trust acceptance. Close only after selected-candidate and installed-package/native Wayland trust flow. |
+| B4-7, B4-16 | Keep UNVERIFIED. Local SSH/GTK trust, audit and tunnel-loss scenarios passed on `c3122d9`; hosted PostgreSQL release and driver/SSH integration passed in #37797466945 and #37806196821. Frozen-candidate and installed-package/native Wayland acceptance remain open. |
+| B4-9 | The full local driver TLS matrix passed twice on `a47b1fb` (48/48); see [the PR evidence comment](https://github.com/cozyGarage/BookiE/pull/329#issuecomment-6052925352). Hosted Driver TLS passed on `c3122d9` in #37797466945 and `896f1b3` in #37806196821. The earlier MongoDB `ConnectionRefused` failures on `98134709` did not recur; cause remains unknown. Frozen-candidate and installed-package/native Wayland acceptance remain open. |
+| B4-22 | Keep UNVERIFIED. Five bundle/export GTK scenarios passed locally with a staged `a7f14fa` binary. Build Linux #37806196821 passed a generic installed GTK safety smoke on `896f1b3`, not the bundle flow. Obtain frozen-candidate bundle acceptance and installed-package/native Wayland evidence. |
+| B4-12 | DONE for the scoped frozen-candidate rollback acceptance: the backend-termination selector passed on candidate source `a7f14fa` (1 test) and in hosted B4 rollback jobs #37797466945 and #37806196821. It verifies `TransactionRollbackFailed`, the failing statement index and disconnect errors, absent transactional row/trigger effects after reconnect, and expected sequence advancement. Full-candidate and package qualification remain separate; see [candidate evidence](evidence/b4-rollback-frozen-candidate-2026-10-08/manifest.json). |
+| B4-11 | Existing direct failed-batch coverage includes INSERTs on InnoDB, MyISAM, MEMORY, CSV and ARCHIVE ([PR #337](https://github.com/cozyGarage/BookiE/pull/337#issuecomment-6053382536)); UPDATE and DELETE on InnoDB, MyISAM, MEMORY and CSV ([PR #353](https://github.com/cozyGarage/BookiE/pull/353)); and Aria direct DML and trigger effects. PR #408 adds a BLACKHOLE trigger sink; after rebasing onto `e697824`, the full `mysql_atomic` selector passed locally (13 passed, 66 filtered, 143.42 s) on test tree `e267ba0`. Its hosted checks remain in progress and the PR-event Docker rollback job was skipped. Other storage engines and side-effect patterns remain open; see [PR #408](https://github.com/cozyGarage/BookiE/pull/408). |
+| B4-17 | Existing `ssh-gtk-*` artifacts show both-hop trust prompts, routed query, second-hop decline without learning, changed-key refusal and terminal audit outcomes using staged release binaries under Xvfb/AT-SPI. Build Linux #37806196821 passed the PostgreSQL release and driver/SSH integration jobs on `896f1b3`; the installed GTK safety smoke is not native SSH trust acceptance. A staged-candidate Wayland probe did not establish host-key refusal; see [probe evidence](evidence/b4-ssh-native-wayland-2026-10-08/manifest.json). Close only after selected-candidate and installed-package/native Wayland trust flow. |
 | B4-21 | Keep Windows AD interoperability open. Samba AD Kerberos+TLS fixtures are useful local coverage but do not establish interoperability with Windows AD; candidate and distribution-package acceptance are also outstanding. |
 | UI-1b | Keep refusing edits to saved SSH jump chains. Implement the per-hop secret editor design across persistence, transport identity, bundle compatibility and GTK before enabling chain editing. |
 

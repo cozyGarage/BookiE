@@ -1,0 +1,15 @@
+BookiE B4-11/B4-12 hosted rollback acceptance, 2026-10-08
+
+Build Linux run #37854177911 tested source commit
+`f073844461d11291b7eb9ae094e175bdd5a6ea7a`. Its "B4 rollback acceptance
+(docker)" job (#113578648695) completed successfully. The successful step ran
+`python3 scripts/run-test-layer.py b4-rollback`, which executes the complete
+`mysql_atomic` integration selector and the focused PostgreSQL backend-
+termination rollback-failure selector. The MySQL selector includes PR #408's
+BLACKHOLE trigger-sink regression.
+
+At evidence capture, the rollback job was successful while the overall Build
+Linux run was still in progress; this evidence does not claim the other jobs or
+the overall workflow passed. Optional/vendor MySQL-family engines, broader
+side-effect patterns, and installed distribution-package acceptance remain
+open.

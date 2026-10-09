@@ -16,7 +16,7 @@ screenshot paths. Test both normal size and a narrow/resized window, keyboard
 focus, clipboard and popover/dialog placement. Mark blocked and not-run items
 explicitly. No boxes were checked by the September 28 documentation review.
 
-Take light and dark screenshots for each section, per `CLAUDE.md`. Record a result
+Take light and dark screenshots for each section, per `AGENTS.md`. Record a result
 beside each item rather than leaving it blank, because a blank line here reads as
 "passed" to the next person.
 

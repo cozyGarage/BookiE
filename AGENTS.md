@@ -1,0 +1,262 @@
+# Agent and contributor rules
+
+These rules apply to every coding agent and every contributor. `CLAUDE.md`
+points here; tool-specific files must not restate or contradict this page.
+
+## Project
+
+TablePro is a Linux-only native database client, being renamed **BookiE**. Work
+happens on the `linux` branch in the Rust 1.98 Cargo workspace under `linux/`.
+
+- The rename covers the display name, binary names (`bookie`, `bookie-agentd`)
+  and branding assets only. App ID, config and data paths, keyring schema,
+  UUIDs, audit format and protocol contracts stay `tablepro` /
+  `com.tablepro.linux`. Check the sprint before renaming any of them.
+- The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are
+  static workspace crates registered at compile time. No cross-platform UI
+  layers, web views or source for another operating system.
+- Every shipped feature works without an account, license key, subscription,
+  paid tier or remote entitlement check.
+- The root [LICENSE](LICENSE) applies. User-facing changes go in
+  [linux/CHANGELOG.md](linux/CHANGELOG.md).
+
+## Where to start
+
+1. [linux/docs/README.md](linux/docs/README.md): the documentation map and where
+   each fact belongs.
+2. [The active sprint](linux/docs/bookie-0.2-sprint.md): milestone order, 0.2.0
+   readiness and acceptance.
+3. [The ledger](linux/docs/known-issues.md): every open issue with its status,
+   evidence and owner. Pick work from your lane's row in
+   [Owners and handoff](linux/docs/known-issues.md#owners-and-handoff).
+4. The ADR that governs your change ([index](linux/docs/decisions/README.md)).
+   Every type or value change follows
+   [ADR 0007](linux/docs/decisions/0007-type-and-value-preservation.md).
+
+Accepted ADRs constrain architecture. The sprint owns sequencing and acceptance;
+ROADMAP and PLAN only point to it. Dated reviews and archives prove their
+recorded source only; they do not override current decisions.
+
+## Lanes and ownership
+
+Work is split into lanes. Each open ledger row has exactly one owner in the
+owner table, and each lane edits only its own files.
+
+| Lane | Owns |
+|---|---|
+| B3 | Types, values, drivers and result paths: `core` value and result types, decoders under `crates/drivers/`, grid value display, the [B3 board](linux/docs/type-contract-strategy.md) |
+| B4 | Transport, guard, audit, SSH, rollback and acceptance: `policy`, `transport`, `ssh`, audit storage, the [B4 board](linux/docs/b4-task-board.md) |
+| UX | The app layer, packaging, CI and the lab, and shared documentation |
+| Maintainer | Decisions and anything needing a person or a real desktop |
+
+- To work in another lane's files, first record the handoff in the ledger
+  (the owner table and, for a shared task, a row in the handoff table) in the
+  same commit as the first change.
+- When a lane finishes a row, cross it out with the commit, PR or test that
+  closed it, and remove it from the owner table.
+- Each agent works in its own git worktree (for example
+  `~/Projects/tablepro-<lane>`), never in another agent's checkout. Branch from
+  the latest `origin/linux` and name branches `<lane>/<topic>` or
+  `<type>/<topic>`.
+
+## Workflow
+
+1. Write the failing test first, then the fix, in one commit.
+2. Run the checks in [Validation](#validation) locally. Run scripts unpiped:
+   `bash linux/scripts/preflight.sh | tail -3` reports `tail`'s status, not the
+   script's.
+3. Merge `origin/linux` into the branch (do not rebase a shared branch). Resolve
+   generated files by regenerating them, for example
+   `python3 linux/scripts/inventory-ignored-tests.py > linux/docs/ignored-tests.md`.
+4. **Gate on Forgejo:** `bash linux/scripts/forgejo-gate.sh <branch> [remote-branch]`.
+   It pushes to the lab Forgejo, waits for that push's run and lists jobs that
+   did not pass. Forgejo is the acceptance gate: it runs the merge tier (Docker
+   drivers, installed GTK, distro floor, packages) on every branch push. A green
+   GitHub pull request only means the cheap tier ran.
+5. Open the GitHub pull request against `linux`, merge it when the Forgejo gate
+   is green (squash, subject `<type>(<scope>): <summary> (#N)`), then sync
+   Forgejo's `linux` to GitHub's.
+6. Never leave a background job, container or lab VM change running that you
+   did not start, and never stop one you did not start. On shared executors,
+   stop only your own containers by name.
+
+## Principles
+
+1. Security comes first. Validate input at system boundaries and deny unsafe
+   operations by default.
+2. Fix root causes. Reproduce or trace a defect before changing code.
+3. Keep dependencies one-directional and preserve crate boundaries.
+4. Use clear names, small functions, early returns and explicit error paths.
+5. Do not add comments. Code, types, tests and module boundaries express
+   intent. Record only what an external system forces on us and no name can say.
+6. Every testable behaviour change needs a regression test.
+7. Keep changes focused. Do not mix unrelated cleanup into a fix.
+8. No feature gates based on accounts, licenses, subscriptions, payment or
+   remote access checks.
+
+## Workspace architecture
+
+The workspace manifest is `linux/Cargo.toml`.
+[linux/ARCHITECTURE.md](linux/ARCHITECTURE.md) has the data flow.
+
+- `crates/core`: domain types, driver traits, query results, filters,
+  transactions and the driver registry. Depends on no other workspace crate.
+- `crates/policy`: statement classification, rules, approvals, masking,
+  blast-radius checks and audit types. Depends on `core` only.
+- `crates/storage`: saved connections, Secret Service access, query history and
+  the audit journal.
+- `crates/ssh`: SSH tunnels through built-in `russh` or system OpenSSH.
+- `crates/transport`: connection assembly for the GUI and `agentd`: driver
+  options, SSH chain, tunnel and the service endpoint used for certificate
+  verification.
+- `crates/mcp`: MCP authentication, scopes, connection allowlists, rate limits,
+  tools and transport.
+- `crates/agentd`: headless MCP process and composition root without GTK.
+- `crates/drivers/*`: one static crate per engine, implementing `core` traits,
+  never depending on the app.
+- `crates/app`: the GTK application and composition root.
+
+Dependencies point toward `core`. Domain and driver crates never import GTK or
+Relm4. A new engine is a driver crate implementing the `core` contracts, added
+to both composition roots, with documented maturity
+([adding drivers](linux/docs/adding-drivers.md)) and tests against a real engine.
+
+## UI and async rules
+
+- GTK widgets belong to the glib main context. Database and blocking work never
+  run on the GTK thread.
+- Relm4 messages drive state transitions; component-scoped commands own work
+  whose lifetime belongs to a component. Async outcomes return to the update loop
+  before touching widgets. Keep logic out of widget construction so it can be
+  unit-tested.
+- Cancellation and timeouts reach the database operation (ADR 0005). A dropped
+  future is not proof that a driver stopped.
+- Late results never replace state from a newer connection, query or request:
+  use a generation or request id.
+
+## Security invariants
+
+These apply to the GUI, the MCP server and `tablepro-agentd`.
+
+- Every connection exposed to a consumer is wrapped by `PolicyGuard`. MCP and
+  agent code never sees a raw driver connection.
+- MCP token scopes say who may call a tool, connection allowlists say which
+  connections a token may use, `PolicyGuard` says what SQL may run. All three
+  are required.
+- Preview, transaction, retry and batch paths pass the same policy checks as
+  direct execution.
+- Statement handling keeps the order: classify, evaluate rules, request approval
+  when required, apply masking, execute, write the audit outcome.
+- Denied, failed, cancelled and timed-out operations produce their terminal audit
+  state. Audit failure never opens a path around policy.
+- MCP input, saved connection files, imported files, environment variables and
+  database metadata are untrusted.
+- Bind values through driver parameters. Validate and dialect-quote identifiers.
+  Never build SQL by joining untrusted text.
+- Passwords, tokens and SSH secrets live in Secret Service through
+  `tablepro-storage`, never in JSON, command lines, traces, errors or audit
+  fields, and stay in `secrecy` types until the driver boundary.
+- Bound request sizes, query limits, timeouts and rate limits at external
+  interfaces. No unbounded queues or collections controlled by callers.
+- MCP tools use least-privilege scopes and deny access when a token, scope,
+  allowlist entry or policy decision is missing.
+- New dependencies need a license and advisory review against `linux/deny.toml`.
+
+## Rust code style
+
+`linux/rustfmt.toml`, `linux/clippy.toml` and the workspace lints are
+authoritative; [code conventions](linux/docs/code-conventions.md) settles
+function length, parameters, naming and extraction.
+
+- Rust edition 2024, Rust 1.98, line width 120.
+- No comments or doc comments, except the external-system rule above.
+- Early returns; at most three levels of indentation in a function body.
+- A function body is at most 60 lines (`check-function-size.py`, baselines in
+  `linux/function-size-baselines.txt`: lower a count when you split, never raise
+  one). Rust files stay under 1,200 lines (`check-file-size.sh`, baselines in
+  `linux/file-size-baselines.txt`: split before growing a listed file).
+- Small public APIs; private by default.
+- No `unwrap`, `expect`, `panic!`, `todo!` or `unimplemented!` in production
+  paths. A new integration test file under `tests/` starts with
+  `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`.
+- Typed `thiserror` errors across crate boundaries, with context but no secrets.
+- Avoid `unsafe`; isolate it behind the smallest safe interface when a native API
+  forces it.
+- Do not suppress Clippy lints locally to avoid fixing code.
+- Logs use `tracing` fields; `print!` and friends are denied. Never log SQL
+  parameters, credentials, tokens, connection strings or unmasked results.
+
+## Tests
+
+Unit tests sit next to pure logic; integration tests live in each crate's
+`tests/`. Driver behaviour is tested against a real database (testcontainers or
+an isolated local database); filesystem tests use `tempfile`. Policy and MCP
+changes test denied and allowed cases, scopes, allowlists, approval, masking,
+timeouts and audit terminal states. GTK-only behaviour that automation cannot
+reach gets manual steps in
+[manual verification](linux/docs/manual-verification-0.2-features.md). Never
+change a test to accept incorrect behaviour; confirm a new regression test fails
+on the unfixed code.
+
+Every test belongs to one tier with one script and one gate. Use the
+[validation playbook](linux/docs/validation-playbook.md) to pick layers and
+`python3 linux/scripts/run-test-layer.py --list` to discover commands.
+
+| Tier | Contents | Script |
+|---|---|---|
+| unit | `--lib --bins` across the workspace | `linux/scripts/preflight.sh` |
+| sandbox | integration targets needing no Docker, database or display | `linux/scripts/test-sandbox.sh` |
+| driver | `crates/drivers/*/tests/integration.rs`, SSH and socket fixtures | `linux/scripts/ci-local.sh integration` |
+| driver-tls | `crates/driver-tls-tests` | `linux/scripts/test-driver-tls.sh` |
+| release | `crates/release-tests` against PostgreSQL | `linux/scripts/test-postgres-release.sh` |
+| gtk-widgets | `#[ignore]` widget tests listed in `linux/scripts/isolated-tests.json` under `gtk` | `linux/scripts/test-gtk-widgets.sh` |
+| keyring | `#[ignore]` tests listed under `keyring` | `linux/scripts/test-secret-service.sh` |
+| gtk | `crates/app/tests/gtk_safety.py` on an installed build | `linux/scripts/test-gtk-safety.sh` |
+
+All tiers run on Forgejo (`.forgejo/workflows/ci.yml` and `nightly.yml`). New
+gtk-widgets and keyring tests must be added to `isolated-tests.json`, and the
+ignored-test inventory regenerated, or the tier fails. A new crate goes into the
+crate lists in `preflight.sh` and `test-sandbox.sh`.
+
+## Validation
+
+From the repository root, narrow test first, then:
+
+```bash
+bash linux/scripts/preflight.sh            # size, panic and bounded-operation guards, fmt, clippy, unit, sandbox
+bash linux/scripts/test-gtk-widgets.sh     # when GTK code changed
+python3 linux/scripts/check-known-issues.py && python3 linux/scripts/check-doc-links.py   # when docs changed
+cargo deny check                           # from linux/, when dependencies changed
+bash linux/scripts/forgejo-gate.sh <branch>
+```
+
+Driver integration tests need Docker. If a prerequisite is missing, say which
+check could not run and why.
+
+## Changelog and commits
+
+- [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) in
+  `linux/CHANGELOG.md` under `[Unreleased]`: one line per user-facing change,
+  describing user impact, with no paths, type or function names. Test coverage,
+  evidence runs and audits are not changelog entries; record them on the owning
+  board or in `linux/docs/evidence/`. Do not add `Fixed` for a defect introduced
+  and fixed before release.
+- Conventional Commits with a single-line subject and no body. Types: `feat`,
+  `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`,
+  `revert`, `security`. Scopes such as `app`, `core`, `policy`, `mcp`, `agentd`,
+  `storage`, `ssh`, `drivers`, `driver-postgres`.
+- A public API change updates every caller and test in the same commit.
+
+## Documentation rules
+
+The [documentation map](linux/docs/README.md) says where each fact lives and
+where a new document goes. In short: decisions in ADRs, open work in the ledger,
+order and acceptance in the sprint, run-specific proof in `linux/docs/evidence/`
+or the PR, dated reviews in `linux/docs/archive/`. Write each fact once and link
+to it. Keep file paths stable; scripts and other lanes depend on them.
+
+## Writing style
+
+Short, plain sentences. Be specific. No em dashes, sales language or generic
+praise. User-facing text describes behaviour and next steps without internal
+errors or secrets.

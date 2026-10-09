@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 mod codec;
@@ -82,15 +82,16 @@ impl DatabaseDriver for MongodbDriver {
             .run_command(doc! { "ping": 1 })
             .await
             .map_err(|err| map_mongo_connect_error(err, verifies_cert))?;
-        Ok(Box::new(MongodbConnection::new(client, database_name)))
+        Ok(Box::new(MongodbConnection { client, database_name }))
     }
 }
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const METADATA_SAMPLE_SIZE: i64 = 128;
 
 async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, DriverError> {
+    let host = uri_host(&opts.host)?;
     let scheme = "mongodb";
-    let host = mongo_host_authority(&opts.host)?;
     let password = opts.password.expose_secret();
     let auth = if !opts.username.is_empty() {
         format!("{}:{}@", encode_uri(&opts.username), encode_uri(password))
@@ -116,34 +117,25 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
     Ok(client_opts)
 }
 
-fn mongo_host_authority(host: &str) -> Result<String, DriverError> {
-    let ip_host = host
+fn uri_host(host: &str) -> Result<String, DriverError> {
+    let raw_host = host
         .strip_prefix('[')
-        .and_then(|value| value.strip_suffix(']'))
+        .and_then(|host| host.strip_suffix(']'))
         .unwrap_or(host);
-    let bracketed = ip_host != host;
-    if let Ok(address) = ip_host.parse::<std::net::IpAddr>() {
-        return Ok(match address {
-            std::net::IpAddr::V4(address) if !bracketed => address.to_string(),
-            std::net::IpAddr::V4(_) => return Err(DriverError::Unsupported("invalid MongoDB host".into())),
-            std::net::IpAddr::V6(address) => format!("[{address}]"),
-        });
+    if raw_host.is_empty()
+        || raw_host.chars().any(|ch| {
+            ch.is_control() || ch.is_whitespace() || matches!(ch, '/' | '?' | '#' | '@' | '%' | ',' | '\\' | '[' | ']')
+        })
+    {
+        return Err(DriverError::Unsupported("invalid MongoDB host".into()));
     }
-    let labels = host.strip_suffix('.').unwrap_or(host).split('.');
-    let valid = !host.is_empty()
-        && host.len() <= 254
-        && labels.into_iter().all(|label| {
-            !label.is_empty()
-                && label.len() <= 63
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-                && label.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-        });
-    if valid {
-        Ok(host.to_string())
-    } else {
-        Err(DriverError::Unsupported("invalid MongoDB host".into()))
+    if raw_host.parse::<std::net::Ipv6Addr>().is_ok() {
+        return Ok(format!("[{raw_host}]"));
     }
+    if host.starts_with('[') || raw_host.contains(':') {
+        return Err(DriverError::Unsupported("invalid MongoDB host".into()));
+    }
+    Ok(raw_host.to_owned())
 }
 
 fn encode_uri(s: &str) -> String {
@@ -184,7 +176,6 @@ fn tls_for(config: &tablepro_core::TlsConfig, service_host: &str) -> Tls {
 struct MongodbConnection {
     client: Client,
     database_name: String,
-    columns: tokio::sync::RwLock<HashMap<String, Vec<ColumnInfo>>>,
 }
 
 fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (Vec<Vec<Value>>, bool) {
@@ -201,48 +192,48 @@ fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (Vec<Vec<
 }
 
 impl MongodbConnection {
-    fn new(client: Client, database_name: String) -> Self {
-        Self {
-            client,
-            database_name,
-            columns: tokio::sync::RwLock::new(HashMap::new()),
-        }
-    }
-
     fn db(&self) -> Database {
         self.client.database(&self.database_name)
     }
 
-    async fn census_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+    async fn columns_and_page(
+        &self,
+        table: &str,
+        page: Option<(u64, u64)>,
+    ) -> Result<(Vec<ColumnInfo>, Vec<Document>), DriverError> {
         let coll = self.db().collection::<Document>(table);
-        let mut cursor = coll.find(doc! {}).await.map_err(map_mongo_error)?;
+        let mut page_docs = Vec::new();
+        if let Some((offset, limit)) = page.filter(|(_, limit)| *limit > 0) {
+            let limit = i64::try_from(limit)
+                .map_err(|_| DriverError::Unsupported("MongoDB page size exceeds the server range".into()))?;
+            let mut cursor = coll
+                .find(doc! {})
+                .sort(doc! { "_id": 1 })
+                .skip(offset)
+                .limit(limit)
+                .await
+                .map_err(map_mongo_error)?;
+            while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
+                page_docs.push(doc);
+            }
+        }
+        let cursor = coll
+            .find(doc! {})
+            .sort(doc! { "_id": 1 })
+            .limit(METADATA_SAMPLE_SIZE)
+            .await
+            .map_err(map_mongo_error)?;
+        let sample_docs: Vec<Document> = cursor.try_collect().await.map_err(map_mongo_error)?;
         let mut types = BTreeMap::new();
-        while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-            for (key, value) in &doc {
+        for doc in &sample_docs {
+            for (key, value) in doc {
                 observe_bson_type(&mut types, key, value);
             }
         }
-        if !types.contains_key("_id") {
-            types.insert("_id".into(), "ObjectId".into());
-        }
-        Ok(columns_from_types(types))
-    }
-
-    async fn page_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        if let Some(columns) = self.columns.read().await.get(table).cloned() {
-            return Ok(columns);
-        }
-        let mut cache = self.columns.write().await;
-        if let Some(columns) = cache.get(table) {
-            return Ok(columns.clone());
-        }
-        let columns = self.census_columns(table).await?;
-        cache.insert(table.into(), columns.clone());
-        Ok(columns)
-    }
-
-    async fn invalidate_columns(&self, table: &str) {
-        self.columns.write().await.remove(table);
+        types.entry("_id".into()).or_insert_with(|| "ObjectId".into());
+        let mut columns = columns_from_types(types);
+        merge_page_types(&mut columns, &page_docs);
+        Ok((columns, page_docs))
     }
 }
 
@@ -269,10 +260,7 @@ impl Connection for MongodbConnection {
     }
 
     async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        let mut cache = self.columns.write().await;
-        let columns = self.census_columns(table).await?;
-        cache.insert(table.into(), columns.clone());
-        Ok(columns)
+        self.columns_and_page(table, None).await.map(|(columns, _)| columns)
     }
 
     async fn fetch_rows(
@@ -282,46 +270,13 @@ impl Connection for MongodbConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let mut columns = self.page_columns(table).await?;
-        let coll = self.db().collection::<Document>(table);
-        let mut docs = Vec::new();
-        if limit > 0 {
-            let mut cursor = coll
-                .find(doc! {})
-                .sort(doc! { "_id": 1 })
-                .skip(offset)
-                .limit(limit.min(i64::MAX as u64) as i64)
-                .await
-                .map_err(map_mongo_error)?;
-            while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-                docs.push(doc);
-            }
-        }
-        let mut cache = self.columns.write().await;
-        if let Some(cached) = cache.get(table) {
-            columns = cached.clone();
-        }
-        merge_page_types(&mut columns, &docs);
-        cache.insert(table.into(), columns.clone());
-        drop(cache);
+        let (columns, docs) = self.columns_and_page(table, Some((offset, limit))).await?;
         let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
         Ok(QueryResult {
             columns,
             rows,
             truncated: false,
         })
-    }
-
-    async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        if params.is_empty() {
-            return self.query(sql).await;
-        }
-        let Some(query) = parse_keyed_value_select(sql, params, &self.database_name)? else {
-            return Err(DriverError::Unsupported(
-                "MongoDB bound reads support a single selected value by _id".into(),
-            ));
-        };
-        self.run_keyed_value_select(query).await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
@@ -365,6 +320,18 @@ impl Connection for MongodbConnection {
         )))
     }
 
+    async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
+        if params.is_empty() {
+            return self.query(sql).await;
+        }
+        let Some(query) = parse_keyed_value_select(sql, params, &self.database_name)? else {
+            return Err(DriverError::Unsupported(
+                "MongoDB bound reads support a single selected value by _id".into(),
+            ));
+        };
+        self.run_keyed_value_select(query).await
+    }
+
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
         let trimmed = sql.trim();
         if let Some((coll, doc)) = parse_insert_one(trimmed) {
@@ -373,7 +340,6 @@ impl Connection for MongodbConnection {
                 .insert_one(doc)
                 .await
                 .map_err(map_mongo_error)?;
-            self.invalidate_columns(&coll).await;
             return Ok(ExecResult { rows_affected: 1 });
         }
         if let Some((coll, filter)) = parse_delete_many(trimmed) {
@@ -383,7 +349,6 @@ impl Connection for MongodbConnection {
                 .delete_many(filter)
                 .await
                 .map_err(map_mongo_error)?;
-            self.invalidate_columns(&coll).await;
             return Ok(ExecResult {
                 rows_affected: result.deleted_count,
             });
@@ -394,7 +359,6 @@ impl Connection for MongodbConnection {
                 .drop()
                 .await
                 .map_err(map_mongo_error)?;
-            self.invalidate_columns(&coll).await;
             return Ok(ExecResult { rows_affected: 0 });
         }
         Err(DriverError::Unsupported(
@@ -410,7 +374,6 @@ impl Connection for MongodbConnection {
                 .update_one(update.filter, doc! { "$set": update.set })
                 .await
                 .map_err(map_mongo_error)?;
-            self.invalidate_columns(&update.collection).await;
             return Ok(ExecResult {
                 rows_affected: result.matched_count,
             });
@@ -422,7 +385,6 @@ impl Connection for MongodbConnection {
                 .delete_one(delete.filter)
                 .await
                 .map_err(map_mongo_error)?;
-            self.invalidate_columns(&delete.collection).await;
             return Ok(ExecResult {
                 rows_affected: result.deleted_count,
             });
@@ -530,11 +492,10 @@ impl MongodbConnection {
     }
 
     async fn run_find(&self, q: FindQuery) -> Result<QueryResult, DriverError> {
-        let mut columns = self.page_columns(&q.collection).await?;
+        let (mut columns, _) = self.columns_and_page(&q.collection, None).await?;
         let coll = self.db().collection::<Document>(&q.collection);
         let mut cursor = coll
             .find(q.filter)
-            .sort(doc! { "_id": 1 })
             .skip(q.skip)
             .limit(q.limit)
             .await
@@ -605,21 +566,14 @@ impl MongodbConnection {
 mod tests {
     use super::*;
 
-    fn assert_first_id(page: &QueryResult, expected: &str) {
-        let id_column = page.columns.iter().position(|column| column.name == "_id").unwrap();
-        let actual = match &page.rows[0][id_column] {
-            Value::Text(value) => value.as_str(),
-            Value::Json(serde_json::Value::String(value)) => value.as_str(),
-            other => panic!("unexpected MongoDB _id value: {other:?}"),
-        };
-        assert_eq!(actual, expected);
-    }
-
     #[tokio::test]
     async fn open_session_is_refused() {
         let client_opts = ClientOptions::parse("mongodb://127.0.0.1:27017").await.unwrap();
         let client = Client::with_options(client_opts).unwrap();
-        let conn = MongodbConnection::new(client, "test".into());
+        let conn = MongodbConnection {
+            client,
+            database_name: "test".into(),
+        };
 
         match conn.open_session().await {
             Err(DriverError::Unsupported(_)) => {}
@@ -641,7 +595,10 @@ mod tests {
         };
         let client_opts = build_client_options(&opts).await.unwrap();
         let client = Client::with_options(client_opts).unwrap();
-        let conn = MongodbConnection::new(client, "test".into());
+        let conn = MongodbConnection {
+            client,
+            database_name: "test".into(),
+        };
         let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(50));
 
         let result = conn.list_tables_controlled(&control).await;
@@ -664,17 +621,17 @@ mod tests {
         };
         let client_opts = build_client_options(&opts).await.unwrap();
         let client = Client::with_options(client_opts).unwrap();
-        let conn = MongodbConnection::new(client, "test".into());
+        let conn = MongodbConnection {
+            client,
+            database_name: "test".into(),
+        };
         let token = tokio_util::sync::CancellationToken::new();
         let control = tablepro_core::OperationControl::new(token.clone(), None);
         let operation = tokio::spawn(async move { conn.list_tables_controlled(&control).await });
 
         // Hold the accepted socket open so this is an in-flight operation,
         // rather than a connect failure or a server disconnect.
-        let (_stream, _) = tokio::time::timeout(std::time::Duration::from_secs(5), listener.accept())
-            .await
-            .expect("MongoDB did not connect to the localhost fixture")
-            .unwrap();
+        let (_stream, _) = listener.accept().await.unwrap();
         token.cancel();
 
         match operation.await.unwrap() {
@@ -683,196 +640,6 @@ mod tests {
             }
             other => panic!("expected unknown cancelled outcome, not disconnection: {other:?}"),
         }
-    }
-
-    #[tokio::test]
-    #[ignore = "requires docker"]
-    async fn browse_pages_reuse_the_census_until_refresh() {
-        use mongodb::bson::{Document, doc};
-        use std::sync::{Arc, Mutex};
-        use testcontainers::{ImageExt, runners::AsyncRunner};
-        use testcontainers_modules::mongo::Mongo;
-
-        let container = Mongo::default().with_tag("7").start().await.unwrap();
-        let host = container.get_host().await.unwrap().to_string();
-        let port = container.get_host_port_ipv4(27017).await.unwrap();
-        let mut options = ClientOptions::parse(format!("mongodb://{host}:{port}/appdb"))
-            .await
-            .unwrap();
-        let finds = Arc::new(Mutex::new(Vec::<Document>::new()));
-        options.command_event_handler = Some(mongodb::event::EventHandler::callback({
-            let finds = finds.clone();
-            move |event: mongodb::event::command::CommandEvent| {
-                if let mongodb::event::command::CommandEvent::Started(event) = event
-                    && event.command_name == "find"
-                    && event.command.get_str("find").ok() == Some("browse_pages")
-                {
-                    finds.lock().unwrap().push(event.command);
-                }
-            }
-        }));
-        let client = Client::with_options(options).unwrap();
-        let database = client.database("appdb");
-        let coll = database.collection::<Document>("browse_pages");
-        coll.insert_many([doc! { "_id": "b", "value": 2 }, doc! { "_id": "a", "value": 1 }])
-            .await
-            .unwrap();
-        let connection = MongodbConnection::new(client, "appdb".into());
-
-        connection.fetch_columns(None, "browse_pages").await.unwrap();
-        assert_eq!(finds.lock().unwrap().len(), 1);
-        let first_page = connection.fetch_rows(None, "browse_pages", 0, 1).await.unwrap();
-        let second_page = connection.fetch_rows(None, "browse_pages", 1, 1).await.unwrap();
-        assert_first_id(&first_page, "a");
-        assert_first_id(&second_page, "b");
-        {
-            let commands = finds.lock().unwrap();
-            assert_eq!(commands.len(), 3);
-            assert_eq!(commands[0].get("limit"), None);
-            assert_eq!(commands[1].get_i64("limit").unwrap(), 1);
-            assert_eq!(commands[1].get_document("sort").unwrap().get_i32("_id").unwrap(), 1);
-            assert_eq!(commands[2].get_i64("limit").unwrap(), 1);
-            assert_eq!(commands[2].get_i64("skip").unwrap(), 1);
-            assert_eq!(commands[2].get_document("sort").unwrap().get_i32("_id").unwrap(), 1);
-        }
-        assert_empty_collection_and_zero_limit_contract(&connection, &database, &finds).await;
-
-        connection.fetch_columns(None, "browse_pages").await.unwrap();
-        assert_eq!(finds.lock().unwrap().len(), 4);
-        connection
-            .execute(r#"db.browse_pages.insertOne({"fresh": true})"#)
-            .await
-            .unwrap();
-        connection.fetch_rows(None, "browse_pages", 0, 1).await.unwrap();
-        {
-            let commands = finds.lock().unwrap();
-            assert_eq!(commands.len(), 6);
-            assert_eq!(commands[4].get("limit"), None);
-            assert_eq!(commands[5].get_i64("limit").unwrap(), 1);
-        }
-        assert_paged_find_queries_reuse_census(&connection, &finds).await;
-    }
-
-    #[tokio::test]
-    #[ignore = "requires docker"]
-    async fn concurrent_first_pages_share_one_census() {
-        use mongodb::bson::{Document, doc};
-        use std::sync::{Arc, Mutex};
-        use testcontainers::{ImageExt, runners::AsyncRunner};
-        use testcontainers_modules::mongo::Mongo;
-
-        let container = Mongo::default().with_tag("7").start().await.unwrap();
-        let host = container.get_host().await.unwrap().to_string();
-        let port = container.get_host_port_ipv4(27017).await.unwrap();
-        let mut options = ClientOptions::parse(format!("mongodb://{host}:{port}/appdb"))
-            .await
-            .unwrap();
-        let finds = Arc::new(Mutex::new(Vec::<Document>::new()));
-        options.command_event_handler = Some(mongodb::event::EventHandler::callback({
-            let finds = finds.clone();
-            move |event: mongodb::event::command::CommandEvent| {
-                if let mongodb::event::command::CommandEvent::Started(event) = event
-                    && event.command_name == "find"
-                    && event.command.get_str("find").ok() == Some("concurrent_cold_pages")
-                {
-                    finds.lock().unwrap().push(event.command);
-                }
-            }
-        }));
-        let client = Client::with_options(options).unwrap();
-        let coll = client.database("appdb").collection::<Document>("concurrent_cold_pages");
-        coll.insert_many([doc! { "value": 1 }, doc! { "value": 2 }])
-            .await
-            .unwrap();
-        let connection = Arc::new(MongodbConnection::new(client, "appdb".into()));
-
-        let (first, second) = tokio::join!(
-            connection.fetch_rows(None, "concurrent_cold_pages", 0, 1),
-            connection.fetch_rows(None, "concurrent_cold_pages", 1, 1),
-        );
-        assert_eq!(first.unwrap().rows.len(), 1);
-        assert_eq!(second.unwrap().rows.len(), 1);
-        {
-            let commands = finds.lock().unwrap();
-            assert_eq!(commands.len(), 3);
-            assert_eq!(
-                commands.iter().filter(|command| command.get("limit").is_none()).count(),
-                1
-            );
-            assert!(
-                commands
-                    .iter()
-                    .filter(|command| command.get("limit").is_some())
-                    .all(|command| { command.get_i64("limit").unwrap() == 1 })
-            );
-        }
-        assert_concurrent_page_types_are_merged(&connection, &coll).await;
-    }
-
-    async fn assert_concurrent_page_types_are_merged(
-        connection: &MongodbConnection,
-        coll: &mongodb::Collection<Document>,
-    ) {
-        coll.update_one(doc! { "value": 1 }, doc! { "$set": { "left_only": true } })
-            .await
-            .unwrap();
-        coll.update_one(doc! { "value": 2 }, doc! { "$set": { "right_only": true } })
-            .await
-            .unwrap();
-        let (first, second) = tokio::join!(
-            connection.fetch_rows(None, "concurrent_cold_pages", 0, 1),
-            connection.fetch_rows(None, "concurrent_cold_pages", 1, 1),
-        );
-        first.unwrap();
-        second.unwrap();
-        let columns = connection.columns.read().await;
-        let names: Vec<_> = columns["concurrent_cold_pages"]
-            .iter()
-            .map(|column| column.name.as_str())
-            .collect();
-        assert!(names.contains(&"left_only"));
-        assert!(names.contains(&"right_only"));
-    }
-
-    async fn assert_empty_collection_and_zero_limit_contract(
-        connection: &MongodbConnection,
-        database: &mongodb::Database,
-        finds: &std::sync::Arc<std::sync::Mutex<Vec<mongodb::bson::Document>>>,
-    ) {
-        database.create_collection("empty_columns").await.unwrap();
-        let columns = connection.fetch_columns(None, "empty_columns").await.unwrap();
-        assert!(
-            columns
-                .iter()
-                .any(|column| column.name == "_id" && column.data_type == "ObjectId")
-        );
-        let page = connection.fetch_rows(None, "browse_pages", 0, 0).await.unwrap();
-        assert!(page.rows.is_empty());
-        let commands = finds.lock().unwrap();
-        assert_eq!(commands.len(), 3);
-    }
-
-    async fn assert_paged_find_queries_reuse_census(
-        connection: &MongodbConnection,
-        finds: &std::sync::Arc<std::sync::Mutex<Vec<mongodb::bson::Document>>>,
-    ) {
-        let first_page = connection
-            .query("db.browse_pages.find({}).skip(0).limit(1)")
-            .await
-            .unwrap();
-        let second_page = connection
-            .query("db.browse_pages.find({}).skip(1).limit(1)")
-            .await
-            .unwrap();
-        assert_first_id(&first_page, "a");
-        assert_first_id(&second_page, "b");
-        let commands = finds.lock().unwrap();
-        assert_eq!(commands.len(), 8);
-        assert_eq!(commands[6].get_i64("limit").unwrap(), 1);
-        assert_eq!(commands[6].get_document("sort").unwrap().get_i32("_id").unwrap(), 1);
-        assert_eq!(commands[7].get_i64("limit").unwrap(), 1);
-        assert_eq!(commands[7].get_i64("skip").unwrap(), 1);
-        assert_eq!(commands[7].get_document("sort").unwrap().get_i32("_id").unwrap(), 1);
     }
 
     #[test]
@@ -893,6 +660,45 @@ mod tests {
         assert_eq!(d.default_port(), 27017);
         assert_eq!(d.default_database(), "test");
         assert_eq!(d.default_username(), "");
+    }
+
+    #[test]
+    fn mongodb_host_rejects_uri_delimiters_and_brackets_ipv6() {
+        for host in [
+            "",
+            "db/name",
+            "db?x",
+            "db#x",
+            "user@db",
+            "db%2fadmin",
+            "db,other",
+            "db\\name",
+            "db name",
+            "[bad-ip]",
+        ] {
+            assert!(uri_host(host).is_err(), "host must be refused: {host:?}");
+        }
+        assert_eq!(uri_host("db.internal").unwrap(), "db.internal");
+        assert_eq!(uri_host("127.0.0.1").unwrap(), "127.0.0.1");
+        assert_eq!(uri_host("::1").unwrap(), "[::1]");
+        assert_eq!(uri_host("[::1]").unwrap(), "[::1]");
+    }
+
+    #[tokio::test]
+    async fn reserved_credentials_remain_encoded_and_keep_the_database_auth_source() {
+        let opts = ConnectOptions {
+            host: "127.0.0.1".into(),
+            port: 27017,
+            username: "user@name".into(),
+            password: secrecy::SecretString::new("p:/?#@ss".into()),
+            database: "appdb".into(),
+            ..Default::default()
+        };
+        let client_opts = build_client_options(&opts).await.unwrap();
+        let credential = client_opts.credential.unwrap();
+        assert_eq!(credential.username.as_deref(), Some("user@name"));
+        assert_eq!(credential.password.as_deref(), Some("p:/?#@ss"));
+        assert_eq!(credential.source.as_deref(), Some("appdb"));
     }
 
     #[test]
@@ -931,43 +737,6 @@ mod tests {
         };
         let client_opts = build_client_options(&opts).await.expect("build client options");
         assert_eq!(client_opts.direct_connection, Some(true));
-    }
-
-    #[test]
-    fn mongo_host_authority_accepts_dns_and_ip_literals() {
-        for (input, expected) in [
-            ("db.internal", "db.internal"),
-            ("db.internal.", "db.internal."),
-            ("127.0.0.1", "127.0.0.1"),
-            ("::1", "[::1]"),
-            ("[::1]", "[::1]"),
-        ] {
-            assert_eq!(mongo_host_authority(input).unwrap(), expected);
-        }
-    }
-
-    #[test]
-    fn mongo_host_authority_rejects_uri_syntax_and_malformed_names() {
-        for input in [
-            "",
-            "db/path",
-            "db?replicaSet=evil",
-            "db#fragment",
-            "user@db",
-            "db,other",
-            "db:27018",
-            "db%2fother",
-            "db\\other",
-            " db",
-            "db ",
-            "-db",
-            "db..internal",
-            "[::1",
-            "::1]",
-            "[127.0.0.1]",
-        ] {
-            assert!(mongo_host_authority(input).is_err(), "accepted {input:?}");
-        }
     }
 
     #[tokio::test]

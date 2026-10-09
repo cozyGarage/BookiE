@@ -1,11 +1,11 @@
 # Code conventions
 
-`CLAUDE.md` states the rules that make a change acceptable. This document states
+`AGENTS.md` states the rules that make a change acceptable. This document states
 the rules that make two changes agree with each other. Its purpose is to settle
 recurring choices once, so a later change does not reverse an earlier one for no
 reason other than a different author on a different day.
 
-If a rule here and `CLAUDE.md` disagree, `CLAUDE.md` wins and this document is
+If a rule here and `AGENTS.md` disagree, `AGENTS.md` wins and this document is
 wrong and must be fixed.
 
 ## Function shape
@@ -84,7 +84,7 @@ helpers that are called once and read worse than the original.
 The exception is narrow. It covers only widget construction and message
 dispatch. It does not cover logic that happens to sit inside them. When an
 `update` arm computes something, that computation moves to a free function in a
-sibling module and gets a unit test, which is the rule `CLAUDE.md` already
+sibling module and gets a unit test, which is the rule `AGENTS.md` already
 states as "keep reusable logic outside widget construction".
 
 The baseline file does not distinguish these from the rest, on purpose. A UI
@@ -172,7 +172,7 @@ reason. Do not change it in passing inside a feature commit.
 | Where does a driver panic get caught? | `PolicyGuard`, once, for every consumer | [ADR 0006](decisions/0006-driver-panic-containment.md) |
 | How does a service reach a component? | An `Arc`-shared service handle, not a global | [state-management](state-management.md) |
 | Whole-value state versus per-key state | `StateFile<T>` for whole documents, `WorkspaceStore` for per-connection merge | [state-management](state-management.md) |
-| Is a comment allowed? | Only for behaviour outside this repository | `CLAUDE.md` |
+| Is a comment allowed? | Only for behaviour outside this repository | `AGENTS.md` |
 | Optional behaviour on a trait | Existing capability first; shared extension requires concrete callers and wrapper review | this document |
 | A cell the driver could not decode | `Value::Undecodable` carrying the type name, never `Value::Null` | [ADR 0007](decisions/0007-type-and-value-preservation.md) |
 | Cancellation | Reaches the database operation, not just the future | [ADR 0005](decisions/0005-server-side-cancellation.md) |

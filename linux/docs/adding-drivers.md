@@ -78,7 +78,7 @@ references; they do not introduce a Linux runtime plugin ABI.
 
 Use current testcontainers `AsyncRunner` examples in existing drivers.
 Integration crates need the test-only Clippy allowances specified in
-`CLAUDE.md`; fixture tests are ignored in the fast tier and executed by their
+`AGENTS.md`; fixture tests are ignored in the fast tier and executed by their
 dedicated layer.
 
 From `linux/`, a focused engine fixture command is:

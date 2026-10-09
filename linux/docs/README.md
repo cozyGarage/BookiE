@@ -1,61 +1,90 @@
-# Documentation entry point
+# Documentation map
 
-Read this page before loading long plans or evidence ledgers. The active sprint
+Read this page before loading long plans or evidence. Rules for agents and
+contributors are in the repository [AGENTS.md](../../AGENTS.md). The active sprint
 sets work order; accepted ADRs set technical rules. A dated result proves only
 its recorded source, environment and consumer.
 
-## Minimum agent context
+## Minimum context for a task
 
-1. Repository `CLAUDE.md` and applicable `AGENTS.md` instructions.
-2. [Active sprint](bookie-0.2-sprint.md): choose one milestone/task.
-3. The relevant [ADR](decisions/README.md); for every type/value change read
+1. [AGENTS.md](../../AGENTS.md).
+2. The [active sprint](bookie-0.2-sprint.md), including 0.2.0 readiness.
+3. Your lane's rows in the [ledger](known-issues.md#owners-and-handoff).
+4. The governing [ADR](decisions/README.md); for every type or value change,
    [ADR 0007](decisions/0007-type-and-value-preservation.md).
-4. The owning task/case and affected checks in the [validation playbook](validation-playbook.md).
+5. The affected checks in the [validation playbook](validation-playbook.md).
 
-Do not load every archive as mandatory context. Look up the specific heading,
-test selector and SHA needed for the task. Recheck current source before relying
-on historical statements such as “next”, “current” or “pending”.
+Do not load archives as mandatory context. Look up the heading, test selector or
+SHA you need, and recheck current source before trusting words such as "next",
+"current" or "pending" in a dated document.
+
+## Documents by audience
+
+| Audience | Documents |
+|---|---|
+| People using BookiE | [User guide](user-guide.md), [platforms](platforms.md), [Linux README](../README.md) |
+| Anyone comparing clients | [0.2 feature comparison](0.2-feature-comparison.md) |
+| Contributors writing code | [AGENTS.md](../../AGENTS.md), [architecture](../ARCHITECTURE.md), [code conventions](code-conventions.md), [adding drivers](adding-drivers.md), [state management](state-management.md), [connections](connections.md), [disconnection contracts](disconnection-contracts.md), [storage](storage.md), [error handling](error-handling.md) |
+| Contributors testing | [Validation playbook](validation-playbook.md), [testing](testing.md), [ignored-test inventory](ignored-tests.md) (generated), [manual verification](manual-verification-0.2-features.md), [capability evidence](capability-evidence.md) |
+| Planning and status | [Sprint](bookie-0.2-sprint.md), [ledger](known-issues.md), [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence index](value-contracts.md), [ROADMAP](../ROADMAP.md), [changelog](../CHANGELOG.md) |
+| Decisions | [ADRs](decisions/README.md), [proposals](proposals/) |
+| Proof and history | [evidence](evidence/), [archive](archive/), [upstream sync](upstream-sync.md) |
 
 ## Where each fact belongs
 
 | Fact | Owner | Update rule |
 | --- | --- | --- |
-| Type/value semantics and proof standard | [ADR 0007](decisions/0007-type-and-value-preservation.md) | Change a decision explicitly; link it from plans |
-| Connection/session/trust semantics | [ADR 0008](decisions/0008-connection-and-session-ownership.md) | B4 task IDs track implementation, not competing rules |
-| Durable identity and migration semantics | [ADR 0009](decisions/0009-persistence-and-identity-compatibility.md) | Operational procedures stay in storage/state guides |
-| Every known open issue outside B3, with its status, evidence and owner | [Known issues ledger](known-issues.md) (owners in [Owners and handoff](known-issues.md#owners-and-handoff)) | Cross out a row only with the commit or test that closed it; `scripts/check-known-issues.py` enforces the format |
-| Milestones, order and acceptance | [Active sprint](bookie-0.2-sprint.md) | Keep current instructions compact; archive dated progress |
-| B3 remaining work | [Type/consumer board](type-contract-strategy.md) | One bounded case, outcome, evidence pointer and next action |
-| B4 implementation packets | [B4 board](b4-task-board.md) | Update the owning task and integrated status |
-| UI-1b SSH jump-chain editor | [Per-hop credential proposal](proposals/ui-1b-ssh-jump-chain-editor.md) | Proposal only; retain edit refusal until storage, transport, bundle, and GTK work land together |
-| Type/consumer proof lookup | [Value evidence index](value-contracts.md) | Link to the case; detailed logs/counts belong in history/evidence |
-| Supported distros, Rust toolchain, Arch package, Flathub, accessibility | [Platforms](platforms.md) | Keep one section per concern; the build floor is stated here |
-| Commands, execution ownership, handoff format | [Validation playbook](validation-playbook.md) | Reuse existing layers; distinguish local/hosted/installed |
-| SonarCloud findings | [SonarCloud triage](validation-playbook.md#sonarcloud-triage) | Confirm framework-specific findings against the native platform before changing source |
-| Crate/source structure | [Architecture](../ARCHITECTURE.md) | Match actual manifests and owning wrappers |
-| Active milestone / short status | [Sprint](bookie-0.2-sprint.md) / [ROADMAP](../ROADMAP.md) | Sprint owns acceptance; roadmap links to current boards |
+| A rule for every change | [AGENTS.md](../../AGENTS.md) | One copy; tool-specific files point to it |
+| An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR |
+| A design not yet decided | [proposals/](proposals/) | Becomes an ADR or is deleted |
+| An open issue, its status, evidence and owner | The [ledger](known-issues.md) | One row per issue; cross out only with the closing commit, PR or test; `scripts/check-known-issues.py` checks the format and owners |
+| Milestones, order, acceptance, 0.2.0 readiness | The [sprint](bookie-0.2-sprint.md) | Compact current instructions; move dated progress to the archive |
+| B3 remaining work | The [B3 board](type-contract-strategy.md) | One bounded case, outcome, evidence pointer and next action |
+| B4 implementation and acceptance | The [B4 board](b4-task-board.md) | Update the owning task and integrated status |
+| Type and consumer proof lookup | The [value evidence index](value-contracts.md) | Link to the case; detailed logs belong in evidence or history |
+| Distros, toolchain, packages, Flathub, accessibility | [Platforms](platforms.md) | One section per concern |
+| Commands, layers, gates, handoff format | The [validation playbook](validation-playbook.md) | Reuse existing layers; say whether a result was local, Forgejo or installed |
+| Crate and source structure | [Architecture](../ARCHITECTURE.md) | Match the manifests |
+| A user-visible change | The [changelog](../CHANGELOG.md) | One line of user impact; no test or evidence notes |
+| What a user can do and how | The [user guide](user-guide.md) | Update with the feature that changes it |
+| Run-specific proof (manifests, focused logs) | `evidence/<topic>-<YYYY-MM-DD>/` | A `manifest.json` plus small text logs; link it from the owning row or board |
+| A finished review, audit or long history | [archive/](archive/) | Dated file name; never edited after archiving except for broken links |
 
-## Archive
+## Adding a document
 
-[docs/archive](archive/) holds the dated reviews, audits, inventories and long
-histories (sprint, B3, B4, connections, validation, value contracts). They are
-source-pinned evidence, not current instructions: open items from them live in
-the [ledger](known-issues.md). Use the
+- Look for the owner in the table above first; most new facts are a row, a
+  section or an ADR, not a new file.
+- A new reference document goes in `linux/docs/` with a lowercase, hyphenated
+  name and a line in the audience table above. Keep it under about 3,000 words;
+  split by concern before it grows past that.
+- Number ADRs sequentially (`decisions/NNNN-title.md`) and add them to the ADR
+  index with their status.
+- Evidence directories are named `<topic>-<YYYY-MM-DD>` and hold only what a
+  reviewer needs to check a claim. Large or raw logs stay in the PR or CI run.
+- When a document stops being current, move it to `archive/` with its date in
+  the name, update links (`scripts/check-doc-links.py` finds the broken ones) and
+  leave its open items in the ledger.
+- Do not move or rename a current document casually: scripts, CI and other lanes
+  link to these paths.
+
+## Archive starting points
+
+[archive/](archive/) holds dated reviews, audits, inventories and long
+histories. They are source-pinned evidence, not instructions; open items from
+them live in the ledger. The
 [changelog engineering history index](../CHANGELOG.md#historical-engineering-records)
-to locate a dated record, and the current boards and linked PR discussions or
-CI artifacts for active decisions and case proof. Useful starting points:
+locates dated records.
 
-- [Release audit, October 3](archive/release-audit-2026-10-03.md): a dated broad source audit pinned to its then-current baseline; use the live ledger and boards for current status.
-- [Architecture review](archive/architecture-consistency-review-2026-10-03.md): source risks and unavailable raw proof.
-- [App layer audit](archive/app-layer-external-audit-2026-10-06.md): GUI gaps and the TablePro and dbx UI comparison.
-- [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md): scroll profile, weak-cache implementation and measured results; keep query paging and ODBC scoped separately.
-- [Upstream main](archive/upstream-main-review-2026-10-03.md) and [older releases](archive/upstream-older-releases-review-2026-10-03.md): candidate fixes.
+- [Release audit, October 3](archive/release-audit-2026-10-03.md)
+- [Architecture review](archive/architecture-consistency-review-2026-10-03.md)
+- [App layer audit](archive/app-layer-external-audit-2026-10-06.md): GUI gaps and the TablePro and dbx comparison
+- [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
+- [Upstream main](archive/upstream-main-review-2026-10-03.md) and [older releases](archive/upstream-older-releases-review-2026-10-03.md)
+- [External audit and post-0.2 plan](../../external-audit.md) and its [client review](../../external-audit-client-review.md)
 
 ## Keep context bounded
 
-Record a rule once in an ADR and a task once on its board. Put run-specific
-manifests and logs in the PR discussion or CI artifacts, then link them from the
-owning board and changelog; do not add per-run evidence directories to source.
-Do not copy old test counts into a current acceptance claim. Keep ignored
-`target/quality` paths as plain text; when output is unavailable, say so instead
-of leaving a dead link.
+Record a rule once in an ADR and a task once on its board or in the ledger. Do
+not copy old test counts into a current claim. Keep ignored `target/quality`
+paths as plain text, and when output is unavailable, say so instead of leaving a
+dead link.

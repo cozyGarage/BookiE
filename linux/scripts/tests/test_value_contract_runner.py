@@ -11,6 +11,11 @@ spec = importlib.util.spec_from_file_location("value_runner", path)
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
 
+cleanup_path = Path(__file__).resolve().parents[1] / "cleanup-testcontainers.py"
+cleanup_spec = importlib.util.spec_from_file_location("cleanup_testcontainers", cleanup_path)
+cleanup_runner = importlib.util.module_from_spec(cleanup_spec)
+cleanup_spec.loader.exec_module(cleanup_runner)
+
 
 class ValueRunnerTests(unittest.TestCase):
     def test_all_drivers_have_required_suites(self):
@@ -53,6 +58,22 @@ class ValueRunnerTests(unittest.TestCase):
         self.assertEqual(runner.select_artifact(message, runner.expected_suites()), ("crates/core/Cargo.toml", "/tmp/test"))
         message["profile"]["test"] = False
         self.assertIsNone(runner.select_artifact(message, runner.expected_suites()))
+
+    def test_shared_container_cleanup_removes_only_the_run_label(self):
+        with patch.object(cleanup_runner.subprocess, "run") as run:
+            run.return_value.stdout = "one\ntwo\n"
+            cleanup_runner.cleanup("run-123")
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args_list[0].args[0], [
+            "docker", "ps", "-aq", "--filter", "label=com.tablepro.test-run=run-123"
+        ])
+        self.assertEqual(run.call_args_list[1].args[0], ["docker", "rm", "-f", "one", "two"])
+
+    def test_shared_container_cleanup_does_not_remove_other_runs(self):
+        with patch.object(cleanup_runner.subprocess, "run") as run:
+            run.return_value.stdout = ""
+            cleanup_runner.cleanup("run-123")
+        run.assert_called_once()
 
     def test_success_requires_every_listed_test_to_pass(self):
         listed = runner.subprocess.CompletedProcess([], 0, "value_contract_case: test\n", "")

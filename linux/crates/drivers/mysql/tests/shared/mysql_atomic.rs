@@ -257,6 +257,83 @@ async fn mysql_failed_batch_keeps_direct_inserts_on_nontransactional_engines() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_failed_batch_blackhole_trigger_sink_discards_rows_but_runs_with_trigger() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts.clone()).await;
+    conn.execute("CREATE TABLE blackhole_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE blackhole_sink (id INT PRIMARY KEY) ENGINE=BLACKHOLE")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE myisam_trigger_witness (id INT PRIMARY KEY) ENGINE=MyISAM")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO blackhole_parent VALUES (1)").await.unwrap();
+
+    let fixture = sqlx::mysql::MySqlPoolOptions::new()
+        .connect_with(
+            sqlx::mysql::MySqlConnectOptions::new()
+                .host(&opts.host)
+                .port(opts.port)
+                .username(&opts.username)
+                .password(opts.password.expose_secret())
+                .database(&opts.database),
+        )
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER blackhole_parent_after_insert AFTER INSERT ON blackhole_parent \
+         FOR EACH ROW BEGIN \
+             INSERT INTO blackhole_sink VALUES (NEW.id); \
+             INSERT INTO myisam_trigger_witness VALUES (NEW.id); \
+         END",
+    )
+    .execute(&fixture)
+    .await
+    .unwrap();
+    fixture.close().await;
+
+    let batch = vec![
+        ("INSERT INTO blackhole_parent VALUES (2)".into(), vec![]),
+        ("INSERT INTO blackhole_parent VALUES (1)".into(), vec![]),
+    ];
+    let error = conn
+        .execute_in_transaction(&batch)
+        .await
+        .expect_err("duplicate key must fail after the trigger side effects");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+        "the trigger statement must complete before the batch fails, got {error:?}"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM blackhole_parent ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "the InnoDB parent insert is rolled back"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM myisam_trigger_witness ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(2)]],
+        "the trigger ran and its nontransactional witness survives rollback"
+    );
+    assert!(
+        conn.query("SELECT id FROM blackhole_sink")
+            .await
+            .unwrap()
+            .rows
+            .is_empty(),
+        "BLACKHOLE executes as a sink and does not retain the trigger row"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn mysql_failed_batch_keeps_direct_updates_and_deletes_on_nontransactional_engines() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts).await;
@@ -795,6 +872,90 @@ async fn mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigg
             .rows,
         Vec::<Vec<Value>>::new(),
         "the InnoDB AFTER DELETE trigger effect is rolled back"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_failed_multirow_insert_preserves_only_nontransactional_trigger_effects() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts.clone()).await;
+    conn.execute("CREATE TABLE statement_failure_parent (id INT PRIMARY KEY, unique_value INT UNIQUE) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO statement_failure_parent VALUES (1, 10), (2, 20), (3, 30)")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE statement_failure_innodb_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE statement_failure_myisam_effects (id INT PRIMARY KEY) ENGINE=MyISAM")
+        .await
+        .unwrap();
+
+    let fixture = sqlx::mysql::MySqlPoolOptions::new()
+        .connect_with(
+            sqlx::mysql::MySqlConnectOptions::new()
+                .host(&opts.host)
+                .port(opts.port)
+                .username(&opts.username)
+                .password(opts.password.expose_secret())
+                .database(&opts.database),
+        )
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER statement_failure_parent_after_insert AFTER INSERT ON statement_failure_parent \
+         FOR EACH ROW BEGIN \
+             INSERT INTO statement_failure_innodb_effects VALUES (NEW.id); \
+             INSERT INTO statement_failure_myisam_effects VALUES (NEW.id); \
+         END",
+    )
+    .execute(&fixture)
+    .await
+    .unwrap();
+    fixture.close().await;
+
+    let batch = vec![(
+        "INSERT INTO statement_failure_parent VALUES (4, 40), (5, 30)".into(),
+        vec![],
+    )];
+    let error = conn
+        .execute_in_transaction(&batch)
+        .await
+        .expect_err("the second inserted row must violate unique_value");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 0, .. }),
+        "the failed INSERT is statement zero, got {error:?}"
+    );
+
+    assert_eq!(
+        conn.query("SELECT id, unique_value FROM statement_failure_parent ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![
+            vec![Value::Int(1), Value::Int(10)],
+            vec![Value::Int(2), Value::Int(20)],
+            vec![Value::Int(3), Value::Int(30)],
+        ],
+        "the failed InnoDB INSERT restores the first row after the second row collides"
+    );
+    assert!(
+        conn.query("SELECT id FROM statement_failure_innodb_effects")
+            .await
+            .unwrap()
+            .rows
+            .is_empty(),
+        "transactional trigger effects from the failed statement roll back"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM statement_failure_myisam_effects ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(4)]],
+        "the MyISAM trigger effect from the successful first row survives statement rollback"
     );
 }
 

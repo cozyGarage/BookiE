@@ -50,20 +50,20 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision",
                 "value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity",
                 "value_contract_mongodb_off_page_type_change_during_census_refuses_edit",
-                "value_contract_mongodb_browse_censuses_once_then_uses_bounded_page_queries",
-                "value_contract_mongodb_type_change_after_census_is_marked_mixed",
+                "value_contract_mongodb_browse_uses_a_bounded_sample_and_page_find",
+                "value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents",
                 "value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values",
-                "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
-                "value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings",
-                "value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes",
-                "value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes",
-                "value_contract_mysql_spatial_grid_refusal_preserves_native_bytes",
                 "postgres_value_query_refetches_by_enum_and_domain_composite_key",
                 "mysql_value_query_refetches_the_exact_blob_for_a_composite_key",
                 "mssql_value_query_refetches_the_exact_blob_for_a_composite_key",
                 "clickhouse_value_query_refetches_the_exact_text_for_a_composite_key",
                 "mongodb_guarded_refetch_preserves_long_text_and_binary_values",
                 "redis_guarded_refetch_preserves_binary_key_and_value",
+                "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
+                "value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings",
+                "value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes",
+                "value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes",
+                "value_contract_mysql_spatial_grid_refusal_preserves_native_bytes",
                 "value_contract_mysql_bit_parser_edits_preserve_native_values",
                 "value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit",
                 "value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings",
@@ -171,6 +171,13 @@ class CiWorkflowTests(unittest.TestCase):
             "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
             commands[1],
         )
+
+    def test_mysql_approval_dialog_runs_in_hosted_installed_gtk_acceptance(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  duckdb:\n", 1)[0]
+        self.assertIn("Build staged release GTK binary", acceptance)
+        self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", acceptance)
+        self.assertIn("bash scripts/test-gtk-mysql-approval.sh", acceptance)
 
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
