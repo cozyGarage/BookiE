@@ -161,13 +161,22 @@ async fn open_kerberos_client(target: MssqlTarget) -> Result<MssqlClient, Driver
     let handle = tokio::runtime::Handle::current();
     let connecting = tokio::task::spawn_blocking(move || {
         let _attempt = attempt;
-        handle.block_on(open_client(target))
+        handle.block_on(connect_with_deadline(CONNECT_TIMEOUT, open_client(target)))
     });
     match tokio::time::timeout(CONNECT_TIMEOUT, connecting).await {
         Ok(Ok(result)) => result,
         Ok(Err(error)) => Err(DriverError::Internal(error.to_string())),
         Err(_) => Err(DriverError::ConnectionRefused),
     }
+}
+
+async fn connect_with_deadline<F, T>(duration: std::time::Duration, connecting: F) -> Result<T, DriverError>
+where
+    F: std::future::Future<Output = Result<T, DriverError>>,
+{
+    tokio::time::timeout(duration, connecting)
+        .await
+        .map_err(|_| DriverError::ConnectionRefused)?
 }
 
 async fn open_client(target: MssqlTarget) -> Result<MssqlClient, DriverError> {
