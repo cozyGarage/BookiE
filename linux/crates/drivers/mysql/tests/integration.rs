@@ -19,6 +19,9 @@ mod server_restart;
 #[path = "support/disconnection.rs"]
 mod disconnection;
 
+#[path = "support/shared_container.rs"]
+mod shared_container;
+
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;
 
@@ -32,25 +35,8 @@ async fn an_unavailable_mysql_server_is_classified_as_connection_refused() {
         .expect("MySQL setup refusal remains distinct from established disconnect");
 }
 
-async fn start_mysql() -> (ContainerAsync<Mysql>, ConnectOptions) {
-    let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
-        .start()
-        .await
-        .expect("start mysql container");
-    let host = container.get_host().await.expect("host").to_string();
-    let port = container.get_host_port_ipv4(3306).await.expect("port");
-    let opts = ConnectOptions {
-        host,
-        port,
-        database: "test".into(),
-        username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
-        ..Default::default()
-    };
-    (container, opts)
+async fn start_mysql() -> (shared_container::TestDatabase, ConnectOptions) {
+    shared_container::start_mysql().await
 }
 
 async fn start_mariadb() -> (ContainerAsync<GenericImage>, ConnectOptions) {

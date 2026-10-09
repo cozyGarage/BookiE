@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import uuid
 
 from rust_test_evidence import completed_tests
 
@@ -73,7 +74,7 @@ def compile_suites(command, expected, directory):
     return artifacts, {"exit_code": status, "seconds": round(time.monotonic() - started, 3), "fresh_artifacts": fresh, "rebuilt_packages": sorted(rebuilt)}
 
 
-def run_suite(manifest, executable, directory):
+def run_suite(manifest, executable, directory, run_id=None):
     name = manifest.removesuffix("/Cargo.toml").replace("/", "-")
     log_path = directory / f"{name}.log"
     try:
@@ -87,11 +88,13 @@ def run_suite(manifest, executable, directory):
         log_path.write_text(listing.stdout + listing.stderr)
         return {"tests": count, "exit_code": listing.returncode or 1, "error": "value contract test missing", "log": log_path.name}
     started = time.monotonic()
+    environment = dict(os.environ, TABLEPRO_TEST_RUN_ID=run_id) if run_id else None
     with log_path.open("w") as log:
         try:
             result = subprocess.run(
                 [executable, "value_contract", "--include-ignored", "--test-threads=1", "--format=pretty", "--color=never"],
                 cwd=ROOT,
+                env=environment,
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 timeout=SUITE_TIMEOUT_SECONDS,
@@ -100,6 +103,17 @@ def run_suite(manifest, executable, directory):
         except subprocess.TimeoutExpired:
             log.write(f"\nValue-contract suite exceeded {SUITE_TIMEOUT_SECONDS} seconds.\n")
             exit_code = 124
+    if run_id:
+        cleanup = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/cleanup-testcontainers.py"), run_id],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        if cleanup.returncode:
+            with log_path.open("a") as log:
+                log.write(f"\nShared database container cleanup failed: {cleanup.stderr}\n")
+            exit_code = exit_code or cleanup.returncode
     if exit_code == 0 and not completed_tests(log_path.read_text(), expected):
         with log_path.open("a") as log:
             log.write("\nERROR: execution did not pass every listed test exactly once.\n")
@@ -131,7 +145,11 @@ def main():
         for manifest, executable in sorted(artifacts.items()):
             if args.unit_only and expected[manifest] == "integration":
                 continue
-            result = run_suite(manifest, executable, directory)
+            run_id = uuid.uuid4().hex if manifest in {
+                "crates/drivers/mysql/Cargo.toml",
+                "crates/drivers/postgres/Cargo.toml",
+            } else None
+            result = run_suite(manifest, executable, directory, run_id)
             report["suites"][manifest] = result
             failed |= result["exit_code"] != 0
             print(f"{manifest}: {result}", flush=True)
