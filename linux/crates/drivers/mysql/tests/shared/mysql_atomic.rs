@@ -877,6 +877,90 @@ async fn mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigg
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_failed_multirow_insert_preserves_only_nontransactional_trigger_effects() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts.clone()).await;
+    conn.execute("CREATE TABLE statement_failure_parent (id INT PRIMARY KEY, unique_value INT UNIQUE) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO statement_failure_parent VALUES (1, 10), (2, 20), (3, 30)")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE statement_failure_innodb_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE statement_failure_myisam_effects (id INT PRIMARY KEY) ENGINE=MyISAM")
+        .await
+        .unwrap();
+
+    let fixture = sqlx::mysql::MySqlPoolOptions::new()
+        .connect_with(
+            sqlx::mysql::MySqlConnectOptions::new()
+                .host(&opts.host)
+                .port(opts.port)
+                .username(&opts.username)
+                .password(opts.password.expose_secret())
+                .database(&opts.database),
+        )
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER statement_failure_parent_after_insert AFTER INSERT ON statement_failure_parent \
+         FOR EACH ROW BEGIN \
+             INSERT INTO statement_failure_innodb_effects VALUES (NEW.id); \
+             INSERT INTO statement_failure_myisam_effects VALUES (NEW.id); \
+         END",
+    )
+    .execute(&fixture)
+    .await
+    .unwrap();
+    fixture.close().await;
+
+    let batch = vec![(
+        "INSERT INTO statement_failure_parent VALUES (4, 40), (5, 30)".into(),
+        vec![],
+    )];
+    let error = conn
+        .execute_in_transaction(&batch)
+        .await
+        .expect_err("the second inserted row must violate unique_value");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 0, .. }),
+        "the failed INSERT is statement zero, got {error:?}"
+    );
+
+    assert_eq!(
+        conn.query("SELECT id, unique_value FROM statement_failure_parent ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![
+            vec![Value::Int(1), Value::Int(10)],
+            vec![Value::Int(2), Value::Int(20)],
+            vec![Value::Int(3), Value::Int(30)],
+        ],
+        "the failed InnoDB INSERT restores the first row after the second row collides"
+    );
+    assert!(
+        conn.query("SELECT id FROM statement_failure_innodb_effects")
+            .await
+            .unwrap()
+            .rows
+            .is_empty(),
+        "transactional trigger effects from the failed statement roll back"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM statement_failure_myisam_effects ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(4)]],
+        "the MyISAM trigger effect from the successful first row survives statement rollback"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn mysql_batch_rollback_preserves_trigger_session_variable_effects() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts.clone()).await;
