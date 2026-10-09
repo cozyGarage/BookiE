@@ -101,280 +101,6 @@ jobs:
         run: |
           cd src/linux && bash scripts/test-gtk-widgets.sh
 
-  gtk:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 60
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-${{ matrix.shard }}
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Select isolated MCP HTTP port
-        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
-      - name: Installed GTK end-to-end suite, one third
-        run: |
-          cd src/linux && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
-
-  driver:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
-      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
-    strategy:
-      fail-fast: false
-      matrix:
-        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb]
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Driver integration
-        run: |
-          cd src/linux
-          cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
-          }
-          trap cleanup_testcontainers EXIT
-          trap 'cleanup_testcontainers; exit 143' TERM
-          trap 'cleanup_testcontainers; exit 130' INT
-          cargo test --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
-
-  consumers:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/consumers
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: MCP, policy sessions
-        run: |
-          cd src/linux
-          cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
-          cargo test --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
-          cargo test --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
-      - name: App server tests
-        run: |
-          cd src/linux && python3 scripts/run-isolated-tests.py app-server
-
-  socket-ssh:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: PostgreSQL socket and SSH fixtures
-        run: |
-          cd src/linux
-          ./scripts/test-postgres-socket.sh
-          bash ./scripts/test-ssh.sh
-
-  driver-tls:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Driver TLS fixtures
-        run: |
-          cd src/linux && ./scripts/test-driver-tls.sh
-
-  pg-release:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Select isolated MCP HTTP port
-        run: cd src/linux && python3 scripts/ci-mcp-port.py 4
-      - name: PostgreSQL release fixture
-        run: |
-          cd src/linux && ./scripts/test-postgres-release.sh
-
-  keyring:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 30
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/keyring
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Secret Service tier
-        run: |
-          cd src/linux && ./scripts/test-secret-service.sh
-
-  e2e:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/e2e-${{ matrix.server }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - server: postgres
-            mcp_port_slot: 5
-          - server: mysql
-            mcp_port_slot: 6
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Select isolated MCP HTTP port
-        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
-      - name: Real server end to end
-        run: |
-          cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
-
-  duckdb:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 90
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/duckdb
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: DuckDB driver and the app with DuckDB
-        run: |
-          cd src/linux
-          cargo clippy --locked -p tablepro-driver-duckdb --all-targets -- -D warnings
-          cargo test --locked -p tablepro-driver-duckdb -- --include-ignored
-          cargo build --locked -p tablepro-app --features duckdb
-  gtk-server:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 60
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-server-${{ matrix.server }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - server: clickhouse
-            mcp_port_slot: 7
-          - server: mysql-approval
-            mcp_port_slot: 8
-          - server: mongodb
-            mcp_port_slot: 9
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Select isolated MCP HTTP port
-        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
-      - name: Installed GTK scenarios against a real server
-        run: |
-          cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
-  supply-chain:
-    runs-on: debian-host
-    needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/supply-chain
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Supply-chain tools
-        run: |
-          command -v cargo-deny >/dev/null || cargo install --locked cargo-deny --version 0.20.2
-          command -v cargo-audit >/dev/null || cargo install --locked cargo-audit --version 0.22.2
-      - name: Advisories, licenses and sources
-        run: |
-          cd src/linux && python3 scripts/run-test-layer.py supply-chain
   distro-floor:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
@@ -413,3 +139,277 @@ jobs:
             mv "$released.part" "$released"
           fi
           cd src/linux && PREVIOUS_DEB="$released" bash scripts/test-deb-package.sh ${{ matrix.base }}
+  driver:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
+      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
+    strategy:
+      fail-fast: false
+      matrix:
+        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb]
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Driver integration
+        run: |
+          cd src/linux
+          cleanup_testcontainers() {
+            python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
+          }
+          trap cleanup_testcontainers EXIT
+          trap 'cleanup_testcontainers; exit 143' TERM
+          trap 'cleanup_testcontainers; exit 130' INT
+          cargo test --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
+
+  e2e:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/e2e-${{ matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - server: postgres
+            mcp_port_slot: 5
+          - server: mysql
+            mcp_port_slot: 6
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Real server end to end
+        run: |
+          cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
+
+  consumers:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/consumers
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: MCP, policy sessions
+        run: |
+          cd src/linux
+          cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
+          cargo test --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
+          cargo test --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
+      - name: App server tests
+        run: |
+          cd src/linux && python3 scripts/run-isolated-tests.py app-server
+
+  gtk:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-${{ matrix.shard }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
+      - name: Installed GTK end-to-end suite, one third
+        run: |
+          cd src/linux && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
+
+  duckdb:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/duckdb
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: DuckDB driver and the app with DuckDB
+        run: |
+          cd src/linux
+          cargo clippy --locked -p tablepro-driver-duckdb --all-targets -- -D warnings
+          cargo test --locked -p tablepro-driver-duckdb -- --include-ignored
+          cargo build --locked -p tablepro-app --features duckdb
+  pg-release:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py 4
+      - name: PostgreSQL release fixture
+        run: |
+          cd src/linux && ./scripts/test-postgres-release.sh
+
+  socket-ssh:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: PostgreSQL socket and SSH fixtures
+        run: |
+          cd src/linux
+          ./scripts/test-postgres-socket.sh
+          bash ./scripts/test-ssh.sh
+
+  gtk-server:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-server-${{ matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - server: clickhouse
+            mcp_port_slot: 7
+          - server: mysql-approval
+            mcp_port_slot: 8
+          - server: mongodb
+            mcp_port_slot: 9
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Select isolated MCP HTTP port
+        run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Installed GTK scenarios against a real server
+        run: |
+          cd src/linux && bash scripts/test-gtk-${{ matrix.server }}.sh
+  driver-tls:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Driver TLS fixtures
+        run: |
+          cd src/linux && ./scripts/test-driver-tls.sh
+
+  keyring:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/keyring
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Secret Service tier
+        run: |
+          cd src/linux && ./scripts/test-secret-service.sh
+
+  supply-chain:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/supply-chain
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Supply-chain tools
+        run: |
+          command -v cargo-deny >/dev/null || cargo install --locked cargo-deny --version 0.20.2
+          command -v cargo-audit >/dev/null || cargo install --locked cargo-audit --version 0.22.2
+      - name: Advisories, licenses and sources
+        run: |
+          cd src/linux && python3 scripts/run-test-layer.py supply-chain
