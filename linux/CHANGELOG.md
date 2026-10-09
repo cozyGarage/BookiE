@@ -104,6 +104,7 @@
 
 ### Fixed
 
+- A table's column and foreign key lists from a superseded refresh are no longer applied after a newer refresh started
 - Pressing Cancel while a connection is finishing no longer opens that connection anyway
 - Refreshing, closing or pressing Kill twice in the activity dialog no longer cancels a Kill that is already running, so its result is always shown
 - A run that cannot start (the session is closing or the connection is gone) no longer hides the result of the query still running in that editor
