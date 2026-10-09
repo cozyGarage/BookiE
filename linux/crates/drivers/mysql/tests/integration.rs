@@ -841,6 +841,15 @@ async fn a_copied_insert_survives_a_value_that_could_escape_its_literal() {
 async fn a_value_the_driver_cannot_decode_is_reported_rather_than_shown_as_null() {
     let (_c, opts) = start_mysql().await;
     let conn = connect(opts).await;
+    conn.execute(
+        "CREATE TABLE non_utf8_labels (enum_value ENUM('ünï') CHARACTER SET utf8mb4, \
+         set_value SET('ünï') CHARACTER SET utf8mb4)",
+    )
+    .await
+    .unwrap();
+    conn.execute("INSERT INTO non_utf8_labels VALUES ('ünï', 'ünï')")
+        .await
+        .unwrap();
     let mut session = conn.open_session().await.unwrap();
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
     session
@@ -848,12 +857,22 @@ async fn a_value_the_driver_cannot_decode_is_reported_rather_than_shown_as_null(
         .await
         .unwrap();
     let result = session
-        .query_params_controlled("SELECT 'ünï' AS latin, CAST(NULL AS SIGNED) AS absent", &[], &control)
+        .query_params_controlled(
+            "SELECT 'ünï' AS latin, CAST(NULL AS SIGNED) AS absent, enum_value, set_value \
+             FROM non_utf8_labels",
+            &[],
+            &control,
+        )
         .await
         .unwrap();
     assert_eq!(
         result.rows,
-        vec![vec![Value::Undecodable("VARCHAR".into()), Value::Null]],
+        vec![vec![
+            Value::Undecodable("VARCHAR".into()),
+            Value::Null,
+            Value::Bytes(vec![0xfc, b'n', 0xef]),
+            Value::Bytes(vec![0xfc, b'n', 0xef]),
+        ]],
         "a value that failed to decode must not be indistinguishable from a stored NULL"
     );
 }
