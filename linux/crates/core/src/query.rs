@@ -264,28 +264,69 @@ mod tests {
         };
         assert!(byte_budget.admit(&row));
         assert!(!byte_budget.admit(&row));
+
+        let one_cell = [Value::Null];
+        let mut exact_cell_budget = QueryResultBudget {
+            cells: MAX_QUERY_RESULT_CELLS - 1,
+            ..QueryResultBudget::default()
+        };
+        assert!(exact_cell_budget.admit(&one_cell));
+        assert!(!exact_cell_budget.admit(&one_cell));
         let mut cell_budget = QueryResultBudget {
-            cells: super::MAX_QUERY_RESULT_CELLS,
+            cells: MAX_QUERY_RESULT_CELLS,
             ..QueryResultBudget::default()
         };
         assert!(!cell_budget.admit(&[Value::Null]));
         let mut row_budget = QueryResultBudget {
-            rows: super::MAX_QUERY_ROWS,
+            rows: MAX_QUERY_ROWS - 1,
             ..QueryResultBudget::default()
         };
-        assert!(!row_budget.admit(&[Value::Null]));
+        assert!(row_budget.admit(&one_cell));
+        assert!(!row_budget.admit(&one_cell));
     }
 
     #[test]
-    fn result_budget_admits_the_exact_cell_limit_once() {
-        let mut budget = QueryResultBudget {
-            cells: MAX_QUERY_RESULT_CELLS - 1,
-            ..QueryResultBudget::default()
-        };
-        let row = [Value::Null];
+    fn result_budget_counts_dynamic_value_storage() {
+        let text = Value::Text(String::with_capacity(32));
+        let undecodable = Value::Undecodable(String::with_capacity(32));
+        let bytes = Value::Bytes(vec![0; 32]);
+        let json_string = serde_json::json!("a dynamically stored JSON string");
+        let json_array = serde_json::json!(["a dynamically stored JSON array"]);
+        let json_object = serde_json::json!({"key": "a dynamically stored JSON object"});
 
-        assert!(budget.admit(&row));
-        assert!(!budget.admit(&row));
+        for value in [&text, &undecodable, &bytes] {
+            assert!(super::value_size(value) > 1);
+        }
+        for value in [&json_string, &json_array, &json_object] {
+            assert!(super::json_heap_size(value) > 1);
+            assert!(super::value_size(&Value::Json(value.clone())) > 1);
+        }
+
+        let empty_row = super::row_size(&[]);
+        let one_cell = super::row_size(&[Value::Null]);
+        assert!(empty_row > 1);
+        assert!(one_cell > empty_row);
+    }
+
+    #[test]
+    fn first_result_keeps_truncation_from_either_batch_or_result_set() {
+        for (batch_truncated, result_truncated, expected) in [
+            (true, false, true),
+            (false, true, true),
+            (true, true, true),
+            (false, false, false),
+        ] {
+            let batch = QueryResultBatch {
+                result_sets: vec![QueryResult {
+                    columns: Vec::new(),
+                    rows: Vec::new(),
+                    truncated: result_truncated,
+                }],
+                truncated: batch_truncated,
+            };
+
+            assert_eq!(batch.into_first().truncated, expected);
+        }
     }
 
     #[test]
@@ -297,22 +338,6 @@ mod tests {
 
         assert!(budget.admit(&[]));
         assert!(!budget.admit(&[]));
-    }
-
-    #[test]
-    fn first_result_keeps_truncation_from_either_batch_or_result_set() {
-        for (batch_truncated, result_truncated) in [(true, false), (false, true), (true, true)] {
-            let batch = QueryResultBatch {
-                result_sets: vec![QueryResult {
-                    columns: Vec::new(),
-                    rows: Vec::new(),
-                    truncated: result_truncated,
-                }],
-                truncated: batch_truncated,
-            };
-
-            assert!(batch.into_first().truncated);
-        }
     }
 
     #[test]

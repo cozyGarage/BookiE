@@ -30,6 +30,9 @@ mod vector_contract;
 #[path = "support/array_contract.rs"]
 mod array_contract;
 
+#[path = "support/date_array_csv_import.rs"]
+mod date_array_csv_import;
+
 #[path = "support/custom_array_contract.rs"]
 mod custom_array_contract;
 
@@ -53,6 +56,9 @@ mod time_contract;
 
 #[path = "support/date_contract.rs"]
 mod date_contract;
+
+#[path = "support/interval_array_csv_import.rs"]
+mod interval_array_csv_import;
 
 #[path = "support/wide_numeric_contract.rs"]
 mod wide_numeric_contract;

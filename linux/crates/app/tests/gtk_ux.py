@@ -123,6 +123,21 @@ def scenarios(ui):
     def wait_for_result_column(name, present=True):
         ui.wait_for_node_containing(f"{name}\n", role=pyatspi.ROLE_LABEL, present=present)
 
+    def toggle_table_column(cell_text, column_name):
+        open_cell_menu(cell_text)
+        choose_menu_item(8)
+        wait_for_adw_dialog("Columns")
+        switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
+        switch = next(
+            node for node in ui.descendants(ui.application_node())
+            if ui.node_name(node) == column_name
+            and ui.node_role(node) in switch_roles
+            and node.queryAction().nActions > 0
+        )
+        ui.invoke(switch)
+        ui.press_x11_key("Escape")
+        wait_for_adw_dialog("Columns", present=False)
+
     def choose_menu_item(position):
         for _ in range(position):
             ui.press_x11_key("Down")
@@ -289,8 +304,46 @@ def scenarios(ui):
         assert "asked it to show its window" in result.stderr, result.stderr
         ui.wait_for_frame_containing(" — BookiE")
 
+    def profile_table_browse_payload(rows, payload_bytes):
+        ui.run_sql("CREATE TABLE profile_cells (id INTEGER PRIMARY KEY, person TEXT NOT NULL, payload TEXT NOT NULL)")
+        ui.wait_for_node_containing("done in", timeout=300)
+        half_bytes = (payload_bytes + 1) // 2
+        ui.run_sql(
+            f"WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < {rows}) "
+            "INSERT INTO profile_cells "
+            f"SELECT x, 'person-' || x, substr(lower(hex(randomblob({half_bytes}))), 1, {payload_bytes}) FROM c"
+        )
+        ui.wait_for_node_containing("done in", timeout=300)
+        before_rss, _ = app_memory_kb()
+        started = time.monotonic()
+        ui.wait_for_node(name="profile_cells")
+        ui.invoke_named_action_within("profile_cells", "Open profile_cells")
+        time.sleep(3)
+        after_load = app_memory_kb()[0] / 1024
+        actual_delta_mb = after_load - before_rss / 1024
+        minimum_delta_mb = payload_bytes / (1024 * 1024) / 2
+        assert actual_delta_mb >= minimum_delta_mb, (
+            f"large table page did not retain the expected payload: delta={actual_delta_mb:.1f} MB, "
+            f"minimum={minimum_delta_mb:.1f} MB"
+        )
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+            out.write(json.dumps({
+                "profile_mode": "table-browse",
+                "rows_requested": rows,
+                "cell_payload_bytes": payload_bytes,
+                "observation_after_open_seconds": round(time.monotonic() - started, 2),
+                "rss_before_mb": round(before_rss / 1024, 1),
+                "rss_delta_mb": round(actual_delta_mb, 1),
+            }) + "\n")
+
     def profile_large_result_in_the_grid(database, base):
         rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
+        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_CELL_BYTES", "0"))
+        if rows < 1 or (payload_bytes != 0 and not 8_193 <= payload_bytes <= 8 * 1024 * 1024):
+            raise ValueError("profile rows and cell payload size are outside their supported bounds")
+        if payload_bytes:
+            profile_table_browse_payload(rows, payload_bytes)
+            return
 
         def rss_sample():
             resident, high_water = app_memory_kb()
@@ -374,6 +427,7 @@ def scenarios(ui):
         })
         line = json.dumps({
             "rows_requested": rows,
+            "cell_payload_bytes": payload_bytes,
             "repetition": int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1")),
             "rows_loaded_inferred": end["visible_rows"][1] if end["visible_rows"] else None,
             "truncated_inferred": bool(end["visible_rows"] and end["visible_rows"][1] < rows),
@@ -597,6 +651,37 @@ def scenarios(ui):
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("name", present=False)
+
+    def postgres_hidden_projection_refresh_and_edit_preserve_hidden_value(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke_named_action_within("public.people", "Open people")
+        ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
+        toggle_table_column("Ada Lovelace", "profile")
+        wait_for_result_column("profile", present=False)
+        ui.press_x11_key("F5")
+        ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
+        click_cell("Ada Lovelace")
+        ui.invoke(ui.wait_for_node(name="Row inspector", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="Not fetched")
+        assert psql("SELECT profile->>'role' FROM people WHERE id=1") == "analyst"
+
+        psql("UPDATE people SET name='AdaByron' WHERE id=1")
+        ui.press_x11_key("F5")
+        ui.wait_for_node(name="AdaByron", role=pyatspi.ROLE_LABEL)
+        click_cell("AdaByron", count=2)
+        for key in "AdaLovelace":
+            ui.press_x11_key(key.lower(), ("Shift_L",) if key.isupper() else ())
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        ui.press_x11_key("s", ("Control_L",))
+        wait_for_oracle(psql, "SELECT name FROM people WHERE id=1", "AdaLovelace")
+        assert psql("SELECT profile->>'role' FROM people WHERE id=1") == "analyst"
+
+        toggle_table_column("AdaLovelace", "profile")
+        ui.press_x11_key("F5")
+        wait_for_result_column("profile")
+        ui.wait_for_node_containing("analyst", role=pyatspi.ROLE_LABEL)
 
     def postgres_saved_mtls_connection_authenticates_and_queries(database, base):
         ui.open_saved_connection(ui.POSTGRES_MTLS_CONNECTION_NAME)
@@ -1146,6 +1231,7 @@ def scenarios(ui):
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_saved_connection_browses_rows_and_values)
+        result.append(postgres_hidden_projection_refresh_and_edit_preserve_hidden_value)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
         result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)

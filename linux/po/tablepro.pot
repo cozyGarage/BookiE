@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.6-dev\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/TablePro/issues\n"
-"POT-Creation-Date: 2026-10-07 18:28+0200\n"
+"POT-Creation-Date: 2026-10-08 16:11+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -128,14 +128,12 @@ msgstr ""
 msgid "Command"
 msgstr ""
 
-#: crates/app/src/services/sidebar_tree.rs:102
-#: crates/app/src/ui/app/init_sidebar.rs:202 crates/app/src/ui/app/mod.rs:378
-#: crates/app/src/ui/app/workspace_chrome.rs:86
+#: crates/app/src/services/sidebar_tree.rs:102 crates/app/src/ui/app/mod.rs:380
+#: crates/app/src/ui/app/workspace_chrome.rs:87
 msgid "Tables"
 msgstr ""
 
 #: crates/app/src/services/sidebar_tree.rs:103
-#: crates/app/src/ui/app/init_sidebar.rs:149
 msgid "Views"
 msgstr ""
 
@@ -168,8 +166,7 @@ msgstr ""
 msgid "Connection closed."
 msgstr ""
 
-#: crates/app/src/ui/activity_dialog.rs:111
-#: crates/app/src/ui/editor/mod.rs:1009
+#: crates/app/src/ui/activity_dialog.rs:111 crates/app/src/ui/editor/mod.rs:978
 msgid "Running…"
 msgstr ""
 
@@ -207,48 +204,67 @@ msgstr ""
 msgid "This engine does not report this kind of activity."
 msgstr ""
 
-#: crates/app/src/ui/app/browse.rs:296 crates/app/src/ui/history_dialog.rs:133
+#: crates/app/src/ui/app/browse.rs:41
+msgid "The table columns changed before the value could be fetched."
+msgstr ""
+
+#: crates/app/src/ui/app/browse.rs:70 crates/app/src/ui/app/import.rs:101
+#: crates/app/src/ui/app/import.rs:213 crates/app/src/ui/app/structure.rs:140
+#: crates/app/src/ui/app/structure.rs:269
+#: crates/app/src/ui/app/structure.rs:315
+#: crates/app/src/ui/app/structure.rs:328
+#: crates/app/src/ui/app/structure.rs:517
+#: crates/app/src/ui/app/structure.rs:640
+msgid "No active connection."
+msgstr ""
+
+#: crates/app/src/ui/app/browse.rs:403 crates/app/src/ui/history_dialog.rs:133
 msgid "Failed"
 msgstr ""
 
-#: crates/app/src/ui/app/browse.rs:303 crates/app/src/ui/app/browse.rs:307
-#: crates/app/src/ui/app/browse.rs:318 crates/app/src/ui/app/browse.rs:365
+#: crates/app/src/ui/app/browse.rs:410 crates/app/src/ui/app/browse.rs:414
+#: crates/app/src/ui/app/browse.rs:425 crates/app/src/ui/app/browse.rs:434
+#: crates/app/src/ui/app/browse.rs:483
 msgid "Nothing to export"
 msgstr ""
 
-#: crates/app/src/ui/app/browse.rs:403
+#: crates/app/src/ui/app/browse.rs:432
+msgid "Show hidden columns and reload before exporting this page."
+msgstr ""
+
+#: crates/app/src/ui/app/browse.rs:521
 msgid "Open a table to filter rows."
 msgstr ""
 
-#: crates/app/src/ui/app/browse.rs:419 crates/app/src/ui/app/connection.rs:159
+#: crates/app/src/ui/app/browse.rs:537 crates/app/src/ui/app/connection.rs:159
 msgid "Discard pending changes?"
 msgstr ""
 
-#: crates/app/src/ui/app/browse.rs:421
+#: crates/app/src/ui/app/browse.rs:539
 msgid ""
 "Refreshing reloads the table from the database and drops every unsaved edit "
 "on this tab."
 msgstr ""
 
-#: crates/app/src/ui/app/browse.rs:424 crates/app/src/ui/app/connection.rs:164
+#: crates/app/src/ui/app/browse.rs:542 crates/app/src/ui/app/connection.rs:164
 #: crates/app/src/ui/app/connection.rs:336
 #: crates/app/src/ui/app/editor_files.rs:105
 #: crates/app/src/ui/app/favorites.rs:50
 #: crates/app/src/ui/app/init_window.rs:113
-#: crates/app/src/ui/app/organization.rs:92
-#: crates/app/src/ui/app/organization.rs:143
+#: crates/app/src/ui/app/organization.rs:115
+#: crates/app/src/ui/app/organization.rs:166
 #: crates/app/src/ui/app/status_pages.rs:44
 #: crates/app/src/ui/app/structure.rs:82
 #: crates/app/src/ui/app/workspace_close.rs:28
 #: crates/app/src/ui/app/workspace_close.rs:132
-#: crates/app/src/ui/app/workspace_tabs.rs:621
+#: crates/app/src/ui/app/workspace_tabs.rs:627
 #: crates/app/src/ui/browse_tab/row_ops.rs:208
 #: crates/app/src/ui/connect_dialog/mod.rs:941
 #: crates/app/src/ui/connection_bundle/export.rs:70
 #: crates/app/src/ui/connection_bundle/import.rs:26
 #: crates/app/src/ui/connection_bundle/import.rs:105
-#: crates/app/src/ui/connection_row.rs:197 crates/app/src/ui/editor/mod.rs:315
-#: crates/app/src/ui/editor/session_mode.rs:128
+#: crates/app/src/ui/connection_row.rs:197 crates/app/src/ui/editor/mod.rs:294
+#: crates/app/src/ui/editor/session_mode.rs:133
 #: crates/app/src/ui/export_dialog/file.rs:83
 #: crates/app/src/ui/grid/editing.rs:395
 #: crates/app/src/ui/history_dialog.rs:507
@@ -258,13 +274,18 @@ msgstr ""
 #: crates/app/src/ui/preferences.rs:135
 #: crates/app/src/ui/saved_queries_dialog.rs:100
 #: crates/app/src/ui/saved_queries_dialog.rs:121
-#: crates/app/src/ui/ssh_prompt.rs:103
+#: crates/app/src/ui/ssh_prompt.rs:105
 #: crates/app/src/ui/structure_tab_dialogs.rs:55
 msgid "Cancel"
 msgstr ""
 
-#: crates/app/src/ui/app/browse.rs:425
+#: crates/app/src/ui/app/browse.rs:543
 msgid "Discard and refresh"
+msgstr ""
+
+#: crates/app/src/ui/app/browse.rs:563 crates/app/src/ui/app/browse.rs:566
+#: crates/app/src/ui/app/browse.rs:569
+msgid "The row key did not identify exactly one cell."
 msgstr ""
 
 #: crates/app/src/ui/app/bundle.rs:36
@@ -313,13 +334,13 @@ msgstr ""
 msgid "The connections could not be saved."
 msgstr ""
 
-#: crates/app/src/ui/app/connection.rs:36
+#: crates/app/src/ui/app/connection.rs:35
 msgid ""
 "This connection uses an SSH jump chain, which the form cannot edit yet. Edit "
 "ssh.jump in the saved connection file."
 msgstr ""
 
-#: crates/app/src/ui/app/connection.rs:57
+#: crates/app/src/ui/app/connection.rs:56
 #: crates/app/src/ui/app/connection.rs:356
 msgid "A connection change is already in progress."
 msgstr ""
@@ -408,7 +429,7 @@ msgstr ""
 #: crates/app/src/ui/explain_dialog.rs:27
 #: crates/app/src/ui/explain_dialog.rs:55
 #: crates/app/src/ui/export_dialog.rs:431
-#: crates/app/src/ui/grid/context_menu.rs:144
+#: crates/app/src/ui/grid/context_menu.rs:149
 msgid "Close"
 msgstr ""
 
@@ -486,39 +507,39 @@ msgstr ""
 msgid "Connection switch stopped because changes could not be saved."
 msgstr ""
 
-#: crates/app/src/ui/app/connection.rs:758
+#: crates/app/src/ui/app/connection.rs:720
 #, rust-format
 msgid "Connection lost — reconnecting (attempt {n}, will keep retrying)"
 msgstr ""
 
-#: crates/app/src/ui/app/connection.rs:765
+#: crates/app/src/ui/app/connection.rs:727
 #, rust-format
 msgid ""
 "Connection lost and cannot be restored: {reason}. Reopen the connection to "
 "retry."
 msgstr ""
 
-#: crates/app/src/ui/app/connection.rs:805
+#: crates/app/src/ui/app/connection.rs:767
 msgid "The connection could not be duplicated."
 msgstr ""
 
-#: crates/app/src/ui/app/connection.rs:813
+#: crates/app/src/ui/app/connection.rs:775
 #, rust-format
 msgid "Created “{name}”. Enter its password the first time you connect."
 msgstr ""
 
-#: crates/app/src/ui/app/connection.rs:831
+#: crates/app/src/ui/app/connection.rs:793
 msgid "The connection could not be deleted."
 msgstr ""
 
-#: crates/app/src/ui/app/connection.rs:849
+#: crates/app/src/ui/app/connection.rs:811
 msgid ""
 "The connection was deleted, but some stored credentials could not be removed."
 msgstr ""
 
 #: crates/app/src/ui/app/database_switcher.rs:100
-#: crates/app/src/ui/browse_tab/mod.rs:568
-#: crates/app/src/ui/browse_tab/mod.rs:1058
+#: crates/app/src/ui/browse_tab/mod.rs:564
+#: crates/app/src/ui/browse_tab/mod.rs:1032
 #: crates/app/src/ui/catalog_dialog.rs:133
 msgid "Loading…"
 msgstr ""
@@ -540,7 +561,7 @@ msgstr ""
 msgid "A reopened tab is no longer linked to its file: {reason}"
 msgstr ""
 
-#: crates/app/src/ui/app/editor_files.rs:76 crates/app/src/ui/app/mod.rs:672
+#: crates/app/src/ui/app/editor_files.rs:76 crates/app/src/ui/app/mod.rs:693
 msgid "Saved"
 msgstr ""
 
@@ -586,8 +607,8 @@ msgstr ""
 
 #: crates/app/src/ui/app/favorites.rs:51
 #: crates/app/src/ui/app/init_window.rs:115
-#: crates/app/src/ui/app/organization.rs:93
-#: crates/app/src/ui/app/workspace_tabs.rs:623
+#: crates/app/src/ui/app/organization.rs:116
+#: crates/app/src/ui/app/workspace_tabs.rs:629
 #: crates/app/src/ui/browse_tab/chrome.rs:223
 #: crates/app/src/ui/grid/editing.rs:392
 #: crates/app/src/ui/structure_tab/mod.rs:740
@@ -624,16 +645,6 @@ msgstr ""
 
 #: crates/app/src/ui/app/import.rs:80 crates/app/src/ui/import_dialog.rs:441
 msgid "Import CSV"
-msgstr ""
-
-#: crates/app/src/ui/app/import.rs:101 crates/app/src/ui/app/import.rs:213
-#: crates/app/src/ui/app/structure.rs:140
-#: crates/app/src/ui/app/structure.rs:269
-#: crates/app/src/ui/app/structure.rs:315
-#: crates/app/src/ui/app/structure.rs:328
-#: crates/app/src/ui/app/structure.rs:517
-#: crates/app/src/ui/app/structure.rs:640
-msgid "No active connection."
 msgstr ""
 
 #: crates/app/src/ui/app/import.rs:104
@@ -696,31 +707,13 @@ msgstr ""
 msgid "Line {line}, column {column}: {reason}"
 msgstr ""
 
-#: crates/app/src/ui/app/init_sidebar.rs:120
+#: crates/app/src/ui/app/init_sidebar.rs:130
 msgid "No tables"
 msgstr ""
 
-#: crates/app/src/ui/app/init_sidebar.rs:122
+#: crates/app/src/ui/app/init_sidebar.rs:132
 msgid ""
 "Nothing matches the current search, or this connection has no tables yet."
-msgstr ""
-
-#: crates/app/src/ui/app/init_sidebar.rs:224
-#, rust-format
-msgid "New Table in {schema}…"
-msgstr ""
-
-#: crates/app/src/ui/app/init_sidebar.rs:225
-msgid "New Table…"
-msgstr ""
-
-#: crates/app/src/ui/app/init_sidebar.rs:241
-#, rust-format
-msgid "Table from CSV in {schema}…"
-msgstr ""
-
-#: crates/app/src/ui/app/init_sidebar.rs:242
-msgid "Table from CSV…"
 msgstr ""
 
 #: crates/app/src/ui/app/init_window.rs:71
@@ -742,7 +735,7 @@ msgid ""
 msgstr ""
 
 #: crates/app/src/ui/app/init_window.rs:114
-#: crates/app/src/ui/app/workspace_tabs.rs:622
+#: crates/app/src/ui/app/workspace_tabs.rs:628
 #: crates/app/src/ui/browse_tab/chrome.rs:216
 #: crates/app/src/ui/structure_tab/mod.rs:736
 msgid "Discard"
@@ -770,134 +763,142 @@ msgstr ""
 msgid "Pick a table from the sidebar, or use the button below (Ctrl+T)."
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:306
+#: crates/app/src/ui/app/mod.rs:308
 msgid "New connection"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:313
+#: crates/app/src/ui/app/mod.rs:315
 msgid "Open saved connection"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:323
+#: crates/app/src/ui/app/mod.rs:325
 msgid "Switch database"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:334
+#: crates/app/src/ui/app/mod.rs:336
 msgid "Read-only"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:344
+#: crates/app/src/ui/app/mod.rs:346
 msgid "Saving…"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:350
+#: crates/app/src/ui/app/mod.rs:352
 msgid "Main menu"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:384
+#: crates/app/src/ui/app/mod.rs:386
 msgid "Search tables"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:400
+#: crates/app/src/ui/app/mod.rs:402
 msgid "Filter tables…"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:423
+#: crates/app/src/ui/app/mod.rs:425
 msgid "Retry"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:827
+#: crates/app/src/ui/app/mod.rs:849
 msgid "Saved as favorite"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:839 crates/app/src/ui/app/mod.rs:846
+#: crates/app/src/ui/app/mod.rs:861 crates/app/src/ui/app/mod.rs:868
 msgid "Connect to a database first to run SQL."
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:918
+#: crates/app/src/ui/app/mod.rs:940
 msgid "Open a result grid to jump to a column."
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:65
+#: crates/app/src/ui/app/organization.rs:88
 #: crates/app/src/ui/connection_row.rs:105
 msgid "Group and tags"
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:66
+#: crates/app/src/ui/app/organization.rs:89
 #, rust-format
 msgid "Group “{name}” and tag it so it is easy to find."
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:69
+#: crates/app/src/ui/app/organization.rs:92
 msgid "Group"
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:72
+#: crates/app/src/ui/app/organization.rs:95
 msgid "Tags, separated by commas"
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:79
+#: crates/app/src/ui/app/organization.rs:102
 msgid "Colour"
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:125
+#: crates/app/src/ui/app/organization.rs:148
 msgid "A group or tag is too long. Keep each under 64 characters."
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:131
+#: crates/app/src/ui/app/organization.rs:154
 #: crates/app/src/ui/welcome_view.rs:137
 msgid "Import from URL"
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:133
+#: crates/app/src/ui/app/organization.rs:156
 msgid ""
 "Paste a connection URL such as postgres://user@host:5432/database. A "
 "password in the URL is stored in the system keyring, never in the connection "
 "file."
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:136
+#: crates/app/src/ui/app/organization.rs:159
 msgid "Connection URL"
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:144
+#: crates/app/src/ui/app/organization.rs:167
 #: crates/app/src/ui/connection_bundle/import.rs:106
 #: crates/app/src/ui/import_dialog.rs:61
 msgid "Import"
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:169
+#: crates/app/src/ui/app/organization.rs:192
 msgid ""
 "That is not a connection URL BookiE can read. Use a form like postgres://"
 "user@host:5432/database."
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:205
+#: crates/app/src/ui/app/organization.rs:228
 #, rust-format
 msgid "Imported “{name}”."
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:209
+#: crates/app/src/ui/app/organization.rs:232
 msgid "The imported connection could not be saved."
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:245
+#: crates/app/src/ui/app/organization.rs:268
 msgid "This connection could not be updated."
 msgstr ""
 
-#: crates/app/src/ui/app/organization.rs:262
+#: crates/app/src/ui/app/organization.rs:285
 msgid "No colour"
 msgstr ""
 
-#: crates/app/src/ui/app/row_ops.rs:154
-msgid "INSERT statement copied"
+#: crates/app/src/ui/app/row_ops.rs:141
+#: crates/app/src/ui/browse_tab/mod.rs:1163
+#: crates/app/src/ui/browse_tab/row_ops.rs:436
+msgid ""
+"Some row values were not fetched. Show hidden columns and reload before "
+"copying or exporting."
 msgstr ""
 
 #: crates/app/src/ui/app/row_ops.rs:159
+msgid "INSERT statement copied"
+msgstr ""
+
+#: crates/app/src/ui/app/row_ops.rs:164
 msgid "Copied to clipboard"
 msgstr ""
 
-#: crates/app/src/ui/app/row_ops.rs:194
+#: crates/app/src/ui/app/row_ops.rs:199
 #, rust-format
 msgid ""
 "{n} rows could not be located. They may have been changed by another "
@@ -917,8 +918,8 @@ msgid "Open Quickly"
 msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:16
-#: crates/app/src/ui/grid/context_menu.rs:43
-#: crates/app/src/ui/grid/context_menu.rs:373
+#: crates/app/src/ui/grid/context_menu.rs:45
+#: crates/app/src/ui/grid/context_menu.rs:409
 msgid "Jump to Column…"
 msgstr ""
 
@@ -1034,8 +1035,8 @@ msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:197
 #: crates/app/src/ui/browse_tab/chrome.rs:24
-#: crates/app/src/ui/grid/context_menu.rs:42
-#: crates/app/src/ui/grid/context_menu.rs:376
+#: crates/app/src/ui/grid/context_menu.rs:44
+#: crates/app/src/ui/grid/context_menu.rs:412
 msgid "Insert row"
 msgstr ""
 
@@ -1302,7 +1303,7 @@ msgid "Catalog refresh failed"
 msgstr ""
 
 #: crates/app/src/ui/app/structure.rs:832
-#: crates/app/src/ui/app/workspace_tabs.rs:316
+#: crates/app/src/ui/app/workspace_tabs.rs:317
 msgid "New Table"
 msgstr ""
 
@@ -1344,37 +1345,37 @@ msgid "Close Tabs to the Right"
 msgstr ""
 
 #: crates/app/src/ui/app/workspace_tabs.rs:190
-#: crates/app/src/ui/app/workspace_tabs.rs:387
-#: crates/app/src/ui/app/workspace_tabs.rs:538
+#: crates/app/src/ui/app/workspace_tabs.rs:393
+#: crates/app/src/ui/app/workspace_tabs.rs:544
 msgid "Row as JSON"
 msgstr ""
 
-#: crates/app/src/ui/app/workspace_tabs.rs:480
+#: crates/app/src/ui/app/workspace_tabs.rs:486
 msgid "Structure"
 msgstr ""
 
-#: crates/app/src/ui/app/workspace_tabs.rs:616
+#: crates/app/src/ui/app/workspace_tabs.rs:622
 #, rust-format
 msgid "Save changes to “{name}”?"
 msgstr ""
 
-#: crates/app/src/ui/app/workspace_tabs.rs:619
+#: crates/app/src/ui/app/workspace_tabs.rs:625
 msgid "Unsaved changes will be permanently lost if you discard them."
 msgstr ""
 
-#: crates/app/src/ui/app/workspace_tabs.rs:987
-#: crates/app/src/ui/editor/outcomes.rs:293
+#: crates/app/src/ui/app/workspace_tabs.rs:997
+#: crates/app/src/ui/editor/outcomes.rs:458
 #: crates/app/src/ui/editor/schema.rs:42
 #: crates/app/src/ui/history_dialog.rs:1021
 msgid "Empty query"
 msgstr ""
 
-#: crates/app/src/ui/app/workspace_tabs.rs:1058
+#: crates/app/src/ui/app/workspace_tabs.rs:1068
 #, rust-format
 msgid "Query {n}"
 msgstr ""
 
-#: crates/app/src/ui/app/workspace_tabs.rs:1119
+#: crates/app/src/ui/app/workspace_tabs.rs:1129
 msgid "No recently closed tab"
 msgstr ""
 
@@ -1486,17 +1487,21 @@ msgstr ""
 msgid "Couldn't load rows"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/mod.rs:569
-#: crates/app/src/ui/browse_tab/mod.rs:1059
+#: crates/app/src/ui/browse_tab/grid_render.rs:350
+msgid "The database returned rows that do not match the table columns."
+msgstr ""
+
+#: crates/app/src/ui/browse_tab/mod.rs:565
+#: crates/app/src/ui/browse_tab/mod.rs:1033
 #, rust-format
 msgid "Fetching rows from {table}"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/mod.rs:601
+#: crates/app/src/ui/browse_tab/mod.rs:597
 msgid "Read-only connection. Editing disabled."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/mod.rs:606
+#: crates/app/src/ui/browse_tab/mod.rs:602
 msgid ""
 "This table has no primary key. Row order is not stable; use the SQL editor "
 "to modify rows."
@@ -1551,22 +1556,27 @@ msgstr ""
 msgid "That row moved while you were editing. The change was not applied."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/row_ops.rs:445
+#: crates/app/src/ui/browse_tab/row_ops.rs:451
 msgid "Pasting rows isn't supported yet"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/row_ops.rs:520
+#: crates/app/src/ui/browse_tab/row_ops.rs:526
 #: crates/app/src/ui/structure_tab/mod.rs:1011
 #: crates/app/src/ui/structure_tab/mod.rs:1017
 msgid "Cannot save"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/row_ops.rs:576
+#: crates/app/src/ui/browse_tab/row_ops.rs:582
 #: crates/app/src/ui/structure_tab/mod.rs:1090
 msgid "Save failed"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/selection.rs:183
+#: crates/app/src/ui/browse_tab/selection/stats.rs:65
+#, rust-format
+msgid "{column}: sum {sum}, average {average}"
+msgstr ""
+
+#: crates/app/src/ui/browse_tab/selection.rs:185
 #, rust-format
 msgid "{n} selected · press Delete to remove"
 msgstr ""
@@ -1583,101 +1593,102 @@ msgstr ""
 msgid "Value is not a declared ENUM or SET member"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:218
+#: crates/app/src/ui/browse_tab/value_parse.rs:157
+#: crates/app/src/ui/browse_tab/value_parse.rs:804
+msgid "Invalid number"
+msgstr ""
+
+#: crates/app/src/ui/browse_tab/value_parse.rs:233
 msgid "Invalid SQL Server datetimeoffset column scale"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:222
+#: crates/app/src/ui/browse_tab/value_parse.rs:237
 msgid "Invalid SQL Server datetimeoffset"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:235
+#: crates/app/src/ui/browse_tab/value_parse.rs:250
 msgid ""
 "SQL Server datetimeoffset value exceeds the column precision or offset range"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:316
-#: crates/app/src/ui/browse_tab/value_parse.rs:531
-#: crates/app/src/ui/browse_tab/value_parse.rs:829
+#: crates/app/src/ui/browse_tab/value_parse.rs:339
+#: crates/app/src/ui/browse_tab/value_parse.rs:554
+#: crates/app/src/ui/browse_tab/value_parse.rs:852
 msgid "Invalid date. Use YYYY-MM-DD."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:325
-#: crates/app/src/ui/browse_tab/value_parse.rs:823
+#: crates/app/src/ui/browse_tab/value_parse.rs:348
+#: crates/app/src/ui/browse_tab/value_parse.rs:846
 msgid "Invalid datetime. Use YYYY-MM-DD HH:MM:SS."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:336
-#: crates/app/src/ui/browse_tab/value_parse.rs:475
+#: crates/app/src/ui/browse_tab/value_parse.rs:359
+#: crates/app/src/ui/browse_tab/value_parse.rs:498
 msgid "Invalid timestamp with time zone."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:359
+#: crates/app/src/ui/browse_tab/value_parse.rs:382
 msgid "MySQL spatial values cannot be edited losslessly"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:393
-#: crates/app/src/ui/browse_tab/value_parse.rs:623
-#: crates/app/src/ui/browse_tab/value_parse.rs:775
+#: crates/app/src/ui/browse_tab/value_parse.rs:416
+#: crates/app/src/ui/browse_tab/value_parse.rs:646
+#: crates/app/src/ui/browse_tab/value_parse.rs:798
 msgid "Invalid integer"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:395
+#: crates/app/src/ui/browse_tab/value_parse.rs:418
 msgid "Integer is outside the supported MySQL column range"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:408
+#: crates/app/src/ui/browse_tab/value_parse.rs:431
 msgid "Integer is outside the supported MongoDB Int32 range"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:427
-#: crates/app/src/ui/browse_tab/value_parse.rs:787
+#: crates/app/src/ui/browse_tab/value_parse.rs:450
+#: crates/app/src/ui/browse_tab/value_parse.rs:810
 msgid "Invalid decimal"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:440
+#: crates/app/src/ui/browse_tab/value_parse.rs:463
 msgid "MongoDB BSON dates support millisecond precision only"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:470
-#: crates/app/src/ui/browse_tab/value_parse.rs:478
+#: crates/app/src/ui/browse_tab/value_parse.rs:493
+#: crates/app/src/ui/browse_tab/value_parse.rs:501
 msgid "DuckDB TIMESTAMPTZ supports microsecond precision only"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:504
+#: crates/app/src/ui/browse_tab/value_parse.rs:527
 msgid "Invalid time."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:512
+#: crates/app/src/ui/browse_tab/value_parse.rs:535
 msgid "Invalid date and time."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:630
+#: crates/app/src/ui/browse_tab/value_parse.rs:653
 msgid "Integer is outside the supported BIT range"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:768
+#: crates/app/src/ui/browse_tab/value_parse.rs:791
 msgid "Invalid boolean. Use true/false, yes/no, or 1/0."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:781
-msgid "Invalid number"
-msgstr ""
-
-#: crates/app/src/ui/browse_tab/value_parse.rs:793
+#: crates/app/src/ui/browse_tab/value_parse.rs:816
 msgid "Invalid UUID. Expected 8-4-4-4-12 hex digits."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:799
+#: crates/app/src/ui/browse_tab/value_parse.rs:822
 #, rust-format
 msgid "Invalid JSON: {error}"
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:807
+#: crates/app/src/ui/browse_tab/value_parse.rs:830
 msgid "Invalid timestamp. Use ISO 8601, e.g. 2024-01-15T14:30:00Z."
 msgstr ""
 
-#: crates/app/src/ui/browse_tab/value_parse.rs:839
+#: crates/app/src/ui/browse_tab/value_parse.rs:862
 msgid "Invalid time. Use HH:MM:SS."
 msgstr ""
 
@@ -2132,6 +2143,11 @@ msgstr ""
 msgid "SQL warnings ({n})"
 msgstr ""
 
+#: crates/app/src/ui/editor/error_location.rs:17
+#, rust-format
+msgid "Line {line}, column {column}"
+msgstr ""
+
 #: crates/app/src/ui/editor/find_bar.rs:21
 msgid "No results"
 msgstr ""
@@ -2190,96 +2206,104 @@ msgstr ""
 msgid "The query ran for {seconds} seconds."
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:295
+#: crates/app/src/ui/editor/mod.rs:265
 msgid "SQL warnings"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:296
+#: crates/app/src/ui/editor/mod.rs:266
 msgid "Character suggestions; SQL is not changed"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:316
+#: crates/app/src/ui/editor/mod.rs:285 crates/app/src/ui/editor/pinned.rs:61
+msgid "Pin results"
+msgstr ""
+
+#: crates/app/src/ui/editor/mod.rs:286
+msgid "Keep these results above the results of the next run"
+msgstr ""
+
+#: crates/app/src/ui/editor/mod.rs:295
 msgid "Cancel running query (Esc)"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:324
-#: crates/app/src/ui/editor/session_mode.rs:147
+#: crates/app/src/ui/editor/mod.rs:303
+#: crates/app/src/ui/editor/session_mode.rs:152
 msgid "Session"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:325
+#: crates/app/src/ui/editor/mod.rs:304
 msgid ""
 "Run this tab on its own connection, so settings, temporary tables and "
 "transactions carry over between runs"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:334
+#: crates/app/src/ui/editor/mod.rs:313
 msgid "Explain"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:335
+#: crates/app/src/ui/editor/mod.rs:314
 msgid "Explain query plan"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:342
+#: crates/app/src/ui/editor/mod.rs:321
 msgid "Run"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:343
+#: crates/app/src/ui/editor/mod.rs:322
 msgid "Run query (Ctrl+Return)"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:675
+#: crates/app/src/ui/editor/mod.rs:657
 msgid "empty query"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:737
+#: crates/app/src/ui/editor/mod.rs:719
 msgid "No statement at cursor"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:811 crates/app/src/ui/history_dialog.rs:1034
+#: crates/app/src/ui/editor/mod.rs:780 crates/app/src/ui/history_dialog.rs:1034
 msgid "cancelled"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:814
+#: crates/app/src/ui/editor/mod.rs:783
 msgid "Query cancelled"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:815
+#: crates/app/src/ui/editor/mod.rs:784
 msgid "The running query was stopped."
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:832
+#: crates/app/src/ui/editor/mod.rs:801
 #, rust-format
 msgid "Query exceeded the {n}s timeout configured in Preferences."
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:838
+#: crates/app/src/ui/editor/mod.rs:807
 msgid "timed out"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:841
+#: crates/app/src/ui/editor/mod.rs:810
 msgid "Query timed out"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:890
+#: crates/app/src/ui/editor/mod.rs:859
 msgid "Formatting is unavailable for this connection"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:956
+#: crates/app/src/ui/editor/mod.rs:925
 msgid "Cannot ask for parameter values without a window"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:983
+#: crates/app/src/ui/editor/mod.rs:952
 msgid "Waiting for session to finish"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:990 crates/app/src/ui/editor/mod.rs:995
-#: crates/app/src/ui/editor/session_mode.rs:206
+#: crates/app/src/ui/editor/mod.rs:959 crates/app/src/ui/editor/mod.rs:964
+#: crates/app/src/ui/editor/session_mode.rs:211
 msgid "no active connection"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:1148 crates/app/src/ui/editor/mod.rs:1161
+#: crates/app/src/ui/editor/mod.rs:1118 crates/app/src/ui/editor/mod.rs:1131
 msgid "query-results"
 msgstr ""
 
@@ -2317,135 +2341,171 @@ msgstr ""
 msgid "Save SQL file"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:95
+#: crates/app/src/ui/editor/outcomes.rs:184
 #, rust-format
 msgid "error in {ms} ms"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:97
+#: crates/app/src/ui/editor/outcomes.rs:186
 #, rust-format
 msgid "done in {ms} ms"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:103
+#: crates/app/src/ui/editor/outcomes.rs:192
 #, rust-format
 msgid "{ok}/{total} statements · {ms} ms"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:108
+#: crates/app/src/ui/editor/outcomes.rs:197
 msgid "error"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:147
+#: crates/app/src/ui/editor/outcomes.rs:218
+#, rust-format
+msgid "Result set {n} ({rows})"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:228
+msgid "Result set"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:248
 #, rust-format
 msgid "Statement {n} executed"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:148
+#: crates/app/src/ui/editor/outcomes.rs:249
 #, rust-format
 msgid "No rows returned · {ms} ms"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:155
-#, rust-format
-msgid "Statement {n} failed"
-msgstr ""
-
-#: crates/app/src/ui/editor/outcomes.rs:162
+#: crates/app/src/ui/editor/outcomes.rs:257
 #, rust-format
 msgid "Statement {n} not run"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:163
+#: crates/app/src/ui/editor/outcomes.rs:258
 msgid "Skipped because an earlier statement failed."
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:213
+#: crates/app/src/ui/editor/outcomes.rs:268
+msgid "Copy error"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:275
+#, rust-format
+msgid "Statement {n} failed"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:291
+msgid "No rows returned"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:363
 #, rust-format
 msgid "Result {n} ({rows})"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:216
+#: crates/app/src/ui/editor/outcomes.rs:366
 #, rust-format
 msgid "Result {n} (error)"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:217
+#: crates/app/src/ui/editor/outcomes.rs:367
 #, rust-format
 msgid "Result {n} (skipped)"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:221
+#: crates/app/src/ui/editor/outcomes.rs:371
 #, rust-format
 msgid "{n} · {statement} ({rows})"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:225
+#: crates/app/src/ui/editor/outcomes.rs:375
 #, rust-format
 msgid "{n} · {statement} (error)"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:228
+#: crates/app/src/ui/editor/outcomes.rs:378
 #, rust-format
 msgid "{n} · {statement} (skipped)"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:267
+#: crates/app/src/ui/editor/outcomes.rs:389
+msgid "Result"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:390
+#, rust-format
+msgid "📌 {statement} ({rows})"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:432
 msgid "Statement result"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:294
+#: crates/app/src/ui/editor/outcomes.rs:459
 msgid "Type a SQL statement and press Run."
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:123
+#: crates/app/src/ui/editor/pinned.rs:59
+#, rust-format
+msgid "Unpin results ({n})"
+msgstr ""
+
+#: crates/app/src/ui/editor/pinned.rs:86
+#, rust-format
+msgid "{n} pinned; they stay above the next run"
+msgstr ""
+
+#: crates/app/src/ui/editor/session_mode.rs:128
 msgid "End the session with an open transaction?"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:125
+#: crates/app/src/ui/editor/session_mode.rs:130
 msgid "Changes made since BEGIN are kept only if you commit them."
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:129
+#: crates/app/src/ui/editor/session_mode.rs:134
 msgid "Roll Back"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:130
+#: crates/app/src/ui/editor/session_mode.rs:135
 msgid "Commit"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:145
+#: crates/app/src/ui/editor/session_mode.rs:150
 msgid "Session · transaction open"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:280
-#: crates/app/src/ui/editor/session_mode.rs:419
+#: crates/app/src/ui/editor/session_mode.rs:285
+#: crates/app/src/ui/editor/session_mode.rs:424
 msgid "Rolling back and closing session…"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:309
+#: crates/app/src/ui/editor/session_mode.rs:314
 msgid "Closing session…"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:377
+#: crates/app/src/ui/editor/session_mode.rs:382
 msgid ""
 "This editor session was retired after a connection failure. Reopen Session "
 "before running more SQL."
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:450
+#: crates/app/src/ui/editor/session_mode.rs:455
 msgid "Session rolled back"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:474
+#: crates/app/src/ui/editor/session_mode.rs:479
 msgid "Committing session…"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:503
+#: crates/app/src/ui/editor/session_mode.rs:508
 msgid "Session committed"
 msgstr ""
 
-#: crates/app/src/ui/editor/session_mode.rs:562
+#: crates/app/src/ui/editor/session_mode.rs:567
 msgid "This engine does not offer dedicated sessions yet"
 msgstr ""
 
@@ -2504,63 +2564,63 @@ msgid ""
 "local container, set TLS to Disabled."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:38
+#: crates/app/src/ui/error_text.rs:39
 #, rust-format
 msgid "Query failed (SQLSTATE {sqlstate}): {message}"
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:41
+#: crates/app/src/ui/error_text.rs:42
 #, rust-format
 msgid "Query failed: {message}"
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:42
+#: crates/app/src/ui/error_text.rs:43
 msgid "The connection was closed. Try reconnecting."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:44
+#: crates/app/src/ui/error_text.rs:45
 msgid ""
 "This row changed in the database after you loaded it. Your edits are still "
 "available; reload the row and reapply them."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:47
+#: crates/app/src/ui/error_text.rs:48
 msgid ""
 "This connection is read-only. Reopen it without read-only mode to make "
 "changes."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:49
+#: crates/app/src/ui/error_text.rs:50
 #, rust-format
 msgid "Blocked by policy: {detail}"
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:51
+#: crates/app/src/ui/error_text.rs:52
 #, rust-format
 msgid "This driver does not support: {detail}"
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:53
+#: crates/app/src/ui/error_text.rs:54
 #, rust-format
 msgid "Internal driver error: {detail}"
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:54
+#: crates/app/src/ui/error_text.rs:55
 msgid "The operation was cancelled."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:55
+#: crates/app/src/ui/error_text.rs:56
 msgid "The operation timed out."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:57
+#: crates/app/src/ui/error_text.rs:58
 #, rust-format
 msgid ""
 "The operation was interrupted, but the database outcome could not be "
 "confirmed: {detail}"
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:61
+#: crates/app/src/ui/error_text.rs:62
 #, rust-format
 msgid ""
 "Kerberos login failed: {detail}. Check that klist shows a valid ticket, run "
@@ -2568,40 +2628,40 @@ msgid ""
 "typed."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:68
+#: crates/app/src/ui/error_text.rs:69
 #, rust-format
 msgid ""
 "Save failed at statement {n}: {error}. The rollback request succeeded; "
 "writes to non-transactional tables may remain."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:77
+#: crates/app/src/ui/error_text.rs:78
 #, rust-format
 msgid ""
 "Save failed at statement {n}: {error}. Rollback also failed: "
 "{rollback_error}. Database changes may have been applied."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:89
+#: crates/app/src/ui/error_text.rs:90
 msgid ""
 "No keyring is running, so saved passwords can't be read. Start GNOME "
 "Keyring, KeePassXC with Secret Service, or another Secret Service provider, "
 "then try again."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:92
+#: crates/app/src/ui/error_text.rs:93
 msgid ""
 "The keyring is locked. Unlock it, for example by signing in again or opening "
 "Passwords and Keys, then try again."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:96
+#: crates/app/src/ui/error_text.rs:97
 msgid ""
 "Unlocking the keyring was cancelled, so the saved password was not read. Try "
 "again and unlock it when asked."
 msgstr ""
 
-#: crates/app/src/ui/error_text.rs:100
+#: crates/app/src/ui/error_text.rs:101
 #, rust-format
 msgid "The keyring could not be used: {detail}"
 msgstr ""
@@ -2817,97 +2877,97 @@ msgstr ""
 msgid "At least one column stays visible."
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:140
+#: crates/app/src/ui/grid/context_menu.rs:145
 #, rust-format
 msgid "Skipped {n} NULL, binary or unsupported values."
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:142
+#: crates/app/src/ui/grid/context_menu.rs:147
 msgid "Copy as IN clause"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:342
+#: crates/app/src/ui/grid/context_menu.rs:378
 msgid "Edit cell"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:348
+#: crates/app/src/ui/grid/context_menu.rs:384
 msgid "Rows"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:349
+#: crates/app/src/ui/grid/context_menu.rs:385
 msgid "With Headers"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:350
+#: crates/app/src/ui/grid/context_menu.rs:386
 msgid "JSON"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:351
+#: crates/app/src/ui/grid/context_menu.rs:387
 msgid "CSV"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:352
+#: crates/app/src/ui/grid/context_menu.rs:388
 msgid "CSV with Headers"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:353
+#: crates/app/src/ui/grid/context_menu.rs:389
 msgid "Markdown"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:354
+#: crates/app/src/ui/grid/context_menu.rs:390
 msgid "IN Clause"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:356
+#: crates/app/src/ui/grid/context_menu.rs:392
 msgid "INSERT Statement"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:359
+#: crates/app/src/ui/grid/context_menu.rs:395
 #: crates/app/src/ui/grid/value_viewer.rs:100
 msgid "Copy value"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:360
+#: crates/app/src/ui/grid/context_menu.rs:396
 msgid "Copy as"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:361
+#: crates/app/src/ui/grid/context_menu.rs:397
 msgid "Copy column name"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:365
+#: crates/app/src/ui/grid/context_menu.rs:401
 msgid "Filter by This Value"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:367
+#: crates/app/src/ui/grid/context_menu.rs:403
 msgid "View Value…"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:368
+#: crates/app/src/ui/grid/context_menu.rs:404
 msgid "Show Row as JSON"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:371
+#: crates/app/src/ui/grid/context_menu.rs:407
 msgid "Export Results…"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:372
+#: crates/app/src/ui/grid/context_menu.rs:408
 msgid "Columns…"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:374
+#: crates/app/src/ui/grid/context_menu.rs:410
 msgid "Find in Loaded Rows…"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:377
+#: crates/app/src/ui/grid/context_menu.rs:413
 msgid "Duplicate row"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:378
+#: crates/app/src/ui/grid/context_menu.rs:414
 msgid "Set to NULL"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:379
+#: crates/app/src/ui/grid/context_menu.rs:415
 msgid "Delete row"
 msgstr ""
 
@@ -2923,25 +2983,30 @@ msgstr ""
 msgid "(auto)"
 msgstr ""
 
-#: crates/app/src/ui/grid/row_find.rs:92 crates/app/src/ui/grid/row_find.rs:96
+#: crates/app/src/ui/grid/display.rs:51
+#, rust-format
+msgid "{n} bytes total"
+msgstr ""
+
+#: crates/app/src/ui/grid/row_find.rs:96 crates/app/src/ui/grid/row_find.rs:100
 msgid "Search the loaded rows"
 msgstr ""
 
-#: crates/app/src/ui/grid/row_find.rs:147
+#: crates/app/src/ui/grid/row_find.rs:151
 msgid "No matching rows"
 msgstr ""
 
-#: crates/app/src/ui/grid/row_find.rs:149
+#: crates/app/src/ui/grid/row_find.rs:153
 #, rust-format
 msgid "The first {count} matches"
 msgstr ""
 
-#: crates/app/src/ui/grid/row_find.rs:151
+#: crates/app/src/ui/grid/row_find.rs:155
 #, rust-format
 msgid "{count} matching rows"
 msgstr ""
 
-#: crates/app/src/ui/grid/row_find.rs:190
+#: crates/app/src/ui/grid/row_find.rs:203
 msgid "Find in Loaded Rows"
 msgstr ""
 
@@ -3122,7 +3187,7 @@ msgstr ""
 msgid "Pin"
 msgstr ""
 
-#: crates/app/src/ui/history_dialog.rs:839 crates/app/src/ui/sidebar_row.rs:237
+#: crates/app/src/ui/history_dialog.rs:839 crates/app/src/ui/sidebar_row.rs:319
 msgid "Open in new tab"
 msgstr ""
 
@@ -3430,16 +3495,20 @@ msgid "Save a query as a favorite, or open a tab to switch to it."
 msgstr ""
 
 #: crates/app/src/ui/quick_switcher_dialog.rs:107
-#: crates/app/src/ui/sidebar_row.rs:153
+#: crates/app/src/ui/sidebar_row.rs:200
 #, rust-format
 msgid "Open {name}"
 msgstr ""
 
-#: crates/app/src/ui/row_inspector.rs:50
+#: crates/app/src/ui/row_inspector.rs:26 crates/app/src/ui/row_inspector.rs:27
+msgid "Not fetched"
+msgstr ""
+
+#: crates/app/src/ui/row_inspector.rs:67
 msgid "No row selected"
 msgstr ""
 
-#: crates/app/src/ui/row_inspector.rs:51
+#: crates/app/src/ui/row_inspector.rs:68
 msgid "Select one row to see every column."
 msgstr ""
 
@@ -3485,19 +3554,37 @@ msgstr ""
 msgid "Saved queries are unavailable"
 msgstr ""
 
-#: crates/app/src/ui/sidebar_row.rs:243
+#: crates/app/src/ui/sidebar_row.rs:223
+#, rust-format
+msgid "New Table in {schema}…"
+msgstr ""
+
+#: crates/app/src/ui/sidebar_row.rs:224
+#, rust-format
+msgid "Table from CSV in {schema}…"
+msgstr ""
+
+#: crates/app/src/ui/sidebar_row.rs:226
+msgid "New Table…"
+msgstr ""
+
+#: crates/app/src/ui/sidebar_row.rs:226
+msgid "Table from CSV…"
+msgstr ""
+
+#: crates/app/src/ui/sidebar_row.rs:325
 msgid "Edit Structure"
 msgstr ""
 
-#: crates/app/src/ui/sidebar_row.rs:245
+#: crates/app/src/ui/sidebar_row.rs:327
 msgid "Show CREATE TABLE"
 msgstr ""
 
-#: crates/app/src/ui/sidebar_row.rs:250
+#: crates/app/src/ui/sidebar_row.rs:332
 msgid "Import CSV…"
 msgstr ""
 
-#: crates/app/src/ui/sidebar_row.rs:251
+#: crates/app/src/ui/sidebar_row.rs:333
 #: crates/app/src/ui/structure_tab/mod.rs:745
 msgid "Drop Table…"
 msgstr ""

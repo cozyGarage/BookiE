@@ -1,6 +1,9 @@
 use super::*;
 use secrecy::ExposeSecret;
 
+#[path = "mysql_atomic_parts/advisory_lock.rs"]
+mod advisory_lock;
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn empty_query_results_preserve_mysql_projection_metadata() {

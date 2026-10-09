@@ -70,15 +70,19 @@ fn decode_vector(bytes: &[u8], expected_oid: u32) -> Option<String> {
         return None;
     }
     let length = usize::try_from(reader.integer()?).ok()?;
-    if reader.integer()? != 0 || length > reader.remaining.len() / 4 {
+    if reader.integer()? != 0 {
         return None;
     }
-    let mut elements = Vec::with_capacity(length);
+    let mut elements = Vec::with_capacity(vector_capacity(length, reader.remaining.len())?);
     for _ in 0..length {
         let length = reader.integer()?;
         elements.push(element_text(oid, false, read_bounded_element(&mut reader, length)?)?);
     }
     reader.remaining.is_empty().then(|| elements.join(" "))
+}
+
+fn vector_capacity(length: usize, payload_bytes: usize) -> Option<usize> {
+    (length <= payload_bytes / 4).then_some(length)
 }
 
 struct Reader<'a> {
@@ -356,6 +360,13 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_vector_capacity_is_bounded_by_element_length_words() {
+        assert_eq!(vector_capacity(2, 8), Some(2));
+        assert_eq!(vector_capacity(3, 8), None);
+        assert_eq!(vector_capacity(usize::MAX, 8), None);
+    }
+
+    #[test]
     fn value_contract_temporal_array_elements_reject_malformed_payloads() {
         for (oid, length) in [(1082, 4), (1083, 8), (1114, 8), (1184, 8), (1186, 16), (1266, 12)] {
             for size in 0..24 {
@@ -403,6 +414,26 @@ mod tests {
             }
         }
         bytes
+    }
+
+    #[test]
+    fn value_contract_bit_arrays_decode_binary_elements_and_refuse_nul_text() {
+        for (oid, value, expected) in [
+            (BIT_OID, &[0, 0, 0, 5, 0b1010_0000][..], "{\"10100\"}"),
+            (VARBIT_OID, &[0, 0, 0, 3, 0b1010_0000][..], "{\"101\"}"),
+        ] {
+            assert_eq!(
+                decode_binary(&wire(oid, &[(1, 1)], &[Some(value)]), oid, false).as_deref(),
+                Some(expected)
+            );
+        }
+        for oid in [19, 25, 1042, 1043] {
+            assert_eq!(
+                decode_binary(&wire(oid, &[(1, 1)], &[Some(b"a\0b")]), oid, false),
+                None,
+                "OID {oid}"
+            );
+        }
     }
 
     #[test]
@@ -608,5 +639,15 @@ mod tests {
             remaining: &bytes[12..],
         };
         assert!(read_dimensions(&mut reader, 1).is_none());
+    }
+
+    #[test]
+    fn value_contract_dimension_product_must_fit_element_length_words() {
+        for (payload_bytes, expected) in [(7, false), (8, true)] {
+            let mut bytes = words(&[2, 1]);
+            bytes.extend(vec![0; payload_bytes]);
+            let mut reader = Reader { remaining: &bytes };
+            assert_eq!(read_dimensions(&mut reader, 1).is_some(), expected, "{payload_bytes}");
+        }
     }
 }

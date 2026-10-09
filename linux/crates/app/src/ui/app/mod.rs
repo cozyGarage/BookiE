@@ -110,6 +110,8 @@ pub struct App {
     sidebar_views: Vec<tablepro_core::TableInfo>,
     sidebar_tables: Vec<tablepro_core::TableInfo>,
     catalog_generation: std::cell::Cell<u64>,
+    catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
+    schema_fetch_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     content_holder: adw::ToolbarView,
     toast_overlay: adw::ToastOverlay,
     /// Persistent "Connecting…" toast handle. Held so we can dismiss it
@@ -505,6 +507,8 @@ impl SimpleComponent for App {
             sidebar_views: Vec::new(),
             sidebar_tables: Vec::new(),
             catalog_generation: std::cell::Cell::new(0),
+            catalog_cancel: Default::default(),
+            schema_fetch_cancel: Default::default(),
             content_holder: widgets.content_holder.clone(),
             toast_overlay: widgets.toast_overlay.clone(),
             connect_progress_toast: None,
@@ -652,6 +656,23 @@ impl SimpleComponent for App {
             AppMsg::RowCountLoaded(tab_id, request, count) => self.on_browse_row_count_loaded(tab_id, request, count),
             AppMsg::RowCountFailed(tab_id, request) => self.on_browse_row_count_failed(tab_id, request),
             AppMsg::FetchBrowsePage(tab_id) => self.fetch_browse_page(tab_id, sender),
+            AppMsg::FetchBrowseCellValue(tab_id, request, col_index, column_name, row_key) => {
+                self.fetch_browse_cell_value(tab_id, request, col_index, column_name, row_key, sender)
+            }
+            AppMsg::BrowseCellValueLoaded(tab_id, request, col_index, column_name, result) => {
+                self.dispatch_to_tab(
+                    tab_id,
+                    match result {
+                        Ok(value) => BrowseTabInput::CellValueLoaded {
+                            request,
+                            col_index,
+                            column_name,
+                            value,
+                        },
+                        Err(message) => BrowseTabInput::CellValueFailed(request, message),
+                    },
+                );
+            }
             AppMsg::FetchBrowseColumns(tab_id) => self.fetch_browse_columns(tab_id, sender),
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
             AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(),

@@ -3,7 +3,13 @@
 The shared standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 [The B3 board](type-contract-strategy.md) owns remaining tasks. This page is a
 bounded entry into case evidence, not another conversion policy or aggregate
-support claim. Updated 2026-10-07; this index links evidence but does not run tests.
+support claim. Updated 2026-10-09; this index links evidence but does not run tests.
+
+SQL Server `decimal(38,38)` values preserve signed `1e-38`, scaled zero,
+native text and CSV round trips; values outside `rust_decimal`'s exact range
+remain exact text. Non-NULL `sql_variant` values refuse scalar decoding while
+SQL NULL and connection usability are retained. See the merged [PR #443](https://github.com/cozyGarage/BookiE/pull/443)
+for native test and mutation evidence.
 
 Recent PostgreSQL enum-function evidence covers both `enum_range(NULL::type)`
 and bounded `enum_range(start, end)` semantics under a same-named leading

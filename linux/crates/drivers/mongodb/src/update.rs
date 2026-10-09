@@ -1,7 +1,7 @@
 use mongodb::bson::{Bson, Document, doc};
 use sqlparser::ast::{
-    AssignmentTarget, BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, FunctionArguments, ObjectNamePart,
-    Statement, TableFactor, Value as SqlValue,
+    AssignmentTarget, BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
+    ObjectNamePart, Query, Select, SelectItem, SetExpr, Statement, TableFactor, Value as SqlValue,
 };
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
@@ -18,6 +18,99 @@ pub(super) struct KeyedUpdate {
 pub(super) struct KeyedDelete {
     pub(super) collection: String,
     pub(super) filter: Document,
+}
+
+pub(super) struct KeyedValueSelect {
+    pub(super) collection: String,
+    pub(super) column: String,
+    pub(super) key: Bson,
+}
+
+pub(super) fn parse_keyed_value_select(
+    sql: &str,
+    params: &[Value],
+    database: &str,
+) -> Result<Option<KeyedValueSelect>, DriverError> {
+    let statements = Parser::parse_sql(&GenericDialect {}, sql)
+        .map_err(|error| DriverError::Unsupported(format!("invalid parameterized MongoDB value query: {error}")))?;
+    let [Statement::Query(query)] = statements.as_slice() else {
+        return Ok(None);
+    };
+    let Some(select) = simple_value_select(query) else {
+        return Ok(None);
+    };
+    let [SelectItem::UnnamedExpr(Expr::Identifier(column))] = select.projection.as_slice() else {
+        return Ok(None);
+    };
+    if column.value.starts_with('$') || column.value.contains('.') {
+        return Ok(None);
+    }
+    let relation = &select.from[0];
+    if !relation.joins.is_empty() {
+        return Ok(None);
+    }
+    let Some(collection) = collection_named(&relation.relation, database) else {
+        return Ok(None);
+    };
+    let Some(Expr::BinaryOp {
+        left,
+        op: BinaryOperator::Eq,
+        right,
+    }) = select.selection.as_ref()
+    else {
+        return Ok(None);
+    };
+    if identifier_from_expr(left).as_deref() != Some("_id") || params.len() != 1 {
+        return Ok(None);
+    }
+    let mut index = 0;
+    let key = take_placeholder(right, params, &mut index)?;
+    if index != params.len() {
+        return Ok(None);
+    }
+    Ok(Some(KeyedValueSelect {
+        collection,
+        column: column.value.clone(),
+        key,
+    }))
+}
+
+fn simple_value_select(query: &Query) -> Option<&Select> {
+    if query.with.is_some()
+        || query.order_by.is_some()
+        || query.limit_clause.is_some()
+        || query.fetch.is_some()
+        || !query.locks.is_empty()
+        || query.for_clause.is_some()
+        || query.settings.is_some()
+        || query.format_clause.is_some()
+        || !query.pipe_operators.is_empty()
+    {
+        return None;
+    }
+    let SetExpr::Select(select) = query.body.as_ref() else {
+        return None;
+    };
+    if select.distinct.is_some()
+        || select.top.is_some()
+        || select.exclude.is_some()
+        || select.into.is_some()
+        || select.from.len() != 1
+        || !select.lateral_views.is_empty()
+        || select.prewhere.is_some()
+        || !matches!(&select.group_by, GroupByExpr::Expressions(expressions, _) if expressions.is_empty())
+        || !select.cluster_by.is_empty()
+        || !select.distribute_by.is_empty()
+        || !select.sort_by.is_empty()
+        || select.having.is_some()
+        || !select.named_window.is_empty()
+        || select.qualify.is_some()
+        || select.value_table_mode.is_some()
+        || select.connect_by.is_some()
+    {
+        return None;
+    }
+    Some(select)
 }
 
 pub(super) fn parse_keyed_update(
@@ -278,5 +371,46 @@ fn identifier_from_expr(expr: &Expr) -> Option<String> {
         Expr::Identifier(identifier) => Some(identifier.value.clone()),
         Expr::CompoundIdentifier(identifiers) if identifiers.len() == 1 => Some(identifiers[0].value.clone()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod value_select_tests {
+    use super::*;
+
+    #[test]
+    fn value_select_binds_only_the_selected_field_and_native_id() {
+        let id = "0123456789abcdef01234567";
+        let parsed = parse_keyed_value_select(
+            "SELECT \"payload\" FROM \"appdb\".\"records\" WHERE \"_id\" = ?",
+            &[Value::Json(serde_json::json!({"$oid": id}))],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(parsed.collection, "records");
+        assert_eq!(parsed.column, "payload");
+        assert_eq!(parsed.key, Bson::ObjectId(id.parse().unwrap()));
+    }
+
+    #[test]
+    fn value_select_refuses_extra_predicates_and_query_shapes() {
+        for sql in [
+            "SELECT payload FROM records WHERE _id = ? AND tenant = ?",
+            "SELECT payload FROM records WHERE _id = ? ORDER BY _id",
+            "SELECT payload FROM records WHERE _id = ? UNION SELECT payload FROM other",
+            "SELECT payload FROM records",
+            "SELECT \"nested.value\" FROM records WHERE _id = ?",
+            "SELECT \"$value\" FROM records WHERE _id = ?",
+            "DELETE FROM records WHERE _id = ?",
+        ] {
+            assert!(
+                parse_keyed_value_select(sql, &[Value::Text("id".into())], "appdb")
+                    .unwrap()
+                    .is_none(),
+                "accepted {sql}"
+            );
+        }
     }
 }

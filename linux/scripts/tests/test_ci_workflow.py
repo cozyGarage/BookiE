@@ -16,6 +16,14 @@ bounded_spec.loader.exec_module(bounded_checker)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_driver_jobs_reuse_and_clean_the_run_scoped_database(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
+        self.assertIn("TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
+        self.assertIn("cleanup-testcontainers.py", driver)
+        self.assertIn("trap cleanup_testcontainers EXIT", driver)
+        self.assertIn("--test-threads=1", driver)
+
     def test_bounded_operation_guard_catches_multiline_calls(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "fixture.rs"
@@ -53,6 +61,12 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mongodb_browse_uses_a_bounded_sample_and_page_find",
                 "value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents",
                 "value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values",
+                "postgres_value_query_refetches_by_enum_and_domain_composite_key",
+                "mysql_value_query_refetches_the_exact_blob_for_a_composite_key",
+                "mssql_value_query_refetches_the_exact_blob_for_a_composite_key",
+                "clickhouse_value_query_refetches_the_exact_text_for_a_composite_key",
+                "mongodb_guarded_refetch_preserves_long_text_and_binary_values",
+                "redis_guarded_refetch_preserves_binary_key_and_value",
                 "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
                 "value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings",
                 "value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes",

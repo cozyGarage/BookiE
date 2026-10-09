@@ -4,7 +4,7 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 i
 0.2.0. Implementation is authorized; no 0.2 release is approved.
 
 
-## 0.2.0 readiness: 2026-10-08
+## 0.2.0 readiness: 2026-10-09
 
 No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 (owner in brackets; details in the [ledger](known-issues.md)):
@@ -22,11 +22,33 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
   acceptance gate since 2026-10-08), installed checks on Arch and Debian, and the
   30-attempt soak (Forgejo nightly `gtk-soak`).
 
+## Current continuation: 2026-10-09
+
+The merged `linux` baseline is `20d67d7da51b12b49ede28813cabb088affa861d`
+(PR #448); PRs #441–#448 are merged. PR #443 adds SQL Server
+`decimal(38,38)` preservation and refuses lossy `sql_variant` values. Its full
+MSSQL run passed 77 tests; the full local value-contract tier passed 428 tests
+with no missing suites, and unpiped preflight passed. The scoped SQL Server
+codec mutation audit tested 38 variants: 32 caught, 6 build-unviable, none
+missed or timed out. PR #448 adds deep PostgreSQL enum expression and array
+result boundaries through 4,096 domain layers; its Docker contract, local
+preflight and all 11 required hosted checks passed. Focused MySQL decoder
+mutations deleting the BIT and DECIMAL branches were caught by native contracts
+on the current source. PR #449 pins PostgreSQL `array_remove`,
+`array_prepend`, `array_position` and `array_positions` scalar-parameter
+behavior at 63, 64 and deeper enum-domain levels; its focused Docker contract
+passed 1/1 on the working branch. Merged topic branches have been deleted.
+
+B3 remains open after #448: continue the wider engine/type/consumer/configuration
+matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
+and B7 remain open as listed above; keep the sequence B3 → B4 → installed
+Arch/Wayland → Debian/GNOME → B7. The merged baseline is not release-qualified.
+
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless
 the maintainer adds it.
 
-## Current continuation plan: 2026-10-08
+## Historical continuation snapshot: 2026-10-08
 
 Code baseline: `0bb8e34354d13e3ab9911b9db710eddb02115170` on `linux`, checked
 2026-10-08.
