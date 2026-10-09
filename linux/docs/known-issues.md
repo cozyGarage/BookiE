@@ -30,7 +30,9 @@ integration job was skipped and Forgejo run 85 was disrupted by executor
 restarts. Its follow-up branch adds native stored-value oracles and serial
 MariaDB fixture reuse. Both charset selectors and all 31 serial
 `value_contract` tests passed locally using one MySQL and one MariaDB container;
-unpiped preflight passed. The follow-up is not yet published or Forgejo-gated.
+unpiped preflight passed. The branch was published at `f29743c`; Forgejo run 88
+tests that pre-#452 tip. The current local head merges #452 at `0dd520d` and
+still needs its own gate before push.
 The broader B3 engine/type/consumer matrix and installed acceptance remain
 open. This is a status snapshot, not a release qualification.
 Older audits remain historical; this ledger and the
