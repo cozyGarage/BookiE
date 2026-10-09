@@ -147,6 +147,45 @@ async fn assert_deep_enum_array_position_supported(
             "array_position parameter {parameter:?}, depth {levels}"
         );
     }
+    assert_deep_enum_array_positions_supported(connection, schema, levels).await;
+}
+
+async fn assert_deep_enum_array_positions_supported(
+    connection: &dyn tablepro_core::Connection,
+    schema: &str,
+    levels: usize,
+) {
+    for (parameter, positions) in [
+        (Value::Text("paused".into()), ["[]", "[]"]),
+        (Value::Null, ["[2]", "[1,2]"]),
+    ] {
+        let result = connection
+            .query_params(
+                &format!(
+                    "SELECT id, array_to_json(array_positions(ARRAY[status, NULL], $1))::text, \
+                     pg_typeof($1)::text, \
+                     pg_typeof(array_positions(ARRAY[status, NULL], $1))::text \
+                     FROM {schema}.rows WHERE id <= 2 ORDER BY id"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("array_positions at {levels} domains: {error:?}"));
+        assert_eq!(
+            result.rows,
+            positions
+                .into_iter()
+                .enumerate()
+                .map(|(index, positions)| vec![
+                    Value::Int(index as i64 + 1),
+                    Value::Text(positions.into()),
+                    Value::Text(format!("{schema}.state")),
+                    Value::Text("integer[]".into()),
+                ])
+                .collect::<Vec<_>>(),
+            "array_positions parameter {parameter:?}, depth {levels}"
+        );
+    }
 }
 
 async fn assert_deep_enum_case_parameters(
