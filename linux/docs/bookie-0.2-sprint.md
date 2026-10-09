@@ -12,10 +12,11 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 - B3 [B3]: the broader type, consumer and configuration matrix, PERF-10 memory
   reduction (the preview is display-only; full values are still held), PERF-3
   MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
-  TEST-29's fast and durable test-container paths are in PR #457. Local commits
-  `559ba69`, `c0eb82f` and `200bf5e` pin MySQL/MariaDB session assertions and
-  harden MongoDB, Redis TLS and SQL Server fixture startup. Focused tests pass;
-  the final local head awaits a serialized hosted gate.
+  TEST-29's fast and durable test-container paths are in PR #457. Published
+  head `e0bb6ce` passes the MySQL and MongoDB jobs; Forgejo run 101 found two
+  PostgreSQL driver test failures and the known B4 query-plan policy mismatch.
+  Local follow-up `8e586fb` pins the enum oracle query to its session; its
+  focused test passes locally and is awaiting the next serialized gate.
 - B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
   remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
   (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
@@ -63,21 +64,24 @@ Merged topic branches have been deleted.
 For TEST-29, the local full PostgreSQL integration binary passed 234/234 in
 133.16 seconds and the MySQL/MariaDB binary passed 90/90 in 55.50 seconds.
 SQL Server's DDL batch, durable lost-ack and restart tests, and fast-fixture wide
-numeric test passed. PR #457 is open on GitHub at published head `ab4b273`, with
-the latest `origin/linux` merged. All GitHub checks for that head passed. The
-same-session MySQL/MariaDB checks pass 4/4, and local unpiped preflight passes.
-Forgejo run 99 completed red on `ab4b273`: `driver (mongodb)` got
-`ConnectionRefused` before authentication, `pg-release` redacted the wildcard
-query plan, `driver-tls` got `ConnectionRefused` from its Redis TLS fixture, and
-one SQL Server testcontainer timed out during startup. MySQL passed 90/90; all
-GTK shards, Postgres e2e and both distro floors passed. Local commit `559ba69`
-keeps the duplicate-key failure cases in dedicated sessions; `c0eb82f` waits
-for authenticated MongoDB readiness; `200bf5e` retries the first Redis TLS
-connection and gives SQL Server containers 180 seconds to start. The focused
-MySQL/MariaDB checks pass 4/4, MongoDB auth and the SQL Server timeout case pass,
-and the TLS fixture suite passes 48/48 locally. The final local head is queued
-behind UX run 100; it will push and gate only after that run releases the shared
-lock. Run 97 was canceled as a duplicate.
+numeric test passed. PR #457 is open on GitHub at published head `e0bb6ce`, with
+the latest `origin/linux` merged. Forgejo run 99 on `ab4b273` completed red:
+MongoDB readiness, PostgreSQL query-plan policy, Redis TLS fixture readiness and
+SQL Server startup failed. The follow-up on `e0bb6ce` passed the MySQL/MariaDB
+suite 90/90, MongoDB and Redis jobs, TLS suite, all GTK shards, Postgres e2e and
+both distro floors; its PostgreSQL driver job failed two cases. The byte-budget
+transaction test took 40 seconds under runner contention but passes alone
+locally in 2.15 seconds. The mixed-case enum oracle used a pooled connection
+with incidental `search_path` state; local commit `8e586fb` now reads the native
+oracle on the dedicated session, and the focused test passes. The separate
+`pg-release` failure remains B4-owned: the test expects a plan for `SELECT *`,
+which policy redacts fail-closed. Local commits `559ba69`, `c0eb82f` and
+`200bf5e` keep the MySQL/MariaDB failure cases on one session, wait for
+authenticated MongoDB readiness, retry Redis TLS connection refusal, and allow
+SQL Server 180 seconds to start. Targeted MySQL/MariaDB checks pass 4/4; the
+driver-TLS fixture suite passes 48/48; unpiped preflight passes. Local commit
+`8e586fb` remains unpushed while its exact-head gate is queued behind UX's next
+gate. Run 97 was canceled as a duplicate.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
