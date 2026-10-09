@@ -86,6 +86,16 @@ async fn tagged_query_pid(connection: &dyn Connection, tag: &str) -> Option<i64>
     })
 }
 
+async fn wait_for_tagged_query_pid(connection: &dyn Connection, tag: &str) -> Option<i64> {
+    for _ in 0..100 {
+        if let Some(pid) = tagged_query_pid(connection, tag).await {
+            return Some(pid);
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    None
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
@@ -96,15 +106,9 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
     let running = connection.clone();
     let task = tokio::spawn(async move { running.query(&format!("SELECT pg_sleep(30) /* {tag} */")).await });
 
-    let mut pid = None;
-    for _ in 0..100 {
-        pid = tagged_query_pid(observer.as_ref(), tag).await;
-        if pid.is_some() {
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    }
-    let pid = pid.expect("tagged query must reach PostgreSQL");
+    let pid = wait_for_tagged_query_pid(observer.as_ref(), tag)
+        .await
+        .expect("tagged query must reach PostgreSQL");
     let terminated = observer
         .query(&format!("SELECT pg_terminate_backend({pid})"))
         .await
@@ -212,7 +216,7 @@ async fn a_disconnected_session_is_retired_without_affecting_the_shared_pool() {
         (session, result)
     });
 
-    let pid = tagged_query_pid(observer.as_ref(), tag)
+    let pid = wait_for_tagged_query_pid(observer.as_ref(), tag)
         .await
         .expect("tagged session query must reach PostgreSQL");
     let terminated = observer
@@ -257,15 +261,9 @@ async fn backend_loss_during_row_stream_fails_the_whole_query_as_disconnected() 
             .await
     });
 
-    let mut pid = None;
-    for _ in 0..100 {
-        if let Some(backend_pid) = tagged_query_pid(observer.as_ref(), tag).await {
-            pid = Some(backend_pid);
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
-    }
-    let pid = pid.expect("tagged streaming query must reach PostgreSQL");
+    let pid = wait_for_tagged_query_pid(observer.as_ref(), tag)
+        .await
+        .expect("tagged streaming query must reach PostgreSQL");
     // Let the executor produce some rows before cutting its backend. The
     // public query API returns a complete result, so a partial result is a bug.
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
