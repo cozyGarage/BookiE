@@ -19,17 +19,14 @@ Rules:
   acceptance.
 
 Reconciled against BookiE `fork/linux` tip
-`c437675c90e88a869f74569fcf0bc65d66db3e93` (PR #422), checked 2026-10-09
-02:10 UTC. PRs #419–#422 are merged. For PR #421, hosted preflight, security,
-SonarCloud and the development Flatpak passed; focused B3 tests passed within
-the still-running GTK checks, while default Flatpak remained in progress. Hosted
-driver integration was skipped; its focused PostgreSQL test and full local
-preflight passed. For PR #422, security, supply-chain and SonarCloud passed;
-hosted preflight and both Flatpak builds were still running. Its focused
-PostgreSQL test and full local preflight passed. This is a timestamped CI
-snapshot, not a release qualification. Hosted success does not replace the
-frozen-candidate, installed, or native Wayland gates that remain open in the B4
-board. Older audits remain historical; this ledger and the
+`762c4b1a8efd17aaba508eb5cb57904a62d7f41b` (PR #441), checked 2026-10-09
+10:46 UTC. PRs #392, #441 and #442 are merged; their local and remote branches
+have been removed. PR #443 is open for SQL Server `decimal(38,38)` support and
+lossy `sql_variant` refusal. Its full MSSQL target run passed 77 tests, its
+focused Docker contracts and unpiped preflight passed, and the `sql_variant`
+refusal arm's targeted mutation was caught. The broader B3 engine/type/consumer
+matrix and installed acceptance remain open. This is a status snapshot, not a
+release qualification. Older audits remain historical; this ledger and the
 [active sprint](bookie-0.2-sprint.md) own current status.
 ## Owners and handoff
 
@@ -40,7 +37,7 @@ table in the same commit.
 
 | Owner | Open rows | Next |
 | --- | --- | --- |
-| B3 (types, values, drivers, result paths) | UI-14b, UI-15b, UI-19, UI-20, UI-21, TEST-2, TEST-12, PERF-3, PERF-4, PERF-7, PERF-9, PERF-10 | 2026-10-08 handoff: B3 implements PERF-9/10; UI-19 is deferred (C). UI-14b's open part is the hidden-column projection (PERF-9); UI-15b is the grid null display style; UI-21 is the `CellView` display boundary. AUD-3 is done in PR #420; TEST-26 is done in PR #419. See B3/UX handoff below |
+| B3 (types, values, drivers, result paths) | UI-14b, UI-15b, UI-19, UI-20, UI-21, TEST-2, TEST-12, PERF-3, PERF-4, PERF-7, PERF-9, PERF-10 | 2026-10-09 update: PR #392 merged and PERF-9/10 implementation is in place; installed GTK acceptance and comparable memory profiling remain open. UI-19 is deferred (C). UI-14b, UI-15b and UI-21 retain the B3/UX boundary below. AUD-3 is done in PR #420; TEST-26 is done in PR #419. PR #443 covers current SQL Server decimal and variant gaps; after it merges, continue TEST-2 mutation triage and the remaining engine/type/consumer/configuration matrix |
 | B4 (transport, guard, audit, SSH, rollback) | AUD-2, B4-7, B4-9, B4-11, B4-16, B4-17, B4-21, B4-22, UI-1b, UI-13b, TEST-15, PERF-2, PERF-8 | Exact-source Build Linux [#37865445368](https://github.com/cozyGarage/BookiE/actions/runs/37865445368) on `5db1cfe` passed the B4 rollback, TLS, PostgreSQL release and installed GTK safety jobs. Run [#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390) on `102ef480` also passed the MySQL approval scenario, all seven SSH/mTLS GTK scenarios and 462 integration tests; this does not resolve the earlier intermittent empty-dialog failures. Local Samba AD Kerberos tests passed, but Windows AD interoperability remains unproven. Package-installed SSH/TLS/rollback/bundle/Kerberos flows and native Wayland acceptance remain open. AUD-1/3 and B4-12 are done. AUD-2 disconnect cancellation and terminal audit are implemented in PR #427; the MySQL approval and MCP disconnect GTK scenarios now pass locally on exact-source release binary `ee017ac`, with hosted acceptance for the disconnect scenario still open. See [AUD-2 installed GTK evidence](evidence/aud2-ui-installed-local-ee017ac/manifest.json). A guard read-snapshot session start (read-only `BEGIN`, audited as a read) unblocks UI-13b and ADR 0011 cursor paging (PERF-8, PERF-2). UI-1b has a [secrets-per-hop proposal](proposals/ui-1b-ssh-jump-chain-editor.md); implementation and GTK acceptance remain open. TEST-15 has independent row/audit coverage for PostgreSQL, MySQL, Redis, ClickHouse and SQL Server (#355). B4-11 now covers `LAST_INSERT_ID()`, trigger session-variable state and advisory locks surviving failed-batch rollback on MySQL/MariaDB; optional/vendor engines and other side-effect classes remain open. See [B4-11 advisory-lock evidence](evidence/mysql-advisory-lock-rollback-2026-10-09/manifest.json) |
 | UX lane (app layer, packaging, lab) | AUD-5, AUD-6, AUD-7, TEST-27, TEST-28, SNAP-2, SNAP-3, SNAP-4 | Audit findings of 2026-10-08: AUD-7 then AUD-6. Snapshots (ADR 0015) after SNAP-1 is decided |
 | The maintainer (needs a person or a decision) | SNAP-1, PKG-1, PKG-2, PKG-4, PKG-8, DOC-3, DOC-5, TEST-6 | PKG-8: choose between `--filesystem=home` and portal-only file access, which changes how saved SQLite and DuckDB file paths behave in the Flatpak (a portal path is not a stable path). PKG-2 is waiting on PKG-1's native Wayland pass; PKG-4 is waiting on Flathub submission and screenshots (the build, install, launch and mapped-window checks pass). PKG-1: run the Wayland recipe in the row on a real desktop. DOC-3: Orca and high contrast. TEST-6: the manual checklist. DOC-5: compare clients on lab VMs |
