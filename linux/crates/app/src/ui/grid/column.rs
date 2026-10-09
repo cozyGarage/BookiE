@@ -4,8 +4,8 @@ use tablepro_core::{ColumnInfo, Value};
 
 use super::context_menu::GridMenus;
 use super::display::{
-    CellView, FULL_EDIT_TEXT_SLOT, POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view,
-    value_to_full_edit_text,
+    CellView, FULL_EDIT_TEXT_SLOT, POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, VALUE_SLOT,
+    cell_view, value_to_full_edit_text,
 };
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
 pub(super) use super::presentation::column_is_editable as is_cell_editable;
@@ -129,7 +129,7 @@ pub(super) fn build_column(
         } else {
             (raw_value, false)
         };
-        let preview = (!edited).then(|| row.cell_preview(idx)).flatten();
+        let preview = preview_for_bind(&row, idx, edited);
         let view = preview
             .as_ref()
             .map(CellView::from_preview)
@@ -175,6 +175,7 @@ pub(super) fn build_column(
         let is_pending_delete = pending_classes.contains(&"tp-row-pending-delete");
         let Some(child) = item.child() else { return };
         if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
+            VALUE_SLOT.set(&label, value.clone());
             label.set_inline_editable(inline_editable);
             label.set_text(text.as_ref());
             apply_cell_tooltip(label.upcast_ref(), text.as_ref(), is_null);
@@ -251,6 +252,7 @@ pub(super) fn build_column(
             POSITION_SLOT.take(&label);
             ROW_KEY_SLOT.take(&label);
             SNAPSHOT_SLOT.take(&label);
+            VALUE_SLOT.take(&label);
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
             checkbox.set_sensitive(false);
             POSITION_SLOT.take(&checkbox);
@@ -296,6 +298,14 @@ pub(super) fn build_column(
         column.set_fixed_width(min);
     }
     column
+}
+
+fn preview_for_bind(
+    row: &crate::ui::row_object::RowObject,
+    index: usize,
+    edited: bool,
+) -> Option<crate::ui::row_object::CellPreview> {
+    (!edited).then(|| row.cell_preview(index)).flatten()
 }
 
 fn clear_pending_classes(widget: &gtk4::Widget) {
@@ -367,6 +377,16 @@ mod tests {
         let mut c = col("integer", false);
         c.is_auto_increment = true;
         assert!(!is_cell_editable(&c));
+    }
+
+    #[test]
+    fn an_edited_preview_keeps_the_full_value_and_hides_the_preview() {
+        let full = "x".repeat(9_000);
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Int(1), Value::Text(full.clone())]);
+        row.preview_long_values(&[0]);
+        assert!(preview_for_bind(&row, 1, false).is_some());
+        assert!(preview_for_bind(&row, 1, true).is_none());
+        assert_eq!(row.cell_value(1), Value::Text(full));
     }
 
     #[test]
@@ -827,6 +847,42 @@ mod tests {
         );
         cell.stop_editing(false);
 
+        window.close();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn editing_literal_null_sentinel_text_keeps_it_distinct_from_sql_null() {
+        use gtk4::prelude::*;
+        gtk4::init().unwrap();
+        let columns = vec![col("TEXT", false), col("TEXT", false)];
+        let result = tablepro_core::QueryResult {
+            columns: columns.clone(),
+            rows: vec![vec![Value::Text("<NULL>".into()), Value::Null]],
+            truncated: false,
+        };
+        let (sender, _receiver) = relm4::channel::<GridMsg>();
+        let (view, _) = crate::ui::grid::build_column_view(
+            &std::sync::Arc::new(result),
+            &columns,
+            "null_sentinel_text",
+            Some(sender),
+            None,
+            None,
+            None,
+            None,
+            TabGridContext::default(),
+            None,
+            std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
+        );
+        let window = gtk4::Window::builder().child(&view).build();
+        window.present();
+        let editors = wait_for_editors(view.upcast_ref(), 2);
+        for (cell, expected) in editors.iter().zip(["<NULL>", ""]) {
+            super::super::editing::enter_edit_mode(cell);
+            assert_eq!(cell.entry().text().as_str(), expected);
+            cell.stop_editing(false);
+        }
         window.close();
     }
 }

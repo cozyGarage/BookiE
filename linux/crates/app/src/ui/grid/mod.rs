@@ -24,8 +24,12 @@ use context_menu::install_grid_context_menus;
 
 pub(crate) use display::preview_to_display_text;
 pub(crate) use display::value_to_full_edit_text;
-pub use display::{editable_null_sentinel, focused_cell_identity, value_to_display_text};
+pub use display::{focused_cell_identity, value_to_display_text};
 pub(crate) use value_viewer::present as present_value_viewer;
+
+pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
+    editing::enter_edit_mode(label);
+}
 
 #[derive(Debug)]
 pub enum GridMsg {

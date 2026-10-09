@@ -3,9 +3,6 @@
 ## [Unreleased]
 
 ### Added
-- Concurrent MongoDB first-page requests now share one schema census and retain the union of types observed across pages.
-- MongoDB browse performs a complete type census on initial load and refresh, then reuses it across pages and invalidates it after driver writes; browse pages use stable ascending _id order.
-- MongoDB paged `find` queries reuse the same connection-local type census instead of rescanning the collection for each page.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
@@ -105,6 +102,7 @@
 
 ### Fixed
 
+- Copy Value preserves full previewed, pending and draft cell values; editing literal `<NULL>` text no longer turns it into an empty value.
 - MongoDB connections now reject malformed or URI-shaped host input before constructing the connection URI.
 - Closing a table tab, paging, or disconnecting now stops the slow read it started on the server instead of letting it run to the timeout.
 - PostgreSQL optimistic grid edits cast both new and previously read custom enum, enum-array, and domain values to qualified native types, so stale-row comparisons work across those columns.

@@ -154,10 +154,7 @@ impl BrowseTab {
                 return;
             };
             if let Ok(label) = focused.dynamic_cast::<crate::ui::cell_editor::CellEditor>() {
-                if label.text().as_str() == crate::ui::grid::editable_null_sentinel() {
-                    label.set_text("");
-                }
-                label.start_editing();
+                crate::ui::grid::enter_cell_edit_mode(&label);
             }
             // Bool draft (CheckButton focused) needs no edit-mode
             // dance; clicking / Space toggles natively.

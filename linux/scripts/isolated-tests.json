@@ -240,6 +240,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::column::tests::editing_literal_null_sentinel_text_keeps_it_distinct_from_sql_null"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::context_menu::tests::copy_value_keeps_keyless_previews_pending_edits_and_drafts_whole"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::export::tests::clipboard_csv_is_published_and_read_back_exactly"
     ],
     [
