@@ -248,6 +248,20 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(scenario=scenario):
                 self.assertIn(scenario, default_scenarios)
 
+    def test_analysis_and_flatpak_skip_docs_and_reuse_cache(self):
+        for name in ["codeql.yml", "sonar-rust.yml"]:
+            workflow = (ROOT / ".github/workflows" / name).read_text()
+            self.assertIn('"!linux/docs/**"', workflow)
+            self.assertIn('"!**.md"', workflow)
+            self.assertIn('"linux/**"', workflow)
+        flatpak = (ROOT / ".github/workflows/flatpak-linux.yml").read_text()
+        self.assertIn(
+            "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+            flatpak.split("concurrency:", 1)[1].split("jobs:", 1)[0],
+        )
+        self.assertIn("hashFiles('linux/flatpak/**')", flatpak)
+        self.assertNotIn("github.sha }}", flatpak.split("cache-key:", 1)[1].split("\n", 1)[0])
+
 
 if __name__ == "__main__":
     unittest.main()
