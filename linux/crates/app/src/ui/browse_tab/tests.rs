@@ -220,7 +220,7 @@ async fn value_contract_mongodb_off_page_type_change_during_census_refuses_edit(
 
     let decimal: Decimal128 = "12345678901234567890.1234567890123".parse().unwrap();
     collection
-        .update_one(doc! { "_id": 149 }, doc! { "$set": { "value": decimal } })
+        .update_one(doc! { "_id": 127 }, doc! { "$set": { "value": decimal } })
         .await
         .unwrap();
     native
@@ -236,7 +236,7 @@ async fn value_contract_mongodb_off_page_type_change_during_census_refuses_edit(
 
     assert_mongodb_census_race_page(&page);
 
-    let changed = collection.find_one(doc! { "_id": 149 }).await.unwrap().unwrap();
+    let changed = collection.find_one(doc! { "_id": 127 }).await.unwrap().unwrap();
     let sibling = collection.find_one(doc! { "_id": 1 }).await.unwrap().unwrap();
     assert_eq!(changed.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
     assert_eq!(
@@ -304,7 +304,7 @@ async fn value_contract_mongodb_census_is_not_a_snapshot_for_already_read_docume
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_mongodb_browse_uses_one_find_for_schema_and_page() {
+async fn value_contract_mongodb_browse_uses_a_bounded_sample_and_page_find() {
     use tablepro_core::OperationControl;
 
     let (_container, native, _collection, connection) = mongodb_census_race_fixture().await;
@@ -315,7 +315,7 @@ async fn value_contract_mongodb_browse_uses_one_find_for_schema_and_page() {
         .await
         .unwrap();
     let after = mongodb_find_command_count(&native).await;
-    assert_eq!(after - before, 1, "schema and page data must share one find cursor");
+    assert_eq!(after - before, 2, "bounded schema sample and page use separate finds");
     let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
     assert_eq!(page.columns[value_index].data_type, "string");
     assert_eq!(page.rows[0][value_index], Value::Text("before".into()));

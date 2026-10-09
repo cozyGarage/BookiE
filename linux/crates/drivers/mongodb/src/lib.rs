@@ -86,8 +86,10 @@ impl DatabaseDriver for MongodbDriver {
 }
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const METADATA_SAMPLE_SIZE: i64 = 128;
 
 async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, DriverError> {
+    let host = uri_host(&opts.host)?;
     let scheme = "mongodb";
     let password = opts.password.expose_secret();
     let auth = if !opts.username.is_empty() {
@@ -100,7 +102,7 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
     } else {
         format!("/{}", encode_uri(&opts.database))
     };
-    let uri = format!("{scheme}://{auth}{}:{}{db_path}", opts.host, opts.port);
+    let uri = format!("{scheme}://{auth}{host}:{}{db_path}", opts.port);
     let mut client_opts = ClientOptions::parse(&uri).await.map_err(map_mongo_error)?;
     client_opts.app_name = Some("TablePro".into());
     client_opts.tls = Some(tls_for(&opts.tls, opts.service_address().0));
@@ -112,6 +114,27 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
     // or reaching a host the client can't resolve.
     client_opts.direct_connection = Some(true);
     Ok(client_opts)
+}
+
+fn uri_host(host: &str) -> Result<String, DriverError> {
+    let raw_host = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host);
+    if raw_host.is_empty()
+        || raw_host.chars().any(|ch| {
+            ch.is_control() || ch.is_whitespace() || matches!(ch, '/' | '?' | '#' | '@' | '%' | ',' | '\\' | '[' | ']')
+        })
+    {
+        return Err(DriverError::Unsupported("invalid MongoDB host".into()));
+    }
+    if raw_host.parse::<std::net::Ipv6Addr>().is_ok() {
+        return Ok(format!("[{raw_host}]"));
+    }
+    if host.starts_with('[') || raw_host.contains(':') {
+        return Err(DriverError::Unsupported("invalid MongoDB host".into()));
+    }
+    Ok(raw_host.to_owned())
 }
 
 fn encode_uri(s: &str) -> String {
@@ -178,27 +201,38 @@ impl MongodbConnection {
         page: Option<(u64, u64)>,
     ) -> Result<(Vec<ColumnInfo>, Vec<Document>), DriverError> {
         let coll = self.db().collection::<Document>(table);
-        let mut cursor = coll.find(doc! {}).await.map_err(map_mongo_error)?;
-        let mut types = BTreeMap::new();
         let mut page_docs = Vec::new();
-        let page_end = page.map(|(offset, limit)| offset.saturating_add(limit));
-        let mut position = 0u64;
-        while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-            for (key, value) in &doc {
-                observe_bson_type(&mut types, key, value);
-            }
-            if let (Some((offset, _)), Some(end)) = (page, page_end)
-                && position >= offset
-                && position < end
-            {
+        if let Some((offset, limit)) = page.filter(|(_, limit)| *limit > 0) {
+            let limit = i64::try_from(limit)
+                .map_err(|_| DriverError::Unsupported("MongoDB page size exceeds the server range".into()))?;
+            let mut cursor = coll
+                .find(doc! {})
+                .sort(doc! { "_id": 1 })
+                .skip(offset)
+                .limit(limit)
+                .await
+                .map_err(map_mongo_error)?;
+            while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
                 page_docs.push(doc);
             }
-            position = position.saturating_add(1);
         }
-        if !types.contains_key("_id") {
-            types.insert("_id".into(), "ObjectId".into());
+        let cursor = coll
+            .find(doc! {})
+            .sort(doc! { "_id": 1 })
+            .limit(METADATA_SAMPLE_SIZE)
+            .await
+            .map_err(map_mongo_error)?;
+        let sample_docs: Vec<Document> = cursor.try_collect().await.map_err(map_mongo_error)?;
+        let mut types = BTreeMap::new();
+        for doc in &sample_docs {
+            for (key, value) in doc {
+                observe_bson_type(&mut types, key, value);
+            }
         }
-        Ok((columns_from_types(types), page_docs))
+        types.entry("_id".into()).or_insert_with(|| "ObjectId".into());
+        let mut columns = columns_from_types(types);
+        merge_page_types(&mut columns, &page_docs);
+        Ok((columns, page_docs))
     }
 }
 
@@ -393,7 +427,7 @@ impl Connection for MongodbConnection {
 
 impl MongodbConnection {
     async fn run_find(&self, q: FindQuery) -> Result<QueryResult, DriverError> {
-        let mut columns = self.fetch_columns(None, &q.collection).await?;
+        let (mut columns, _) = self.columns_and_page(&q.collection, None).await?;
         let coll = self.db().collection::<Document>(&q.collection);
         let mut cursor = coll
             .find(q.filter)
@@ -561,6 +595,45 @@ mod tests {
         assert_eq!(d.default_port(), 27017);
         assert_eq!(d.default_database(), "test");
         assert_eq!(d.default_username(), "");
+    }
+
+    #[test]
+    fn mongodb_host_rejects_uri_delimiters_and_brackets_ipv6() {
+        for host in [
+            "",
+            "db/name",
+            "db?x",
+            "db#x",
+            "user@db",
+            "db%2fadmin",
+            "db,other",
+            "db\\name",
+            "db name",
+            "[bad-ip]",
+        ] {
+            assert!(uri_host(host).is_err(), "host must be refused: {host:?}");
+        }
+        assert_eq!(uri_host("db.internal").unwrap(), "db.internal");
+        assert_eq!(uri_host("127.0.0.1").unwrap(), "127.0.0.1");
+        assert_eq!(uri_host("::1").unwrap(), "[::1]");
+        assert_eq!(uri_host("[::1]").unwrap(), "[::1]");
+    }
+
+    #[tokio::test]
+    async fn reserved_credentials_remain_encoded_and_keep_the_database_auth_source() {
+        let opts = ConnectOptions {
+            host: "127.0.0.1".into(),
+            port: 27017,
+            username: "user@name".into(),
+            password: secrecy::SecretString::new("p:/?#@ss".into()),
+            database: "appdb".into(),
+            ..Default::default()
+        };
+        let client_opts = build_client_options(&opts).await.unwrap();
+        let credential = client_opts.credential.unwrap();
+        assert_eq!(credential.username.as_deref(), Some("user@name"));
+        assert_eq!(credential.password.as_deref(), Some("p:/?#@ss"));
+        assert_eq!(credential.source.as_deref(), Some("appdb"));
     }
 
     #[test]
