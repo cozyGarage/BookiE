@@ -43,3 +43,17 @@ The broad driver-integration job was still running when checked. This remains
 hosted staged-binary evidence; distribution-package/native Wayland acceptance
 is open. The job report and per-scenario results are in run
 [#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390).
+
+## AUD-2 local rerun and suspect-merge review
+
+On exact source `102ef48017f10c7a63c271608b98d3b05b449795`, the
+`mysql_unparseable_routine_dialog_denial_preserves_database` GTK scenario also
+passed locally with an isolated D-Bus session, Xvfb, and an explicitly started
+AT-SPI bus. The test verified denial left the procedure absent, then approval
+created the second procedure. See the [local run manifest](b4-aud2-gtk-rerun-2026-10-09/manifest.json)
+and its captured log. PR #407 changes documentation/evidence only; PR #408 adds
+a MySQL rollback test and evidence only. Neither changes runtime SQL
+classification or approval routing. These findings rule out those two PRs as
+direct runtime causes, but do not explain the two earlier empty-snapshot
+failures. AUD-2 remains open pending a reproducible failure or enough repeated
+installed runs to establish stability.
