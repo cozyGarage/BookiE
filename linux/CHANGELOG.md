@@ -134,6 +134,7 @@
 
 ### Security
 
+- A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server
 - Importing a connection bundle now refuses a file over 16 MiB, or anything that is not a regular file, before reading it.
 - Driver panic messages, which can contain query text or credentials, are no longer written to the logs or the terminal; only the location is. Set `TABLEPRO_DEBUG_PANICS=1` to print them while developing.
 

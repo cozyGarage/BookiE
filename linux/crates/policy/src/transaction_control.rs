@@ -71,6 +71,18 @@ pub fn transaction_control(sql: &str, driver_id: &str) -> Option<TransactionCont
     let [statement] = statements.as_slice() else {
         return None;
     };
+    control_of(statement)
+}
+
+pub(crate) fn hides_transaction_control(sql: &str, driver_id: &str) -> bool {
+    let dialect = dialect_for(driver_id);
+    let Ok(statements) = Parser::parse_sql(dialect.as_ref(), sql.trim()) else {
+        return false;
+    };
+    statements.len() > 1 && statements.iter().any(|statement| control_of(statement).is_some())
+}
+
+fn control_of(statement: &Statement) -> Option<TransactionControl> {
     match statement {
         Statement::StartTransaction { statements, .. } if statements.is_empty() => Some(TransactionControl::Begin),
         Statement::Commit { chain, .. } => Some(TransactionControl::Commit { chain: *chain }),

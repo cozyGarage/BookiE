@@ -1,7 +1,7 @@
 use tablepro_core::Session;
 
 use super::*;
-use crate::transaction_control::{TransactionControl, transaction_control};
+use crate::transaction_control::{TransactionControl, hides_transaction_control, transaction_control};
 
 const CLOSE_ROLLBACK_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -65,6 +65,10 @@ impl Session for PolicySession {
             Some(TransactionControl::Begin) => self.begin(sql, control).await,
             Some(TransactionControl::Commit { chain }) => self.finish(sql, control, Finish::Commit, chain).await,
             Some(TransactionControl::Rollback { chain }) => self.finish(sql, control, Finish::Rollback, chain).await,
+            None if hides_transaction_control(sql, &self.guard.ctx.driver_id) => Err(DriverError::PolicyDenied(
+                "send BEGIN, COMMIT and ROLLBACK as separate statements so the session can track the transaction"
+                    .into(),
+            )),
             None => self.statement(sql, params, control).await,
         }
     }
