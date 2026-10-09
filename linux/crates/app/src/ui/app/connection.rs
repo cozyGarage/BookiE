@@ -433,6 +433,11 @@ impl App {
             tracing::warn!("discarding duplicate prepared connection");
             return;
         }
+        if connection_service::was_cancelled(self.connect_cancel.as_ref()) {
+            drop(prepared);
+            self.on_connection_cancelled();
+            return;
+        }
         self.connect_cancel = None;
         self.dismiss_loading_page();
         self.prepared_connection = Some(*prepared);

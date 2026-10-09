@@ -12,18 +12,15 @@ pub(super) struct RunTerminal {
 }
 
 impl RunGeneration {
-    pub(super) fn begin(&mut self) -> u64 {
+    pub(super) fn start_new(&mut self) -> u64 {
         self.next = self.next.wrapping_add(1);
         self.current = Some(self.next);
+        self.active.insert(self.next);
         self.next
     }
 
     pub(super) fn accepts(&self, generation: u64) -> bool {
         self.current == Some(generation)
-    }
-
-    pub(super) fn start(&mut self, generation: u64) -> bool {
-        self.accepts(generation) && self.active.insert(generation)
     }
 
     pub(super) fn finish(&mut self, generation: u64) -> Option<RunTerminal> {
