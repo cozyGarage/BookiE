@@ -12,8 +12,9 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 - B3 [B3]: the broader type, consumer and configuration matrix, PERF-10 memory
   reduction (the preview is display-only; full values are still held), PERF-3
   MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
-  TEST-29's fast and durable test-container paths are implemented locally; its
-  serialized hosted gate is pending.
+  TEST-29's fast and durable test-container paths are in PR #457; focused
+  MySQL/MariaDB rollback tests and local preflight pass. The exact-head hosted
+  gate is pending.
 - B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
   remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
   (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
@@ -61,8 +62,12 @@ Merged topic branches have been deleted.
 For TEST-29, the local full PostgreSQL integration binary passed 234/234 in
 133.16 seconds and the MySQL/MariaDB binary passed 90/90 in 55.50 seconds.
 SQL Server's DDL batch, durable lost-ack and restart tests, and fast-fixture wide
-numeric test passed. Forgejo run 93 was cancelled while UX's serialized gates
-were active; this B3 change has not been pushed or gated yet.
+numeric test passed. PR #457 is open at `8ad09c2f8` with the latest `origin/linux`
+merged; its focused MySQL/MariaDB same-session rollback tests pass 4/4 and
+unpiped preflight passes. GitHub checks are still running. Forgejo run 96 was
+for the older `dc8779b` head and failed the PostgreSQL release-plan test because
+the fail-closed policy masks its wildcard projection; run 97 was canceled as a
+duplicate. The exact PR head still needs its serialized gate.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
