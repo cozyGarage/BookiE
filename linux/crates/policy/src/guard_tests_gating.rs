@@ -306,6 +306,31 @@ async fn blast_radius_count_runs_through_the_controlled_query_path() {
 }
 
 #[tokio::test]
+async fn a_side_effecting_predicate_is_never_run_by_the_blast_radius_count() {
+    for sql in [
+        "DELETE FROM jobs WHERE pg_terminate_backend(pid)",
+        "UPDATE jobs SET status = 'done' WHERE nextval('job_seq') > 0",
+    ] {
+        let queries = Arc::new(AtomicUsize::new(0));
+        let guard = PolicyGuard::new(
+            query_counting_connection(queries.clone()),
+            context(
+                Principal::human_gui(),
+                Environment::Local,
+                PolicyConfig::default(),
+                Arc::new(AutoApproveSink),
+                Arc::new(SequenceAuditSink::new(vec![])),
+                Arc::new(AuditState::new()),
+            ),
+        );
+
+        guard.execute(sql).await.expect("approved write");
+
+        assert_eq!(queries.load(Ordering::SeqCst), 0, "{sql}");
+    }
+}
+
+#[tokio::test]
 async fn an_expired_deadline_skips_the_blast_radius_count() {
     let queries = Arc::new(AtomicUsize::new(0));
     let guard = PolicyGuard::new(

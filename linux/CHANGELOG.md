@@ -141,6 +141,10 @@
 
 ### Security
 
+- `SELECT … INTO` is now treated as a write, so read-only connections and agent read access refuse it instead of letting it create a table
+- The row-count estimate that guards large writes no longer runs a side-effecting function in your WHERE clause before you approve the statement; such statements ask for approval without an estimate
+- A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server
+- A SQLite, PostgreSQL, MySQL or MariaDB connection marked read-only is now read-only in the database engine itself, so a statement the safety checks mistake for a read still cannot change data; a read-only SQLite connection no longer creates a missing file
 - Importing a connection bundle now refuses a file over 16 MiB, or anything that is not a regular file, before reading it.
 - Driver panic messages, which can contain query text or credentials, are no longer written to the logs or the terminal; only the location is. Set `TABLEPRO_DEBUG_PANICS=1` to print them while developing.
 
