@@ -90,6 +90,7 @@
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- The Debian package installs its programs without debug symbols, which makes the installed files about a quarter smaller
 - The time shown for a statement no longer includes the wait for your approval on a guarded connection.
 - MongoDB browse pages now use a bounded schema sample and stable `_id` paging instead of scanning the full collection for every page.
 - Disposable database test fixtures use tmpfs and reduced flush syncing; lost-ack, crash and restart tests keep durable storage.
