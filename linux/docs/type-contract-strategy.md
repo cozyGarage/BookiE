@@ -328,6 +328,10 @@ change, including the repeated DST-overlap wall-clock time with distinct `-04`
 and `-05` offsets. The test compares native type, JSON and wire output after
 rebinding, and confirms the wire bytes match the original session
 (`value_contract_timestamptz_array_rebinding_preserves_instants_after_timezone_change`).
+The `interval[]` CSV import contract now also changes `IntervalStyle` from
+`postgres_verbose` to `iso_8601`; the imported row retains native type and exact
+`array_send` bytes, while a pre-existing sibling remains unchanged
+([test](../crates/drivers/postgres/tests/support/interval_array_csv_import.rs)).
 Other temporal-array session/consumer combinations remain open.
 
 PostgreSQL inferred enum-array binding now has direct evidence for the
