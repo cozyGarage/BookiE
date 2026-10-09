@@ -455,7 +455,10 @@ async fn value_contract_inferred_enum_array_parameter_respects_domain_depth_boun
 
     let connection = connect(options).await;
     let mut transaction = connection.begin().await.unwrap();
-    transaction.execute("SET LOCAL search_path TO public").await.unwrap();
+    transaction
+        .execute(&format!("SET LOCAL search_path TO {schema}_shadow, public"))
+        .await
+        .unwrap();
 
     transaction.execute("SAVEPOINT native_domain_equality").await.unwrap();
     let native_equality = transaction
@@ -565,6 +568,16 @@ async fn create_enum_scalar_depth_fixture(connection: &dyn tablepro_core::Connec
     connection
         .execute(&format!(
             "CREATE TYPE {schema}.state AS ENUM ('ready', 'paused', 'NULL', '')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!("CREATE SCHEMA {schema}_shadow"))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {schema}_shadow.state AS ENUM ('ready', 'paused', 'NULL', '', 'shadow-only')"
         ))
         .await
         .unwrap();

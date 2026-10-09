@@ -1072,7 +1072,7 @@ Scalar enum parameter contexts now have a native comparison at the 63/64-domain
 boundary: `COALESCE` and `CASE` preserve PostgreSQL's inferred enum result type
 and value for text labels, the literal `NULL` label, empty text and SQL NULL,
 while the source column retains its outer domain type. The test runs with the
-target schema absent from `search_path`
+target schema absent from a `search_path` led by a same-named shadow enum
 ([test](../crates/drivers/postgres/tests/support/domain_depth_boundary_contract.rs)).
 
 A restricted PostgreSQL session now verifies enum parameter inference after
