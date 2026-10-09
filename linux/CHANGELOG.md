@@ -8,6 +8,7 @@
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
 - Arbitrary SQL result grids now preview long text, JSON and binary cells with byte counts; View Value reads the complete value from the guarded result already in memory.
 - Previewed grid cells no longer keep a second full value in each cell widget.
+- Materialized result-grid rows share their source values, reducing duplicate memory for long cells.
 - Overlapping View Value requests discard stale replies so an older fetch cannot replace the latest requested cell.
 - ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
 - DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.

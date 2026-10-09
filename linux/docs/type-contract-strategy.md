@@ -58,9 +58,14 @@ at two rows and refuses missing or ambiguous matches. PostgreSQL enum/domain
 key casts have planner regressions. Arbitrary SQL editor result grids now use the
 same typed 8 KiB preview and byte count. View Value reads the exact full value
 from the already-returned guarded result instead of rerunning arbitrary SQL.
-The result still retains full values, so this does not reduce shared-result
-memory. MongoDB refetches selected fields
-by `_id`; Redis string refetch binds arbitrary key bytes. Local SQLite and
+The shared result still retains full values and remains the main memory owner.
+Materialized grid rows now read from it without cloning long cell payloads;
+rows detach only when the store replaces its source, preserving held rows without
+pinning the old result. A pointer-identity regression uses a 1 MiB text value,
+checks the full value and preview, and the projection test preserves SQL NULL
+versus unfetched cells after replacement (`shared_result_rows_do_not_clone_large_cell_payloads_into_row_objects`).
+MongoDB refetches selected fields by `_id`; Redis string refetch binds arbitrary
+key bytes. Local SQLite and
 Docker MySQL service tests refetch a 9,000-byte BLOB by
 composite key and compare its exact returned bytes with native storage oracles;
 the MySQL test also checks `LONGBLOB`, byte length and the native hex prefix. A
