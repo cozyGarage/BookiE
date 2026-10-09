@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
   "date": "2026-10-09",
-  "scope": "B4-17 partial GTK acceptance using a local Arch package candidate on current fork/linux",
+  "scope": "B4-17 partial GTK acceptance using a local Arch package candidate built from fork/linux source snapshot 8fdbed84",
   "source_commit": "8fdbed84b37373b2ea45af14103e03795f72c9c5",
+  "branch_reconciliation": "The candidate was built from the fetched linux head 8fdbed84b. When evidence was reconciled, fork/linux had advanced to 395bc1826 by PR #432; this run does not qualify that newer head.",
   "source_sha256": {
     "scripts/test-postgres-release.sh": "f1b865d96403ec596514e0edb2480ad0be3b906e4ab1523289e32621abd30b45",
     "scripts/test-gtk-safety.sh": "adec0b08de0d0d0d9545a868e858c667259b67eee78417b066f7b33ec0e528d7",
