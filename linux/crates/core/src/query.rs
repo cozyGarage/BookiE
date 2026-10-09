@@ -224,7 +224,10 @@ pub struct ExecResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{ColumnInfo, QualifiedTypeName, QueryResultBudget, Value};
+    use super::{
+        ColumnInfo, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBatch,
+        QueryResultBudget, Value,
+    };
 
     #[test]
     fn enum_catalog_metadata_does_not_change_column_info_wire_shape() {
@@ -270,5 +273,44 @@ mod tests {
             ..QueryResultBudget::default()
         };
         assert!(!row_budget.admit(&[Value::Null]));
+    }
+
+    #[test]
+    fn result_budget_admits_the_exact_cell_limit_once() {
+        let mut budget = QueryResultBudget {
+            cells: MAX_QUERY_RESULT_CELLS - 1,
+            ..QueryResultBudget::default()
+        };
+        let row = [Value::Null];
+
+        assert!(budget.admit(&row));
+        assert!(!budget.admit(&row));
+    }
+
+    #[test]
+    fn result_budget_counts_admitted_rows_to_the_limit() {
+        let mut budget = QueryResultBudget {
+            rows: MAX_QUERY_ROWS - 1,
+            ..QueryResultBudget::default()
+        };
+
+        assert!(budget.admit(&[]));
+        assert!(!budget.admit(&[]));
+    }
+
+    #[test]
+    fn first_result_keeps_truncation_from_either_batch_or_result_set() {
+        for (batch_truncated, result_truncated) in [(true, false), (false, true), (true, true)] {
+            let batch = QueryResultBatch {
+                result_sets: vec![QueryResult {
+                    columns: Vec::new(),
+                    rows: Vec::new(),
+                    truncated: result_truncated,
+                }],
+                truncated: batch_truncated,
+            };
+
+            assert!(batch.into_first().truncated);
+        }
     }
 }
