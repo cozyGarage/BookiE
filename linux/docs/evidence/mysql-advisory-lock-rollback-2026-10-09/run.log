@@ -1,14 +1,15 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
      Running tests/integration.rs (/home/trung/.cache/bookie-b4-review/linux/target/debug/deps/integration-3f630a0a029525e7)
 
 running 18 tests
 test mysql_atomic::a_failed_mysql_dml_batch_confirms_rollback_and_preserves_neighbor_rows ... ok
 test mysql_atomic::a_lost_connection_during_a_batch_reports_rollback_failure ... ok
+test mysql_atomic::advisory_lock::mariadb_failed_batch_preserves_named_lock_session_state ... ok
+test mysql_atomic::advisory_lock::mysql_failed_batch_preserves_named_lock_session_state ... ok
 test mysql_atomic::empty_query_results_preserve_mysql_projection_metadata ... ok
 test mysql_atomic::implicit_commit_batch_is_refused_before_mysql_dispatch ... ok
 test mysql_atomic::mariadb_aria_nontransactional_effects_survive_failed_batches ... ok
 test mysql_atomic::mariadb_failed_batch_preserves_last_insert_id_session_state ... ok
-test mysql_atomic::mariadb_failed_batch_preserves_named_lock_session_state ... ok
 test mysql_atomic::mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects ... ok
 test mysql_atomic::mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigger_effects ... ok
 test mysql_atomic::mysql_batch_rollback_preserves_trigger_session_variable_effects ... ok
@@ -16,11 +17,10 @@ test mysql_atomic::mysql_failed_batch_blackhole_trigger_sink_discards_rows_but_r
 test mysql_atomic::mysql_failed_batch_keeps_direct_inserts_on_nontransactional_engines ... ok
 test mysql_atomic::mysql_failed_batch_keeps_direct_updates_and_deletes_on_nontransactional_engines ... ok
 test mysql_atomic::mysql_failed_batch_preserves_last_insert_id_session_state ... ok
-test mysql_atomic::mysql_failed_batch_preserves_named_lock_session_state ... ok
 test mysql_atomic::mysql_failed_multirow_insert_preserves_only_nontransactional_trigger_effects ... ok
 test mysql_atomic::mysql_transaction_queries_are_bounded_and_mark_truncation ... ok
 test mysql_atomic::mysql_transaction_queries_obey_result_byte_budget_and_remain_usable ... ok
 
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 171.42s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 174.61s
 
 script_exit_code=0
