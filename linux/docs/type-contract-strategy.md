@@ -682,6 +682,12 @@ behavior-equivalent: `value_to_text(Value::Null)` returns `None`, which the JSON
 fallback also serializes as null. Final triage: 22 caught, one equivalent, no
 missed or unresolved timed-out mutants.
 
+Dialect-specific SQL string quoting was mutation-audited at source SHA-256
+`589e831e5a7dc2be8b47a03243542559db7a4fa3eefe3750d81070d2ddb7868f`.
+The MySQL, ClickHouse and PostgreSQL `string_literal`/`quote_literal` slice
+generated ten mutants; the `backslash` regression selector caught all ten in
+15 seconds.
+
 SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
 ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
 Native `typeof()` and `hex()` check both the source expression and restored
