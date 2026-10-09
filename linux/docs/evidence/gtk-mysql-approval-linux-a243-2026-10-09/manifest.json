@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "scope": "Reported MySQL approval-dialog regression on installed fork/linux release build",
+  "source_commit": "a243000037a1f034ed3d219e1212ada10b2f7e87",
+  "binary_path": "/home/trung/.local/opt/bookie-main-a243/bookie",
+  "binary_sha256": "808a6a706d4995fda05a1c08f82c37cc0f52c4581c10749bafac22824f5a2022",
+  "engine_fixture": "Docker MySQL 8.0",
+  "runtime": "User-local release executable; Xvfb X11, private D-Bus, GTK AT-SPI automation",
+  "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database",
+  "result": "passed twice; approval dialog appeared and denial preserved database state",
+  "runs": [
+    "run1 used ATSPI_DBUS_IMPLEMENTATION=dbus-daemon in the invoking environment",
+    "run2 passed through the runner after its D-Bus accessibility initialization fix"
+  ],
+  "harness_fix": "scripts/test-gtk-mysql-approval.sh now sets ATSPI_DBUS_IMPLEMENTATION=dbus-daemon for its isolated D-Bus session",
+  "not_established": [
+    "Hosted mysql-approval gate",
+    "Distro package acceptance",
+    "Native Wayland acceptance"
+  ],
+  "log_sha256": {
+    "run1/run.log": "63f16a824af9ef4f016871f01e454ced6f809eac8825362deab618035fe94c3f",
+    "run1/result.json": "f4137b1050de2db2851936a2b3e08ddd1a1c7c47b8a1d4e12728dbf1c737eb2f",
+    "run2/run.log": "4be1fdece6d29ae7cab7b024eafb816d5ba0171d9a1fbee969458509e591a937",
+    "run2/result.json": "f4137b1050de2db2851936a2b3e08ddd1a1c7c47b8a1d4e12728dbf1c737eb2f",
+    "results.json": "a657de6666efb827725fc50594c2785a2456e6f64b59194294f5b70252221b71"
+  },
+  "source_sha256": {
+    "scripts/test-gtk-mysql-approval.sh": "27ffda727809f426c64d4493c09c44b4d8a980255678e495f211858302b477a9"
+  }
+}

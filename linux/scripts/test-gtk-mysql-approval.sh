@@ -19,6 +19,7 @@ if [[ "${TABLEPRO_GTK_MYSQL_DBUS_ACTIVE:-0}" != "1" ]]; then
   trap cleanup_runtime EXIT
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
+  ATSPI_DBUS_IMPLEMENTATION=dbus-daemon \
   TABLEPRO_GTK_MYSQL_DBUS_ACTIVE=1 \
     CARGO_HOME="$cargo_home" \
     RUSTUP_HOME="$rustup_home" \

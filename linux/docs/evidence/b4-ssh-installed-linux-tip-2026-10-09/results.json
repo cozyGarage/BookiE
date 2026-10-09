@@ -1,0 +1,37 @@
+[
+  {
+    "scenario": "postgres_saved_mtls_connection_authenticates_and_queries",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "postgres_ssh_changed_second_hop_key_is_refused",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "postgres_ssh_multihop_trusts_both_hops_and_queries",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "postgres_ssh_second_hop_decline_does_not_learn_key",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "postgres_ssh_setup_failure_is_durably_audited",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+    "status": "passed",
+    "error": null
+  },
+  {
+    "scenario": "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+    "status": "passed",
+    "error": null
+  }
+]
