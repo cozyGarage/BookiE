@@ -44,7 +44,9 @@ container="$(docker run --rm --detach --publish 127.0.0.1::3306 \
   --env MYSQL_ROOT_PASSWORD=tablepro_test \
   --env MYSQL_ROOT_HOST=% \
   --env MYSQL_DATABASE=bookie_test \
-  mysql:8.0 --default-authentication-plugin=mysql_native_password)"
+  --tmpfs /var/lib/mysql \
+  mysql:8.0 --default-authentication-plugin=mysql_native_password \
+  --innodb-flush-log-at-trx-commit=0 --innodb-doublewrite=0 --sync-binlog=0)"
 cleanup() {
   docker rm --force "$container" >/dev/null 2>&1 || true
 }

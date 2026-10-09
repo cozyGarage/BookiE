@@ -41,7 +41,8 @@ done
 
 container="$(docker run --rm --detach --publish 127.0.0.1::5432 \
   --env POSTGRES_PASSWORD=tablepro_test --env POSTGRES_DB=bookie_test \
-  postgres:17-alpine)"
+  --tmpfs /var/lib/postgresql/data \
+  postgres:17-alpine -c fsync=off -c synchronous_commit=off -c full_page_writes=off)"
 cleanup() {
   docker rm --force "$container" >/dev/null 2>&1 || true
 }
