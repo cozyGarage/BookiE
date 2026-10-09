@@ -294,6 +294,16 @@ mod tests {
     }
 
     #[test]
+    fn a_text_value_that_looks_like_the_null_marker_is_text_and_not_null() {
+        let text = Value::Text(editable_null_sentinel());
+        let view = cell_view(&text, &metadata("text"));
+        assert!(!view.is_null);
+        assert!(view.inline_editable);
+        assert_eq!(view.text_for_bind(true), editable_null_sentinel());
+        assert!(cell_view(&Value::Null, &metadata("text")).is_null);
+    }
+
+    #[test]
     fn bind_text_for_bytes_in_an_editable_column_stays_display_text() {
         let binary = Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01]);
         assert_eq!(cell_view(&binary, &metadata("text")).text_for_bind(true), "<4 bytes>");

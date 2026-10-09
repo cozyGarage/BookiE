@@ -541,6 +541,21 @@ mod tests {
     }
 
     #[test]
+    fn read_only_connection_denies_select_into() {
+        let facts = classify("SELECT * INTO backup FROM accounts", "postgres");
+        let read_only = evaluate(
+            &Principal::human_gui(),
+            Environment::Local,
+            &facts,
+            true,
+            &env_policy(Environment::Local),
+            None,
+        );
+        assert_eq!(read_only.rule_name(), "connection_read_only");
+        assert!(!read_only.is_allow(), "{read_only:?}");
+    }
+
+    #[test]
     fn agent_unparseable_denied() {
         let facts = classify("NOT SQL AT ALL !!!", "postgres");
         let d = evaluate(

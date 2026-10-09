@@ -109,6 +109,28 @@ mod tests {
     }
 
     #[test]
+    fn a_plain_explain_of_a_query_keeps_plan_output_redacted() {
+        let positions = sensitive_projection(
+            "EXPLAIN SELECT * FROM cards WHERE pan = '4111111111111111'",
+            "postgres",
+            &sensitive_patterns(),
+            1,
+        );
+        assert_eq!(positions, vec![true]);
+    }
+
+    #[test]
+    fn explain_analyze_and_non_query_plans_remain_redacted() {
+        for sql in ["EXPLAIN ANALYZE SELECT * FROM cards", "EXPLAIN DELETE FROM cards"] {
+            assert_eq!(
+                sensitive_projection(sql, "postgres", &sensitive_patterns(), 1),
+                vec![true],
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
     fn a_plain_wildcard_over_a_real_table_is_redacted_fail_closed() {
         assert_eq!(
             sensitive_projection("SELECT * FROM cards", "postgres", &sensitive_patterns(), 2),

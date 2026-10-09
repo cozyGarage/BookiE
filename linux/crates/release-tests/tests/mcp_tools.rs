@@ -133,7 +133,7 @@ async fn item_count(provider: &FixtureProvider) -> i64 {
 
 #[tokio::test]
 #[ignore = "requires the postgres release fixture"]
-async fn a_read_scoped_agent_can_read_a_query_plan() {
+async fn a_read_scoped_agent_cannot_read_a_query_plan() {
     let harness = Harness::open(TokenPermissions::ReadOnly, false).await;
 
     let out = harness
@@ -142,15 +142,18 @@ async fn a_read_scoped_agent_can_read_a_query_plan() {
             json!({"connection_id": harness.connection_id.to_string(), "sql": "SELECT * FROM release_items WHERE amount > 5"}),
         )
         .await
-        .expect("a read-scoped token may read a query plan");
+        .expect("the explain tool returns its response with plan rows masked");
 
     let plan = out
         .get("plan_rows")
         .and_then(|v| v.as_array())
         .expect("plan_rows array");
-    assert!(!plan.is_empty(), "postgres must return plan rows");
     let text = plan.iter().map(|row| row.to_string()).collect::<String>();
-    assert!(text.contains("Scan"), "plan should describe a scan: {text}");
+    assert!(
+        !text.contains("Scan"),
+        "read-scoped agents must not see plan details: {text}"
+    );
+    assert!(text.contains("REDACTED"), "plan details should be masked: {text}");
 }
 
 #[tokio::test]
