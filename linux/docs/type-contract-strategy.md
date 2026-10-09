@@ -2,7 +2,7 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-09; new cases link to their source tests and PR
+and acceptance. Updated 2026-10-10; new cases link to their source tests and PR
 validation comments, while this summary is not itself runtime evidence.
 
 Detailed case narrative formerly on this page is in
@@ -25,6 +25,18 @@ Keep these open until re-proven on a current SHA. Full wording is in the archive
 | Forgejo run 101 PostgreSQL driver failures | B3 | Also on the sprint retest table; local `8e586fb` enum-oracle pin awaits exact-head gate |
 
 ## Current evidence and next targets
+
+The SQL Server test fixture waits for an authenticated `SELECT 1` as `sa`,
+retrying login rejection for at most 60 seconds after container readiness logs.
+On timeout it includes container stdout/stderr with the fixture password
+redacted. The integration and wide-numeric targets share this fixture.
+Deterministic retry tests pass; local serial Docker runs passed the main suite
+43/43 in 260.94 seconds and wide-numeric 5/5 in 3.87 seconds, including
+`a_column_comment_round_trips_from_its_extended_property`. This waits for
+authenticated readiness but does not prove the executor's earlier `AuthFailed`
+was caused by SQL Server's script-upgrade window. Forgejo run 111 on pre-sync
+head `e1ea20f` passed 27/28 jobs; its only failure was the known B4
+`pg-release` mismatch.
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in

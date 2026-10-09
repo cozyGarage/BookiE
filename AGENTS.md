@@ -71,8 +71,10 @@ owner table, and each lane edits only its own files.
 4. **Gate on Forgejo:** `bash linux/scripts/forgejo-gate.sh <branch> [remote-branch]`.
    It pushes to the lab Forgejo, waits for that push's run and lists jobs that
    did not pass. Forgejo is the acceptance gate: it runs the merge tier (Docker
-   drivers, installed GTK, distro floor, packages) on every branch push. A green
-   GitHub pull request only means the cheap tier ran.
+   drivers, installed GTK, distro floor, packages) on every branch push. GitHub
+   no longer runs the merge tier on pushes to `linux` or `main`: drivers,
+   installed GTK, driver TLS, the PostgreSQL release fixture and DuckDB run on
+   Forgejo only, so a green GitHub pull request only means the cheap tier ran.
 5. Open the GitHub pull request against `linux`, merge it when the Forgejo gate
    is green (squash, subject `<type>(<scope>): <summary> (#N)`), then sync
    Forgejo's `linux` to GitHub's.
@@ -93,8 +95,9 @@ owner table, and each lane edits only its own files.
    failure seen while another run was active is inconclusive until it is
    re-run alone. Never start a second gate by hand to "speed up".
 8. **Do not repeat work between GitHub and Forgejo.** GitHub runs the cheap tier,
-   security, Flatpak and the workflow and harness contracts on pull requests.
-   Forgejo runs the merge tier on its own executors. Do not re-run a Forgejo
+   security, Flatpak and the workflow and harness contracts on pull requests,
+   plus at most a weekly scheduled backup run. A push to `linux` does not start
+   the merge tier there. Forgejo runs the merge tier on its own executors. Do not re-run a Forgejo
    job to learn what GitHub already reported, and do not trust a skipped GitHub
    job as a pass.
 9. **Merge only on GitHub.** Forgejo is the gate, not the merge target: never merge a
