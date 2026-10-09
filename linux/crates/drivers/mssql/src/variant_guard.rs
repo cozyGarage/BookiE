@@ -5,7 +5,7 @@ use std::panic::{AssertUnwindSafe, resume_unwind};
 use futures::FutureExt;
 use tablepro_core::DriverError;
 
-const UNSUPPORTED_VARIANT: &str = "pinned Tiberius cannot decode sql_variant metadata; the connection was retired";
+const UNSUPPORTED_VARIANT: &str = "Tiberius cannot decode this sql_variant value; the connection was retired";
 
 pub(crate) fn is_unsupported_result(error: &DriverError) -> bool {
     matches!(error, DriverError::Unsupported(message) if message == UNSUPPORTED_VARIANT)

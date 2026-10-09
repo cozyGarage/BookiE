@@ -42,9 +42,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 clickhouse = { version = "0.15", default-features = false, features = ["rustls-tls-aws-lc", "rustls-tls-webpki-roots"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "chrono", "rust_decimal", "uuid", "json"] }
-# native-tls (OpenSSL on Linux) avoids tiberius's pinned rustls 0.21 /
-# rustls-webpki 0.101 stack, which still carries known advisories.
-tiberius = { version = "0.12", default-features = false, features = ["tds73", "native-tls", "chrono", "rust_decimal"] }
+# Tiberius 0.13 supports SQL Server's full DECIMAL scale of 38.
+tiberius = { version = "0.13", default-features = false, features = ["tds73", "native-tls", "chrono", "rust_decimal"] }
 csv = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 jiff = "0.2"
@@ -74,7 +73,7 @@ glob = "0.3"
 libc = "0.2"
 
 [patch.crates-io]
-tiberius = { git = "https://github.com/tiberius-rs/tiberius", rev = "c1d2e741ee6fe0935091826d91fb5886b6a4082a" }
+tiberius = { git = "https://github.com/tiberius-rs/tiberius", rev = "7fd75bb7070fe6ea41374698abf78928bb983bda" }
 sqlx-mysql = { path = "vendor/sqlx-mysql" }
 sqlx-postgres = { path = "vendor/sqlx-postgres" }
 mongodb = { path = "vendor/mongodb" }
