@@ -152,3 +152,27 @@ jobs:
       - name: Shared value contracts across drivers, GTK and DuckDB
         run: |
           cd src/linux && python3 scripts/run-test-layer.py values
+  gtk-ubuntu:
+    runs-on: ubuntu-host
+    continue-on-error: true
+    timeout-minutes: 60
+    env:
+      TABLEPRO_GTK_WAIT_SECONDS: "45"
+      CARGO_TARGET_DIR: /var/cache/ci/target/nightly-gtk-ubuntu-${{ matrix.shard }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Installed GTK end-to-end suite on native Ubuntu 24.04, one third
+        run: |
+          cd src/linux && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
+
