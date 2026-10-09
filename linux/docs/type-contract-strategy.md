@@ -87,6 +87,15 @@ refetch binds arbitrary key bytes and checks an exact
 shared result memory, installed GTK and memory profiling remain open under
 PERF-10.
 
+The core result budget tests exact byte, cell and row limits; owned text, byte
+and recursive JSON memory accounting; retained rows across result sets; and
+first-result truncation from either the batch or its first set. A full-file
+`cargo-mutants` run on query source SHA-256
+`ef3bb83d9461c146fceff51cf0ae4c61dc47daff8bcdc9018f2230249325fb69` tested all
+35 generated variants: 33 were caught and 2 constructor replacements were
+unviable, with no missed or timed-out mutants. This closes the scoped result
+budget mutation audit; broader TEST-2 coverage remains open.
+
 The MySQL ENUM/SET editor parser now has focused regressions for malformed
 declarations and MySQL literal escapes. Invalid type prefixes, incomplete
 label lists, missing quotes, or trailing metadata must refuse the edit rather
