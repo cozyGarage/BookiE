@@ -1,0 +1,20 @@
+# Pinned B4 hosted acceptance: 2026-10-09
+
+Build Linux workflow run [#37865445368](https://github.com/cozyGarage/BookiE/actions/runs/37865445368)
+was dispatched with `ref=5db1cfe5f15ac258472ac04c82f9083ca2ea81aa`. Each listed
+job checked out that same SHA and uploaded a passing layer report:
+
+- B4 rollback: 14 MySQL `mysql_atomic` tests and the PostgreSQL backend-termination
+  rollback-failure test passed. The MySQL group includes the intra-statement
+  multi-row trigger case added for PR #415.
+- Driver TLS: six groups passed, 48 tests total.
+- PostgreSQL release GTK: all seven saved mTLS/SSH trust, audit, reconnect and
+  multi-hop scenarios passed, including the accessible Cancel refusal path
+  added by PR #411.
+- Installed GTK safety: 53/53 scenarios passed, including sanitized bundle
+  export/import audit, encrypted credential round-trip and cross-profile import.
+
+The installed GTK and PostgreSQL jobs use a staged release binary under the
+hosted Debian/Xvfb/AT-SPI fixture. These results do not qualify a distribution
+package or native Wayland. The overall workflow was still in progress because
+the broad driver integration job had not completed when this report was captured.
