@@ -30,6 +30,9 @@ mod vector_contract;
 #[path = "support/array_contract.rs"]
 mod array_contract;
 
+#[path = "support/date_array_csv_import.rs"]
+mod date_array_csv_import;
+
 #[path = "support/custom_array_contract.rs"]
 mod custom_array_contract;
 
