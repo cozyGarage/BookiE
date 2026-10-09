@@ -4,6 +4,8 @@ use drivers_mssql::MssqlDriver;
 use secrecy::SecretString;
 use tablepro_core::{ConnectOptions, DatabaseDriver};
 use testcontainers::ContainerAsync;
+use testcontainers::ImageExt;
+use testcontainers::core::Mount;
 use testcontainers_modules::mssql_server::MssqlServer;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
@@ -20,6 +22,7 @@ async fn sql_server_numeric_values_outside_rust_decimal_round_trip_as_exact_text
 async fn start_mssql() -> (ContainerAsync<MssqlServer>, Box<dyn tablepro_core::Connection>) {
     let container = MssqlServer::default()
         .with_accept_eula()
+        .with_mount(Mount::tmpfs_mount("/var/opt/mssql").with_mode(0o1777))
         .start()
         .await
         .expect("start MSSQL container");

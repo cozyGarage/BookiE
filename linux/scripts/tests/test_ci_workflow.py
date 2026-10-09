@@ -13,9 +13,28 @@ spec.loader.exec_module(checker)
 bounded_spec = importlib.util.spec_from_file_location("bounded_operations", ROOT / "linux/scripts/check-bounded-operations.py")
 bounded_checker = importlib.util.module_from_spec(bounded_spec)
 bounded_spec.loader.exec_module(bounded_checker)
+port_spec = importlib.util.spec_from_file_location("ci_mcp_port", ROOT / "linux/scripts/ci-mcp-port.py")
+port_helper = importlib.util.module_from_spec(port_spec)
+port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_gtk_jobs_select_distinct_run_scoped_mcp_ports(self):
+        ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        nightly = (ROOT / ".forgejo/workflows/nightly.yml").read_text()
+        for workflow in (ci, nightly):
+            self.assertIn("scripts/ci-mcp-port.py", workflow)
+        for call in [
+            'scripts/ci-mcp-port.py "${{ matrix.shard }}"',
+            "scripts/ci-mcp-port.py 4",
+            'scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"',
+            'scripts/ci-mcp-port.py "${{ matrix.run }}"',
+        ]:
+            self.assertIn(call, ci + nightly)
+        ports = [port_helper.port_for_run(137, slot) for slot in range(1, 12)]
+        self.assertEqual(len(ports), len(set(ports)))
+        self.assertTrue(all(20000 <= port <= 59999 for port in ports))
+
     def test_forgejo_driver_jobs_reuse_and_clean_the_run_scoped_database(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
