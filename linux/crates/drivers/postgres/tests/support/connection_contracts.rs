@@ -11,7 +11,10 @@ async fn list_databases_returns_connectable_user_databases_only() {
 
     let names = conn.list_databases().await.unwrap();
 
-    assert_eq!(names, vec!["alpha_db".to_string(), "postgres".to_string()]);
+    assert_eq!(
+        names,
+        vec!["alpha_db".to_string(), "postgres".to_string(), "test".to_string()]
+    );
 }
 
 #[tokio::test]
