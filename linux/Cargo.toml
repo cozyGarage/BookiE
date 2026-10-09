@@ -79,6 +79,17 @@ sqlx-postgres = { path = "vendor/sqlx-postgres" }
 mongodb = { path = "vendor/mongodb" }
 redis = { path = "vendor/redis" }
 
+[workspace.metadata.sonar]
+organization = "cozygarage"
+project-key = "cozyGarage_BookiE"
+project-name = "BookiE"
+host-url = "https://sonarcloud.io"
+exclusions = [
+    "target/**",
+    "vendor/**",
+    "docs/evidence/**",
+]
+
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
