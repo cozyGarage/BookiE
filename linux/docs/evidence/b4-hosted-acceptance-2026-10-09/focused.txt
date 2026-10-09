@@ -44,6 +44,19 @@ hosted staged-binary evidence; distribution-package/native Wayland acceptance
 is open. The job report and per-scenario results are in run
 [#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390).
 
+## Final workflow completion
+
+Build Linux run #37867814390 has now completed successfully on the same exact
+source SHA. Its broad driver integration job passed in 1,721.849 seconds. The
+uploaded driver report says `passed`; its log contains 462 passing tests across
+13 test-result groups, including 10 `agent_auth` and 12 `openssh_session`
+tests. The complete workflow conclusion is `success`, including the Linux
+regression gate. The report and full log were downloaded from
+`regression-integration-37867814390-1`; SHA-256 values are recorded in the
+[manifest](manifest.json). This completes hosted acceptance for the listed
+B4 candidate behaviors while leaving distribution-package/native Wayland and
+Windows AD gates open.
+
 ## AUD-2 local rerun and suspect-merge review
 
 On exact source `102ef48017f10c7a63c271608b98d3b05b449795`, the

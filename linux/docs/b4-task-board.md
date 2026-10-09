@@ -61,8 +61,9 @@ or installed acceptance; those gates remain open.
 
 ## Current pinned B4 acceptance checkpoint (2026-10-09)
 
-`fork/linux` is now `102ef48017f10c7a63c271608b98d3b05b449795` (PR #417).
-That merge changes the hosted test workflow only. Build Linux run
+`fork/linux` is now `4bcec064d1dc4a8f4905f92f40461e4c215ed23b` (PR #419).
+PR #419 updates test-container reuse/support; it does not change application
+runtime code. Exact-source Build Linux run
 [#37865445368](https://github.com/cozyGarage/BookiE/actions/runs/37865445368)
 was explicitly dispatched against immutable product candidate
 `5db1cfe5f15ac258472ac04c82f9083ca2ea81aa`; its B4 rollback, TLS, PostgreSQL
@@ -70,8 +71,7 @@ release and installed GTK safety jobs completed successfully. The artifact
 reports and exact selectors are in the [candidate manifest](evidence/b4-hosted-acceptance-2026-10-09/manifest.json).
 This advances B4-7/9/11/12/16/17/22 hosted evidence. It does not establish
 distribution-package or native Wayland acceptance, and it does not establish
-Windows AD interoperability. The whole workflow was still in progress while
-the broad driver integration job ran.
+Windows AD interoperability.
 
 PR #417 adds the MySQL human-approval dialog regression to hosted installed
 GTK acceptance. Exact-SHA dispatch [#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390)
@@ -79,8 +79,10 @@ ran against `102ef48017f10c7a63c271608b98d3b05b449795`. Its B4 rollback
 (14 MySQL tests and 1 PostgreSQL rollback-failure test), TLS (48 tests), and
 PostgreSQL release GTK jobs passed. The PostgreSQL release job's MySQL
 human-approval dialog step passed, and all seven SSH/mTLS scenarios passed.
-The installed GTK safety and broad driver-integration jobs were still running
-at capture. This hosted pass does not resolve why the operator observed two
+At the initial capture, installed GTK safety and broad driver-integration jobs
+were still running. Both subsequently passed; the broad integration layer
+passed 462 tests across 13 groups, and the complete workflow concluded
+successfully. This hosted pass does not resolve why the operator observed two
 earlier empty-dialog failures; the root cause remains open. See the [follow-up
 acceptance note](evidence/b4-hosted-acceptance-2026-10-09/focused.txt).
 
