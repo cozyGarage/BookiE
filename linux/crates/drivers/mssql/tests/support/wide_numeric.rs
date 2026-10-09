@@ -7,7 +7,8 @@ pub(super) async fn assert_contract(connection: &dyn Connection) {
     connection
         .execute(
             "CREATE TABLE numeric_source (id int PRIMARY KEY, wide decimal(38,0), \
-             high_scale decimal(38,30), fitting decimal(28,4), nullable decimal(38,0))",
+             high_scale decimal(38,30), fitting decimal(28,4), nullable decimal(38,0), \
+             scale_boundary decimal(38,28))",
         )
         .await
         .unwrap();
@@ -16,14 +17,17 @@ pub(super) async fn assert_contract(connection: &dyn Connection) {
             "INSERT INTO numeric_source VALUES \
              (1, 99999999999999999999999999999999999999, \
               12345678.123456789012345678901234567890, \
-              123456789012345678901234.5678, NULL), \
+              123456789012345678901234.5678, NULL, \
+              0.0000000000000000000000000001), \
              (2, -99999999999999999999999999999999999999, \
-              -0.000000000000000000000000000001, -0.0001, 0)",
+              -0.000000000000000000000000000001, -0.0001, 0, \
+              -0.0000000000000000000000000001), \
+             (3, 0, 0.000000000000000000000000000000, 0.0000, 0, 0)",
         )
         .await
         .unwrap();
     let source = connection
-        .query("SELECT id, wide, high_scale, fitting, nullable FROM numeric_source ORDER BY id")
+        .query("SELECT id, wide, high_scale, fitting, nullable, scale_boundary FROM numeric_source ORDER BY id")
         .await
         .unwrap();
     assert_eq!(
@@ -35,12 +39,22 @@ pub(super) async fn assert_contract(connection: &dyn Connection) {
                 Value::Text("12345678.123456789012345678901234567890".into()),
                 Value::Decimal(Decimal::from_str("123456789012345678901234.5678").unwrap()),
                 Value::Null,
+                Value::Decimal(Decimal::from_str("0.0000000000000000000000000001").unwrap()),
             ],
             vec![
                 Value::Int(2),
                 Value::Text("-99999999999999999999999999999999999999".into()),
                 Value::Text("-0.000000000000000000000000000001".into()),
                 Value::Decimal(Decimal::from_str("-0.0001").unwrap()),
+                Value::Decimal(Decimal::ZERO),
+                Value::Decimal(Decimal::from_str("-0.0000000000000000000000000001").unwrap()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Decimal(Decimal::ZERO),
+                Value::Text("0.000000000000000000000000000000".into()),
+                Value::Decimal(Decimal::ZERO),
+                Value::Decimal(Decimal::ZERO),
                 Value::Decimal(Decimal::ZERO),
             ],
         ],
@@ -71,7 +85,10 @@ async fn create_copy_table(connection: &dyn Connection, table: &str) {
 async fn insert_bound_rows(connection: &dyn Connection, table: &str, rows: &[Vec<Value>]) {
     for row in rows {
         connection
-            .execute_params(&format!("INSERT INTO {table} VALUES (@P1, @P2, @P3, @P4, @P5)"), row)
+            .execute_params(
+                &format!("INSERT INTO {table} VALUES (@P1, @P2, @P3, @P4, @P5, @P6)"),
+                row,
+            )
             .await
             .unwrap();
     }
@@ -82,15 +99,17 @@ async fn assert_native_text(connection: &dyn Connection, table: &str) {
         .query(&format!(
             "SELECT COUNT(*) FROM numeric_source s JOIN {table} c ON s.id = c.id \
              AND s.wide = c.wide AND s.high_scale = c.high_scale AND s.fitting = c.fitting \
+             AND s.scale_boundary = c.scale_boundary \
              AND (s.nullable = c.nullable OR (s.nullable IS NULL AND c.nullable IS NULL))"
         ))
         .await
         .unwrap();
-    assert_eq!(count.rows, vec![vec![Value::Int(2)]]);
+    assert_eq!(count.rows, vec![vec![Value::Int(3)]]);
     let native = connection
         .query(&format!(
             "SELECT CONVERT(varchar(40), wide), CONVERT(varchar(40), high_scale), \
-             CONVERT(varchar(40), fitting), CONVERT(varchar(40), nullable) FROM {table} ORDER BY id"
+             CONVERT(varchar(40), fitting), CONVERT(varchar(40), nullable), \
+             CONVERT(varchar(40), scale_boundary) FROM {table} ORDER BY id"
         ))
         .await
         .unwrap();
@@ -102,12 +121,21 @@ async fn assert_native_text(connection: &dyn Connection, table: &str) {
                 Value::Text("12345678.123456789012345678901234567890".into()),
                 Value::Text("123456789012345678901234.5678".into()),
                 Value::Null,
+                Value::Text("0.0000000000000000000000000001".into()),
             ],
             vec![
                 Value::Text("-99999999999999999999999999999999999999".into()),
                 Value::Text("-0.000000000000000000000000000001".into()),
                 Value::Text("-0.0001".into()),
                 Value::Text("0".into()),
+                Value::Text("-0.0000000000000000000000000001".into()),
+            ],
+            vec![
+                Value::Text("0".into()),
+                Value::Text("0.000000000000000000000000000000".into()),
+                Value::Text("0.0000".into()),
+                Value::Text("0".into()),
+                Value::Text("0.0000000000000000000000000000".into()),
             ],
         ]
     );
