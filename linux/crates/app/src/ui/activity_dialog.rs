@@ -111,7 +111,7 @@ pub fn present(
             status_l.set_text(&tr!("Running…"));
             let text_buf = text_buf.clone();
             let status_l = status_l.clone();
-            let token = replace_in_flight(&in_flight_for_query);
+            let token = crate::services::request_generation::replace_in_flight(&in_flight_for_query);
             let timeout_secs = crate::services::operation_control::timeout_for(
                 &preferences_for_query,
                 &database_for_query,
@@ -181,7 +181,7 @@ pub fn present(
         };
         let text_buf = text_buf.clone();
         let status_l = status_l.clone();
-        let token = replace_in_flight(&in_flight_for_kill);
+        let token = crate::services::request_generation::replace_in_flight(&in_flight_for_kill);
         let timeout_secs = crate::services::operation_control::timeout_for(
             &preferences_for_kill,
             &database_for_kill,
@@ -220,13 +220,6 @@ pub fn present(
         in_flight_for_close.borrow().cancel();
     });
     dialog.present(Some(parent));
-}
-
-fn replace_in_flight(current: &RefCell<CancellationToken>) -> CancellationToken {
-    current.borrow().cancel();
-    let next = CancellationToken::new();
-    *current.borrow_mut() = next.clone();
-    next
 }
 
 /// The dialog offers every activity view, so a button the engine cannot

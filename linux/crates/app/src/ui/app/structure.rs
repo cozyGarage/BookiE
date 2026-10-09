@@ -760,13 +760,14 @@ impl App {
         }
         let generation = self.catalog_generation.get().wrapping_add(1);
         self.catalog_generation.set(generation);
+        let token = crate::services::request_generation::replace_in_flight(&self.catalog_cancel);
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let sender_for_cmd = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let result = async {
                         let tables = conn.list_tables_controlled(&control).await?;
                         let views = conn.list_views_controlled(&control).await?;

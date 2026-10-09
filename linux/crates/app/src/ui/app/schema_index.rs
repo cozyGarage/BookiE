@@ -10,7 +10,7 @@ impl App {
         let pending: Vec<crate::ui::editor::SchemaRequest> = {
             let mut index = self.schema_index.borrow_mut();
             if index.sync_connection(&identity) {
-                self.requested_columns.borrow_mut().clear();
+                self.reset_schema_fetches();
             }
             let mut requested = self.requested_columns.borrow_mut();
             tables
@@ -26,12 +26,16 @@ impl App {
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let sender_clone = sender.clone();
+        let token = self.schema_fetch_cancel.borrow().clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     for request in pending {
+                        if token.is_cancelled() {
+                            break;
+                        }
                         let (schema, table) = split_table_reference(&request.table);
-                        let control = crate::services::operation_control::bounded(timeout_secs);
+                        let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
                         let result = conn
                             .fetch_columns_controlled(schema.as_deref(), &table, &control)
                             .await
@@ -42,6 +46,11 @@ impl App {
                 })
                 .drop_on_shutdown()
         });
+    }
+
+    fn reset_schema_fetches(&self) {
+        self.requested_columns.borrow_mut().clear();
+        crate::services::request_generation::replace_in_flight(&self.schema_fetch_cancel);
     }
 
     pub(super) fn on_schema_columns_fetched(
@@ -55,7 +64,7 @@ impl App {
         let key = crate::ui::editor::table_key(&request.table);
         let mut index = self.schema_index.borrow_mut();
         if index.sync_connection(&identity) {
-            self.requested_columns.borrow_mut().clear();
+            self.reset_schema_fetches();
         }
         if !index.accepts(&request) {
             return;
@@ -72,7 +81,7 @@ impl App {
         if let Some(identity) = self.connection_id.and_then(|id| self.database.identity(id))
             && self.schema_index.borrow_mut().sync_connection(&identity)
         {
-            self.requested_columns.borrow_mut().clear();
+            self.reset_schema_fetches();
         }
         let mut words: Vec<String> = self.table_names.clone();
         let tabs = self.workspace_tabs.borrow();

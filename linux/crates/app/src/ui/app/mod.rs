@@ -110,6 +110,8 @@ pub struct App {
     sidebar_views: Vec<tablepro_core::TableInfo>,
     sidebar_tables: Vec<tablepro_core::TableInfo>,
     catalog_generation: std::cell::Cell<u64>,
+    catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
+    schema_fetch_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     content_holder: adw::ToolbarView,
     toast_overlay: adw::ToastOverlay,
     /// Persistent "Connecting…" toast handle. Held so we can dismiss it
@@ -505,6 +507,8 @@ impl SimpleComponent for App {
             sidebar_views: Vec::new(),
             sidebar_tables: Vec::new(),
             catalog_generation: std::cell::Cell::new(0),
+            catalog_cancel: Default::default(),
+            schema_fetch_cancel: Default::default(),
             content_holder: widgets.content_holder.clone(),
             toast_overlay: widgets.toast_overlay.clone(),
             connect_progress_toast: None,
