@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "branch": "fork/linux",
+  "source_commit": "4bcec064d1dc4a8f4905f92f40461e4c215ed23b",
+  "task": "B4 distribution package lifecycle smoke",
+  "command": "bash scripts/test-deb-package.sh debian:13",
+  "environment": "Docker-based Debian 13 floor image; package built from the read-only current fork/linux checkout",
+  "result": "passed",
+  "assertions": [
+    "The Debian package passed package validation and installed-package checks.",
+    "Install and reinstall passed.",
+    "Upgrade and downgrade passed.",
+    "Purge removed the installed BookiE binary.",
+    "Existing tablepro configuration and history sentinel files survived install, reinstall, upgrade, downgrade, and purge.",
+    "The MySQL approval GTK scenario passed with TABLEPRO_GTK_BINARY=/usr/bin/bookie after installing the Debian package built from this source."
+  ],
+  "package": {
+    "version": "0.1.5-1",
+    "architecture": "amd64",
+    "size_bytes": 24851064
+  },
+  "log_sha256": {
+    "deb-test.log": "774ce02fdfd8d35b0ba625d1c238c94089726b3557425cf4cebf0593077466e8",
+    "installed-gtk.log": "7fd5502871137c2ffbefacda8aa320eb7d3a98bd6540c5cb03580842f9f8132e"
+  },
+  "installed_gtk": {
+    "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database",
+    "result": "1 passed, 0 failed",
+    "binary": "/usr/bin/bookie from installed tablepro Debian package",
+    "environment": "Debian 13 floor image, MySQL 8.0 Docker fixture, isolated D-Bus, Xvfb, AT-SPI",
+    "runner": "scripts/test-gtk-mysql-approval.sh via scripts/test-gtk-safety.sh",
+    "package_sha256": "55215d94bd8d68b44646097fbc506d29cb0104eced91219e6fc76fa145e920cf",
+    "package_size_bytes": 24850004
+  },
+  "not_established": [
+    "Other B4 UI flows (SSH trust, TLS, rollback failure, and bundle audit) using the installed Debian package",
+    "Native Wayland SSH trust, TLS, approval, or bundle flows",
+    "Windows Active Directory interoperability"
+  ]
+}

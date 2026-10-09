@@ -1,0 +1,21 @@
+== debian:13
+ Description: Native Linux database client
+  BookiE is a native GTK4 / libadwaita database client. It installs
+  bookie and bookie-agentd, with tablepro aliases.
+ new Debian package, version 2.0.
+ size 24851036 bytes: control archive=484 bytes.
+     424 bytes,    10 lines      control
+ Package: tablepro
+ Version: 0.1.5-1
+ Section: database
+ Priority: optional
+ Architecture: amd64
+ Maintainer: TablePro Contributors <noreply@tablepro.app>
+ Depends: libgtk-4-1, libadwaita-1-0, libgtksourceview-5-0, libsecret-1-0, libgssapi-krb5-2, libkrb5-3, libsqlite3-0
+ Description: Native Linux database client
+  BookiE is a native GTK4 / libadwaita database client. It installs
+installed package checks passed
+installed package checks passed
+installed package checks passed
+installed package checks passed
+install, reinstall, upgrade, downgrade and purge keep the user data under the tablepro paths

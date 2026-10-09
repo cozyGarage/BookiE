@@ -5,26 +5,66 @@ branch="${1:-$(git rev-parse --abbrev-ref HEAD)}"
 target="${2:-$branch}"
 remote="${FORGEJO_REMOTE:-forgejo}"
 token_file="${FORGEJO_TOKEN_FILE:-$HOME/.config/forgejo/token}"
-api="${FORGEJO_API:-http://192.168.1.246:3000/api/v1/repos/trung/bookie}"
+remote_url="$(git remote get-url "$remote")"
+default_api="$(printf '%s' "$remote_url" | sed -E 's#^(https?://)([^/@]*@)?([^/]+)/(.+)\.git$#\1\3/api/v1/repos/\4#')"
+api="${FORGEJO_API:-$default_api}"
 timeout_minutes="${FORGEJO_GATE_TIMEOUT_MINUTES:-60}"
 
 export GIT_ASKPASS="${GIT_ASKPASS:-$HOME/.config/forgejo/askpass.sh}"
 sha="$(git rev-parse "$branch")"
-git push --quiet "$remote" "$branch:$target"
 token="$(cat "$token_file")"
+
+docs_only() {
+  git fetch --quiet "$remote" linux || return 1
+  local changed
+  changed="$(git diff --name-only "$remote/linux...$sha")"
+  [ -n "$changed" ] && [ -z "$(printf '%s\n' "$changed" | grep -vE '(\.md$|^linux/docs/)')" ]
+}
+if docs_only; then
+  (cd "$(git rev-parse --show-toplevel)/linux" &&
+    python3 scripts/inventory-ignored-tests.py --check &&
+    python3 scripts/check-doc-links.py &&
+    python3 scripts/check-known-issues.py)
+  echo "documentation only: no Forgejo run is needed for $sha; the documentation checks passed"
+  exit 0
+fi
+
+exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate.lock}"
+if ! flock -n 9; then
+  echo "another gate is running on this host; waiting for it to finish"
+  flock 9
+fi
+latest_run_id() {
+  curl -fsS -H "Authorization: token $token" "$api/actions/runs?limit=1" | python3 -c '
+import json, sys
+runs = json.load(sys.stdin)["workflow_runs"]
+print(runs[0]["id"] if runs else 0)
+'
+}
+remote_sha="$(git ls-remote "$remote" "refs/heads/$target" | cut -f1)"
+if [ "$remote_sha" = "$sha" ]; then
+  after=0
+  echo "$target already points at $sha on $remote; using its latest ci run, which may be older than this check"
+else
+  after="$(latest_run_id)"
+  git push --quiet "$remote" "$branch:$target"
+fi
 deadline=$((SECONDS + timeout_minutes * 60))
 
 summarize() {
   curl -fsS -H "Authorization: token $token" "$api/actions/runs?limit=50" | python3 -c '
 import json, sys
-sha = sys.argv[1]
-runs = [run for run in json.load(sys.stdin)["workflow_runs"] if run["commit_sha"] == sha]
+sha, after = sys.argv[1], int(sys.argv[2])
+runs = [
+    run for run in json.load(sys.stdin)["workflow_runs"]
+    if run["commit_sha"] == sha and run["id"] > after and run.get("workflow_id") == "ci.yml"
+]
 if not runs:
     print("pending")
 else:
     run = max(runs, key=lambda item: item["id"])
     print(run["status"], run["id"])
-' "$sha"
+' "$sha" "$after"
 }
 
 while [ "$SECONDS" -lt "$deadline" ]; do

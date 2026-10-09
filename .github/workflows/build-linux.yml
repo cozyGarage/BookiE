@@ -5,11 +5,15 @@ on:
     branches: [main, linux]
     paths:
       - "linux/**"
+      - "!linux/docs/**"
+      - "!**.md"
       - ".github/workflows/build-linux.yml"
   pull_request:
     branches: [main, linux]
     paths:
       - "linux/**"
+      - "!linux/docs/**"
+      - "!**.md"
       - ".github/workflows/build-linux.yml"
   schedule:
     - cron: "13 14 * * 1"
