@@ -158,7 +158,7 @@ pub fn present(
     let status_l = status.clone();
     let driver = driver_id.clone();
     let kill_entry_c = kill_entry.clone();
-    let in_flight_for_kill = in_flight.clone();
+    let kill_flight = crate::services::single_flight::SingleFlight::default();
     let database_for_kill = database.clone();
     let preferences_for_kill = preferences.clone();
     kill_btn.connect_clicked(move |_| {
@@ -181,26 +181,25 @@ pub fn present(
         };
         let text_buf = text_buf.clone();
         let status_l = status_l.clone();
-        let token = replace_in_flight(&in_flight_for_kill);
+        let Some(flight) = kill_flight.try_begin() else {
+            status_l.set_text(&tr!("A kill is already running."));
+            return;
+        };
+        let token = CancellationToken::new();
         let timeout_secs = crate::services::operation_control::timeout_for(
             &preferences_for_kill,
             &database_for_kill,
             Some(connection),
         );
         glib::spawn_future_local(async move {
-            let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
+            let _flight = flight;
+            let control = crate::services::operation_control::bounded_with(timeout_secs, token);
             match conn.execute_controlled(&sql, &control).await {
                 Ok(r) => {
-                    if token.is_cancelled() {
-                        return;
-                    }
                     text_buf.set_text(&format!("Kill issued; rows_affected={}", r.rows_affected));
                     status_l.set_text(&tr!("Done"));
                 }
                 Err(e) => {
-                    if token.is_cancelled() {
-                        return;
-                    }
                     text_buf.set_text(&e.to_string());
                     status_l.set_text(&tr!("Kill failed"));
                 }
