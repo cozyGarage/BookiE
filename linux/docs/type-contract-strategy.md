@@ -320,13 +320,20 @@ canonical JSON/CSV output and SQL replay after switching from `SQL, DMY` to
 `ISO, MDY`; typed CSV import now restores the same source after that session
 change, with native type/JSON/wire checks and an untouched sibling
 ([test](../crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_timestamp_dmy.rs)).
+The `date[]` SQL/DMY CSV import path also restores BC dates, infinity and SQL
+NULL after switching to ISO/MDY, with native type/JSON/wire checks and an
+untouched sibling
+([test](../crates/drivers/postgres/tests/support/date_array_csv_import.rs)).
 The `timetz[]` case also preserves explicit offsets through an `America/New_York`
-to UTC transition and the JSON/CSV/XLSX/SQL consumer paths
-([evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
+to UTC transition and the JSON/CSV/XLSX/SQL consumer paths. CSV import under
+the changed UTC session preserves native type, JSON and wire bytes, with an
+untouched sibling row
+([test](../crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_text.rs)).
 `timestamptz[]` also rebinds across an `America/Los_Angeles` to UTC session
 change, including the repeated DST-overlap wall-clock time with distinct `-04`
-and `-05` offsets. The test compares native type, JSON and wire output after
-rebinding, and confirms the wire bytes match the original session
+and `-05` offsets. CSV import under UTC preserves native type, JSON, wire bytes
+and an untouched sibling row. The test compares native type, JSON and wire
+output after rebinding, and confirms the wire bytes match the original session
 (`value_contract_timestamptz_array_rebinding_preserves_instants_after_timezone_change`).
 Other temporal-array session/consumer combinations remain open.
 
@@ -970,8 +977,11 @@ preserve inferred parameter types; raw domain
 and the [ordering](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json)
 and [list-operator evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json),
 plus [NULL-safe distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).
-Other direct query-parameter contexts, session configurations, domain chains
-deeper than seven layers and other custom/native cases remain open.
+Other direct query-parameter contexts and session configurations remain open.
+Selected schema-aware result, edit, insert and filter paths pass through 1,025
+domain layers; raw inferred text/NULL contexts have explicit limits, and
+domain-over-enum array decoding refuses at 1,024 and 1,025 layers. Other
+custom/native cases still need proof.
 
 PostgreSQL 16 also infers text and SQL NULL as the custom enum in both argument
 positions of `COALESCE` and in `array_append(ARRAY[enum_column], $1)`. Native
@@ -1043,10 +1053,12 @@ previously fetched metadata; rollback leaves the original rows intact. Raw
 inferred SQL NULL updates preserve the outer domain type and invalid labels
 reach PostgreSQL through 63 layers. At depths 64, 65 and 128, raw inferred text
 (valid and invalid) and SQL NULL return an explicit unsupported result even
-after schema-aware work in the same-backend transaction; schema-aware
-operations pass through 512 layers. Domain depths beyond 512 and other
-enum/session configurations remain open; the 302- and 512-level cases extend
-the same source contract at [deep_domains.rs](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs). See the
+after schema-aware work in the same-backend transaction. Selected
+schema-aware operations pass through 1,025 layers under a shadowed path, while
+raw inferred text/NULL contexts remain refused at the tested deep boundary;
+domain depths beyond 1,025 and other enum/session configurations remain open.
+The 302- and 512-level cases extend the same source contract at
+[deep_domains.rs](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs). See the
 [301-layer evidence](evidence/postgres-domain-301-level-results-2026-10-06/manifest.json),
 [300-layer evidence](evidence/postgres-domain-300-level-results-2026-10-05/manifest.json),
 [deep-domain boundary evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
