@@ -57,6 +57,9 @@ echo "==> panic sites in production code"
 echo "==> function sizes"
 python3 scripts/check-function-size.py
 
+echo "==> comment lines"
+python3 scripts/check-comment-lines.py
+
 echo "==> cargo fmt --check (workspace)"
 cargo fmt --all -- --check
 
