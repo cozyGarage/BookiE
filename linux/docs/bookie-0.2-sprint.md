@@ -45,7 +45,12 @@ oracles and shared MariaDB fixtures for the serial full suite. Both charset
 selectors and all 31 serial `value_contract` tests passed locally using one
 MySQL and one MariaDB container; unpiped preflight passed. The branch was
 published at `f29743c`; Forgejo run 88 tests that pre-#452 tip. The current
-local head merges #452 at `0dd520d` and still needs its own gate before push.
+run reports a PostgreSQL test failure: a disconnect regression checked for its
+tagged backend before it was visible in `pg_stat_activity`. Commit `b98ce22`
+reuses bounded polling in the affected backend-termination tests; the local
+PostgreSQL disconnection module passed 10/10 tests and unpiped preflight passed
+on the current head. The updated local head still needs its own gate before
+push; run 88 does not cover the fix or the #452 merge.
 Merged topic branches have been deleted.
 
 B3 remains open after #450: continue the wider engine/type/consumer/configuration
