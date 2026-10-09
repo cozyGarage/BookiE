@@ -50,7 +50,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision",
                 "value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity",
                 "value_contract_mongodb_off_page_type_change_during_census_refuses_edit",
-                "value_contract_mongodb_browse_uses_one_find_for_schema_and_page",
+                "value_contract_mongodb_browse_uses_a_bounded_sample_and_page_find",
                 "value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents",
                 "value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values",
                 "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
