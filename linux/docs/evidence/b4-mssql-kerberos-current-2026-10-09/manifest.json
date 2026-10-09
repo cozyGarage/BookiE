@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "source_commit": "102ef48017f10c7a63c271608b98d3b05b449795",
+  "test_command": "bash scripts/test-mssql-kerberos.sh",
+  "environment": "Local Docker fixture with Samba AD DC and SQL Server 2022",
+  "log_sha256": {
+    "kerberos.log": "acc4ce5583035d12205792c79951d36650f2967a28e0e1c8014c90e189677858"
+  },
+  "result": "2 passed, 0 failed",
+  "tests": [
+    "kerberos_refuses_an_unregistered_sql_server_spn",
+    "kerberos_ticket_connects_over_verified_tls_and_executes_query"
+  ],
+  "not_established": [
+    "Windows Active Directory interoperability",
+    "distribution-package installation",
+    "native Wayland acceptance"
+  ]
+}
