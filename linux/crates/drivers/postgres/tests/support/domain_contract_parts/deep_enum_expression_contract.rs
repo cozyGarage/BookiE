@@ -48,8 +48,10 @@ async fn assert_deep_enum_array_scalar_parameters(
 ) {
     if levels == 63 {
         assert_deep_enum_array_remove_supported(connection, schema).await;
+        assert_deep_enum_array_prepend_supported(connection, schema).await;
     } else {
         assert_deep_enum_array_remove_refused(connection, schema, levels).await;
+        assert_deep_enum_array_prepend_refused(connection, schema, levels).await;
     }
     assert_deep_enum_array_position_supported(connection, schema, levels).await;
 }
@@ -108,6 +110,63 @@ async fn assert_deep_enum_array_remove_refused(
             matches!(&error, tablepro_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "array_remove parameter {parameter:?}, depth {levels}: {error:?}"
+        );
+    }
+}
+
+async fn assert_deep_enum_array_prepend_supported(
+    connection: &dyn tablepro_core::Connection,
+    schema: &str,
+) {
+    for (parameter, values) in [
+        (Value::Text("paused".into()), ["{paused,ready}", "{paused,NULL}"]),
+        (Value::Null, ["{NULL,ready}", "{NULL,NULL}"]),
+    ] {
+        let result = connection
+            .query_params(
+                &format!(
+                    "SELECT id, array_prepend($1, ARRAY[status])::text, \
+                     pg_typeof($1)::text, pg_typeof(array_prepend($1, ARRAY[status]))::text \
+                     FROM {schema}.rows WHERE id <= 2 ORDER BY id"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("array_prepend at 63 domains: {error:?}"));
+        assert_eq!(
+            result.rows,
+            values
+                .into_iter()
+                .enumerate()
+                .map(|(index, value)| vec![
+                    Value::Int(index as i64 + 1),
+                    Value::Text(value.into()),
+                    Value::Text(format!("{schema}.state")),
+                    Value::Text(format!("{schema}.state[]")),
+                ])
+                .collect::<Vec<_>>(),
+            "array_prepend parameter {parameter:?} at 63 domains"
+        );
+    }
+}
+
+async fn assert_deep_enum_array_prepend_refused(
+    connection: &dyn tablepro_core::Connection,
+    schema: &str,
+    levels: usize,
+) {
+    for parameter in [Value::Text("paused".into()), Value::Null] {
+        let error = connection
+            .query_params(
+                &format!("SELECT array_prepend($1, ARRAY[status]) FROM {schema}.rows WHERE id = 1"),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .expect_err("deep enum array_prepend parameter must be refused");
+        assert!(
+            matches!(&error, tablepro_core::DriverError::Unsupported(message)
+                if message.contains("resolvable depth")),
+            "array_prepend parameter {parameter:?}, depth {levels}: {error:?}"
         );
     }
 }

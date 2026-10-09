@@ -34,11 +34,10 @@ missed or timed out. PR #448 adds deep PostgreSQL enum expression and array
 result boundaries through 4,096 domain layers; its Docker contract, local
 preflight and all 11 required hosted checks passed. Focused MySQL decoder
 mutations deleting the BIT and DECIMAL branches were caught by native contracts
-on the current source. The active B3 follow-up pins PostgreSQL `array_remove`,
-`array_position` and `array_positions` scalar-parameter behavior at 63, 64 and
-deeper enum-domain levels; its focused Docker contract passed 1/1 on the working
-branch. Merged
-topic branches have been deleted.
+on the current source. PR #449 pins PostgreSQL `array_remove`,
+`array_prepend`, `array_position` and `array_positions` scalar-parameter
+behavior at 63, 64 and deeper enum-domain levels; its focused Docker contract
+passed 1/1 on the working branch. Merged topic branches have been deleted.
 
 B3 remains open after #448: continue the wider engine/type/consumer/configuration
 matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4

@@ -138,9 +138,10 @@ the depth matrix remains in
 `../crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs`.
 
 The same sampled 63-to-4,096-layer shadowed-path matrix now distinguishes scalar
-array-function parameters: `array_remove(ARRAY[status], $1)` preserves the
-native enum parameter and exact array value at 63 layers, then refuses at 64
-and deeper; `array_position(ARRAY[status, NULL], $1)` and
+array-function parameters: `array_remove(ARRAY[status], $1)` and
+`array_prepend($1, ARRAY[status])` preserve the native enum parameter and exact
+array value at 63 layers, then refuse at 64 and deeper;
+`array_position(ARRAY[status, NULL], $1)` and
 `array_positions(ARRAY[status, NULL], $1)` retain the enum parameter type and
 PostgreSQL's NULL-element matching semantics through 4,096 layers. Both text
 and SQL NULL are checked against the expected result and `pg_typeof`; the Docker contract is
