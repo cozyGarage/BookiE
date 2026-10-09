@@ -17,6 +17,10 @@ on:
       - ".github/workflows/flatpak-linux.yml"
   workflow_dispatch:
 
+concurrency:
+  group: flatpak-linux-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   flatpak:
     name: flatpak-builder (${{ matrix.profile }})
@@ -42,7 +46,7 @@ jobs:
         with:
           bundle: ${{ matrix.bundle }}
           manifest-path: ${{ matrix.manifest }}
-          cache-key: flatpak-builder-${{ matrix.profile }}-${{ github.sha }}
+          cache-key: flatpak-builder-${{ matrix.profile }}-${{ hashFiles('linux/flatpak/**') }}
           upload-artifact: true
       - name: Record packaging scope
         run: |

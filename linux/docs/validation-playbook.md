@@ -148,13 +148,17 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 
 ## Hosted checks
 
-Build Linux owns required regression jobs and its final `Linux regression gate`.
-Each migrated layer job uploads reports even after failure. Missing artifacts
+Build Linux owns the cheap-tier regression jobs and its final `Linux regression gate`; its merge-tier jobs run on its weekly schedule and on dispatch, not on pushes. Each migrated layer job uploads reports even after failure. Missing artifacts
 fail visibly. Linux Security runs policy tests and supply-chain checks in
 independent jobs, including when a GTK build fails. Linux CI contracts tests the
 validation infrastructure without waiting for a Rust build. Linux test quality
-owns mutation/coverage. Security and quality results are separate from the Build
-regression gate; review all of them at the same SHA.
+owns mutation/coverage. CodeQL (Rust, Python, workflow files) and SonarCloud run
+as reference scans. Security, quality and scan results are separate from the
+Build regression gate; review all of them at the same SHA.
+
+Scan findings are advice, not a gate. Fix a real finding in a small pull
+request. Mark a wrong one "False positive" or "Won't fix" in the tool with a one-line reason,
+and record the reasoning here when it is a framework pattern others will meet again.
 
 Actions are pinned to commits. Jobs use read-only repository permissions and
 ordinary `pull_request`, not privileged execution of PR code. Test fixtures use
@@ -271,10 +275,10 @@ No workflow here automatically publishes a release or waives an acceptance gate.
 Confirm a framework-specific finding against the native platform before changing source.
 
 Automatic Analysis (Autoscan) and CI analysis cannot both run for
-`cozyGarage_BookiE`. To use the Sonar Rust GitHub Actions workflow, a project
-admin must open the project dashboard, go to **Administration → Analysis
-Method**, and turn **Automatic Analysis** off, then re-run the workflow. Leaving
-Autoscan on keeps non-Rust findings but blocks CI Rust analysis.
+`cozyGarage_BookiE`. Automatic Analysis is off and the `SONAR_TOKEN` repository
+secret is set, so the `sonar-rust` workflow analyses Rust, Python and the
+other files on pushes and pull requests to `linux`. Pull requests from forks
+have no secret and skip the scan.
 
 ### GTK CSS node selectors
 
@@ -298,4 +302,4 @@ their status updated in the project dashboard; no source suppression was added.
 
 ## CI tiers
 
-A pull request runs the cheap tier: guards, formatting, Clippy, the unit and sandbox tiers, the GTK widget tier, security, Flatpak (path filtered) and the workflow contracts. On Forgejo the merge tier is split into parallel jobs on the Debian executors: the installed GTK suite in three shards (`TABLEPRO_GTK_SHARD=i/3`), one job per driver fixture, the consumer, socket and SSH fixtures, driver TLS, the PostgreSQL release fixture, the keyring tier, the two real-server end-to-end runs, and the distro floor with the package test per distro (including an upgrade from the released 0.1.5 `.deb`), the DuckDB driver and DuckDB app build, the ClickHouse, MySQL approval and MongoDB installed GTK scenarios and the `supply-chain` layer (cargo-deny and cargo-audit). A push to `linux` or `main` also runs the merge tier: the installed GTK suite, driver integration, driver TLS, the PostgreSQL release fixture, DuckDB, and on Forgejo the server end-to-end runs, the Ubuntu 24.04 and Debian 13 floor and the Debian package build, install and purge. `scripts/check-ci-jobs.py` accepts a skipped merge-tier job on a pull request only; the merge-tier set is `MERGE_ONLY` in that script, and `test_ci_workflow.py` fails if the workflow and the set disagree. Forgejo's nightly workflow (`.forgejo/workflows/nightly.yml`) runs unit-tier coverage, sharded `cargo-mutants`, the shared `values` layer (900 s per crate until TEST-26 shares database servers), the installed GTK suite on a native Ubuntu 24.04 runner (informational until TEST-28 is resolved), a GTK soak of six runs of five retry-free installed attempts at one commit, and an Arch package build in an `archlinux` container with an upgrade from the released package (`scripts/test-arch-package-container.sh`). The installed GTK suite waits 15 seconds for each accessible node by default; the Forgejo workflow sets `TABLEPRO_GTK_WAIT_SECONDS` to 45 because shared executors otherwise time out on load. Forgejo is the acceptance gate: it runs the whole tier, merge tier included, on every branch push, because a green GitHub pull request only means the cheap tier ran and the Docker, installed GTK and distro jobs were skipped. `scripts/forgejo-gate.sh [branch]` pushes the branch to the `forgejo` remote, waits for its run (60 minutes by default) and lists the jobs that did not pass. A newer push cancels the running tier for a feature branch but never for `linux`. A red merge run is reconciled on `linux` afterwards. Merge runs are never cancelled by a newer push (GitHub keeps the running one and the newest pending one), so a burst of merges still ends in one completed merge-tier run; only pull request runs are cancelled by a newer push.
+A pull request and a push to `linux` or `main` on GitHub run the cheap tier only: guards, formatting, Clippy, the unit and sandbox tiers, the GTK widget tier, security, Flatpak (path filtered) and the workflow contracts. Forgejo is the acceptance and merge gate: it runs the merge tier on every branch push (see [AGENTS.md](../../AGENTS.md) Validation). That tier is split into parallel jobs on the Debian executors: the installed GTK suite in three shards (`TABLEPRO_GTK_SHARD=i/3`), one job per driver fixture, the consumer, socket and SSH fixtures, driver TLS, the PostgreSQL release fixture, the keyring tier, the two real-server end-to-end runs, the distro floor with the package test per distro (including an upgrade from the released 0.1.5 `.deb`), the DuckDB driver and DuckDB app build, the ClickHouse, MySQL approval and MongoDB installed GTK scenarios and the `supply-chain` layer (cargo-deny and cargo-audit). GitHub Build Linux still defines the former merge jobs (`gtk-safety`, `integration`, `b4-rollback`, `driver-tls`, `postgres-release`, `duckdb`) as `MERGE_ONLY` in `scripts/check-ci-jobs.py`, but they run only on schedule or `workflow_dispatch`, not on pull request or push; `test_ci_workflow.py` fails if the workflow guards and that set disagree. Forgejo's nightly workflow (`.forgejo/workflows/nightly.yml`) runs unit-tier coverage, sharded `cargo-mutants`, the shared `values` layer (900 s per crate until TEST-26 shares database servers), the installed GTK suite on a native Ubuntu 24.04 runner (informational until TEST-28 is resolved), a GTK soak of six runs of five retry-free installed attempts at one commit, and an Arch package build in an `archlinux` container with an upgrade from the released package (`scripts/test-arch-package-container.sh`). The installed GTK suite waits 15 seconds for each accessible node by default; the Forgejo workflow sets `TABLEPRO_GTK_WAIT_SECONDS` to 45 because shared executors otherwise time out on load. A green GitHub check only means the cheap tier ran; Docker, installed GTK and distro acceptance stay on Forgejo. `scripts/forgejo-gate.sh [branch]` pushes the branch to the `forgejo` remote, waits for its run (60 minutes by default) and lists the jobs that did not pass. A newer push cancels the running tier for a feature branch but never for `linux`. A red merge run is reconciled on `linux` afterwards. On Forgejo, merge runs are never cancelled by a newer push to `linux`; only feature-branch runs cancel in progress. On GitHub, only pull request Build Linux runs cancel when a newer push arrives.

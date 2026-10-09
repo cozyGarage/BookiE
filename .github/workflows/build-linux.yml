@@ -29,11 +29,10 @@ on:
 permissions:
   contents: read
 
-# A newer pull request push supersedes its in-flight run. A run on
-# linux or main is the merge-tier gate, so it is never cancelled: GitHub
-# keeps the running one and the newest pending one. Scheduled and
-# dispatched runs keep their own group so a release-candidate soak is
-# never cancelled by ordinary branch traffic.
+# A newer pull request push supersedes its in-flight run. Push runs on
+# linux or main keep the cheap tier only; Forgejo is the merge gate.
+# Scheduled and dispatched runs keep their own group so a manual full
+# Build Linux is never cancelled by ordinary branch traffic.
 concurrency:
   group: build-linux-${{ github.event_name }}-${{ github.ref }}-${{ inputs.ref || 'auto' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -171,7 +170,7 @@ jobs:
           if-no-files-found: error
 
   gtk-safety:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Installed GTK safety smoke
     timeout-minutes: 60
     runs-on: ubuntu-24.04
@@ -289,7 +288,7 @@ jobs:
         run: cargo +stable clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 
   integration:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Driver integration tests (docker)
     timeout-minutes: 55
     runs-on: ubuntu-24.04
@@ -338,7 +337,7 @@ jobs:
           if-no-files-found: error
 
   b4-rollback:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: B4 rollback acceptance (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -383,7 +382,7 @@ jobs:
           if-no-files-found: error
 
   driver-tls:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Driver TLS fixture (docker)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
@@ -428,7 +427,7 @@ jobs:
           if-no-files-found: error
 
   postgres-release:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: PostgreSQL release fixture (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -499,7 +498,7 @@ jobs:
           if-no-files-found: error
 
   duckdb:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: preflight
     name: Optional DuckDB driver and GTK feature
     timeout-minutes: 60
