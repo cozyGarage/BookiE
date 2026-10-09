@@ -91,9 +91,10 @@ BookiE checks every statement before it runs:
 
 ## Snapshots
 
-Planned for database servers: take a snapshot of a database before an
-experiment and restore it with one click. See ledger rows SNAP-1 to SNAP-4 in
-[known-issues.md](known-issues.md) for progress.
+Planned for a 0.2.x release, after 0.2.0: take a snapshot of a database before an
+experiment and restore it with one click, starting with PostgreSQL. See
+[ADR 0015](decisions/0015-database-snapshots.md) and ledger rows SNAP-1 to SNAP-4 in
+[known-issues.md](known-issues.md).
 
 ## AI agents (MCP)
 
