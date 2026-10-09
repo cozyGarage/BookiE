@@ -97,7 +97,11 @@ owner table, and each lane edits only its own files.
    Forgejo runs the merge tier on its own executors. Do not re-run a Forgejo
    job to learn what GitHub already reported, and do not trust a skipped GitHub
    job as a pass.
-9. Never leave a background job, container or lab VM change running that you
+9. **Merge only on GitHub.** Forgejo is the gate, not the merge target: never merge a
+   pull request on Forgejo, and never push to Forgejo's `linux` by hand. A Forgejo
+   merge makes its `linux` diverge from GitHub's, and the sync (which only
+   fast-forwards) then stops until someone resets it.
+10. Never leave a background job, container or lab VM change running that you
    did not start, and never stop one you did not start. On shared executors,
    stop only your own containers by name.
 
