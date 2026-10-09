@@ -671,6 +671,17 @@ cursor-arithmetic variants; this is the focused check for the seven variants
 that timed out when the whole `sql_lex::tests` module was selected
 ([mutation evidence](evidence/sql-lex-cursor-arithmetic-guard-results-2026-10-06/manifest.json)).
 
+The core JSON exporter was mutation-audited at source SHA-256
+`88007bfbfb309030f2f080c2d48bb10012ab4e6e3ac383fa993c2cb1e30678d1`.
+The initial 23-mutant run caught 20; two duplicate-name loop mutations timed
+out because the broad `json` selector also runs a renderer test that invokes
+the same loop directly. Running those three loop mutations against the bounded
+`json_field_names_make_progress_when_duplicate_names_have_gaps` selector caught
+all three in five seconds. Removing the explicit `Value::Null` arm is
+behavior-equivalent: `value_to_text(Value::Null)` returns `None`, which the JSON
+fallback also serializes as null. Final triage: 22 caught, one equivalent, no
+missed or unresolved timed-out mutants.
+
 SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
 ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
 Native `typeof()` and `hex()` check both the source expression and restored
