@@ -977,7 +977,8 @@ def run_scenario(binary, scenario):
             nonlocal process, stderr
             invoke_accessible_action("win.quit")
             process.wait(timeout=WAIT_SECONDS)
-            assert process.returncode == 0, "graceful quit failed"
+            if process.returncode != 0:
+                raise RuntimeError("graceful quit failed")
             stderr += stop_application(process)
             wait_for_frame_containing(" — BookiE", present=False)
             if before_start is not None:
