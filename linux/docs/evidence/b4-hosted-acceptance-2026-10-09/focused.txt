@@ -34,3 +34,12 @@ was still running its broad driver integration and installed GTK safety jobs
 when captured. The MySQL scenario pass does not explain the operator's two
 earlier empty-dialog failures, so AUD-2 remains open pending a repeated
 installed run or a root-cause reproduction.
+
+After the follow-up checkpoint was captured, its Installed GTK safety smoke
+job completed successfully on the same exact source SHA. The artifact contains
+53/53 passing scenarios, including the sanitized bundle export/import audit,
+encrypted credential round-trip and cross-profile import cases for B4-22.
+The broad driver-integration job was still running when checked. This remains
+hosted staged-binary evidence; distribution-package/native Wayland acceptance
+is open. The job report and per-scenario results are in run
+[#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390).

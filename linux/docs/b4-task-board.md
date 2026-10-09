@@ -91,6 +91,13 @@ agent authentication and OpenSSH forwarding. Distribution-package and native
 Wayland trust-flow acceptance remain open. See the [native SSH evidence
 manifest](evidence/b4-ssh-native-current-2026-10-09/manifest.json).
 
+The SQL Server Kerberos/TLS fixture also passed locally on `102ef480`:
+`bash scripts/test-mssql-kerberos.sh` ran both verified-TLS ticket
+authentication and unregistered-SPN refusal tests successfully against the
+Samba AD fixture. This does not establish Windows AD interoperability or
+package-installed acceptance. See the [current Kerberos evidence
+manifest](evidence/b4-mssql-kerberos-current-2026-10-09/manifest.json).
+
 ## Exact-SHA B4 acceptance checkpoint (2026-10-08)
 
 Earlier B4 layers passed on runtime SHA `a7f14faef07f05bd4a3d63a6ca31b60f2a4e0200`,
