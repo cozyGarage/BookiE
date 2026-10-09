@@ -455,7 +455,10 @@ async fn value_contract_inferred_enum_array_parameter_respects_domain_depth_boun
 
     let connection = connect(options).await;
     let mut transaction = connection.begin().await.unwrap();
-    transaction.execute("SET LOCAL search_path TO public").await.unwrap();
+    transaction
+        .execute(&format!("SET LOCAL search_path TO {schema}_shadow, public"))
+        .await
+        .unwrap();
 
     transaction.execute("SAVEPOINT native_domain_equality").await.unwrap();
     let native_equality = transaction
@@ -541,4 +544,125 @@ async fn value_contract_inferred_enum_array_parameter_respects_domain_depth_boun
     }
 
     transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_deep_enum_scalar_contexts_match_native_inference_at_depth_boundary() {
+    let (_container, options) = start_pg().await;
+    let setup = connect(options.clone()).await;
+    let schema = "value_contract_enum_scalar_depth";
+    create_enum_scalar_depth_fixture(setup.as_ref(), schema).await;
+    drop(setup);
+
+    let connection = connect(options).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("SET LOCAL search_path TO public").await.unwrap();
+    assert_scalar_contexts_match_native_inference(&mut *transaction, schema, 63).await;
+    assert_scalar_contexts_match_native_inference(&mut *transaction, schema, 64).await;
+    transaction.rollback().await.unwrap();
+}
+
+async fn create_enum_scalar_depth_fixture(connection: &dyn tablepro_core::Connection, schema: &str) {
+    connection.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {schema}.state AS ENUM ('ready', 'paused', 'NULL', '')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!("CREATE SCHEMA {schema}_shadow"))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {schema}_shadow.state AS ENUM ('ready', 'paused', 'NULL', '', 'shadow-only')"
+        ))
+        .await
+        .unwrap();
+    let mut base = "state".to_owned();
+    for level in 1..=64 {
+        let domain = format!("state_domain_{level}");
+        connection
+            .execute(&format!("CREATE DOMAIN {schema}.{domain} AS {schema}.{base}"))
+            .await
+            .unwrap();
+        base = domain;
+    }
+    connection
+        .execute(&format!(
+            "CREATE TABLE {schema}.rows (id integer PRIMARY KEY, \
+             status_63 {schema}.state_domain_63, status_64 {schema}.state_domain_64)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "INSERT INTO {schema}.rows VALUES \
+             (1, 'ready', 'paused'), (2, NULL, NULL), (3, 'paused', 'ready')"
+        ))
+        .await
+        .unwrap();
+}
+
+async fn assert_scalar_contexts_match_native_inference(
+    session: &mut dyn tablepro_core::Transaction,
+    schema: &str,
+    depth: usize,
+) {
+    for (expression, native_expression) in scalar_contexts(depth) {
+        for (parameter, native_parameter) in [
+            (Value::Text("paused".into()), "'paused'"),
+            (Value::Text("NULL".into()), "'NULL'"),
+            (Value::Text(String::new()), "''"),
+            (Value::Null, "NULL"),
+        ] {
+            let native_expression = native_expression.replace("$ARG", native_parameter);
+            let native = session
+                .query(&format!(
+                    "SELECT id, {native_expression}::text, \
+                     pg_typeof({native_expression})::text, pg_typeof(status_{depth})::text \
+                     FROM {schema}.rows ORDER BY id"
+                ))
+                .await
+                .unwrap();
+            let inferred = session
+                .query_params(
+                    &format!(
+                        "SELECT id, {expression}::text, pg_typeof($1)::text, \
+                         pg_typeof({expression})::text, pg_typeof(status_{depth})::text \
+                         FROM {schema}.rows ORDER BY id"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            let expected = native
+                .rows
+                .into_iter()
+                .map(|row| {
+                    vec![
+                        row[0].clone(),
+                        row[1].clone(),
+                        Value::Text(format!("{schema}.state")),
+                        row[2].clone(),
+                        row[3].clone(),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(inferred.rows, expected, "depth {depth}: {expression}, {parameter:?}");
+        }
+    }
+}
+
+fn scalar_contexts(depth: usize) -> [(String, String); 2] {
+    let column = format!("status_{depth}");
+    [
+        (format!("COALESCE($1, {column})"), format!("COALESCE($ARG, {column})")),
+        (
+            format!("CASE WHEN id = 1 THEN $1 ELSE {column} END"),
+            format!("CASE WHEN id = 1 THEN $ARG ELSE {column} END"),
+        ),
+    ]
 }
