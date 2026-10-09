@@ -237,7 +237,10 @@ exec sleep 300
 
     #[tokio::test]
     async fn cancelling_while_open_openssh_is_connecting_stops_the_master_and_removes_its_directory() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("bookie-ssh-cancel-")
+            .tempdir_in("/tmp")
+            .unwrap();
         let script = dir.path().join("ssh");
         std::fs::write(
             &script,
@@ -275,22 +278,30 @@ exec sleep 300
 
         let cancel = CancellationToken::new();
         let connecting = open_openssh(&config, &environment, ("db.internal", 5432), None, cancel.clone());
+        let pid_file = dir.path().join("master.pid");
+        let pid_file_for_start = pid_file.clone();
         let cancelling = async {
-            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                while !std::fs::read_to_string(&pid_file_for_start)
+                    .ok()
+                    .and_then(|pid| pid.trim().parse::<u32>().ok())
+                    .is_some()
+                {
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .expect("the fake OpenSSH master must start before cancellation");
             cancel.cancel();
         };
-        let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(10), async {
             tokio::join!(connecting, cancelling)
         })
         .await
         .expect("cancellation must stop the connect well before the 60s handshake timeout");
         assert!(result.is_err(), "a cancelled connect must fail");
 
-        let pid: u32 = std::fs::read_to_string(dir.path().join("master.pid"))
-            .unwrap()
-            .trim()
-            .parse()
-            .unwrap();
+        let pid: u32 = std::fs::read_to_string(pid_file).unwrap().trim().parse().unwrap();
         assert!(wait_until_dead(pid).await, "the master process must stop");
 
         let leftovers: Vec<_> = std::fs::read_dir(runtime.instance_dir())
