@@ -1048,6 +1048,13 @@ preserve inferred parameter types; raw domain
 and the [ordering](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json)
 and [list-operator evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json),
 plus [NULL-safe distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).
+Domain-over-enum array parameters inferred by comparison with a domain-array
+column are covered at the 63/64-layer boundary under a shadowed `search_path`.
+At 63 layers, populated arrays with NULL elements, empty arrays and SQL NULL
+match explicit native type, result and wire-byte controls; invalid enum labels
+retain SQLSTATE 22P02 and stored values remain unchanged. At 64 layers, all
+three parameter forms refuse with the resolvable-depth error and stored values
+remain unchanged ([test](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_enum_array_parameters.rs)).
 Other direct query-parameter contexts and session configurations remain open.
 Selected schema-aware result, edit, insert and filter paths pass through 4,096
 domain layers; raw inferred text/NULL contexts have explicit limits. Deep
