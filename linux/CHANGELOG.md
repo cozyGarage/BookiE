@@ -191,6 +191,7 @@
 ### Fixed
 
 - SQL Server `DECIMAL(38,38)` values no longer panic the driver and retain exact text when they exceed the editable decimal range.
+- SQL Server `sql_variant` values keep their native column type and show as undecodable instead of being mislabeled as a base scalar.
 - Browse shortcuts for Left, Right, and space showed keypad keys, and click shortcuts showed Shift and Ctrl alone.
 - New connection opened on the first driver with port 5432, database postgres, and username postgres.
 - Browse shortcuts for Left, Right, and space showed a blank key.

@@ -1143,23 +1143,33 @@ strict combined runner also passed all 121 selected contracts on commit
 
 ### SQL Server `sql_variant` metadata refusal
 
-A SQL Server Docker regression first checks the native base type and exact
+A SQL Server Docker regression first checked the native base type and exact
 `CONVERT(varchar(40), value)` text for `bigint` value `9007199254740993`, which
 is beyond binary64's exact-integer range. Selecting the `sql_variant` then
 reproduced a panic in the pinned Tiberius TDS metadata parser's unimplemented
-`SSVariant` branch. The driver now catches that specific dependency panic at
-the result boundary, returns `DriverError::Unsupported`, and retires the
-affected connection instead of reusing a partially consumed TDS stream. The
-same behavior is checked for both a shared connection and an isolated session.
-The value is still unsupported; this is safe refusal, not `sql_variant`
-decoding or editing.
+`SSVariant` branch. The driver caught that dependency panic at the result
+boundary and retired the partially consumed stream. The same behavior was
+checked for a shared connection and isolated session.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration sql_variant_result_is_refused_without_panicking_or_reusing_the_connection -- --include-ignored --exact --test-threads=1
 ```
 
-The focused SQL Server Docker contract passed. Exact decoding remains open
-until Tiberius supports `SSVariant` metadata without panicking.
+The focused SQL Server Docker contract passed at that dependency revision.
+
+Follow-up on 2026-10-09: Tiberius 0.13 decodes the tested `bigint` base value,
+but a `sql_variant` column can contain different base types and the shared
+`Value` does not retain the per-cell type. Results now keep the declared
+`sql_variant` column metadata and mark non-NULL cells undecodable; SQL NULL
+remains NULL. Fully consumed results leave shared connections and isolated
+sessions usable. The panic guard still retires a stream if another base type
+triggers Tiberius's known `SSVariant` panic.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration sql_variant_values_are_undecodable_and_keep_connections_usable -- --ignored --test-threads=1
+```
+
+Exact per-cell base-type decoding and editing remain open.
 
 Scoped `cargo-mutants` testing of `variant_guard.rs` first found that a
 mutation making the refusal classifier return `true` for every error survived.
