@@ -891,6 +891,7 @@ impl ConnectDialog {
             forwarded_socket_dir: None,
             application_name: Some("BookiE".into()),
             connect_timeout_secs: timeout_value(self.connect_timeout.value()),
+            read_only: self.read_only.is_active(),
         }
     }
 

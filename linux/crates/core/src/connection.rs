@@ -39,6 +39,7 @@ pub struct ConnectOptions {
     pub forwarded_socket_dir: Option<PathBuf>,
     pub application_name: Option<String>,
     pub connect_timeout_secs: Option<u32>,
+    pub read_only: bool,
 }
 
 impl ConnectOptions {
@@ -108,6 +109,7 @@ impl Default for ConnectOptions {
             forwarded_socket_dir: None,
             application_name: None,
             connect_timeout_secs: None,
+            read_only: false,
         }
     }
 }
