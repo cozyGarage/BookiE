@@ -320,6 +320,10 @@ canonical JSON/CSV output and SQL replay after switching from `SQL, DMY` to
 `ISO, MDY`; typed CSV import now restores the same source after that session
 change, with native type/JSON/wire checks and an untouched sibling
 ([test](../crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_timestamp_dmy.rs)).
+The `date[]` SQL/DMY CSV import path also restores BC dates, infinity and SQL
+NULL after switching to ISO/MDY, with native type/JSON/wire checks and an
+untouched sibling
+([test](../crates/drivers/postgres/tests/support/date_array_csv_import.rs)).
 The `timetz[]` case also preserves explicit offsets through an `America/New_York`
 to UTC transition and the JSON/CSV/XLSX/SQL consumer paths. CSV import under
 the changed UTC session preserves native type, JSON and wire bytes, with an
