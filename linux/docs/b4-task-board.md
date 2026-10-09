@@ -74,12 +74,15 @@ Windows AD interoperability. The whole workflow was still in progress while
 the broad driver integration job ran.
 
 PR #417 adds the MySQL human-approval dialog regression to hosted installed
-GTK acceptance. The post-merge Build Linux run
-[#37867344713](https://github.com/cozyGarage/BookiE/actions/runs/37867344713)
-and exact-SHA dispatch for `102ef480`
-[#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390)
-have both started preflight but have not reached acceptance jobs yet. The
-MySQL scenario result is not available yet.
+GTK acceptance. Exact-SHA dispatch [#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390)
+ran against `102ef48017f10c7a63c271608b98d3b05b449795`. Its B4 rollback
+(14 MySQL tests and 1 PostgreSQL rollback-failure test), TLS (48 tests), and
+PostgreSQL release GTK jobs passed. The PostgreSQL release job's MySQL
+human-approval dialog step passed, and all seven SSH/mTLS scenarios passed.
+The installed GTK safety and broad driver-integration jobs were still running
+at capture. This hosted pass does not resolve why the operator observed two
+earlier empty-dialog failures; the root cause remains open. See the [follow-up
+acceptance note](evidence/b4-hosted-acceptance-2026-10-09/focused.txt).
 
 ## Exact-SHA B4 acceptance checkpoint (2026-10-08)
 

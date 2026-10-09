@@ -18,3 +18,19 @@ The installed GTK and PostgreSQL jobs use a staged release binary under the
 hosted Debian/Xvfb/AT-SPI fixture. These results do not qualify a distribution
 package or native Wayland. The overall workflow was still in progress because
 the broad driver integration job had not completed when this report was captured.
+
+## Follow-up on current linux: run #37867814390
+
+Build Linux run [#37867814390](https://github.com/cozyGarage/BookiE/actions/runs/37867814390)
+was dispatched at the exact current source SHA
+`102ef48017f10c7a63c271608b98d3b05b449795`. Its B4 rollback artifact reports
+14 MySQL `mysql_atomic` tests and 1 PostgreSQL rollback-failure test passed;
+its Driver TLS and PostgreSQL release artifacts also report success. The
+PostgreSQL release job step `MySQL human-approval dialog regression` completed
+successfully, exercising
+`mysql_unparseable_routine_dialog_denial_preserves_database`. The seven SSH
+and mTLS GTK scenarios passed on the same source SHA. This exact-SHA workflow
+was still running its broad driver integration and installed GTK safety jobs
+when captured. The MySQL scenario pass does not explain the operator's two
+earlier empty-dialog failures, so AUD-2 remains open pending a repeated
+installed run or a root-cause reproduction.

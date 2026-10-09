@@ -68,5 +68,40 @@
     "Windows Active Directory interoperability",
     "Optional/vendor MySQL-family storage engines and side effects outside the listed fixtures"
   ],
+  "follow_up_hosted_run": {
+    "workflow": "Build Linux",
+    "run_id": 37867814390,
+    "url": "https://github.com/cozyGarage/BookiE/actions/runs/37867814390",
+    "candidate_source_commit": "102ef48017f10c7a63c271608b98d3b05b449795",
+    "run_status_at_capture": "in_progress",
+    "completed_jobs": {
+      "B4 rollback acceptance (docker)": {
+        "status": "success",
+        "artifact": "regression-b4-rollback-37867814390-1",
+        "mysql_result": "14 passed, 0 failed",
+        "postgres_result": "1 passed, 0 failed"
+      },
+      "Driver TLS fixture (docker)": {
+        "status": "success",
+        "total_tests_passed": 48
+      },
+      "PostgreSQL release fixture (docker)": {
+        "status": "success",
+        "artifact": "regression-postgres-release-37867814390-1",
+        "ssh_mtls_scenarios": "7 passed",
+        "mysql_approval_step": {
+          "name": "MySQL human-approval dialog regression",
+          "job_id": 113620086800,
+          "status": "success",
+          "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database"
+        }
+      }
+    },
+    "jobs_still_running_at_capture": [
+      "Driver integration tests (docker)",
+      "Installed GTK safety smoke"
+    ],
+    "interpretation": "The current-main MySQL approval scenario passed once; this does not determine the root cause of the two earlier operator-reported failures."
+  },
   "summary": "focused.txt"
 }
