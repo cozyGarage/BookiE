@@ -31,12 +31,15 @@ restarts. Its follow-up branch adds native stored-value oracles and serial
 MariaDB fixture reuse. Both charset selectors and all 88 serialized MySQL
 integration tests passed locally using one MySQL and one MariaDB container
 (66.36 s); unpiped preflight passed. The branch was published at `f29743c`; Forgejo run 88
-tests that pre-#452 tip and reports a PostgreSQL disconnect-test race: its
-one-shot `pg_stat_activity` lookup ran before the tagged backend was visible.
+failed on that pre-#452 tip. The PostgreSQL failure was a disconnect-test race:
+its one-shot `pg_stat_activity` lookup ran before the tagged backend was
+visible. Ubuntu and Debian also failed GTK safety waits for `open_editor` and
+`audit_failure_denies`; the cause remains unclassified and needs separate UI
+follow-up.
 Commit `b98ce22` adds bounded polling to the backend-termination fixtures; the
 local PostgreSQL disconnection module passed 10/10 tests and unpiped preflight
 passed on the current head. Run 88 does not cover the #452 merge or this fix;
-the updated local head still needs its own gate before push.
+the updated local head still needs its own gate.
 The broader B3 engine/type/consumer matrix and installed acceptance remain
 open. This is a status snapshot, not a release qualification.
 Older audits remain historical; this ledger and the
