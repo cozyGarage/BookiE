@@ -24,15 +24,15 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 
 ## Current continuation: 2026-10-09
 
-The merged `linux` baseline is `762c4b1a8efd17aaba508eb5cb57904a62d7f41b`
-(PR #441). PR #442 is also merged. B3 PR #443 contains SQL Server
-`decimal(38,38)` preservation and refusal of lossy `sql_variant` values. Its
-code head `38d10ecf302b54108ec47ae7143d2d4d8db3d13e` passed 77 MSSQL tests and
-unpiped local preflight. Workflow lint, harness, resolve-ref, SonarCloud and
-supply-chain checks passed on that code head; Flatpak default/development and
-security-policy checks were still running at the last poll. This status update
-is docs-only commit `030d55f00d1511714cd107459f4bacb9f35145a0`; its hosted gates
-restarted, so wait for checks on the latest head before merging.
+The merged `linux` baseline is `682769abe60f624f2644b6f74472be8fca3883b0`
+(PR #443). PRs #441 and #442 are also merged. PR #443 adds SQL Server
+`decimal(38,38)` preservation and refuses lossy `sql_variant` values. Its full
+MSSQL run passed 77 tests; the full local value-contract tier passed 428 tests
+with no missing suites, and unpiped preflight passed. All 11 hosted checks
+passed, including SonarCloud, Flatpak default/development, and GTK parser tests.
+The scoped SQL Server codec mutation audit tested 38 variants: 32 caught, 6
+build-unviable, none missed or timed out. Its local and remote branches are
+deleted.
 
 B3 remains open after #443: continue the wider engine/type/consumer/configuration
 matrix and mutation triage, then complete installed grid acceptance. B4 and B7
