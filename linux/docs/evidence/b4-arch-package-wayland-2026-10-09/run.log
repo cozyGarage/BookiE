@@ -1,0 +1,1189 @@
+wrote fixture materials to /home/trung/.cache/bookie-ui-main/linux/tests/fixtures/postgres-release/materials
+the SSH host key changed; the release script uses a fixture-local known_hosts file
+ Image tablepro-postgres-release-db Building
+ Image tablepro-postgres-release-bastion Building
+ Image tablepro-postgres-release-relay Building
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.72kB done
+#1 DONE 0.0s
+
+#2 [relay internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.02kB done
+#2 DONE 0.0s
+
+#3 [bastion internal] load build definition from Dockerfile
+#3 transferring dockerfile: 1.03kB done
+#3 DONE 0.0s
+
+#4 [db internal] load build definition from Dockerfile
+#4 transferring dockerfile: 354B done
+#4 DONE 0.0s
+
+#5 [db internal] load metadata for docker.io/library/postgres:16-alpine
+#5 DONE 0.0s
+
+#6 [db internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#7 [db internal] load build context
+#7 DONE 0.0s
+
+#8 [db 1/6] FROM docker.io/library/postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+#8 resolve docker.io/library/postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+#8 resolve docker.io/library/postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777 0.0s done
+#8 CACHED
+
+#7 [db internal] load build context
+#7 transferring context: 4.70kB done
+#7 DONE 0.0s
+
+#9 [db 2/6] COPY materials/server.crt /certs/server.crt
+#9 DONE 0.1s
+
+#10 [bastion internal] load metadata for docker.io/library/alpine:3.21
+#10 ...
+
+#11 [db 3/6] COPY materials/server.key /certs/server.key
+#11 DONE 0.1s
+
+#12 [db 4/6] COPY materials/ca.crt /certs/ca.crt
+#12 DONE 0.1s
+
+#13 [db 5/6] COPY db/pg_hba.conf /certs/pg_hba.conf
+#13 DONE 0.1s
+
+#14 [db 6/6] RUN chown -R postgres:postgres /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#14 DONE 0.2s
+
+#10 [bastion internal] load metadata for docker.io/library/alpine:3.21
+#10 DONE 0.7s
+
+#6 [relay internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#15 [relay 1/5] FROM docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+#15 resolve docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507 0.0s done
+#15 DONE 0.0s
+
+#16 [bastion internal] load build context
+#16 transferring context: 669B done
+#16 DONE 0.0s
+
+#17 [relay internal] load build context
+#17 transferring context: 683B done
+#17 DONE 0.0s
+
+#18 [relay 2/5] RUN apk add --no-cache openssh-server     && adduser -D -s /bin/sh tunnel     && sed -i 's/^tunnel:!:/tunnel:*:/' /etc/shadow     && mkdir -p /home/tunnel/.ssh
+#18 CACHED
+
+#19 [db] exporting to image
+#19 exporting layers 0.2s done
+#19 exporting manifest sha256:fa55e18494795adad2cb5b306fe3c772244f3b955e191f368f12b1172f082087 done
+#19 exporting config sha256:04e5070f87a977190b764c7e96138c7c396f2598e472c2e1a4b2455288896ece done
+#19 exporting attestation manifest sha256:f077df9a18a92cb7e9063da3173a8fc4f5728d3e95a6af5ec7aa5de9eefd0b99 0.0s done
+#19 exporting manifest list sha256:5c72c54ce02ababb29af98c071a2f671b141eb43c5359c5185379f040239ed13 0.0s done
+#19 naming to docker.io/library/tablepro-postgres-release-db:latest
+#19 ...
+
+#20 [relay 3/5] COPY materials/ssh_relay_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+#20 DONE 0.1s
+
+#21 [bastion 3/5] COPY materials/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+#21 DONE 0.1s
+
+#19 [db] exporting to image
+#19 naming to docker.io/library/tablepro-postgres-release-db:latest done
+#19 unpacking to docker.io/library/tablepro-postgres-release-db:latest 0.1s done
+#19 DONE 0.4s
+
+#22 [bastion 4/5] COPY materials/client_ed25519_key.pub /home/tunnel/.ssh/authorized_keys
+#22 DONE 0.1s
+
+#23 [relay 4/5] COPY materials/client_ed25519_key.pub /home/tunnel/.ssh/authorized_keys
+#23 DONE 0.1s
+
+#24 [relay 5/5] RUN chmod 600 /etc/ssh/ssh_host_ed25519_key     && chown -R tunnel:tunnel /home/tunnel/.ssh     && chmod 700 /home/tunnel/.ssh     && chmod 600 /home/tunnel/.ssh/authorized_keys     && printf '%s\n'         'Port 22'         'HostKey /etc/ssh/ssh_host_ed25519_key'         'PermitRootLogin no'         'PasswordAuthentication no'         'KbdInteractiveAuthentication no'         'PubkeyAuthentication yes'         'AllowTcpForwarding yes'         'AllowUsers tunnel'         'PermitOpen any'         'X11Forwarding no'         'AllowAgentForwarding no'         > /etc/ssh/sshd_config
+#24 DONE 0.3s
+
+#25 [db] resolving provenance for metadata file
+#25 DONE 0.0s
+
+#26 [bastion 5/5] RUN chmod 600 /etc/ssh/ssh_host_ed25519_key     && chown -R tunnel:tunnel /home/tunnel/.ssh     && chmod 700 /home/tunnel/.ssh     && chmod 600 /home/tunnel/.ssh/authorized_keys     && printf '%s\n'         'Port 22'         'HostKey /etc/ssh/ssh_host_ed25519_key'         'PermitRootLogin no'         'PasswordAuthentication no'         'KbdInteractiveAuthentication no'         'PubkeyAuthentication yes'         'AllowTcpForwarding yes'         'AllowUsers tunnel'         'PermitOpen any'         'X11Forwarding no'         'AllowAgentForwarding no'         > /etc/ssh/sshd_config
+#26 DONE 0.3s
+
+#27 [relay] exporting to image
+#27 exporting layers 0.4s done
+#27 exporting manifest sha256:acf79dbe7fc1c7f70cf37a485ce93e9cc80c30a820ff5db5e87105443fb33fa1 0.0s done
+#27 exporting config sha256:0529ba107cd6fe1470facb2cb113e1311b9f72053e06bbcd3d52bf228f5185b7 0.0s done
+#27 exporting attestation manifest sha256:dc2beaab48cb4623b4f97cb1c70e85c29fefbc7827d835c8d9e2ad88d5753d2b 0.0s done
+#27 exporting manifest list sha256:015ad546f6d32467ebcba98558816845b8b42e5614333aa33f632e16010bbe7c 0.0s done
+#27 naming to docker.io/library/tablepro-postgres-release-relay:latest done
+#27 unpacking to docker.io/library/tablepro-postgres-release-relay:latest
+#27 unpacking to docker.io/library/tablepro-postgres-release-relay:latest 0.1s done
+#27 DONE 0.5s
+
+#28 [bastion] exporting to image
+#28 exporting layers 0.4s done
+#28 exporting manifest sha256:ad0fc70b02c1852b9a194113647ec554d62f5c9146126fcf61d719175ff8df9d 0.0s done
+#28 exporting config sha256:590322d8f6857eb6ba7d8d09de1774cdefe6ef0a4f26edf70b6b57b07afa1b5f 0.0s done
+#28 exporting attestation manifest sha256:1b86ef0c1a35b7e733a702840388841fd1b86f04ed0d256ba8e1817726e06e63 0.0s done
+#28 exporting manifest list sha256:498426853d26aa3d4f868de4bba87a790042f41f9bcbac5f5ecfae029c28d5e8 0.0s done
+#28 naming to docker.io/library/tablepro-postgres-release-bastion:latest done
+#28 unpacking to docker.io/library/tablepro-postgres-release-bastion:latest 0.1s done
+#28 DONE 0.5s
+
+#29 [bastion] resolving provenance for metadata file
+#29 DONE 0.0s
+
+#30 [relay] resolving provenance for metadata file
+#30 DONE 0.0s
+ Image tablepro-postgres-release-relay Built
+ Image tablepro-postgres-release-db Built
+ Image tablepro-postgres-release-bastion Built
+ Network tablepro-postgres-release_fixture Creating
+ Network tablepro-postgres-release_fixture Creating
+ Network tablepro-postgres-release_fixture Created
+ Network tablepro-postgres-release_fixture Created
+ Container tablepro-postgres-release-db-1 Creating
+ Container tablepro-postgres-release-relay-1 Creating
+ Container tablepro-postgres-release-relay-1 Created
+ Container tablepro-postgres-release-db-1 Created
+ Container tablepro-postgres-release-bastion-1 Creating
+ Container tablepro-postgres-release-bastion-1 Created
+ Container tablepro-postgres-release-toxiproxy-1 Creating
+ Container tablepro-postgres-release-toxiproxy-1 Created
+ Container tablepro-postgres-release-relay-1 Starting
+ Container tablepro-postgres-release-db-1 Starting
+ Container tablepro-postgres-release-relay-1 Started
+ Container tablepro-postgres-release-db-1 Started
+ Container tablepro-postgres-release-db-1 Waiting
+ Container tablepro-postgres-release-db-1 Healthy
+ Container tablepro-postgres-release-bastion-1 Starting
+ Container tablepro-postgres-release-bastion-1 Started
+ Container tablepro-postgres-release-bastion-1 Waiting
+ Container tablepro-postgres-release-bastion-1 Healthy
+ Container tablepro-postgres-release-toxiproxy-1 Starting
+ Container tablepro-postgres-release-toxiproxy-1 Started
+ Container tablepro-postgres-release-relay-1 Waiting
+ Container tablepro-postgres-release-toxiproxy-1 Waiting
+ Container tablepro-postgres-release-db-1 Waiting
+ Container tablepro-postgres-release-bastion-1 Waiting
+ Container tablepro-postgres-release-db-1 Healthy
+ Container tablepro-postgres-release-relay-1 Healthy
+ Container tablepro-postgres-release-bastion-1 Healthy
+ Container tablepro-postgres-release-toxiproxy-1 Healthy
+   Compiling libc v0.2.189
+   Compiling zeroize v1.9.0
+   Compiling subtle v2.6.1
+   Compiling typenum v1.20.1
+   Compiling cmov v0.5.4
+   Compiling cfg-if v1.0.5
+   Compiling rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling const-oid v0.10.2
+   Compiling cpufeatures v0.3.1
+   Compiling cpubits v0.1.1
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.25
+   Compiling autocfg v1.5.1
+   Compiling quote v1.0.47
+   Compiling base64ct v1.8.3
+   Compiling base16ct v1.0.0
+   Compiling pin-project-lite v0.2.17
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.12
+   Compiling ff v0.14.0
+   Compiling bytes v1.12.1
+   Compiling semver v1.0.28
+   Compiling futures-core v0.3.34
+   Compiling futures-sink v0.3.34
+   Compiling pkg-config v0.3.34
+   Compiling ctutils v0.4.2
+   Compiling group v0.14.0
+   Compiling dunce v1.0.5
+   Compiling fs_extra v1.3.0
+   Compiling pem-rfc7468 v1.0.0
+   Compiling version_check v0.9.5
+   Compiling serde_core v1.0.229
+   Compiling cfg_aliases v0.2.2
+   Compiling futures-channel v0.3.34
+   Compiling nix v0.31.3
+   Compiling rustc_version v0.4.1
+   Compiling num-traits v0.2.19
+   Compiling der v0.8.2
+   Compiling keccak v0.2.2
+   Compiling futures-io v0.3.34
+   Compiling slab v0.4.12
+   Compiling generic-array v0.14.7
+   Compiling memchr v2.8.3
+   Compiling byteorder v1.5.0
+   Compiling once_cell v1.21.4
+   Compiling rustversion v1.0.23
+   Compiling crc32fast v1.5.2
+   Compiling curve25519-dalek v5.0.0
+   Compiling futures-task v0.3.34
+   Compiling thiserror v2.0.20
+   Compiling aws-lc-rs v1.18.1
+   Compiling simd-adler32 v0.3.10
+   Compiling bitflags v2.13.2
+   Compiling serde v1.0.229
+   Compiling adler2 v2.0.1
+   Compiling miniz_oxide v0.9.1
+   Compiling sponge-cursor v0.1.0
+   Compiling syn v3.0.6
+   Compiling syn v2.0.119
+   Compiling hex v0.4.3
+   Compiling untrusted v0.7.1
+   Compiling hybrid-array v0.4.15
+   Compiling log v0.4.34
+   Compiling tracing-core v0.1.36
+   Compiling md5 v0.8.1
+   Compiling data-encoding v2.11.1
+   Compiling hex-literal v1.1.0
+   Compiling num-integer v0.1.47
+   Compiling generic-array v1.4.5
+   Compiling flate2 v1.1.10
+   Compiling jobserver v0.1.35
+   Compiling cc v1.4.6
+   Compiling spki v0.8.0
+   Compiling pkcs1 v0.8.0-rc.4
+   Compiling errno v0.3.14
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.3
+   Compiling block-buffer v0.12.1
+   Compiling block-padding v0.4.2
+   Compiling sec1 v0.8.1
+   Compiling module-lattice v0.2.3
+   Compiling signal-hook-registry v1.4.8
+   Compiling crypto-common v0.2.2
+   Compiling crypto-bigint v0.7.5
+   Compiling inout v0.2.2
+   Compiling cmake v0.1.58
+   Compiling digest v0.11.3
+   Compiling cipher v0.5.2
+   Compiling universal-hash v0.6.1
+   Compiling aead v0.6.1
+   Compiling kem v0.3.0
+   Compiling polyval v0.7.3
+   Compiling poly1305 v0.9.1
+   Compiling aws-lc-sys v0.45.0
+   Compiling hmac v0.13.0
+   Compiling sha2 v0.11.0
+   Compiling signature v3.0.0
+   Compiling blake2 v0.11.0
+   Compiling sha3 v0.11.0
+   Compiling sha1 v0.11.0
+   Compiling sha3 v0.12.0
+   Compiling aes v0.9.3
+   Compiling pbkdf2 v0.13.0
+   Compiling ctr v0.10.1
+   Compiling ghash v0.6.0
+   Compiling salsa20 v0.11.0
+   Compiling cbc v0.2.1
+   Compiling hkdf v0.13.0
+   Compiling chacha20 v0.10.2
+   Compiling blowfish v0.10.0
+   Compiling argon2 v0.6.0
+   Compiling uuid v1.26.1
+   Compiling ml-kem v0.3.2
+   Compiling rand v0.10.2
+   Compiling aes-gcm v0.11.1
+   Compiling secrecy v0.10.3
+   Compiling scrypt v0.12.0
+   Compiling bcrypt-pbkdf v0.11.0
+   Compiling pkcs5 v0.8.1
+   Compiling tokio-macros v2.7.2
+   Compiling futures-macro v0.3.34
+   Compiling thiserror-impl v2.0.20
+   Compiling async-trait v0.1.92
+   Compiling num-bigint v0.5.1
+   Compiling pkcs8 v0.11.0
+   Compiling tokio v1.53.1
+   Compiling ed25519 v3.0.0
+   Compiling futures-util v0.3.34
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling enum_dispatch v0.3.13
+   Compiling tracing-attributes v0.1.31
+   Compiling delegate v0.13.5
+   Compiling primefield v0.14.0
+   Compiling elliptic-curve v0.14.1
+   Compiling rfc6979 v0.6.0
+   Compiling ssh-encoding v0.3.0
+   Compiling crypto-primes v0.7.2
+   Compiling wnaf v0.14.1
+   Compiling ssh-cipher v0.3.0
+   Compiling russh-cryptovec v0.62.0
+   Compiling ecdsa v0.17.0
+   Compiling primeorder v0.14.0
+   Compiling tracing v0.1.44
+   Compiling p256 v0.14.0
+   Compiling p384 v0.14.0
+   Compiling p521 v0.14.0
+   Compiling rsa v0.10.0-rc.18
+   Compiling ed25519-dalek v3.0.0
+   Compiling futures-executor v0.3.34
+   Compiling futures v0.3.34
+   Compiling russh-util v0.52.0
+   Compiling tokio-util v0.7.19
+   Compiling ssh-key v0.7.0-rc.11
+   Compiling russh v0.63.3
+   Compiling tablepro-ssh v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/ssh)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.50s
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling num-traits v0.2.19
+   Compiling portable-atomic v1.15.0
+   Compiling equivalent v1.0.2
+   Compiling log v0.4.34
+   Compiling critical-section v1.2.0
+   Compiling futures-io v0.3.34
+   Compiling smallvec v1.16.1
+   Compiling syn v2.0.119
+   Compiling syn v3.0.6
+   Compiling futures-channel v0.3.34
+   Compiling stable_deref_trait v1.2.1
+   Compiling generic-array v0.14.7
+   Compiling itoa v1.0.18
+   Compiling foldhash v0.2.0
+   Compiling allocator-api2 v0.2.21
+   Compiling memchr v2.8.3
+   Compiling litemap v0.8.3
+   Compiling bitflags v2.13.2
+   Compiling writeable v0.6.4
+   Compiling icu_normalizer_data v2.3.0
+   Compiling icu_properties_data v2.3.0
+   Compiling utf8_iter v1.0.4
+   Compiling aws-lc-sys v0.45.0
+   Compiling aws-lc-rs v1.18.1
+   Compiling percent-encoding v2.3.2
+   Compiling zmij v1.0.23
+   Compiling glob v0.3.4
+   Compiling ring v0.17.14
+   Compiling hashbrown v0.17.1
+   Compiling form_urlencoded v1.2.2
+   Compiling serde_json v1.0.151
+   Compiling scopeguard v1.2.0
+   Compiling getrandom v0.2.17
+   Compiling untrusted v0.9.0
+   Compiling rustls v0.23.45
+   Compiling vcpkg v0.2.15
+   Compiling parking v2.2.1
+   Compiling regex-syntax v0.8.11
+   Compiling minimal-lexical v0.2.1
+   Compiling clang-sys v1.9.1
+   Compiling libloading v0.8.9
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling crossbeam-utils v0.8.23
+   Compiling digest v0.10.7
+   Compiling nom v7.1.3
+   Compiling iana-time-zone v0.1.65
+   Compiling rust_decimal v1.43.0
+   Compiling once_cell v1.21.4
+   Compiling either v1.18.0
+   Compiling crc32fast v1.5.2
+   Compiling indexmap v2.14.2
+   Compiling event-listener v5.4.2
+   Compiling tracing-core v0.1.36
+   Compiling itertools v0.13.0
+   Compiling lock_api v0.4.14
+   Compiling simd-adler32 v0.3.10
+   Compiling shlex v1.3.0
+   Compiling fastrand v2.5.0
+   Compiling parking_lot_core v0.9.12
+   Compiling rustc-hash v2.1.3
+   Compiling arrayvec v0.7.8
+   Compiling hex v0.4.3
+   Compiling rustix v1.1.5
+   Compiling miniz_oxide v0.9.1
+   Compiling zlib-rs v0.6.8
+   Compiling winnow v1.0.4
+   Compiling zerocopy v0.8.57
+   Compiling linux-raw-sys v0.12.1
+   Compiling regex-automata v0.4.18
+   Compiling parking_lot v0.12.5
+   Compiling cpufeatures v0.2.17
+   Compiling object v0.39.1
+   Compiling winnow v0.7.15
+   Compiling tinyvec v1.13.3
+   Compiling uuid v1.26.1
+   Compiling cexpr v0.6.0
+   Compiling bumpalo v3.20.3
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling zopfli v0.8.3
+   Compiling num-integer v0.1.47
+   Compiling regex v1.13.1
+   Compiling base64 v0.22.1
+   Compiling typed-path v0.12.3
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling synstructure v0.14.0
+   Compiling ryu v1.0.23
+   Compiling getrandom v0.3.4
+   Compiling toml_edit v0.25.15+spec-1.1.0
+   Compiling sha2 v0.10.9
+   Compiling csv-core v0.1.13
+   Compiling unicode_categories v0.1.1
+   Compiling bindgen v0.72.1
+   Compiling sqlformat v0.5.0
+   Compiling csv v1.4.0
+   Compiling hashbrown v0.16.1
+   Compiling crc-catalog v2.5.0
+   Compiling unicode-normalization v0.1.25
+   Compiling crc v3.4.0
+   Compiling serde_bytes v0.11.19
+   Compiling proc-macro-crate v3.5.0
+   Compiling flate2 v1.1.10
+   Compiling futures-intrusive v0.5.0
+   Compiling crossbeam-queue v0.3.14
+   Compiling stacker v0.1.25
+   Compiling zeroize_derive v1.5.0
+   Compiling tracing-attributes v0.1.31
+   Compiling zerocopy-derive v0.8.57
+   Compiling enumflags2_derive v0.7.12
+   Compiling hashlink v0.11.1
+   Compiling crunchy v0.2.4
+   Compiling zip v8.6.0
+   Compiling endi v1.1.1
+   Compiling unicode-properties v0.1.4
+   Compiling unicode-bidi v0.3.18
+   Compiling serde_derive v1.0.229
+   Compiling futures-macro v0.3.34
+   Compiling tokio-macros v2.7.2
+   Compiling zeroize v1.9.0
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.3
+   Compiling zerovec-derive v0.11.6
+   Compiling hybrid-array v0.4.15
+   Compiling displaydoc v0.2.7
+   Compiling thiserror-impl v2.0.20
+   Compiling futures-util v0.3.34
+   Compiling tracing v0.1.44
+   Compiling der v0.8.2
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling block-padding v0.4.2
+   Compiling crypto-bigint v0.7.5
+   Compiling inout v0.2.2
+   Compiling rustls-pki-types v1.15.1
+   Compiling async-trait v0.1.92
+   Compiling zerofrom v0.1.8
+   Compiling ar_archive_writer v0.5.3
+   Compiling yoke v0.8.3
+   Compiling tempfile v3.27.0
+   Compiling stringprep v0.1.5
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling webpki-roots v1.0.9
+   Compiling rand_core v0.9.5
+   Compiling event-listener-strategy v0.5.4
+   Compiling tiny-keccak v2.0.2
+   Compiling digest v0.11.3
+   Compiling cipher v0.5.2
+   Compiling universal-hash v0.6.1
+   Compiling thiserror v2.0.20
+   Compiling aead v0.6.1
+   Compiling polyval v0.7.3
+   Compiling recursive-proc-macro-impl v0.1.1
+   Compiling hmac v0.13.0
+   Compiling sha2 v0.11.0
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling ghash v0.6.0
+   Compiling ctr v0.10.1
+   Compiling pbkdf2 v0.13.0
+   Compiling aes v0.9.3
+   Compiling icu_collections v2.3.0
+   Compiling spki v0.8.0
+   Compiling salsa20 v0.11.0
+   Compiling cbc v0.2.1
+   Compiling chacha20 v0.10.2
+   Compiling icu_locale_core v2.3.0
+   Compiling signature v3.0.0
+   Compiling hkdf v0.13.0
+   Compiling sha1 v0.11.0
+   Compiling pkcs1 v0.8.0-rc.4
+   Compiling psm v0.1.32
+   Compiling sec1 v0.8.1
+   Compiling md-5 v0.11.0
+   Compiling rand v0.10.2
+   Compiling spin v0.9.9
+   Compiling aes-gcm v0.11.1
+   Compiling atoi v2.0.0
+   Compiling prettyplease v0.2.37
+   Compiling dotenvy v0.15.7
+   Compiling flume v0.12.0
+   Compiling openssl-sys v0.9.117
+   Compiling block-padding v0.3.3
+   Compiling scrypt v0.12.0
+   Compiling strsim v0.11.1
+   Compiling whoami v2.1.3
+   Compiling recursive v0.1.1
+   Compiling httparse v1.10.1
+   Compiling pkcs5 v0.8.1
+   Compiling sqlparser v0.58.0
+   Compiling const-random-macro v0.1.16
+   Compiling icu_provider v2.3.1
+   Compiling inout v0.1.4
+   Compiling libm v0.2.16
+   Compiling futures-executor v0.3.34
+   Compiling try-lock v0.2.5
+   Compiling tower-service v0.3.3
+   Compiling bindgen v0.71.1
+   Compiling const-random v0.1.18
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling futures v0.3.34
+   Compiling want v0.3.1
+   Compiling pkcs8 v0.11.0
+   Compiling cipher v0.4.4
+   Compiling async-broadcast v0.7.2
+   Compiling serde_repr v0.1.21
+   Compiling zvariant_utils v4.2.0
+   Compiling bytes v1.12.1
+   Compiling chrono v0.4.45
+   Compiling secrecy v0.10.3
+   Compiling enumflags2 v0.7.12
+   Compiling zcheapstr v1.1.0
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+   Compiling crypto-primes v0.7.2
+   Compiling elliptic-curve v0.14.1
+   Compiling primefield v0.14.0
+   Compiling rfc6979 v0.6.0
+   Compiling tokio v1.53.1
+   Compiling http v1.5.0
+   Compiling wnaf v0.14.1
+   Compiling idna_adapter v1.2.2
+   Compiling primeorder v0.14.0
+   Compiling idna v1.1.0
+   Compiling ecdsa v0.17.0
+   Compiling ssh-encoding v0.3.0
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling macro_magic_core_macros v0.5.1
+   Compiling zvariant_derive v5.15.0
+   Compiling url v2.5.8
+   Compiling derive-syn-parse v0.2.0
+   Compiling rust_xlsxwriter v0.99.1
+   Compiling libsqlite3-sys v0.37.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling zvariant v5.15.0
+   Compiling http-body v1.1.0
+   Compiling rsa v0.10.0-rc.18
+   Compiling async-recursion v1.1.1
+   Compiling num-iter v0.1.46
+   Compiling num-bigint v0.4.8
+   Compiling futures-lite v2.6.1
+   Compiling hmac v0.12.1
+   Compiling ordered-stream v0.2.0
+   Compiling atomic-waker v1.1.2
+   Compiling rand_chacha v0.9.0
+   Compiling toml_write v0.1.2
+   Compiling num-bigint-dig v0.9.1
+   Compiling openssl-probe v0.2.1
+   Compiling rand v0.9.5
+   Compiling ident_case v1.0.1
+   Compiling httpdate v1.0.3
+   Compiling darling_core v0.24.1
+   Compiling toml_edit v0.22.27
+   Compiling macro_magic_core v0.5.1
+   Compiling curve25519-dalek v5.0.0
+   Compiling ipnet v2.12.2
+   Compiling ed25519 v3.0.0
+   Compiling num-rational v0.4.2
+   Compiling num-bigint v0.5.1
+   Compiling blowfish v0.10.0
+   Compiling blake2 v0.11.0
+   Compiling poly1305 v0.9.1
+   Compiling num-complex v0.4.6
+   Compiling radium v0.7.0
+   Compiling crossbeam-epoch v0.9.21
+   Compiling openssl v0.10.81
+   Compiling foreign-types-shared v0.1.1
+   Compiling rand_core v0.6.4
+   Compiling foreign-types v0.3.2
+   Compiling zbus_names v4.3.4
+   Compiling password-hash v0.5.0
+   Compiling ssh-cipher v0.3.0
+   Compiling num v0.4.3
+   Compiling argon2 v0.6.0
+   Compiling toml v0.8.23
+   Compiling ed25519-dalek v3.0.0
+   Compiling bcrypt-pbkdf v0.11.0
+   Compiling prefix-trie v0.8.4
+   Compiling nix v0.31.3
+   Compiling zbus_macros v5.19.0
+   Compiling macro_magic_macros v0.5.1
+   Compiling sha3 v0.11.0
+   Compiling pbkdf2 v0.12.2
+   Compiling hkdf v0.12.4
+   Compiling http-body-util v0.1.5
+   Compiling p384 v0.14.0
+   Compiling tokio-util v0.7.19
+   Compiling tokio-stream v0.1.19
+   Compiling hyper v1.11.1
+   Compiling p521 v0.14.0
+   Compiling p256 v0.14.0
+   Compiling cbc v0.1.2
+   Compiling aes v0.8.4
+   Compiling darling_macro v0.24.1
+   Compiling kem v0.3.0
+   Compiling module-lattice v0.2.3
+   Compiling openssl-macros v0.1.1
+   Compiling tablepro-core v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/core)
+   Compiling blake2 v0.10.6
+   Compiling md-5 v0.10.6
+   Compiling ahash v0.8.12
+   Compiling hyper-util v0.1.20
+   Compiling time-core v0.1.9
+   Compiling lazy_static v1.5.0
+   Compiling native-tls v0.2.18
+   Compiling unicode-segmentation v1.13.3
+   Compiling tap v1.0.1
+   Compiling thiserror v1.0.69
+   Compiling num-conv v0.2.2
+   Compiling wyz v0.5.1
+   Compiling sha3 v0.12.0
+   Compiling argon2 v0.5.3
+   Compiling time-macros v0.2.32
+   Compiling ml-kem v0.3.2
+   Compiling darling v0.24.1
+   Compiling convert_case v0.10.0
+   Compiling russh-cryptovec v0.62.0
+   Compiling russh-util v0.52.0
+   Compiling hickory-proto v0.26.3
+   Compiling multiversion-macros v0.9.0
+   Compiling enum_dispatch v0.3.13
+   Compiling thiserror-impl v1.0.69
+   Compiling delegate v0.13.5
+   Compiling zbus v5.19.0
+   Compiling rustc_version_runtime v0.3.0
+   Compiling encoding_rs v0.8.41
+   Compiling generic-array v1.4.5
+   Compiling crossbeam-channel v0.5.17
+   Compiling utf8parse v0.2.2
+   Compiling tower-layer v0.3.3
+   Compiling unicode-xid v0.2.6
+   Compiling powerfmt v0.2.0
+   Compiling funty v2.0.0
+   Compiling deranged v0.5.8
+   Compiling sync_wrapper v1.0.2
+   Compiling tagptr v0.2.0
+   Compiling derive_more-impl v2.1.1
+   Compiling anstyle-parse v1.0.0
+   Compiling multiversion v0.9.0
+   Compiling moka v0.12.16
+   Compiling libgssapi-sys v0.3.4
+   Compiling serde_with_macros v3.23.0
+   Compiling macro_magic v0.5.1
+   Compiling typed-builder-macro v0.22.0
+   Compiling serde_derive_internals v0.29.1
+   Compiling bitvec v1.1.1
+   Compiling simdutf8 v0.1.5
+   Compiling hickory-net v0.26.3
+   Compiling tablepro-policy v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/policy)
+   Compiling time v0.3.55
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling core_detect v1.0.0
+   Compiling colorchoice v1.0.5
+   Compiling mime v0.3.17
+   Compiling anstyle v1.0.14
+   Compiling ssh-key v0.7.0-rc.11
+   Compiling multiversion_no_op v1.0.0
+   Compiling resolv-conf v0.7.6
+   Compiling anstyle-query v1.1.5
+   Compiling anstream v1.0.0
+   Compiling async-native-tls v0.4.0
+   Compiling derive_more v2.1.1
+   Compiling hickory-resolver v0.26.3
+   Compiling typed-builder v0.22.0
+   Compiling axum-core v0.5.6
+   Compiling libgssapi v0.8.3
+   Compiling clickhouse-macros v0.3.0
+   Compiling serde_with v3.23.0
+   Compiling mongodb-internal-macros v3.9.1
+   Compiling tower v0.5.3
+   Compiling combine v4.6.8
+   Compiling rustls-native-certs v0.8.4
+   Compiling half v2.7.1
+   Compiling asynchronous-codec v0.6.2
+   Compiling clickhouse-types v0.1.3
+   Compiling async-lock v3.4.2
+   Compiling bson v2.15.0
+   Compiling derive-where v1.7.0
+   Compiling arc-swap v1.9.2
+   Compiling serde_path_to_error v0.1.20
+   Compiling backon v1.6.0
+   Compiling bstr v1.13.1
+   Compiling heck v0.5.0
+   Compiling xxhash-rust v0.8.18
+   Compiling clap_lex v1.1.1
+   Compiling pretty-hex v0.3.0
+   Compiling connection-string v0.2.0
+   Compiling matchit v0.8.4
+   Compiling jiff-core v0.1.1
+   Compiling take_mut v0.2.2
+   Compiling bnum v0.13.0
+   Compiling arcstr v1.2.0
+   Compiling clap_builder v4.6.7
+   Compiling clap_derive v4.6.7
+   Compiling axum v0.8.9
+   Compiling tiberius v0.12.3 (https://github.com/tiberius-rs/tiberius?rev=c1d2e741ee6fe0935091826d91fb5886b6a4082a#c1d2e741)
+   Compiling sharded-slab v0.1.7
+   Compiling tracing-serde v0.2.0
+   Compiling tracing-log v0.2.0
+   Compiling thread_local v1.1.10
+   Compiling nu-ansi-term v0.50.3
+   Compiling matchers v0.2.0
+   Compiling jiff v0.2.37
+   Compiling tracing-subscriber v0.3.23
+   Compiling ashpd v0.13.13
+   Compiling clap v4.6.7
+   Compiling tablepro-driver-mssql v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/mssql)
+   Compiling oo7 v0.6.0
+   Compiling rustls-webpki v0.103.15
+   Compiling russh v0.63.3
+   Compiling sqlx-core v0.9.0
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling mongodb v3.9.1 (/home/trung/.cache/bookie-ui-main/linux/vendor/mongodb)
+   Compiling redis v1.7.0 (/home/trung/.cache/bookie-ui-main/linux/vendor/redis)
+   Compiling clickhouse v0.15.2
+   Compiling tablepro-ssh v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/ssh)
+   Compiling sqlx-postgres v0.9.0 (/home/trung/.cache/bookie-ui-main/linux/vendor/sqlx-postgres)
+   Compiling sqlx-mysql v0.9.0 (/home/trung/.cache/bookie-ui-main/linux/vendor/sqlx-mysql)
+   Compiling sqlx-sqlite v0.9.0
+   Compiling tablepro-driver-clickhouse v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/clickhouse)
+   Compiling sqlx v0.9.0
+   Compiling tablepro-storage v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/storage)
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/postgres)
+   Compiling tablepro-driver-sqlite v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/sqlite)
+   Compiling tablepro-driver-mysql v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/mysql)
+   Compiling tablepro-driver-redis v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/redis)
+   Compiling tablepro-transport v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/transport)
+   Compiling tablepro-mcp v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/mcp)
+   Compiling tablepro-release-tests v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/release-tests)
+   Compiling tablepro-driver-mongodb v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/mongodb)
+   Compiling tablepro-agentd v0.1.6-dev (/home/trung/.cache/bookie-ui-main/linux/crates/agentd)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 14s
+     Running tests/g5_system_openssh.rs (packaging/arch/src/target/debug/deps/g5_system_openssh-e5738714a7a34c54)
+
+running 1 test
+test agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+
+   Compiling tablepro-agentd v0.1.6-dev (/home/trung/.cache/bookie-ui-main/linux/crates/agentd)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.17s
+     Running tests/mtls.rs (packaging/arch/src/target/debug/deps/mtls-a8d36154b50e9e1b)
+
+running 3 tests
+test agentd_refuses_a_saved_client_certificate_from_an_untrusted_authority ... ok
+test agentd_uses_a_saved_client_certificate_for_the_database_session ... ok
+test agentd_uses_a_saved_client_certificate_through_its_saved_ssh_route ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+   Compiling tokio v1.53.1
+   Compiling crypto-bigint v0.7.5
+   Compiling tracing v0.1.44
+   Compiling rust_decimal v1.43.0
+   Compiling serde_json v1.0.151
+   Compiling chrono v0.4.45
+   Compiling crossbeam-utils v0.8.23
+   Compiling rustls v0.23.45
+   Compiling rustls-webpki v0.103.15
+   Compiling zopfli v0.8.3
+   Compiling libsqlite3-sys v0.37.0
+   Compiling atoi v2.0.0
+   Compiling tempfile v3.27.0
+   Compiling num-bigint v0.4.8
+   Compiling num-iter v0.1.46
+   Compiling md-5 v0.11.0
+   Compiling http v1.5.0
+   Compiling rand_core v0.9.5
+   Compiling toml_edit v0.22.27
+   Compiling num-complex v0.4.6
+   Compiling sqlparser v0.58.0
+   Compiling rand v0.9.5
+   Compiling module-lattice v0.2.3
+   Compiling crossbeam-queue v0.3.14
+   Compiling zip v8.6.0
+   Compiling ml-kem v0.3.2
+   Compiling num-bigint v0.5.1
+   Compiling num-bigint-dig v0.9.1
+   Compiling http-body v1.1.0
+   Compiling http-body-util v0.1.5
+   Compiling num-rational v0.4.2
+   Compiling axum-core v0.5.6
+   Compiling num v0.4.3
+   Compiling rust_xlsxwriter v0.99.1
+   Compiling toml v0.8.23
+   Compiling elliptic-curve v0.14.1
+   Compiling primefield v0.14.0
+   Compiling rfc6979 v0.6.0
+   Compiling ssh-encoding v0.3.0
+   Compiling crypto-primes v0.7.2
+   Compiling wnaf v0.14.1
+   Compiling ssh-cipher v0.3.0
+   Compiling russh-cryptovec v0.62.0
+   Compiling ecdsa v0.17.0
+   Compiling primeorder v0.14.0
+   Compiling p521 v0.14.0
+   Compiling p256 v0.14.0
+   Compiling p384 v0.14.0
+   Compiling rsa v0.10.0-rc.18
+   Compiling tokio-stream v0.1.19
+   Compiling tokio-util v0.7.19
+   Compiling zbus v5.19.0
+   Compiling russh-util v0.52.0
+   Compiling hyper v1.11.1
+   Compiling tower v0.5.3
+   Compiling tablepro-core v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/core)
+   Compiling sqlx-core v0.9.0
+   Compiling hyper-util v0.1.20
+   Compiling axum v0.8.9
+   Compiling sqlx-postgres v0.9.0 (/home/trung/.cache/bookie-ui-main/linux/vendor/sqlx-postgres)
+   Compiling sqlx-sqlite v0.9.0
+   Compiling ssh-key v0.7.0-rc.11
+   Compiling tablepro-policy v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/policy)
+   Compiling russh v0.63.3
+   Compiling ashpd v0.13.13
+   Compiling sqlx v0.9.0
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/postgres)
+   Compiling oo7 v0.6.0
+   Compiling tablepro-storage v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/storage)
+   Compiling tablepro-ssh v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/ssh)
+   Compiling tablepro-transport v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/transport)
+   Compiling tablepro-mcp v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/mcp)
+   Compiling tablepro-release-tests v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/release-tests)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.57s
+     Running unittests src/lib.rs (packaging/arch/src/target/debug/deps/tablepro_release_tests-420e5f4db729d782)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/activity_locks.rs (packaging/arch/src/target/debug/deps/activity_locks-ea6cd61b31b79ab8)
+
+running 2 tests
+test activity_templates_run_against_a_verified_session ... ok
+test blocking_lock_query_reports_a_contended_row ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+
+     Running tests/agent_transport.rs (packaging/arch/src/target/debug/deps/agent_transport-bf2442a145f30972)
+
+running 4 tests
+test a_direct_session_and_a_tunnelled_session_reach_the_same_database ... ok
+test a_tunnelled_connection_fails_closed_when_the_bastion_is_unreachable ... ok
+test shared_transport_records_builtin_unknown_and_changed_host_key_refusals ... ok
+test the_shared_transport_verifies_the_database_hostname_through_the_bastion ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+     Running tests/browse_filters.rs (packaging/arch/src/target/debug/deps/browse_filters-c85e202305772b3f)
+
+running 8 tests
+test a_composite_keyset_seeks_past_the_last_seen_pair ... ok
+test a_filter_value_carrying_sql_stays_data ... ok
+test an_unknown_filter_column_is_refused_before_reaching_the_database ... ok
+test capped_stream_preserves_columns_values_and_connection_reuse ... ok
+test combinators_and_raw_sql_compose_with_bound_rules ... ok
+test every_filter_operator_selects_the_expected_rows ... ok
+test keyset_paging_walks_the_same_rows_as_offset_paging ... ok
+test postgres_patterns_search_non_text_columns_without_changing_comparisons ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.15s
+
+     Running tests/mcp_tools.rs (packaging/arch/src/target/debug/deps/mcp_tools-a8a62087e79b826c)
+
+running 9 tests
+test a_denied_agent_write_is_journalled ... ok
+test a_hostile_table_name_cannot_inject_sql_through_a_metadata_tool ... ok
+test a_metadata_tool_is_refused_for_a_connection_outside_the_allowlist ... ok
+test a_read_scoped_agent_can_read_a_query_plan ... ok
+test a_read_scoped_agent_cannot_run_a_write_through_execute_query ... ok
+test a_read_scoped_agent_reads_table_metadata_a_count_and_a_page ... ok
+test csv_export_escapes_values_read_from_the_database ... ok
+test explain_analyze_is_denied_and_leaves_the_table_intact ... ok
+test explain_analyze_stays_denied_on_a_read_only_connection_with_write_scope ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.81s
+
+     Running tests/parameters.rs (packaging/arch/src/target/debug/deps/parameters-b03a2fa9d49104af)
+
+running 5 tests
+test a_copied_insert_round_trips_a_value_holding_a_backslash_and_a_quote ... ok
+test a_dollar_quoted_function_body_executes_as_one_statement ... ok
+test a_sql_payload_in_a_parameter_stays_data ... ok
+test named_parameters_bind_values_through_the_driver ... ok
+test repeated_parameters_bind_the_same_value_at_every_position ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+     Running tests/policy_transactions.rs (packaging/arch/src/target/debug/deps/policy_transactions-959689227b9f4371)
+
+running 4 tests
+test batch_rollback_discards_every_statement_after_a_failure ... ok
+test interactive_rollback_discards_uncommitted_writes ... ok
+test read_only_denies_a_data_changing_cte_and_leaves_rows_in_place ... ok
+test read_only_denies_an_administrative_function ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+     Running tests/reconnect.rs (packaging/arch/src/target/debug/deps/reconnect-5cb4eb2570763963)
+
+running 2 tests
+test direct_reconnect_restores_a_verified_session ... ok
+test ssh_reconnect_replaces_the_tunnel_and_the_session ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+     Running tests/saved_tls.rs (packaging/arch/src/target/debug/deps/saved_tls-07a10a7ebda0d886)
+
+running 9 tests
+test a_rotated_valid_client_certificate_is_used_by_the_saved_connection ... ok
+test a_saved_certificate_authority_verifies_a_privately_issued_certificate ... ok
+test a_saved_connection_naming_the_wrong_authority_is_refused ... ok
+test a_saved_connection_without_an_authority_cannot_verify_a_private_certificate ... ok
+test an_unverified_mode_ignores_a_saved_authority ... ok
+test saved_mtls_connection_authenticates_directly_with_client_certificate ... ok
+test saved_mtls_connection_authenticates_through_ssh ... ok
+test server_requiring_client_certificate_rejects_missing_identity ... ok
+test server_requiring_client_certificate_rejects_untrusted_identity ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running tests/structure_ddl.rs (packaging/arch/src/target/debug/deps/structure_ddl-147e1f568bcbedf1)
+
+running 8 tests
+test a_created_table_matches_the_drafted_columns_indexes_and_keys ... ok
+test a_drafted_foreign_key_is_created_and_enforced ... ok
+test a_failed_statement_rolls_back_the_whole_ddl_batch ... ok
+test a_renamed_column_keeps_a_comment_edited_in_the_same_save ... ok
+test a_renamed_table_keeps_its_rows ... ok
+test an_edited_draft_applies_the_diffed_column_changes ... ok
+test column_comments_are_created_added_edited_and_cleared ... ok
+test structure_batches_do_not_commit_or_rollback_an_editor_transaction ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.56s
+
+     Running tests/tls_identity.rs (packaging/arch/src/target/debug/deps/tls_identity-7c148f084d6e22c2)
+
+running 8 tests
+test ssh_tunnel_reaches_a_database_with_no_published_port ... ok
+test verify_ca_rejects_an_unknown_certificate_authority ... ok
+test verify_full_over_a_tcp_tunnel_never_downgrades_to_the_local_dial_address ... ok
+test verify_full_rejects_a_hostname_outside_the_certificate ... ok
+test verify_full_rejects_an_unknown_certificate_authority ... ok
+test verify_full_succeeds_against_the_certificate_hostname ... ok
+test verify_full_through_ssh_rejects_a_hostname_outside_the_certificate ... ok
+test verify_full_through_ssh_uses_the_original_database_hostname ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+   Compiling target-lexicon v0.13.5
+   Compiling smallvec v1.16.1
+   Compiling serde_spanned v1.1.1
+   Compiling version-compare v0.2.1
+   Compiling system-deps v9.0.0
+   Compiling fastrand v2.5.0
+   Compiling glib-macros v0.22.9
+   Compiling toml v1.1.6+spec-1.1.0
+   Compiling memoffset v0.9.1
+   Compiling field-offset v0.3.6
+   Compiling aho-corasick v1.1.5
+   Compiling regex-syntax v0.8.11
+   Compiling gtk4-macros v0.11.4
+   Compiling temp-dir v0.1.16
+   Compiling glib-build-tools v0.22.8
+   Compiling concurrent-queue v2.5.0
+   Compiling relm4-macros v0.11.0
+   Compiling icu_normalizer v2.3.0
+   Compiling parking_lot_core v0.9.12
+   Compiling tempfile v3.27.0
+   Compiling flume v0.12.0
+   Compiling futures-lite v2.6.1
+   Compiling hyper v1.11.1
+   Compiling num-bigint-dig v0.9.1
+   Compiling gettext-sys v0.27.0
+   Compiling parking_lot v0.12.5
+   Compiling backon v1.6.0
+   Compiling tablepro-core v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/core)
+   Compiling tablepro-app v0.1.6-dev (/home/trung/.cache/bookie-ui-main/linux/crates/app)
+   Compiling idna_adapter v1.2.2
+   Compiling futures-intrusive v0.5.0
+   Compiling cfg-expr v0.20.9
+   Compiling idna v1.1.0
+   Compiling moka v0.12.16
+   Compiling fragile v2.1.0
+   Compiling async-channel v2.5.0
+   Compiling whoami v1.6.1
+   Compiling zbus v5.19.0
+   Compiling url v2.5.8
+   Compiling system-deps v7.0.8
+   Compiling hyper-util v0.1.20
+   Compiling sqlx-core v0.9.0
+   Compiling hickory-proto v0.26.3
+   Compiling async-native-tls v0.4.0
+   Compiling redis v1.7.0 (/home/trung/.cache/bookie-ui-main/linux/vendor/redis)
+   Compiling tiberius v0.12.3 (https://github.com/tiberius-rs/tiberius?rev=c1d2e741ee6fe0935091826d91fb5886b6a4082a#c1d2e741)
+   Compiling gdk4-sys v0.11.4
+   Compiling gsk4-sys v0.11.4
+   Compiling gtk4-sys v0.11.4
+   Compiling libadwaita-sys v0.9.2
+   Compiling sourceview5-sys v0.11.2
+   Compiling glib-sys v0.22.9
+   Compiling gobject-sys v0.22.9
+   Compiling gio-sys v0.22.9
+   Compiling gdk-pixbuf-sys v0.22.9
+   Compiling cairo-sys-rs v0.22.9
+   Compiling pango-sys v0.22.9
+   Compiling graphene-sys v0.22.9
+   Compiling regex-automata v0.4.18
+   Compiling hyper-rustls v0.27.9
+   Compiling axum v0.8.9
+   Compiling clickhouse v0.15.2
+   Compiling glib v0.22.9
+   Compiling hickory-net v0.26.3
+   Compiling sqlx-postgres v0.9.0 (/home/trung/.cache/bookie-ui-main/linux/vendor/sqlx-postgres)
+   Compiling sqlx-mysql v0.9.0 (/home/trung/.cache/bookie-ui-main/linux/vendor/sqlx-mysql)
+   Compiling sqlx-sqlite v0.9.0
+   Compiling tablepro-policy v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/policy)
+   Compiling tablepro-driver-mssql v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/mssql)
+   Compiling hickory-resolver v0.26.3
+   Compiling regex v1.13.1
+   Compiling matchers v0.2.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling locale_config v0.3.0
+   Compiling gettext-rs v0.8.0
+   Compiling tablepro-driver-clickhouse v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/clickhouse)
+   Compiling mongodb v3.9.1 (/home/trung/.cache/bookie-ui-main/linux/vendor/mongodb)
+   Compiling ashpd v0.13.13
+   Compiling oo7 v0.6.0
+   Compiling sqlx v0.9.0
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/postgres)
+   Compiling tablepro-driver-mysql v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/mysql)
+   Compiling tablepro-driver-sqlite v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/sqlite)
+   Compiling tablepro-storage v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/storage)
+   Compiling gio v0.22.9
+   Compiling cairo-rs v0.22.9
+   Compiling graphene-rs v0.22.8
+   Compiling tablepro-driver-redis v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/redis)
+   Compiling tablepro-transport v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/transport)
+   Compiling tablepro-mcp v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/mcp)
+   Compiling gdk-pixbuf v0.22.0
+   Compiling pango v0.22.9
+   Compiling gdk4 v0.11.4
+   Compiling tablepro-driver-mongodb v0.1.0 (/home/trung/.cache/bookie-ui-main/linux/crates/drivers/mongodb)
+   Compiling gsk4 v0.11.4
+   Compiling gtk4 v0.11.4
+   Compiling libadwaita v0.9.2
+   Compiling sourceview5 v0.11.2
+   Compiling relm4 v0.11.0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 04s
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.35' (uid=1000 pid=3758607 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[3758617]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=3758619 comm="python3 /home/trung/.cache/bookie-ui-main/linux/cr")
+dbus-daemon[3758617]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.43' (uid=1000 pid=3758635 comm="/home/trung/.local/opt/bookie-0.1.7/usr/bin/bookie")
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.43' (uid=1000 pid=3758635 comm="/home/trung/.local/opt/bookie-0.1.7/usr/bin/bookie")
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.46' (uid=1000 pid=3758672 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.46' (uid=1000 pid=3758672 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.46' (uid=1000 pid=3758672 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:3758672): xdg-desktop-portal-WARNING **: 09:22:47.014: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3758672): xdg-desktop-portal-WARNING **: 09:22:47.014: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3758672): xdg-desktop-portal-WARNING **: 09:22:47.014: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3758672): xdg-desktop-portal-WARNING **: 09:22:47.023: Failed to connect to PipeWire: Couldn't connect to PipeWire
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.hyprland' requested by ':1.46' (uid=1000 pid=3758672 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.hyprland'
+[LOG] Initializing xdph...
+[LOG] XDG_CURRENT_DESKTOP set to Hyprland
+[LOG] Gathering exported interfaces
+[LOG]  | Got interface: wl_seat (ver 9)
+[LOG]  | Got interface: wl_data_device_manager (ver 3)
+[LOG]  | Got interface: wl_compositor (ver 6)
+[LOG]  | Got interface: wl_subcompositor (ver 1)
+[LOG]  | Got interface: wl_shm (ver 2)
+[LOG]  | Got interface: wp_viewporter (ver 1)
+[LOG]  | Got interface: wp_tearing_control_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_fractional_scale_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_output_manager_v1 (ver 3)
+[LOG]  | Got interface: wp_cursor_shape_manager_v1 (ver 2)
+[LOG]  | Got interface: zwp_idle_inhibit_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_relative_pointer_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_decoration_manager_v1 (ver 2)
+[LOG]  | Got interface: wp_alpha_modifier_v1 (ver 1)
+[LOG]  | Got interface: zwlr_gamma_control_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_foreign_toplevel_list_v1 (ver 1)
+[LOG]  | Got interface: zwp_pointer_gestures_v1 (ver 3)
+[LOG]  | Got interface: zwlr_foreign_toplevel_manager_v1 (ver 3)
+[LOG] [toplevel] (activate) locks: 1
+[LOG]  | Got interface: zwp_keyboard_shortcuts_inhibit_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_text_input_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_text_input_manager_v3 (ver 1)
+[LOG]  | Got interface: zwp_pointer_constraints_v1 (ver 1)
+[LOG]  | Got interface: zwlr_output_power_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_activation_v1 (ver 1)
+[LOG]  | Got interface: ext_idle_notifier_v1 (ver 2)
+[LOG]  | Got interface: hyprland_lock_notifier_v1 (ver 1)
+[LOG]  | Got interface: ext_session_lock_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_input_method_manager_v2 (ver 1)
+[LOG]  | Got interface: zwp_virtual_keyboard_manager_v1 (ver 1)
+[LOG]  | Got interface: zwlr_virtual_pointer_manager_v1 (ver 2)
+[LOG]  | Got interface: zwlr_output_manager_v1 (ver 4)
+[LOG]  | Got interface: org_kde_kwin_server_decoration_manager (ver 1)
+[LOG]  | Got interface: hyprland_focus_grab_manager_v1 (ver 1)
+[LOG]  | Got interface: zwp_tablet_manager_v2 (ver 1)
+[LOG]  | Got interface: zwlr_layer_shell_v1 (ver 5)
+[LOG]  | Got interface: wp_presentation (ver 2)
+[LOG]  | Got interface: xdg_wm_base (ver 7)
+[LOG]  | Got interface: zwlr_data_control_manager_v1 (ver 2)
+[LOG]  | Got interface: zwp_primary_selection_device_manager_v1 (ver 1)
+[LOG]  | Got interface: xwayland_shell_v1 (ver 1)
+[LOG]  | Got interface: hyprland_toplevel_mapping_manager_v1 (ver 1)
+[LOG] [toplevel mapping] registered manager
+[LOG]  | Got interface: hyprland_global_shortcuts_manager_v1 (ver 1)
+[LOG] [globalshortcuts] registered
+[LOG]  | Got interface: xdg_wm_dialog_v1 (ver 1)
+[LOG]  | Got interface: wp_single_pixel_buffer_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_security_context_manager_v1 (ver 1)
+[LOG]  | Got interface: hyprland_ctm_control_manager_v1 (ver 2)
+[LOG]  | Got interface: hyprland_input_capture_manager_v1 (ver 1)
+[LOG] [input-capture] initializing input capture portal
+[LOG] [input-capture] init successful
+[LOG]  | Got interface: hyprland_surface_manager_v1 (ver 2)
+[LOG]  | Got interface: wp_content_type_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_toplevel_tag_manager_v1 (ver 1)
+[LOG]  | Got interface: xdg_system_bell_v1 (ver 1)
+[LOG]  | Got interface: vicinae_hotkey_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_workspace_manager_v1 (ver 1)
+[LOG]  | Got interface: ext_data_control_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_pointer_warp_v1 (ver 1)
+[LOG]  | Got interface: wp_fifo_manager_v1 (ver 1)
+[LOG]  | Got interface: zxdg_exporter_v2 (ver 1)
+[LOG]  | Got interface: zxdg_importer_v2 (ver 1)
+[LOG]  | Got interface: ext_background_effect_manager_v1 (ver 1)
+[LOG]  | Got interface: wp_commit_timing_manager_v1 (ver 1)
+[LOG]  | Got interface: zwlr_screencopy_manager_v1 (ver 3)
+[ERR] [pipewire] pw didn't allow for a context connection
+[LOG] [screencopy] init successful
+[LOG]  | Got interface: hyprland_toplevel_export_manager_v1 (ver 2)
+[LOG]  | Got interface: ext_output_image_capture_source_manager_v1 (ver 1)
+[LOG]  | Got interface: extdbus-daemon[3725681]: [session uid=1000 pid=3725681 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+
+(process:3758619): dbind-WARNING **: 09:22:47.212: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+passed: postgres_ssh_unknown_host_key_decline_is_durably_audited
+A connection to the bus can't be made
+/bin/sh: line 1: kill: (3758704) - No such process

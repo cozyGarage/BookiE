@@ -57,6 +57,9 @@ mod time_contract;
 #[path = "support/date_contract.rs"]
 mod date_contract;
 
+#[path = "support/interval_array_csv_import.rs"]
+mod interval_array_csv_import;
+
 #[path = "support/wide_numeric_contract.rs"]
 mod wide_numeric_contract;
 
