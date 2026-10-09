@@ -99,6 +99,7 @@
 - Pressing Cancel while a connection is finishing no longer opens that connection anyway
 - Refreshing, closing or pressing Kill twice in the activity dialog no longer cancels a Kill that is already running, so its result is always shown
 - A run that cannot start (the session is closing or the connection is gone) no longer hides the result of the query still running in that editor
+- Deleting or pinning several history entries in quick succession no longer brings a deleted entry back into the list
 - Closing a table tab, paging, or disconnecting now stops the slow read it started on the server instead of letting it run to the timeout.
 - PostgreSQL optimistic grid edits cast both new and previously read custom enum, enum-array, and domain values to qualified native types, so stale-row comparisons work across those columns.
 - A PostgreSQL query that returns more rows than the result cap now returns the capped rows promptly and stops the server query, instead of waiting for the server to finish or timing out.

@@ -12,6 +12,7 @@ pub mod filter_settings;
 pub mod gtk_approval;
 pub mod mcp_service;
 pub mod operation_control;
+pub mod ordered_refresh;
 pub mod persistence_stores;
 pub mod preferences;
 pub mod query_parameters;
