@@ -321,11 +321,10 @@ async fn write_bundle(
     organization: Vec<(Uuid, tablepro_storage::ConnectionOrganization)>,
 ) -> Result<usize, BundleError> {
     let count = connections.len();
-    let ids: Vec<Uuid> = connections.iter().map(|connection| connection.id).collect();
     let secrets = if choice.passphrase.is_empty() {
         Vec::new()
     } else {
-        tablepro_storage::collect_bundle_secrets(&ids).await?
+        tablepro_storage::collect_bundle_secrets(&connections).await?
     };
     let export = BundleExport {
         producer: format!("bookie {}", env!("CARGO_PKG_VERSION")),
@@ -414,7 +413,7 @@ async fn apply_plan(
         )
         .await;
         if stored.is_err() {
-            roll_back(item).await;
+            roll_back(item, carried).await;
             return Ok((imported, planned));
         }
         imported += 1;
@@ -425,12 +424,12 @@ async fn apply_plan(
 /// Undo one item after a failed credential write. An entry that existed
 /// before the import is restored from its snapshot; one this import
 /// created is removed along with whatever it managed to store.
-async fn roll_back(item: &ImportItem) {
+async fn roll_back(item: &ImportItem, secrets: &tablepro_storage::BundleSecrets) {
     if let Err(error) = tablepro_storage::restore_connection(item.previous.as_ref(), item.connection.id).await {
         tracing::warn!(error = %error, "rolling back an imported connection failed");
     }
     if matches!(item.disposition, ImportDisposition::New | ImportDisposition::Remapped) {
-        tablepro_storage::forget_imported_secrets(item.connection.id).await;
+        tablepro_storage::forget_imported_bundle_secrets(item.connection.id, secrets).await;
     }
 }
 

@@ -333,6 +333,21 @@
       "tablepro-storage",
       "--lib",
       "connection_bundle::tests::rolling_back_an_import_removes_only_the_credentials_it_wrote"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::an_export_collects_each_versioned_ssh_hop_secret"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::rolling_back_a_bundle_import_removes_its_per_hop_credentials"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::importing_a_bundle_keeps_existing_hop_credentials_until_replacement_is_asked_for"
     ]
   ]
 }

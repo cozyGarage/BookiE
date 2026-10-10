@@ -67,7 +67,7 @@ edits the other lane's files without a ledger entry.
 | ID | Issue | Status | Evidence / next | Layer |
 | --- | --- | --- | --- | --- |
 | UI-1 | ~~Saved connections cannot be edited~~ | DONE | PR #87, `prefill.rs` tests | unit |
-| UI-1b | SSH jump chains cannot be edited in the form; such connections are refused for editing | OPEN | Storage groundwork adds stable hop IDs, credential revisions, v1-to-v2 connection-file migration, and per-hop Secret Service APIs. Credential migration/cleanup, transport cache identity, encrypted bundle v2, and GTK acceptance remain. Keep edit refusal until the full path lands and passes together; see the [per-hop credential proposal](proposals/ui-1b-ssh-jump-chain-editor.md) | gtk-widget |
+| UI-1b | SSH jump chains cannot be edited in the form; such connections are refused for editing | OPEN | PR #490 adds stable hop IDs, credential revisions, connection-file migration and per-hop Secret Service APIs. PR #492 implements hop-scoped transport and cache identity; this dependent PR adds encrypted bundle v2 and retains v1 import. GTK editing and acceptance remain. Keep edit refusal until the full path lands and passes together; see the [per-hop credential proposal](proposals/ui-1b-ssh-jump-chain-editor.md) | gtk-widget |
 | UI-2 | ~~Failed connect has no Retry or Edit~~ | DONE | PR #87, `recovery_tests` | unit |
 | UI-3 | ~~Saved connection cannot be cancelled while connecting~~ | DONE | PR #87; `establish_classified_with_cancellation` in `connection_service.rs` | unit |
 | UI-3b | ~~The connect dialog's own Connect button has no cancel~~ | DONE | `open_candidate` cancelled before anything is saved; scenario `connect_dialog_cancel_stops_a_hanging_connection` | gtk-installed |
