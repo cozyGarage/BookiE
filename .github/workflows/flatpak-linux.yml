@@ -17,19 +17,20 @@ on:
       - ".github/workflows/flatpak-linux.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: flatpak-linux-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   flatpak:
     name: flatpak-builder (${{ matrix.profile }})
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        include:
-          - profile: default
-            bundle: bookie.flatpak
-            manifest: linux/flatpak/com.tablepro.linux.json
-          - profile: development
-            bundle: bookie-devel.flatpak
-            manifest: linux/flatpak/com.tablepro.linux.Devel.json
+        profile: ${{ fromJSON(github.event_name == 'pull_request' && '["default"]' || '["default","development"]') }}
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
       options: --privileged
@@ -40,9 +41,9 @@ jobs:
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@401fe28a8384095fc1531b9d320b292f0ee45adb
         with:
-          bundle: ${{ matrix.bundle }}
-          manifest-path: ${{ matrix.manifest }}
-          cache-key: flatpak-builder-${{ matrix.profile }}-${{ github.sha }}
+          bundle: ${{ matrix.profile == 'development' && 'bookie-devel.flatpak' || 'bookie.flatpak' }}
+          manifest-path: ${{ matrix.profile == 'development' && 'linux/flatpak/com.tablepro.linux.Devel.json' || 'linux/flatpak/com.tablepro.linux.json' }}
+          cache-key: flatpak-builder-${{ matrix.profile }}-${{ hashFiles('linux/flatpak/**') }}
           upload-artifact: true
       - name: Record packaging scope
         run: |

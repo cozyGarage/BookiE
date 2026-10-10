@@ -14,8 +14,10 @@ mod guard;
 mod mask;
 mod principal;
 mod rules;
+mod select_writes;
 mod sensitive_projection;
 mod transaction_control;
+mod verdict;
 
 pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
 pub use audit::{

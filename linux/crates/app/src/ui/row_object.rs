@@ -43,7 +43,7 @@ mod imp {
 
     #[glib::object_subclass]
     impl ObjectSubclass for RowObject {
-        const NAME: &'static str = "TableProRowObject";
+        const NAME: &str = "TableProRowObject";
         type Type = super::RowObject;
     }
 

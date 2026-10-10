@@ -1,0 +1,152 @@
+diff --git a/src/client/auth/scram.rs b/src/client/auth/scram.rs
+index 1507e8e..bde70ad 100644
+--- a/src/client/auth/scram.rs
++++ b/src/client/auth/scram.rs
+@@ -49,6 +49,7 @@ const NO_CHANNEL_BINDING: char = 'n';
+ 
+ /// The minimum number of iterations of the hash function that we will accept from the server.
+ const MIN_ITERATION_COUNT: u32 = 4096;
++const MAX_ITERATION_COUNT: u32 = 100_000;
+ 
+ /// Cache of pre-computed salted passwords.
+ static CREDENTIAL_CACHE: LazyLock<RwLock<HashMap<CacheEntry, Vec<u8>>>> =
+@@ -518,13 +519,18 @@ impl ServerFirst {
+                 "SCRAM",
+                 "handshake terminated early",
+             ))
+-        } else if &self.nonce[0..nonce.len()] != nonce {
++        } else if !self.nonce.starts_with(nonce) {
+             Err(Error::authentication_error("SCRAM", "mismatched nonce"))
+         } else if self.i < MIN_ITERATION_COUNT {
+             Err(Error::authentication_error(
+                 "SCRAM",
+                 "iteration count too low",
+             ))
++        } else if self.i > MAX_ITERATION_COUNT {
++            Err(Error::authentication_error(
++                "SCRAM",
++                "iteration count too high",
++            ))
+         } else {
+             Ok(())
+         }
+@@ -708,6 +714,47 @@ mod tests {
+             i: 4096,
+             ..invalid_iteration_count
+         };
+-        assert!(valid_iteration_count.validate(nonce).is_ok())
++        assert!(valid_iteration_count.validate(nonce).is_ok());
++
++        let max_allowed_iteration_count = ServerFirst {
++            i: 100_000,
++            ..valid_iteration_count
++        };
++        assert!(max_allowed_iteration_count.validate(nonce).is_ok());
++
++        let too_high_iteration_count = ServerFirst {
++            i: 100_001,
++            ..max_allowed_iteration_count
++        };
++        assert!(too_high_iteration_count.validate(nonce).is_err());
++    }
++
++    fn server_first_with_nonce(nonce: &str) -> ServerFirst {
++        ServerFirst {
++            conversation_id: Bson::Null,
++            done: false,
++            message: "mocked".to_string(),
++            nonce: nonce.to_string(),
++            salt: Vec::new(),
++            i: 4096,
++        }
++    }
++
++    #[test]
++    fn test_nonce_prefix_matches() {
++        let server_first = server_first_with_nonce("client-nonceserver-suffix");
++        assert!(server_first.validate("client-nonce").is_ok());
++    }
++
++    #[test]
++    fn test_nonce_mismatch_is_rejected() {
++        let server_first = server_first_with_nonce("server-nonce");
++        assert!(server_first.validate("client-nonce").is_err());
++    }
++
++    #[test]
++    fn test_client_nonce_longer_than_server_nonce_is_rejected_not_a_panic() {
++        let server_first = server_first_with_nonce("short");
++        assert!(server_first.validate("this-nonce-is-longer-than-the-server-echoed-back").is_err());
+     }
+ }
+diff --git a/src/client/options.rs b/src/client/options.rs
+index 6f720fa..bfcc091 100644
+--- a/src/client/options.rs
++++ b/src/client/options.rs
+@@ -1244,6 +1244,13 @@ pub struct TlsOptions {
+     /// If set, the key in `cert_key_file_path` must be encrypted with this password.
+     #[cfg(feature = "cert-key-password")]
+     pub tls_certificate_key_file_password: Option<Vec<u8>>,
++
++    /// Overrides the hostname used for certificate verification (SNI and the
++    /// hostname check) without changing which address the driver dials. Set
++    /// this when the dial address is a local forwarding endpoint, such as an
++    /// SSH tunnel, but the certificate was issued for the server's real
++    /// hostname.
++    pub verify_hostname: Option<String>,
+ }
+ 
+ impl TlsOptions {
+diff --git a/src/runtime/tls_openssl.rs b/src/runtime/tls_openssl.rs
+index 20d8c40..9e2ddb6 100644
+--- a/src/runtime/tls_openssl.rs
++++ b/src/runtime/tls_openssl.rs
+@@ -81,6 +81,7 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
+         allow_invalid_hostnames: _,
+         #[cfg(feature = "cert-key-password")]
+         tls_certificate_key_file_password,
++        verify_hostname: _,
+     } = cfg;
+ 
+     if let Some(true) = allow_invalid_certificates {
+diff --git a/src/runtime/tls_rustls.rs b/src/runtime/tls_rustls.rs
+index afc6481..1007ba4 100644
+--- a/src/runtime/tls_rustls.rs
++++ b/src/runtime/tls_rustls.rs
+@@ -32,17 +32,22 @@ pub(crate) type TlsStream<T> = tokio_rustls::client::TlsStream<T>;
+ #[derive(Clone)]
+ pub(crate) struct TlsConfig {
+     connector: TlsConnector,
++    verify_hostname: Option<String>,
+ }
+ 
+ impl TlsConfig {
+     /// Create a new `TlsConfig` from the provided options from the user.
+     /// This operation is expensive, so the resultant `TlsConfig` should be cached.
+     pub(crate) fn new(options: TlsOptions) -> Result<TlsConfig> {
++        let verify_hostname = options.verify_hostname.clone();
+         let mut tls_config = make_rustls_config(options)?;
+         tls_config.enable_sni = true;
+ 
+         let connector: TlsConnector = Arc::new(tls_config).into();
+-        Ok(TlsConfig { connector })
++        Ok(TlsConfig {
++            connector,
++            verify_hostname,
++        })
+     }
+ }
+ 
+@@ -51,9 +56,10 @@ pub(crate) async fn tls_connect<T: AsyncRead + AsyncWrite + Unpin>(
+     tcp_stream: T,
+     cfg: &TlsConfig,
+ ) -> Result<TlsStream<T>> {
+-    let name = ServerName::try_from(host)
++    let verify_host = cfg.verify_hostname.as_deref().unwrap_or(host);
++    let name = ServerName::try_from(verify_host)
+         .map_err(|e| ErrorKind::DnsResolve {
+-            message: format!("could not resolve {:?}: {e}", crate::error::Redact(host)),
++            message: format!("could not resolve {:?}: {e}", crate::error::Redact(verify_host)),
+         })?
+         .to_owned();
+ 

@@ -246,8 +246,8 @@ impl App {
                 .register(async move {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     match conn.fetch_columns_controlled(schema.as_deref(), &table, &control).await {
+                        Ok(_) | Err(_) if control.cancellation_token().is_cancelled() => {}
                         Ok(columns) => sender_clone.input(AppMsg::ColumnsLoaded(tab_id, columns)),
-                        Err(_) if control.cancellation_token().is_cancelled() => {}
                         Err(error) => sender_clone.input(AppMsg::LoadFailed(
                             Some(tab_id),
                             BrowseLoadFailure {
@@ -288,6 +288,7 @@ impl App {
                     if let Ok(foreign_keys) = conn
                         .fetch_foreign_keys_controlled(schema.as_deref(), &table, &control)
                         .await
+                        && !control.cancellation_token().is_cancelled()
                     {
                         sender_clone.input(AppMsg::ForeignKeysLoaded(tab_id, foreign_keys));
                     }

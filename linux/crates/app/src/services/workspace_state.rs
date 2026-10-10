@@ -22,9 +22,15 @@ pub struct WorkspaceStore {
 
 struct WorkspaceStoreInner {
     file_lock: Arc<Mutex<()>>,
-    memory_lock: Mutex<()>,
-    cache: Mutex<HashMap<Uuid, Option<ConnectionWorkspaceState>>>,
+    memory: Mutex<Memory>,
     writer: WorkspaceWriter,
+}
+
+#[derive(Default)]
+struct Memory {
+    cache: HashMap<Uuid, Option<ConnectionWorkspaceState>>,
+    saved_at: HashMap<Uuid, u64>,
+    clock: u64,
 }
 
 struct WorkspaceWriter {
@@ -312,8 +318,7 @@ impl WorkspaceStore {
         Self {
             inner: Arc::new(WorkspaceStoreInner {
                 file_lock,
-                memory_lock: Mutex::new(()),
-                cache: Mutex::new(HashMap::new()),
+                memory: Mutex::new(Memory::default()),
                 writer: WorkspaceWriter { wake, queue },
             }),
         }
@@ -321,8 +326,7 @@ impl WorkspaceStore {
 
     pub fn prefetch_connections(&self, ids: &[Uuid]) -> Result<(), WorkspaceFlushError> {
         prefetch_connections_coordinated(
-            &self.inner.memory_lock,
-            &self.inner.cache,
+            &self.inner.memory,
             ids,
             || {
                 let receiver = self.flush();
@@ -331,7 +335,11 @@ impl WorkspaceStore {
                 }
             },
             || {
-                let _guard = self.inner.file_lock.lock().unwrap_or_else(|error| error.into_inner());
+                let _guard = self
+                    .inner
+                    .file_lock
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 load_locked()
             },
         )
@@ -339,9 +347,10 @@ impl WorkspaceStore {
 
     pub fn load_connection(&self, id: Uuid) -> Option<ConnectionWorkspaceState> {
         self.inner
-            .cache
+            .memory
             .lock()
-            .unwrap_or_else(|error| error.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .cache
             .get(&id)
             .cloned()
             .flatten()
@@ -349,27 +358,26 @@ impl WorkspaceStore {
 
     pub fn save_connection(&self, id: Uuid, mut conn_state: ConnectionWorkspaceState) {
         clamp_connection(&mut conn_state);
-        save_connection_coordinated(
-            &self.inner.memory_lock,
-            &self.inner.cache,
-            &self.inner.writer.queue,
-            id,
-            conn_state,
-        );
+        save_connection_coordinated(&self.inner.memory, &self.inner.writer.queue, id, conn_state);
         wake_writer(&self.inner.writer);
     }
 
     pub fn forget_connection(&self, id: Uuid) {
         {
-            let _memory_guard = self.inner.memory_lock.lock().unwrap_or_else(|error| error.into_inner());
-            self.inner
-                .cache
+            let mut memory = self
+                .inner
+                .memory
                 .lock()
-                .unwrap_or_else(|error| error.into_inner())
-                .remove(&id);
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            memory.cache.remove(&id);
+            memory.saved_at.remove(&id);
         }
         {
-            let _guard = self.inner.file_lock.lock().unwrap_or_else(|error| error.into_inner());
+            let _guard = self
+                .inner
+                .file_lock
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             match load_locked() {
                 Ok(mut state) => {
                     if state.connections.remove(&id.to_string()).is_some()
@@ -397,14 +405,14 @@ impl WorkspaceStore {
             .writer
             .queue
             .lock()
-            .unwrap_or_else(|error| error.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .flush(sender);
         if !wake_writer(&self.inner.writer) {
             self.inner
                 .writer
                 .queue
                 .lock()
-                .unwrap_or_else(|error| error.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .fail_flushes(WorkspaceFlushError::WriterUnavailable);
         }
         receiver
@@ -418,35 +426,41 @@ impl Default for WorkspaceStore {
 }
 
 fn prefetch_connections_coordinated(
-    memory_lock: &Mutex<()>,
-    cache: &Mutex<HashMap<Uuid, Option<ConnectionWorkspaceState>>>,
+    memory: &Mutex<Memory>,
     ids: &[Uuid],
     flush: impl FnOnce(),
     load: impl FnOnce() -> Result<WorkspaceState, WorkspaceFlushError>,
 ) -> Result<(), WorkspaceFlushError> {
-    let _memory_guard = memory_lock.lock().unwrap_or_else(|error| error.into_inner());
+    let started = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clock;
     flush();
     let state = load()?;
-    let mut cache = cache.lock().unwrap_or_else(|error| error.into_inner());
+    let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for id in ids {
-        cache.insert(*id, state.connections.get(&id.to_string()).cloned());
+        if memory.saved_at.get(id).is_some_and(|saved| *saved > started) {
+            continue;
+        }
+        memory
+            .cache
+            .insert(*id, state.connections.get(&id.to_string()).cloned());
     }
     Ok(())
 }
 
 fn save_connection_coordinated(
-    memory_lock: &Mutex<()>,
-    cache: &Mutex<HashMap<Uuid, Option<ConnectionWorkspaceState>>>,
+    memory: &Mutex<Memory>,
     queue: &Mutex<WorkspaceQueue>,
     id: Uuid,
     state: ConnectionWorkspaceState,
 ) {
-    let _memory_guard = memory_lock.lock().unwrap_or_else(|error| error.into_inner());
-    cache
+    let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    memory.clock += 1;
+    let clock = memory.clock;
+    memory.saved_at.insert(id, clock);
+    memory.cache.insert(id, Some(state.clone()));
+    queue
         .lock()
-        .unwrap_or_else(|error| error.into_inner())
-        .insert(id, Some(state.clone()));
-    queue.lock().unwrap_or_else(|error| error.into_inner()).save(id, state);
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .save(id, state);
 }
 
 fn wake_writer(writer: &WorkspaceWriter) -> bool {
@@ -459,13 +473,16 @@ fn wake_writer(writer: &WorkspaceWriter) -> bool {
 
 fn run_writer(receiver: mpsc::Receiver<()>, queue: Arc<Mutex<WorkspaceQueue>>, file_lock: Arc<Mutex<()>>) {
     while receiver.recv().is_ok() {
-        let pending = queue.lock().unwrap_or_else(|error| error.into_inner()).take_pending();
+        let pending = queue
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take_pending();
         if pending.is_empty() {
             continue;
         }
         let attempted_sequence = pending.iter().map(|(_, entry)| entry.sequence).max().unwrap_or(0);
         let result = {
-            let _guard = file_lock.lock().unwrap_or_else(|error| error.into_inner());
+            let _guard = file_lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             load_locked().and_then(|mut state| {
                 for (id, entry) in &pending {
                     state.connections.insert(id.to_string(), entry.state.clone());
@@ -473,7 +490,7 @@ fn run_writer(receiver: mpsc::Receiver<()>, queue: Arc<Mutex<WorkspaceQueue>>, f
                 save_locked(&state)
             })
         };
-        let mut queue = queue.lock().unwrap_or_else(|error| error.into_inner());
+        let mut queue = queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if result.is_err() {
             queue.restore_pending(pending);
         }
@@ -714,9 +731,10 @@ mod tests {
         let id = Uuid::new_v4();
         first
             .inner
-            .cache
+            .memory
             .lock()
             .unwrap()
+            .cache
             .insert(id, Some(connection("SELECT 1")));
 
         assert!(clone.load_connection(id).is_some());
@@ -840,8 +858,7 @@ mod tests {
 
     #[test]
     fn prefetch_cannot_replace_a_save_started_while_snapshot_is_loading() {
-        let memory_lock = Arc::new(Mutex::new(()));
-        let cache = Arc::new(Mutex::new(HashMap::new()));
+        let memory = Arc::new(Mutex::new(Memory::default()));
         let queue = Arc::new(Mutex::new(WorkspaceQueue::default()));
         let id = Uuid::new_v4();
         let mut disk_state = WorkspaceState::default();
@@ -849,12 +866,10 @@ mod tests {
         let (load_started_sender, load_started_receiver) = mpsc::sync_channel(0);
         let (continue_load_sender, continue_load_receiver) = mpsc::sync_channel(0);
 
-        let prefetch_memory_lock = Arc::clone(&memory_lock);
-        let prefetch_cache = Arc::clone(&cache);
+        let prefetch_memory = Arc::clone(&memory);
         let prefetch = std::thread::spawn(move || {
             prefetch_connections_coordinated(
-                &prefetch_memory_lock,
-                &prefetch_cache,
+                &prefetch_memory,
                 &[id],
                 || {},
                 || {
@@ -867,29 +882,59 @@ mod tests {
         });
         load_started_receiver.recv().unwrap();
 
-        let save_memory_lock = Arc::clone(&memory_lock);
-        let save_cache = Arc::clone(&cache);
-        let save_queue = Arc::clone(&queue);
-        let save = std::thread::spawn(move || {
-            save_connection_coordinated(
-                &save_memory_lock,
-                &save_cache,
-                &save_queue,
-                id,
-                connection("SELECT new"),
-            );
-        });
+        save_connection_coordinated(&memory, &queue, id, connection("SELECT new"));
 
         continue_load_sender.send(()).unwrap();
         prefetch.join().unwrap();
-        save.join().unwrap();
 
-        let cached = cache.lock().unwrap().get(&id).cloned().flatten().unwrap();
+        let cached = memory.lock().unwrap().cache.get(&id).cloned().flatten().unwrap();
         assert!(matches!(&cached.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT new"));
         let pending = queue.lock().unwrap().take_pending();
         assert_eq!(pending.len(), 1);
         assert!(
             matches!(&pending[0].1.state.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT new")
+        );
+    }
+
+    #[test]
+    fn a_save_does_not_wait_for_a_slow_prefetch() {
+        let memory = Arc::new(Mutex::new(Memory::default()));
+        let queue = Arc::new(Mutex::new(WorkspaceQueue::default()));
+        let id = Uuid::new_v4();
+        let (load_started_sender, load_started_receiver) = mpsc::sync_channel(0);
+        let (continue_load_sender, continue_load_receiver) = mpsc::sync_channel(0);
+
+        let prefetch_memory = Arc::clone(&memory);
+        let prefetch = std::thread::spawn(move || {
+            prefetch_connections_coordinated(
+                &prefetch_memory,
+                &[id],
+                || {},
+                || {
+                    load_started_sender.send(()).unwrap();
+                    continue_load_receiver.recv().unwrap();
+                    Ok(WorkspaceState::default())
+                },
+            )
+            .unwrap();
+        });
+        load_started_receiver.recv().unwrap();
+
+        let (saved_sender, saved_receiver) = mpsc::channel();
+        let save_memory = Arc::clone(&memory);
+        let save_queue = Arc::clone(&queue);
+        let save = std::thread::spawn(move || {
+            save_connection_coordinated(&save_memory, &save_queue, id, connection("SELECT new"));
+            saved_sender.send(()).unwrap();
+        });
+        let finished_while_loading = saved_receiver.recv_timeout(std::time::Duration::from_secs(5)).is_ok();
+
+        continue_load_sender.send(()).unwrap();
+        prefetch.join().unwrap();
+        save.join().unwrap();
+        assert!(
+            finished_while_loading,
+            "a save must not block behind a prefetch's disk work"
         );
     }
 

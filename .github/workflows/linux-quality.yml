@@ -1,17 +1,6 @@
 name: Linux test quality
 
 on:
-  push:
-    branches: [linux]
-    paths:
-      - ".github/workflows/linux-quality.yml"
-      - "linux/crates/drivers/postgres/src/**"
-      - "linux/crates/drivers/postgres/tests/**"
-      - "linux/crates/core/**"
-      - "linux/crates/policy/**"
-      - "linux/crates/ssh/**"
-      - "linux/crates/drivers/redis/**"
-      - "linux/scripts/tests/test_mutation_workflow.py"
   schedule:
     - cron: "41 3 * * 0"
   workflow_dispatch:

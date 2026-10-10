@@ -40,7 +40,7 @@ mod imp {
 
     #[glib::object_subclass]
     impl ObjectSubclass for RowStore {
-        const NAME: &'static str = "TableProRowStore";
+        const NAME: &str = "TableProRowStore";
         type Type = super::RowStore;
         type Interfaces = (gio::ListModel,);
     }

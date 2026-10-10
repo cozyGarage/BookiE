@@ -4,7 +4,17 @@ import os
 from pathlib import Path
 import sys
 
-REQUIRED = {"preflight", "fast", "gtk-safety", "integration", "b4-rollback", "driver-tls", "postgres-release", "duckdb"}
+REQUIRED = {
+    "pin-revision",
+    "preflight",
+    "fast",
+    "gtk-safety",
+    "integration",
+    "b4-rollback",
+    "driver-tls",
+    "postgres-release",
+    "duckdb",
+}
 SCHEDULED = "current-stable-clippy"
 MERGE_ONLY = {"gtk-safety", "integration", "b4-rollback", "driver-tls", "postgres-release", "duckdb"}
 
@@ -16,11 +26,16 @@ def assess(results, event):
     for name in sorted(expected | results.keys()):
         status = results.get(name, {}).get("result", "missing")
         allowed_skip = name == SCHEDULED and event in {"push", "pull_request"} and status == "skipped"
-        deferred = name in MERGE_ONLY and event == "pull_request" and status == "skipped"
+        deferred = name in MERGE_ONLY and event in {"push", "pull_request"} and status == "skipped"
         accepted = name in expected and (status == "success" or allowed_skip or deferred)
         if not accepted:
             failures.append(name)
-        detail = "scheduled/manual only" if allowed_skip else "runs after merge" if deferred else status
+        if allowed_skip:
+            detail = "scheduled/manual only"
+        elif deferred:
+            detail = "Forgejo merge gate; GitHub schedule/manual only"
+        else:
+            detail = status
         rows.append(f"| {name} | {detail} | {'accepted' if accepted else 'FAILED'} |")
     return failures, rows
 

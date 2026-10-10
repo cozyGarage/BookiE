@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "B4-21 current-tip Samba AD Kerberos authentication and verified-TLS refusal selectors",
+  "source_commit": "3b9f2c8442c0648245e6df2c02eaee56f7b13621",
+  "test_binary_path": "linux/target/debug/deps/mssql_kerberos-8e7afaf4ee6b7391",
+  "test_binary_sha256": "5a46ee542ae73b1c10fc22a72d446d5824b024b765ce9719eb800797b20e075c",
+  "command": "bash linux/scripts/test-mssql-kerberos.sh",
+  "runtime": "Local Linux host; Docker Samba AD and SQL Server fixtures; generated Kerberos keytabs and verified TLS certificates",
+  "result": "2 passed, 0 failed",
+  "duration_seconds": 48,
+  "tests": [
+    "kerberos_refuses_an_unregistered_sql_server_spn",
+    "kerberos_ticket_connects_over_verified_tls_and_executes_query"
+  ],
+  "not_established": [
+    "Windows Active Directory interoperability",
+    "Distribution-package Kerberos acceptance",
+    "Frozen-candidate acceptance"
+  ],
+  "artifacts": {
+    "run.log": "dd4524446e96560398bb4ad09996f47737d5136882db8853ac72718d2ba4caaf"
+  }
+}

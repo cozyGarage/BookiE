@@ -71,8 +71,10 @@ owner table, and each lane edits only its own files.
 4. **Gate on Forgejo:** `bash linux/scripts/forgejo-gate.sh <branch> [remote-branch]`.
    It pushes to the lab Forgejo, waits for that push's run and lists jobs that
    did not pass. Forgejo is the acceptance gate: it runs the merge tier (Docker
-   drivers, installed GTK, distro floor, packages) on every branch push. A green
-   GitHub pull request only means the cheap tier ran.
+   drivers, installed GTK, distro floor, packages) on every branch push. GitHub
+   no longer runs the merge tier on pushes to `linux` or `main`: drivers,
+   installed GTK, driver TLS, the PostgreSQL release fixture and DuckDB run on
+   Forgejo only, so a green GitHub pull request only means the cheap tier ran.
 5. Open the GitHub pull request against `linux`, merge it when the Forgejo gate
    is green (squash, subject `<type>(<scope>): <summary> (#N)`), then sync
    Forgejo's `linux` to GitHub's.
@@ -93,10 +95,14 @@ owner table, and each lane edits only its own files.
    failure seen while another run was active is inconclusive until it is
    re-run alone. Never start a second gate by hand to "speed up".
 8. **Do not repeat work between GitHub and Forgejo.** GitHub runs the cheap tier,
-   security, Flatpak and the workflow and harness contracts on pull requests.
-   Forgejo runs the merge tier on its own executors. Do not re-run a Forgejo
+   security, Flatpak and the workflow and harness contracts on pull requests,
+   plus at most a weekly scheduled backup run. A push to `linux` does not start
+   the merge tier there. Forgejo runs the merge tier on its own executors. Do not re-run a Forgejo
    job to learn what GitHub already reported, and do not trust a skipped GitHub
    job as a pass.
+   CodeQL and SonarCloud run on GitHub as reference scans, not gates: fix real
+   findings in small pull requests and mark wrong ones "False positive" or
+   "Won't fix" with a reason (see validation-playbook, SonarCloud triage).
 9. **Merge only on GitHub.** Forgejo is the gate, not the merge target: never merge a
    pull request on Forgejo, and never push to Forgejo's `linux` by hand. A Forgejo
    merge makes its `linux` diverge from GitHub's, and the sync (which only
@@ -194,7 +200,10 @@ authoritative; [code conventions](linux/docs/code-conventions.md) settles
 function length, parameters, naming and extraction.
 
 - Rust edition 2024, Rust 1.98, line width 120.
-- No comments or doc comments, except the external-system rule above.
+- No comments or doc comments, except the external-system rule above. A Rust
+  file may not gain comment lines (`check-comment-lines.py`, baselines in
+  `linux/comment-line-baselines.txt`); after deleting comments run
+  `python3 linux/scripts/check-comment-lines.py --update` to lower them.
 - Early returns; at most three levels of indentation in a function body.
 - A function body is at most 60 lines (`check-function-size.py`, baselines in
   `linux/function-size-baselines.txt`: lower a count when you split, never raise
@@ -222,6 +231,26 @@ reach gets manual steps in
 [manual verification](linux/docs/manual-verification-0.2-features.md). Never
 change a test to accept incorrect behaviour; confirm a new regression test fails
 on the unfixed code.
+
+Rules for pull requests that add tests (any agent, including Cursor):
+
+- Assert observable behaviour, such as an outcome, a stored value or an error
+  kind, and not rule names, message text or internal identifiers that the code
+  owner may rename.
+- A test pull request does not change product rules. When a rule looks wrong,
+  tell the lane owner and leave the rule alone.
+- A new test fails on the code before the fix, or its commit says it pins
+  existing behaviour.
+- Merge `origin/linux` into the branch and run `linux/scripts/preflight.sh`
+  before opening the pull request.
+- Do not edit ledger rows, sprint text or files that another lane owns
+  (for example `policy/src/rules.rs`, owned by B4 in the lane table);
+  those edits are what conflict.
+- Check the open pull requests for the same files first. When two change the
+  same map or sentinel (for example `change-test-map.json`), say which one lands
+  first and rebase the other.
+- Say in the pull request when it needs the Forgejo gate; the maintainer or the
+  UX lane gates the exact head, since these agents cannot reach Forgejo.
 
 Every test belongs to one tier with one script and one gate. Use the
 [validation playbook](linux/docs/validation-playbook.md) to pick layers and

@@ -1,3 +1,5 @@
+use crate::classify::{StatementClass, StatementFacts};
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub(crate) struct Effects(u16);
 
@@ -16,12 +18,10 @@ impl Effects {
         Self(self.0 | other.0)
     }
 
-    #[cfg(test)]
     pub(crate) const fn contains(self, other: Self) -> bool {
         self.0 & other.0 == other.0
     }
 
-    #[cfg(test)]
     pub(crate) const fn writes(self) -> bool {
         let write_effects = Self::WRITES_ROWS
             .union(Self::WRITES_SCHEMA)
@@ -31,9 +31,36 @@ impl Effects {
     }
 }
 
+pub(crate) fn inferred_effects(facts: &StatementFacts) -> Effects {
+    let mut effects = Effects::EMPTY;
+    if facts.class == StatementClass::Unparseable || facts.contains_unknown_write {
+        effects = effects.union(Effects::UNKNOWN);
+    }
+    if facts.writes {
+        if facts.contains_ddl {
+            effects = effects.union(Effects::WRITES_SCHEMA);
+        }
+        if facts.contains_mutating_dml || !facts.contains_ddl {
+            effects = effects.union(Effects::WRITES_ROWS);
+        }
+    } else {
+        effects = effects.union(Effects::READS);
+    }
+    if facts.class == StatementClass::Administrative {
+        effects = effects.union(Effects::ADMIN);
+    }
+    if facts.class == StatementClass::Transaction {
+        effects = effects.union(Effects::TRANSACTION_CONTROL);
+    }
+    effects
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{classify::StatementClass, classify::classify_with_effects};
+    use crate::{
+        audit::AuditOperationClass,
+        classify::{StatementClass, classify_with_effects},
+    };
 
     use super::Effects;
 
@@ -41,6 +68,7 @@ mod tests {
     fn effects_match_legacy_write_facts_without_changing_legacy_classes() {
         for (sql, driver) in [
             ("SELECT * FROM users", "postgres"),
+            ("SELECT * INTO backup FROM users", "postgres"),
             ("INSERT INTO users(id) VALUES (1)", "postgres"),
             ("UPDATE users SET id = 2 WHERE id = 1", "postgres"),
             ("DELETE FROM users WHERE id = 1", "postgres"),
@@ -66,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn effects_union_is_order_independent_while_legacy_script_class_remains_unchanged() {
+    fn mixed_write_scripts_get_an_order_independent_class() {
         let delete_then_insert = classify_with_effects(
             "DELETE FROM users WHERE id = 1; INSERT INTO users(id) VALUES (2)",
             "postgres",
@@ -77,9 +105,40 @@ mod tests {
         );
 
         assert_eq!(delete_then_insert.effects, insert_then_delete.effects);
-        assert_eq!(delete_then_insert.facts.class, StatementClass::Insert);
-        assert_eq!(insert_then_delete.facts.class, StatementClass::Delete);
+        assert_eq!(delete_then_insert.facts.class, StatementClass::Other);
+        assert_eq!(insert_then_delete.facts.class, StatementClass::Other);
+        assert_eq!(
+            AuditOperationClass::from_statement(delete_then_insert.facts.class, delete_then_insert.facts.writes),
+            AuditOperationClass::from_statement(insert_then_delete.facts.class, insert_then_delete.facts.writes)
+        );
+        assert_eq!(
+            AuditOperationClass::from_statement(delete_then_insert.facts.class, delete_then_insert.facts.writes),
+            AuditOperationClass::UnknownWrite
+        );
         assert!(delete_then_insert.effects.contains(Effects::WRITES_ROWS));
+
+        for sql in [
+            "DELETE FROM users WHERE id = 1; INSERT INTO users(id) VALUES (2); UPDATE users SET id = 3",
+            "INSERT INTO users(id) VALUES (2); UPDATE users SET id = 3; DELETE FROM users WHERE id = 1",
+            "UPDATE users SET id = 3; DELETE FROM users WHERE id = 1; INSERT INTO users(id) VALUES (2)",
+        ] {
+            assert_eq!(
+                classify_with_effects(sql, "postgres").facts.class,
+                StatementClass::Other,
+                "SQL: {sql}"
+            );
+        }
+
+        for sql in [
+            "SELECT 1; DELETE FROM users WHERE id = 1",
+            "DELETE FROM users WHERE id = 1; SELECT 1",
+        ] {
+            assert_eq!(
+                classify_with_effects(sql, "postgres").facts.class,
+                StatementClass::Delete,
+                "SQL: {sql}"
+            );
+        }
     }
 
     #[test]

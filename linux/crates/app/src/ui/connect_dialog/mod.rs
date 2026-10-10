@@ -870,7 +870,7 @@ impl ConnectDialog {
         let (username, password) = if self.form.shows_credentials() {
             let entered = self.username.text().trim().to_string();
             let username = if socket && entered.is_empty() {
-                whoami::fallible::username().unwrap_or_default()
+                whoami::username().unwrap_or_default()
             } else {
                 entered
             };
@@ -886,11 +886,11 @@ impl ConnectDialog {
             password: SecretString::new(password.into()),
             tls: self.tls_config_for(driver),
             auth_mode: self.form.mode(),
-            service_endpoint: None,
             local_socket_dir: socket.then(|| std::path::PathBuf::from(self.socket_dir.text().as_str())),
-            forwarded_socket_dir: None,
             application_name: Some("BookiE".into()),
             connect_timeout_secs: timeout_value(self.connect_timeout.value()),
+            read_only: self.read_only.is_active(),
+            ..Default::default()
         }
     }
 

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "branch": "linux",
+  "source_commit": "43b718ee2dc4b20bff03ac75ad87f4f571501406",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "95a78cad3df4d62a65cef30e81139a0ebbaa3ce630cb383bdc8babb93af276d1"
+  },
+  "engine": "Docker MySQL and MariaDB fixtures",
+  "case": "The serialized MySQL-family atomicity group on the fetched current linux tip",
+  "test": "mysql_atomic::*",
+  "contract": [
+    "The selector covers failed-batch refusal and rollback reporting, MyISAM, MEMORY, CSV, ARCHIVE, MRG_MyISAM, BLACKHOLE, and MariaDB Aria effects.",
+    "The selector covers direct writes, trigger-driven INSERT, UPDATE and DELETE effects, auto-increment allocation, trigger session state, pinned-session LAST_INSERT_ID, and advisory-lock rollback.",
+    "All 20 selected tests passed against disposable Docker MySQL and MariaDB servers. This is local current-source evidence and does not establish frozen-candidate or installed acceptance."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic:: -- --include-ignored --test-threads=1",
+      "result": "20 passed, 73 filtered out",
+      "log": "mysql-atomic.txt"
+    }
+  },
+  "remaining": [
+    "Optional or vendor-specific storage engines and other side-effect classes remain open.",
+    "Frozen-candidate, package-installed, hosted and Forgejo acceptance remain separate."
+  ],
+  "log_sha256": {
+    "mysql-atomic.txt": "8cb501c2185af64f0dcccc6fca2616b695478724518167ef0260dae4995bef2d"
+  }
+}

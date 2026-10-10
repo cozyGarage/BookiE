@@ -1,7 +1,7 @@
 use tablepro_core::Session;
 
 use super::*;
-use crate::transaction_control::{TransactionControl, transaction_control};
+use crate::transaction_control::{TransactionControl, hides_transaction_control, transaction_control};
 
 const CLOSE_ROLLBACK_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -65,6 +65,10 @@ impl Session for PolicySession {
             Some(TransactionControl::Begin) => self.begin(sql, control).await,
             Some(TransactionControl::Commit { chain }) => self.finish(sql, control, Finish::Commit, chain).await,
             Some(TransactionControl::Rollback { chain }) => self.finish(sql, control, Finish::Rollback, chain).await,
+            None if hides_transaction_control(sql, &self.guard.ctx.driver_id) => Err(DriverError::PolicyDenied(
+                "send BEGIN, COMMIT and ROLLBACK as separate statements so the session can track the transaction"
+                    .into(),
+            )),
             None => self.statement(sql, params, control).await,
         }
     }
@@ -126,8 +130,12 @@ impl PolicySession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let facts = classify(sql, &self.guard.ctx.driver_id);
-        let authorization = self.guard.authorize_classified(sql, facts, Some(control)).await?;
+        let analysis = classify_with_effects(sql, &self.guard.ctx.driver_id);
+        let facts = analysis.facts;
+        let authorization = self
+            .guard
+            .authorize_classified(sql, facts, analysis.effects, Some(control))
+            .await?;
         let writes = authorization.facts.writes;
         let result = match self.batch {
             Some(batch) => {

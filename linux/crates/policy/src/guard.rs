@@ -16,11 +16,14 @@ use crate::audit::{
     AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome,
 };
 use crate::blast_radius::count_sql_for_mutation;
-use crate::classify::{StatementFacts, classify};
+use crate::classify::{StatementClass, StatementFacts, classify, classify_with_effects};
 use crate::config::PolicyConfig;
+use crate::effects::Effects;
 use crate::mask::apply_masking;
 use crate::principal::Principal;
-use crate::rules::{Decision, evaluate_categorical, evaluate_eligible_write, shared_connection_decision};
+use crate::rules::{
+    Decision, evaluate_categorical, evaluate_eligible_write, evaluate_with_effects, shared_connection_decision,
+};
 
 const BLAST_RADIUS_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -109,11 +112,12 @@ impl PolicyGuard {
         _is_params_exec: bool,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        let facts = classify(sql, &self.ctx.driver_id);
+        let analysis = classify_with_effects(sql, &self.ctx.driver_id);
+        let facts = analysis.facts;
         if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
             return self.resolve_authorization(sql, facts, decision, None, control).await;
         }
-        self.authorize_classified(sql, facts, control).await
+        self.authorize_classified(sql, facts, analysis.effects, control).await
     }
 
     async fn authorize_bounded(
@@ -122,26 +126,30 @@ impl PolicyGuard {
         enforced_rows: Option<u64>,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        let facts = classify(sql, &self.ctx.driver_id);
+        let analysis = classify_with_effects(sql, &self.ctx.driver_id);
+        let facts = analysis.facts;
         if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
             return self.resolve_authorization(sql, facts, decision, None, control).await;
         }
-        self.authorize_with_bound(sql, facts, enforced_rows, control).await
+        self.authorize_with_bound(sql, facts, analysis.effects, enforced_rows, control)
+            .await
     }
 
     async fn authorize_classified(
         &self,
         sql: &str,
         facts: StatementFacts,
+        effects: Effects,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        self.authorize_with_bound(sql, facts, None, control).await
+        self.authorize_with_bound(sql, facts, effects, None, control).await
     }
 
     async fn authorize_with_bound(
         &self,
         sql: &str,
         facts: StatementFacts,
+        effects: Effects,
         enforced_rows: Option<u64>,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
@@ -149,18 +157,35 @@ impl PolicyGuard {
             .ctx
             .policy
             .for_connection(&self.ctx.connection_id.to_string(), self.ctx.environment);
-        if let Some(decision) = evaluate_categorical(
+        if evaluate_categorical(
             &self.ctx.principal,
             self.ctx.environment,
             &facts,
+            effects,
             self.ctx.read_only,
             &env_policy,
-        ) {
-            return self.resolve_authorization(sql, facts, decision, None, control).await;
+        )
+        .is_some()
+        {
+            let joined = evaluate_with_effects(
+                &self.ctx.principal,
+                self.ctx.environment,
+                &facts,
+                effects,
+                self.ctx.read_only,
+                &env_policy,
+                None,
+            );
+            return self.resolve_authorization(sql, facts, joined, None, control).await;
         }
 
         self.require_governed_write_available()?;
-        let estimated_rows = if facts.contains_mutating_dml && env_policy.blast_radius_max_rows.is_some() {
+        let estimated_rows = if facts.contains_mutating_dml
+            && facts.class != StatementClass::Administrative
+            && !effects.contains(Effects::ADMIN)
+            && !effects.contains(Effects::UNKNOWN)
+            && env_policy.blast_radius_max_rows.is_some()
+        {
             match enforced_rows {
                 Some(rows) => Some(rows),
                 None => self.estimate_blast_radius(sql, &facts, control).await?,
@@ -172,6 +197,7 @@ impl PolicyGuard {
             &self.ctx.principal,
             self.ctx.environment,
             &facts,
+            effects,
             &env_policy,
             estimated_rows,
         );

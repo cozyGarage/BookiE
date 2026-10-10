@@ -21,6 +21,9 @@ mod disconnection;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
+#[path = "support/read_only_session.rs"]
+mod read_only_session;
+
 #[path = "support/result_charset.rs"]
 mod result_charset;
 
