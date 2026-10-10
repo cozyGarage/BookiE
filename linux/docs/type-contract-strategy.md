@@ -62,8 +62,7 @@ GREATEST and LEAST against native literal inference at depths 63 and 64, with
 the parameter on either side of GREATEST/LEAST. Text, literal `NULL`, empty
 text and SQL NULL preserve the expected parameter, expression and column types
 with both the regular and first-position shadowed `search_path` variants. The
-two focused PostgreSQL 16 Docker tests passed; see the [initial case evidence](evidence/postgres-deep-enum-shadowed-search-path-2026-10-10/manifest.json)
-and [expanded context evidence](evidence/postgres-deep-enum-scalar-contexts-2026-10-10/manifest.json).
+two focused PostgreSQL 16 Docker tests passed; see the [run evidence and current-head rerun](https://github.com/cozyGarage/BookiE/pull/491#issuecomment-6095567613).
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
