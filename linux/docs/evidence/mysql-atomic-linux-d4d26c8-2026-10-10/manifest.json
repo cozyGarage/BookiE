@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "B4-11 MySQL and MariaDB failed-batch rollback effects, including MRG_MyISAM write-through",
+  "source_commit": "d4d26c82759347f3d9991d1e081c194242f81349",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "8a7c2d37f7efb6ced18cb13a73909f9cca8548277b3d065cd3eabbc8a5770903",
+    "crates/drivers/mysql/tests/shared/mysql_atomic_parts/advisory_lock.rs": "1709621fa0836cd7fc975bfc394d39543c23e798704d28a16bc0087995b7851a",
+    "crates/drivers/mysql/tests/integration.rs": "50b36817acf976b0502a7cb9741118539890c103f4b4042302ec45e358c91fb1"
+  },
+  "selector": "mysql_atomic::",
+  "command": "rtk cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic:: -- --ignored --test-threads=1",
+  "runtime": "Local Linux host with Docker 29.7.2 and the repository MySQL/MariaDB fixtures",
+  "result": "19 passed; 0 failed; 0 ignored; 73 filtered out; 127.18 seconds; exit code 0",
+  "coverage_added": [
+    "A failed batch writes through an MRG_MyISAM table and confirms the underlying MyISAM row survives rollback"
+  ],
+  "other_validation": {
+    "preflight": "passed",
+    "ignored_test_inventory": "regenerated and check passed",
+    "git_diff_check": "passed"
+  },
+  "not_established": [
+    "Optional/vendor MySQL engines such as NDB",
+    "Side-effect classes beyond those named in this test group",
+    "Frozen-candidate, hosted, distribution-package or installed acceptance"
+  ]
+}
