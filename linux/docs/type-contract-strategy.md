@@ -34,8 +34,10 @@ and binary UUID `_id` cursors on MongoDB 7 ([tests](../crates/drivers/mongodb/te
 diagnostic measured 2.380 ms at offset 500k and 2.373 ms at offset 999,950,
 compared with 135.902 ms and 266.040 ms through direct offset reads. Raw
 samples and source fingerprints are in the [PR #493 evidence comment](https://github.com/cozyGarage/BookiE/pull/493#issuecomment-6095435772).
-Filtered, sorted and keyless deep-page behavior, installed Arch/Wayland,
-Debian/GNOME and network-latency acceptance remain open.
+Equality-filtered keyset pages now preserve both the filter and `_id` cursor in
+the native regression `filtered_keyset_page_keeps_the_filter_and_cursor`.
+Other filtered operators, sorted and keyless deep-page behavior, installed
+Arch/Wayland, Debian/GNOME and network-latency acceptance remain open.
 
 The SQL Server test fixture waits for an authenticated `SELECT 1` as `sa`,
 retrying login rejection for at most 60 seconds after container readiness logs.

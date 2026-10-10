@@ -37,6 +37,39 @@ async fn keyset_page_query_reads_rows_after_the_native_id_cursor() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn filtered_keyset_page_keeps_the_filter_and_cursor() {
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    client
+        .database("appdb")
+        .collection::<Document>("filtered_keyset")
+        .insert_many([
+            doc! { "_id": 1, "group": "keep" },
+            doc! { "_id": 2, "group": "skip" },
+            doc! { "_id": 3, "group": "keep" },
+            doc! { "_id": 4, "group": "keep" },
+        ])
+        .await
+        .unwrap();
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let page = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE \"group\" = ? AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Text("keep".into()), Value::Int(1)],
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(page.rows.len(), 2);
+    assert_eq!(page.rows[0], vec![Value::Int(3), Value::Text("keep".into())]);
+    assert_eq!(page.rows[1], vec![Value::Int(4), Value::Text("keep".into())]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn keyset_page_query_binds_object_id_cursor_values() {
     let (_container, host, port) = super::start_mongo().await;
     let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))

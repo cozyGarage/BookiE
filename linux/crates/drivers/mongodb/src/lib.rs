@@ -326,10 +326,16 @@ impl Connection for MongodbConnection {
             return self.query(sql).await;
         }
         if let Some(page) = parse_keyset_page_select(sql, params, &self.database_name)? {
+            let cursor = doc! { "$expr": { "$gt": ["$_id", { "$literal": page.key }] } };
+            let filter = if page.filter.is_empty() {
+                cursor
+            } else {
+                doc! { "$and": [page.filter, cursor] }
+            };
             return self
                 .run_find(FindQuery {
                     collection: page.collection,
-                    filter: doc! { "$expr": { "$gt": ["$_id", { "$literal": page.key }] } },
+                    filter,
                     skip: 0,
                     limit: page.limit,
                     sort_by_id: true,

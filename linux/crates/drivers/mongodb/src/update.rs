@@ -28,6 +28,7 @@ pub(super) struct KeyedValueSelect {
 
 pub(super) struct KeysetPageSelect {
     pub(super) collection: String,
+    pub(super) filter: Document,
     pub(super) key: Bson,
     pub(super) limit: i64,
 }
@@ -55,23 +56,74 @@ pub(super) fn parse_keyset_page_select(
     let Some(collection) = collection_named(&relation.relation, database) else {
         return Ok(None);
     };
-    let Some(Expr::BinaryOp {
-        left,
-        op: BinaryOperator::Gt,
-        right,
-    }) = select.selection.as_ref()
-    else {
+    let Some(selection) = select.selection.as_ref() else {
         return Ok(None);
     };
-    if identifier_from_expr(left).as_deref() != Some("_id") || params.len() != 1 {
+    let Some((filter, key)) = keyset_filter(selection, params)? else {
+        return Ok(None);
+    };
+    Ok(Some(KeysetPageSelect {
+        collection,
+        filter,
+        key,
+        limit,
+    }))
+}
+
+fn keyset_filter(selection: &Expr, params: &[Value]) -> Result<Option<(Document, Bson)>, DriverError> {
+    let mut predicates = Vec::new();
+    collect_and_predicates(selection, &mut predicates);
+    if predicates.iter().filter(|expr| keyset_cursor(expr).is_some()).count() != 1 {
         return Ok(None);
     }
+    let mut filter = Document::new();
+    let mut key = None;
     let mut index = 0;
-    let key = take_placeholder(right, params, &mut index)?;
+    for predicate in predicates {
+        if let Some(cursor) = keyset_cursor(predicate) {
+            if key.is_some() {
+                return Ok(None);
+            }
+            key = Some(take_placeholder(cursor, params, &mut index)?);
+        } else {
+            for (field, value) in selector_from_expr(predicate, params, &mut index)? {
+                if filter.insert(field, value).is_some() {
+                    return Ok(None);
+                }
+            }
+        }
+    }
     if index != params.len() {
         return Ok(None);
     }
-    Ok(Some(KeysetPageSelect { collection, key, limit }))
+    Ok(key.map(|key| (filter, key)))
+}
+
+fn collect_and_predicates<'a>(expr: &'a Expr, predicates: &mut Vec<&'a Expr>) {
+    match expr {
+        Expr::Nested(inner) => collect_and_predicates(inner, predicates),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::And,
+            right,
+        } => {
+            collect_and_predicates(left, predicates);
+            collect_and_predicates(right, predicates);
+        }
+        _ => predicates.push(expr),
+    }
+}
+
+fn keyset_cursor(expr: &Expr) -> Option<&Expr> {
+    let Expr::BinaryOp {
+        left,
+        op: BinaryOperator::Gt,
+        right,
+    } = expr
+    else {
+        return None;
+    };
+    (identifier_from_expr(left).as_deref() == Some("_id")).then_some(right)
 }
 
 fn keyset_page_query(query: &Query) -> Option<(&Select, i64)> {
