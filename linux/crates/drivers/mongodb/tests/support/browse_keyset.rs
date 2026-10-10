@@ -110,6 +110,37 @@ async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
         .unwrap();
     assert!(null_or_missing_not_equal.rows.is_empty());
 
+    let in_values = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"rank\" IN (?, ?) LIMIT 2 OFFSET 0",
+            &[Value::Int(2), Value::Int(4)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(in_values.rows.len(), 2);
+    assert_eq!(in_values.rows[0][0], Value::Int(2));
+    assert_eq!(in_values.rows[1][0], Value::Int(4));
+
+    let not_in_values = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"rank\" NOT IN (?, ?) LIMIT 2 OFFSET 0",
+            &[Value::Int(2), Value::Int(3)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(not_in_values.rows.len(), 2);
+    assert_eq!(not_in_values.rows[0][0], Value::Int(1));
+    assert_eq!(not_in_values.rows[1][0], Value::Int(4));
+
+    let not_in_with_null = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"rank\" NOT IN (?, ?) LIMIT 2 OFFSET 0",
+            &[Value::Int(2), Value::Json(serde_json::Value::Null)],
+        )
+        .await
+        .unwrap();
+    assert!(not_in_with_null.rows.is_empty());
+
     let between = connection
         .query_params(
             "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"rank\" BETWEEN ? AND ? LIMIT 2 OFFSET 0",

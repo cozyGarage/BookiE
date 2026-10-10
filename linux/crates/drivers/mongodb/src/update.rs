@@ -147,6 +147,7 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
             low,
             high,
         } => between_selector(expr, low, high, params, index),
+        Expr::InList { expr, list, negated } => in_list_selector(expr, list, *negated, params, index),
         Expr::IsNull(inner) => {
             let Some(field) = identifier_from_expr(inner) else {
                 return Err(browse_filter_error());
@@ -210,6 +211,37 @@ fn between_selector(
         return Err(browse_filter_error());
     }
     Ok(doc! { field: { "$gte": low, "$lte": high } })
+}
+
+fn in_list_selector(
+    expr: &Expr,
+    list: &[Expr],
+    negated: bool,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let Some(field) = identifier_from_expr(expr) else {
+        return Err(browse_filter_error());
+    };
+    let values = list
+        .iter()
+        .map(|item| value_to_bson(&take_placeholder_value(item, params, index)?))
+        .collect::<Result<Vec<_>, _>>()?;
+    let has_null = values.iter().any(|value| matches!(value, Bson::Null));
+    let values = values
+        .into_iter()
+        .filter(|value| !matches!(value, Bson::Null))
+        .collect::<Vec<_>>();
+    if (negated && has_null) || values.is_empty() {
+        return Ok(doc! { "_id": { "$in": [] } });
+    }
+    if negated {
+        let mut excluded = values;
+        excluded.push(Bson::Null);
+        Ok(doc! { field: { "$exists": true, "$nin": excluded } })
+    } else {
+        Ok(doc! { field: { "$in": values } })
+    }
 }
 
 fn browse_filter_error() -> DriverError {
@@ -727,6 +759,31 @@ mod keyset_page_tests {
                 ),
                 Err(DriverError::Unsupported(_))
             ));
+        }
+    }
+
+    #[test]
+    fn in_filters_bind_values_and_keep_sql_null_semantics() {
+        for (predicate, params, expected) in [
+            (
+                "value IN (?, ?, ?)",
+                vec![Value::Int(4), Value::Json(serde_json::Value::Null), Value::Int(8)],
+                doc! { "value": { "$in": [Bson::Int64(4), Bson::Int64(8)] } },
+            ),
+            (
+                "value NOT IN (?, ?)",
+                vec![Value::Int(4), Value::Int(8)],
+                doc! { "value": { "$exists": true, "$nin": [Bson::Int64(4), Bson::Int64(8), Bson::Null] } },
+            ),
+            (
+                "value NOT IN (?, ?)",
+                vec![Value::Int(4), Value::Json(serde_json::Value::Null)],
+                doc! { "_id": { "$in": [] } },
+            ),
+        ] {
+            let sql = format!("SELECT * FROM records WHERE {predicate} LIMIT 2 OFFSET 0");
+            let parsed = parse_browse_page_select(&sql, &params, "appdb").unwrap().unwrap();
+            assert_eq!(parsed.filter, expected);
         }
     }
 
