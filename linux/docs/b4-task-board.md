@@ -17,8 +17,14 @@ also includes refreshed B4 evidence. PR #458 computes `Effects`
 alongside legacy facts, and PR #459 adds engine read-only enforcement; both are
 merged. PR #460 implements migration step 2 (S8) and is merged. PR #463
 implements DuckDB read-only selected-file restrictions and is merged. PR #486
-fixes a selected-file open race and remains open. PR
-#461 keeps read-scoped explain plans redacted, and PR #475 adds the B4-11
+adds a selected-file open race fix and remains open. Its FIFO fix did not
+address post-connect replacement through a direct reader-function call. The
+local follow-up now restricts DuckDB to a private hard link of the pinned inode
+and keeps that link alive with in-flight queries; the view continues reading
+the selected inode while direct reads through the replaced pathname are denied.
+The path-replacement regression reproduced on the prior code and passes locally
+with the follow-up. Review and acceptance remain open. PR #461 keeps read-scoped
+explain plans redacted, and PR #475 adds the B4-11
 `MRG_MyISAM` rollback case; both are merged. PR #480 implements migration step
 3 (joined verdicts for S6/S7) and remains open. Migration step 4, removing the
 legacy facts and duplicate walkers, remains. Exact local verification and
