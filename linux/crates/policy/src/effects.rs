@@ -1,3 +1,5 @@
+use crate::classify::{StatementClass, StatementFacts};
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub(crate) struct Effects(u16);
 
@@ -16,12 +18,10 @@ impl Effects {
         Self(self.0 | other.0)
     }
 
-    #[cfg(test)]
     pub(crate) const fn contains(self, other: Self) -> bool {
         self.0 & other.0 == other.0
     }
 
-    #[cfg(test)]
     pub(crate) const fn writes(self) -> bool {
         let write_effects = Self::WRITES_ROWS
             .union(Self::WRITES_SCHEMA)
@@ -29,6 +29,30 @@ impl Effects {
             .union(Self::UNKNOWN);
         self.0 & write_effects.0 != 0
     }
+}
+
+pub(crate) fn inferred_effects(facts: &StatementFacts) -> Effects {
+    let mut effects = Effects::EMPTY;
+    if facts.class == StatementClass::Unparseable || facts.contains_unknown_write {
+        effects = effects.union(Effects::UNKNOWN);
+    }
+    if facts.writes {
+        if facts.contains_ddl {
+            effects = effects.union(Effects::WRITES_SCHEMA);
+        }
+        if facts.contains_mutating_dml || !facts.contains_ddl {
+            effects = effects.union(Effects::WRITES_ROWS);
+        }
+    } else {
+        effects = effects.union(Effects::READS);
+    }
+    if facts.class == StatementClass::Administrative {
+        effects = effects.union(Effects::ADMIN);
+    }
+    if facts.class == StatementClass::Transaction {
+        effects = effects.union(Effects::TRANSACTION_CONTROL);
+    }
+    effects
 }
 
 #[cfg(test)]

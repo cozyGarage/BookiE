@@ -9,7 +9,7 @@ use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
 use crate::effects::Effects;
-use crate::effects_classification::{merge_script_class, sql_effects_from_tokens, statement_effects};
+use crate::effects_classification::{merge_script_class, sql_effects_from_tokens, statement_effects, truncate_facts};
 use crate::select_writes::select_writes;
 
 /// Coarse statement class used by policy rules.
@@ -279,7 +279,7 @@ fn classify_statement(stmt: &Statement) -> StatementFacts {
             is_multi_statement: false,
             parse_error: None,
         },
-        Statement::Truncate { table_names, .. } => ddl_facts(table_names.iter().map(|t| t.name.to_string()).collect()),
+        Statement::Truncate { table_names, .. } => truncate_facts(table_names.iter().map(|table| &table.name)),
         Statement::CreateVirtualTable { .. }
         | Statement::CreateRole { .. }
         | Statement::CreateSecret { .. }
@@ -978,7 +978,7 @@ mod tests {
     #[test]
     fn truncate_is_ddl_write() {
         let f = classify("TRUNCATE TABLE payments", "postgres");
-        assert!(f.writes);
+        assert!(f.writes && f.contains_mutating_dml && f.contains_unscoped_dml);
         assert_eq!(f.class, StatementClass::Ddl);
     }
 
