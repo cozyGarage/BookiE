@@ -19,7 +19,7 @@ async fn mariadb_allow_invalid_dates_preserves_native_calendar_text() {
 async fn assert_invalid_calendar_text(options: &ConnectOptions, engine: &str) {
     let connection = connect(options.clone()).await;
     connection
-        .execute("CREATE TABLE allow_invalid_dates (d DATE, dt DATETIME)")
+        .execute("CREATE TABLE allow_invalid_dates (d DATE, d_april DATE, dt DATETIME, dt_fractional DATETIME(6))")
         .await
         .unwrap();
     let mut session = connection.open_session().await.unwrap();
@@ -30,7 +30,8 @@ async fn assert_invalid_calendar_text(options: &ConnectOptions, engine: &str) {
         .unwrap();
     session
         .query_params_controlled(
-            "INSERT INTO allow_invalid_dates VALUES ('2024-02-31', '2024-02-31 12:34:56')",
+            "INSERT INTO allow_invalid_dates VALUES \
+             ('2024-02-31', '2024-04-31', '2024-02-31 12:34:56', '2024-02-31 12:34:56.123456')",
             &[],
             &control,
         )
@@ -38,20 +39,27 @@ async fn assert_invalid_calendar_text(options: &ConnectOptions, engine: &str) {
         .unwrap_or_else(|error| panic!("{engine} must accept the calendar values in ALLOW_INVALID_DATES: {error}"));
 
     let result = session
-        .query_params_controlled("SELECT d, dt FROM allow_invalid_dates", &[], &control)
+        .query_params_controlled(
+            "SELECT d, d_april, dt, dt_fractional FROM allow_invalid_dates",
+            &[],
+            &control,
+        )
         .await
         .unwrap();
     assert_eq!(
         result.rows,
         vec![vec![
             Value::Text("2024-02-31".into()),
-            Value::Text("2024-02-31 12:34:56".into())
+            Value::Text("2024-04-31".into()),
+            Value::Text("2024-02-31 12:34:56".into()),
+            Value::Text("2024-02-31 12:34:56.123456".into()),
         ]],
         "{engine} driver values"
     );
     let native = session
         .query_params_controlled(
-            "SELECT CAST(d AS CHAR), CAST(dt AS CHAR), CAST(d + 0 AS CHAR), CAST(dt + 0 AS CHAR) \
+            "SELECT CAST(d AS CHAR), CAST(d_april AS CHAR), CAST(dt AS CHAR), CAST(dt_fractional AS CHAR), \
+             CAST(d + 0 AS CHAR), CAST(d_april + 0 AS CHAR), CAST(dt + 0 AS CHAR), CAST(dt_fractional + 0 AS CHAR) \
              FROM allow_invalid_dates",
             &[],
             &control,
@@ -62,9 +70,13 @@ async fn assert_invalid_calendar_text(options: &ConnectOptions, engine: &str) {
         native.rows,
         vec![vec![
             Value::Text("2024-02-31".into()),
+            Value::Text("2024-04-31".into()),
             Value::Text("2024-02-31 12:34:56".into()),
+            Value::Text("2024-02-31 12:34:56.123456".into()),
             Value::Text("20240231".into()),
+            Value::Text("20240431".into()),
             Value::Text("20240231123456".into()),
+            Value::Text("20240231123456.123456".into()),
         ]],
         "{engine} native storage oracle"
     );
@@ -86,7 +98,8 @@ async fn assert_invalid_calendar_csv_round_trip(
     let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     session
         .query_params_controlled(
-            "CREATE TABLE allow_invalid_dates_csv_copy (d DATE, dt DATETIME)",
+            "CREATE TABLE allow_invalid_dates_csv_copy \
+             (d DATE, d_april DATE, dt DATETIME, dt_fractional DATETIME(6))",
             &[],
             control,
         )
@@ -114,7 +127,9 @@ async fn assert_invalid_calendar_csv_round_trip(
         imported,
         vec![
             Value::Text("2024-02-31".into()),
-            Value::Text("2024-02-31 12:34:56".into())
+            Value::Text("2024-04-31".into()),
+            Value::Text("2024-02-31 12:34:56".into()),
+            Value::Text("2024-02-31 12:34:56.123456".into()),
         ]
     );
     session
@@ -123,7 +138,8 @@ async fn assert_invalid_calendar_csv_round_trip(
         .unwrap();
     let restored = session
         .query_params_controlled(
-            "SELECT CAST(d AS CHAR), CAST(dt AS CHAR), CAST(d + 0 AS CHAR), CAST(dt + 0 AS CHAR) \
+            "SELECT CAST(d AS CHAR), CAST(d_april AS CHAR), CAST(dt AS CHAR), CAST(dt_fractional AS CHAR), \
+             CAST(d + 0 AS CHAR), CAST(d_april + 0 AS CHAR), CAST(dt + 0 AS CHAR), CAST(dt_fractional + 0 AS CHAR) \
              FROM allow_invalid_dates_csv_copy",
             &[],
             control,
@@ -134,9 +150,13 @@ async fn assert_invalid_calendar_csv_round_trip(
         restored.rows,
         vec![vec![
             Value::Text("2024-02-31".into()),
+            Value::Text("2024-04-31".into()),
             Value::Text("2024-02-31 12:34:56".into()),
+            Value::Text("2024-02-31 12:34:56.123456".into()),
             Value::Text("20240231".into()),
+            Value::Text("20240431".into()),
             Value::Text("20240231123456".into()),
+            Value::Text("20240231123456.123456".into()),
         ]]
     );
 }
