@@ -68,6 +68,12 @@ table in the same commit.
 | change-test-map value-path growth | B: B3/UX expand exact selectors for export/import/grid dialog paths | `linux/scripts/change-test-map.json` | Cheap GitHub change-contracts only |
 | TEST-6 first triage slice | B: UX records triage; maintainer keeps remaining manual/Wayland items | `linux/docs/evidence/test-6-triage-2026-10-10/`, `linux/docs/known-issues.md` (TEST-6/AUD-11/AUD-9 rows) | No TEST-28 product fix in this handoff |
 
+### B3/B4 handoff, 2026-10-10
+
+| Row | Decision | B3 may edit | B4 may edit |
+| --- | --- | --- | --- |
+| Sonar S6471 SSH poison recovery closure | B: B3 applies the maintainer-requested method-reference cleanup; B4 retains SSH ownership | `linux/docs/known-issues.md`, `linux/crates/ssh/src/lib.rs` | Review the one-line SSH change |
+
 For PERF-9/10, preserve ADR 0007 outcomes and native stored-value oracles, and add
 the regression at the lowest applicable tier in the same commit. UX works only
 in `~/Projects/tablepro-ux2`; these file boundaries apply there. Neither lane
