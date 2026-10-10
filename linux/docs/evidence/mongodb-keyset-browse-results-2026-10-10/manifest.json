@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-10",
   "branch": "b3/mongodb-browse-cost",
-  "source_commit": "8263f2fc3f79063d8c8721dc57110dab51c90495",
+  "source_commit": "d76d330fc7a474883e432b7cf59aeb988e172473",
   "engine": "MongoDB 7 in Docker via testcontainers",
   "environment": {
     "host": "AMD Ryzen 7 5800U, 16 logical CPUs",
@@ -44,7 +44,7 @@
   },
   "log_sha256": {
     "parser-tests.txt": "bcb59d85a4f6b88554e22a59b7fd27ad5174c4c16a35de37ad1a21dc5b75fb33",
-    "keyset-regression.txt": "45ca3048ac1687ca17b7ede4898f8aef2e9d953d593e9ab574e3e4066a9c654d",
+    "keyset-regression.txt": "242f1656cb07c301543dd9e53783e3aab894d612a2fb6fc62593756bd53f958a",
     "profile.txt": "c5e10bdcbcd52ab6b64abeed98eb9c6f3ec2cc710c7814b44d13c384d388d177"
   },
   "source_fingerprints_sha256": {
@@ -52,7 +52,7 @@
     "linux/crates/drivers/mongodb/src/update.rs": "37954d76171773e12262535e302534aec15a18f6c0258f61f37182afad1bc355",
     "linux/crates/drivers/mongodb/src/shell.rs": "075d9b4cb68a7f309be75270b947c1893bc6a58c7ea074a5879bf1407a9f832f",
     "linux/crates/drivers/mongodb/tests/integration.rs": "e42336d8cd5e9e62ea8e8517aea99c3a86165aa61ff24c22d611720c63b65718",
-    "linux/crates/drivers/mongodb/tests/support/browse_keyset.rs": "3938eaa3acb78c681ab7ebd9ad40fac94b1beb1df889be9fec6d6069b705367a",
+    "linux/crates/drivers/mongodb/tests/support/browse_keyset.rs": "e833eabac2ed0a657b020248a03e42ae4dfdbe2cdf34e3158b31f5bf955cbd9e",
     "linux/crates/drivers/mongodb/tests/support/census_cost.rs": "bb6dbe10174ea2145363919bdc1a25359d1f914130de4d0c6ecb4b7378e2e715"
   },
   "remaining": [
