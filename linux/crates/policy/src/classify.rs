@@ -9,7 +9,7 @@ use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
 use crate::effects::Effects;
-use crate::effects_classification::{sql_effects_from_tokens, statement_effects};
+use crate::effects_classification::{merge_script_class, sql_effects_from_tokens, statement_effects};
 use crate::select_writes::select_writes;
 
 /// Coarse statement class used by policy rules.
@@ -122,12 +122,7 @@ fn classify_statements(
         contains_mutating_dml |= facts.contains_mutating_dml;
         contains_unscoped_dml |= facts.contains_unscoped_dml;
         contains_unknown_write |= facts.contains_unknown_write;
-        if facts.class == StatementClass::Administrative {
-            class = StatementClass::Administrative;
-        } else if class != StatementClass::Administrative && (facts.class.is_write() || class == StatementClass::Select)
-        {
-            class = facts.class;
-        }
+        class = merge_script_class(class, facts.class);
         for t in facts.tables {
             if !tables.iter().any(|x| x == &t) {
                 tables.push(t);
