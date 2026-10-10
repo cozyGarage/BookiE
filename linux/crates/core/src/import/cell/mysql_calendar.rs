@@ -19,7 +19,7 @@ pub(super) fn invalid_text(text: &str, data_type: &str) -> bool {
     let (Some(year), Some(month), Some(day), None) = (parts.next(), parts.next(), parts.next(), parts.next()) else {
         return false;
     };
-    if year.len() != 4 || month.len() != 2 || day.len() != 2 {
+    if year.len() != 4 {
         return false;
     }
     let (Ok(year), Ok(month), Ok(day)) = (year.parse(), month.parse(), day.parse()) else {

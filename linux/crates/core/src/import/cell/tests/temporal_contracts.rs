@@ -55,7 +55,14 @@ fn value_contract_mysql_invalid_calendar_csv_values_remain_exact_text() {
         assert_eq!(values, vec![Value::Text(text.into())]);
     }
 
-    for text in ["2024-13-01", "2024-02-31x", "2024-02-31 25:00:00"] {
+    for text in [
+        "024-02-31 12:34:56",
+        "024-02-31 12:34:56",
+        "2024-13-01 12:34:56",
+        "2024-02-32 12:34:56",
+        "2024-02-31x 12:34:56",
+        "2024-02-31 25:00:00",
+    ] {
         assert!(
             row_to_values_for_driver(
                 &[text.into()],
