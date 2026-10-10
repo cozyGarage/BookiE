@@ -68,7 +68,7 @@ edits the other lane's files without a ledger entry.
 | ID | Issue | Status | Evidence / next | Layer |
 | --- | --- | --- | --- | --- |
 | UI-1 | ~~Saved connections cannot be edited~~ | DONE | PR #87, `prefill.rs` tests | unit |
-| UI-1b | SSH jump chains cannot be edited in the form; such connections are refused for editing | OPEN | [Per-hop credential proposal](proposals/ui-1b-ssh-jump-chain-editor.md) specifies stable hop IDs, separate Secret Service references, atomic migration/cleanup, transport cache identity, encrypted bundle v2, and GTK acceptance. Keep edit refusal until storage, transport, bundles and GTK editing land and pass together | gtk-widget |
+| UI-1b | SSH jump chains cannot be edited in the form; such connections are refused for editing | OPEN | Storage groundwork adds stable hop IDs, credential revisions, v1-to-v2 connection-file migration, and per-hop Secret Service APIs. Credential migration/cleanup, transport cache identity, encrypted bundle v2, and GTK acceptance remain. Keep edit refusal until the full path lands and passes together; see the [per-hop credential proposal](proposals/ui-1b-ssh-jump-chain-editor.md) | gtk-widget |
 | UI-2 | ~~Failed connect has no Retry or Edit~~ | DONE | PR #87, `recovery_tests` | unit |
 | UI-3 | ~~Saved connection cannot be cancelled while connecting~~ | DONE | PR #87; `establish_classified_with_cancellation` in `connection_service.rs` | unit |
 | UI-3b | ~~The connect dialog's own Connect button has no cancel~~ | DONE | `open_candidate` cancelled before anything is saved; scenario `connect_dialog_cancel_stops_a_hanging_connection` | gtk-installed |
@@ -296,7 +296,10 @@ The lab Forgejo (an internal instance; its address and repository are set throug
 `FORGEJO_API` and the `forgejo` git remote) is the acceptance gate since 2026-10-08. It runs `.forgejo/workflows/ci.yml` on every
 branch push and `.forgejo/workflows/nightly.yml` each night, on three Debian 13
 internal executors (Forgejo runner label `debian-host`, Docker with the userland
-proxy off).
+proxy off) and one native Ubuntu 24.04 executor (`ubuntu-host`). All four also carry
+`any-host`: the guards, Clippy, unit, sandbox, supply-chain and distro-floor jobs use it,
+while the native GTK, widget and release-fixture jobs stay on `debian-host` because the
+native Ubuntu GTK suite is not yet reliable (TEST-28).
 `scripts/forgejo-gate.sh <branch>` pushes a branch, waits for its run and lists
 the jobs that did not pass. A green GitHub pull request only means the cheap tier
 ran. The Arch lab VM was retired on 2026-10-08; Arch package checks run

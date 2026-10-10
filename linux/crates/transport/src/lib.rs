@@ -669,6 +669,8 @@ mod tests {
             read_only: false,
             environment: Environment::Local,
             ssh: Some(SavedSshConfig {
+                hop_id: Uuid::new_v4(),
+                credential_revision: 0,
                 host: "bastion.example".into(),
                 port: 22,
                 username: "user".into(),
@@ -994,6 +996,8 @@ mod tests {
 
     fn key_hop(host: &str) -> SavedSshConfig {
         SavedSshConfig {
+            hop_id: Uuid::new_v4(),
+            credential_revision: 0,
             host: host.into(),
             port: 22,
             username: "svc".into(),

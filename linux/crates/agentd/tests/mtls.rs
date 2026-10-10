@@ -131,6 +131,8 @@ async fn agentd_uses_a_saved_client_certificate_through_its_saved_ssh_route() {
     saved.host = fixture.database_hostname.clone();
     saved.port = fixture.database_port;
     saved.ssh = Some(SavedSshConfig {
+        hop_id: uuid::Uuid::new_v4(),
+        credential_revision: 0,
         host: fixture.ssh_host.clone(),
         port: fixture.ssh_port,
         username: fixture.ssh_username.clone(),

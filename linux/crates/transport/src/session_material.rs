@@ -173,6 +173,8 @@ mod tests {
 
     fn key_hop(path: PathBuf) -> SavedSshConfig {
         SavedSshConfig {
+            hop_id: uuid::Uuid::new_v4(),
+            credential_revision: 0,
             host: "bastion.example".into(),
             port: 22,
             username: "jump".into(),
