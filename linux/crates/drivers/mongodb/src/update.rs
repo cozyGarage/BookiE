@@ -91,7 +91,7 @@ fn browse_filter(selection: &Expr, params: &[Value]) -> Result<Option<(Document,
             }
             key = Some(take_placeholder(cursor, params, &mut index)?);
         } else {
-            for (field, value) in selector_from_expr(predicate, params, &mut index)? {
+            for (field, value) in browse_selector_from_expr(predicate, params, &mut index)? {
                 if filter.insert(field, value).is_some() {
                     return Ok(None);
                 }
@@ -102,6 +102,61 @@ fn browse_filter(selection: &Expr, params: &[Value]) -> Result<Option<(Document,
         return Ok(None);
     }
     Ok(Some((filter, key)))
+}
+
+fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Document, DriverError> {
+    match expr {
+        Expr::Nested(inner) => browse_selector_from_expr(inner, params, index),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::And,
+            right,
+        } => {
+            let mut filter = browse_selector_from_expr(left, params, index)?;
+            for (field, value) in browse_selector_from_expr(right, params, index)? {
+                if filter.insert(field, value).is_some() {
+                    return Err(browse_filter_error());
+                }
+            }
+            Ok(filter)
+        }
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::Or,
+            right,
+        } => Ok(doc! {
+            "$or": [
+                browse_selector_from_expr(left, params, index)?,
+                browse_selector_from_expr(right, params, index)?,
+            ]
+        }),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::Eq,
+            right,
+        } => {
+            let Some(field) = identifier_from_expr(left) else {
+                return Err(browse_filter_error());
+            };
+            let value = value_to_bson(&take_placeholder_value(right, params, index)?)?;
+            Ok(if matches!(value, Bson::Null) {
+                explicit_null_selector(field)
+            } else {
+                doc! { field: value }
+            })
+        }
+        Expr::IsNull(inner) => {
+            let Some(field) = identifier_from_expr(inner) else {
+                return Err(browse_filter_error());
+            };
+            Ok(explicit_null_selector(field))
+        }
+        _ => Err(browse_filter_error()),
+    }
+}
+
+fn browse_filter_error() -> DriverError {
+    DriverError::Unsupported("MongoDB browse filters support equality and IS NULL predicates".into())
 }
 
 fn collect_and_predicates<'a>(expr: &'a Expr, predicates: &mut Vec<&'a Expr>) {

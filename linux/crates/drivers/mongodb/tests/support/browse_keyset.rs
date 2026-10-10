@@ -65,6 +65,18 @@ async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
     assert_eq!(filtered.rows.len(), 1);
     assert_eq!(filtered.rows[0][0], Value::Int(3));
 
+    let alternatives = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE (\"group\" = ? OR \"group\" = ?) LIMIT 3 OFFSET 0",
+            &[Value::Text("keep".into()), Value::Text("skip".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(alternatives.rows.len(), 3);
+    assert_eq!(alternatives.rows[0][0], Value::Int(1));
+    assert_eq!(alternatives.rows[1][0], Value::Int(2));
+    assert_eq!(alternatives.rows[2][0], Value::Int(3));
+
     let nulls = connection
         .query_params(
             "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"value\" IS NULL LIMIT 2 OFFSET 0",
