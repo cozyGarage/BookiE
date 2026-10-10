@@ -150,6 +150,7 @@
 
 ### Security
 
+- Agent result masking now treats `to_json` / `to_jsonb` and JSON object builders the same as `row_to_json` when deciding which columns to redact
 - `SELECT … INTO` is now treated as a write, so read-only connections and agent read access refuse it instead of letting it create a table
 - The row-count estimate that guards large writes no longer runs a side-effecting function in your WHERE clause before you approve the statement; such statements ask for approval without an estimate
 - A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server

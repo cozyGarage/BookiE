@@ -43,7 +43,7 @@ same result:
 1. Add `Effects` beside the current facts; compute both; assert equal in tests.
 2. Move scripts to the union and drop first-statement classification (S8).
 3. Convert rules to return verdicts and fold them; keep rule names for audit
-   (S6, S7).
+   (S6, S7). Done on tip via #480 (joined Allow < RequireApproval < Deny).
 4. Delete the old facts fields and the duplicated walkers.
 
 ## Checks
@@ -98,6 +98,5 @@ sandbox.
 Tests now cover selected-file reads, direct reader access through the original
 path after replacement, denial of sibling and unrelated files, quotes and
 Unicode, symlinks, FIFO refusal without blocking, configuration locking, and
-mutations against a read-only database. PR #486's focused DuckDB suite passes
-locally. Keep AUD-10 open until the pinned bundled DuckDB version also passes
-the required acceptance gate.
+mutations against a read-only database. PR #486 (merged, Forgejo run 143)
+closed the remaining selected-file open race; AUD-10 is DONE on the ledger.
