@@ -60,6 +60,7 @@ These failed or incomplete runs stay open until re-proven on a current SHA:
 | TEST-28 native Ubuntu AT-SPI grid / Columns UI | UX | Container distro-floor passes; native job is the broken surface |
 | Build Linux on `c2f3f78b9`: Docker Hub `toomanyrequests` | lab | Infrastructure; last fully green Build Linux was `0d36a65d7` (#455) |
 
+
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless
 the maintainer adds it.
