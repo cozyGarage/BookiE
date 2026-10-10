@@ -144,6 +144,47 @@
         "tests::clickhouse_json_row_preserves_wide_integer_tokens_exactly"
       ]
     },
+    "crates/core/src/export/csv.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::csv::tests::value_contract_csv_keeps_empty_text_distinct_from_null",
+        "export::csv::tests::value_contract_csv_binary_round_trip_preserves_null_empty_and_every_byte",
+        "export::csv::tests::value_contract_csv_round_trip_preserves_signed_integer_boundaries",
+        "export::csv::tests::value_contract_csv_round_trip_preserves_decimal_trailing_zeroes",
+        "export::csv::tests::value_contract_csv_round_trip_keeps_nonfinite_floats_distinct_from_null",
+        "export::csv::tests::value_contract_csv_round_trip_preserves_bool_uuid_and_json"
+      ]
+    },
+    "crates/core/src/export/paged.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::paged::tests::every_page_lands_in_one_file_in_order",
+        "export::paged::tests::a_failing_page_publishes_nothing",
+        "export::paged::tests::cancelling_between_rows_publishes_nothing",
+        "export::paged::tests::a_value_equal_to_the_null_marker_is_refused_instead_of_written"
+      ]
+    },
+    "crates/core/src/export/file.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::file::tests::value_contract_workbook_empty_text_is_refused_without_losing_destination",
+        "export::file::tests::safe_csv_preserves_numbers_and_raw_mode_preserves_text",
+        "export::file::tests::streamed_sqlite_any_csv_preserves_runtime_value_tags",
+        "export::file::tests::file_and_clipboard_agree_and_cancellation_preserves_destination"
+      ]
+    },
+    "crates/core/src/import/csv_import.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "import::csv_import::tests::a_quoted_field_keeps_its_delimiters_and_newlines",
+        "import::csv_import::tests::a_doubled_quote_inside_a_quoted_field_is_one_quote",
+        "import::csv_import::tests::a_field_over_the_length_limit_is_refused_and_names_the_line"
+      ]
+    },
     "crates/core/src/export/json.rs": {
       "package": "tablepro-core",
       "target": "--lib",
