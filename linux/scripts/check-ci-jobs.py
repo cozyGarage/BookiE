@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 REQUIRED = {
-    "resolve-ref",
+    "pin-revision",
     "preflight",
     "fast",
     "gtk-safety",

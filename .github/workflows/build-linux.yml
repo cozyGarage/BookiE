@@ -41,26 +41,47 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  resolve-ref:
-    name: Resolve tested commit
+  pin-revision:
+    name: Pin tested revision
     runs-on: ubuntu-24.04
     outputs:
-      commit: ${{ steps.revision.outputs.commit }}
+      revision: ${{ steps.pin.outputs.revision }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.sha }}
-      - name: Resolve the tested commit once
-        id: revision
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Pin the tested revision once
+        id: pin
+        env:
+          REQUESTED_REF: ${{ inputs.ref }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "tree under test: $(git rev-parse HEAD)"
-          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          revision="$(git rev-parse HEAD)"
+          echo "tree under test: $revision"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$REQUESTED_REF" ]]; then
+            case "$REQUESTED_REF" in
+              refs/pull/*|pull/*)
+                echo "workflow_dispatch cannot pin a pull request ref" >&2
+                exit 1
+                ;;
+            esac
+            git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+            if ! git branch -r --contains "$revision" | grep -qE 'origin/' \
+              && ! git tag --contains "$revision" | grep -q .; then
+              echo "pinned revision must be on an origin branch or tag" >&2
+              exit 1
+            fi
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
   ensure-ci-gtk-image:
     name: Ensure CI debian-testing GTK image
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: resolve-ref
+    needs: pin-revision
     permissions:
       contents: read
       packages: write
@@ -69,7 +90,8 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -105,7 +127,7 @@ jobs:
     name: Preflight and sandbox tier (no GTK app)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: resolve-ref
+    needs: pin-revision
     env:
       CARGO_INCREMENTAL: "0"
     defaults:
@@ -114,7 +136,8 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -134,11 +157,13 @@ jobs:
           toolchain: 1.98
           components: rustfmt, clippy
       - name: Shared sccache
+        if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: linux
           shared-key: linux-build
+          save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/linux' || github.ref == 'refs/heads/main')) }}
       - name: Preflight
         run: python3 scripts/run-test-layer.py quick
 
@@ -154,7 +179,7 @@ jobs:
     name: Fast checks (GTK)
     timeout-minutes: 60
     runs-on: ubuntu-24.04
-    needs: [resolve-ref, ensure-ci-gtk-image]
+    needs: [pin-revision, ensure-ci-gtk-image]
     # The GNOME 50 baseline requires GTK 4.22, GLib 2.88 and libadwaita 1.9.
     # Pre-baked debian:testing + GTK deps from linux/ci/debian-testing-gtk.
     # The integration job stays on the host runner — driver crates depend
@@ -176,7 +201,8 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
           fetch-depth: 0
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
@@ -192,6 +218,7 @@ jobs:
           toolchain: 1.98
           components: rustfmt, clippy
       - name: Shared sccache
+        if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
@@ -224,7 +251,7 @@ jobs:
     name: Installed GTK safety smoke
     timeout-minutes: 60
     runs-on: ubuntu-24.04
-    needs: [resolve-ref, fast]
+    needs: [pin-revision, fast]
     container:
       image: debian:testing
       credentials:
@@ -243,7 +270,8 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -263,6 +291,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-gtk-safety
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Secret Service round-trip
         run: python3 scripts/run-test-layer.py keyring
       - name: GTK installed-flow smoke
@@ -290,7 +319,7 @@ jobs:
     timeout-minutes: 30
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    needs: resolve-ref
+    needs: pin-revision
     container:
       image: debian:testing
       credentials:
@@ -309,7 +338,8 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -339,6 +369,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-current-stable-clippy
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Clippy on current stable
         # The repository override selects 1.98, so +stable is required here.
         run: cargo +stable clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
@@ -348,14 +379,15 @@ jobs:
     name: Driver integration tests (docker)
     timeout-minutes: 55
     runs-on: ubuntu-24.04
-    needs: [resolve-ref, b4-rollback]
+    needs: [pin-revision, b4-rollback]
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -384,6 +416,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-integration
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Verify docker is available
         run: docker version
       - name: Driver, socket and SSH integration
@@ -402,14 +435,15 @@ jobs:
     name: B4 rollback acceptance (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: resolve-ref
+    needs: pin-revision
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -434,6 +468,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-integration
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Verify docker is available
         run: docker version
       - name: Focused MySQL and PostgreSQL rollback cases
@@ -452,14 +487,15 @@ jobs:
     name: Driver TLS fixture (docker)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
-    needs: resolve-ref
+    needs: pin-revision
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -484,6 +520,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-driver-tls
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Verify docker is available
         run: docker compose version
       - name: Driver TLS fixture
@@ -502,14 +539,15 @@ jobs:
     name: PostgreSQL release fixture (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: resolve-ref
+    needs: pin-revision
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -549,6 +587,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-postgres-release
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Build staged release GTK binary
         run: cargo build --locked --release -p tablepro-app
       - name: Stage release binary for installed GTK scenarios
@@ -575,7 +614,7 @@ jobs:
 
   duckdb:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    needs: resolve-ref
+    needs: pin-revision
     name: Optional DuckDB driver and GTK feature
     timeout-minutes: 60
     runs-on: ubuntu-24.04
@@ -600,7 +639,8 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -617,6 +657,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-duckdb
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Driver tests including offline extensions and flat files
         run: cargo test --locked -p tablepro-driver-duckdb
       - name: Build the GTK application with DuckDB
@@ -629,7 +670,7 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     needs:
-      - resolve-ref
+      - pin-revision
       - preflight
       - fast
       - gtk-safety
@@ -642,7 +683,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.resolve-ref.outputs.commit || github.sha }}
+          persist-credentials: false
       - name: Require every regression job
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}
