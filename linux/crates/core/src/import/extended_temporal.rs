@@ -102,6 +102,22 @@ mod tests {
     }
 
     #[test]
+    fn extended_dates_pin_bc_year_month_day_and_gregorian_leap_boundaries() {
+        for text in ["10000-12-31", "0005-02-29 (BC)", "0401-02-29 (BC)"] {
+            assert!(duckdb_extended_date(text), "{text}");
+        }
+        for text in [
+            "1-01-01 (BC)",
+            "0000-01-01 (BC)",
+            "0101-02-29 (BC)",
+            "0201-02-29 (BC)",
+            "10000-02-00",
+        ] {
+            assert!(!duckdb_extended_date(text), "{text}");
+        }
+    }
+
+    #[test]
     fn timestamptz_nanos_keep_fractional_seconds_across_zone_forms() {
         assert_eq!(
             duckdb_extended_timestamptz_nanos("280000-02-29 12:34:56.123456+05:30"),
