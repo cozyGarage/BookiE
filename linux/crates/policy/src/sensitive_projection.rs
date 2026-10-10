@@ -55,25 +55,46 @@ fn select_projection_sensitivity(query: &Query, patterns: &[String]) -> Option<V
 fn expr_references_sensitive(expr: &Expr, patterns: &[String]) -> bool {
     let rendered = expr.to_string();
     let lowered = rendered.to_ascii_lowercase();
-    record_to_json_constructor(&lowered)
+    record_serialization_constructor(&lowered)
         || text_identifiers(&rendered).any(|ident| column_is_sensitive(ident, patterns))
 }
 
-fn record_to_json_constructor(lowered: &str) -> bool {
+fn record_serialization_constructor(lowered: &str) -> bool {
     for name in [
         "row_to_json(",
         "to_json(",
         "to_jsonb(",
+        "json_agg(",
+        "jsonb_agg(",
+        "json_object_agg(",
+        "jsonb_object_agg(",
         "json_build_object(",
         "jsonb_build_object(",
         "json_object(",
         "jsonb_object(",
     ] {
-        if lowered.contains(name) {
+        if let Some(function_name) = name.strip_suffix('(')
+            && contains_function_call(lowered, function_name)
+        {
             return true;
         }
     }
     false
+}
+
+fn contains_function_call(sql: &str, function_name: &str) -> bool {
+    sql.match_indices(function_name).any(|(start, _)| {
+        let preceding_boundary = sql[..start]
+            .chars()
+            .next_back()
+            .is_none_or(|character| !character.is_ascii_alphanumeric() && character != '_');
+        let after_name = &sql[start + function_name.len()..];
+        let after_name = after_name
+            .trim_start()
+            .strip_prefix('"')
+            .unwrap_or(after_name.trim_start());
+        preceding_boundary && after_name.trim_start().starts_with('(')
+    })
 }
 
 fn text_identifiers(text: &str) -> impl Iterator<Item = &str> {
@@ -253,6 +274,11 @@ mod tests {
             "WITH outer_q AS (WITH inner_q AS (SELECT pan AS p FROM cards) SELECT p FROM inner_q) SELECT p FROM outer_q",
             "SELECT to_json(c) FROM cards c",
             "SELECT jsonb_build_object('pan', pan) FROM cards",
+            "SELECT json_agg(c) FROM cards c",
+            "SELECT \"json_agg\"(c) FROM cards c",
+            "SELECT jsonb_agg(c) FROM cards c",
+            "SELECT json_object_agg('row', c) FROM cards c",
+            "SELECT jsonb_object_agg('row', c) FROM cards c",
         ] {
             assert_eq!(
                 sensitive_projection(sql, "postgres", &sensitive_patterns(), 1),
