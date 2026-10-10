@@ -450,7 +450,7 @@ changes need review for cross-consumer and security effects before marking done.
 
 ```text
 Working branch: linux.
-Read CLAUDE.md, PLAN.md, docs/bookie-0.2-sprint.md and docs/validation-playbook.md
+Read CLAUDE.md, docs/bookie-0.2-sprint.md and docs/validation-playbook.md
 (paths under linux/ for docs). Follow the RTK instruction for shell commands.
 Confirm current full HEAD and git status; reviewed baseline was
 fe22716459c242b350bf34e7070dde19bba184ba. Record any newer commits or local edits.
@@ -888,7 +888,7 @@ checks BSON markers in the workbook; all eight integration tests passed.
 
 ## Documentation and boundaries
 
-Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while
+Link this sprint from ROADMAP.md and mark the 0.1.1 plan superseded while
 retaining history. Keep shared Rust close to upstream, import with attribution,
 isolate branding/governance/compatibility/additional drivers. Never merge Apple
 source. Prepare upstream-compatible fixes separately. Contacting authors, upstream

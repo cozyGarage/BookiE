@@ -22,11 +22,12 @@ SHA you need, and recheck current source before trusting words such as "next",
 
 | Audience | Documents |
 |---|---|
-| People using BookiE | [User guide](user-guide.md), [platforms](platforms.md), [Linux README](../README.md) |
+| People using BookiE | [User guide](user-guide.md), [platforms](platforms.md), [root README](../../README.md) |
 | Anyone comparing clients | [0.2 feature comparison](0.2-feature-comparison.md) |
 | Contributors writing code | [AGENTS.md](../../AGENTS.md), [architecture](../ARCHITECTURE.md), [code conventions](code-conventions.md), [adding drivers](adding-drivers.md), [state management](state-management.md), [connections](connections.md), [disconnection contracts](disconnection-contracts.md), [storage](storage.md), [error handling](error-handling.md) |
 | Contributors testing | [Validation playbook](validation-playbook.md) (including [CI tiers](validation-playbook.md#ci-tiers): GitHub cheap vs Forgejo merge), [testing](testing.md), [ignored-test inventory](ignored-tests.md) (generated), [manual verification](manual-verification-0.2-features.md), [capability evidence](capability-evidence.md) |
 | Planning and status | [Sprint](bookie-0.2-sprint.md), [0.2.0 scope](0.2.0-scope.md), [backlog](backlog.md), [known limitations](known-limitations.md), [ledger](known-issues.md), [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence index](value-contracts.md), [ROADMAP](../ROADMAP.md), [changelog](../CHANGELOG.md) |
+| Product context and specs | [PRODUCT.md](../../PRODUCT.md), [personas](../../docs/personas.md), [PRINCIPLES.md](../../PRINCIPLES.md), [SECURITY.md](../../SECURITY.md), [capability specs](../../specs/README.md) (drafts until reviewed; AGENTS and ADRs rank above them) |
 | Decisions | [ADRs](decisions/README.md), [proposals](proposals/) |
 | Proof and history | [evidence](evidence/), [archive](archive/), [upstream sync](upstream-sync.md) |
 
@@ -35,6 +36,8 @@ SHA you need, and recheck current source before trusting words such as "next",
 | Fact | Owner | Update rule |
 | --- | --- | --- |
 | A rule for every change | [AGENTS.md](../../AGENTS.md) | One copy; tool-specific files point to it |
+| What the product is and who it serves | [PRODUCT.md](../../PRODUCT.md), [personas](../../docs/personas.md), [PRINCIPLES.md](../../PRINCIPLES.md) | Keep aligned with shipped behaviour; NEEDS REVIEW until a maintainer clears the draft |
+| Current capability behaviour extracted from code | [specs/](../../specs/README.md) | Descriptive only; when a spec and the code disagree, fix the spec |
 | An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR |
 | A design not yet decided | [proposals/](proposals/) | Becomes an ADR or is deleted |
 | An open issue, its status, evidence and owner | The [ledger](known-issues.md) | One row per issue; cross out only with the closing commit, PR or test; `scripts/check-known-issues.py` checks the format and owners |
@@ -44,7 +47,7 @@ SHA you need, and recheck current source before trusting words such as "next",
 | Type and consumer proof lookup | The [value evidence index](value-contracts.md) | Link to the case; detailed logs belong in evidence or history |
 | Distros, toolchain, packages, Flathub, accessibility | [Platforms](platforms.md) | One section per concern |
 | Commands, layers, gates, handoff format | The [validation playbook](validation-playbook.md) | Reuse existing layers; say whether a result was local, Forgejo or installed |
-| Crates, data flow, rename boundary, CI gate split | [Architecture](../ARCHITECTURE.md) | Match the manifests and [AGENTS.md](../../AGENTS.md); cheap vs Forgejo detail stays in the [validation playbook](validation-playbook.md#ci-tiers) |
+| Crates, request pipeline, DAG, rename boundary, CI gate split | [Architecture](../ARCHITECTURE.md) (Mermaid map + trait boundaries; peers under Studied from for document structure) | Match the manifests and [AGENTS.md](../../AGENTS.md); cheap vs Forgejo detail stays in the [validation playbook](validation-playbook.md#ci-tiers) |
 | A user-visible change | The [changelog](../CHANGELOG.md) | One line of user impact; no test or evidence notes |
 | What a user can do and how | The [user guide](user-guide.md) | Update with the feature that changes it |
 | Run-specific proof (manifests, focused logs) | `evidence/<topic>-<YYYY-MM-DD>/` | A `manifest.json` plus small text logs; link it from the owning row or board |
