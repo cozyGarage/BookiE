@@ -23,7 +23,7 @@ impl RateLimiter {
     }
 
     pub fn check(&self, key: &str) -> Result<(), String> {
-        let mut map = self.windows.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut map = self.windows.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let now = Instant::now();
         map.retain(|tracked, entries| {
             entries.retain(|seen| now.duration_since(*seen) < WINDOW);

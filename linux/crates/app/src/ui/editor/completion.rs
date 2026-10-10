@@ -322,7 +322,7 @@ fn table_references(statement: &str) -> Vec<(String, Option<String>)> {
         let mut consumed = index + 2;
         if let Some(next) = tokens.get(consumed) {
             if next.eq_ignore_ascii_case("as") {
-                alias = tokens.get(consumed + 1).map(|value| value.to_string());
+                alias = tokens.get(consumed + 1).map(ToString::to_string);
                 consumed += 2;
             } else if !KEYWORDS.contains(&next.to_ascii_lowercase().as_str()) {
                 alias = Some(next.to_string());

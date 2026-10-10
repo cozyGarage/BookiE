@@ -122,7 +122,7 @@ pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPrevi
 pub(crate) fn value_to_full_edit_text(value: &Value) -> String {
     match value {
         Value::Null => String::new(),
-        other => value_to_text(other, |s| s.to_string()),
+        other => value_to_text(other, ToString::to_string),
     }
 }
 
