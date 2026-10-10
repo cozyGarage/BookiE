@@ -96,5 +96,6 @@ mod tests {
         assert_eq!(decode("42").unwrap(), None);
         assert!(decode("bookie:sqlite-any:v1:integer:nope").is_err());
         assert!(decode("bookie:sqlite-any:v1:blob:0xz1").is_err());
+        assert!(decode("bookie:sqlite-any:v1:blob:f").is_err());
     }
 }
