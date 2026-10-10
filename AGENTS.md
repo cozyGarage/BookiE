@@ -41,51 +41,9 @@ Accepted ADRs constrain architecture. The sprint owns sequencing and acceptance;
 ROADMAP and PLAN only point to it. Dated reviews and archives prove their
 recorded source only; they do not override current decisions.
 
-## Altitude
+## Product context and specs
 
-On conflict, the higher layer wins:
-
-```text
-PRINCIPLES.md
-  → accepted ADR / BDR (linux/docs/decisions/)
-    → specs/<capability> + linux/ARCHITECTURE.md
-      → this file (conventions, lanes, Forgejo, tests)
-        → code
-```
-
-This file remains the agent entry (R1). Standard-shaped files point here and at
-the linux homes; they do not replace lane rules or Forgejo merge tiers.
-
-## Standards bridge
-
-Gradual adoption of repository-standards, profile `core`, bookmark
-[`.standards-version`](.standards-version) (1.0.19). Layer 2 Node stack is
-declined.
-
-| File | Role |
-|---|---|
-| [PRODUCT.md](PRODUCT.md) | What BookiE is and is not |
-| [docs/personas.md](docs/personas.md) | Who a spec must serve |
-| [docs/PRINCIPLES.md](docs/PRINCIPLES.md) | Altitude apex |
-| [SECURITY.md](SECURITY.md) | Vulnerability contact |
-| [docs/decision-records/](docs/decision-records/README.md) | Index onto `linux/docs/decisions/` |
-| [docs/adoption-assessment.md](docs/adoption-assessment.md) | Gate 2 gap map |
-| [docs/backlog.md](docs/backlog.md) | Alignment count only; product work stays in the ledger |
-| [specs/](specs/README.md) | PolicyGuard and SSH behaviour extracted from code |
-| [docs/standards-updates.md](docs/standards-updates.md) | How to take the next standard delta |
-
-Working language: English. If a shipped skill under `.claude/skills` or a Cursor
-skill covers the request, read it before acting. Most lifecycle skills are not
-vendored yet (manifest exception; alignment item A-15).
-
-Advisory drift only:
-
-```bash
-node scripts/self-verify.mjs --warn --profile core
-bash scripts/standards-drift.sh
-```
-
-Do not make Forgejo or `forgejo-gate` depend on that number.
+[PRODUCT.md](PRODUCT.md) says what BookiE is and is not, [docs/personas.md](docs/personas.md) says who it serves, and [PRINCIPLES.md](PRINCIPLES.md) holds the standing principles. [specs/](specs/README.md) describe current behaviour extracted from the code. They are drafts until reviewed: this file and accepted ADRs rank above them, and when a spec and the code disagree, check the code and fix the spec.
 
 ## Lanes and ownership
 

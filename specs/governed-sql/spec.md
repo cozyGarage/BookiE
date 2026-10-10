@@ -1,6 +1,6 @@
 # Governed SQL
 
-> [NEEDS REVIEW] drafted by the adoption run on 2026-10-11 from PolicyGuard, MCP auth and ARCHITECTURE. Backlog: A-3.
+> [NEEDS REVIEW] Draft written on 2026-10-11 from PolicyGuard, MCP auth and ARCHITECTURE. A maintainer review is pending.
 
 **Spec tier:** buildable
 **Serves:** `Local DBA`, `MCP operator`

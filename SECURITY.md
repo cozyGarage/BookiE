@@ -1,9 +1,6 @@
 # Security
 
-**Reporting a vulnerability.** Use GitHub private vulnerability reporting on the repository that tracks BookiE issues:
-
-- Upstream tracker: https://github.com/TableProApp/TablePro/security/advisories/new
-- Current delivery fork: https://github.com/cozyGarage/BookiE/security/advisories/new
+**Reporting a vulnerability.** Use GitHub private vulnerability reporting: https://github.com/cozyGarage/BookiE/security/advisories/new
 
 Do not open a public issue for anything exploitable. Do not attach secrets, connection files, tokens or unmasked query results. Expect an acknowledgment within 3 business days.
 

@@ -1,8 +1,8 @@
 # Personas - who we build for
 
-> [NEEDS REVIEW] drafted by the adoption run on 2026-10-11 from the UI, MCP and packaging surfaces. Backlog: A-2.
+> [NEEDS REVIEW] Draft written on 2026-10-11 from the UI, MCP and packaging surfaces. A maintainer review is pending.
 
-Personas sit above specs and the alignment backlog. A spec names who it serves. An alignment item names whose problem it moves.
+A spec names which persona it serves.
 
 ## Why personas gate everything
 

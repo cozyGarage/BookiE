@@ -1,6 +1,6 @@
 # BookiE - product overview
 
-> [NEEDS REVIEW] drafted by the adoption run on 2026-10-11 from the repo and its README. Backlog: A-1.
+> [NEEDS REVIEW] Draft written on 2026-10-11 from the repo and its README. A maintainer review is pending.
 
 ## What it is
 
@@ -18,7 +18,7 @@ Stay a Linux-only native client. Finish BookiE 0.2.0 as a development release fo
 
 - **Live:** saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, audit records, MCP access, `bookie-agentd`. Installable 0.1.5 packages on Debian (GNOME 50 libraries) and Arch. PostgreSQL is the furthest-along engine.
 - **In progress:** B3 type/value consumer coverage, B4 transport and session acceptance, installed desktop qualification, progressive server-cursor paging (accepted in ADR 0011, not implemented).
-- **Not started / planned:** Flathub submission, Ubuntu 24.04 runtime, a web UI, runtime driver plugins, accounts or paid tiers.
+- **Left out of 0.2.0:** Flatpak and Flathub, a web UI, runtime driver plugins, accounts or paid tiers.
 
 ## Users / personas
 
@@ -46,7 +46,6 @@ The roster is in [docs/personas.md](docs/personas.md). The primary persona is th
 - [README](README.md)
 - [Architecture](linux/ARCHITECTURE.md)
 - [ADRs](linux/docs/decisions/README.md)
-- [Decision-records index](docs/decision-records/README.md)
 
 ## Success metrics
 
