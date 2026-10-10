@@ -315,6 +315,16 @@
       "tests::hop_zero_password_auth_still_works"
     ],
     [
+      "tablepro-transport",
+      "--lib",
+      "tests::password_auth_uses_the_secret_bound_to_each_hop"
+    ],
+    [
+      "tablepro-transport",
+      "--lib",
+      "tests::legacy_jump_key_passphrase_is_refused_before_keyring_access"
+    ],
+    [
       "tablepro-agentd",
       "saved_transport",
       "a_saved_ssh_hop_is_used_instead_of_dialling_the_database_directly"
@@ -338,6 +348,21 @@
       "tablepro-storage",
       "--lib",
       "connection_bundle::tests::rolling_back_an_import_removes_only_the_credentials_it_wrote"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::an_export_collects_each_versioned_ssh_hop_secret"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::rolling_back_a_bundle_import_removes_its_per_hop_credentials"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::importing_a_bundle_keeps_existing_hop_credentials_until_replacement_is_asked_for"
     ]
   ]
 }
