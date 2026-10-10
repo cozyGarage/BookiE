@@ -1,6 +1,8 @@
 # Upstream main fix inventory: 2026-10-03
 
 Companion to the [Linux applicability review](upstream-main-review-2026-10-03.md).
+Keep failure and screened-subject tables here; open work stays in the
+[ledger](../known-issues.md) and active boards.
 
 Pinned upstream tip: `5c2df3b60cd40c25ba86c57e3d1c87499340cb3c`.
 GitHub API committer-date window: September 14 through that tip, inclusive.

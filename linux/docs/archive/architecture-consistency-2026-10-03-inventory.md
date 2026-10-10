@@ -1,8 +1,12 @@
 # Documentation and evidence review inventory
 
+Companion to [the review](architecture-consistency-review-2026-10-03.md). Keep
+this inventory for path-level failure and disposition tables; open product
+items live in the [ledger](../known-issues.md), not here.
+
 Starting source: `4b7814f5e1f586c3761c1454e66d3394ad2c9609`. Reviewed 2026-10-03.
 
-Every row received the consistency screen described in [the review](architecture-consistency-review-2026-10-03.md).
+Every row received the consistency screen described in the review.
 Baseline/current digests and exact checks are in [the manifest](../evidence/architecture-review-2026-10-03/manifest.json).
 A screened row is not exhaustive semantic certification or a runtime pass.
 
@@ -16,7 +20,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [CONTRIBUTING.md](../../../CONTRIBUTING.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [PLAN.md](../../../PLAN.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [README.md](../../../README.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [external-audit.md](../../../external-audit.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
+| [external-audit-2026-10-06.md](external-audit-2026-10-06.md) | archived dated review (moved from repo root 2026-10-10) | Corrected authority, source drift or evidence qualification |
 | [linux/ARCHITECTURE.md](../../ARCHITECTURE.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/CHANGELOG.md](../../CHANGELOG.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/CONTRIBUTING.md](../../CONTRIBUTING.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
