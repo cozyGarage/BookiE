@@ -4,7 +4,7 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.6-dev (0.1.5 i
 0.2.0. Implementation is authorized; no 0.2 release is approved.
 
 
-## 0.2.0 readiness: 2026-10-09
+## 0.2.0 readiness: 2026-10-10
 
 No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 (owner in brackets; details in the [ledger](known-issues.md)):
@@ -14,12 +14,17 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
   MongoDB census, UI-19 (deferred), mutation triage, installed grid acceptance.
   TEST-29's fast and durable test-container paths are in PR #457. Published
   head `e0bb6ce` passes the MySQL and MongoDB jobs; Forgejo run 101 found two
-  PostgreSQL driver test failures and the known B4 query-plan policy mismatch.
-  Local follow-up `8e586fb` pins the enum oracle query to its session; its
-  focused test passes locally and is awaiting the next serialized gate.
-- B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
-  remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
-  (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
+  PostgreSQL driver test failures. PR #461 aligned the release expectation with
+  fail-closed explain-plan masking for read-scoped agents.
+  Run 127 re-proves the run-101 PostgreSQL driver fixes; the latest merged
+  `linux` branch still needs its exact-head gate. Its separate `pg-release`
+  failure is B4-owned. See the [B3 retest record](type-contract-strategy.md#retest-indicators).
+- B4 [B4]: B4-12 scoped rollback acceptance is complete. Frozen-candidate and
+  installed acceptance remains for the other transport rows; B4-11 optional
+  engine/effect coverage, AUD-2 hosted acceptance, AUD-9 remaining lineage
+  cases, AUD-10 DuckDB path-race follow-up, AUD-11 verdict migration step 4,
+  UI-1b, UI-13b, TEST-15, PERF-2 and PERF-8 remain. See the [B4 board](b4-task-board.md)
+  and [ledger](known-issues.md) for exact status and evidence.
 - Desktop acceptance [maintainer]: PKG-1 native Wayland on Arch, PKG-2
   Debian/GNOME, PKG-4 Flathub submission and screenshots, PKG-8 the Flatpak
   file-access decision, TEST-6 the 107-item manual checklist.
@@ -29,10 +34,11 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 
 ## Current continuation
 
-Merged `linux` baseline after PRs #441–#458 includes generation-ordered results,
-SQL Server wide decimal / `sql_variant` refusal, deep PostgreSQL enum/array
-contracts, MySQL/MariaDB charset regressions, B4 policy effects dual-compute,
-and SSH/rollback acceptance evidence. Case detail lives on the
+Merged `linux` baseline includes PRs #459–#461, #463 and #475: engine read-only
+enforcement, order-independent script classification, fail-closed explain-plan
+masking, DuckDB selected-file restrictions and MySQL merge-table rollback
+coverage. PR #480 (joined policy verdicts) and PR #486 (DuckDB replaced-path
+race) remain open. Case detail lives on the
 [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md),
 [value evidence index](value-contracts.md) and [ledger](known-issues.md).
 Dated PR-by-PR continuation notes are in
@@ -48,12 +54,12 @@ These failed or incomplete runs stay open until re-proven on a current SHA:
 
 | Signal | Owner | Note |
 | --- | --- | --- |
-| Forgejo run 101: two PostgreSQL driver failures | B3 | Local follow-up `8e586fb` pins the enum oracle to one session; await exact-head gate |
-| `pg-release` query-plan masking (`***REDACTED***`) | B4 / AUD-9 | Product intent settled by #461 (plans stay masked for read-scoped agents); AUD-9 unknown-projection fail-closed remains open through the Forgejo gate |
+| Forgejo run 101: two PostgreSQL driver failures | B3 | Run 127 re-proves these fixes; the current `linux` head still needs its exact-head gate. See the [B3 retest record](type-contract-strategy.md#retest-indicators) |
+| Forgejo run 127: `pg-release` failure after #461 | B4 / AUD-9 | Compare the exact-head failure with #461's redacted-plan expectation before closing; remaining lineage cases stay open |
 | Forgejo run 88 GTK waits: `open_editor`, `audit_failure_denies` | UX | Cause unclassified; run 88 predates #451/#452 |
 | TEST-28 native Ubuntu AT-SPI grid / Columns UI | UX | Container distro-floor passes; native job is the broken surface |
 | Build Linux on `c2f3f78b9`: Docker Hub `toomanyrequests` | lab | Infrastructure; last fully green Build Linux was `0d36a65d7` (#455) |
-| Build Linux on `57fd504ab`: plan rows fully redacted | B4 | Superseded by #461; keep only as historical SHA, not an open product-intent mismatch |
+
 
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless

@@ -1,0 +1,128 @@
+diff --git a/src/aio/smol.rs b/src/aio/smol.rs
+index 760b560..803ef80 100644
+--- a/src/aio/smol.rs
++++ b/src/aio/smol.rs
+@@ -212,12 +212,16 @@ impl RedisRuntime for Smol {
+     ) -> RedisResult<Self> {
+         let tcp_stream = connect_tcp(&socket_addr, tcp_settings).await?;
+ 
++        let verify_host = tls_params
++            .as_ref()
++            .and_then(|params| params.verify_host.as_deref())
++            .unwrap_or(hostname);
+         let config = create_rustls_config(insecure, tls_params.clone())?;
+         let tls_connector = TlsConnector::from(Arc::new(config));
+ 
+         Ok(tls_connector
+             .connect(
+-                rustls::pki_types::ServerName::try_from(hostname)?.to_owned(),
++                rustls::pki_types::ServerName::try_from(verify_host)?.to_owned(),
+                 tcp_stream,
+             )
+             .await
+diff --git a/src/aio/tokio.rs b/src/aio/tokio.rs
+index e57d5eb..54a54ca 100644
+--- a/src/aio/tokio.rs
++++ b/src/aio/tokio.rs
+@@ -152,12 +152,16 @@ impl RedisRuntime for Tokio {
+         tls_params: &Option<TlsConnParams>,
+         tcp_settings: &crate::io::tcp::TcpSettings,
+     ) -> RedisResult<Self> {
++        let verify_host = tls_params
++            .as_ref()
++            .and_then(|params| params.verify_host.as_deref())
++            .unwrap_or(hostname);
+         let config = create_rustls_config(insecure, tls_params.clone())?;
+         let tls_connector = TlsConnector::from(Arc::new(config));
+ 
+         Ok(tls_connector
+             .connect(
+-                rustls::pki_types::ServerName::try_from(hostname)?.to_owned(),
++                rustls::pki_types::ServerName::try_from(verify_host)?.to_owned(),
+                 connect_tcp(&socket_addr, tcp_settings).await?,
+             )
+             .await
+diff --git a/src/cluster_handling/client.rs b/src/cluster_handling/client.rs
+index b479905..c40dfa0 100644
+--- a/src/cluster_handling/client.rs
++++ b/src/cluster_handling/client.rs
+@@ -191,6 +191,7 @@ impl ClusterParams {
+                 #[cfg(feature = "tls-rustls")]
+                 root_cert_store: None,
+                 danger_accept_invalid_hostnames: false,
++                verify_host: None,
+             });
+             tls_params.danger_accept_invalid_hostnames = true;
+             Some(tls_params)
+diff --git a/src/connection.rs b/src/connection.rs
+index e55e4b7..dd73ff5 100644
+--- a/src/connection.rs
++++ b/src/connection.rs
+@@ -53,6 +53,11 @@ pub struct TlsConnParams {
+     pub(crate) root_cert_store: Option<RootCertStore>,
+     #[cfg(any(feature = "tls-rustls-insecure", feature = "tls-native-tls"))]
+     pub(crate) danger_accept_invalid_hostnames: bool,
++    /// Overrides the hostname used for certificate verification without
++    /// changing which address the driver dials. Set when the dial address
++    /// is a local forwarding endpoint, such as an SSH tunnel, but the
++    /// certificate was issued for the server's real hostname.
++    pub(crate) verify_host: Option<String>,
+ }
+ 
+ static DEFAULT_PORT: u16 = 6379;
+@@ -206,6 +211,7 @@ impl ConnectionAddr {
+                     #[cfg(feature = "tls-rustls")]
+                     root_cert_store: None,
+                     danger_accept_invalid_hostnames: insecure,
++                    verify_host: None,
+                 });
+             }
+         }
+@@ -983,10 +989,14 @@ impl ActualConnection {
+                 ref tls_params,
+             } => {
+                 let host: &str = host;
++                let verify_host = tls_params
++                    .as_ref()
++                    .and_then(|params| params.verify_host.as_deref())
++                    .unwrap_or(host);
+                 let config = create_rustls_config(insecure, tls_params.clone())?;
+                 let conn = rustls::ClientConnection::new(
+                     Arc::new(config),
+-                    rustls::pki_types::ServerName::try_from(host)?.to_owned(),
++                    rustls::pki_types::ServerName::try_from(verify_host)?.to_owned(),
+                 )?;
+                 let reader = match timeout {
+                     None => {
+diff --git a/src/tls.rs b/src/tls.rs
+index 5429e14..f7671c2 100644
+--- a/src/tls.rs
++++ b/src/tls.rs
+@@ -27,6 +27,11 @@ pub struct TlsCertificates {
+     pub client_tls: Option<ClientTlsConfig>,
+     /// root certificate byte stream in PEM format if the local truststore is *not* to be used
+     pub root_cert: Option<Vec<u8>>,
++    /// Overrides the hostname used for certificate verification without
++    /// changing which address the client dials. Set this when the dial
++    /// address is a local forwarding endpoint, such as an SSH tunnel, but
++    /// the certificate was issued for the server's real hostname.
++    pub verify_host: Option<String>,
+ }
+ 
+ pub(crate) fn inner_build_with_tls(
+@@ -64,6 +69,7 @@ pub(crate) fn retrieve_tls_certificates(
+     let TlsCertificates {
+         client_tls,
+         root_cert,
++        verify_host,
+     } = certificates;
+ 
+     let client_tls_params = if let Some(ClientTlsConfig {
+@@ -115,6 +121,7 @@ pub(crate) fn retrieve_tls_certificates(
+         root_cert_store,
+         #[cfg(any(feature = "tls-rustls-insecure", feature = "tls-native-tls"))]
+         danger_accept_invalid_hostnames: false,
++        verify_host: verify_host.clone(),
+     })
+ }
+ 

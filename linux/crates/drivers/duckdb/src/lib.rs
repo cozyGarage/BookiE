@@ -1,7 +1,14 @@
-use std::sync::{Arc, Mutex};
+#[cfg(target_os = "linux")]
+use std::os::{fd::AsRawFd, unix::fs::MetadataExt};
+use std::{
+    fs::File,
+    sync::{Arc, Mutex},
+};
 
 use async_trait::async_trait;
-use duckdb::{Connection as DuckConnection, core::LogicalTypeId, params_from_iter, types::ValueRef};
+use duckdb::{
+    AccessMode, Config, Connection as DuckConnection, core::LogicalTypeId, params_from_iter, types::ValueRef,
+};
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
@@ -48,13 +55,98 @@ impl DatabaseDriver for DuckdbDriver {
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let path = opts.database.clone();
-        let conn = tokio::task::spawn_blocking(move || open_path(&path))
+        let read_only = opts.read_only;
+        let (conn, selected_file) = tokio::task::spawn_blocking(move || open_path_with_access(&path, read_only))
             .await
             .map_err(|e| DriverError::Internal(format!("duckdb connect join: {e}")))??;
         Ok(Box::new(DuckdbConnection {
             conn: Arc::new(Mutex::new(conn)),
+            _selected_file: selected_file,
         }))
     }
+}
+
+fn open_path_with_access(path: &str, read_only: bool) -> Result<(DuckConnection, Option<File>), DriverError> {
+    if !read_only {
+        return open_path(path).map(|conn| (conn, None));
+    }
+    if path.is_empty() || path == ":memory:" {
+        return Err(DriverError::Unsupported(
+            "read-only DuckDB requires a database file or a selected flat file".into(),
+        ));
+    }
+    if let Some(reader_fn) = flat_file_reader_fn(path) {
+        let (conn, file) = open_read_only_flat_file(path, reader_fn)?;
+        return Ok((conn, Some(file)));
+    }
+
+    let config = Config::default()
+        .access_mode(AccessMode::ReadOnly)
+        .map_err(map_duck_error)?
+        .enable_external_access(false)
+        .map_err(map_duck_error)?;
+    let conn = DuckConnection::open_with_flags(path, config).map_err(map_duck_error)?;
+    conn.execute_batch("SET lock_configuration = true;")
+        .map_err(map_duck_error)?;
+    Ok((conn, None))
+}
+
+#[cfg(target_os = "linux")]
+fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnection, File), DriverError> {
+    use std::path::Path;
+
+    let canonical = std::fs::canonicalize(path).map_err(map_file_error)?;
+    let before_open = std::fs::metadata(&canonical).map_err(map_file_error)?;
+    if !before_open.is_file() {
+        return Err(DriverError::PolicyDenied(
+            "the selected DuckDB input must be a regular file".into(),
+        ));
+    }
+    let file = File::open(&canonical).map_err(map_file_error)?;
+    let opened = file.metadata().map_err(map_file_error)?;
+    let after_open = std::fs::metadata(&canonical).map_err(map_file_error)?;
+    if !opened.is_file() || !same_file_identity(&before_open, &opened) || !same_file_identity(&opened, &after_open) {
+        return Err(DriverError::PolicyDenied(
+            "the selected DuckDB input changed during read-only connection setup".into(),
+        ));
+    }
+
+    let proc_fd_dir = Path::new("/proc/self/fd");
+    if !proc_fd_dir.is_dir() {
+        return Err(DriverError::Unsupported(
+            "read-only DuckDB flat-file access requires Linux procfs file descriptors".into(),
+        ));
+    }
+    let stable_path = format!("{}/{}", proc_fd_dir.display(), file.as_raw_fd());
+    let conn = DuckConnection::open_in_memory().map_err(map_duck_error)?;
+    conn.execute_batch(&format!(
+        "SET allowed_paths = ['{}']; \
+         SET enable_external_access = false; \
+         CREATE VIEW {} AS SELECT * FROM {}('{}'); \
+         SET lock_configuration = true;",
+        escape_duckdb_literal(&stable_path),
+        quote_duckdb_ident(&derive_view_name(path)),
+        reader_fn,
+        escape_duckdb_literal(&stable_path)
+    ))
+    .map_err(map_duck_error)?;
+    Ok((conn, file))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn open_read_only_flat_file(_path: &str, _reader_fn: &str) -> Result<(DuckConnection, File), DriverError> {
+    Err(DriverError::Unsupported(
+        "read-only DuckDB flat-file access is supported only on Linux".into(),
+    ))
+}
+
+#[cfg(target_os = "linux")]
+fn same_file_identity(left: &std::fs::Metadata, right: &std::fs::Metadata) -> bool {
+    left.dev() == right.dev() && left.ino() == right.ino()
+}
+
+fn map_file_error(error: std::io::Error) -> DriverError {
+    DriverError::Internal(format!("DuckDB selected file setup failed: {error}"))
 }
 
 /// A `.duckdb`/`.db` file opens directly. A flat data file (Parquet,
@@ -126,6 +218,7 @@ fn escape_duckdb_literal(value: &str) -> String {
 
 struct DuckdbConnection {
     conn: Arc<Mutex<DuckConnection>>,
+    _selected_file: Option<File>,
 }
 
 #[async_trait]

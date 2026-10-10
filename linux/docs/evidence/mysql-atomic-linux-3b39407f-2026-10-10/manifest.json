@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "B4-11 exact-tip MySQL and MariaDB failed-batch rollback and side-effect selector",
+  "source_commit": "3b39407f20d1fbfd1608679f6031b27420d78afa",
+  "test_binary_path": "linux/target/debug/deps/integration-3f630a0a029525e7",
+  "test_binary_sha256": "a3dceea8a1bdd43830e7be4292a1ad762303295e4d66ba65d88c131a5255a750",
+  "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+  "runtime": "Local Linux host; serialized Docker MySQL 8.1 and MariaDB fixtures",
+  "result": "20 passed, 0 failed, 73 filtered out",
+  "duration_seconds": 162,
+  "coverage": [
+    "Transactional DML rollback and lost-connection rollback reporting",
+    "MySQL and MariaDB advisory locks and pinned-session LAST_INSERT_ID state",
+    "MyISAM, MEMORY, CSV, ARCHIVE, BLACKHOLE, MRG_MyISAM and MariaDB Aria effects",
+    "Direct INSERT, UPDATE and DELETE effects on nontransactional engines",
+    "Trigger row effects and trigger session-variable effects",
+    "Auto-increment allocation, implicit-commit refusal and bounded transaction queries"
+  ],
+  "not_established": [
+    "Optional/vendor engines not available in the fixtures",
+    "Other side-effect classes not covered by the current selector",
+    "Frozen-candidate, package-installed and acceptance-gate runs"
+  ],
+  "artifacts": {
+    "run.log": "8e6a3c71c00686fcfaa88ed4f6a7d1c5049e166828ac0c0e15c13b3ecf52bfc3"
+  }
+}

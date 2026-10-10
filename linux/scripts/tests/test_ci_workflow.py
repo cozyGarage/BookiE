@@ -133,13 +133,45 @@ class CiWorkflowTests(unittest.TestCase):
     def test_jobs_share_an_immutable_checkout(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         self.assertNotIn("continue-on-error:", workflow)
-        self.assertIn("commit: ${{ steps.revision.outputs.commit }}", workflow)
-        self.assertIn("ref: ${{ needs.preflight.outputs.commit }}", workflow)
+        self.assertIn("revision: ${{ steps.pin.outputs.revision }}", workflow)
+        self.assertIn("ref: ${{ needs.pin-revision.outputs.revision }}", workflow)
+        self.assertNotIn("needs.preflight.outputs.commit", workflow)
+        self.assertNotIn("needs.resolve-ref.outputs.commit", workflow)
+        gate = workflow.split("  regression-gate:\n", 1)[1]
+        self.assertNotIn("needs.pin-revision.outputs.revision", gate.split("steps:", 1)[1])
         for line in workflow.splitlines():
             if line.strip().startswith("ref:"):
                 self.assertNotIn("github.ref", line)
         quality = (ROOT / ".github/workflows/linux-quality.yml").read_text()
         self.assertEqual(quality.count("ref: ${{ needs.resolve-ref.outputs.commit }}"), 2)
+
+    def test_preflight_and_fast_share_cache_and_run_after_pin_revision(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        preflight = workflow.split("  preflight:\n", 1)[1].split("  fast:\n", 1)[0]
+        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
+        ensure = workflow.split("  ensure-ci-gtk-image:\n", 1)[1].split("  preflight:\n", 1)[0]
+        self.assertIn("needs: pin-revision", preflight)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image]", fast)
+        self.assertNotIn("needs: preflight", fast)
+        self.assertIn("mozilla-actions/sccache-action@", preflight)
+        self.assertIn("mozilla-actions/sccache-action@", fast)
+        self.assertIn("shared-key: linux-build", preflight)
+        self.assertIn("shared-key: linux-build", fast)
+        self.assertIn(
+            "save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/linux' || github.ref == 'refs/heads/main')) }}",
+            preflight,
+        )
+        self.assertIn("persist-credentials: false", preflight)
+        self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk", ensure)
+        self.assertIn('echo "tag=${tag}" >> "$GITHUB_OUTPUT"', ensure)
+        self.assertNotIn('echo "image=', ensure)
+        self.assertIn(
+            "image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}",
+            fast,
+        )
+        self.assertNotIn("needs.ensure-ci-gtk-image.outputs.image", fast)
+        self.assertNotIn("prefix-key: linux-preflight", workflow)
+        self.assertNotIn("prefix-key: linux-fast-gtk", workflow)
 
     def test_required_jobs_never_accept_failure_skip_cancel_or_missing(self):
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
@@ -190,7 +222,21 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("if: inputs.username != ''", action)
         self.assertNotIn("echo \"$DOCKERHUB_TOKEN\"", action)
         self.assertNotIn("echo '${{ inputs.password }}'", action)
-        for job in ["fast", "gtk-safety", "current-stable-clippy", "duckdb"]:
+        fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+        ensure = re.search(r"^  ensure-ci-gtk-image:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+        self.assertIn(
+            "image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}",
+            fast,
+        )
+        self.assertNotIn("needs.ensure-ci-gtk-image.outputs.image", fast)
+        self.assertIn("secrets.GITHUB_TOKEN", fast)
+        self.assertIn("./.github/actions/dockerhub-login", fast)
+        self.assertIn("secrets.DOCKERHUB_USERNAME", fast)
+        self.assertIn("secrets.DOCKERHUB_TOKEN", fast)
+        self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk", ensure)
+        self.assertIn("tag: ${{ steps.publish.outputs.tag }}", ensure)
+        self.assertIn("./.github/actions/dockerhub-login", ensure)
+        for job in ["gtk-safety", "current-stable-clippy", "duckdb"]:
             section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
             self.assertIn("image: debian:testing", section, job)
             self.assertIn("secrets.DOCKERHUB_USERNAME", section, job)
@@ -229,7 +275,7 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             self.assertIn(required, focused)
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("needs: [preflight, b4-rollback]", integration)
+        self.assertIn("needs: [pin-revision, b4-rollback]", integration)
         layers = json.loads((ROOT / "linux/scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
         commands = [step["argv"] for step in layers["steps"]]
         self.assertEqual(len(commands), 2)

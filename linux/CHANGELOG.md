@@ -90,6 +90,8 @@
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- Startup opens the query history database while the rest of the application starts instead of waiting for it first.
+- The Debian package installs its programs without debug symbols, which makes the installed files about a quarter smaller
 - The distro-floor image installs a pinned, checksum-verified `rustup-init` instead of piping an unverified script to the shell.
 - The time shown for a statement no longer includes the wait for your approval on a guarded connection.
 - MongoDB browse pages now use a bounded schema sample and stable `_id` paging instead of scanning the full collection for every page.
@@ -293,6 +295,8 @@
 
 ### Security
 
+- Unparseable statements require approval when write or DDL approval is enabled, even when unparseable SQL is otherwise allowed.
+- Statements that access host files or run external programs, writes with unknown effects, and Local `TRUNCATE` require human approval.
 - The agent daemon no longer trusts an SSH host key it has not seen before. An unattended connection to an unknown host fails and names the key's fingerprint; connecting once from the app or with `ssh` records it. A changed key is still refused everywhere.
 - A lone BEGIN, COMMIT or ROLLBACK on a shared connection is refused with an explanation, in the SQL editor and through MCP. Each statement ran on a shared connection, so a script such as `BEGIN; UPDATE …; ROLLBACK;` committed the update while reporting every step as successful. A whole transaction sent as one batch, such as a SQL Server `GO` batch, still runs.
 - A saved connection's SSH jump chain is capped at eight hops, so an edited connection file cannot force a deep recursive parse.

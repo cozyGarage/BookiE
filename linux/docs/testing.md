@@ -309,7 +309,7 @@ For ordinary UI changes, test the affected flow manually and include before and 
 
 Where each check runs is set by [CI tiers](validation-playbook.md#ci-tiers). In short:
 
-- **GitHub pull requests and pushes to `linux`** run the cheap tier. `.github/workflows/build-linux.yml` has `preflight` and `fast` (formatting, Clippy and the unit tier in a Debian testing container with the GNOME 50 libraries). The workflow contracts, security, Flatpak, CodeQL and SonarCloud workflows are path filtered and skip documentation-only changes.
+- **GitHub pull requests and pushes to `linux`** run the cheap tier. `.github/workflows/build-linux.yml` resolves one commit, then runs `preflight` and `fast` in parallel (shared sccache / rust-cache; `fast` uses the pre-baked GHCR GTK image). The regression gate still fails the run if `preflight` fails. The workflow contracts, security, Flatpak, CodeQL and SonarCloud workflows are path filtered and skip documentation-only changes.
 - **Forgejo** runs the merge tier on every branch push: the installed GTK suite under Xvfb and PyAT-SPI with a real Secret Service round-trip, PostgreSQL, MySQL, SQL Server, ClickHouse and Redis integration tests, the PostgreSQL release fixture (TLS, SSH bastion, Toxiproxy), driver TLS fixtures, the DuckDB driver and application build, and supply-chain checks. `.forgejo/workflows/nightly.yml` adds coverage, mutation, the value contracts and the GTK soak.
 - **GitHub schedule and `workflow_dispatch`** still run the merge-tier jobs of `build-linux.yml` as a weekly backup, and `.github/workflows/gtk-soak.yml` runs a daily five-attempt soak.
 

@@ -62,9 +62,9 @@ testcontainers-modules = { version = "0.15", default-features = false, features 
 oo7 = { version = "0.6", default-features = false, features = ["tokio", "native_crypto"] }
 relm4 = { version = "0.11", default-features = false, features = ["macros", "libadwaita"] }
 sqlparser = "0.58"
-toml = "0.8"
-sha2 = "0.10"
-argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
+toml = "1"
+sha2 = "0.11"
+argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
 aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"] }
 base64 = "0.22"
 zeroize = { version = "1", features = ["alloc"] }
@@ -73,7 +73,6 @@ glob = "0.3"
 libc = "0.2"
 
 [patch.crates-io]
-tiberius = { git = "https://github.com/tiberius-rs/tiberius", rev = "7fd75bb7070fe6ea41374698abf78928bb983bda" }
 sqlx-mysql = { path = "vendor/sqlx-mysql" }
 sqlx-postgres = { path = "vendor/sqlx-postgres" }
 mongodb = { path = "vendor/mongodb" }
@@ -88,6 +87,12 @@ exclusions = [
     "target/**",
     "vendor/**",
     "docs/evidence/**",
+    "ci/**",
+]
+"sonar.coverage.exclusions" = [
+    "ci/**",
+    "scripts/check-ci-jobs.py",
+    "scripts/tests/test_ci_workflow.py",
 ]
 
 [workspace.lints.clippy]
