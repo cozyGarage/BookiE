@@ -14,10 +14,12 @@ remain in the active sprint.
 
 ## After 0.2.0
 
-The [external audit and improvement plan](../external-audit.md) proposes root
-workspace organization, Rust backend ownership checks, GitHub/test tooling,
-docs/examples/evidence synchronization and optional driver reuse. Review it
-after completing 0.2.0; these pending packets do not extend the active sprint.
+The
+[external audit and improvement plan](docs/archive/external-audit-2026-10-06.md)
+proposes root workspace organization, Rust backend ownership checks,
+GitHub/test tooling, docs/examples/evidence synchronization and optional
+driver reuse. Review it after completing 0.2.0; these pending packets do not
+extend the active sprint.
 
 ## Status rules
 

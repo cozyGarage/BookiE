@@ -1,0 +1,369 @@
+crates/core/src/activity.rs:125:50: replace > with >= in activity_template
+crates/core/src/activity.rs:137:49: replace > with >= in activity_template
+crates/core/src/activity.rs:147:49: replace > with >= in activity_template
+crates/core/src/catalog.rs:45:9: delete ! in CatalogObjectKind::is_schema_scoped
+crates/core/src/catalog.rs:45:9: replace CatalogObjectKind::is_schema_scoped -> bool with false
+crates/core/src/catalog.rs:45:9: replace CatalogObjectKind::is_schema_scoped -> bool with true
+crates/core/src/connection.rs:120:9: replace Connection::list_databases -> Result<Vec<String>, DriverError> with Ok(vec![])
+crates/core/src/connection.rs:120:9: replace Connection::list_databases -> Result<Vec<String>, DriverError> with Ok(vec![String::new()])
+crates/core/src/connection.rs:120:9: replace Connection::list_databases -> Result<Vec<String>, DriverError> with Ok(vec!["xyzzy".into()])
+crates/core/src/connection.rs:127:9: replace Connection::list_views -> Result<Vec<TableInfo>, DriverError> with Ok(vec![])
+crates/core/src/connection.rs:140:9: replace Connection::list_objects -> Result<Vec<CatalogObject>, DriverError> with Ok(vec![])
+crates/core/src/connection.rs:148:9: replace Connection::list_objects_controlled -> Result<Vec<CatalogObject>, DriverError> with Ok(vec![])
+crates/core/src/connection.rs:245:9: replace Connection::execute_in_transaction_checked -> Result<Vec<u64>, DriverError> with Ok(vec![])
+crates/core/src/connection.rs:245:9: replace Connection::execute_in_transaction_checked -> Result<Vec<u64>, DriverError> with Ok(vec![0])
+crates/core/src/connection.rs:245:9: replace Connection::execute_in_transaction_checked -> Result<Vec<u64>, DriverError> with Ok(vec![1])
+crates/core/src/connection.rs:268:9: replace Connection::execute_in_transaction_checked_controlled -> Result<Vec<u64>, DriverError> with Ok(vec![])
+crates/core/src/connection.rs:268:9: replace Connection::execute_in_transaction_checked_controlled -> Result<Vec<u64>, DriverError> with Ok(vec![0])
+crates/core/src/connection.rs:268:9: replace Connection::execute_in_transaction_checked_controlled -> Result<Vec<u64>, DriverError> with Ok(vec![1])
+crates/core/src/connection.rs:280:9: replace Connection::fetch_indexes -> Result<Vec<IndexInfo>, DriverError> with Ok(vec![])
+crates/core/src/connection.rs:298:9: replace Connection::fetch_foreign_keys -> Result<Vec<ForeignKeyInfo>, DriverError> with Ok(vec![])
+crates/core/src/connection.rs:318:9: replace Connection::server_version -> Result<Option<String>, DriverError> with Ok(Some(String::new()))
+crates/core/src/connection.rs:318:9: replace Connection::server_version -> Result<Option<String>, DriverError> with Ok(Some("xyzzy".into()))
+crates/core/src/driver.rs:100:9: replace DatabaseDriver::supports_column_comments -> bool with false
+crates/core/src/driver.rs:111:9: replace DatabaseDriver::catalog_object_kinds -> &'static[crate::CatalogObjectKind] with Vec::leak(Vec::new())
+crates/core/src/driver.rs:115:9: replace DatabaseDriver::supports_integrated_auth -> bool with true
+crates/core/src/driver.rs:119:9: replace DatabaseDriver::supports_local_socket -> bool with true
+crates/core/src/driver.rs:126:9: replace DatabaseDriver::supports_client_tls_auth -> bool with true
+crates/core/src/driver.rs:134:9: replace DatabaseDriver::forwarded_socket_name -> Option<String> with Some(String::new())
+crates/core/src/driver.rs:134:9: replace DatabaseDriver::forwarded_socket_name -> Option<String> with Some("xyzzy".into())
+crates/core/src/driver.rs:21:9: replace DriverMaturity::label -> &'static str with ""
+crates/core/src/driver.rs:21:9: replace DriverMaturity::label -> &'static str with "xyzzy"
+crates/core/src/driver.rs:43:9: replace DatabaseDriver::maturity -> DriverMaturity with Default::default()
+crates/core/src/driver.rs:47:9: replace DatabaseDriver::is_file_based -> bool with true
+crates/core/src/driver.rs:58:9: replace DatabaseDriver::ddl_is_transactional -> bool with true
+crates/core/src/driver.rs:68:9: replace DatabaseDriver::reports_rows_affected -> bool with false
+crates/core/src/export/csv.rs:170:9: delete field header_row from struct CsvOptions expression in render_tsv
+crates/core/src/export/csv.rs:171:9: delete field null_to_empty from struct CsvOptions expression in render_tsv
+crates/core/src/export/csv.rs:188:9: delete field header_row from struct CsvOptions expression in rfc4180_options
+crates/core/src/export/csv.rs:215:5: replace write_csv_row_with_options -> io::Result<()> with Ok(())
+crates/core/src/export/csv.rs:320:25: replace && with || in <impl ResultWriter for CsvWriter>::begin
+crates/core/src/export/error.rs:45:9: replace ExportError::is_cancelled -> bool with true
+crates/core/src/export/file.rs:87:32: replace + with * in write_result_file
+crates/core/src/export/json.rs:62:9: delete match arm Value::Null in value_to_json
+crates/core/src/filter.rs:115:9: replace FilterSet::len -> usize with 1
+crates/core/src/filter.rs:262:17: delete match arm FilterOp::LtEq in build_rule_sql
+crates/core/src/filter.rs:280:30: replace += with *= in build_rule_sql
+crates/core/src/filter.rs:290:30: replace += with *= in build_rule_sql
+crates/core/src/filter.rs:303:30: replace += with *= in build_rule_sql
+crates/core/src/filter.rs:523:25: replace || with && in classify
+crates/core/src/filter.rs:541:59: replace || with && in classify
+crates/core/src/filter.rs:547:9: replace || with && in classify
+crates/core/src/filter.rs:548:9: replace || with && in classify
+crates/core/src/filter.rs:559:5: replace parse_bool -> Option<bool> with Some(true)
+crates/core/src/filter.rs:561:9: delete match arm "false" | "f" | "0" | "no" | "n" in parse_bool
+crates/core/src/import/cell.rs:310:30: replace && with || in value_for
+crates/core/src/import/cell.rs:317:32: replace match guard is_any || is_unknown with false in value_for
+crates/core/src/import/cell.rs:317:32: replace match guard is_any || is_unknown with true in value_for
+crates/core/src/import/cell.rs:317:39: replace || with && in value_for
+crates/core/src/import/cell.rs:321:46: replace match guard matches!(kind, ColumnKind::Bytes) with false in value_for
+crates/core/src/import/cell.rs:321:46: replace match guard matches!(kind, ColumnKind::Bytes) with true in value_for
+crates/core/src/import/cell.rs:324:25: replace match guard is_any with false in value_for
+crates/core/src/import/cell.rs:367:18: replace == with != in parse_non_null_cell
+crates/core/src/import/cell.rs:401:106: replace != with == in parse_non_null_cell
+crates/core/src/import/cell.rs:401:42: replace match guard driver_id == "duckdb" && value.timestamp_subsec_nanos() % 1_000 != 0 with false in parse_non_null_cell
+crates/core/src/import/cell.rs:401:98: replace % with + in parse_non_null_cell
+crates/core/src/import/cell.rs:401:98: replace % with / in parse_non_null_cell
+crates/core/src/import/cell.rs:481:9: delete match arm Value::DateTime(value) in postgres_temporal_needs_text
+crates/core/src/import/cell.rs:482:9: delete match arm Value::TimestampTz(value) in postgres_temporal_needs_text
+crates/core/src/import/cell.rs:509:5: replace postgres_extended_temporal -> Option<String> with None
+crates/core/src/import/cell.rs:511:13: replace == with != in postgres_extended_temporal
+crates/core/src/import/cell.rs:517:35: replace % with + in postgres_extended_temporal
+crates/core/src/import/cell.rs:517:35: replace % with / in postgres_extended_temporal
+crates/core/src/import/cell.rs:517:43: replace == with != in postgres_extended_temporal
+crates/core/src/import/cell.rs:520:8: delete ! in postgres_extended_temporal
+crates/core/src/import/cell.rs:530:24: replace % with + in postgres_extended_temporal
+crates/core/src/import/cell.rs:530:24: replace % with / in postgres_extended_temporal
+crates/core/src/import/cell.rs:530:32: replace == with != in postgres_extended_temporal
+crates/core/src/import/extended_temporal.rs:21:31: replace || with && in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:21:44: replace || with && in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:21:58: replace || with && in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:21:67: replace > with == in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:21:67: replace > with >= in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:24:39: replace - with + in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:24:39: replace - with / in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:25:65: replace % with + in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:25:65: replace % with / in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:25:71: replace != with == in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:29:9: delete match arm 4 | 6 | 9 | 11 in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:32:9: replace > with >= in duckdb_extended_date
+crates/core/src/import/extended_temporal.rs:66:60: replace < with <= in valid_duckdb_zone
+crates/core/src/import/extended_temporal.rs:67:14: replace match guard digits.as_bytes().get(2) == Some(&b':') with true in valid_duckdb_zone
+crates/core/src/import/extended_temporal.rs:71:67: replace < with <= in valid_duckdb_zone
+crates/core/src/import/extended_temporal.rs:9:28: replace || with && in duckdb_extended_date
+crates/core/src/import/plan.rs:159:83: replace + with * in insert_statement
+crates/core/src/import/plan.rs:159:83: replace + with - in insert_statement
+crates/core/src/import/plan.rs:160:37: replace += with *= in insert_statement
+crates/core/src/import/plan.rs:164:37: replace += with *= in insert_statement
+crates/core/src/import/plan.rs:87:21: replace && with || in build_insert_plan
+crates/core/src/operation.rs:127:23: replace match guard confirms_cancellation(&error) with false in classify_interrupted
+crates/core/src/operation.rs:127:23: replace match guard confirms_cancellation(&error) with true in classify_interrupted
+crates/core/src/operation.rs:133:5: replace wait_for_deadline with ()
+crates/core/src/operation.rs:24:9: replace OperationControl::cancellation_token -> &CancellationToken with Box::leak(Box::new(Default::default()))
+crates/core/src/operation.rs:56:5: replace check_pre_dispatch -> Result<(), DriverError> with Ok(())
+crates/core/src/operation.rs:59:57: replace <= with > in check_pre_dispatch
+crates/core/src/operation.rs:70:34: replace + with - in run_controlled_setup
+crates/core/src/pagination.rs:55:33: replace += with *= in keyset_where_clause
+crates/core/src/pagination.rs:55:33: replace += with -= in keyset_where_clause
+crates/core/src/pagination.rs:66:25: replace += with *= in keyset_where_clause
+crates/core/src/params.rs:112:82: replace > with >= in extract_named_parameters
+crates/core/src/params.rs:14:9: replace NamedParameters::is_empty -> bool with true
+crates/core/src/params.rs:40:9: replace ParameterKind::label -> &'static str with ""
+crates/core/src/params.rs:40:9: replace ParameterKind::label -> &'static str with "xyzzy"
+crates/core/src/registry.rs:17:9: replace DriverRegistry::register with ()
+crates/core/src/registry.rs:21:9: replace DriverRegistry::get -> Option<Arc<dyn DatabaseDriver>> with None
+crates/core/src/registry.rs:25:9: replace DriverRegistry::iter -> impl Iterator<Item =&Arc<dyn DatabaseDriver>> with ::std::iter::empty()
+crates/core/src/registry.rs:29:9: replace DriverRegistry::len -> usize with 0
+crates/core/src/registry.rs:29:9: replace DriverRegistry::len -> usize with 1
+crates/core/src/registry.rs:33:9: replace DriverRegistry::is_empty -> bool with false
+crates/core/src/registry.rs:33:9: replace DriverRegistry::is_empty -> bool with true
+crates/core/src/session.rs:19:9: replace Session::transaction_open -> bool with true
+crates/core/src/sql_ddl/column.rs:270:23: replace match guard !name.is_empty() with true in build_reorder_column
+crates/core/src/sql_ddl/column.rs:49:18: replace == with != in build_drop_column
+crates/core/src/sql_ddl/diff.rs:136:12: delete ! in diff_to_ops
+crates/core/src/sql_ddl/diff.rs:136:52: replace == with != in diff_to_ops
+crates/core/src/sql_ddl/diff.rs:147:12: delete ! in diff_to_ops
+crates/core/src/sql_ddl/diff.rs:147:48: replace == with != in diff_to_ops
+crates/core/src/sql_ddl/diff.rs:174:22: replace == with != in materialize_ops
+crates/core/src/sql_ddl/diff.rs:38:43: delete ! in diff_to_ops
+crates/core/src/sql_ddl/diff.rs:54:12: delete ! in diff_to_ops
+crates/core/src/sql_ddl/diff.rs:54:47: replace == with != in diff_to_ops
+crates/core/src/sql_ddl/diff.rs:70:12: delete ! in diff_to_ops
+crates/core/src/sql_ddl/diff.rs:70:51: replace == with != in diff_to_ops
+crates/core/src/sql_ddl/index_fk.rs:68:20: replace match guard !s.is_empty() with true in build_drop_index
+crates/core/src/sql_ddl/index_fk.rs:84:30: replace || with && in build_add_foreign_key
+crates/core/src/sql_ddl/table.rs:34:17: replace > with >= in build_create_table
+crates/core/src/sql_ddl/types.rs:121:36: replace || with && in collation_clause
+crates/core/src/sql_ddl/types.rs:121:55: replace > with == in collation_clause
+crates/core/src/sql_ddl/types.rs:121:55: replace > with >= in collation_clause
+crates/core/src/sql_ddl/types.rs:134:16: replace > with == in validate_safe_type
+crates/core/src/sql_ddl/types.rs:134:16: replace > with >= in validate_safe_type
+crates/core/src/sql_ddl/types.rs:138:9: replace || with && in validate_safe_type
+crates/core/src/sql_ddl/types.rs:139:9: replace || with && in validate_safe_type
+crates/core/src/sql_ddl/types.rs:140:9: replace || with && in validate_safe_type
+crates/core/src/sql_ddl/types.rs:141:9: replace || with && in validate_safe_type
+crates/core/src/sql_ddl/types.rs:142:9: replace || with && in validate_safe_type
+crates/core/src/sql_ddl/types.rs:143:9: replace || with && in validate_safe_type
+crates/core/src/sql_ddl/types.rs:157:16: replace > with == in validate_safe_default
+crates/core/src/sql_ddl/types.rs:157:16: replace > with >= in validate_safe_default
+crates/core/src/sql_ddl/types.rs:160:24: replace || with && in validate_safe_default
+crates/core/src/sql_ddl/types.rs:160:44: replace || with && in validate_safe_default
+crates/core/src/sql_ddl/types.rs:160:64: replace || with && in validate_safe_default
+crates/core/src/sql_ddl/types.rs:160:84: replace || with && in validate_safe_default
+crates/core/src/sql_ddl/types.rs:314:21: replace || with && in DraftColumn::differs_beyond_name
+crates/core/src/sql_ddl/types.rs:400:20: replace match guard !s.is_empty() with true in qualified_table
+crates/core/src/sql_ddl/types.rs:490:65: delete ! in mssql_set_column_comment
+crates/core/src/sql_ddl/types.rs:526:5: replace validate_column_name -> Result<(), BuildDdlError> with Ok(())
+crates/core/src/sql_ddl/types.rs:592:46: replace || with && in render_column_definition
+crates/core/src/sql_ddl/types.rs:598:22: replace && with || in render_column_definition
+crates/core/src/sql_ddl/types.rs:613:22: replace && with || in render_column_definition
+crates/core/src/sql_diagnostics.rs:27:17: replace < with <= in scan
+crates/core/src/sql_diagnostics.rs:29:98: replace > with >= in scan
+crates/core/src/sql_diagnostics.rs:37:49: replace - with + in scan
+crates/core/src/sql_diagnostics.rs:37:49: replace - with / in scan
+crates/core/src/sql_diagnostics.rs:40:13: delete match arm '\u{201c}' | '\u{201d}' in scan
+crates/core/src/sql_dialect.rs:234:25: replace += with *= in build_full_row_update
+crates/core/src/sql_dialect.rs:37:19: replace > with >= in validate_ident
+crates/core/src/sql_format/mod.rs:23:24: replace < with > in format_script
+crates/core/src/sql_format/mod.rs:23:33: replace || with && in format_script
+crates/core/src/sql_format/mod.rs:23:46: replace > with < in format_script
+crates/core/src/sql_format/mod.rs:42:9: delete field indent from struct sqlformat::FormatOptions expression in format_statement
+crates/core/src/sql_format/mod.rs:46:9: delete field uppercase from struct sqlformat::FormatOptions expression in format_statement
+crates/core/src/sql_format/mod.rs:47:9: delete field lines_between_queries from struct sqlformat::FormatOptions expression in format_statement
+crates/core/src/sql_format/mod.rs:48:9: delete field dialect from struct sqlformat::FormatOptions expression in format_statement
+crates/core/src/sql_format/mod.rs:61:9: delete match arm SqlGrammar::PostgreSql in format_dialect
+crates/core/src/sql_format/mod.rs:62:9: delete match arm SqlGrammar::MsSql in format_dialect
+crates/core/src/sql_format/significant_tokens.rs:28:25: replace == with != in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:28:59: replace && with || in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:30:30: delete ! in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:30:47: replace + with * in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:30:47: replace + with - in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:32:56: replace && with || in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:32:65: replace == with != in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:33:30: replace == with != in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:34:25: replace && with || in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:38:21: replace || with && in significant_tokens
+crates/core/src/sql_format/significant_tokens.rs:40:30: delete ! in significant_tokens
+crates/core/src/sqlite_any_csv.rs:15:5: replace is_unknown_type -> bool with true
+crates/core/src/sql_lex.rs:115:82: replace > with >= in statement_spans
+crates/core/src/sql_literal.rs:104:34: replace match guard driver_id == "clickhouse" with true in render_sql_literal
+crates/core/src/sql_literal.rs:110:35: replace match guard driver_id == "clickhouse" with true in render_sql_literal
+crates/core/src/sql_literal.rs:113:35: replace match guard driver_id == "mssql" with false in render_sql_literal
+crates/core/src/sql_literal.rs:113:35: replace match guard driver_id == "mssql" with true in render_sql_literal
+crates/core/src/sql_literal.rs:113:45: replace == with != in render_sql_literal
+crates/core/src/sql_literal.rs:116:38: replace match guard driver_id == "clickhouse" with true in render_sql_literal
+crates/core/src/sql_literal.rs:90:32: replace match guard driver_id == "sqlite" && *value == 0.0 && value.is_sign_negative() with false in render_sql_literal
+crates/core/src/sql_literal.rs:90:42: replace == with != in render_sql_literal
+crates/core/src/sql_literal.rs:90:64: replace == with != in render_sql_literal
+crates/core/src/sql_literal.rs:90:71: replace && with || in render_sql_literal
+crates/core/src/sql_syntax/script/compound_tracker.rs:106:33: replace >= with < in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:107:34: replace += with *= in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:107:34: replace += with -= in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:136:9: delete match arm (TriggerState::Start, TriggerToken::Explain) in advance_trigger
+crates/core/src/sql_syntax/script/compound_tracker.rs:138:9: delete match arm (TriggerState::Explain, TriggerToken::Other) in advance_trigger
+crates/core/src/sql_syntax/script/compound_tracker.rs:53:13: delete match arm ScriptTokenKind::OpenParen in CompoundTracker::observe
+crates/core/src/sql_syntax/script/compound_tracker.rs:53:60: replace += with *= in CompoundTracker::observe
+crates/core/src/sql_syntax/script/compound_tracker.rs:70:35: delete ! in CompoundTracker::semicolon_ends_statement
+crates/core/src/sql_syntax/script/compound_tracker.rs:70:65: replace && with || in CompoundTracker::semicolon_ends_statement
+crates/core/src/sql_syntax/script/compound_tracker.rs:70:85: replace > with < in CompoundTracker::semicolon_ends_statement
+crates/core/src/sql_syntax/script/compound_tracker.rs:70:85: replace > with == in CompoundTracker::semicolon_ends_statement
+crates/core/src/sql_syntax/script/compound_tracker.rs:70:85: replace > with >= in CompoundTracker::semicolon_ends_statement
+crates/core/src/sql_syntax/script/compound_tracker.rs:72:67: replace > with < in CompoundTracker::semicolon_ends_statement
+crates/core/src/sql_syntax/script/compound_tracker.rs:85:9: replace CompoundTracker::reset with ()
+crates/core/src/sql_syntax/script/compound_tracker.rs:97:13: replace && with || in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:97:24: replace == with != in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:98:17: replace || with && in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:98:27: replace == with != in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:99:36: replace && with || in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:99:53: replace && with || in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/compound_tracker.rs:99:82: replace == with != in CompoundTracker::observe_routine_word
+crates/core/src/sql_syntax/script/directive_scan.rs:22:36: replace > with >= in go_line
+crates/core/src/sql_syntax/script/directive_scan.rs:22:40: replace && with || in go_line
+crates/core/src/sql_syntax/script/directive_scan.rs:22:62: replace < with <= in go_line
+crates/core/src/sql_syntax/script/directive_scan.rs:48:47: replace && with || in delimiter_line
+crates/core/src/sql_syntax/script/lexer.rs:110:18: replace == with != in Lexer<'a>::whitespace_end
+crates/core/src/sql_syntax/script/lexer.rs:118:9: delete ! in Lexer<'a>::dash_comment_starts
+crates/core/src/sql_syntax/script/lexer.rs:118:9: replace Lexer<'a>::dash_comment_starts -> bool with false
+crates/core/src/sql_syntax/script/lexer.rs:118:9: replace Lexer<'a>::dash_comment_starts -> bool with true
+crates/core/src/sql_syntax/script/lexer.rs:119:13: replace || with && in Lexer<'a>::dash_comment_starts
+crates/core/src/sql_syntax/script/lexer.rs:121:28: replace + with * in Lexer<'a>::dash_comment_starts
+crates/core/src/sql_syntax/script/lexer.rs:121:28: replace + with - in Lexer<'a>::dash_comment_starts
+crates/core/src/sql_syntax/script/lexer.rs:122:57: replace || with && in Lexer<'a>::dash_comment_starts
+crates/core/src/sql_syntax/script/lexer.rs:126:9: replace Lexer<'a>::hash_comment_starts -> bool with false
+crates/core/src/sql_syntax/script/lexer.rs:126:9: replace Lexer<'a>::hash_comment_starts -> bool with true
+crates/core/src/sql_syntax/script/lexer.rs:140:31: replace + with * in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:140:31: replace + with - in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:142:45: replace + with * in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:143:34: replace == with != in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:144:23: replace -= with += in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:144:23: replace -= with /= in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:149:25: replace == with != in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:149:33: replace && with || in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:149:55: replace && with || in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:151:23: replace += with *= in Lexer<'a>::block_comment
+crates/core/src/sql_syntax/script/lexer.rs:170:36: replace + with * in Lexer<'a>::quoted
+crates/core/src/sql_syntax/script/lexer.rs:170:36: replace + with - in Lexer<'a>::quoted
+crates/core/src/sql_syntax/script/lexer.rs:179:31: replace == with != in Lexer<'a>::quote_end
+crates/core/src/sql_syntax/script/lexer.rs:180:23: replace += with *= in Lexer<'a>::quote_end
+crates/core/src/sql_syntax/script/lexer.rs:180:23: replace += with -= in Lexer<'a>::quote_end
+crates/core/src/sql_syntax/script/lexer.rs:182:41: replace + with - in Lexer<'a>::quote_end
+crates/core/src/sql_syntax/script/lexer.rs:183:27: replace += with *= in Lexer<'a>::quote_end
+crates/core/src/sql_syntax/script/lexer.rs:183:27: replace += with -= in Lexer<'a>::quote_end
+crates/core/src/sql_syntax/script/lexer.rs:185:39: replace + with * in Lexer<'a>::quote_end
+crates/core/src/sql_syntax/script/lexer.rs:195:36: replace + with * in Lexer<'a>::escape_string
+crates/core/src/sql_syntax/script/lexer.rs:195:36: replace + with - in Lexer<'a>::escape_string
+crates/core/src/sql_syntax/script/lexer.rs:203:88: replace + with * in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:203:88: replace + with - in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:207:31: replace + with * in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:207:31: replace + with - in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:209:25: replace && with || in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:209:49: replace + with * in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:209:49: replace + with - in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:209:54: replace == with != in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:210:31: replace + with * in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:210:31: replace + with - in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:212:76: replace + with * in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:212:76: replace + with - in Lexer<'a>::bracketed
+crates/core/src/sql_syntax/script/lexer.rs:224:103: replace + with - in Lexer<'a>::dollar
+crates/core/src/sql_syntax/script/lexer.rs:242:50: replace + with * in Lexer<'a>::dollar
+crates/core/src/sql_syntax/script/lexer.rs:242:50: replace + with - in Lexer<'a>::dollar
+crates/core/src/sql_syntax/script/lexer.rs:248:18: replace != with == in Lexer<'a>::tagged_opener_end
+crates/core/src/sql_syntax/script/lexer.rs:249:55: replace == with != in Lexer<'a>::tagged_opener_end
+crates/core/src/sql_syntax/script/lexer.rs:249:63: replace || with && in Lexer<'a>::tagged_opener_end
+crates/core/src/sql_syntax/script/lexer.rs:249:72: replace >= with < in Lexer<'a>::tagged_opener_end
+crates/core/src/sql_syntax/script/lexer.rs:255:74: replace || with && in Lexer<'a>::tagged_opener_end
+crates/core/src/sql_syntax/script/lexer.rs:263:20: replace + with * in Lexer<'a>::tagged_opener_end
+crates/core/src/sql_syntax/script/lexer.rs:263:20: replace + with - in Lexer<'a>::tagged_opener_end
+crates/core/src/sql_syntax/script/lexer.rs:267:9: replace Lexer<'a>::heredoc_close -> Option<usize> with None
+crates/core/src/sql_syntax/script/lexer.rs:271:31: replace + with * in Lexer<'a>::heredoc_close
+crates/core/src/sql_syntax/script/lexer.rs:272:40: replace + with * in Lexer<'a>::heredoc_close
+crates/core/src/sql_syntax/script/lexer.rs:272:40: replace + with - in Lexer<'a>::heredoc_close
+crates/core/src/sql_syntax/script/lexer.rs:272:44: replace + with * in Lexer<'a>::heredoc_close
+crates/core/src/sql_syntax/script/lexer.rs:272:44: replace + with - in Lexer<'a>::heredoc_close
+crates/core/src/sql_syntax/script/lexer.rs:272:53: replace + with * in Lexer<'a>::heredoc_close
+crates/core/src/sql_syntax/script/lexer.rs:272:53: replace + with - in Lexer<'a>::heredoc_close
+crates/core/src/sql_syntax/script/lexer.rs:281:39: replace + with * in Lexer<'a>::word
+crates/core/src/sql_syntax/script/lexer.rs:283:20: replace == with != in Lexer<'a>::word
+crates/core/src/sql_syntax/script/lexer.rs:283:29: replace + with * in Lexer<'a>::word
+crates/core/src/sql_syntax/script/lexer.rs:285:13: replace && with || in Lexer<'a>::word
+crates/core/src/sql_syntax/script/lexer.rs:285:36: replace == with != in Lexer<'a>::word
+crates/core/src/sql_syntax/script/lexer.rs:305:9: replace Lexer<'a>::delimiter_at -> bool with false
+crates/core/src/sql_syntax/script/lexer.rs:308:25: replace + with * in Lexer<'a>::delimiter_at
+crates/core/src/sql_syntax/script/lexer.rs:308:25: replace + with - in Lexer<'a>::delimiter_at
+crates/core/src/sql_syntax/script/lexer.rs:309:9: delete ! in Lexer<'a>::delimiter_at
+crates/core/src/sql_syntax/script/lexer.rs:310:13: replace || with && in Lexer<'a>::delimiter_at
+crates/core/src/sql_syntax/script/lexer.rs:310:16: delete ! in Lexer<'a>::delimiter_at
+crates/core/src/sql_syntax/script/lexer.rs:314:46: replace || with && in Lexer<'a>::is_word_start
+crates/core/src/sql_syntax/script/lexer.rs:314:59: replace || with && in Lexer<'a>::is_word_start
+crates/core/src/sql_syntax/script/lexer.rs:318:35: replace || with && in Lexer<'a>::is_word_part
+crates/core/src/sql_syntax/script/lexer.rs:318:48: replace || with && in Lexer<'a>::is_word_part
+crates/core/src/sql_syntax/script/lexer.rs:318:61: replace || with && in Lexer<'a>::is_word_part
+crates/core/src/sql_syntax/script/lexer.rs:318:9: replace Lexer<'a>::is_word_part -> bool with false
+crates/core/src/sql_syntax/script/lexer.rs:42:50: replace - with + in Lexer<'a>::at_line_start
+crates/core/src/sql_syntax/script/lexer.rs:42:50: replace - with / in Lexer<'a>::at_line_start
+crates/core/src/sql_syntax/script/lexer.rs:42:55: replace == with != in Lexer<'a>::at_line_start
+crates/core/src/sql_syntax/script/lexer.rs:42:9: replace Lexer<'a>::at_line_start -> bool with true
+crates/core/src/sql_syntax/script/lexer.rs:53:32: replace match guard self.delimiter_at(start, delimiter) with false in Lexer<'a>::next_token
+crates/core/src/sql_syntax/script/lexer.rs:66:21: replace match guard next == Some(b'-') && self.dash_comment_starts(start) with false in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:66:21: replace match guard next == Some(b'-') && self.dash_comment_starts(start) with true in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:66:26: replace == with != in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:66:40: replace && with || in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:67:21: replace match guard self.hash_comment_starts(next) with false in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:67:21: replace match guard self.hash_comment_starts(next) with true in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:68:21: replace match guard next == Some(b'*') with true in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:68:26: replace == with != in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:69:21: replace match guard next == Some(b'/') && self.syntax.slash_slash_comment with true in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:69:26: replace == with != in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:69:40: replace && with || in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:71:13: delete match arm b'"' in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:72:13: delete match arm b'`' in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:74:66: replace + with * in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:74:66: replace + with - in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:76:13: delete match arm b'[' in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:78:21: replace match guard delimiter.is_none() with false in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:78:21: replace match guard delimiter.is_none() with true in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:79:13: delete match arm b'(' in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:80:13: delete match arm b')' in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:81:18: replace match guard b.is_ascii_digit() with false in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/lexer.rs:81:96: replace + with * in Lexer<'a>::lex_at
+crates/core/src/sql_syntax/script/script_plan.rs:123:46: replace match guard self.open.is_none() with true in Builder<'a>::accept_directive
+crates/core/src/sql_syntax/script/script_plan.rs:138:18: replace > with < in Builder<'a>::push_directive
+crates/core/src/sql_syntax/script/script_plan.rs:138:18: replace > with == in Builder<'a>::push_directive
+crates/core/src/sql_syntax/script/script_plan.rs:138:18: replace > with >= in Builder<'a>::push_directive
+crates/core/src/sql_syntax/script/script_plan.rs:155:40: replace != with == in Builder<'a>::accept
+crates/core/src/sql_syntax/script/script_plan.rs:160:25: replace != with == in Builder<'a>::accept
+crates/core/src/sql_syntax/script/script_plan.rs:189:38: replace + with * in Builder<'a>::finish_statement
+crates/core/src/sql_syntax/script/script_plan.rs:194:9: replace Builder<'a>::extend_extents with ()
+crates/core/src/sql_syntax/script/script_plan.rs:196:79: replace < with <= in Builder<'a>::extend_extents
+crates/core/src/sql_syntax/script/script_plan.rs:196:79: replace < with == in Builder<'a>::extend_extents
+crates/core/src/sql_syntax/script/script_plan.rs:196:79: replace < with > in Builder<'a>::extend_extents
+crates/core/src/sql_syntax/script/script_plan.rs:198:20: delete ! in Builder<'a>::extend_extents
+crates/core/src/sql_syntax/script/script_plan.rs:203:39: replace == with != in Builder<'a>::extend_extents
+crates/core/src/sql_syntax/script/script_plan.rs:204:53: replace + with * in Builder<'a>::extend_extents
+crates/core/src/sql_syntax/script/script_plan.rs:204:53: replace + with - in Builder<'a>::extend_extents
+crates/core/src/sql_syntax/script/script_plan.rs:28:9: replace ScriptPlan::batches -> &[ScriptBatch] with Vec::leak(Vec::new())
+crates/core/src/sql_syntax/script/script_plan.rs:52:56: replace < with <= in ScriptPlan::tokens
+crates/core/src/sql_syntax/script/script_plan.rs:91:37: replace < with <= in Builder<'a>::run
+crates/core/src/sql_syntax/script/script_plan.rs:95:50: replace == with != in Builder<'a>::run
+crates/core/src/sql_syntax/script/script_statement.rs:11:9: replace ScriptStatement::text -> &'a str with ""
+crates/core/src/sql_syntax/script/script_statement.rs:11:9: replace ScriptStatement::text -> &'a str with "xyzzy"
+crates/core/src/text_file.rs:90:23: replace match guard error.kind() == io::ErrorKind::NotFound with true in resolve_link_target
+crates/core/src/text_file.rs:98:23: replace match guard error.kind() == io::ErrorKind::NotFound with true in existing_metadata
+crates/core/src/tls.rs:106:9: replace Environment::display_name -> &'static str with ""
+crates/core/src/tls.rs:106:9: replace Environment::display_name -> &'static str with "xyzzy"
+crates/core/src/tls.rs:147:9: replace || with && in looks_like_tls_failure
+crates/core/src/tls.rs:148:9: replace || with && in looks_like_tls_failure
+crates/core/src/tls.rs:149:9: replace || with && in looks_like_tls_failure
+crates/core/src/tls.rs:150:9: replace || with && in looks_like_tls_failure
+crates/core/src/tls.rs:32:9: delete ! in TlsMode::encrypts
+crates/core/src/tls.rs:32:9: replace TlsMode::encrypts -> bool with false
+crates/core/src/tls.rs:32:9: replace TlsMode::encrypts -> bool with true
+crates/core/src/tls.rs:36:9: replace TlsMode::verifies_cert -> bool with false
+crates/core/src/tls.rs:36:9: replace TlsMode::verifies_cert -> bool with true
+crates/core/src/tls.rs:40:9: replace TlsMode::label -> &'static str with ""
+crates/core/src/tls.rs:40:9: replace TlsMode::label -> &'static str with "xyzzy"
+crates/core/src/tls.rs:76:9: replace TlsConfig::disabled -> Self with Default::default()
+crates/core/src/tls.rs:77:13: delete field mode from struct Self expression in TlsConfig::disabled
+crates/core/src/tls.rs:97:9: replace Environment::as_str -> &'static str with ""
+crates/core/src/tls.rs:97:9: replace Environment::as_str -> &'static str with "xyzzy"
+crates/core/src/transaction.rs:67:9: replace Transaction::rollback_controlled -> Result<(), DriverError> with Ok(())

@@ -1,11 +1,13 @@
 # External audit: BookiE after 0.2.0
 
-Reviewed 2026-10-06. This is a deferred improvement plan for BookiE's Linux
-application and Rust backend. Start implementation after finishing 0.2.0.
-The [active sprint](linux/docs/bookie-0.2-sprint.md) retains current delivery
-and acceptance authority. [PLAN](PLAN.md) and [ROADMAP](linux/ROADMAP.md) link
-here for later review. No workspace move, workflow rollout or driver addition
-was implemented in this audit.
+Archived 2026-10-10 from the repository root into `linux/docs/archive/`
+(dated review; not current task instructions). Reviewed 2026-10-06. This is a
+deferred improvement plan for BookiE's Linux application and Rust backend.
+Start implementation after finishing 0.2.0. The
+[active sprint](../bookie-0.2-sprint.md) retains current delivery and
+acceptance authority. [PLAN](../../../PLAN.md) and
+[ROADMAP](../../ROADMAP.md) link here for later review. No workspace move,
+workflow rollout or driver addition was implemented in this audit.
 
 The objective is a clear root workspace, independently testable Rust services,
 synchronized documentation/evidence and deliberate library reuse. Preserve
@@ -29,7 +31,7 @@ chosen dependencies and source versions when implementation begins.
 
 ### Follow-up: other clients and current BookiE code
 
-[The client lessons and Linux source review](external-audit-client-review.md)
+[The client lessons and Linux source review](external-audit-client-review-2026-10-06.md)
 adds DBeaver, pgAdmin, Beekeeper Studio and DB Browser for SQLite examples,
 an explicit BookiE-core versus dbx-core comparison, and bounded current-code
 verification. Its priority findings are relational stale-write protection,
@@ -51,7 +53,7 @@ Proposed layout:
 ```text
 Cargo.toml / Cargo.lock / rust-toolchain.toml
 README.md / CONTRIBUTING.md / CHANGELOG.md / PLAN.md / ROADMAP.md
-CLAUDE.md / LICENSE / external-audit.md
+CLAUDE.md / LICENSE / docs/archive/external-audit-2026-10-06.md
 .github/                 forms, PR template, workflows, GitHub-specific helpers
 crates/                  existing app/core/policy/storage/ssh/transport/mcp/
                          agentd/drivers and test-support packages
@@ -287,7 +289,7 @@ open-source application or Maven repository is not redistribution clearance.
 
 ### Provenance and dependency review
 
-BookiE's [LICENSE](LICENSE) and dependency policy remain authoritative.
+BookiE's [LICENSE](../../../LICENSE) and dependency policy remain authoritative.
 dbx's inspected root [LICENSE][dbx-license] is Apache-2.0, but its agents README
 still says AGPL-3.0. Resolve provenance for copied agent files before adoption.
 DBeaver Community's [license][dbeaver-license] is Apache-2.0 with additional
