@@ -28,7 +28,7 @@ SHA you need, and recheck current source before trusting words such as "next",
 | Contributors testing | [Validation playbook](validation-playbook.md) (including [CI tiers](validation-playbook.md#ci-tiers): GitHub cheap vs Forgejo merge), [testing](testing.md), [ignored-test inventory](ignored-tests.md) (generated), [manual verification](manual-verification-0.2-features.md), [capability evidence](capability-evidence.md) |
 | Planning and status | [Sprint](bookie-0.2-sprint.md), [0.2.0 scope](0.2.0-scope.md), [backlog](backlog.md), [known limitations](known-limitations.md), [ledger](known-issues.md), [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence index](value-contracts.md), [ROADMAP](../ROADMAP.md), [changelog](../CHANGELOG.md) |
 | Product context and specs | [PRODUCT.md](../../PRODUCT.md), [personas](../../docs/personas.md), [PRINCIPLES.md](../../PRINCIPLES.md), [SECURITY.md](../../SECURITY.md), [capability specs](../../specs/README.md) (drafts until reviewed; AGENTS and ADRs rank above them) |
-| Decisions | [ADRs](decisions/README.md), [proposals](proposals/) |
+| Decisions | [ADRs](decisions/README.md), [decision checklist](decisions/checklist.md), [proposals](proposals/) |
 | Proof and history | [evidence](evidence/), [archive](archive/), [upstream sync](upstream-sync.md) |
 
 ## Where each fact belongs
@@ -38,7 +38,8 @@ SHA you need, and recheck current source before trusting words such as "next",
 | A rule for every change | [AGENTS.md](../../AGENTS.md) | One copy; tool-specific files point to it |
 | What the product is and who it serves | [PRODUCT.md](../../PRODUCT.md), [personas](../../docs/personas.md), [PRINCIPLES.md](../../PRINCIPLES.md) | Keep aligned with shipped behaviour; NEEDS REVIEW until a maintainer clears the draft |
 | Current capability behaviour extracted from code | [specs/](../../specs/README.md) | Descriptive only; when a spec and the code disagree, fix the spec |
-| An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR |
+| An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR; keep the [checklist](decisions/checklist.md) row in sync |
+| Which forks already have an answer | The [decision checklist](decisions/checklist.md) | Link, N/A, or open item; do not invent a decision to fill a cell |
 | A design not yet decided | [proposals/](proposals/) | Becomes an ADR or is deleted |
 | An open issue, its status, evidence and owner | The [ledger](known-issues.md) | One row per issue; cross out only with the closing commit, PR or test; `scripts/check-known-issues.py` checks the format and owners |
 | Milestones, order, acceptance, 0.2.0 readiness | The [sprint](bookie-0.2-sprint.md) | Compact current instructions; move dated progress to the archive |

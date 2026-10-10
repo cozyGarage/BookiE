@@ -2,6 +2,10 @@
 
 These documents record the reasons behind major technical choices. Accepted decisions stay stable. A later decision may supersede an earlier one by linking to it explicitly.
 
+Which forks already have an answer (and which are still open) is listed in the
+[decision checklist](checklist.md). Prefer a link there over inventing a second
+record for the same choice.
+
 ## Format
 
 ```markdown
@@ -61,4 +65,5 @@ remain on the [active sprint](../bookie-0.2-sprint.md) and owning boards.
 2. Copy the format above into a lowercase dash-separated filename.
 3. Keep the document focused on one decision.
 4. Add it to the index in the same change.
-5. Submit it through the normal review process.
+5. Update the [checklist](checklist.md) row for that fork (Decided with a link, or leave Open).
+6. Submit it through the normal review process.
