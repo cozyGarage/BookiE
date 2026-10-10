@@ -54,8 +54,26 @@ fn select_projection_sensitivity(query: &Query, patterns: &[String]) -> Option<V
 
 fn expr_references_sensitive(expr: &Expr, patterns: &[String]) -> bool {
     let rendered = expr.to_string();
-    rendered.to_ascii_lowercase().contains("row_to_json(")
+    let lowered = rendered.to_ascii_lowercase();
+    record_to_json_constructor(&lowered)
         || text_identifiers(&rendered).any(|ident| column_is_sensitive(ident, patterns))
+}
+
+fn record_to_json_constructor(lowered: &str) -> bool {
+    for name in [
+        "row_to_json(",
+        "to_json(",
+        "to_jsonb(",
+        "json_build_object(",
+        "jsonb_build_object(",
+        "json_object(",
+        "jsonb_object(",
+    ] {
+        if lowered.contains(name) {
+            return true;
+        }
+    }
+    false
 }
 
 fn text_identifiers(text: &str) -> impl Iterator<Item = &str> {
@@ -222,6 +240,23 @@ mod tests {
             assert_eq!(
                 masked.rows[0][0],
                 tablepro_core::Value::Text("***REDACTED***".into()),
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn set_operations_and_nested_ctes_fail_closed_for_sensitive_lineage() {
+        for sql in [
+            "SELECT pan AS p FROM cards INTERSECT SELECT label AS p FROM archives",
+            "SELECT pan AS p FROM cards EXCEPT SELECT label AS p FROM archives",
+            "WITH outer_q AS (WITH inner_q AS (SELECT pan AS p FROM cards) SELECT p FROM inner_q) SELECT p FROM outer_q",
+            "SELECT to_json(c) FROM cards c",
+            "SELECT jsonb_build_object('pan', pan) FROM cards",
+        ] {
+            assert_eq!(
+                sensitive_projection(sql, "postgres", &sensitive_patterns(), 1),
+                vec![true],
                 "{sql}"
             );
         }
