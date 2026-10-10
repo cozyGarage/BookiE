@@ -46,7 +46,8 @@ owner table, and each lane edits only its own files.
 |---|---|
 | B3 | Types, values, drivers and result paths: `core` value and result types, decoders under `crates/drivers/`, grid value display, the [B3 board](linux/docs/type-contract-strategy.md) |
 | B4 | Transport, guard, audit, SSH, rollback and acceptance: `policy`, `transport`, `ssh`, audit storage, the [B4 board](linux/docs/b4-task-board.md) |
-| UX | The app layer, packaging, CI and the lab, and shared documentation |
+| UX | The app layer, packaging, CI and the lab, the ledger, and shared documentation. UX also runs the Forgejo gate for every pull request that is green on GitHub and merges it once both agree |
+| Cursor | Documentation and tests only. UX reviews its test pull requests; the maintainer merges its documentation pull requests, which need no Forgejo run |
 | Maintainer | Decisions and anything needing a person or a real desktop |
 
 - To work in another lane's files, first record the handoff in the ledger
@@ -56,7 +57,8 @@ owner table, and each lane edits only its own files.
   closed it, and remove it from the owner table.
 - Each agent works in its own git worktree (for example
   `~/Projects/tablepro-<lane>`), never in another agent's checkout. Branch from
-  the latest `origin/linux` and name branches `<lane>/<topic>` or
+  the latest `linux` fetched from `git@github.com:cozyGarage/BookiE.git` (the
+  `fork` remote in this checkout); name branches `<lane>/<topic>` or
   `<type>/<topic>`.
 
 ## Workflow
@@ -65,8 +67,9 @@ owner table, and each lane edits only its own files.
 2. Run the checks in [Validation](#validation) locally. Run scripts unpiped:
    `bash linux/scripts/preflight.sh | tail -3` reports `tail`'s status, not the
    script's.
-3. Merge `origin/linux` into the branch (do not rebase a shared branch). Resolve
-   generated files by regenerating them, for example
+3. Merge the latest BookiE `linux` branch into the branch (do not rebase a
+   shared branch). In this checkout, that is `fork/linux`. Resolve generated
+   files by regenerating them, for example
    `python3 linux/scripts/inventory-ignored-tests.py > linux/docs/ignored-tests.md`.
 4. **Gate on Forgejo:** `bash linux/scripts/forgejo-gate.sh <branch> [remote-branch]`.
    It pushes to the lab Forgejo, waits for that push's run and lists jobs that
@@ -241,7 +244,8 @@ Rules for pull requests that add tests (any agent, including Cursor):
   tell the lane owner and leave the rule alone.
 - A new test fails on the code before the fix, or its commit says it pins
   existing behaviour.
-- Merge `origin/linux` into the branch and run `linux/scripts/preflight.sh`
+- Merge the latest BookiE `linux` branch into the branch and run
+  `linux/scripts/preflight.sh`
   before opening the pull request.
 - Do not edit ledger rows, sprint text or files that another lane owns
   (for example `policy/src/rules.rs`, owned by B4 in the lane table);
