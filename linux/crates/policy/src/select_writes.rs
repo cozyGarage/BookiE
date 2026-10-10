@@ -22,9 +22,9 @@ mod tests {
             ("SELECT * INTO backup FROM accounts", "mssql"),
         ] {
             let facts = classify(sql, driver);
-            assert!(facts.writes, "{sql} must be classified as a write");
+            assert!(facts.writes(), "{sql} must be classified as a write");
             assert_ne!(facts.class, StatementClass::Select, "{sql}");
         }
-        assert!(!classify("SELECT * FROM accounts", "postgres").writes);
+        assert!(!classify("SELECT * FROM accounts", "postgres").writes());
     }
 }
