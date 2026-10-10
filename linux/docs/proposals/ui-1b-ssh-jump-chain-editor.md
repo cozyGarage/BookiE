@@ -1,6 +1,6 @@
 # UI-1b: SSH jump-chain editor and per-hop credentials
 
-**Status:** Implementation in progress. Stable hop identity and per-hop Secret Service storage primitives are implemented; credential migration, transport resolution, encrypted bundle v2, GTK editing, and acceptance remain incomplete. Keep jump-chain editing refused.
+**Status:** Implementation in progress. PR #490 adds stable hop identities and per-hop Secret Service storage. PR #492 implements per-hop built-in transport resolution and cache identity. This dependent PR adds encrypted bundle v2 and retains version 1 import. GTK editing, full secret migration/rollback coverage, and installed acceptance remain incomplete. Keep jump-chain editing refused.
 
 ## Current behavior
 
@@ -38,10 +38,11 @@ user's SSH config.
    save unsupported combinations. Do not silently reuse hop 0's credential.
 6. Keep saved jump chains unavailable to the system OpenSSH backend until its
    `ProxyJump` and per-hop askpass behavior is separately designed and tested.
-7. Extend encrypted connection bundles to carry per-hop secrets in a new
-   version while retaining version-1 import. Keep plaintext exports free of
-   secrets and preserve current fail-closed behavior when a bundle's secrets
-   cannot be read or written.
+7. Encrypted bundle version 2 carries each versioned hop's secret bound to
+   its hop ID and credential revision; version 1 import remains supported.
+   Plaintext exports stay free of credentials and malformed per-hop secret
+   references are refused. GTK editor integration and failure-injection
+   coverage remain before the edit refusal can be removed.
 
 ## Required checks before removing the refusal
 

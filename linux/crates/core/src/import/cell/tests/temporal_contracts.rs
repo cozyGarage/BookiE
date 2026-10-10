@@ -42,7 +42,14 @@ fn value_contract_postgres_temporal_sentinels_restore_only_recognized_csv_formul
 #[test]
 fn value_contract_mysql_invalid_calendar_csv_values_remain_exact_text() {
     let options = CsvImportOptions::default();
-    for (data_type, text) in [("DATE", "2024-02-31"), ("DATETIME", "2024-02-31 12:34:56")] {
+    for (data_type, text) in [
+        ("DATE", "2024-02-31"),
+        ("DATE", "2024-04-31"),
+        ("DATE", "2023-02-29"),
+        ("DATETIME", "2024-02-31 12:34:56"),
+        ("DATETIME(3)", "2024-02-31 12:34:56.123"),
+        ("DATETIME(6)", "2024-02-31 12:34:56.123456"),
+    ] {
         let values = row_to_values_for_driver(
             &[text.into()],
             &[Some(0)],
@@ -55,18 +62,21 @@ fn value_contract_mysql_invalid_calendar_csv_values_remain_exact_text() {
         assert_eq!(values, vec![Value::Text(text.into())]);
     }
 
-    for text in [
-        "024-02-31 12:34:56",
-        "2024-13-01 12:34:56",
-        "2024-02-32 12:34:56",
-        "2024-02-31x 12:34:56",
-        "2024-02-31 25:00:00",
+    for (data_type, text) in [
+        ("DATETIME", "024-02-31 12:34:56"),
+        ("DATETIME", "2024-13-01 12:34:56"),
+        ("DATETIME", "2024-02-32 12:34:56"),
+        ("DATETIME", "2024-02-31x 12:34:56"),
+        ("DATETIME", "2024-02-31 25:00:00"),
+        ("DATETIME", "2024-02-31 12:34:56.1"),
+        ("DATETIME(3)", "2024-02-31 12:34:56.1234"),
+        ("DATETIME(6)", "2024-02-31 12:34:56.1234567"),
     ] {
         assert!(
             row_to_values_for_driver(
                 &[text.into()],
                 &[Some(0)],
-                &[column("value", "DATETIME")],
+                &[column("value", data_type)],
                 &options,
                 2,
                 "mysql",
