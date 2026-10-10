@@ -46,7 +46,7 @@
       "crates/core/src/sql_dialect.rs": "37813f7cfaf214dc2a83d32632437ae9dba00330ce8729b263c417cad57dd28f"
     },
     "command": "rtk bash linux/scripts/test-postgres-release.sh",
-    "result": "Passed: system OpenSSH fixture 1/1; mTLS 3/3; PostgreSQL release integration 51/51 including the read-scoped plan denial and both EXPLAIN ANALYZE denial checks; GTK SSH/mTLS scenarios 7/7; exit code 0.",
+        "result": "Passed: system OpenSSH fixture 1/1; mTLS 3/3; PostgreSQL release integration 59/59 including the read-scoped plan denial and both EXPLAIN ANALYZE denial checks; GTK SSH/mTLS scenarios 7/7; exit code 0.",
     "limitation": "The run used a local release binary and Docker fixtures. It is not a Forgejo gate, frozen-candidate, package-installed or native Wayland acceptance run."
   },
   "log_sha256": {

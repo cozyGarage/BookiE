@@ -30,7 +30,7 @@ masked for read-scoped agents and aligns the tool description and release test
 with that behavior, because a plan may contain server-generated predicates.
 The policy suite passed 216 tests with 4 Docker-only tests ignored. The current
 Linux code tip `d4d26c8` was rechecked on 2026-10-10: system OpenSSH 1/1, mTLS
-3/3, PostgreSQL release integration 51/51 (including plan denial and both
+3/3, PostgreSQL release integration 59/59 (including plan denial and both
 `EXPLAIN ANALYZE` denial checks), and seven SSH/mTLS GTK scenarios passed. See
 the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
 This local result does not establish the Forgejo gate, hosted acceptance or
