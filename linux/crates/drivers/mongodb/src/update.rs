@@ -132,6 +132,20 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
                 | BinaryOperator::NotEq),
             right,
         } => comparison_selector(left, operator, right, params, index),
+        Expr::Like {
+            negated,
+            any: false,
+            expr,
+            pattern,
+            escape_char,
+        } => pattern_selector(expr, pattern, escape_char.as_ref(), *negated, false, params, index),
+        Expr::ILike {
+            negated,
+            any: false,
+            expr,
+            pattern,
+            escape_char,
+        } => pattern_selector(expr, pattern, escape_char.as_ref(), *negated, true, params, index),
         Expr::Between {
             expr,
             negated: false,
@@ -243,8 +257,93 @@ fn in_list_selector(
     }
 }
 
+fn pattern_selector(
+    expr: &Expr,
+    pattern: &Expr,
+    escape_char: Option<&SqlValue>,
+    negated: bool,
+    insensitive: bool,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let Some(field) = identifier_from_expr(expr) else {
+        return Err(browse_filter_error());
+    };
+    let pattern = match take_placeholder_value(pattern, params, index)? {
+        Value::Text(pattern) => pattern,
+        Value::Null => return Ok(doc! { "_id": { "$in": [] } }),
+        _ => return Err(browse_filter_error()),
+    };
+    let escape = match escape_char {
+        Some(value) => Some(value.clone().into_string().ok_or_else(browse_filter_error)?),
+        None => None,
+    };
+    let escape = match escape {
+        None => '\\',
+        Some(escape) => {
+            let mut chars = escape.chars();
+            let Some(ch) = chars.next() else {
+                return Err(browse_filter_error());
+            };
+            if chars.next().is_some() {
+                return Err(browse_filter_error());
+            }
+            ch
+        }
+    };
+    Ok(doc! {
+        field: like_regex_selector(&pattern, escape, negated, insensitive)
+    })
+}
+
+fn like_regex_selector(pattern: &str, escape: char, negated: bool, insensitive: bool) -> Document {
+    let mut regex = String::with_capacity(pattern.len() + 2);
+    regex.push('^');
+    let mut escaped = false;
+    for ch in pattern.chars() {
+        if escaped {
+            push_regex_literal(&mut regex, ch);
+            escaped = false;
+        } else if ch == escape {
+            escaped = true;
+        } else {
+            match ch {
+                '%' => regex.push_str("[\\s\\S]*"),
+                '_' => regex.push_str("[\\s\\S]"),
+                _ => push_regex_literal(&mut regex, ch),
+            }
+        }
+    }
+    if escaped {
+        push_regex_literal(&mut regex, escape);
+    }
+    regex.push('$');
+    let mut expression = doc! { "$regex": regex };
+    if insensitive {
+        expression.insert("$options", "i");
+    }
+    if negated {
+        doc! { "$type": "string", "$not": expression }
+    } else {
+        expression.insert("$type", "string");
+        expression
+    }
+}
+
+fn push_regex_literal(regex: &mut String, ch: char) {
+    if matches!(
+        ch,
+        '\\' | '.' | '^' | '$' | '|' | '?' | '*' | '+' | '(' | ')' | '[' | ']' | '{' | '}'
+    ) {
+        regex.push('\\');
+    }
+    regex.push(ch);
+}
+
 fn browse_filter_error() -> DriverError {
-    DriverError::Unsupported("MongoDB browse filters support equality, comparison, range, and null predicates".into())
+    DriverError::Unsupported(
+        "MongoDB browse filters support comparison, range, pattern, set-membership, and null predicates".into(),
+    )
 }
 
 fn collect_and_predicates<'a>(expr: &'a Expr, predicates: &mut Vec<&'a Expr>) {
@@ -759,6 +858,38 @@ mod keyset_page_tests {
                 Err(DriverError::Unsupported(_))
             ));
         }
+    }
+
+    #[test]
+    fn pattern_filters_translate_wildcards_and_regex_literals() {
+        let parsed = parse_browse_page_select(
+            "SELECT * FROM records WHERE label LIKE ? LIMIT 2 OFFSET 0",
+            &[Value::Text("a.%_".into())],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            parsed.filter,
+            doc! { "label": { "$regex": r"^a\.[\s\S]*[\s\S]$", "$type": "string" } }
+        );
+    }
+
+    #[test]
+    fn escaped_case_insensitive_negated_pattern_is_string_only() {
+        let parsed = parse_browse_page_select(
+            "SELECT * FROM records WHERE label NOT ILIKE ? ESCAPE '!' LIMIT 2 OFFSET 0",
+            &[Value::Text("A!%".into())],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            parsed.filter,
+            doc! { "label": { "$type": "string", "$not": { "$regex": "^A%$", "$options": "i" } } }
+        );
     }
 
     #[test]

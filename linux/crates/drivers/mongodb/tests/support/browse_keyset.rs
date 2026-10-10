@@ -351,6 +351,72 @@ async fn null_filtered_keyset_page_excludes_missing_fields() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn pattern_keyset_filters_match_like_wildcards_without_matching_nulls() {
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    client
+        .database("appdb")
+        .collection::<Document>("pattern_keyset")
+        .insert_many([
+            doc! { "_id": 1, "label": "keep" },
+            doc! { "_id": 2, "label": "skip" },
+            doc! { "_id": 3, "label": "Keep" },
+            doc! { "_id": 4, "label": "kAep" },
+            doc! { "_id": 5, "label": "literal%keep" },
+            doc! { "_id": 6, "label": Bson::Null },
+            doc! { "_id": 7 },
+        ])
+        .await
+        .unwrap();
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let cases = [
+        (
+            "SELECT * FROM \"appdb\".\"pattern_keyset\" WHERE \"label\" LIKE ? AND \"_id\" > ? LIMIT 20 OFFSET 0",
+            "k__p",
+            &[1, 4][..],
+        ),
+        (
+            "SELECT * FROM \"appdb\".\"pattern_keyset\" WHERE \"label\" ILIKE ? AND \"_id\" > ? LIMIT 20 OFFSET 0",
+            "K__P",
+            &[1, 3, 4][..],
+        ),
+        (
+            "SELECT * FROM \"appdb\".\"pattern_keyset\" WHERE \"label\" NOT ILIKE ? AND \"_id\" > ? LIMIT 20 OFFSET 0",
+            "K__P",
+            &[2, 5][..],
+        ),
+        (
+            "SELECT * FROM \"appdb\".\"pattern_keyset\" WHERE \"label\" LIKE ? AND \"_id\" > ? LIMIT 20 OFFSET 0",
+            r"literal\%keep",
+            &[5][..],
+        ),
+        (
+            "SELECT * FROM \"appdb\".\"pattern_keyset\" WHERE \"label\" LIKE ? ESCAPE '!' AND \"_id\" > ? LIMIT 20 OFFSET 0",
+            "literal!%keep",
+            &[5][..],
+        ),
+        (
+            "SELECT * FROM \"appdb\".\"pattern_keyset\" WHERE \"label\" NOT LIKE ? AND \"_id\" > ? LIMIT 20 OFFSET 0",
+            "k__p",
+            &[2, 3, 5][..],
+        ),
+    ];
+    for (sql, pattern, expected) in cases {
+        let page = connection
+            .query_params(sql, &[Value::Text(pattern.into()), Value::Int(0)])
+            .await
+            .unwrap();
+        let actual = page.rows.iter().map(|row| row[0].clone()).collect::<Vec<_>>();
+        let expected = expected.iter().copied().map(Value::Int).collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn keyset_page_query_binds_object_id_cursor_values() {
     let (_container, host, port) = super::start_mongo().await;
     let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
