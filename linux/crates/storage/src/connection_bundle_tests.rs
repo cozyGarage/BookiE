@@ -52,6 +52,15 @@ fn secrets_for(id: Uuid) -> BundleSecrets {
     )
 }
 
+fn hop_secret(hop_id: Uuid, credential_revision: u64, kind: BundleSshSecretKind, value: &str) -> BundleSshSecret {
+    BundleSshSecret::new(
+        hop_id,
+        credential_revision,
+        kind,
+        SecretString::new(value.to_owned().into()),
+    )
+}
+
 fn plaintext_body(bytes: &[u8]) -> BundleBody {
     match parse_bundle(bytes).expect("parse") {
         ParsedBundle::Plaintext(body) => body,
@@ -138,10 +147,18 @@ fn a_legacy_use_tls_flag_cannot_contradict_the_exported_tls_mode() {
 fn a_bundle_without_a_passphrase_carries_no_credentials() {
     let connection = saved("sales");
     let id = connection.id;
-    let bytes = export_plaintext(&export_of(vec![connection], vec![secrets_for(id)])).expect("export");
+    let mut secrets = secrets_for(id);
+    secrets.set_ssh_hop_secrets(vec![hop_secret(
+        Uuid::new_v4(),
+        2,
+        BundleSshSecretKind::Password,
+        "hop-only-secret",
+    )]);
+    let bytes = export_plaintext(&export_of(vec![connection], vec![secrets])).expect("export");
     let rendered = String::from_utf8_lossy(&bytes);
     assert!(!rendered.contains("hunter2"));
     assert!(!rendered.contains("bastion-pw"));
+    assert!(!rendered.contains("hop-only-secret"));
     assert!(plaintext_body(&bytes).secrets.is_empty());
 }
 
@@ -157,6 +174,12 @@ fn a_plaintext_payload_carrying_credentials_is_rejected() {
         "db_password": "hunter2",
         "ssh_password": null,
         "ssh_passphrase": null,
+        "ssh_hops": [{
+            "hop_id": Uuid::new_v4(),
+            "credential_revision": 1,
+            "kind": "password",
+            "secret": "hop-only-secret"
+        }],
     }]);
     let bytes = serde_json::to_vec(&document).expect("json");
 
@@ -193,6 +216,181 @@ fn an_encrypted_bundle_round_trips_its_credentials() {
     assert_eq!(secrets.db_password().map(|v| v.expose_secret()), Some("hunter2"));
     assert_eq!(secrets.ssh_password().map(|v| v.expose_secret()), Some("bastion-pw"));
     assert!(secrets.ssh_passphrase().is_none());
+}
+
+#[test]
+fn an_encrypted_v2_bundle_round_trips_credentials_for_each_ssh_hop() {
+    let mut connection = saved("sales");
+    let root_id = Uuid::new_v4();
+    let jump_id = Uuid::new_v4();
+    connection.ssh = Some(SavedSshConfig {
+        hop_id: root_id,
+        credential_revision: 3,
+        host: "bastion.example".into(),
+        port: 22,
+        username: "root-hop".into(),
+        auth: SavedSshAuth::Password,
+        jump: Some(Box::new(SavedSshConfig {
+            hop_id: jump_id,
+            credential_revision: 7,
+            host: "relay.example".into(),
+            port: 2222,
+            username: "jump-hop".into(),
+            auth: SavedSshAuth::PrivateKey {
+                path: PathBuf::from("/home/test/.ssh/relay"),
+                has_passphrase: true,
+            },
+            jump: None,
+            agent: false,
+            client: Default::default(),
+        })),
+        agent: false,
+        client: Default::default(),
+    });
+    let connection_id = connection.id;
+    let mut secrets = BundleSecrets::new(connection_id, None, None, None);
+    secrets.set_ssh_hop_secrets(vec![
+        hop_secret(root_id, 3, BundleSshSecretKind::Password, "root-only-secret"),
+        hop_secret(jump_id, 7, BundleSshSecretKind::Passphrase, "jump-only-secret"),
+    ]);
+    let bytes = export_encrypted(&export_of(vec![connection], vec![secrets]), PASSPHRASE).expect("export");
+    let document: serde_json::Value = serde_json::from_slice(&bytes).expect("document");
+    assert_eq!(document["version"], 2);
+    let rendered = String::from_utf8_lossy(&bytes);
+    assert!(!rendered.contains("root-only-secret"));
+    assert!(!rendered.contains("jump-only-secret"));
+
+    let body = encrypted_body(&bytes, PASSPHRASE).expect("unlock");
+    assert_eq!(body.secrets.len(), 1);
+    let hop_secrets = body.secrets[0].ssh_hop_secrets();
+    assert_eq!(hop_secrets.len(), 2);
+    assert_eq!(hop_secrets[0].hop_id(), root_id);
+    assert_eq!(hop_secrets[0].credential_revision(), 3);
+    assert_eq!(hop_secrets[0].kind(), BundleSshSecretKind::Password);
+    assert_eq!(hop_secrets[0].secret().expose_secret(), "root-only-secret");
+    assert_eq!(hop_secrets[1].hop_id(), jump_id);
+    assert_eq!(hop_secrets[1].credential_revision(), 7);
+    assert_eq!(hop_secrets[1].kind(), BundleSshSecretKind::Passphrase);
+    assert_eq!(hop_secrets[1].secret().expose_secret(), "jump-only-secret");
+}
+
+#[test]
+fn a_bundle_rejects_duplicate_ssh_hop_identities() {
+    let mut connection = saved("duplicate hops");
+    let hop_id = Uuid::new_v4();
+    connection.ssh = Some(SavedSshConfig {
+        hop_id,
+        credential_revision: 2,
+        host: "bastion.example".into(),
+        port: 22,
+        username: "first".into(),
+        auth: SavedSshAuth::Password,
+        jump: Some(Box::new(SavedSshConfig {
+            hop_id,
+            credential_revision: 2,
+            host: "relay.example".into(),
+            port: 22,
+            username: "second".into(),
+            auth: SavedSshAuth::Password,
+            jump: None,
+            agent: false,
+            client: Default::default(),
+        })),
+        agent: false,
+        client: Default::default(),
+    });
+    let body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&connection)],
+        ..BundleBody::default()
+    };
+
+    assert!(matches!(
+        check_body_bounds(&body),
+        Err(BundleError::Field("connections.ssh.hop_id"))
+    ));
+}
+
+#[test]
+fn a_bundle_rejects_per_hop_secrets_for_legacy_credentials() {
+    let mut connection = saved("legacy hop secret");
+    let hop_id = Uuid::new_v4();
+    connection.ssh = Some(SavedSshConfig {
+        hop_id,
+        credential_revision: 0,
+        host: "bastion.example".into(),
+        port: 22,
+        username: "jump".into(),
+        auth: SavedSshAuth::Password,
+        jump: None,
+        agent: false,
+        client: Default::default(),
+    });
+    let mut secrets = BundleSecrets::new(connection.id, None, None, None);
+    secrets.set_ssh_hop_secrets(vec![hop_secret(
+        hop_id,
+        0,
+        BundleSshSecretKind::Password,
+        "legacy-secret",
+    )]);
+    let body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&connection)],
+        secrets: vec![secrets],
+        ..BundleBody::default()
+    };
+
+    assert!(matches!(
+        check_body_bounds(&body),
+        Err(BundleError::Field("secrets.ssh_hops"))
+    ));
+}
+
+#[test]
+fn a_version_one_encrypted_bundle_remains_readable() {
+    let connection = saved("legacy");
+    let export = export_of(vec![connection.clone()], vec![secrets_for(connection.id)]);
+    let body = export.body(true);
+    let legacy_body: serde_json::Value = serde_json::to_value(&body).expect("legacy body");
+    assert!(legacy_body["secrets"][0].get("ssh_hops").is_none());
+    let mut plaintext = Zeroizing::new(Vec::new());
+    serde_json::to_writer(&mut *plaintext, &legacy_body).expect("serialize legacy body");
+    let envelope = EnvelopeHeader {
+        version: 1,
+        producer: export.producer.clone(),
+        exported_at: export.exported_at.clone(),
+    };
+    let sealed = seal(&plaintext, PASSPHRASE, &envelope).expect("seal legacy bundle");
+    let document = BundleDocument {
+        format: BUNDLE_FORMAT.into(),
+        version: 1,
+        producer: export.producer,
+        exported_at: export.exported_at,
+        payload: BundlePayload {
+            kind: KIND_ENCRYPTED.into(),
+            body: None,
+            kdf: Some(sealed.kdf),
+            cipher: Some(sealed.cipher),
+            ciphertext: Some(BASE64.encode(sealed.ciphertext)),
+        },
+    };
+    let bytes = serde_json::to_vec(&document).expect("serialize legacy bundle");
+
+    let body = encrypted_body(&bytes, PASSPHRASE).expect("unlock version-one bundle");
+    assert_eq!(body.connections.len(), 1);
+    assert_eq!(
+        body.secrets[0].ssh_password().map(|secret| secret.expose_secret()),
+        Some("bastion-pw")
+    );
+}
+
+#[test]
+fn a_version_one_plaintext_bundle_remains_readable() {
+    let bytes = export_plaintext(&export_of(vec![saved("legacy plaintext")], Vec::new())).expect("export");
+    let mut document: serde_json::Value = serde_json::from_slice(&bytes).expect("document");
+    document["version"] = serde_json::json!(1);
+
+    let body = plaintext_body(&serde_json::to_vec(&document).expect("legacy document"));
+    assert_eq!(body.connections.len(), 1);
+    assert!(body.secrets.is_empty());
 }
 
 #[test]
@@ -250,10 +448,10 @@ fn a_document_that_is_not_a_bundle_is_refused() {
 fn a_future_bundle_version_is_refused_rather_than_guessed() {
     let bytes = export_plaintext(&export_of(vec![saved("sales")], Vec::new())).expect("export");
     let mut document: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
-    document["version"] = serde_json::json!(2);
+    document["version"] = serde_json::json!(3);
     assert!(matches!(
         parse_bundle(&serde_json::to_vec(&document).expect("json")),
-        Err(BundleError::UnsupportedVersion(2))
+        Err(BundleError::UnsupportedVersion(3))
     ));
 }
 
@@ -607,7 +805,19 @@ fn an_import_keeps_an_existing_local_password_unless_replacement_is_asked_for() 
 #[tokio::test]
 #[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
 async fn an_export_collects_every_credential_kind_for_a_connection() {
-    let id = Uuid::new_v4();
+    let mut connection = saved("bundle secret collection");
+    let id = connection.id;
+    connection.ssh = Some(SavedSshConfig {
+        hop_id: Uuid::new_v4(),
+        credential_revision: 0,
+        host: "bastion.example".into(),
+        port: 22,
+        username: "jump".into(),
+        auth: SavedSshAuth::Password,
+        jump: None,
+        agent: false,
+        client: Default::default(),
+    });
     crate::secrets::store_password(id, "db-pw", "bundle-test")
         .await
         .unwrap();
@@ -615,7 +825,7 @@ async fn an_export_collects_every_credential_kind_for_a_connection() {
         .await
         .unwrap();
 
-    let collected = collect_bundle_secrets(std::slice::from_ref(&id)).await.unwrap();
+    let collected = collect_bundle_secrets(std::slice::from_ref(&connection)).await.unwrap();
 
     assert_eq!(collected.len(), 1);
     assert_eq!(collected[0].connection_id, id);
@@ -629,13 +839,67 @@ async fn an_export_collects_every_credential_kind_for_a_connection() {
 #[tokio::test]
 #[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
 async fn a_connection_with_no_stored_credentials_contributes_nothing_to_a_bundle() {
-    let id = Uuid::new_v4();
+    let connection = saved("empty bundle secret collection");
     assert!(
-        collect_bundle_secrets(std::slice::from_ref(&id))
+        collect_bundle_secrets(std::slice::from_ref(&connection))
             .await
             .unwrap()
             .is_empty()
     );
+}
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn an_export_collects_each_versioned_ssh_hop_secret() {
+    let connection_id = Uuid::new_v4();
+    let root_id = Uuid::new_v4();
+    let jump_id = Uuid::new_v4();
+    let mut connection = saved("hop secrets");
+    connection.id = connection_id;
+    connection.ssh = Some(SavedSshConfig {
+        hop_id: root_id,
+        credential_revision: 2,
+        host: "bastion.example".into(),
+        port: 22,
+        username: "root-hop".into(),
+        auth: SavedSshAuth::Password,
+        jump: Some(Box::new(SavedSshConfig {
+            hop_id: jump_id,
+            credential_revision: 4,
+            host: "relay.example".into(),
+            port: 22,
+            username: "jump-hop".into(),
+            auth: SavedSshAuth::PrivateKey {
+                path: PathBuf::from("/home/test/.ssh/relay"),
+                has_passphrase: true,
+            },
+            jump: None,
+            agent: false,
+            client: Default::default(),
+        })),
+        agent: false,
+        client: Default::default(),
+    });
+    crate::secrets::store_ssh_hop_password(connection_id, root_id, 2, "root-secret", "bundle-test")
+        .await
+        .unwrap();
+    crate::secrets::store_ssh_hop_passphrase(connection_id, jump_id, 4, "jump-secret", "bundle-test")
+        .await
+        .unwrap();
+
+    let collected = collect_bundle_secrets(std::slice::from_ref(&connection)).await.unwrap();
+    assert_eq!(collected.len(), 1);
+    assert_eq!(collected[0].ssh_hop_secrets().len(), 2);
+    assert_eq!(
+        collected[0].ssh_hop_secrets()[0].secret().expose_secret(),
+        "root-secret"
+    );
+    assert_eq!(
+        collected[0].ssh_hop_secrets()[1].secret().expose_secret(),
+        "jump-secret"
+    );
+
+    forget_imported_bundle_secrets(connection_id, &collected[0]).await;
 }
 
 #[tokio::test]
@@ -688,4 +952,73 @@ async fn rolling_back_an_import_removes_only_the_credentials_it_wrote() {
 
     assert!(crate::secrets::load_password(target).await.unwrap().is_none());
     assert!(crate::secrets::load_ssh_password(target).await.unwrap().is_none());
+}
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn rolling_back_a_bundle_import_removes_its_per_hop_credentials() {
+    let source = Uuid::new_v4();
+    let target = Uuid::new_v4();
+    let hop_id = Uuid::new_v4();
+    let mut carried = BundleSecrets::new(source, None, None, None);
+    carried.set_ssh_hop_secrets(vec![hop_secret(hop_id, 5, BundleSshSecretKind::Password, "hop-secret")]);
+
+    store_bundle_secrets(target, &carried, "bundle-test", false)
+        .await
+        .unwrap();
+    assert_eq!(
+        crate::secrets::load_ssh_hop_password(target, hop_id, 5)
+            .await
+            .unwrap()
+            .map(|secret| secret.expose_secret().to_owned()),
+        Some("hop-secret".into())
+    );
+
+    forget_imported_bundle_secrets(target, &carried).await;
+    assert!(
+        crate::secrets::load_ssh_hop_password(target, hop_id, 5)
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn importing_a_bundle_keeps_existing_hop_credentials_until_replacement_is_asked_for() {
+    let target = Uuid::new_v4();
+    let hop_id = Uuid::new_v4();
+    crate::secrets::store_ssh_hop_password(target, hop_id, 2, "local-secret", "bundle-test")
+        .await
+        .unwrap();
+    let mut carried = BundleSecrets::new(Uuid::new_v4(), None, None, None);
+    carried.set_ssh_hop_secrets(vec![hop_secret(
+        hop_id,
+        2,
+        BundleSshSecretKind::Password,
+        "bundle-secret",
+    )]);
+
+    store_bundle_secrets(target, &carried, "bundle-test", false)
+        .await
+        .unwrap();
+    assert_eq!(
+        crate::secrets::load_ssh_hop_password(target, hop_id, 2)
+            .await
+            .unwrap()
+            .map(|secret| secret.expose_secret().to_owned()),
+        Some("local-secret".into())
+    );
+    store_bundle_secrets(target, &carried, "bundle-test", true)
+        .await
+        .unwrap();
+    assert_eq!(
+        crate::secrets::load_ssh_hop_password(target, hop_id, 2)
+            .await
+            .unwrap()
+            .map(|secret| secret.expose_secret().to_owned()),
+        Some("bundle-secret".into())
+    );
+
+    forget_imported_bundle_secrets(target, &carried).await;
 }
