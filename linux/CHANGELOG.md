@@ -90,6 +90,7 @@
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- Startup opens the query history database while the rest of the application starts instead of waiting for it first.
 - The Debian package installs its programs without debug symbols, which makes the installed files about a quarter smaller
 - The distro-floor image installs a pinned, checksum-verified `rustup-init` instead of piping an unverified script to the shell.
 - The time shown for a statement no longer includes the wait for your approval on a guarded connection.
