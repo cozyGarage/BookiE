@@ -13,7 +13,8 @@ this page keeps the order. Draft of 2026-10-11, for the maintainer.
 | UI-20 | Server output (NOTICE, PRINT) and a timing breakdown | with PERF-4 |
 | UI-15b | Null display style preference | |
 | UI-17b, UI-18, UI-22, UI-23, UI-26 | Preview tabs, history as a panel, code folding and split panes, more PostgreSQL catalog objects, editable SSH profiles | accepted for later |
-| PKG-4, PKG-8 | Flatpak build, Flathub submission, and the file-access decision (`--filesystem=home` or portal only) | decide PKG-8 before PKG-4 |
+| PKG-2 | Debian and GNOME desktop pass (UI-D1 to D4) | the packages keep building and passing the distro floor in CI; this is the desktop acceptance |
+| PKG-4, PKG-8 | Flatpak build, Flathub submission, and the file-access decision (`--filesystem=home` or portal only) | not part of 0.2.0; decide PKG-8 before PKG-4 |
 
 ## Performance
 

@@ -59,8 +59,11 @@ for the maintainer; an entry is removed when the row closes.
 
 ## Platforms and packaging
 
-- Native Wayland install, upgrade and rollback are not yet verified on a real
-  desktop (PKG-1, PKG-2). Xvfb results do not count.
+- 0.2.0 is tested on Arch Linux with Hyprland as a native Wayland client. The
+  install, upgrade and rollback pass on the real desktop is pending (PKG-1); Xvfb
+  results do not count.
+- GNOME on Debian and Ubuntu is not accepted on a real desktop yet (PKG-2), although
+  the packages build and the installed test suite passes in containers.
 - The Flatpak build is not verified and is not offered (PKG-4, PKG-8).
 - Windows and macOS are not supported; the application is built for Linux with GTK 4
   and libadwaita.
