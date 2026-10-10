@@ -46,7 +46,8 @@ owner table, and each lane edits only its own files.
 |---|---|
 | B3 | Types, values, drivers and result paths: `core` value and result types, decoders under `crates/drivers/`, grid value display, the [B3 board](linux/docs/type-contract-strategy.md) |
 | B4 | Transport, guard, audit, SSH, rollback and acceptance: `policy`, `transport`, `ssh`, audit storage, the [B4 board](linux/docs/b4-task-board.md) |
-| UX | The app layer, packaging, CI and the lab, and shared documentation |
+| UX | The app layer, packaging, CI and the lab, the ledger, and shared documentation. UX also runs the Forgejo gate for every pull request that is green on GitHub and merges it once both agree |
+| Cursor | Documentation and tests only. UX reviews its test pull requests; the maintainer merges its documentation pull requests, which need no Forgejo run |
 | Maintainer | Decisions and anything needing a person or a real desktop |
 
 - To work in another lane's files, first record the handoff in the ledger
