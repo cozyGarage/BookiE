@@ -14,6 +14,7 @@ use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
     QueryResult, QueryResultBudget, TableInfo, Value,
 };
+use tempfile::TempDir;
 
 mod temporal;
 
@@ -60,13 +61,18 @@ impl DatabaseDriver for DuckdbDriver {
             .await
             .map_err(|e| DriverError::Internal(format!("duckdb connect join: {e}")))??;
         Ok(Box::new(DuckdbConnection {
-            conn: Arc::new(Mutex::new(conn)),
-            _selected_file: selected_file,
+            session: Arc::new(DuckdbSession {
+                conn: Mutex::new(conn),
+                _selected_file: selected_file,
+            }),
         }))
     }
 }
 
-fn open_path_with_access(path: &str, read_only: bool) -> Result<(DuckConnection, Option<File>), DriverError> {
+fn open_path_with_access(
+    path: &str,
+    read_only: bool,
+) -> Result<(DuckConnection, Option<SelectedFlatFile>), DriverError> {
     if !read_only {
         return open_path(path).map(|conn| (conn, None));
     }
@@ -76,8 +82,8 @@ fn open_path_with_access(path: &str, read_only: bool) -> Result<(DuckConnection,
         ));
     }
     if let Some(reader_fn) = flat_file_reader_fn(path) {
-        let (conn, file) = open_read_only_flat_file(path, reader_fn)?;
-        return Ok((conn, Some(file)));
+        let (conn, selected_file) = open_read_only_flat_file(path, reader_fn)?;
+        return Ok((conn, Some(selected_file)));
     }
 
     let config = Config::default()
@@ -92,9 +98,7 @@ fn open_path_with_access(path: &str, read_only: bool) -> Result<(DuckConnection,
 }
 
 #[cfg(target_os = "linux")]
-fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnection, File), DriverError> {
-    use std::path::Path;
-
+fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnection, SelectedFlatFile), DriverError> {
     let canonical = std::fs::canonicalize(path).map_err(map_file_error)?;
     let before_open = std::fs::metadata(&canonical).map_err(map_file_error)?;
     if !before_open.is_file() {
@@ -111,13 +115,19 @@ fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnecti
         ));
     }
 
-    let proc_fd_dir = Path::new("/proc/self/fd");
-    if !proc_fd_dir.is_dir() {
-        return Err(DriverError::Unsupported(
-            "read-only DuckDB flat-file access requires Linux procfs file descriptors".into(),
+    let parent = canonical
+        .parent()
+        .ok_or_else(|| DriverError::Unsupported("selected DuckDB input has no parent directory".into()))?;
+    let private_dir = private_alias_directory(parent, opened.dev())?;
+    let pinned_path = private_dir.path().join("selected-input");
+    std::fs::hard_link(&canonical, &pinned_path).map_err(map_file_error)?;
+    let alias_metadata = std::fs::metadata(&pinned_path).map_err(map_file_error)?;
+    if !same_file_identity(&opened, &alias_metadata) {
+        return Err(DriverError::PolicyDenied(
+            "the selected DuckDB input changed while it was being pinned".into(),
         ));
     }
-    let stable_path = format!("{}/{}", proc_fd_dir.display(), file.as_raw_fd());
+    let stable_path = pinned_path.to_string_lossy();
     let conn = DuckConnection::open_in_memory().map_err(map_duck_error)?;
     conn.execute_batch(&format!(
         "SET allowed_paths = ['{}']; \
@@ -130,7 +140,45 @@ fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnecti
         escape_duckdb_literal(&stable_path)
     ))
     .map_err(map_duck_error)?;
-    Ok((conn, file))
+    Ok((
+        conn,
+        SelectedFlatFile {
+            _file: file,
+            _private_dir: private_dir,
+        },
+    ))
+}
+
+#[cfg(target_os = "linux")]
+fn private_alias_directory(parent: &std::path::Path, device: u64) -> Result<TempDir, DriverError> {
+    let mut candidates = vec![parent.to_path_buf()];
+    candidates.extend(
+        ["XDG_CACHE_HOME", "HOME"]
+            .into_iter()
+            .filter_map(std::env::var_os)
+            .map(std::path::PathBuf::from),
+    );
+    candidates.push(std::env::temp_dir());
+
+    let mut last_error = None;
+    for candidate in candidates {
+        let Ok(metadata) = std::fs::metadata(&candidate) else {
+            continue;
+        };
+        if !metadata.is_dir() || metadata.dev() != device {
+            continue;
+        }
+        match tempfile::Builder::new().prefix(".bookie-duckdb-").tempdir_in(candidate) {
+            Ok(directory) => return Ok(directory),
+            Err(error) => last_error = Some(error),
+        }
+    }
+    match last_error {
+        Some(error) => Err(map_file_error(error)),
+        None => Err(DriverError::Unsupported(
+            "no writable private directory shares the selected DuckDB file system".into(),
+        )),
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -171,7 +219,7 @@ fn open_selected_file(path: &std::path::Path, expected: &std::fs::Metadata) -> R
 }
 
 #[cfg(not(target_os = "linux"))]
-fn open_read_only_flat_file(_path: &str, _reader_fn: &str) -> Result<(DuckConnection, File), DriverError> {
+fn open_read_only_flat_file(_path: &str, _reader_fn: &str) -> Result<(DuckConnection, SelectedFlatFile), DriverError> {
     Err(DriverError::Unsupported(
         "read-only DuckDB flat-file access is supported only on Linux".into(),
     ))
@@ -254,16 +302,26 @@ fn escape_duckdb_literal(value: &str) -> String {
 }
 
 struct DuckdbConnection {
-    conn: Arc<Mutex<DuckConnection>>,
-    _selected_file: Option<File>,
+    session: Arc<DuckdbSession>,
+}
+
+struct DuckdbSession {
+    conn: Mutex<DuckConnection>,
+    _selected_file: Option<SelectedFlatFile>,
+}
+
+struct SelectedFlatFile {
+    _file: File,
+    _private_dir: TempDir,
 }
 
 #[async_trait]
 impl Connection for DuckdbConnection {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        let conn = Arc::clone(&self.conn);
+        let conn = Arc::clone(&self.session);
         blocking(move || {
             let guard = conn
+                .conn
                 .lock()
                 .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
             let mut stmt = guard
@@ -292,11 +350,12 @@ impl Connection for DuckdbConnection {
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        let conn = Arc::clone(&self.conn);
+        let conn = Arc::clone(&self.session);
         let schema = schema.map(str::to_string);
         let table = table.to_string();
         blocking(move || {
             let guard = conn
+                .conn
                 .lock()
                 .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
             let (sql, binds) = match schema {
@@ -368,23 +427,24 @@ impl Connection for DuckdbConnection {
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
-        let conn = Arc::clone(&self.conn);
+        let conn = Arc::clone(&self.session);
         let sql = sql.to_string();
         blocking(move || run_query(&conn, &sql, &[], MAX_QUERY_ROWS)).await
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let conn = Arc::clone(&self.conn);
+        let conn = Arc::clone(&self.session);
         let sql = sql.to_owned();
         let params = params.to_vec();
         blocking(move || run_query(&conn, &sql, &params, MAX_QUERY_ROWS)).await
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
-        let conn = Arc::clone(&self.conn);
+        let conn = Arc::clone(&self.session);
         let sql = sql.to_string();
         blocking(move || {
             let guard = conn
+                .conn
                 .lock()
                 .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
             let rows_affected = guard.execute(&sql, []).map_err(map_duck_error)? as u64;
@@ -397,11 +457,12 @@ impl Connection for DuckdbConnection {
         if params.is_empty() {
             return self.execute(sql).await;
         }
-        let conn = Arc::clone(&self.conn);
+        let conn = Arc::clone(&self.session);
         let sql = sql.to_string();
         let params = params.to_vec();
         blocking(move || {
             let guard = conn
+                .conn
                 .lock()
                 .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
             let bind = values_to_duck_params(&params)?;
@@ -414,10 +475,11 @@ impl Connection for DuckdbConnection {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        let conn = Arc::clone(&self.conn);
+        let conn = Arc::clone(&self.session);
         let statements = statements.to_vec();
         blocking(move || {
             let guard = conn
+                .conn
                 .lock()
                 .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
             guard.execute_batch("BEGIN").map_err(map_duck_error)?;
@@ -473,13 +535,9 @@ impl Connection for DuckdbConnection {
     }
 }
 
-fn run_query(
-    conn: &Arc<Mutex<DuckConnection>>,
-    sql: &str,
-    params: &[Value],
-    limit: usize,
-) -> Result<QueryResult, DriverError> {
+fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usize) -> Result<QueryResult, DriverError> {
     let guard = conn
+        .conn
         .lock()
         .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
     let mut stmt = guard.prepare(sql).map_err(map_duck_error)?;

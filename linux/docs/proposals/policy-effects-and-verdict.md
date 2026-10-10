@@ -63,15 +63,19 @@ read-only design must preserve that flow while denying access to every other
 external path.
 
 For a flat-file connection, resolve the selected local path to a canonical
-absolute path and require it to be a regular file. Open an in-memory DuckDB
-connection, set `allowed_paths` to a list containing exactly that path, set
-`enable_external_access=false`, and lock configuration before exposing the
-connection to user SQL. Then create the driver's view using that same canonical
-path. Do not allow a directory, parent prefix, URL or other file. If any
-restriction cannot be applied, refuse the connection rather than opening it
-with external access enabled. `allowed_paths` is intended for this exact-file
-case; DuckDB documents it alongside `enable_external_access` in its [file access
-security controls](https://duckdb.org/docs/current/operations_manual/securing_duckdb/overview).
+absolute path, require a regular file, and pin its identity before DuckDB opens
+it. A path allowlist alone is not an identity allowlist: after the selected
+path is replaced, DuckDB can still authorize a different file at that same
+path. The Linux driver pins the opened file and creates a private hard link to
+that inode on the same filesystem. DuckDB's `allowed_paths` contains only this
+private alias; the driver creates its view from that alias and retains the
+alias directory for the connection lifetime. Direct external reads through the
+user-selected path and all sibling or unrelated paths must fail, including
+after the user-selected path is replaced. If identity pinning or the exact
+allowlist cannot be applied, refuse the connection rather than opening it with
+external access enabled. DuckDB documents `allowed_paths` alongside
+`enable_external_access` in its [file access security
+controls](https://duckdb.org/docs/current/operations_manual/securing_duckdb/overview).
 
 For a `.duckdb` or `.db` connection, open the selected database in read-only
 access mode (the pinned Rust API exposes this through
@@ -81,27 +85,18 @@ The read-only policy remains responsible for rejecting SQL writes. The driver
 must confirm that opening the primary database still works with the
 external-file restrictions enabled.
 
-The pinned Rust wrapper needs a focused spike before implementation. Its
-`Config::with` path calls DuckDB's C configuration setter, while
-`allowed_paths` is a list-valued setting; upstream has reported that the C
-setter rejects list-valued options ([DuckDB issue #25057](https://github.com/duckdb/duckdb/issues/25057)). Test the pinned
-DuckDB 1.10505 build. If the wrapper cannot set the list during open, apply the
-setting through trusted initialization SQL before user SQL, using a bound
-value if supported or a tested SQL-literal encoder for the canonical path. A
-failed setting must fail closed.
-
-This is a DuckDB-level path restriction, not an operating-system sandbox. A
-path replacement race between canonicalization and DuckDB opening the file is
-not covered by the allowlist alone. The spike must establish that the selected
-file cannot be redirected during connection setup, or document the need for a
-stable file-handle strategy before describing the control as a strict
-file-isolation boundary.
+The pinned Rust wrapper applies the list-valued setting through trusted
+initialization SQL before user SQL, using a tested SQL-literal encoder. This is
+a DuckDB-level path restriction, not an operating-system sandbox. A private
+same-filesystem hard link preserves the selected inode across pathname
+replacement; if the filesystem cannot provide that link or a private directory
+on the same filesystem, the read-only flat-file connection must fail closed.
 
 Acceptance tests must show that the selected file can populate its view, while
 `read_text`, `read_csv`, `read_parquet`, `read_json`, `ATTACH` and `COPY` cannot
-access a sibling or unrelated path. Include quotes and Unicode in selected
-paths, a symlink/path-alias case, an attempted path replacement during
-initialization, attempts to change the settings after configuration is locked,
-and mutation attempts against a read-only database. Do not ship this control
-until those tests pass on the pinned bundled DuckDB version. Until then,
-DuckDB read-only relies on policy checks alone.
+access a sibling, unrelated path, or the original selected path directly.
+Include quotes and Unicode in selected paths, a symlink/path-alias case,
+replacement races during setup and after connection, attempts to change the
+settings after configuration is locked, and mutation attempts against a
+read-only database. Do not close this control until those tests pass on the
+pinned bundled DuckDB version and the required acceptance gate completes.
