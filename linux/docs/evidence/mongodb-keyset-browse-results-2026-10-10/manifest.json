@@ -56,6 +56,7 @@
     "linux/crates/drivers/mongodb/tests/support/census_cost.rs": "bb6dbe10174ea2145363919bdc1a25359d1f914130de4d0c6ecb4b7378e2e715"
   },
   "remaining": [
+    "Filtered, sorted and keyless deep-page behavior is not covered by this regression or profile.",
     "The timing uses local Docker and debug builds; realistic network latency is unmeasured.",
     "Installed Arch/Wayland and Debian/GNOME browsing acceptance remains open.",
     "The driver offset API remains linear for direct callers; the GUI uses keyset queries after the shared 10,000-row threshold."
