@@ -11,7 +11,7 @@ execution and installed acceptance are separate states.
 
 ## Current Linux-tip B4 checkpoint (2026-10-10)
 
-`fork/linux` is `9f813d763d2c75852b61c5c7b1a5d785afd54344` (2026-10-10).
+`fork/linux` is `e65030d9505f7b8ac58601fd883986a041dd25b8` (2026-10-10).
 The latest application-code commit is `79d9e51` (#481); the current branch tip
 also includes the packaging change in #483. PR #458 computes `Effects`
 alongside legacy facts, and PR #459 adds engine read-only enforcement; both are
