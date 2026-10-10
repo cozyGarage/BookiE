@@ -292,6 +292,13 @@ fn evaluate_agent_write_categorical(
     env_policy: &EnvPolicy,
 ) -> Vec<Decision> {
     let mut decisions = Vec::new();
+    if effects.contains(Effects::HOST_OR_FILE_ACCESS) {
+        decisions.push(Decision::Deny {
+            rule: "agent_host_access_denied".into(),
+            message: "agents may not access host files or external programs".into(),
+        });
+    }
+
     if env_policy.agent_writes == crate::config::WritePolicy::Deny {
         decisions.push(Decision::Deny {
             rule: "agent_writes_denied".into(),
@@ -665,7 +672,29 @@ mod tests {
             None,
         );
         assert!(matches!(agent_decision, Decision::Deny { .. }), "{agent_decision:?}");
-        assert_eq!(agent_decision.rule_name(), "agent_writes_denied");
+        assert!(has_rule(&agent_decision, "agent_writes_denied"));
+
+        let write_enabled_policy = EnvPolicy {
+            agent_writes: WritePolicy::Allow,
+            ..local
+        };
+        let write_enabled_agent_decision = evaluate_with_effects(
+            &agent,
+            Environment::Local,
+            &analysis.facts,
+            analysis.effects,
+            false,
+            &write_enabled_policy,
+            None,
+        );
+        assert!(
+            matches!(write_enabled_agent_decision, Decision::Deny { .. }),
+            "host file reads must remain denied even when database writes are enabled: {write_enabled_agent_decision:?}"
+        );
+        assert!(
+            has_rule(&write_enabled_agent_decision, "agent_host_access_denied"),
+            "the audit reason must name the host-access rule: {write_enabled_agent_decision:?}"
+        );
     }
 
     #[test]
