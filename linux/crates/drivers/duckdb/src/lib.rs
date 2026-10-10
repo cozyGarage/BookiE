@@ -102,7 +102,7 @@ fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnecti
             "the selected DuckDB input must be a regular file".into(),
         ));
     }
-    let file = File::open(&canonical).map_err(map_file_error)?;
+    let file = open_selected_file(&canonical).map_err(map_file_error)?;
     let opened = file.metadata().map_err(map_file_error)?;
     let after_open = std::fs::metadata(&canonical).map_err(map_file_error)?;
     if !opened.is_file() || !same_file_identity(&before_open, &opened) || !same_file_identity(&opened, &after_open) {
@@ -131,6 +131,16 @@ fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnecti
     ))
     .map_err(map_duck_error)?;
     Ok((conn, file))
+}
+
+#[cfg(target_os = "linux")]
+fn open_selected_file(path: &std::path::Path) -> std::io::Result<File> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -692,6 +702,30 @@ fn map_duck_error(err: duckdb::Error) -> DriverError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn read_only_flat_file_open_does_not_block_on_a_fifo() {
+        use std::time::Duration;
+
+        let dir = tempfile::tempdir().unwrap();
+        let fifo = dir.path().join("race.csv");
+        let status = std::process::Command::new("mkfifo").arg(&fifo).status().unwrap();
+        assert!(status.success());
+
+        let path = fifo.clone();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let opener = std::thread::spawn(move || {
+            let result = open_selected_file(&path).map(|file| file.metadata().map(|metadata| metadata.is_file()));
+            let _ = sender.send(result);
+        });
+        let result = receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("opening the selected path must not hang on a FIFO");
+        opener.join().unwrap();
+        assert!(result.is_ok());
+        assert!(!result.unwrap().unwrap());
+    }
 
     async fn in_memory_connection() -> Box<dyn Connection> {
         DuckdbDriver
