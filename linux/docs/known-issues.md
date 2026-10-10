@@ -41,7 +41,7 @@ table in the same commit.
 | Owner | Open rows | Next |
 | --- | --- | --- |
 | B3 (types, values, drivers, result paths) | UI-14b, UI-15b, UI-19, UI-20, UI-21, TEST-2, TEST-12, PERF-3, PERF-4, PERF-7, PERF-9, PERF-10 | Tip: continue mutation triage and the remaining engine/type/consumer/configuration matrix. Exact-head Forgejo gate after run 101/127 still owed ([B3 retest](type-contract-strategy.md#retest-indicators)). PERF-9/10 installed GTK and comparable memory profiling remain; UI-19 deferred (C). Row evidence stays in the ledger rows below |
-| B4 (transport, guard, audit, SSH, rollback) | AUD-2, AUD-9, AUD-11, B4-7, B4-9, B4-11, B4-16, B4-17, B4-21, B4-22, UI-1b, UI-13b, TEST-15, PERF-2, PERF-8 | Tip: package-installed SSH/TLS/rollback/bundle/Kerberos and native Wayland remain open ([B4 board](b4-task-board.md)). AUD-10 DONE (#486); #506 merged the shared-analysis portion of AUD-11 step 4, but the single-AST-walk consolidation remains open; AUD-9 lineage continues through the gate. UI-1b: storage groundwork (#490); GTK editor/acceptance still open ([proposal](proposals/ui-1b-ssh-jump-chain-editor.md)). Retest empty-dialog / MongoDB TLS signals stay on the board |
+| B4 (transport, guard, audit, SSH, rollback) | AUD-2, AUD-9, AUD-11, B4-7, B4-9, B4-11, B4-16, B4-17, B4-21, B4-22, UI-1b, UI-13b, TEST-15, PERF-2, PERF-8 | Tip: package-installed SSH/TLS/rollback/bundle/Kerberos and native Wayland remain open ([B4 board](b4-task-board.md)). AUD-10 DONE (#486); #506 merged the shared-analysis portion of AUD-11 step 4, but the single-AST-walk consolidation remains open; AUD-9 lineage continues through the gate. B4-11 rollback warning wording is B4-owned; UX reviews the scoped app and changelog change below. UI-1b: storage groundwork (#490); GTK editor/acceptance still open ([proposal](proposals/ui-1b-ssh-jump-chain-editor.md)). Retest empty-dialog / MongoDB TLS signals stay on the board |
 | UX lane (app layer, packaging, lab) | AUD-5, AUD-6, AUD-7, TEST-28, TEST-30, TEST-31, TEST-32, SNAP-2, SNAP-3, SNAP-4 | TEST-28 native AT-SPI; TEST-31 capacity experiment (next ten Forgejo runs); TEST-32 oracle review; AUD-5 comment sweep. Snapshots (ADR 0015) after SNAP-1 |
 | The maintainer (needs a person or a decision) | PKG-1, PKG-2, PKG-4, PKG-8, DOC-3, DOC-5, TEST-6 | PKG-1 native Wayland recipe on a real desktop; PKG-2 after PKG-1; PKG-4 Flathub + screenshots; PKG-8 Flatpak file-access decision; DOC-3 Orca/high contrast; TEST-6 manual checklist; DOC-5 lab client compare |
 
@@ -67,6 +67,12 @@ table in the same commit.
 | AUD-9 JSON constructors / set-ops | B: B4 extends masking for `to_json` / JSON builders, set-ops and nested CTEs | `linux/crates/policy/src/sensitive_projection.rs` | Unit product and tests; remains OPEN through Forgejo |
 | change-test-map value-path growth | B: B3/UX expand exact selectors for export/import/grid dialog paths | `linux/scripts/change-test-map.json` | Cheap GitHub change-contracts only |
 | TEST-6 first triage slice | B: UX records triage; maintainer keeps remaining manual/Wayland items | `linux/docs/evidence/test-6-triage-2026-10-10/`, `linux/docs/known-issues.md` (TEST-6/AUD-11/AUD-9 rows) | No TEST-28 product fix in this handoff |
+
+### B4/UX rollback warning handoff, 2026-10-10
+
+| Row | Decision | B4 may edit | UX may edit |
+| --- | --- | --- | --- |
+| B4-11 rollback warning | B: B4 owns rollback semantics and test; UX reviews the user-facing wording and changelog entry | `linux/crates/app/src/ui/error_text.rs` and its unit test | `linux/CHANGELOG.md` |
 
 For PERF-9/10, preserve ADR 0007 outcomes and native stored-value oracles, and add
 the regression at the lowest applicable tier in the same commit. UX works only
