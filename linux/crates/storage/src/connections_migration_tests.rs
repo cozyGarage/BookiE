@@ -1,31 +1,6 @@
 use super::*;
 use tempfile::TempDir;
 
-fn sample_connection() -> SavedConnection {
-    SavedConnection {
-        id: Uuid::new_v4(),
-        name: "Migration test".into(),
-        driver_id: "postgres".into(),
-        host: "localhost".into(),
-        port: 5432,
-        socket_dir: None,
-        database: "postgres".into(),
-        username: "postgres".into(),
-        use_tls: false,
-        tls_mode: None,
-        tls_root_cert: None,
-        tls_client_cert: None,
-        tls_client_key: None,
-        read_only: false,
-        auth_mode: AuthMode::Password,
-        environment: Environment::Local,
-        ssh: None,
-        last_opened_at: None,
-        connect_timeout_secs: None,
-        query_timeout_secs: None,
-    }
-}
-
 fn ssh_chain(depth: usize) -> SavedSshConfig {
     let mut hop = SavedSshConfig {
         hop_id: Uuid::new_v4(),
@@ -58,7 +33,7 @@ fn ssh_chain(depth: usize) -> SavedSshConfig {
 async fn an_ssh_chain_at_the_hop_cap_is_accepted() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("connections.json");
-    let mut connection = sample_connection();
+    let mut connection = super::tests::sample_connection();
     connection.ssh = Some(ssh_chain(MAX_SSH_HOPS));
 
     save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
@@ -69,7 +44,7 @@ async fn an_ssh_chain_at_the_hop_cap_is_accepted() {
 async fn an_ssh_chain_past_the_hop_cap_is_refused() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("connections.json");
-    let mut connection = sample_connection();
+    let mut connection = super::tests::sample_connection();
     connection.ssh = Some(ssh_chain(MAX_SSH_HOPS + 1));
 
     let error = save_to(&path, std::slice::from_ref(&connection)).await.unwrap_err();
@@ -81,7 +56,7 @@ async fn an_ssh_chain_past_the_hop_cap_is_refused() {
 async fn a_file_holding_an_over_deep_ssh_chain_is_refused_on_load() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("connections.json");
-    let mut connection = sample_connection();
+    let mut connection = super::tests::sample_connection();
     connection.ssh = Some(ssh_chain(MAX_SSH_HOPS + 1));
     let document = serde_json::json!({
         "version": CURRENT_VERSION,

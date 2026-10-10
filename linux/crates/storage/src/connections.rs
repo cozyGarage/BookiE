@@ -113,14 +113,8 @@ impl SavedConnection {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SavedSshConfig {
-    /// Stable identity for this hop's independent Secret Service entries.
-    /// Legacy records receive one when read; the next connection-file write
-    /// persists it so reordering hops cannot move a credential to another host.
     #[serde(default = "Uuid::new_v4")]
     pub hop_id: Uuid,
-    /// Rotates when this hop's saved password or key passphrase is replaced.
-    /// Secret Service entries are keyed by this revision so a new entry can
-    /// be staged before the saved connection points at it.
     #[serde(default)]
     pub credential_revision: u64,
     pub host: String,
@@ -475,13 +469,13 @@ fn connections_path() -> Result<PathBuf, StorageError> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
     use tempfile::TempDir;
 
-    fn sample_connection() -> SavedConnection {
+    pub(super) fn sample_connection() -> SavedConnection {
         SavedConnection {
             id: Uuid::new_v4(),
             name: "Local Postgres".into(),
