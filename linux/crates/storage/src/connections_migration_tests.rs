@@ -1,40 +1,12 @@
 use super::*;
 use tempfile::TempDir;
 
-fn ssh_chain(depth: usize) -> SavedSshConfig {
-    let mut hop = SavedSshConfig {
-        hop_id: Uuid::new_v4(),
-        credential_revision: 0,
-        host: "bastion".into(),
-        port: 22,
-        username: "jump".into(),
-        auth: SavedSshAuth::Password,
-        jump: None,
-        client: Default::default(),
-        agent: false,
-    };
-    for _ in 1..depth {
-        hop = SavedSshConfig {
-            hop_id: Uuid::new_v4(),
-            credential_revision: 0,
-            host: "bastion".into(),
-            port: 22,
-            username: "jump".into(),
-            auth: SavedSshAuth::Password,
-            jump: Some(Box::new(hop)),
-            client: Default::default(),
-            agent: false,
-        };
-    }
-    hop
-}
-
 #[tokio::test]
 async fn an_ssh_chain_at_the_hop_cap_is_accepted() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("connections.json");
     let mut connection = super::tests::sample_connection();
-    connection.ssh = Some(ssh_chain(MAX_SSH_HOPS));
+    connection.ssh = Some(crate::connection_bundle::ssh_chain_for_test(MAX_SSH_HOPS));
 
     save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
     assert_eq!(load_from(&path).await.unwrap(), vec![connection]);
@@ -45,7 +17,7 @@ async fn an_ssh_chain_past_the_hop_cap_is_refused() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("connections.json");
     let mut connection = super::tests::sample_connection();
-    connection.ssh = Some(ssh_chain(MAX_SSH_HOPS + 1));
+    connection.ssh = Some(crate::connection_bundle::ssh_chain_for_test(MAX_SSH_HOPS + 1));
 
     let error = save_to(&path, std::slice::from_ref(&connection)).await.unwrap_err();
     assert!(matches!(error, StorageError::Schema(_)), "{error:?}");
@@ -57,7 +29,7 @@ async fn a_file_holding_an_over_deep_ssh_chain_is_refused_on_load() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("connections.json");
     let mut connection = super::tests::sample_connection();
-    connection.ssh = Some(ssh_chain(MAX_SSH_HOPS + 1));
+    connection.ssh = Some(crate::connection_bundle::ssh_chain_for_test(MAX_SSH_HOPS + 1));
     let document = serde_json::json!({
         "version": CURRENT_VERSION,
         "connections": [serde_json::to_value(&connection).unwrap()],
