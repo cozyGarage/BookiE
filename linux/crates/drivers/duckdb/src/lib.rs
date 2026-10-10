@@ -732,16 +732,18 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn read_only_flat_file_open_does_not_block_on_a_fifo() {
+    fn read_only_flat_file_open_does_not_block_if_path_is_replaced_with_a_fifo() {
         use std::time::Duration;
 
         let dir = tempfile::tempdir().unwrap();
         let fifo = dir.path().join("race.csv");
+        std::fs::write(&fifo, "id\n7\n").unwrap();
+        let expected = std::fs::metadata(&fifo).unwrap();
+        std::fs::remove_file(&fifo).unwrap();
         let status = std::process::Command::new("mkfifo").arg(&fifo).status().unwrap();
         assert!(status.success());
 
         let path = fifo.clone();
-        let expected = std::fs::metadata(&fifo).unwrap();
         let (sender, receiver) = std::sync::mpsc::channel();
         let opener = std::thread::spawn(move || {
             let result = open_selected_file(&path, &expected).map(|_| ());
