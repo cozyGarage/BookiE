@@ -183,7 +183,7 @@ def main():
         base = resolve_base(args.base)
         files = changed_files(base)
         actions = select_actions(files, load_map())
-    except (OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print(f"change-contracts: {error}", file=sys.stderr)
         return 2
 
