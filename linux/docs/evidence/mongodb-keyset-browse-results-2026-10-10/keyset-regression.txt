@@ -1,9 +1,10 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+   Compiling tablepro-driver-mongodb v0.1.0 (/home/trung/Projects/tablepro-b3-mongodb-browse-cost/linux/crates/drivers/mongodb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.48s
      Running tests/integration.rs (linux/target/debug/deps/integration-fc39c0a96012db67)
 
 running 2 tests
 test browse_keyset::keyset_page_query_reads_rows_after_the_native_id_cursor ... ok
 test browse_keyset::keyset_page_query_binds_object_id_cursor_values ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 42 filtered out; finished in 1.14s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 42 filtered out; finished in 1.28s
 

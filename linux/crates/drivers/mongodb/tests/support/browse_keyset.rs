@@ -48,11 +48,7 @@ async fn keyset_page_query_binds_object_id_cursor_values() {
     client
         .database("appdb")
         .collection::<Document>("keyset_oid")
-        .insert_many([
-            doc! { "_id": third.clone() },
-            doc! { "_id": first.clone() },
-            doc! { "_id": second.clone() },
-        ])
+        .insert_many([doc! { "_id": third }, doc! { "_id": first }, doc! { "_id": second }])
         .await
         .unwrap();
 
