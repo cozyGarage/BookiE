@@ -295,7 +295,10 @@ The lab Forgejo (an internal instance; its address and repository are set throug
 `FORGEJO_API` and the `forgejo` git remote) is the acceptance gate since 2026-10-08. It runs `.forgejo/workflows/ci.yml` on every
 branch push and `.forgejo/workflows/nightly.yml` each night, on three Debian 13
 internal executors (Forgejo runner label `debian-host`, Docker with the userland
-proxy off).
+proxy off) and one native Ubuntu 24.04 executor (`ubuntu-host`). All four also carry
+`any-host`: the guards, Clippy, unit, sandbox, supply-chain and distro-floor jobs use it,
+while the native GTK, widget and release-fixture jobs stay on `debian-host` because the
+native Ubuntu GTK suite is not yet reliable (TEST-28).
 `scripts/forgejo-gate.sh <branch>` pushes a branch, waits for its run and lists
 the jobs that did not pass. A green GitHub pull request only means the cheap tier
 ran. The Arch lab VM was retired on 2026-10-08; Arch package checks run
