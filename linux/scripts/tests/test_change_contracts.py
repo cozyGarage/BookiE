@@ -39,8 +39,17 @@ class ChangeContractTests(unittest.TestCase):
             sorted(data["exact_tests"]["crates/drivers/clickhouse/src/lib.rs"]["tests"]),
         )
 
-    def test_other_value_path_maps_to_its_package_suite(self):
+    def test_json_export_path_maps_to_its_exact_value_contracts(self):
         actions = CHECKER.select_actions(["crates/core/src/export/json.rs"], CHECKER.load_map())
+        self.assertEqual(len(actions), 1)
+        self.assertFalse(actions[0]["full_suite"])
+        self.assertIn(
+            "export::json::tests::value_contract_single_row_json_export_preserves_value_types",
+            actions[0]["required_tests"],
+        )
+
+    def test_other_value_path_maps_to_its_package_suite(self):
+        actions = CHECKER.select_actions(["crates/core/src/export/csv.rs"], CHECKER.load_map())
         self.assertEqual(actions, [{
             "package": "tablepro-core",
             "target": "--lib",
