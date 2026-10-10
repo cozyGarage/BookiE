@@ -38,7 +38,7 @@ Merged `linux` baseline includes PRs #459–#461, #463 and #475: engine read-onl
 enforcement, order-independent script classification, fail-closed explain-plan
 masking, DuckDB selected-file restrictions and MySQL merge-table rollback
 coverage. PR #480 (joined policy verdicts) and PR #486 (DuckDB replaced-path
-race) remain open. Case detail lives on the
+race) are merged; AUD-10 is closed. Case detail lives on the
 [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md),
 [value evidence index](value-contracts.md) and [ledger](known-issues.md).
 Dated PR-by-PR continuation notes are in
@@ -59,6 +59,7 @@ These failed or incomplete runs stay open until re-proven on a current SHA:
 | Forgejo run 88 GTK waits: `open_editor`, `audit_failure_denies` | UX | Cause unclassified; run 88 predates #451/#452 |
 | TEST-28 native Ubuntu AT-SPI grid / Columns UI | UX | Container distro-floor passes; native job is the broken surface |
 | Build Linux on `c2f3f78b9`: Docker Hub `toomanyrequests` | lab | Infrastructure; last fully green Build Linux was `0d36a65d7` (#455) |
+
 
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless
