@@ -1,9 +1,0 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
-     Running unittests src/lib.rs (linux/target/debug/deps/drivers_mongodb-95145fcb85542ca7)
-
-running 2 tests
-test update::keyset_page_tests::keyset_page_binds_one_id_cursor_and_window ... ok
-test update::keyset_page_tests::keyset_page_refuses_other_predicates_projection_and_windows ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 41 filtered out; finished in 0.00s
-

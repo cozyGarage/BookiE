@@ -31,7 +31,7 @@ the shared 10,000-row threshold. The driver now accepts that generated query
 shape and applies an ascending `_id` seek. The regression passed on MongoDB 7; the local 1m-row
 diagnostic measured 2.380 ms at offset 500k and 2.373 ms at offset 999,950,
 compared with 135.902 ms and 266.040 ms through direct offset reads. Raw
-samples and source fingerprints are in the [keyset browse evidence](evidence/mongodb-keyset-browse-results-2026-10-10/manifest.json).
+samples and source fingerprints are in the [PR #493 evidence comment](https://github.com/cozyGarage/BookiE/pull/493#issuecomment-6095435772).
 Filtered, sorted and keyless deep-page behavior, installed Arch/Wayland,
 Debian/GNOME and network-latency acceptance remain open.
 
