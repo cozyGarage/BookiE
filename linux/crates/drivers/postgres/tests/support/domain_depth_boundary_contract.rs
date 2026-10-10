@@ -676,13 +676,18 @@ async fn assert_scalar_contexts_match_native_inference(
     }
 }
 
-fn scalar_contexts(depth: usize) -> [(String, String); 6] {
+fn scalar_contexts(depth: usize) -> [(String, String); 8] {
     let column = format!("status_{depth}");
     [
         (format!("COALESCE($1, {column})"), format!("COALESCE($ARG, {column})")),
+        (format!("COALESCE({column}, $1)"), format!("COALESCE({column}, $ARG)")),
         (
             format!("CASE WHEN id = 1 THEN $1 ELSE {column} END"),
             format!("CASE WHEN id = 1 THEN $ARG ELSE {column} END"),
+        ),
+        (
+            format!("CASE WHEN id = 1 THEN {column} ELSE $1 END"),
+            format!("CASE WHEN id = 1 THEN {column} ELSE $ARG END"),
         ),
         (format!("GREATEST($1, {column})"), format!("GREATEST($ARG, {column})")),
         (format!("GREATEST({column}, $1)"), format!("GREATEST({column}, $ARG)")),

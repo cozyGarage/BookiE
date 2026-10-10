@@ -72,8 +72,7 @@ PostgreSQL deep enum-domain parameter inference compares COALESCE, CASE,
 GREATEST and LEAST against native literal inference at depths 63 and 64, with
 the parameter on either side of GREATEST/LEAST. Text, literal `NULL`, empty
 text and SQL NULL preserve the expected parameter, expression and column types
-with both the regular and first-position shadowed `search_path` variants. The
-two focused PostgreSQL 16 Docker tests passed; see the [run evidence and current-head rerun](https://github.com/cozyGarage/BookiE/pull/491#issuecomment-6095567613).
+with both the regular and first-position shadowed `search_path` variants. A follow-up also checks the column-first COALESCE and ELSE-branch CASE parameter positions at both depths against native inference (`value_contract_deep_enum_scalar_contexts_resolve_under_shadowed_search_path`), and the selector passed locally. The two focused PostgreSQL 16 Docker tests passed; see the [earlier run evidence and current-head rerun](https://github.com/cozyGarage/BookiE/pull/491#issuecomment-6095567613).
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
