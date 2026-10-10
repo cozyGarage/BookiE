@@ -38,7 +38,7 @@ Merged `linux` baseline includes PRs #459–#461, #463 and #475: engine read-onl
 enforcement, order-independent script classification, fail-closed explain-plan
 masking, DuckDB selected-file restrictions and MySQL merge-table rollback
 coverage. PR #480 (joined policy verdicts) and PR #486 (DuckDB replaced-path
-race) remain open. Case detail lives on the
+race) are merged; AUD-10 is closed. Case detail lives on the
 [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md),
 [value evidence index](value-contracts.md) and [ledger](known-issues.md).
 Dated PR-by-PR continuation notes are in

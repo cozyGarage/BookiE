@@ -75,13 +75,11 @@ async fn a_read_only_flat_file_connection_reads_only_the_selected_file() {
     );
 
     let selected_path = escape_duckdb_literal(selected.to_str().unwrap());
-    assert_eq!(
+    assert!(
         connection
             .query(&format!("SELECT id FROM read_csv('{selected_path}')"))
             .await
-            .unwrap()
-            .rows,
-        vec![vec![Value::Int(7)]]
+            .is_err()
     );
 
     for path in [
@@ -128,7 +126,7 @@ async fn a_read_only_flat_file_connection_reads_only_the_selected_file() {
 
 #[cfg(target_os = "linux")]
 #[tokio::test]
-async fn a_read_only_flat_file_connection_fails_closed_if_the_selected_path_is_replaced() {
+async fn a_read_only_flat_file_connection_stays_on_the_selected_inode_after_path_replacement() {
     let dir = tempfile::tempdir().unwrap();
     let selected = dir.path().join("selected.csv");
     let moved = dir.path().join("moved.csv");
@@ -149,7 +147,18 @@ async fn a_read_only_flat_file_connection_fails_closed_if_the_selected_path_is_r
 
     std::fs::rename(&selected, &moved).unwrap();
     std::fs::write(&selected, "id\n99\n").unwrap();
-    assert!(connection.query(&format!("SELECT id FROM {view}")).await.is_err());
+    assert_eq!(
+        connection.query(&format!("SELECT id FROM {view}")).await.unwrap().rows,
+        vec![vec![Value::Int(7)]]
+    );
+
+    let replaced_path = escape_duckdb_literal(selected.to_str().unwrap());
+    assert!(
+        connection
+            .query(&format!("SELECT id FROM read_csv('{replaced_path}')"))
+            .await
+            .is_err()
+    );
 }
 
 #[cfg(target_os = "linux")]

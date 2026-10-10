@@ -257,8 +257,10 @@ fn a_future_bundle_version_is_refused_rather_than_guessed() {
     ));
 }
 
-fn ssh_chain(depth: usize) -> SavedSshConfig {
+pub(super) fn ssh_chain(depth: usize) -> SavedSshConfig {
     let mut hop = SavedSshConfig {
+        hop_id: Uuid::new_v4(),
+        credential_revision: 0,
         host: "bastion".into(),
         port: 22,
         username: "jump".into(),
@@ -269,6 +271,8 @@ fn ssh_chain(depth: usize) -> SavedSshConfig {
     };
     for _ in 1..depth {
         hop = SavedSshConfig {
+            hop_id: Uuid::new_v4(),
+            credential_revision: 0,
             host: "bastion".into(),
             port: 22,
             username: "jump".into(),
