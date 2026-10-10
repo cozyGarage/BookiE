@@ -6,7 +6,7 @@
 # Lower a max when you shrink a file. Do not raise a max; split the file instead.
 # Empty means every crates/**/*.rs file is currently under the soft limit.
 
-crates/core/src/import/cell.rs 1231
+crates/core/src/import/cell.rs 1175
 crates/core/src/sql_dialect.rs 1074
 crates/app/src/ui/connect_dialog/mod.rs 1258
 crates/storage/src/connections.rs 1235
