@@ -3,6 +3,9 @@ name: lab-ci
 on:
   push:
     branches: ["**"]
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: lab-ci-${{ github.ref }}
@@ -105,7 +108,7 @@ jobs:
   distro-floor:
     runs-on: any-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/floor-${{ matrix.base }}
@@ -148,7 +151,7 @@ jobs:
   driver:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
@@ -185,7 +188,7 @@ jobs:
   e2e:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/e2e-${{ matrix.server }}
@@ -220,7 +223,7 @@ jobs:
   consumers:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/consumers
@@ -251,7 +254,7 @@ jobs:
   gtk:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-${{ matrix.shard }}
@@ -282,7 +285,7 @@ jobs:
   duckdb:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/duckdb
@@ -309,7 +312,7 @@ jobs:
   pg-release:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
@@ -336,7 +339,7 @@ jobs:
   socket-ssh:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
@@ -363,7 +366,7 @@ jobs:
   gtk-server:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-server-${{ matrix.server }}
@@ -399,7 +402,7 @@ jobs:
   driver-tls:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
@@ -424,7 +427,7 @@ jobs:
   keyring:
     runs-on: debian-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 30
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/keyring
@@ -444,7 +447,7 @@ jobs:
   supply-chain:
     runs-on: any-host
     needs: [guards, clippy, unit, sandbox, widgets]
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/supply-chain
