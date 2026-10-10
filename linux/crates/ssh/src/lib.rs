@@ -1,6 +1,6 @@
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use secrecy::{ExposeSecret, SecretString};
@@ -553,7 +553,7 @@ async fn connect_and_auth(
         Err(HandshakeWaitError::Timeout) => return Err(timeout_error("ssh handshake", cfg, CONNECT_TIMEOUT)),
     };
 
-    match outcome.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone() {
+    match outcome.lock().unwrap_or_else(PoisonError::into_inner).clone() {
         Some(HostKeyOutcome::LearnedNew { fingerprint }) => tracing::info!(
             host = %cfg.host,
             port = cfg.port,

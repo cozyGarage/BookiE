@@ -15,7 +15,7 @@ for base in "${images[@]}"; do
   docker build -q -t "$tag" --build-arg "BASE=$base" scripts/distro-floor >/dev/null
   docker run --rm -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" -e TABLEPRO_GTK_Y_OFFSET="${TABLEPRO_GTK_Y_OFFSET:-$offset}" -e TABLEPRO_GTK_OLD_ADW=1 ${TABLEPRO_GTK_WAIT_SECONDS:+-e TABLEPRO_GTK_WAIT_SECONDS="$TABLEPRO_GTK_WAIT_SECONDS"} -v "$PWD:/src:ro" -v "${tag}-target:/target" -v "${tag}-cargo:/opt/cargo/registry" -v "${tag}-git:/opt/cargo/git" -e CARGO_TARGET_DIR=/target "$tag" bash -ceu -o pipefail '
     pkg-config --modversion gtk4 libadwaita-1 gtksourceview-5
-    cargo test --manifest-path /src/Cargo.toml -p tablepro-app --lib 2>&1 | grep -E "^test result|FAILED|failed|panicked" | sed -n 1,10p
+    cargo test --manifest-path /src/Cargo.toml -p tablepro-app --lib 2>&1 | grep -E -A1 "^test result|FAILED|failed|panicked" | sed -n 1,60p
     bash /src/scripts/test-gtk-widgets.sh 2>&1 | tail -4
     if [ "${DISTRO_FLOOR_INSTALLED:-0}" = 1 ]; then
       status=0
