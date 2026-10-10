@@ -45,7 +45,10 @@ the text fallback for nested JSON. The app contract also round-trips the values
 through typed CSV into STRICT `ANY`, checking each restored storage class. The
 focused driver and app tests passed 5/5 and 1/1. This branch adds object-member
 key coverage for empty, numeric-looking, literal `NULL` and Unicode text, with
-native storage-class and typed-CSV restore checks; those additions await rerun.
+native storage-class and typed-CSV restore checks. It also covers JSON1
+`json_object()` and `json_array()` as exact text, plus JSONB as native BLOB
+bytes through typed CSV restore. The JSONB driver and app selectors passed
+locally on SQLite 3.53.4; the branch gate has not yet completed.
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in

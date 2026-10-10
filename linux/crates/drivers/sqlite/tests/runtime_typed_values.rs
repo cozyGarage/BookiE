@@ -292,6 +292,37 @@ async fn json_object_and_array_results_remain_exact_text() {
 }
 
 #[tokio::test]
+async fn jsonb_results_remain_binary_blobs_with_native_json_content() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    let result = connection
+        .query(
+            "SELECT jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}'), \
+                    typeof(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}')), \
+                    json(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}')), \
+                    hex(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}'))",
+        )
+        .await
+        .unwrap();
+
+    let [
+        Value::Bytes(bytes),
+        Value::Text(storage_class),
+        Value::Text(json_text),
+        Value::Text(native_hex),
+    ] = result.rows[0].as_slice()
+    else {
+        panic!("SQLite JSONB result did not remain a byte value")
+    };
+    assert!(!bytes.is_empty());
+    assert_eq!(
+        native_hex,
+        &bytes.iter().map(|byte| format!("{byte:02X}")).collect::<String>()
+    );
+    assert_eq!(storage_class, "blob");
+    assert_eq!(json_text, r#"{"empty":"","null":null,"nested":[1,true]}"#);
+}
+
+#[tokio::test]
 async fn declared_enum_values_follow_sqlite_numeric_affinity_and_keep_runtime_kinds() {
     let connection = SqliteDriver.connect(memory_options()).await.unwrap();
     connection.execute("CREATE TABLE enum_like (value ENUM)").await.unwrap();

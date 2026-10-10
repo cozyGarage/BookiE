@@ -181,3 +181,50 @@ async fn sqlite_json_constructors_typed_csv_round_trip_preserves_json_text() {
         ]]
     );
 }
+
+#[tokio::test]
+async fn sqlite_jsonb_typed_csv_round_trip_preserves_blob_bytes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE restored (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    let result = connection
+        .query(
+            "SELECT jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}') AS value, \
+                    typeof(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}')) AS storage_class, \
+                    json(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}')) AS json_text, \
+                    hex(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}')) AS native_hex",
+        )
+        .await
+        .unwrap();
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), None, None],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(value), hex(value), json(value) FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    let source = &result.rows[0];
+    assert_eq!(
+        restored.rows,
+        vec![vec![
+            source[1].clone(),
+            source[3].clone(),
+            source[2].clone(),
+        ]]
+    );
+}
