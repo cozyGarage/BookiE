@@ -142,6 +142,29 @@ mod tests {
     }
 
     #[test]
+    fn a_wildcard_over_a_derived_join_is_redacted_fail_closed() {
+        let positions = sensitive_projection(
+            "SELECT * FROM (SELECT amount AS a FROM orders) t JOIN audit_log ON t.a = audit_log.amount",
+            "postgres",
+            &sensitive_patterns(),
+            1,
+        );
+        assert_eq!(positions, vec![true]);
+    }
+
+    #[test]
+    fn a_sensitive_identifier_with_underscores_keeps_its_full_name() {
+        let patterns = vec!["credit_card_number".to_string()];
+        let positions = sensitive_projection(
+            "SELECT credit_card_number AS safe_label FROM accounts",
+            "postgres",
+            &patterns,
+            1,
+        );
+        assert_eq!(positions, vec![true]);
+    }
+
+    #[test]
     fn an_unrelated_column_is_not_flagged() {
         let positions = sensitive_projection("SELECT amount AS a FROM orders", "postgres", &sensitive_patterns(), 1);
         assert_eq!(positions, vec![false]);
