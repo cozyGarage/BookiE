@@ -933,6 +933,9 @@ fn xlsx_shared_cell_text(path: &std::path::Path, column: usize, row: u32) -> Res
 #[path = "support/census_cost.rs"]
 mod census_cost;
 
+#[path = "support/browse_keyset.rs"]
+mod browse_keyset;
+
 #[path = "support/census_cancellation.rs"]
 mod census_cancellation;
 
