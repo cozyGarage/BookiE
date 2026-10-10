@@ -91,6 +91,7 @@
 
 ### Changed
 - The Debian package installs its programs without debug symbols, which makes the installed files about a quarter smaller
+- The distro-floor image installs a pinned, checksum-verified `rustup-init` instead of piping an unverified script to the shell.
 - The time shown for a statement no longer includes the wait for your approval on a guarded connection.
 - MongoDB browse pages now use a bounded schema sample and stable `_id` paging instead of scanning the full collection for every page.
 - Disposable database test fixtures use tmpfs and reduced flush syncing; lost-ack, crash and restart tests keep durable storage.

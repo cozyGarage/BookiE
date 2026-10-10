@@ -8,6 +8,7 @@ on:
       - "!linux/docs/**"
       - "!**.md"
       - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
   pull_request:
     branches: [main, linux]
     paths:
@@ -15,6 +16,7 @@ on:
       - "!linux/docs/**"
       - "!**.md"
       - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
   schedule:
     - cron: "13 14 * * 1"
   workflow_dispatch:
@@ -29,11 +31,10 @@ on:
 permissions:
   contents: read
 
-# A newer pull request push supersedes its in-flight run. A run on
-# linux or main is the merge-tier gate, so it is never cancelled: GitHub
-# keeps the running one and the newest pending one. Scheduled and
-# dispatched runs keep their own group so a release-candidate soak is
-# never cancelled by ordinary branch traffic.
+# A newer pull request push supersedes its in-flight run. Push runs on
+# linux or main keep the cheap tier only; Forgejo is the merge gate.
+# Scheduled and dispatched runs keep their own group so a manual full
+# Build Linux is never cancelled by ordinary branch traffic.
 concurrency:
   group: build-linux-${{ github.event_name }}-${{ github.ref }}-${{ inputs.ref || 'auto' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -98,6 +99,9 @@ jobs:
     # only on tablepro-core, so they don't pull in libadwaita.
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
       env:
@@ -115,6 +119,11 @@ jobs:
         with:
           ref: ${{ needs.preflight.outputs.commit }}
           fetch-depth: 0
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -171,13 +180,16 @@ jobs:
           if-no-files-found: error
 
   gtk-safety:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Installed GTK safety smoke
     timeout-minutes: 60
     runs-on: ubuntu-24.04
     needs: [preflight, fast]
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -241,6 +253,9 @@ jobs:
     needs: preflight
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -289,7 +304,7 @@ jobs:
         run: cargo +stable clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 
   integration:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Driver integration tests (docker)
     timeout-minutes: 55
     runs-on: ubuntu-24.04
@@ -301,6 +316,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -338,7 +358,7 @@ jobs:
           if-no-files-found: error
 
   b4-rollback:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: B4 rollback acceptance (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -350,6 +370,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -383,7 +408,7 @@ jobs:
           if-no-files-found: error
 
   driver-tls:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Driver TLS fixture (docker)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
@@ -395,6 +420,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -428,7 +458,7 @@ jobs:
           if-no-files-found: error
 
   postgres-release:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: PostgreSQL release fixture (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -440,6 +470,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -499,13 +534,16 @@ jobs:
           if-no-files-found: error
 
   duckdb:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: preflight
     name: Optional DuckDB driver and GTK feature
     timeout-minutes: 60
     runs-on: ubuntu-24.04
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     env:
