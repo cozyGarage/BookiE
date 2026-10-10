@@ -213,6 +213,61 @@ async fn json_each_values_keep_their_runtime_storage_classes() {
 }
 
 #[tokio::test]
+async fn json_each_object_keys_keep_their_text_values_and_storage_classes() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    let result = connection
+        .query(
+            r#"SELECT key, value, type, typeof(key), typeof(value), atom, typeof(atom)
+               FROM json_each('{"":null,"01":true,"NULL":"","雪":{"x":1}}')
+               ORDER BY key"#,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Text(String::new()),
+                Value::Null,
+                Value::Text("null".into()),
+                Value::Text("text".into()),
+                Value::Text("null".into()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+            vec![
+                Value::Text("01".into()),
+                Value::Int(1),
+                Value::Text("true".into()),
+                Value::Text("text".into()),
+                Value::Text("integer".into()),
+                Value::Int(1),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Text("NULL".into()),
+                Value::Text(String::new()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Text(String::new()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Text("雪".into()),
+                Value::Text(r#"{"x":1}"#.into()),
+                Value::Text("object".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
 async fn declared_enum_values_follow_sqlite_numeric_affinity_and_keep_runtime_kinds() {
     let connection = SqliteDriver.connect(memory_options()).await.unwrap();
     connection.execute("CREATE TABLE enum_like (value ENUM)").await.unwrap();

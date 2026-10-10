@@ -43,7 +43,9 @@ SQLite `type` and `typeof` oracles distinguish integer, real, text, SQL NULL,
 boolean, object and array rows while the driver preserves primitive values and
 the text fallback for nested JSON. The app contract also round-trips the values
 through typed CSV into STRICT `ANY`, checking each restored storage class. The
-focused driver and app tests passed 5/5 and 1/1.
+focused driver and app tests passed 5/5 and 1/1. This branch adds object-member
+key coverage for empty, numeric-looking, literal `NULL` and Unicode text, with
+native storage-class and typed-CSV restore checks; those additions await rerun.
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
