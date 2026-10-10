@@ -35,6 +35,8 @@ fn saved_connection(fixture: &Fixture, id: Uuid) -> SavedConnection {
         auth_mode: AuthMode::Password,
         environment: Environment::Prod,
         ssh: Some(SavedSshConfig {
+            hop_id: uuid::Uuid::new_v4(),
+            credential_revision: 0,
             host: fixture.ssh_host.clone(),
             port: fixture.ssh_port,
             username: fixture.ssh_username.clone(),
