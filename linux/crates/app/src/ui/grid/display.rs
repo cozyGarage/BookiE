@@ -538,8 +538,9 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires an isolated GTK display"]
     fn typed_widget_slots_round_trip_and_keep_same_value_types_apart() {
-        gtk4::init().expect("gtk init");
+        gtk4::init().unwrap();
         let label = gtk4::Label::new(None);
         POSITION_SLOT.set(&label, 7);
         COLUMN_SLOT.set(&label, 3);
