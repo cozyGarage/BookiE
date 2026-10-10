@@ -1,6 +1,10 @@
 use super::parse_input_for_driver;
 use tablepro_core::{ColumnInfo, Value};
 
+fn operation_control() -> tablepro_core::OperationControl {
+    tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30))
+}
+
 #[test]
 fn value_contract_mysql_enum_and_set_parser_preserves_labels() {
     let column = |name: &str, data_type: &str| ColumnInfo {
@@ -120,7 +124,7 @@ fn value_contract_mysql_enum_metadata_unescapes_mysql_literals() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+    use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mysql::Mysql;
@@ -143,7 +147,6 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
         })
         .await
         .unwrap();
-    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
     let mut session = connection.open_session().await.unwrap();
     session
         .query_params_controlled(
@@ -154,7 +157,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                 perms SET('read', 'write', 'slash\\\\path', 'NULL', '<member>')
             )",
             &[],
-            &control,
+            &operation_control(),
         )
         .await
         .unwrap();
@@ -163,7 +166,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             "INSERT INTO enum_set_grid VALUES
                 (1, 'happy', 'read'), (2, '<tag>&', '<member>'), (3, NULL, NULL)",
             &[],
-            &control,
+            &operation_control(),
         )
         .await
         .unwrap();
@@ -185,7 +188,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), CAST(perms + 0 AS CHAR), HEX(perms)
              FROM enum_set_grid WHERE id = 2",
             &[],
-            &control,
+            &operation_control(),
         )
         .await
         .unwrap()
@@ -206,11 +209,11 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
     ];
     for mode in modes {
         session
-            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &control)
+            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &operation_control())
             .await
             .unwrap();
         let active = session
-            .query_params_controlled("SELECT @@SESSION.sql_mode", &[], &control)
+            .query_params_controlled("SELECT @@SESSION.sql_mode", &[], &operation_control())
             .await
             .unwrap();
         let Value::Text(active) = &active.rows[0][0] else {
@@ -257,14 +260,14 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             )
             .unwrap();
             session
-                .query_params_controlled(&update.0, &update.1, &control)
+                .query_params_controlled(&update.0, &update.1, &operation_control())
                 .await
                 .unwrap();
             let native = session
                 .query_params_controlled(
                     "SELECT CAST(mood + 0 AS CHAR), HEX(mood) FROM enum_set_grid WHERE id = 1",
                     &[],
-                    &control,
+                    &operation_control(),
                 )
                 .await
                 .unwrap();
@@ -278,7 +281,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
 
         if mode.is_empty() {
             session
-                .query_params_controlled("START TRANSACTION", &[], &control)
+                .query_params_controlled("START TRANSACTION", &[], &operation_control())
                 .await
                 .unwrap();
             for (column, invalid) in [("mood", "unknown"), ("perms", "read,unknown")] {
@@ -286,7 +289,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                     .query_params_controlled(
                         &format!("UPDATE enum_set_grid SET {column} = ? WHERE id = 1"),
                         &[Value::Text(invalid.into())],
-                        &control,
+                        &operation_control(),
                     )
                     .await
                     .unwrap();
@@ -294,7 +297,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                     .query_params_controlled(
                         &format!("SELECT CAST({column} + 0 AS CHAR), HEX({column}) FROM enum_set_grid WHERE id = 1"),
                         &[],
-                        &control,
+                        &operation_control(),
                     )
                     .await
                     .unwrap();
@@ -311,7 +314,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                 }
             }
             session
-                .query_params_controlled("ROLLBACK", &[], &control)
+                .query_params_controlled("ROLLBACK", &[], &operation_control())
                 .await
                 .unwrap();
         }
@@ -331,7 +334,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             )
             .unwrap();
             session
-                .query_params_controlled(&blank_update.0, &blank_update.1, &control)
+                .query_params_controlled(&blank_update.0, &blank_update.1, &operation_control())
                 .await
                 .unwrap();
             let blank_state = session
@@ -339,7 +342,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                     "SELECT IF(mood IS NULL, 'null', 'value'), IF(perms IS NULL, 'null', 'value')
                      FROM enum_set_grid WHERE id = 1",
                     &[],
-                    &control,
+                    &operation_control(),
                 )
                 .await
                 .unwrap();
@@ -362,7 +365,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             )
             .unwrap();
             session
-                .query_params_controlled(&empty_update.0, &empty_update.1, &control)
+                .query_params_controlled(&empty_update.0, &empty_update.1, &operation_control())
                 .await
                 .unwrap();
             let empty_state = session
@@ -371,7 +374,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                             IF(perms IS NULL, 'null', 'value'), CAST(perms + 0 AS CHAR), HEX(perms)
                      FROM enum_set_grid WHERE id = 1",
                     &[],
-                    &control,
+                    &operation_control(),
                 )
                 .await
                 .unwrap();
@@ -399,7 +402,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
         )
         .unwrap();
         session
-            .query_params_controlled(&literal_null_update.0, &literal_null_update.1, &control)
+            .query_params_controlled(&literal_null_update.0, &literal_null_update.1, &operation_control())
             .await
             .unwrap();
         let literal_null_state = session
@@ -407,7 +410,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                 "SELECT IF(mood IS NULL, 'null', 'value'), CAST(mood + 0 AS CHAR), HEX(mood)
                  FROM enum_set_grid WHERE id = 1",
                 &[],
-                &control,
+                &operation_control(),
             )
             .await
             .unwrap();
@@ -434,7 +437,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
         )
         .unwrap();
         session
-            .query_params_controlled(&update.0, &update.1, &control)
+            .query_params_controlled(&update.0, &update.1, &operation_control())
             .await
             .unwrap();
 
@@ -443,7 +446,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                 "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), CAST(perms + 0 AS CHAR), HEX(perms)
                  FROM enum_set_grid ORDER BY id",
                 &[],
-                &control,
+                &operation_control(),
             )
             .await
             .unwrap()
@@ -472,7 +475,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+    use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::core::{IntoContainerPort, WaitFor};
     use testcontainers::runners::AsyncRunner;
     use testcontainers::{GenericImage, ImageExt};
@@ -497,7 +500,6 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
         })
         .await
         .unwrap();
-    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
     let mut session = connection.open_session().await.unwrap();
     session
         .query_params_controlled(
@@ -507,7 +509,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
                 perms SET('read', 'write', 'slash\\\\path')
             )",
             &[],
-            &control,
+            &operation_control(),
         )
         .await
         .unwrap();
@@ -516,7 +518,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
             "INSERT INTO maria_enum_set_grid VALUES
                 (1, 'happy', 'read'), (2, 'happy', 'write'), (3, NULL, NULL)",
             &[],
-            &control,
+            &operation_control(),
         )
         .await
         .unwrap();
@@ -541,11 +543,11 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
     ];
     for mode in modes {
         session
-            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &control)
+            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &operation_control())
             .await
             .unwrap();
         let active = session
-            .query_params_controlled("SELECT @@SESSION.sql_mode", &[], &control)
+            .query_params_controlled("SELECT @@SESSION.sql_mode", &[], &operation_control())
             .await
             .unwrap();
         let Value::Text(active) = &active.rows[0][0] else {
@@ -588,7 +590,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
             )
             .unwrap();
             session
-                .query_params_controlled(&blank_update.0, &blank_update.1, &control)
+                .query_params_controlled(&blank_update.0, &blank_update.1, &operation_control())
                 .await
                 .unwrap();
             let blank_state = session
@@ -596,7 +598,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
                     "SELECT IF(mood IS NULL, 'null', 'value'), IF(perms IS NULL, 'null', 'value')
                      FROM maria_enum_set_grid WHERE id = 1",
                     &[],
-                    &control,
+                    &operation_control(),
                 )
                 .await
                 .unwrap();
@@ -619,7 +621,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
             )
             .unwrap();
             session
-                .query_params_controlled(&empty_update.0, &empty_update.1, &control)
+                .query_params_controlled(&empty_update.0, &empty_update.1, &operation_control())
                 .await
                 .unwrap();
             let empty_state = session
@@ -628,7 +630,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
                             IF(perms IS NULL, 'null', 'value'), CAST(perms + 0 AS CHAR), HEX(perms)
                      FROM maria_enum_set_grid WHERE id = 1",
                     &[],
-                    &control,
+                    &operation_control(),
                 )
                 .await
                 .unwrap();
@@ -655,7 +657,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
         )
         .unwrap();
         session
-            .query_params_controlled(&literal_null_update.0, &literal_null_update.1, &control)
+            .query_params_controlled(&literal_null_update.0, &literal_null_update.1, &operation_control())
             .await
             .unwrap();
         let literal_null_state = session
@@ -663,7 +665,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
                 "SELECT IF(mood IS NULL, 'null', 'value'), CAST(mood + 0 AS CHAR), HEX(mood)
                  FROM maria_enum_set_grid WHERE id = 1",
                 &[],
-                &control,
+                &operation_control(),
             )
             .await
             .unwrap();
@@ -688,7 +690,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
         )
         .unwrap();
         session
-            .query_params_controlled(&update.0, &update.1, &control)
+            .query_params_controlled(&update.0, &update.1, &operation_control())
             .await
             .unwrap();
         let rows = session
@@ -696,7 +698,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
                 "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), CAST(perms + 0 AS CHAR), HEX(perms)
                  FROM maria_enum_set_grid ORDER BY id",
                 &[],
-                &control,
+                &operation_control(),
             )
             .await
             .unwrap()

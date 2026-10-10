@@ -65,16 +65,17 @@ external path.
 For a flat-file connection, resolve the selected local path to a canonical
 absolute path, require a regular file, and pin its identity before DuckDB opens
 it. A path allowlist alone is not an identity allowlist: after the selected
-path is replaced, DuckDB can still authorize a different file at that same
-path. The Linux driver pins the opened file and creates a private hard link to
-that inode on the same filesystem. DuckDB's `allowed_paths` contains only this
-private alias; the driver creates its view from that alias and retains the
-alias directory for the connection lifetime. Direct external reads through the
-user-selected path and all sibling or unrelated paths must fail, including
-after the user-selected path is replaced. If identity pinning or the exact
-allowlist cannot be applied, refuse the connection rather than opening it with
-external access enabled. DuckDB documents `allowed_paths` alongside
-`enable_external_access` in its [file access security
+path is replaced, DuckDB could authorize a different file at the same path. The
+Linux driver opens and verifies the selected file, then creates a private
+same-filesystem hard link to that inode. DuckDB's `allowed_paths` contains only
+this alias; the driver's view reads through the alias, and the session retains
+the file and alias directory for its lifetime. Direct reads through the
+user-selected pathname, sibling paths, and unrelated paths must fail, including
+after the selected pathname is replaced. Do not allow a directory, parent
+prefix, URL or other file. If identity pinning or any restriction cannot be
+applied, refuse the connection rather than opening it with external access
+enabled. DuckDB documents `allowed_paths` alongside `enable_external_access` in
+its [file access security
 controls](https://duckdb.org/docs/current/operations_manual/securing_duckdb/overview).
 
 For a `.duckdb` or `.db` connection, open the selected database in read-only
@@ -86,17 +87,17 @@ must confirm that opening the primary database still works with the
 external-file restrictions enabled.
 
 The pinned Rust wrapper applies the list-valued setting through trusted
-initialization SQL before user SQL, using a tested SQL-literal encoder. This is
-a DuckDB-level path restriction, not an operating-system sandbox. A private
-same-filesystem hard link preserves the selected inode across pathname
-replacement; if the filesystem cannot provide that link or a private directory
-on the same filesystem, the read-only flat-file connection must fail closed.
+initialization SQL before user SQL, using a tested SQL-literal encoder. Opening
+the selected path uses `O_PATH`/`O_NOFOLLOW`, validates file identity, and
+reopens through that descriptor with `O_NONBLOCK`; this prevents a replaced
+FIFO from hanging setup. The hard-link alias keeps the selected inode stable
+for DuckDB and prevents a replacement at the original path from redirecting the
+driver view. This is a DuckDB-level path restriction, not an operating-system
+sandbox.
 
-Acceptance tests must show that the selected file can populate its view, while
-`read_text`, `read_csv`, `read_parquet`, `read_json`, `ATTACH` and `COPY` cannot
-access a sibling, unrelated path, or the original selected path directly.
-Include quotes and Unicode in selected paths, a symlink/path-alias case,
-replacement races during setup and after connection, attempts to change the
-settings after configuration is locked, and mutation attempts against a
-read-only database. Do not close this control until those tests pass on the
-pinned bundled DuckDB version and the required acceptance gate completes.
+Tests now cover selected-file reads, direct reader access through the original
+path after replacement, denial of sibling and unrelated files, quotes and
+Unicode, symlinks, FIFO refusal without blocking, configuration locking, and
+mutations against a read-only database. PR #486's focused DuckDB suite passes
+locally. Keep AUD-10 open until the pinned bundled DuckDB version also passes
+the required acceptance gate.
