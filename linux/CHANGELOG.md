@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- PostgreSQL TLS verification now trusts the operating system certificate store when no custom authority is configured.
 - MongoDB table browsing now seeks deep pages in `_id` sort order, including collections with mixed key types.
 - Saved SSH hops now have stable IDs and credential revisions, with separate Secret Service operations for per-hop passwords and key passphrases. Legacy connections-file v1 data loads and migrates to v2 on save; jump-chain editing and per-hop transport use remain disabled until their integration lands.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
