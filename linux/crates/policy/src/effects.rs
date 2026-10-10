@@ -16,12 +16,10 @@ impl Effects {
         Self(self.0 | other.0)
     }
 
-    #[cfg(test)]
     pub(crate) const fn contains(self, other: Self) -> bool {
         self.0 & other.0 == other.0
     }
 
-    #[cfg(test)]
     pub(crate) const fn writes(self) -> bool {
         let write_effects = Self::WRITES_ROWS
             .union(Self::WRITES_SCHEMA)

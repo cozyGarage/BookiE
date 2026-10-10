@@ -52,6 +52,78 @@ async fn read_only_denial_skips_blast_radius_query() {
 }
 
 #[tokio::test]
+async fn dangerous_effects_ask_for_approval_without_running_a_blast_radius_query() {
+    let queries = Arc::new(AtomicUsize::new(0));
+    let approvals = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        query_counting_connection(queries.clone()),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(CountingApprovalSink {
+                calls: approvals.clone(),
+            }),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    guard
+        .execute("COPY items TO PROGRAM 'echo unsafe'")
+        .await
+        .expect("the mocked approval sink approves the administrative statement");
+
+    assert_eq!(approvals.load(Ordering::SeqCst), 1);
+    assert_eq!(queries.load(Ordering::SeqCst), 0);
+    let events = audit.events.lock().expect("audit events");
+    assert!(events.iter().any(|event| {
+        event
+            .decision_rule
+            .trim_end_matches(":approved")
+            .split('+')
+            .any(|rule| rule == "human_dangerous_effect_approval")
+    }));
+}
+
+#[tokio::test]
+async fn write_approval_overrides_the_human_unparseable_allow_rule() {
+    let approvals = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let mut policy = PolicyConfig::default();
+    let local = policy.environments.entry("local".into()).or_default();
+    local.human_approve_writes = Some(true);
+    local.human_approve_unparseable = Some(false);
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            policy,
+            Arc::new(CountingApprovalSink {
+                calls: approvals.clone(),
+            }),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    guard
+        .execute("DELETE FROM items WHERE id = 1; SELECT (")
+        .await
+        .expect("the mocked approval sink approves the malformed script");
+
+    assert_eq!(approvals.load(Ordering::SeqCst), 1);
+    let events = audit.events.lock().expect("audit events");
+    assert!(
+        events
+            .iter()
+            .any(|event| { event.decision_rule.trim_end_matches(":approved") == "human_write_approve" })
+    );
+}
+
+#[tokio::test]
 async fn implicit_transaction_mode_is_denied_before_dispatch_and_audited() {
     let executes = Arc::new(AtomicUsize::new(0));
     let approvals = Arc::new(AtomicUsize::new(0));

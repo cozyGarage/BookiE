@@ -1,5 +1,6 @@
 use super::*;
 use crate::classify::StatementClass;
+use crate::effects::Effects;
 
 /// Rows one approved import may write. A budget larger than this is
 /// refused before the user is asked, so no single approval can cover an
@@ -168,6 +169,7 @@ impl PolicyGuard {
             &self.ctx.principal,
             self.ctx.environment,
             &facts,
+            Effects::WRITES_ROWS,
             self.ctx.read_only,
             &env_policy,
         )
@@ -176,6 +178,7 @@ impl PolicyGuard {
                 &self.ctx.principal,
                 self.ctx.environment,
                 &facts,
+                Effects::WRITES_ROWS,
                 &env_policy,
                 Some(request.row_budget),
             )

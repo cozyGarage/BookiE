@@ -3,6 +3,7 @@ use tablepro_core::Environment;
 
 use crate::classify::{StatementClass, StatementFacts};
 use crate::config::EnvPolicy;
+use crate::effects::Effects;
 use crate::principal::Principal;
 use crate::transaction_control::{TransactionControl, has_implicit_transaction_starter, transaction_control};
 
@@ -33,6 +34,69 @@ impl Decision {
     pub fn is_allow(&self) -> bool {
         matches!(self, Self::Allow { .. })
     }
+
+    fn severity(&self) -> u8 {
+        match self {
+            Self::Allow { .. } => 0,
+            Self::RequireApproval { .. } => 1,
+            Self::Deny { .. } => 2,
+        }
+    }
+
+    fn join_all(decisions: impl IntoIterator<Item = Self>) -> Option<Self> {
+        let mut decisions: Vec<Self> = decisions.into_iter().collect();
+        let severity = decisions.iter().map(Self::severity).max()?;
+        decisions.retain(|decision| decision.severity() == severity);
+        decisions.sort_by_key(|decision| (decision.rule_name().to_owned(), decision_detail(decision)));
+        decisions.dedup();
+        if decisions.len() == 1 {
+            return decisions.pop();
+        }
+
+        let mut rules = decisions
+            .iter()
+            .map(|decision| decision.rule_name())
+            .collect::<Vec<_>>();
+        rules.dedup();
+        let rule = rules.join("+");
+        match severity {
+            0 => Some(Self::Allow { rule }),
+            1 => {
+                let reason = decisions
+                    .iter()
+                    .filter_map(|decision| match decision {
+                        Self::RequireApproval { reason, .. } => Some(reason.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                let preview = decisions.iter().find_map(|decision| match decision {
+                    Self::RequireApproval { preview, .. } => preview.clone(),
+                    _ => None,
+                });
+                Some(Self::RequireApproval { rule, reason, preview })
+            }
+            _ => {
+                let message = decisions
+                    .iter()
+                    .filter_map(|decision| match decision {
+                        Self::Deny { message, .. } => Some(message.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                Some(Self::Deny { rule, message })
+            }
+        }
+    }
+}
+
+fn decision_detail(decision: &Decision) -> String {
+    match decision {
+        Decision::Allow { .. } => String::new(),
+        Decision::RequireApproval { reason, preview, .. } => format!("{reason}:{preview:?}"),
+        Decision::Deny { message, .. } => message.clone(),
+    }
 }
 
 pub fn evaluate(
@@ -43,8 +107,62 @@ pub fn evaluate(
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Decision {
-    evaluate_categorical(principal, environment, facts, connection_read_only, env_policy)
-        .unwrap_or_else(|| evaluate_eligible_write(principal, environment, facts, env_policy, estimated_rows))
+    evaluate_with_effects(
+        principal,
+        environment,
+        facts,
+        inferred_effects(facts),
+        connection_read_only,
+        env_policy,
+        estimated_rows,
+    )
+}
+
+pub(crate) fn evaluate_with_effects(
+    principal: &Principal,
+    environment: Environment,
+    facts: &StatementFacts,
+    effects: Effects,
+    connection_read_only: bool,
+    env_policy: &EnvPolicy,
+    estimated_rows: Option<u64>,
+) -> Decision {
+    let categorical = evaluate_categorical(principal, environment, facts, effects, connection_read_only, env_policy);
+    if let Some(decision) = &categorical
+        && (!decision.is_allow() || !facts.writes && !effects.writes() || facts.class == StatementClass::Unparseable)
+    {
+        return decision.clone();
+    }
+
+    let eligible = evaluate_eligible_write(principal, environment, facts, effects, env_policy, estimated_rows);
+    Decision::join_all(categorical.into_iter().chain([eligible])).unwrap_or_else(|| Decision::Deny {
+        rule: "no_policy_rules_applied".into(),
+        message: "policy evaluation produced no verdict".into(),
+    })
+}
+
+fn inferred_effects(facts: &StatementFacts) -> Effects {
+    let mut effects = Effects::EMPTY;
+    if facts.class == StatementClass::Unparseable || facts.contains_unknown_write {
+        effects = effects.union(Effects::UNKNOWN);
+    }
+    if facts.writes {
+        if facts.contains_ddl {
+            effects = effects.union(Effects::WRITES_SCHEMA);
+        }
+        if facts.contains_mutating_dml || !facts.contains_ddl {
+            effects = effects.union(Effects::WRITES_ROWS);
+        }
+    } else {
+        effects = effects.union(Effects::READS);
+    }
+    if facts.class == StatementClass::Administrative {
+        effects = effects.union(Effects::ADMIN);
+    }
+    if facts.class == StatementClass::Transaction {
+        effects = effects.union(Effects::TRANSACTION_CONTROL);
+    }
+    effects
 }
 
 pub(crate) fn shared_connection_decision(sql: &str, driver_id: &str, facts: &StatementFacts) -> Option<Decision> {
@@ -96,55 +214,102 @@ pub(crate) fn evaluate_categorical(
     principal: &Principal,
     environment: Environment,
     facts: &StatementFacts,
+    effects: Effects,
     connection_read_only: bool,
     env_policy: &EnvPolicy,
 ) -> Option<Decision> {
-    if connection_read_only && facts.writes {
-        return Some(Decision::Deny {
+    let mut decisions = Vec::new();
+    if connection_read_only && (facts.writes || effects.writes()) {
+        decisions.push(Decision::Deny {
             rule: "connection_read_only".into(),
             message: "connection is marked read-only; statements that may write are not permitted".into(),
         });
     }
 
     if facts.class == StatementClass::Unparseable {
-        let decision = decide_unparseable(principal, env_policy);
-        if matches!(decision, Decision::Deny { .. }) {
-            return Some(decision);
+        decisions.push(decide_unparseable(principal, env_policy));
+        if !principal.is_agent() && env_policy.human_approve_writes {
+            decisions.push(Decision::RequireApproval {
+                rule: "human_write_approve".into(),
+                reason: format!("writes require approval in {}", environment.as_str()),
+                preview: None,
+            });
         }
-        return None;
+        return Decision::join_all(decisions);
     }
 
     if facts.is_multi_statement && principal.is_agent() && !env_policy.agent_allow_multi_statement {
-        return Some(Decision::Deny {
+        decisions.push(Decision::Deny {
             rule: "agent_no_multi_statement".into(),
             message: "agents may not run multi-statement scripts".into(),
         });
     }
 
     if facts.class == StatementClass::Administrative && principal.is_agent() {
-        return Some(Decision::Deny {
+        decisions.push(Decision::Deny {
             rule: "agent_admin_denied".into(),
             message: "agents may not run administrative database operations".into(),
         });
     }
 
-    if !facts.writes {
-        return Some(Decision::Allow {
+    if !facts.writes && !effects.writes() {
+        decisions.push(Decision::Allow {
             rule: "read_allow".into(),
         });
+        return Decision::join_all(decisions);
     }
 
     if principal.is_agent() {
-        return evaluate_agent_write_categorical(environment, facts, env_policy);
+        decisions.extend(evaluate_agent_write_categorical(
+            environment,
+            facts,
+            effects,
+            env_policy,
+        ));
+    } else {
+        decisions.extend(evaluate_human_dangerous_effects(
+            environment,
+            facts,
+            effects,
+            env_policy,
+        ));
+    }
+    Decision::join_all(decisions)
+}
+
+fn evaluate_human_dangerous_effects(
+    environment: Environment,
+    facts: &StatementFacts,
+    effects: Effects,
+    env_policy: &EnvPolicy,
+) -> Vec<Decision> {
+    let dangerous_effect = effects.contains(Effects::ADMIN)
+        || effects.contains(Effects::HOST_OR_FILE_ACCESS)
+        || effects.contains(Effects::UNKNOWN);
+    if !dangerous_effect {
+        return Vec::new();
     }
 
-    None
+    let mut decisions = vec![Decision::RequireApproval {
+        rule: "human_dangerous_effect_approval".into(),
+        reason: "administrative, host-access or unknown write effects require confirmation".into(),
+        preview: Some(table_preview(facts)),
+    }];
+    if env_policy.human_approve_writes {
+        decisions.push(Decision::RequireApproval {
+            rule: "human_write_approve".into(),
+            reason: format!("writes require approval in {}", environment.as_str()),
+            preview: Some(table_preview(facts)),
+        });
+    }
+    decisions
 }
 
 pub(crate) fn evaluate_eligible_write(
     principal: &Principal,
     environment: Environment,
     facts: &StatementFacts,
+    effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Decision {
@@ -153,10 +318,10 @@ pub(crate) fn evaluate_eligible_write(
     }
 
     if principal.is_agent() {
-        return evaluate_agent_write(environment, facts, env_policy, estimated_rows);
+        return evaluate_agent_write(environment, facts, effects, env_policy, estimated_rows);
     }
 
-    evaluate_human_write(environment, facts, env_policy, estimated_rows)
+    evaluate_human_write(environment, facts, effects, env_policy, estimated_rows)
 }
 
 fn decide_unparseable(principal: &Principal, env_policy: &EnvPolicy) -> Decision {
@@ -178,162 +343,187 @@ fn decide_unparseable(principal: &Principal, env_policy: &EnvPolicy) -> Decision
     }
 }
 
+fn table_preview(facts: &StatementFacts) -> String {
+    let mut tables = facts.tables.clone();
+    tables.sort_unstable();
+    tables.dedup();
+    format!("tables: {}", tables.join(", "))
+}
+
 fn evaluate_agent_write_categorical(
     environment: Environment,
     facts: &StatementFacts,
+    effects: Effects,
     env_policy: &EnvPolicy,
-) -> Option<Decision> {
+) -> Vec<Decision> {
+    let mut decisions = Vec::new();
     if env_policy.agent_writes == crate::config::WritePolicy::Deny {
-        return Some(Decision::Deny {
+        decisions.push(Decision::Deny {
             rule: "agent_writes_denied".into(),
             message: format!("agent writes are denied in {}", environment.as_str()),
         });
     }
 
     if facts.contains_ddl && !env_policy.agent_allow_ddl {
-        return Some(Decision::Deny {
+        decisions.push(Decision::Deny {
             rule: "agent_ddl_denied".into(),
             message: "agents may not run DDL".into(),
         });
     }
 
-    if facts.contains_unknown_write {
-        return Some(Decision::Deny {
+    if facts.contains_unknown_write || effects.contains(Effects::UNKNOWN) {
+        decisions.push(Decision::Deny {
             rule: "agent_unknown_write_denied".into(),
             message: "agents may not run writes whose safety category cannot be determined".into(),
         });
     }
 
     if facts.contains_unscoped_dml {
-        return Some(Decision::Deny {
+        decisions.push(Decision::Deny {
             rule: "agent_no_unscoped_dml".into(),
             message: "agents may not run UPDATE/DELETE without a WHERE clause".into(),
         });
     }
 
-    None
+    decisions
 }
 
 fn evaluate_agent_write(
     environment: Environment,
     facts: &StatementFacts,
+    effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Decision {
-    if let Some(decision) = evaluate_agent_write_categorical(environment, facts, env_policy) {
-        return decision;
-    }
+    let mut decisions = evaluate_agent_write_categorical(environment, facts, effects, env_policy);
 
     if let Some(limit) = env_policy.blast_radius_max_rows
         && facts.contains_mutating_dml
     {
         match estimated_rows {
             Some(rows) if rows > limit => {
-                return Decision::Deny {
+                decisions.push(Decision::Deny {
                     rule: "blast_radius_exceeded".into(),
                     message: format!("would affect {rows} rows; limit is {limit}"),
-                };
+                });
             }
             Some(_) => {}
             None => {
-                return Decision::Deny {
+                decisions.push(Decision::Deny {
                     rule: "blast_radius_unknown".into(),
                     message: "could not estimate affected rows; agents are denied when a blast-radius limit is set"
                         .into(),
-                };
+                });
             }
         }
     }
 
-    match env_policy.agent_writes {
+    decisions.push(match env_policy.agent_writes {
         crate::config::WritePolicy::Allow => Decision::Allow {
             rule: "agent_write_allow".into(),
         },
         crate::config::WritePolicy::Approve => Decision::RequireApproval {
             rule: "agent_write_approve".into(),
             reason: format!("{:?} requires approval for agent writes", facts.class),
-            preview: Some(format!("tables: {}", facts.tables.join(", "))),
+            preview: Some(table_preview(facts)),
         },
         crate::config::WritePolicy::Deny => Decision::Deny {
             rule: "agent_writes_denied".into(),
             message: format!("agent writes are denied in {}", environment.as_str()),
         },
-    }
+    });
+    Decision::join_all(decisions).unwrap_or_else(|| Decision::Deny {
+        rule: "no_policy_rules_applied".into(),
+        message: "policy evaluation produced no verdict".into(),
+    })
 }
 
 fn evaluate_human_write_categorical(
     environment: Environment,
     facts: &StatementFacts,
     env_policy: &EnvPolicy,
-) -> Option<Decision> {
+) -> Vec<Decision> {
+    let mut decisions = Vec::new();
     if facts.contains_unscoped_dml {
-        return Some(Decision::RequireApproval {
+        decisions.push(Decision::RequireApproval {
             rule: "human_unscoped_dml".into(),
             reason: "UPDATE/DELETE without WHERE".into(),
-            preview: Some(format!("tables: {}", facts.tables.join(", "))),
+            preview: Some(table_preview(facts)),
         });
     }
 
     if facts.contains_ddl && env_policy.human_approve_ddl {
-        return Some(Decision::RequireApproval {
+        decisions.push(Decision::RequireApproval {
             rule: "human_ddl_approve".into(),
             reason: format!("DDL on {}", environment.as_str()),
-            preview: Some(format!("tables: {}", facts.tables.join(", "))),
+            preview: Some(table_preview(facts)),
         });
     }
 
-    None
+    decisions
 }
 
 fn evaluate_human_write(
     environment: Environment,
     facts: &StatementFacts,
+    effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Decision {
-    if let Some(decision) = evaluate_human_write_categorical(environment, facts, env_policy) {
-        return decision;
-    }
+    let mut decisions = evaluate_human_write_categorical(environment, facts, env_policy);
 
     if let Some(limit) = env_policy.blast_radius_max_rows
         && facts.contains_mutating_dml
     {
         match estimated_rows {
             Some(rows) if rows > limit => {
-                return Decision::RequireApproval {
+                decisions.push(Decision::RequireApproval {
                     rule: "blast_radius_approve".into(),
                     reason: format!("would affect {rows} rows (limit {limit})"),
                     preview: None,
-                };
+                });
             }
             Some(_) => {}
             None => {
-                return Decision::RequireApproval {
+                decisions.push(Decision::RequireApproval {
                     rule: "blast_radius_unknown".into(),
                     reason: "could not estimate affected rows; confirm before running".into(),
                     preview: None,
-                };
+                });
             }
         }
     }
 
     if env_policy.human_approve_writes {
-        return Decision::RequireApproval {
+        decisions.push(Decision::RequireApproval {
             rule: "human_write_approve".into(),
             reason: format!("writes require approval in {}", environment.as_str()),
-            preview: Some(format!("tables: {}", facts.tables.join(", "))),
-        };
+            preview: Some(table_preview(facts)),
+        });
+    } else if effects.contains(Effects::ADMIN)
+        || effects.contains(Effects::HOST_OR_FILE_ACCESS)
+        || effects.contains(Effects::UNKNOWN)
+    {
+        decisions.push(Decision::RequireApproval {
+            rule: "human_dangerous_effect_approval".into(),
+            reason: "administrative, host-access or unknown write effects require confirmation".into(),
+            preview: Some(table_preview(facts)),
+        });
     }
 
-    Decision::Allow {
+    decisions.push(Decision::Allow {
         rule: "human_write_allow".into(),
-    }
+    });
+    Decision::join_all(decisions).unwrap_or_else(|| Decision::Deny {
+        rule: "no_policy_rules_applied".into(),
+        message: "policy evaluation produced no verdict".into(),
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::classify::classify;
+    use crate::classify::{classify, classify_with_effects};
     use crate::config::{PolicyConfig, WritePolicy};
 
     fn env_policy(environment: Environment) -> EnvPolicy {
@@ -379,6 +569,143 @@ mod tests {
                 assert!(matches!(human_decision, Decision::RequireApproval { .. }));
             }
         }
+    }
+
+    #[test]
+    fn malformed_write_with_write_approval_enabled_cannot_use_the_unparseable_allow_rule() {
+        let policy = EnvPolicy {
+            human_approve_writes: true,
+            human_approve_unparseable: false,
+            ..env_policy(Environment::Local)
+        };
+        let sql = "DELETE FROM items WHERE id = 1; SELECT (";
+        let decision = evaluate(
+            &Principal::human_gui(),
+            Environment::Local,
+            &classify(sql, "postgres"),
+            false,
+            &policy,
+            None,
+        );
+
+        assert!(matches!(decision, Decision::RequireApproval { .. }), "{decision:?}");
+        assert_eq!(decision.rule_name(), "human_write_approve");
+    }
+
+    #[test]
+    fn dangerous_effects_join_with_write_rules_instead_of_being_skipped() {
+        let human = Principal::human_gui();
+        let local = env_policy(Environment::Local);
+        let staging = env_policy(Environment::Staging);
+        for sql in [
+            "COPY items TO PROGRAM 'echo unsafe'",
+            "MERGE INTO items USING staged ON items.id = staged.id WHEN MATCHED THEN DELETE",
+        ] {
+            for (environment, policy) in [(Environment::Local, &local), (Environment::Staging, &staging)] {
+                let decision = evaluate(&human, environment, &classify(sql, "postgres"), false, policy, None);
+                assert!(
+                    matches!(decision, Decision::RequireApproval { .. }),
+                    "{environment:?}: {sql}: {decision:?}"
+                );
+            }
+        }
+
+        assert!(matches!(
+            evaluate(
+                &human,
+                Environment::Local,
+                &classify("TRUNCATE TABLE items", "postgres"),
+                false,
+                &local,
+                None,
+            ),
+            Decision::Allow { .. }
+        ));
+        assert!(matches!(
+            evaluate(
+                &human,
+                Environment::Staging,
+                &classify("TRUNCATE TABLE items", "postgres"),
+                false,
+                &staging,
+                None,
+            ),
+            Decision::RequireApproval { .. }
+        ));
+
+        let policies = PolicyConfig::default().for_environment(Environment::Local);
+        let scripts = [
+            "COPY items TO PROGRAM 'echo unsafe'; MERGE INTO items USING staged ON items.id = staged.id WHEN MATCHED THEN DELETE",
+            "MERGE INTO items USING staged ON items.id = staged.id WHEN MATCHED THEN DELETE; COPY items TO PROGRAM 'echo unsafe'",
+        ];
+        let decisions = scripts.map(|sql| {
+            let analysis = classify_with_effects(sql, "postgres");
+            evaluate_with_effects(
+                &human,
+                Environment::Local,
+                &analysis.facts,
+                analysis.effects,
+                false,
+                &policies,
+                None,
+            )
+        });
+        assert_eq!(decisions[0], decisions[1]);
+        assert_eq!(decisions[0].rule_name(), "human_dangerous_effect_approval");
+    }
+
+    #[test]
+    fn joined_verdict_is_independent_of_rule_evaluation_order_and_keeps_rule_names() {
+        let allow = Decision::Allow {
+            rule: "read_allow".into(),
+        };
+        let require_a = Decision::RequireApproval {
+            rule: "human_ddl_approve".into(),
+            reason: "DDL requires confirmation".into(),
+            preview: Some("tables: a".into()),
+        };
+        let require_b = Decision::RequireApproval {
+            rule: "human_write_approve".into(),
+            reason: "writes require confirmation".into(),
+            preview: None,
+        };
+        let deny = Decision::Deny {
+            rule: "connection_read_only".into(),
+            message: "connection is read-only".into(),
+        };
+        let orders = [
+            vec![allow.clone(), require_a.clone(), require_b.clone(), deny.clone()],
+            vec![deny.clone(), require_b.clone(), allow.clone(), require_a.clone()],
+            vec![require_a.clone(), deny.clone(), require_b.clone(), allow.clone()],
+            vec![require_b, allow, deny, require_a],
+        ];
+        let decisions = orders.map(|order| {
+            Decision::join_all(order).unwrap_or(Decision::Allow {
+                rule: "missing_join_result".into(),
+            })
+        });
+        assert!(decisions.iter().all(|decision| decision == &decisions[0]));
+        assert_eq!(decisions[0].rule_name(), "connection_read_only");
+        assert!(matches!(decisions[0], Decision::Deny { .. }));
+
+        let first = Decision::RequireApproval {
+            rule: "human_ddl_approve".into(),
+            reason: "DDL requires confirmation".into(),
+            preview: Some("tables: a".into()),
+        };
+        let second = Decision::RequireApproval {
+            rule: "human_write_approve".into(),
+            reason: "writes require confirmation".into(),
+            preview: None,
+        };
+        let forward = Decision::join_all([first.clone(), second.clone()]).unwrap_or(Decision::Allow {
+            rule: "missing_join_result".into(),
+        });
+        let reverse = Decision::join_all([second, first]).unwrap_or(Decision::Allow {
+            rule: "missing_join_result".into(),
+        });
+        assert_eq!(forward, reverse);
+        assert_eq!(forward.rule_name(), "human_ddl_approve+human_write_approve");
     }
 
     #[test]
@@ -483,11 +810,17 @@ mod tests {
             "INSERT INTO t VALUES (1)",
         ] {
             let facts = classify(sql, "postgres");
-            let decision = evaluate_agent_write(Environment::Prod, &facts, &policy, Some(1));
+            let decision = evaluate_agent_write(Environment::Prod, &facts, inferred_effects(&facts), &policy, Some(1));
             let Decision::Deny { rule, .. } = &decision else {
                 panic!("{sql} produced {decision:?}");
             };
-            assert_eq!(rule, "agent_writes_denied", "{sql}");
+            assert!(
+                rule.split('+').any(|name| name == "agent_writes_denied"),
+                "{sql}: {rule}"
+            );
+            if facts.contains_ddl {
+                assert!(rule.split('+').any(|name| name == "agent_ddl_denied"), "{sql}: {rule}");
+            }
         }
     }
 
