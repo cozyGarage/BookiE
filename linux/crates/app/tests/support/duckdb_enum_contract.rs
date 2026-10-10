@@ -275,7 +275,8 @@ async fn value_contract_duckdb_empty_enum_list_stays_distinct_from_sql_null() {
         .query(
             "SELECT typeof(value), to_json(value) \
              FROM (SELECT []::mood_empty_list[] AS value \
-                   UNION ALL SELECT NULL::mood_empty_list[]) AS source",
+                   UNION ALL SELECT NULL::mood_empty_list[]) AS source \
+             ORDER BY CASE WHEN value IS NULL THEN 1 ELSE 0 END",
         )
         .await
         .unwrap();
