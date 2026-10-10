@@ -121,6 +121,12 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
                 browse_selector_from_expr(right, params, index)?,
             ]
         }),
+        _ => browse_leaf_selector(expr, params, index),
+    }
+}
+
+fn browse_leaf_selector(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Document, DriverError> {
+    match expr {
         Expr::BinaryOp {
             left,
             op:
