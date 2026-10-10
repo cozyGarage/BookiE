@@ -28,6 +28,9 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:

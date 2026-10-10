@@ -126,6 +126,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: Select isolated MCP HTTP port
         run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Distro floor
@@ -161,6 +166,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: Driver integration
         run: |
           cd src/linux
@@ -196,6 +206,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: Select isolated MCP HTTP port
         run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Real server end to end
@@ -218,6 +233,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: MCP, policy sessions
         run: |
           cd src/linux
@@ -248,6 +268,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: Select isolated MCP HTTP port
         run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
       - name: Installed GTK end-to-end suite, one third
@@ -270,6 +295,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: DuckDB driver and the app with DuckDB
         run: |
           cd src/linux
@@ -292,6 +322,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: Select isolated MCP HTTP port
         run: cd src/linux && python3 scripts/ci-mcp-port.py 4
       - name: PostgreSQL release fixture
@@ -314,6 +349,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: PostgreSQL socket and SSH fixtures
         run: |
           cd src/linux
@@ -346,6 +386,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: Select isolated MCP HTTP port
         run: cd src/linux && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Installed GTK scenarios against a real server
@@ -367,6 +412,11 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/linux/scripts/docker-hub-login.sh
       - name: Driver TLS fixtures
         run: |
           cd src/linux && ./scripts/test-driver-tls.sh

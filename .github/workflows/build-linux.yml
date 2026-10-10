@@ -8,6 +8,7 @@ on:
       - "!linux/docs/**"
       - "!**.md"
       - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
   pull_request:
     branches: [main, linux]
     paths:
@@ -15,6 +16,7 @@ on:
       - "!linux/docs/**"
       - "!**.md"
       - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
   schedule:
     - cron: "13 14 * * 1"
   workflow_dispatch:
@@ -97,6 +99,9 @@ jobs:
     # only on tablepro-core, so they don't pull in libadwaita.
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
       env:
@@ -114,6 +119,11 @@ jobs:
         with:
           ref: ${{ needs.preflight.outputs.commit }}
           fetch-depth: 0
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -177,6 +187,9 @@ jobs:
     needs: [preflight, fast]
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -240,6 +253,9 @@ jobs:
     needs: preflight
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -300,6 +316,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -349,6 +370,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -394,6 +420,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -439,6 +470,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -505,6 +541,9 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     env:
