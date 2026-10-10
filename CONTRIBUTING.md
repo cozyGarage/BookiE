@@ -8,7 +8,7 @@ The rules every change follows (code style, tests, security, commits, the Forgej
 
 ## Development setup
 
-The workspace requires Rust 1.98. Install GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (the Ubuntu 24.04 and Debian 13 floor), OpenSSL, Secret Service, Kerberos, Clang, `pkg-config`, and standard build tools. Distro-specific package commands are in [`README.md`](README.md).
+The workspace requires Rust 1.98. For the build / CI floor install GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (Ubuntu 24.04 and Debian 13), plus OpenSSL, Secret Service, Kerberos, Clang, `pkg-config`, and standard build tools. The GNOME 50 package line is higher; see [`README.md`](README.md) and [ADR 0002](linux/docs/decisions/0002-rust-gtk4-libadwaita.md).
 
 ```bash
 git clone https://github.com/<your-name>/TablePro.git

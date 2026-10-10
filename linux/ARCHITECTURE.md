@@ -9,6 +9,7 @@ This page is the one-page map. Accepted [ADRs](docs/decisions/README.md) constra
 | If you want to… | Read |
 |---|---|
 | See crates and dependency direction | [Containers](#containers-crates), [Import DAG](#import-dag) |
+| Know where a change belongs | [Where new code goes](#where-new-code-goes) |
 | Follow one SQL / tool call | [Governed request pipeline](#governed-request-pipeline) |
 | Understand MCP vs policy vs allowlists | [Authority boundaries](#authority-boundaries) |
 | Open a tunnel or verify TLS through SSH | [Transport and service identity](#transport-and-service-identity) |
@@ -16,6 +17,17 @@ This page is the one-page map. Accepted [ADRs](docs/decisions/README.md) constra
 | Find on-disk state | [Persistence](#persistence), [storage](docs/storage.md) |
 | Change UI / async ownership | [UI and async ownership](#ui-and-async-ownership) |
 | See what is intentionally out of scope | [Deliberate limits](#deliberate-limits) |
+
+## How it runs
+
+| Mode | Process | Notes |
+|---|---|---|
+| Desktop | `bookie` (`tablepro-app`) | GTK on the GLib main context; DB work on Tokio via Relm4 commands |
+| Headless MCP | `bookie-agentd` (`tablepro-agentd`) | Same static drivers and `PolicyGuard` path; no GTK |
+| Development profile | Either binary with `TABLEPRO_PROFILE=development` | Uses `tablepro-devel` XDG paths and a separate keyring schema |
+| Validation | Scripts under `linux/scripts/` | Cheap tier locally / on GitHub; merge tier on Forgejo ([playbook](docs/validation-playbook.md#ci-tiers)) |
+
+Native library floors (build/CI vs GNOME 50 package line) are in [ADR 0002](docs/decisions/0002-rust-gtk4-libadwaita.md) and [platforms](docs/platforms.md).
 
 ## System context
 
@@ -193,6 +205,33 @@ Rules that keep this sound:
 3. **Static drivers.** Engines are linked at build time and registered in code. There is no plugin discovery ABI ([ADR 0001](docs/decisions/0001-no-plugin-system.md)).
 4. **Trust at the edges.** MCP input, saved connection files, imported files, environment variables and database metadata are untrusted input.
 
+## Where new code goes
+
+| You are changing | Put it here |
+|---|---|
+| GTK widget, Relm4 component, tab or browse UX | `crates/app` (main context only for widgets) |
+| Headless MCP process wiring | `crates/agentd` |
+| MCP tool, token scope, allowlist or rate limit | `crates/mcp` (must still return a `PolicyGuard`) |
+| Classify, approve, mask, blast radius, audit types | `crates/policy` |
+| Saved connections, keyring, history, audit journal | `crates/storage` |
+| Dial options, SSH chain, TLS service identity | `crates/transport` / `crates/ssh` |
+| Shared value, result, driver or cancel contracts | `crates/core` |
+| A database engine | New `crates/drivers/<engine>` + both composition roots ([adding drivers](docs/adding-drivers.md)) |
+| Architecture or behaviour rule | An [ADR](docs/decisions/README.md); do not invent a parallel rule in a board |
+| Current capability description extracted from code | [`specs/`](../specs/README.md) (draft until reviewed; ADRs and AGENTS rank above it) |
+| Open work, evidence, owner | The [ledger](docs/known-issues.md) or the owning B3/B4 board |
+
+Helpers stay in the crate that owns the behaviour. Do not grow a cross-crate “utils” layer to avoid a decision about ownership.
+
+## Boundary checklist
+
+- Dependencies point toward `core`. No cycles. Drivers and domain crates never import GTK or Relm4.
+- Consumers never hold a raw driver `Connection`; only a `PolicyGuard`.
+- Secrets stay in Secret Service / `secrecy` until the driver boundary; never in JSON, argv, traces or audit fields.
+- Dial target and TLS verify hostname are separate fields under SSH ([transport](#transport-and-service-identity)).
+- Late async results apply only when the generation or request id still matches.
+- Preview, transaction, retry and batch paths use the same policy checks as direct execution.
+
 ## Authority boundaries
 
 Three MCP checks answer different questions. None replaces another:
@@ -313,6 +352,7 @@ Peers whose architecture pages shaped how this map is written (diagrams, seam ta
 | [adulari/forge](https://github.com/adulari/forge) | System context + container map tied to ADRs; domain glossary and stability notes as separate short pages. |
 | [context-graph-ai/contextdb](https://github.com/context-graph-ai/contextdb) | Named trait/pipeline stages with owner tables (engine docs; we apply the shape, not the engine). |
 | [matija/esploro](https://github.com/matija/esploro) | Request lifecycle plus an honest limits section next to the happy path. |
+| [Reactive Resume architecture](https://docs.rxresu.me/contributing/architecture) | “Where new code goes” table and a short boundary checklist after the workspace map (not their web/auth stack). |
 
 Also useful for prose density: [helix-editor/helix `docs/architecture.md`](https://github.com/helix-editor/helix/blob/master/docs/architecture.md) and [Nonanti/narwhal `docs/ARCHITECTURE.md`](https://github.com/Nonanti/narwhal/blob/main/docs/ARCHITECTURE.md).
 

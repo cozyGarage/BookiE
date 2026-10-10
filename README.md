@@ -40,7 +40,7 @@ BookiE 0.1.5 (tag `linux-v0.1.5`) targets:
 
 **Ubuntu 24.04 and 25.10 cannot run this line.** GTK CI builds in Debian testing for the GNOME 50 library baseline.
 
-Runtime baseline: GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (Ubuntu 24.04 and Debian 13 or newer). Build with Rust 1.98. No AUR, Flathub, or Fedora package. No 32-bit or ARM artifacts.
+Build / CI floor: GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (Ubuntu 24.04 and Debian 13). The GNOME 50 GitHub Release `.deb` uses a higher package line (GTK 4.22+, GLib 2.88+, libadwaita 1.9+, GtkSourceView 5.18+). Details: [ADR 0002](linux/docs/decisions/0002-rust-gtk4-libadwaita.md) and [platforms](linux/docs/platforms.md). Build with Rust 1.98. No AUR, Flathub, or Fedora package. No 32-bit or ARM artifacts.
 
 ## Named query parameters
 
