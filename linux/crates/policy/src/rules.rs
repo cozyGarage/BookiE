@@ -252,7 +252,7 @@ pub(crate) fn evaluate_categorical(
         });
     }
 
-    if !facts.writes && !effects.writes() {
+    if !facts.writes && !effects.writes() && !effects.contains(Effects::HOST_OR_FILE_ACCESS) {
         decisions.push(Decision::Allow {
             rule: "read_allow".into(),
         });
@@ -652,6 +652,51 @@ mod tests {
         });
         assert_eq!(decisions[0], decisions[1]);
         assert_eq!(decisions[0].rule_name(), "human_dangerous_effect_approval");
+    }
+
+    #[test]
+    fn host_file_reads_do_not_take_the_plain_read_allow_path() {
+        let analysis = classify_with_effects("SELECT read_text('/etc/passwd')", "duckdb");
+        assert!(analysis.effects.contains(Effects::HOST_OR_FILE_ACCESS));
+        assert!(!analysis.effects.writes());
+        assert!(!analysis.facts.writes);
+
+        let local = EnvPolicy {
+            human_approve_writes: false,
+            ..env_policy(Environment::Local)
+        };
+        let decision = evaluate_with_effects(
+            &Principal::human_gui(),
+            Environment::Local,
+            &analysis.facts,
+            analysis.effects,
+            false,
+            &local,
+            None,
+        );
+        assert!(matches!(decision, Decision::RequireApproval { .. }), "{decision:?}");
+        assert_eq!(decision.rule_name(), "human_dangerous_effect_approval");
+
+        let agent_policy = EnvPolicy {
+            agent_writes: WritePolicy::Deny,
+            ..local
+        };
+        let agent = Principal::Agent {
+            token: "test".into(),
+            client: None,
+            model: None,
+        };
+        let agent_decision = evaluate_with_effects(
+            &agent,
+            Environment::Local,
+            &analysis.facts,
+            analysis.effects,
+            false,
+            &agent_policy,
+            None,
+        );
+        assert!(matches!(agent_decision, Decision::Deny { .. }), "{agent_decision:?}");
+        assert_eq!(agent_decision.rule_name(), "agent_writes_denied");
     }
 
     #[test]
