@@ -329,7 +329,7 @@ impl Connection for MongodbConnection {
             return self
                 .run_find(FindQuery {
                     collection: page.collection,
-                    filter: doc! { "_id": { "$gt": page.key } },
+                    filter: doc! { "$expr": { "$gt": ["$_id", { "$literal": page.key }] } },
                     skip: 0,
                     limit: page.limit,
                     sort_by_id: true,

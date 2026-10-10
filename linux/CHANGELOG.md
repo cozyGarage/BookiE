@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- MongoDB table browsing now uses `_id` cursor seeks for deep pages, avoiding slow collection offsets.
+- MongoDB table browsing now seeks deep pages in `_id` sort order, including collections with mixed key types.
 - Saved SSH hops now have stable IDs and credential revisions, with separate Secret Service operations for per-hop passwords and key passphrases. Legacy connections-file v1 data loads and migrates to v2 on save; jump-chain editing and per-hop transport use remain disabled until their integration lands.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.

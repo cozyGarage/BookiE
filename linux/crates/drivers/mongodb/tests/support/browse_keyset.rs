@@ -70,6 +70,59 @@ async fn keyset_page_query_binds_object_id_cursor_values() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn keyset_page_query_keeps_mixed_bson_id_types_in_sort_order() {
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    let object_id = ObjectId::parse_str("000000000000000000000001").unwrap();
+    client
+        .database("appdb")
+        .collection::<Document>("keyset_mixed_ids")
+        .insert_many([
+            doc! { "_id": 1, "value": "number" },
+            doc! { "_id": "middle", "value": "string" },
+            doc! { "_id": object_id, "value": "object id" },
+        ])
+        .await
+        .unwrap();
+    let explain = client
+        .database("appdb")
+        .run_command(doc! {
+            "explain": {
+                "find": "keyset_mixed_ids",
+                "filter": { "$expr": { "$gt": ["$_id", { "$literal": 1 }] } },
+                "sort": { "_id": 1 },
+                "limit": 2,
+            },
+            "verbosity": "queryPlanner",
+        })
+        .await
+        .unwrap();
+    assert!(explain.to_string().contains("IXSCAN"), "{explain:?}");
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let page = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"keyset_mixed_ids\" WHERE \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Int(1)],
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(page.rows.len(), 2);
+    assert_eq!(
+        page.rows[0][0],
+        Value::Json(Bson::String("middle".into()).into_canonical_extjson())
+    );
+    assert_eq!(
+        page.rows[1][0],
+        Value::Json(Bson::ObjectId(object_id).into_canonical_extjson())
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn keyset_page_query_binds_binary_uuid_cursor_values() {
     let (_container, host, port) = super::start_mongo().await;
     let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
