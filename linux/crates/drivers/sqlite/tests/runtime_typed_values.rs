@@ -268,6 +268,30 @@ async fn json_each_object_keys_keep_their_text_values_and_storage_classes() {
 }
 
 #[tokio::test]
+async fn json_object_and_array_results_remain_exact_text() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    let result = connection
+        .query(
+            "SELECT json_object('empty', '', 'null', NULL, 'number', 7), \
+                    typeof(json_object('empty', '', 'null', NULL, 'number', 7)), \
+                    json_array(1, 1.25, '', NULL, json('true'), json('{\"x\":1}')), \
+                    typeof(json_array(1, 1.25, '', NULL, json('true'), json('{\"x\":1}'))) ",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text(r#"{"empty":"","null":null,"number":7}"#.into()),
+            Value::Text("text".into()),
+            Value::Text(r#"[1,1.25,"",null,true,{"x":1}]"#.into()),
+            Value::Text("text".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
 async fn declared_enum_values_follow_sqlite_numeric_affinity_and_keep_runtime_kinds() {
     let connection = SqliteDriver.connect(memory_options()).await.unwrap();
     connection.execute("CREATE TABLE enum_like (value ENUM)").await.unwrap();
