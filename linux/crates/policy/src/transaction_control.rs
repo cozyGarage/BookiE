@@ -1,4 +1,4 @@
-use sqlparser::ast::Statement;
+use sqlparser::ast::{Statement, TransactionAccessMode, TransactionIsolationLevel, TransactionMode};
 use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Token, Tokenizer};
 
@@ -7,6 +7,8 @@ use crate::classify::dialect_for;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransactionControl {
     Begin,
+    BeginReadOnly,
+    BeginReadOnlySnapshot,
     Commit { chain: bool },
     Rollback { chain: bool },
 }
@@ -84,10 +86,28 @@ pub(crate) fn hides_transaction_control(sql: &str, driver_id: &str) -> bool {
 
 fn control_of(statement: &Statement) -> Option<TransactionControl> {
     match statement {
-        Statement::StartTransaction { statements, .. } if statements.is_empty() => Some(TransactionControl::Begin),
+        Statement::StartTransaction { modes, statements, .. } if statements.is_empty() => transaction_start(modes),
         Statement::Commit { chain, .. } => Some(TransactionControl::Commit { chain: *chain }),
         Statement::Rollback { chain, savepoint: None } => Some(TransactionControl::Rollback { chain: *chain }),
         _ => None,
+    }
+}
+
+fn transaction_start(modes: &[TransactionMode]) -> Option<TransactionControl> {
+    if !modes.contains(&TransactionMode::AccessMode(TransactionAccessMode::ReadOnly)) {
+        return Some(TransactionControl::Begin);
+    }
+    if modes.iter().any(|mode| {
+        matches!(
+            mode,
+            TransactionMode::IsolationLevel(
+                TransactionIsolationLevel::RepeatableRead | TransactionIsolationLevel::Serializable
+            )
+        )
+    }) {
+        Some(TransactionControl::BeginReadOnlySnapshot)
+    } else {
+        Some(TransactionControl::BeginReadOnly)
     }
 }
 
@@ -99,6 +119,17 @@ mod tests {
     fn each_transaction_statement_is_recognised_per_dialect() {
         let cases = [
             ("BEGIN", "postgres", Some(TransactionControl::Begin)),
+            ("BEGIN READ ONLY", "postgres", Some(TransactionControl::BeginReadOnly)),
+            (
+                "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY",
+                "postgres",
+                Some(TransactionControl::BeginReadOnlySnapshot),
+            ),
+            (
+                "START TRANSACTION READ ONLY",
+                "mysql",
+                Some(TransactionControl::BeginReadOnly),
+            ),
             ("START TRANSACTION", "mysql", Some(TransactionControl::Begin)),
             ("BEGIN TRANSACTION", "mssql", Some(TransactionControl::Begin)),
             ("COMMIT", "sqlite", Some(TransactionControl::Commit { chain: false })),
