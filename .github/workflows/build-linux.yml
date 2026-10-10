@@ -30,6 +30,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 # A newer pull request push supersedes its in-flight run. Push runs on
 # linux or main keep the cheap tier only; Forgejo is the merge gate.
@@ -40,24 +41,38 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  preflight:
+  resolve-ref:
+    name: Resolve tested commit
+    runs-on: ubuntu-24.04
     outputs:
       commit: ${{ steps.revision.outputs.commit }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.sha }}
+      - name: Resolve the tested commit once
+        id: revision
+        run: |
+          echo "tree under test: $(git rev-parse HEAD)"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  preflight:
     name: Preflight and sandbox tier (no GTK app)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
+    needs: resolve-ref
+    env:
+      CARGO_INCREMENTAL: "0"
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.sha }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Record the commit under test
-        id: revision
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
-          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -73,10 +88,12 @@ jobs:
         with:
           toolchain: 1.98
           components: rustfmt, clippy
+      - name: Shared sccache
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: linux
-          prefix-key: linux-preflight
+          shared-key: linux-build
       - name: Preflight
         run: python3 scripts/run-test-layer.py quick
 
@@ -92,32 +109,29 @@ jobs:
     name: Fast checks (GTK)
     timeout-minutes: 60
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: resolve-ref
     # The GNOME 50 baseline requires GTK 4.22, GLib 2.88 and libadwaita 1.9.
-    # Debian testing provides that native stack. The
-    # integration job stays on the host runner — driver crates depend
+    # Pre-baked debian:testing + GTK deps from linux/ci/debian-testing-gtk.
+    # The integration job stays on the host runner — driver crates depend
     # only on tablepro-core, so they don't pull in libadwaita.
     container:
-      image: debian:testing
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:latest
       credentials:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
       env:
         DEBIAN_FRONTEND: noninteractive
+    env:
+      CARGO_INCREMENTAL: "0"
     defaults:
       run:
         working-directory: linux
     steps:
-      - name: Install Git before checkout
-        working-directory: /tmp
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
           fetch-depth: 0
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
@@ -128,36 +142,17 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git rev-parse HEAD
-      - name: Install system dependencies
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            build-essential \
-            ca-certificates \
-            curl \
-            git \
-            pkg-config \
-            libgtk-4-dev \
-            libadwaita-1-dev \
-            libgtksourceview-5-dev \
-            libssl-dev \
-            libsecret-1-dev \
-            libkrb5-dev \
-            libsqlite3-dev \
-            clang \
-            dbus-daemon \
-            xvfb \
-            xauth \
-            at-spi2-core \
-            python3-pyatspi
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
         with:
           toolchain: 1.98
           components: rustfmt, clippy
+      - name: Shared sccache
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: linux
-          prefix-key: linux-fast-gtk
+          shared-key: linux-build
+          save-if: false
       - name: Focused tests for changed B3 value paths
         env:
           TABLEPRO_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
@@ -184,7 +179,7 @@ jobs:
     name: Installed GTK safety smoke
     timeout-minutes: 60
     runs-on: ubuntu-24.04
-    needs: [preflight, fast]
+    needs: [resolve-ref, fast]
     container:
       image: debian:testing
       credentials:
@@ -203,7 +198,7 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -250,7 +245,7 @@ jobs:
     timeout-minutes: 30
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: resolve-ref
     container:
       image: debian:testing
       credentials:
@@ -269,7 +264,7 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -308,14 +303,14 @@ jobs:
     name: Driver integration tests (docker)
     timeout-minutes: 55
     runs-on: ubuntu-24.04
-    needs: [preflight, b4-rollback]
+    needs: [resolve-ref, b4-rollback]
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -362,14 +357,14 @@ jobs:
     name: B4 rollback acceptance (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: resolve-ref
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -412,14 +407,14 @@ jobs:
     name: Driver TLS fixture (docker)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: resolve-ref
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -462,14 +457,14 @@ jobs:
     name: PostgreSQL release fixture (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: resolve-ref
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -535,7 +530,7 @@ jobs:
 
   duckdb:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    needs: preflight
+    needs: resolve-ref
     name: Optional DuckDB driver and GTK feature
     timeout-minutes: 60
     runs-on: ubuntu-24.04
@@ -560,7 +555,7 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -589,6 +584,7 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     needs:
+      - resolve-ref
       - preflight
       - fast
       - gtk-safety
@@ -601,7 +597,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit || github.sha }}
+          ref: ${{ needs.resolve-ref.outputs.commit || github.sha }}
       - name: Require every regression job
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}

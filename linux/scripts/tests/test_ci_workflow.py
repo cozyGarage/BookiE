@@ -134,12 +134,28 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         self.assertNotIn("continue-on-error:", workflow)
         self.assertIn("commit: ${{ steps.revision.outputs.commit }}", workflow)
-        self.assertIn("ref: ${{ needs.preflight.outputs.commit }}", workflow)
+        self.assertIn("ref: ${{ needs.resolve-ref.outputs.commit }}", workflow)
+        self.assertNotIn("needs.preflight.outputs.commit", workflow)
         for line in workflow.splitlines():
             if line.strip().startswith("ref:"):
                 self.assertNotIn("github.ref", line)
         quality = (ROOT / ".github/workflows/linux-quality.yml").read_text()
         self.assertEqual(quality.count("ref: ${{ needs.resolve-ref.outputs.commit }}"), 2)
+
+    def test_preflight_and_fast_share_cache_and_run_after_resolve_ref(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        preflight = workflow.split("  preflight:\n", 1)[1].split("  fast:\n", 1)[0]
+        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
+        self.assertIn("needs: resolve-ref", preflight)
+        self.assertIn("needs: resolve-ref", fast)
+        self.assertNotIn("needs: preflight", fast)
+        self.assertIn("mozilla-actions/sccache-action@", preflight)
+        self.assertIn("mozilla-actions/sccache-action@", fast)
+        self.assertIn("shared-key: linux-build", preflight)
+        self.assertIn("shared-key: linux-build", fast)
+        self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:latest", fast)
+        self.assertNotIn("prefix-key: linux-preflight", workflow)
+        self.assertNotIn("prefix-key: linux-fast-gtk", workflow)
 
     def test_required_jobs_never_accept_failure_skip_cancel_or_missing(self):
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
@@ -190,7 +206,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("if: inputs.username != ''", action)
         self.assertNotIn("echo \"$DOCKERHUB_TOKEN\"", action)
         self.assertNotIn("echo '${{ inputs.password }}'", action)
-        for job in ["fast", "gtk-safety", "current-stable-clippy", "duckdb"]:
+        fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+        self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:latest", fast)
+        self.assertIn("secrets.GITHUB_TOKEN", fast)
+        self.assertIn("./.github/actions/dockerhub-login", fast)
+        self.assertIn("secrets.DOCKERHUB_USERNAME", fast)
+        self.assertIn("secrets.DOCKERHUB_TOKEN", fast)
+        for job in ["gtk-safety", "current-stable-clippy", "duckdb"]:
             section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
             self.assertIn("image: debian:testing", section, job)
             self.assertIn("secrets.DOCKERHUB_USERNAME", section, job)
@@ -229,7 +251,7 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             self.assertIn(required, focused)
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("needs: [preflight, b4-rollback]", integration)
+        self.assertIn("needs: [resolve-ref, b4-rollback]", integration)
         layers = json.loads((ROOT / "linux/scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
         commands = [step["argv"] for step in layers["steps"]]
         self.assertEqual(len(commands), 2)

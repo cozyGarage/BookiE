@@ -1,0 +1,53 @@
+name: CI debian-testing GTK image
+
+on:
+  push:
+    branches: [linux, main]
+    paths:
+      - "linux/ci/debian-testing-gtk/**"
+      - ".github/workflows/ci-debian-testing-gtk.yml"
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ci-debian-testing-gtk-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+
+env:
+  IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk
+
+jobs:
+  build-and-push:
+    name: Build and push GHCR image
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        run: |
+          set -euo pipefail
+          docker build \
+            --pull \
+            -t "${IMAGE}:latest" \
+            -t "${IMAGE}:${GITHUB_SHA}" \
+            -f linux/ci/debian-testing-gtk/Dockerfile \
+            linux/ci/debian-testing-gtk
+          docker push "${IMAGE}:latest"
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          echo "Published ${IMAGE}:latest and ${IMAGE}:${GITHUB_SHA}"
