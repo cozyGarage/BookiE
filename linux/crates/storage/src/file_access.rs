@@ -132,7 +132,7 @@ fn write_atomically_blocking(path: &Path, bytes: &[u8]) -> Result<(), StorageErr
         .ok_or_else(|| StorageError::Schema("storage path has no parent".into()))?;
     let file_name = path
         .file_name()
-        .and_then(|name| name.to_str())
+        .and_then(std::ffi::OsStr::to_str)
         .ok_or_else(|| StorageError::Schema("storage path has no valid file name".into()))?;
     let temp_path = parent.join(format!(".{file_name}.{}.tmp", Uuid::new_v4()));
     let result = write_and_replace(&temp_path, path, bytes);
