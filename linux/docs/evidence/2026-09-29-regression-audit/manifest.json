@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-29",
+  "case": "September regression-audit companion logs (historical)",
+  "role": "historical_companion",
+  "archive_narrative": "linux/docs/archive/regression-audit-2026-09-29.md",
+  "note": "Stub added 2026-10-10 so this directory is not an orphan under the docs map. Files are source-pinned companion logs for the archived narrative; not a current pass claim.",
+  "artifacts": [
+    "validation.json",
+    "binary-before.txt",
+    "change-contracts-before.txt",
+    "decimal-before.txt",
+    "isolated-before.txt"
+  ],
+  "status": "historical; keep for archive and architecture-review inventory links"
+}

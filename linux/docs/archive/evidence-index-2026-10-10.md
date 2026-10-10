@@ -13,7 +13,7 @@ retest tables; this file only classifies directories.
 | Local pass with open bounds | 51 | Passed locally; package / Wayland / Forgejo / frozen-candidate still open in the manifest |
 | Passed with retest signal | 4 | Current run passed; manifest notes intermittent / unexplained / infra flake |
 | Review notes prior failures | 2 | Manifest records prior failed attempts; not a live red gate by itself |
-| Orphan (no `manifest.json`) | 5 | Keep until a maintainer decides; do not invent a manifest |
+| Orphan (no `manifest.json`) | 0 | Cleared 2026-10-10: stub historical manifests added (below) |
 | **Total directories** | **407** | |
 
 ## Live retest tables (authoritative)
@@ -38,15 +38,20 @@ retest tables; this file only classifies directories.
 | [architecture-review-2026-10-03](../evidence/architecture-review-2026-10-03/manifest.json) | records prior failed attempts |
 | [b3-review-2026-10-01](../evidence/b3-review-2026-10-01/manifest.json) | records prior failed attempts |
 
-## Orphan directories (no manifest)
+## Former orphan directories (stub manifests added 2026-10-10)
 
-| Directory | Note |
-| --- | --- |
-| `2026-09-29-regression-audit/` | missing manifest.json |
-| `2026-09-bug-consistency/` | missing manifest.json |
-| `2026-09-stabilization/` | missing manifest.json |
-| `sql-lex-mutation-results-2026-10-06/` | missing manifest.json |
-| `upstream-u1-2026-10-03/` | missing manifest.json |
+These kept their companion files and archive narrative links. Each now has a
+non-`schema_version` stub `manifest.json` that marks the directory as
+historical (not a current pass claim). Do not delete the raw logs while
+archive narratives and review inventories still point at them.
+
+| Directory | Stub role | Archive narrative |
+| --- | --- | --- |
+| [2026-09-29-regression-audit/](../evidence/2026-09-29-regression-audit/manifest.json) | historical companion | [regression-audit-2026-09-29.md](regression-audit-2026-09-29.md) |
+| [2026-09-bug-consistency/](../evidence/2026-09-bug-consistency/manifest.json) | historical companion | [bug-consistency-2026-09.md](bug-consistency-2026-09.md) |
+| [2026-09-stabilization/](../evidence/2026-09-stabilization/manifest.json) | historical companion | [stabilization-2026-09.md](stabilization-2026-09.md) |
+| [sql-lex-mutation-results-2026-10-06/](../evidence/sql-lex-mutation-results-2026-10-06/manifest.json) | mutation report | README in-dir; related schema manifests beside it |
+| [upstream-u1-2026-10-03/](../evidence/upstream-u1-2026-10-03/manifest.json) | historical companion | [upstream-u1-sql-server-2026-10-03.md](upstream-u1-sql-server-2026-10-03.md) |
 
 ## Local-pass directories with open bounds
 

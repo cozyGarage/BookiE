@@ -44,7 +44,7 @@ SHA you need, and recheck current source before trusting words such as "next",
 | Type and consumer proof lookup | The [value evidence index](value-contracts.md) | Link to the case; detailed logs belong in evidence or history |
 | Distros, toolchain, packages, Flathub, accessibility | [Platforms](platforms.md) | One section per concern |
 | Commands, layers, gates, handoff format | The [validation playbook](validation-playbook.md) | Reuse existing layers; say whether a result was local, Forgejo or installed |
-| Crate and source structure | [Architecture](../ARCHITECTURE.md) | Match the manifests |
+| Crates, data flow, rename boundary, CI gate split | [Architecture](../ARCHITECTURE.md) | Match the manifests and [AGENTS.md](../../AGENTS.md); cheap vs Forgejo detail stays in the [validation playbook](validation-playbook.md#ci-tiers) |
 | A user-visible change | The [changelog](../CHANGELOG.md) | One line of user impact; no test or evidence notes |
 | What a user can do and how | The [user guide](user-guide.md) | Update with the feature that changes it |
 | Run-specific proof (manifests, focused logs) | `evidence/<topic>-<YYYY-MM-DD>/` | A `manifest.json` plus small text logs; link it from the owning row or board |
@@ -84,7 +84,7 @@ locates dated records.
 - [App layer audit](archive/app-layer-external-audit-2026-10-06.md): GUI gaps and the TablePro and dbx comparison
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
 - [Upstream main](archive/upstream-main-review-2026-10-03.md) ([inventory](archive/upstream-main-review-2026-10-03-inventory.md)) and [older releases](archive/upstream-older-releases-review-2026-10-03.md) ([inventory](archive/upstream-older-releases-2026-10-03-inventory.md))
-- [External audit and post-0.2 plan](../../external-audit.md) and its [client review](../../external-audit-client-review.md)
+- [External audit and post-0.2 plan](archive/external-audit-2026-10-06.md) and its [client review](archive/external-audit-client-review-2026-10-06.md)
 
 ## Keep context bounded
 

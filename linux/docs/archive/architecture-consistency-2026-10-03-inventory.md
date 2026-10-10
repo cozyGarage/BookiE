@@ -20,7 +20,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [CONTRIBUTING.md](../../../CONTRIBUTING.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [PLAN.md](../../../PLAN.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [README.md](../../../README.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [external-audit.md](../../../external-audit.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
+| [external-audit-2026-10-06.md](external-audit-2026-10-06.md) | archived dated review (moved from repo root 2026-10-10) | Corrected authority, source drift or evidence qualification |
 | [linux/ARCHITECTURE.md](../../ARCHITECTURE.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/CHANGELOG.md](../../CHANGELOG.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/CONTRIBUTING.md](../../CONTRIBUTING.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
