@@ -213,6 +213,75 @@ async fn json_each_values_keep_their_runtime_storage_classes() {
 }
 
 #[tokio::test]
+async fn json_operators_keep_json_and_sql_value_storage_classes() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    let result = connection
+        .query(
+            r#"WITH source(document) AS (
+                   VALUES (json('{"integer":42,"real":1.25,"text":"","numeric_text":"42","null":null,
+                                 "boolean":true,"object":{"x":1},"array":[2]}'))
+               )
+               SELECT document -> '$.integer', typeof(document -> '$.integer'),
+                      document ->> '$.integer', typeof(document ->> '$.integer'),
+                      document -> '$.real', typeof(document -> '$.real'),
+                      document ->> '$.real', typeof(document ->> '$.real'),
+                      document -> '$.numeric_text', typeof(document -> '$.numeric_text'),
+                      document ->> '$.numeric_text', typeof(document ->> '$.numeric_text'),
+                      document -> '$.text', typeof(document -> '$.text'),
+                      document ->> '$.text', typeof(document ->> '$.text'),
+                      document -> '$.null', typeof(document -> '$.null'),
+                      document ->> '$.null', typeof(document ->> '$.null'),
+                      document -> '$.boolean', typeof(document -> '$.boolean'),
+                      document ->> '$.boolean', typeof(document ->> '$.boolean'),
+                      document -> '$.object', typeof(document -> '$.object'),
+                      document ->> '$.object', typeof(document ->> '$.object'),
+                      document -> '$.array', typeof(document -> '$.array'),
+                      document ->> '$.array', typeof(document ->> '$.array')
+               FROM source"#,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("42".into()),
+            Value::Text("text".into()),
+            Value::Int(42),
+            Value::Text("integer".into()),
+            Value::Text("1.25".into()),
+            Value::Text("text".into()),
+            Value::Float(1.25),
+            Value::Text("real".into()),
+            Value::Text("\"42\"".into()),
+            Value::Text("text".into()),
+            Value::Text("42".into()),
+            Value::Text("text".into()),
+            Value::Text("\"\"".into()),
+            Value::Text("text".into()),
+            Value::Text(String::new()),
+            Value::Text("text".into()),
+            Value::Text("null".into()),
+            Value::Text("text".into()),
+            Value::Null,
+            Value::Text("null".into()),
+            Value::Text("true".into()),
+            Value::Text("text".into()),
+            Value::Int(1),
+            Value::Text("integer".into()),
+            Value::Text(r#"{"x":1}"#.into()),
+            Value::Text("text".into()),
+            Value::Text(r#"{"x":1}"#.into()),
+            Value::Text("text".into()),
+            Value::Text("[2]".into()),
+            Value::Text("text".into()),
+            Value::Text("[2]".into()),
+            Value::Text("text".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
 async fn json_each_object_keys_keep_their_text_values_and_storage_classes() {
     let connection = SqliteDriver.connect(memory_options()).await.unwrap();
     let result = connection
