@@ -20,6 +20,8 @@ Take light and dark screenshots for each section, per `AGENTS.md`. Record a resu
 beside each item rather than leaving it blank, because a blank line here reads as
 "passed" to the next person.
 
+Real values: before 0.2.0, also run the by-hand value check in [oracle review](oracle-review.md) (Part B), which compares each engine's own client with the grid, export and edit path.
+
 Build first:
 
 ```bash
