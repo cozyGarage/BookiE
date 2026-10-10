@@ -1,5 +1,6 @@
 use super::*;
 use crate::classify::StatementClass;
+use crate::effects::Effects;
 
 /// Rows one approved import may write. A budget larger than this is
 /// refused before the user is asked, so no single approval can cover an
@@ -164,22 +165,15 @@ impl PolicyGuard {
             .ctx
             .policy
             .for_connection(&self.ctx.connection_id.to_string(), self.ctx.environment);
-        let decision = evaluate_categorical(
+        let decision = evaluate_with_effects(
             &self.ctx.principal,
             self.ctx.environment,
             &facts,
+            Effects::WRITES_ROWS,
             self.ctx.read_only,
             &env_policy,
-        )
-        .unwrap_or_else(|| {
-            evaluate_eligible_write(
-                &self.ctx.principal,
-                self.ctx.environment,
-                &facts,
-                &env_policy,
-                Some(request.row_budget),
-            )
-        });
+            Some(request.row_budget),
+        );
         let granted = self.settle_bulk_decision(&request, &facts, decision).await?;
         let scope = self.new_scope(request, &facts, granted);
         self.handle_intent_failure(self.record_intent(&scope.operation()).await)?;
