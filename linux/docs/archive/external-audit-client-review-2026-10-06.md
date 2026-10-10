@@ -1,10 +1,12 @@
 # Database-client lessons and BookiE source review
 
-Reviewed 2026-10-06; companion to [external-audit.md](external-audit.md).
+Archived 2026-10-10 from the repository root into `linux/docs/archive/`.
+Reviewed 2026-10-06; companion to
+[external-audit-2026-10-06.md](external-audit-2026-10-06.md).
 This is a bounded review of Linux BookiE and selected primary-source examples,
 not an exhaustive audit of any client. Findings nominate work for the existing
-[B3](linux/docs/type-contract-strategy.md) and
-[B4](linux/docs/b4-task-board.md) owners; they did not change sprint order or
+[B3](../type-contract-strategy.md) and
+[B4](../b4-task-board.md) owners; they did not change sprint order or
 claim release acceptance. The implementation follow-up below records changes
 made after the review; it does not claim hosted or release acceptance.
 
@@ -76,11 +78,11 @@ string assertions with behavior proof.
 
 ### R1 — High: relational grid saves do not detect an intervening value edit
 
-[Change-tracker materialization](linux/crates/app/src/services/change_tracker.rs)
+[Change-tracker materialization](../../crates/app/src/services/change_tracker.rs)
 retains `(column, previous_value, new_value)` but discards `previous_value` for
-ordinary SQL engines. [The shared builder](linux/crates/core/src/sql_dialect/updates.rs)
+ordinary SQL engines. [The shared builder](../../crates/core/src/sql_dialect/updates.rs)
 generates `SET new_value WHERE primary_key`. MongoDB uses original-value
-predicates. [The save handler](linux/crates/app/src/ui/app/row_ops.rs) examines
+predicates. [The save handler](../../crates/app/src/ui/app/row_ops.rs) examines
 affected counts after commit; one affected row cannot distinguish a stale
 overwrite from a legitimate update. Its helper also accepts every positive
 count, despite surrounding text describing an exactly-one invariant.
@@ -118,9 +120,9 @@ tables. These are separate from the local SQLite proof and hosted gates.
 
 ### R2 — Medium: evidence lookup can select zero tests or confuse historic source with current source
 
-For [numeric-affinity evidence](linux/docs/evidence/sqlite-numeric-affinity-grid-results-2026-10-06/manifest.json),
+For [numeric-affinity evidence](../evidence/sqlite-numeric-affinity-grid-results-2026-10-06/manifest.json),
 all six current source hashes and seven archived log hashes matched. For
-[constraint-refusal evidence](linux/docs/evidence/sqlite-affinity-check-constraint-results-2026-10-06/manifest.json),
+[constraint-refusal evidence](../evidence/sqlite-affinity-check-constraint-results-2026-10-06/manifest.json),
 all four log hashes matched; its one source hash differs from the current test
 file. A historical hash mismatch is not a failing product test. The top-level
 numeric-affinity `test` field also omits the `sqlite_numeric_affinity::` module;
@@ -136,7 +138,7 @@ inventory legacy warning debt.
 
 ### R3 — Medium: row caps do not bound result memory
 
-[QueryResult](linux/crates/core/src/query.rs) materializes `Vec<Vec<Value>>` with
+[QueryResult](../../crates/core/src/query.rs) materializes `Vec<Vec<Value>>` with
 `MAX_QUERY_ROWS = 1_000_000`. Reviewed driver paths use row caps; there is no
 shared aggregate decoded-byte budget in this contract. A few large text/BLOB
 cells can exhaust memory far below a row limit. MCP's request-body cap protects
