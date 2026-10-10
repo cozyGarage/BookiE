@@ -37,9 +37,9 @@ done
 
 STAGE="$OUT/$PKG_NAME"
 rm -rf "$STAGE"
-install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-app" "$STAGE/usr/bin/bookie"
-install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-agentd" "$STAGE/usr/bin/bookie-agentd"
-install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-askpass" "$STAGE/usr/bin/tablepro-askpass"
+install -Dsm755 "$CARGO_TARGET_DIR/release/tablepro-app" "$STAGE/usr/bin/bookie"
+install -Dsm755 "$CARGO_TARGET_DIR/release/tablepro-agentd" "$STAGE/usr/bin/bookie-agentd"
+install -Dsm755 "$CARGO_TARGET_DIR/release/tablepro-askpass" "$STAGE/usr/bin/tablepro-askpass"
 ln -s bookie "$STAGE/usr/bin/tablepro"
 ln -s bookie-agentd "$STAGE/usr/bin/tablepro-agentd"
 install -Dm644 flatpak/com.tablepro.linux.desktop "$STAGE/usr/share/applications/com.tablepro.linux.desktop"

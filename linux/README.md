@@ -5,7 +5,7 @@ application. The repository overview is at [the root README](../README.md).
 
 Current delivery scope and evidence: [active sprint](docs/bookie-0.2-sprint.md). The [October 3 consistency review](docs/archive/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
 
-BookiE is a Linux-only database client built with Rust, GTK4, libadwaita, and Relm4. It is a fork of [TablePro](https://github.com/TableProApp/TablePro). The Rust workspace is rooted in this `linux/` directory.
+BookiE is a Linux-only database client built with Rust, GTK4, libadwaita, and Relm4. The Rust workspace is rooted in this `linux/` directory. The product was previously called TablePro on this branch; the rename covers the display name, binaries (`bookie`, `bookie-agentd`) and branding only. App ID, XDG paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Crate names remain `tablepro-*`.
 
 ## Status
 
@@ -24,7 +24,7 @@ BookiE 0.1.5 (tag `linux-v0.1.5`) targets:
 | Debian / Ubuntu with the required GNOME 50 libraries | amd64 | `tablepro_0.1.5-1_amd64.deb` | `tablepro` | `bookie` |
 | Arch Linux / Omarchy | x86_64 | `bookie-0.1.5-1-x86_64.pkg.tar.zst` | `bookie` | `bookie` |
 
-`tablepro` and `tablepro-agentd` remain aliases. Application ID and XDG paths stay `com.tablepro.linux` / `tablepro`.
+`tablepro` and `tablepro-agentd` remain command aliases. Application ID and XDG paths stay `com.tablepro.linux` / `tablepro`.
 
 **Ubuntu 24.04 and 25.10 cannot run this line.** GTK CI builds in Debian testing for the GNOME 50 library baseline.
 
@@ -111,13 +111,15 @@ A FILE credential cache works when `KRB5CCNAME` points to a readable location. C
 
 ## Checks
 
+From `linux/`:
+
 ```bash
 ./scripts/preflight.sh
-./scripts/ci-local.sh
-./scripts/ci-local.sh integration
 ```
 
-`preflight.sh` skips the GTK application. `ci-local.sh` runs the current workspace library and binary test targets, including the GTK binary tests. Integration mode runs the real-driver Docker suites.
+`preflight.sh` runs size and panic guards, formatting, Clippy, unit tests and the sandbox tier. It does not run the installed GTK suite. Pick further layers from the [validation playbook](docs/validation-playbook.md) (for example `./scripts/ci-local.sh integration` for Docker driver suites, or `./scripts/test-gtk-widgets.sh` when GTK widgets change).
+
+**CI tiers:** GitHub pull requests and pushes to `linux` / `main` run the cheap tier only. A green GitHub check is not merge acceptance. The merge tier (Docker drivers, installed GTK, distro floor, packages, driver TLS, PostgreSQL release fixture, DuckDB) runs on the lab Forgejo on every branch push. Gate with `bash linux/scripts/forgejo-gate.sh <branch>` from the repository root ([AGENTS.md](../AGENTS.md)).
 
 To smoke-test a PostgreSQL server you already run:
 

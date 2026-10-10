@@ -272,7 +272,7 @@ fn tool_description(name: &str) -> &'static str {
         "describe_table" => "Describe columns of a table",
         "execute_query" => "Run a read SQL query (writes require tools:write scope and policy approval)",
         "execute_write" => "Run a write with optional transaction preview (preview=true by default)",
-        "explain_query" => "Run EXPLAIN on a SQL statement",
+        "explain_query" => "Run EXPLAIN on a SQL statement; plan rows are withheld from read-scoped agents",
         "export_data" => {
             "Run a query and return CSV or JSON; CSV responses include the null_marker used for SQL NULL cells"
         }

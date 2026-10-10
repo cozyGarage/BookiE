@@ -103,12 +103,12 @@ fn save_geometry_settings(settings: &gio::Settings, state: &WindowState) -> Resu
 }
 
 pub fn load() -> WindowState {
-    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = FILE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     load_locked()
 }
 
 pub fn save_geometry(width: i32, height: i32, maximized: bool) {
-    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = FILE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut state = load_locked();
     state.width = width;
     state.height = height;
@@ -117,7 +117,7 @@ pub fn save_geometry(width: i32, height: i32, maximized: bool) {
 }
 
 pub fn set_last_connection_id(id: Option<Uuid>) {
-    let _guard = FILE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = FILE_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut state = load_locked();
     state.last_connection_id = id;
     save_locked(&state);

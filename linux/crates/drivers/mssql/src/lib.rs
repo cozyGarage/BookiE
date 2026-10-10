@@ -161,13 +161,22 @@ async fn open_kerberos_client(target: MssqlTarget) -> Result<MssqlClient, Driver
     let handle = tokio::runtime::Handle::current();
     let connecting = tokio::task::spawn_blocking(move || {
         let _attempt = attempt;
-        handle.block_on(open_client(target))
+        handle.block_on(connect_with_deadline(CONNECT_TIMEOUT, open_client(target)))
     });
     match tokio::time::timeout(CONNECT_TIMEOUT, connecting).await {
         Ok(Ok(result)) => result,
         Ok(Err(error)) => Err(DriverError::Internal(error.to_string())),
         Err(_) => Err(DriverError::ConnectionRefused),
     }
+}
+
+async fn connect_with_deadline<F, T>(duration: std::time::Duration, connecting: F) -> Result<T, DriverError>
+where
+    F: std::future::Future<Output = Result<T, DriverError>>,
+{
+    tokio::time::timeout(duration, connecting)
+        .await
+        .map_err(|_| DriverError::ConnectionRefused)?
 }
 
 async fn open_client(target: MssqlTarget) -> Result<MssqlClient, DriverError> {
@@ -239,7 +248,7 @@ impl MssqlConnection {
 
     async fn retire(&self) -> Result<(), DriverError> {
         self.usable.store(false, Ordering::Release);
-        let guard = self.fault.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let guard = self.fault.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(fault) = guard.as_ref() {
             fault.notify_one();
         }
@@ -278,7 +287,7 @@ impl MssqlConnection {
 #[async_trait]
 impl Connection for MssqlConnection {
     fn attach_fault_notify(&self, notify: Arc<Notify>) {
-        *self.fault.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(notify);
+        *self.fault.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(notify);
     }
 
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {

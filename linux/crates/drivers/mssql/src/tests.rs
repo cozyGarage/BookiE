@@ -1,5 +1,31 @@
 use super::*;
 
+#[tokio::test]
+async fn connect_deadline_drops_the_in_flight_connect_future() {
+    use std::future::pending;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct DropSignal(Arc<AtomicBool>);
+
+    impl Drop for DropSignal {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let dropped = Arc::new(AtomicBool::new(false));
+    let signal = DropSignal(Arc::clone(&dropped));
+    let connect = async move {
+        let _signal = signal;
+        pending::<Result<(), DriverError>>().await
+    };
+
+    let result = connect_with_deadline(std::time::Duration::from_millis(1), connect).await;
+
+    assert!(matches!(result, Err(DriverError::ConnectionRefused)));
+    assert!(dropped.load(Ordering::SeqCst));
+}
+
 #[test]
 fn terminal_session_kill_is_disconnected_but_sql_errors_are_preserved() {
     assert!(matches!(map_server_error(596, "killed", 1), DriverError::Disconnected));

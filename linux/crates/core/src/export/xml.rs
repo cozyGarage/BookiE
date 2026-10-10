@@ -170,6 +170,13 @@ mod tests {
     }
 
     #[test]
+    fn valid_names_with_only_one_reserved_prefix_letter_are_not_prefixed() {
+        for name in ["xray", "mango", "lima", "ablate"] {
+            assert_eq!(element_name(name), name);
+        }
+    }
+
+    #[test]
     fn a_sanitised_column_name_is_used_for_every_row_element() {
         let xml = render(&[column("2 bad name!")], &[vec![Value::Int(1)]]);
         assert!(xml.contains("<_2_bad_name_>1</_2_bad_name_>"), "{xml}");

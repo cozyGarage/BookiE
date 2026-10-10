@@ -8,6 +8,7 @@ on:
       - "!linux/docs/**"
       - "!**.md"
       - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
   pull_request:
     branches: [main, linux]
     paths:
@@ -15,6 +16,7 @@ on:
       - "!linux/docs/**"
       - "!**.md"
       - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
   schedule:
     - cron: "13 14 * * 1"
   workflow_dispatch:
@@ -28,35 +30,118 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
-# A newer pull request push supersedes its in-flight run. A run on
-# linux or main is the merge-tier gate, so it is never cancelled: GitHub
-# keeps the running one and the newest pending one. Scheduled and
-# dispatched runs keep their own group so a release-candidate soak is
-# never cancelled by ordinary branch traffic.
+# A newer pull request push supersedes its in-flight run. Push runs on
+# linux or main keep the cheap tier only; Forgejo is the merge gate.
+# Scheduled and dispatched runs keep their own group so a manual full
+# Build Linux is never cancelled by ordinary branch traffic.
 concurrency:
   group: build-linux-${{ github.event_name }}-${{ github.ref }}-${{ inputs.ref || 'auto' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  preflight:
+  pin-revision:
+    name: Pin tested revision
+    runs-on: ubuntu-24.04
     outputs:
-      commit: ${{ steps.revision.outputs.commit }}
+      revision: ${{ steps.pin.outputs.revision }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Pin the tested revision once
+        id: pin
+        env:
+          REQUESTED_REF: ${{ inputs.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          revision="$(git rev-parse HEAD)"
+          echo "tree under test: $revision"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$REQUESTED_REF" ]]; then
+            case "$REQUESTED_REF" in
+              refs/pull/*|pull/*)
+                echo "workflow_dispatch cannot pin a pull request ref" >&2
+                exit 1
+                ;;
+            esac
+            git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+            if ! git branch -r --contains "$revision" | grep -qE 'origin/' \
+              && ! git tag --contains "$revision" | grep -q .; then
+              echo "pinned revision must be on an origin branch or tag" >&2
+              exit 1
+            fi
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+  ensure-ci-gtk-image:
+    name: Ensure CI debian-testing GTK image
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    needs: pin-revision
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.publish.outputs.tag }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull or build and push
+        id: publish
+        env:
+          IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk
+        run: |
+          set -euo pipefail
+          hash="$(sha256sum linux/ci/debian-testing-gtk/Dockerfile | cut -c1-16)"
+          tag="df-${hash}"
+          tag_hash="${IMAGE}:${tag}"
+          tag_latest="${IMAGE}:latest"
+          if ! docker pull "$tag_hash"; then
+            docker build --pull \
+              -t "$tag_hash" \
+              -t "$tag_latest" \
+              -f linux/ci/debian-testing-gtk/Dockerfile \
+              linux/ci/debian-testing-gtk
+            docker push "$tag_hash"
+            docker push "$tag_latest"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+  preflight:
     name: Preflight and sandbox tier (no GTK app)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
+    needs: pin-revision
+    env:
+      CARGO_INCREMENTAL: "0"
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.sha }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Record the commit under test
-        id: revision
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
-          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -72,10 +157,14 @@ jobs:
         with:
           toolchain: 1.98
           components: rustfmt, clippy
+      - name: Shared sccache
+        if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: linux
-          prefix-key: linux-preflight
+          shared-key: linux-build
+          save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/linux' || github.ref == 'refs/heads/main')) }}
       - name: Preflight
         run: python3 scripts/run-test-layer.py quick
 
@@ -91,64 +180,53 @@ jobs:
     name: Fast checks (GTK)
     timeout-minutes: 60
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: [pin-revision, ensure-ci-gtk-image]
     # The GNOME 50 baseline requires GTK 4.22, GLib 2.88 and libadwaita 1.9.
-    # Debian testing provides that native stack. The
-    # integration job stays on the host runner — driver crates depend
+    # Pre-baked debian:testing + GTK deps from linux/ci/debian-testing-gtk.
+    # The integration job stays on the host runner — driver crates depend
     # only on tablepro-core, so they don't pull in libadwaita.
     container:
-      image: debian:testing
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
       env:
         DEBIAN_FRONTEND: noninteractive
+    env:
+      CARGO_INCREMENTAL: "0"
     defaults:
       run:
         working-directory: linux
     steps:
-      - name: Install Git before checkout
-        working-directory: /tmp
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
           fetch-depth: 0
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git rev-parse HEAD
-      - name: Install system dependencies
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            build-essential \
-            ca-certificates \
-            curl \
-            git \
-            pkg-config \
-            libgtk-4-dev \
-            libadwaita-1-dev \
-            libgtksourceview-5-dev \
-            libssl-dev \
-            libsecret-1-dev \
-            libkrb5-dev \
-            libsqlite3-dev \
-            clang \
-            dbus-daemon \
-            xvfb \
-            xauth \
-            at-spi2-core \
-            python3-pyatspi
+          pkg-config --exists 'glib-2.0 >= 2.80'
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
         with:
           toolchain: 1.98
           components: rustfmt, clippy
+      - name: Shared sccache
+        if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: linux
-          prefix-key: linux-fast-gtk
+          shared-key: linux-build
+          save-if: false
       - name: Focused tests for changed B3 value paths
         env:
           TABLEPRO_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
@@ -171,13 +249,16 @@ jobs:
           if-no-files-found: error
 
   gtk-safety:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Installed GTK safety smoke
     timeout-minutes: 60
     runs-on: ubuntu-24.04
-    needs: [preflight, fast]
+    needs: [pin-revision, fast]
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -191,7 +272,8 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -211,6 +293,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-gtk-safety
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Secret Service round-trip
         run: python3 scripts/run-test-layer.py keyring
       - name: GTK installed-flow smoke
@@ -238,9 +321,12 @@ jobs:
     timeout-minutes: 30
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: pin-revision
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -254,7 +340,8 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -284,23 +371,30 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-current-stable-clippy
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Clippy on current stable
         # The repository override selects 1.98, so +stable is required here.
         run: cargo +stable clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 
   integration:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Driver integration tests (docker)
     timeout-minutes: 55
     runs-on: ubuntu-24.04
-    needs: [preflight, b4-rollback]
+    needs: [pin-revision, b4-rollback]
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -324,6 +418,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-integration
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Verify docker is available
         run: docker version
       - name: Driver, socket and SSH integration
@@ -338,18 +433,24 @@ jobs:
           if-no-files-found: error
 
   b4-rollback:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: B4 rollback acceptance (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: pin-revision
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -369,6 +470,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-integration
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Verify docker is available
         run: docker version
       - name: Focused MySQL and PostgreSQL rollback cases
@@ -383,18 +485,24 @@ jobs:
           if-no-files-found: error
 
   driver-tls:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Driver TLS fixture (docker)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: pin-revision
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -414,6 +522,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-driver-tls
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Verify docker is available
         run: docker compose version
       - name: Driver TLS fixture
@@ -428,18 +537,24 @@ jobs:
           if-no-files-found: error
 
   postgres-release:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: PostgreSQL release fixture (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: preflight
+    needs: pin-revision
     defaults:
       run:
         working-directory: linux
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -474,6 +589,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-postgres-release
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Build staged release GTK binary
         run: cargo build --locked --release -p tablepro-app
       - name: Stage release binary for installed GTK scenarios
@@ -499,13 +615,16 @@ jobs:
           if-no-files-found: error
 
   duckdb:
-    if: github.event_name != 'pull_request'
-    needs: preflight
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: pin-revision
     name: Optional DuckDB driver and GTK feature
     timeout-minutes: 60
     runs-on: ubuntu-24.04
     container:
       image: debian:testing
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
       env:
         DEBIAN_FRONTEND: noninteractive
     env:
@@ -522,7 +641,8 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit }}
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -539,6 +659,7 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-duckdb
+          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
       - name: Driver tests including offline extensions and flat files
         run: cargo test --locked -p tablepro-driver-duckdb
       - name: Build the GTK application with DuckDB
@@ -551,6 +672,7 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     needs:
+      - pin-revision
       - preflight
       - fast
       - gtk-safety
@@ -563,7 +685,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ needs.preflight.outputs.commit || github.sha }}
+          persist-credentials: false
       - name: Require every regression job
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}

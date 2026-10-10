@@ -1,16 +1,19 @@
-# TablePro repository
+# BookiE
 
-This repository contains the Linux BookiE application, derived from TablePro.
-This root page describes the repository and its development workflow. For
-BookiE features, supported systems, installation and user-facing guidance, use
-the canonical [Linux application guide](linux/README.md). The two pages have
-different audiences and should not duplicate product or build instructions.
+This repository contains the Linux BookiE application (formerly TablePro on
+this branch). This root page describes the repository and its development
+workflow. For BookiE features, supported systems, installation and user-facing
+guidance, use the canonical [Linux application guide](linux/README.md). The two
+pages have different audiences and should not duplicate product or build
+instructions.
 
 Current delivery scope and evidence: [active sprint](linux/docs/bookie-0.2-sprint.md). The [October 3 consistency review](linux/docs/archive/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
 
-TablePro is a native Linux database client built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. Current development is on the `linux` branch. The Cargo workspace is under `linux/` and requires Rust 1.98.
+BookiE is a Linux-only native database client built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. Current development is on the `linux` branch. The Cargo workspace is under `linux/` and requires Rust 1.98.
 
-Every shipped feature is free to use. TablePro has no account, license, subscription, paid-tier, or remote entitlement gate.
+The rename covers the display name, binary names (`bookie`, `bookie-agentd`) and branding assets only. App ID, config and data paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Crate names remain `tablepro-*`.
+
+Every shipped feature is free to use. BookiE has no account, license, subscription, paid-tier, or remote entitlement gate.
 
 ## Status
 
@@ -67,23 +70,15 @@ cargo run --manifest-path linux/Cargo.toml -p tablepro-app --features duckdb
 
 ## Validate
 
-```bash
-bash linux/scripts/check-file-size.sh
-cargo fmt --manifest-path linux/Cargo.toml --all -- --check
-cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
-cargo test --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --lib --bins
-```
-
-Deeper gates, run from `linux/`:
+Local cheap checks (from the repository root):
 
 ```bash
-./scripts/ci-local.sh integration          # container driver tests
-./scripts/test-postgres-release.sh         # PostgreSQL TLS, SSH, lock, and reconnect fixture
-./scripts/test-gtk-safety.sh               # installed GTK approval and audit flows
-./scripts/ci-local.sh release              # all three in sequence
+bash linux/scripts/preflight.sh
 ```
 
-Container-backed driver tests and more setup details are in [`linux/docs/testing.md`](linux/docs/testing.md).
+`preflight.sh` covers size and panic guards, formatting, Clippy, unit tests and the sandbox tier. Deeper local layers (Docker drivers, GTK widgets, installed GTK, release fixture) are documented in [`linux/docs/validation-playbook.md`](linux/docs/validation-playbook.md) and [`linux/docs/testing.md`](linux/docs/testing.md).
+
+**CI tiers:** A GitHub pull request or push to `linux` / `main` runs the cheap tier only (guards, fmt, Clippy, unit, sandbox, GTK widgets, security, Flatpak, workflow contracts). A green GitHub check does not mean Docker drivers, installed GTK, driver TLS, the PostgreSQL release fixture or DuckDB passed. Those merge-tier jobs run on the lab Forgejo on every branch push. Acceptance is `bash linux/scripts/forgejo-gate.sh <branch>` ([AGENTS.md](AGENTS.md)).
 
 ## Contributing
 
@@ -95,4 +90,4 @@ Release notes and unreleased changes are in [`linux/CHANGELOG.md`](linux/CHANGEL
 
 ## License
 
-TablePro is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE).
+BookiE is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE).

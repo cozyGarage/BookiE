@@ -197,6 +197,21 @@ fn push_len_prefixed(out: &mut Vec<u8>, bytes: &[u8]) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_key_derivation_matches_the_value_released_builds_produce() {
+        let salt = [7u8; SALT_LEN];
+        let kdf = KdfHeader {
+            algorithm: KDF_ALGORITHM.into(),
+            salt: BASE64.encode(salt),
+            memory_kib: 19_456,
+            iterations: 2,
+            parallelism: 1,
+        };
+        let key = derive_key("correct horse battery staple", &salt, &kdf).unwrap();
+        let hex: String = key.iter().map(|byte| format!("{byte:02x}")).collect();
+        assert_eq!(hex, "799f12b9e17710824482d829835acb69f5a9355bf774c4f07342823b11b90928");
+    }
+
     use super::*;
 
     fn envelope() -> EnvelopeHeader {

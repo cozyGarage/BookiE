@@ -3,8 +3,107 @@ use super::*;
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_lost_sql_server_is_reported_as_disconnected() {
+    let (container, opts) = start_mssql_durable().await;
+    let connection = connect(opts.clone()).await;
+    let initial = connection
+        .query("SELECT 1")
+        .await
+        .expect("initial query reaches server");
+    assert_eq!(initial.rows, vec![vec![Value::Int(1)]]);
+
+    container.stop().await.expect("stop SQL Server");
+    let error = connection
+        .query("SELECT 1")
+        .await
+        .expect_err("query after server loss must fail");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "loss of an established SQL Server must be reported as disconnected, got {error:?}"
+    );
+
+    container.start().await.expect("restart SQL Server");
+    let mut replacement_options = opts;
+    replacement_options.host = container.get_host().await.expect("restarted host").to_string();
+    replacement_options.port = container
+        .get_host_port_ipv4(1433)
+        .await
+        .expect("restarted SQL Server port");
+    let recovered = server_restart::retry_operation("SQL Server", || {
+        let options = replacement_options.clone();
+        async move {
+            let replacement = MssqlDriver.connect(options).await?;
+            replacement.query("SELECT 1").await
+        }
+    })
+    .await
+    .expect("SQL Server restarts and accepts SELECT 1");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn server_loss_during_multi_result_stream_rejects_the_whole_query() {
+    let (container, opts) = start_mssql_durable().await;
+    let streaming_connection = connect(opts.clone()).await;
+    let admin_connection = connect(opts.clone()).await;
+    let sql = "/* tablepro_disconnect_stream_probe */ SELECT CAST(1 AS int) AS n; WAITFOR DELAY '00:00:20'; SELECT CAST(2 AS int) AS n";
+    let query = tokio::spawn(async move { streaming_connection.query(sql).await });
+
+    let mut active = false;
+    for _ in 0..100 {
+        let probe = admin_connection
+            .query(
+                "SELECT COUNT(*) AS active_count FROM sys.dm_exec_requests r \
+                 CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t \
+                 WHERE r.session_id <> @@SPID \
+                   AND t.text LIKE N'%tablepro_disconnect_stream_probe%'",
+            )
+            .await
+            .expect("inspect SQL Server active requests");
+        if probe.rows == vec![vec![Value::Int(1)]] {
+            active = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    assert!(active, "streaming query must reach WAITFOR before server loss");
+    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    container.stop().await.expect("stop SQL Server during stream");
+
+    let error = tokio::time::timeout(std::time::Duration::from_secs(20), query)
+        .await
+        .expect("interrupted stream must finish promptly")
+        .expect("query task must not panic")
+        .expect_err("interrupted multi-result query must fail without returning partial rows");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "mid-stream SQL Server loss must be Disconnected, got {error:?}"
+    );
+
+    container.start().await.expect("restart SQL Server");
+    let mut replacement_options = opts;
+    replacement_options.host = container.get_host().await.expect("restarted host").to_string();
+    replacement_options.port = container
+        .get_host_port_ipv4(1433)
+        .await
+        .expect("restarted SQL Server port");
+    let recovered = server_restart::retry_operation("SQL Server", || {
+        let options = replacement_options.clone();
+        async move {
+            let replacement = MssqlDriver.connect(options).await?;
+            replacement.query("SELECT 1").await
+        }
+    })
+    .await
+    .expect("SQL Server restarts and accepts SELECT 1");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_committed_update_with_a_lost_ack_is_not_replayed() {
-    let (container, opts) = start_mssql().await;
+    let (container, opts) = start_mssql_durable().await;
     let observer = connect(opts.clone()).await;
     observer
         .execute("CREATE TABLE lost_ack_target (id INT PRIMARY KEY, value INT NOT NULL)")
@@ -89,7 +188,7 @@ async fn a_committed_update_with_a_lost_ack_is_not_replayed() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_disconnected_session_is_retired_after_server_loss() {
-    let (container, opts) = start_mssql().await;
+    let (container, opts) = start_mssql_durable().await;
     let connection = connect(opts.clone()).await;
     let observer = connect(opts).await;
     let mut session = connection.open_session().await.expect("open session");

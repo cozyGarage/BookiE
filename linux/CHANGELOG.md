@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Saved SSH hops now have stable IDs and credential revisions, with separate Secret Service operations for per-hop passwords and key passphrases. Legacy connections-file v1 data loads and migrates to v2 on save; jump-chain editing and per-hop transport use remain disabled until their integration lands.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
@@ -90,8 +91,12 @@
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- Startup opens the query history database while the rest of the application starts instead of waiting for it first.
+- The Debian package installs its programs without debug symbols, which makes the installed files about a quarter smaller
+- The distro-floor image installs a pinned, checksum-verified `rustup-init` instead of piping an unverified script to the shell.
 - The time shown for a statement no longer includes the wait for your approval on a guarded connection.
 - MongoDB browse pages now use a bounded schema sample and stable `_id` paging instead of scanning the full collection for every page.
+- Disposable database test fixtures use tmpfs and reduced flush syncing; lost-ack, crash and restart tests keep durable storage.
 
 - Ctrl+Tab switches to the most recently used tab, and back again, instead of the next tab in the strip.
 - Create table from CSV now explains that ClickHouse, MongoDB and Redis connections cannot do it, and DuckDB gets its own JSON type name.
@@ -104,6 +109,10 @@
 
 ### Fixed
 
+- The window opens without waiting for old query history to be pruned at startup
+- Undoing or redoing one of several edits to the same cell keeps the earlier edit pending against the value stored in the database, so saving no longer drops it or reports a changed row
+- A table's column and foreign key lists from a superseded refresh are no longer applied after a newer refresh started
+- Saving the window layout no longer waits for a slow disk read at startup, so the window stays responsive while saved tabs load
 - Pressing Cancel while a connection is finishing no longer opens that connection anyway
 - Refreshing, closing or pressing Kill twice in the activity dialog no longer cancels a Kill that is already running, so its result is always shown
 - A run that cannot start (the session is closing or the connection is gone) no longer hides the result of the query still running in that editor
@@ -140,6 +149,10 @@
 
 ### Security
 
+- `SELECT … INTO` is now treated as a write, so read-only connections and agent read access refuse it instead of letting it create a table
+- The row-count estimate that guards large writes no longer runs a side-effecting function in your WHERE clause before you approve the statement; such statements ask for approval without an estimate
+- A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server
+- A SQLite, PostgreSQL, MySQL or MariaDB connection marked read-only is now read-only in the database engine itself, so a statement the safety checks mistake for a read still cannot change data; a read-only SQLite connection no longer creates a missing file
 - Importing a connection bundle now refuses a file over 16 MiB, or anything that is not a regular file, before reading it.
 - Driver panic messages, which can contain query text or credentials, are no longer written to the logs or the terminal; only the location is. Set `TABLEPRO_DEBUG_PANICS=1` to print them while developing.
 
@@ -283,6 +296,8 @@
 
 ### Security
 
+- Unparseable statements require approval when write or DDL approval is enabled, even when unparseable SQL is otherwise allowed.
+- Statements that access host files or run external programs, writes with unknown effects, and Local `TRUNCATE` require human approval.
 - The agent daemon no longer trusts an SSH host key it has not seen before. An unattended connection to an unknown host fails and names the key's fingerprint; connecting once from the app or with `ssh` records it. A changed key is still refused everywhere.
 - A lone BEGIN, COMMIT or ROLLBACK on a shared connection is refused with an explanation, in the SQL editor and through MCP. Each statement ran on a shared connection, so a script such as `BEGIN; UPDATE …; ROLLBACK;` committed the update while reporting every step as successful. A whole transaction sent as one batch, such as a SQL Server `GO` batch, still runs.
 - A saved connection's SSH jump chain is capped at eight hops, so an edited connection file cannot force a deep recursive parse.

@@ -9,7 +9,24 @@ use crate::error::StorageError;
 const KIND_DB_PASSWORD: &str = "db_password";
 const KIND_SSH_PASSWORD: &str = "ssh_password";
 const KIND_SSH_PASSPHRASE: &str = "ssh_passphrase";
+const KIND_SSH_HOP_PASSWORD: &str = "ssh_hop_password";
+const KIND_SSH_HOP_PASSPHRASE: &str = "ssh_hop_passphrase";
 const KIND_MCP_TOKEN: &str = "mcp_token";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SshHopSecretKind {
+    Password,
+    Passphrase,
+}
+
+impl SshHopSecretKind {
+    fn attribute_value(self) -> &'static str {
+        match self {
+            Self::Password => KIND_SSH_HOP_PASSWORD,
+            Self::Passphrase => KIND_SSH_HOP_PASSPHRASE,
+        }
+    }
+}
 
 pub async fn store_password(id: Uuid, password: &str, label: &str) -> Result<(), StorageError> {
     store_secret(id, KIND_DB_PASSWORD, password, label).await
@@ -47,6 +64,92 @@ pub async fn delete_ssh_passphrase(id: Uuid) -> Result<(), StorageError> {
     delete_secret(id, KIND_SSH_PASSPHRASE).await
 }
 
+pub async fn store_ssh_hop_password(
+    connection_id: Uuid,
+    hop_id: Uuid,
+    credential_revision: u64,
+    password: &str,
+    label: &str,
+) -> Result<(), StorageError> {
+    store_secret_with_attrs(
+        &attrs_for_hop(connection_id, hop_id, credential_revision, SshHopSecretKind::Password),
+        password,
+        label,
+    )
+    .await
+}
+
+pub async fn load_ssh_hop_password(
+    connection_id: Uuid,
+    hop_id: Uuid,
+    credential_revision: u64,
+) -> Result<Option<SecretString>, StorageError> {
+    load_secret_with_attrs(&attrs_for_hop(
+        connection_id,
+        hop_id,
+        credential_revision,
+        SshHopSecretKind::Password,
+    ))
+    .await
+}
+
+pub async fn delete_ssh_hop_password(
+    connection_id: Uuid,
+    hop_id: Uuid,
+    credential_revision: u64,
+) -> Result<(), StorageError> {
+    delete_secret_with_attrs(&attrs_for_hop(
+        connection_id,
+        hop_id,
+        credential_revision,
+        SshHopSecretKind::Password,
+    ))
+    .await
+}
+
+pub async fn store_ssh_hop_passphrase(
+    connection_id: Uuid,
+    hop_id: Uuid,
+    credential_revision: u64,
+    passphrase: &str,
+    label: &str,
+) -> Result<(), StorageError> {
+    store_secret_with_attrs(
+        &attrs_for_hop(connection_id, hop_id, credential_revision, SshHopSecretKind::Passphrase),
+        passphrase,
+        label,
+    )
+    .await
+}
+
+pub async fn load_ssh_hop_passphrase(
+    connection_id: Uuid,
+    hop_id: Uuid,
+    credential_revision: u64,
+) -> Result<Option<SecretString>, StorageError> {
+    load_secret_with_attrs(&attrs_for_hop(
+        connection_id,
+        hop_id,
+        credential_revision,
+        SshHopSecretKind::Passphrase,
+    ))
+    .await
+}
+
+pub async fn delete_ssh_hop_passphrase(
+    connection_id: Uuid,
+    hop_id: Uuid,
+    credential_revision: u64,
+) -> Result<(), StorageError> {
+    delete_secret_with_attrs(&attrs_for_hop(
+        connection_id,
+        hop_id,
+        credential_revision,
+        SshHopSecretKind::Passphrase,
+    ))
+    .await
+}
+
 pub async fn store_mcp_token(id: Uuid, plaintext: &str, label: &str) -> Result<(), StorageError> {
     store_secret(id, KIND_MCP_TOKEN, plaintext, label).await
 }
@@ -60,17 +163,29 @@ pub async fn delete_mcp_token(id: Uuid) -> Result<(), StorageError> {
 }
 
 async fn store_secret(id: Uuid, kind: &str, value: &str, label: &str) -> Result<(), StorageError> {
+    store_secret_with_attrs(&attrs_for(id, kind), value, label).await
+}
+
+async fn store_secret_with_attrs(
+    attrs: &HashMap<&'static str, String>,
+    value: &str,
+    label: &str,
+) -> Result<(), StorageError> {
     let keyring = open().await?;
     keyring
-        .create_item(label, &attrs_for(id, kind), value.as_bytes(), true)
+        .create_item(label, attrs, value.as_bytes(), true)
         .await
         .map_err(map_err)?;
     Ok(())
 }
 
 async fn load_secret(id: Uuid, kind: &str) -> Result<Option<SecretString>, StorageError> {
+    load_secret_with_attrs(&attrs_for(id, kind)).await
+}
+
+async fn load_secret_with_attrs(attrs: &HashMap<&'static str, String>) -> Result<Option<SecretString>, StorageError> {
     let keyring = open().await?;
-    let items = keyring.search_items(&attrs_for(id, kind)).await.map_err(map_err)?;
+    let items = keyring.search_items(attrs).await.map_err(map_err)?;
     let Some(item) = items.into_iter().next() else {
         return Ok(None);
     };
@@ -80,8 +195,12 @@ async fn load_secret(id: Uuid, kind: &str) -> Result<Option<SecretString>, Stora
 }
 
 async fn delete_secret(id: Uuid, kind: &str) -> Result<(), StorageError> {
+    delete_secret_with_attrs(&attrs_for(id, kind)).await
+}
+
+async fn delete_secret_with_attrs(attrs: &HashMap<&'static str, String>) -> Result<(), StorageError> {
     let keyring = open().await?;
-    keyring.delete(&attrs_for(id, kind)).await.map_err(map_err)?;
+    keyring.delete(attrs).await.map_err(map_err)?;
     Ok(())
 }
 
@@ -128,6 +247,18 @@ fn attrs_for(id: Uuid, kind: &str) -> HashMap<&'static str, String> {
     m.insert("connection-id", id.to_string());
     m.insert("kind", kind.to_string());
     m
+}
+
+fn attrs_for_hop(
+    connection_id: Uuid,
+    hop_id: Uuid,
+    credential_revision: u64,
+    kind: SshHopSecretKind,
+) -> HashMap<&'static str, String> {
+    let mut attrs = attrs_for(connection_id, kind.attribute_value());
+    attrs.insert("hop-id", hop_id.to_string());
+    attrs.insert("credential-revision", credential_revision.to_string());
+    attrs
 }
 
 #[cfg(test)]
@@ -181,6 +312,43 @@ mod tests {
         let pp = attrs_for(id, KIND_SSH_PASSPHRASE);
         assert_ne!(db.get("kind"), ssh.get("kind"));
         assert_ne!(ssh.get("kind"), pp.get("kind"));
+    }
+
+    #[test]
+    fn hop_secret_attributes_bind_connection_hop_kind_and_revision() {
+        let connection = Uuid::new_v4();
+        let hop = Uuid::new_v4();
+        let attrs = attrs_for_hop(connection, hop, 7, SshHopSecretKind::Password);
+
+        assert_eq!(
+            attrs.get("xdg:schema").map(String::as_str),
+            Some(crate::secret_schema())
+        );
+        assert_eq!(attrs.get("connection-id"), Some(&connection.to_string()));
+        assert_eq!(attrs.get("hop-id"), Some(&hop.to_string()));
+        assert_eq!(attrs.get("kind").map(String::as_str), Some("ssh_hop_password"));
+        assert_eq!(attrs.get("credential-revision").map(String::as_str), Some("7"));
+    }
+
+    #[test]
+    fn hop_secret_attributes_do_not_collide_across_hops_kinds_or_revisions() {
+        let connection = Uuid::new_v4();
+        let first_hop = Uuid::new_v4();
+        let second_hop = Uuid::new_v4();
+        let first = attrs_for_hop(connection, first_hop, 3, SshHopSecretKind::Passphrase);
+
+        assert_ne!(
+            first,
+            attrs_for_hop(connection, second_hop, 3, SshHopSecretKind::Passphrase)
+        );
+        assert_ne!(
+            first,
+            attrs_for_hop(connection, first_hop, 4, SshHopSecretKind::Passphrase)
+        );
+        assert_ne!(
+            first,
+            attrs_for_hop(connection, first_hop, 3, SshHopSecretKind::Password)
+        );
     }
 
     #[test]

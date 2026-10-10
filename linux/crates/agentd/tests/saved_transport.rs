@@ -106,6 +106,8 @@ fn saved_with_bastion(host: &str, bastion_port: u16) -> SavedConnection {
         auth_mode: AuthMode::Password,
         environment: Environment::Prod,
         ssh: Some(SavedSshConfig {
+            hop_id: uuid::Uuid::new_v4(),
+            credential_revision: 0,
             host: "127.0.0.1".into(),
             port: bastion_port,
             username: "jump".into(),
@@ -124,6 +126,7 @@ fn saved_with_bastion(host: &str, bastion_port: u16) -> SavedConnection {
 }
 
 fn saved_sqlite(path: &std::path::Path) -> SavedConnection {
+    std::fs::File::create(path).expect("an empty SQLite database file");
     SavedConnection {
         id: Uuid::new_v4(),
         name: "Local database".into(),

@@ -1,6 +1,6 @@
 # UI-1b: SSH jump-chain editor and per-hop credentials
 
-**Status:** Proposal; implementation and credential migration are not complete.
+**Status:** Implementation in progress. Stable hop identity and per-hop Secret Service storage primitives are implemented; credential migration, transport resolution, encrypted bundle v2, GTK editing, and acceptance remain incomplete. Keep jump-chain editing refused.
 
 ## Current behavior
 

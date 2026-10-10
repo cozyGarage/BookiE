@@ -122,6 +122,207 @@ async fn blob_affinity_values_are_decoded_by_their_runtime_storage_class() {
 }
 
 #[tokio::test]
+async fn json_each_values_keep_their_runtime_storage_classes() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    let result = connection
+        .query(
+            r#"SELECT key, value, type, typeof(value), atom, typeof(atom)
+               FROM json_each('[1,1.25,"text","",null,true,false,{"x":1},[2]]')
+               ORDER BY key"#,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(0),
+                Value::Int(1),
+                Value::Text("integer".into()),
+                Value::Text("integer".into()),
+                Value::Int(1),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Int(1),
+                Value::Float(1.25),
+                Value::Text("real".into()),
+                Value::Text("real".into()),
+                Value::Float(1.25),
+                Value::Text("real".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Text("".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Int(4),
+                Value::Null,
+                Value::Text("null".into()),
+                Value::Text("null".into()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+            vec![
+                Value::Int(5),
+                Value::Int(1),
+                Value::Text("true".into()),
+                Value::Text("integer".into()),
+                Value::Int(1),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Int(6),
+                Value::Int(0),
+                Value::Text("false".into()),
+                Value::Text("integer".into()),
+                Value::Int(0),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Int(7),
+                Value::Text(r#"{"x":1}"#.into()),
+                Value::Text("object".into()),
+                Value::Text("text".into()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+            vec![
+                Value::Int(8),
+                Value::Text("[2]".into()),
+                Value::Text("array".into()),
+                Value::Text("text".into()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+async fn json_each_object_keys_keep_their_text_values_and_storage_classes() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    let result = connection
+        .query(
+            r#"SELECT key, value, type, typeof(key), typeof(value), atom, typeof(atom)
+               FROM json_each('{"":null,"01":true,"NULL":"","雪":{"x":1}}')
+               ORDER BY key"#,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Text(String::new()),
+                Value::Null,
+                Value::Text("null".into()),
+                Value::Text("text".into()),
+                Value::Text("null".into()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+            vec![
+                Value::Text("01".into()),
+                Value::Int(1),
+                Value::Text("true".into()),
+                Value::Text("text".into()),
+                Value::Text("integer".into()),
+                Value::Int(1),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Text("NULL".into()),
+                Value::Text(String::new()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Text(String::new()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Text("雪".into()),
+                Value::Text(r#"{"x":1}"#.into()),
+                Value::Text("object".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+async fn json_object_and_array_results_remain_exact_text() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    let result = connection
+        .query(
+            "SELECT json_object('empty', '', 'null', NULL, 'number', 7), \
+                    typeof(json_object('empty', '', 'null', NULL, 'number', 7)), \
+                    json_array(1, 1.25, '', NULL, json('true'), json('{\"x\":1}')), \
+                    typeof(json_array(1, 1.25, '', NULL, json('true'), json('{\"x\":1}'))) ",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text(r#"{"empty":"","null":null,"number":7}"#.into()),
+            Value::Text("text".into()),
+            Value::Text(r#"[1,1.25,"",null,true,{"x":1}]"#.into()),
+            Value::Text("text".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
+async fn jsonb_results_remain_binary_blobs_with_native_json_content() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    let result = connection
+        .query(
+            "SELECT jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}'), \
+                    typeof(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}')), \
+                    json(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}')), \
+                    hex(jsonb('{\"empty\":\"\",\"null\":null,\"nested\":[1,true]}'))",
+        )
+        .await
+        .unwrap();
+
+    let [
+        Value::Bytes(bytes),
+        Value::Text(storage_class),
+        Value::Text(json_text),
+        Value::Text(native_hex),
+    ] = result.rows[0].as_slice()
+    else {
+        panic!("SQLite JSONB result did not remain a byte value")
+    };
+    assert!(!bytes.is_empty());
+    assert_eq!(
+        native_hex,
+        &bytes.iter().map(|byte| format!("{byte:02X}")).collect::<String>()
+    );
+    assert_eq!(storage_class, "blob");
+    assert_eq!(json_text, r#"{"empty":"","null":null,"nested":[1,true]}"#);
+}
+
+#[tokio::test]
 async fn declared_enum_values_follow_sqlite_numeric_affinity_and_keep_runtime_kinds() {
     let connection = SqliteDriver.connect(memory_options()).await.unwrap();
     connection.execute("CREATE TABLE enum_like (value ENUM)").await.unwrap();
