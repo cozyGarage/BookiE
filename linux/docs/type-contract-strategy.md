@@ -30,13 +30,19 @@ The SQL Server test fixture waits for an authenticated `SELECT 1` as `sa`,
 retrying login rejection for at most 60 seconds after container readiness logs.
 On timeout it includes container stdout/stderr with the fixture password
 redacted. The integration and wide-numeric targets share this fixture.
-Deterministic retry tests pass; local serial Docker runs passed the main suite
-43/43 in 260.94 seconds and wide-numeric 5/5 in 3.87 seconds, including
-`a_column_comment_round_trips_from_its_extended_property`. This waits for
-authenticated readiness but does not prove the executor's earlier `AuthFailed`
-was caused by SQL Server's script-upgrade window. Forgejo run 111 on pre-sync
-head `e1ea20f` passed 27/28 jobs; its only failure was the known B4
-`pg-release` mismatch.
+On the linux-synced PR #465 head, the serial integration target passed 43/43 in
+303.85 seconds and wide-numeric passed 5/5 in 15.90 seconds, including
+`a_column_comment_round_trips_from_its_extended_property`; preflight passed and
+Forgejo run 115 passed. PR #465 merged as `5727bc8`. The readiness probe does
+not prove the executor's earlier `AuthFailed` was caused by SQL Server's
+script-upgrade window.
+
+SQLite's JSON1 `json_each` runtime values are covered by
+`runtime_typed_values::json_each_values_keep_their_runtime_storage_classes`:
+SQLite `type` and `typeof` oracles distinguish integer, real, text, SQL NULL,
+boolean, object and array rows while the driver preserves primitive values and
+the text fallback for nested JSON. The focused
+`cargo test -p tablepro-driver-sqlite --test runtime_typed_values` passed 5/5.
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
