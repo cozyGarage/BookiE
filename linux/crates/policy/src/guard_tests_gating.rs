@@ -116,11 +116,51 @@ async fn write_approval_overrides_the_human_unparseable_allow_rule() {
 
     assert_eq!(approvals.load(Ordering::SeqCst), 1);
     let events = audit.events.lock().expect("audit events");
-    assert!(
-        events
-            .iter()
-            .any(|event| { event.decision_rule.trim_end_matches(":approved") == "human_write_approve" })
+    assert!(events.iter().any(|event| {
+        event
+            .decision_rule
+            .trim_end_matches(":approved")
+            .split('+')
+            .any(|rule| rule == "human_write_approve")
+    }));
+}
+
+#[tokio::test]
+async fn unknown_effects_require_approval_when_unparseable_human_sql_is_allowed() {
+    let approvals = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let mut policy = PolicyConfig::default();
+    let local = policy.environments.entry("local".into()).or_default();
+    local.human_approve_writes = Some(false);
+    local.human_approve_unparseable = Some(false);
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            policy,
+            Arc::new(CountingApprovalSink {
+                calls: approvals.clone(),
+            }),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
     );
+
+    guard
+        .execute("DELETE FROM items WHERE id = 1; SELECT (")
+        .await
+        .expect("the mocked approval sink approves the malformed script");
+
+    assert_eq!(approvals.load(Ordering::SeqCst), 1);
+    let events = audit.events.lock().expect("audit events");
+    assert!(events.iter().any(|event| {
+        event
+            .decision_rule
+            .trim_end_matches(":approved")
+            .split('+')
+            .any(|rule| rule == "human_dangerous_effect_approval")
+    }));
 }
 
 #[tokio::test]

@@ -140,15 +140,7 @@ fn evaluate_categorical_decisions(
     }
 
     if facts.class == StatementClass::Unparseable {
-        decisions.push(decide_unparseable(principal, env_policy));
-        if !principal.is_agent() && env_policy.human_approve_writes {
-            decisions.push(Decision::RequireApproval {
-                rule: "human_write_approve".into(),
-                reason: format!("writes require approval in {}", environment.as_str()),
-                preview: None,
-            });
-        }
-        return decisions;
+        return evaluate_unparseable_decisions(decisions, principal, environment, facts, effects, env_policy);
     }
 
     if facts.is_multi_statement && principal.is_agent() && !env_policy.agent_allow_multi_statement {
@@ -186,6 +178,37 @@ fn evaluate_categorical_decisions(
             effects,
             env_policy,
         ));
+    }
+    decisions
+}
+
+fn evaluate_unparseable_decisions(
+    mut decisions: Vec<Decision>,
+    principal: &Principal,
+    environment: Environment,
+    facts: &StatementFacts,
+    effects: Effects,
+    env_policy: &EnvPolicy,
+) -> Vec<Decision> {
+    let unparseable = decide_unparseable(principal, env_policy);
+    let explicitly_allowed = unparseable.is_allow();
+    decisions.push(unparseable);
+    if principal.is_agent() {
+        return decisions;
+    }
+    if explicitly_allowed {
+        decisions.extend(evaluate_human_dangerous_effects(
+            environment,
+            facts,
+            effects,
+            env_policy,
+        ));
+    } else if env_policy.human_approve_writes {
+        decisions.push(Decision::RequireApproval {
+            rule: "human_write_approve".into(),
+            reason: format!("writes require approval in {}", environment.as_str()),
+            preview: None,
+        });
     }
     decisions
 }
@@ -509,27 +532,6 @@ mod tests {
                 assert!(matches!(human_decision, Decision::RequireApproval { .. }));
             }
         }
-    }
-
-    #[test]
-    fn malformed_write_with_write_approval_enabled_cannot_use_the_unparseable_allow_rule() {
-        let policy = EnvPolicy {
-            human_approve_writes: true,
-            human_approve_unparseable: false,
-            ..env_policy(Environment::Local)
-        };
-        let sql = "DELETE FROM items WHERE id = 1; SELECT (";
-        let decision = evaluate(
-            &Principal::human_gui(),
-            Environment::Local,
-            &classify(sql, "postgres"),
-            false,
-            &policy,
-            None,
-        );
-
-        assert!(matches!(decision, Decision::RequireApproval { .. }), "{decision:?}");
-        assert_eq!(decision.rule_name(), "human_write_approve");
     }
 
     #[test]
