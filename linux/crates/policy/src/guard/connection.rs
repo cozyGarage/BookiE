@@ -191,7 +191,7 @@ impl Connection for PolicyGuard {
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
         let authorization = self.authorize(sql, false, None).await?;
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query(sql))
                 .await;
@@ -217,7 +217,7 @@ impl Connection for PolicyGuard {
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
         let authorization = self.authorize(sql, false, Some(control)).await?;
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query_controlled(sql, control))
                 .await;
@@ -244,7 +244,7 @@ impl Connection for PolicyGuard {
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let authorization = self.authorize(sql, true, None).await?;
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query_params(sql, params))
                 .await;
@@ -275,7 +275,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         let authorization = self.authorize(sql, true, Some(control)).await?;
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| {
                     inner.query_params_controlled(sql, params, control)
@@ -318,7 +318,7 @@ impl Connection for PolicyGuard {
             authorization.preview_state,
         );
         let start = Instant::now();
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             self.require_governed_write_available()?;
             self.handle_intent_failure(self.record_intent(&operation).await)?;
             let mut pending_write = self.ctx.audit_state.pending_write();
@@ -621,7 +621,7 @@ impl PolicyGuard {
 impl Transaction for PolicyTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
         let authorization = self.guard.authorize(sql, false, None).await?;
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             self.guard.require_governed_write_available()?;
             let operation = self.guard.operation(
                 sql,
@@ -671,7 +671,7 @@ impl Transaction for PolicyTransaction {
 
     async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
         let authorization = self.guard.authorize(sql, false, Some(control)).await?;
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             self.guard.require_governed_write_available()?;
             let operation = self.guard.operation(
                 sql,
@@ -721,7 +721,7 @@ impl Transaction for PolicyTransaction {
 
     async fn query_params(&mut self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let authorization = self.guard.authorize(sql, true, None).await?;
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             self.guard.require_governed_write_available()?;
             let operation = self.guard.operation(
                 sql,
@@ -776,7 +776,7 @@ impl Transaction for PolicyTransaction {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         let authorization = self.guard.authorize(sql, true, Some(control)).await?;
-        if authorization.facts.writes {
+        if authorization.facts.writes() {
             self.guard.require_governed_write_available()?;
             let operation = self.guard.operation(
                 sql,

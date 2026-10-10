@@ -1,6 +1,5 @@
 use super::*;
 use crate::classify::StatementClass;
-use crate::effects::Effects;
 
 /// Rows one approved import may write. A budget larger than this is
 /// refused before the user is asked, so no single approval can cover an
@@ -169,7 +168,6 @@ impl PolicyGuard {
             &self.ctx.principal,
             self.ctx.environment,
             &facts,
-            Effects::WRITES_ROWS,
             self.ctx.read_only,
             &env_policy,
             Some(request.row_budget),
@@ -306,7 +304,7 @@ impl PolicyGuard {
             operation_id: Uuid::new_v4(),
             batch_id: None,
             sql: &request.statement,
-            class: AuditOperationClass::from_statement(facts.class, facts.writes),
+            class: AuditOperationClass::from_statement(facts.class, facts.writes()),
             targets: vec![qualified_target(request.schema.as_deref(), &request.table)],
             decision_rule: rule.to_owned(),
             approval_outcome,
@@ -341,7 +339,7 @@ impl PolicyGuard {
             schema: request.schema,
             table: request.table,
             statement: request.statement,
-            class: AuditOperationClass::from_statement(facts.class, facts.writes),
+            class: AuditOperationClass::from_statement(facts.class, facts.writes()),
             decision_rule: granted.decision_rule,
             approval_outcome: granted.approval_outcome,
             preview_state: granted.preview_state,
@@ -391,7 +389,7 @@ fn bulk_facts(request: &BulkInsertRequest, driver_id: &str) -> Result<StatementF
         return Err(denied("an import must name between one row and the import row limit"));
     }
     let facts = classify(&request.statement, driver_id);
-    if facts.is_multi_statement || facts.class != StatementClass::Insert || !facts.writes {
+    if facts.is_multi_statement || facts.class != StatementClass::Insert || !facts.writes() {
         return Err(denied(
             "an import approval covers one INSERT statement and nothing else",
         ));

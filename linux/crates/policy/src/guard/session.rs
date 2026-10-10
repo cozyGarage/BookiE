@@ -130,13 +130,9 @@ impl PolicySession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let analysis = classify_with_effects(sql, &self.guard.ctx.driver_id);
-        let facts = analysis.facts;
-        let authorization = self
-            .guard
-            .authorize_classified(sql, facts, analysis.effects, Some(control))
-            .await?;
-        let writes = authorization.facts.writes;
+        let facts = classify(sql, &self.guard.ctx.driver_id);
+        let authorization = self.guard.authorize_classified(sql, facts, Some(control)).await?;
+        let writes = authorization.facts.writes();
         let result = match self.batch {
             Some(batch) => {
                 self.batch_statement(sql, params, control, authorization, batch.id)
@@ -183,7 +179,7 @@ impl PolicySession {
         authorization: Authorization,
         batch_id: Uuid,
     ) -> Result<QueryResult, DriverError> {
-        let writes = authorization.facts.writes;
+        let writes = authorization.facts.writes();
         if writes {
             self.guard.require_governed_write_available()?;
         }

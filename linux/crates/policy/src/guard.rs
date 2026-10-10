@@ -16,7 +16,7 @@ use crate::audit::{
     AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome,
 };
 use crate::blast_radius::count_sql_for_mutation;
-use crate::classify::{StatementClass, StatementFacts, classify, classify_with_effects};
+use crate::classify::{StatementClass, StatementFacts, classify};
 use crate::config::PolicyConfig;
 use crate::effects::Effects;
 use crate::mask::apply_masking;
@@ -112,12 +112,11 @@ impl PolicyGuard {
         _is_params_exec: bool,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        let analysis = classify_with_effects(sql, &self.ctx.driver_id);
-        let facts = analysis.facts;
+        let facts = classify(sql, &self.ctx.driver_id);
         if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
             return self.resolve_authorization(sql, facts, decision, None, control).await;
         }
-        self.authorize_classified(sql, facts, analysis.effects, control).await
+        self.authorize_classified(sql, facts, control).await
     }
 
     async fn authorize_bounded(
@@ -126,33 +125,30 @@ impl PolicyGuard {
         enforced_rows: Option<u64>,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        let analysis = classify_with_effects(sql, &self.ctx.driver_id);
-        let facts = analysis.facts;
+        let facts = classify(sql, &self.ctx.driver_id);
         if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
             return self.resolve_authorization(sql, facts, decision, None, control).await;
         }
-        self.authorize_with_bound(sql, facts, analysis.effects, enforced_rows, control)
-            .await
+        self.authorize_with_bound(sql, facts, enforced_rows, control).await
     }
 
     async fn authorize_classified(
         &self,
         sql: &str,
         facts: StatementFacts,
-        effects: Effects,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        self.authorize_with_bound(sql, facts, effects, None, control).await
+        self.authorize_with_bound(sql, facts, None, control).await
     }
 
     async fn authorize_with_bound(
         &self,
         sql: &str,
         facts: StatementFacts,
-        effects: Effects,
         enforced_rows: Option<u64>,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
+        let effects = facts.effects;
         let env_policy = self
             .ctx
             .policy
@@ -161,7 +157,6 @@ impl PolicyGuard {
             &self.ctx.principal,
             self.ctx.environment,
             &facts,
-            effects,
             self.ctx.read_only,
             &env_policy,
         )
@@ -171,7 +166,6 @@ impl PolicyGuard {
                 &self.ctx.principal,
                 self.ctx.environment,
                 &facts,
-                effects,
                 self.ctx.read_only,
                 &env_policy,
                 None,
@@ -180,7 +174,7 @@ impl PolicyGuard {
         }
 
         self.require_governed_write_available()?;
-        let estimated_rows = if facts.contains_mutating_dml
+        let estimated_rows = if facts.contains_mutating_dml()
             && facts.class != StatementClass::Administrative
             && !effects.contains(Effects::ADMIN)
             && !effects.contains(Effects::UNKNOWN)
@@ -197,7 +191,6 @@ impl PolicyGuard {
             &self.ctx.principal,
             self.ctx.environment,
             &facts,
-            effects,
             &env_policy,
             estimated_rows,
         );
@@ -442,7 +435,7 @@ impl PolicyGuard {
             operation_id: Uuid::new_v4(),
             batch_id,
             sql,
-            class: AuditOperationClass::from_statement(facts.class, facts.writes),
+            class: AuditOperationClass::from_statement(facts.class, facts.writes()),
             targets: facts.tables.clone(),
             decision_rule: decision.rule_name().to_string(),
             approval_outcome,
