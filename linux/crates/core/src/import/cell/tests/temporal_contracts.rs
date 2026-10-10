@@ -57,7 +57,6 @@ fn value_contract_mysql_invalid_calendar_csv_values_remain_exact_text() {
 
     for text in [
         "024-02-31 12:34:56",
-        "024-02-31 12:34:56",
         "2024-13-01 12:34:56",
         "2024-02-32 12:34:56",
         "2024-02-31x 12:34:56",
