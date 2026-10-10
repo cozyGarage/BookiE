@@ -101,6 +101,7 @@ Live acceptance bounds stay above. Open packaging work:
 | ID | Current implementation and validation | Remaining |
 | --- | --- | --- |
 | B4-22 | Complete distribution-package/native Wayland bundle audit acceptance | Hosted installed GTK safety passed 53/53 scenarios on pinned candidate `5db1cfe`, including bundle export/import audit, encrypted credential round-trip and cross-profile import. Package/native Wayland acceptance remains open; see [current candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) |
+| UI-13b / PERF-8 prerequisite | Policy sessions recognize PostgreSQL `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` and `SERIALIZABLE READ ONLY` as guarded read snapshots; weaker `READ ONLY` starts and unsupported-engine starts are refused. Writes and session/host-file side effects are blocked inside the snapshot. Policy tests and Docker PostgreSQL mutation-between-reads test pass locally; full `preflight.sh` passes. | Wire the session into cursor paging and full export, then complete engine-specific and installed acceptance. Debian package validation was skipped locally because `dpkg-deb` is unavailable. |
 
 ## Completed local slices
 
