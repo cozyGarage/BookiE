@@ -72,11 +72,8 @@ table in the same commit.
 
 | Row | Decision | B4 may edit | UX may edit |
 | --- | --- | --- | --- |
-<<<<<<< HEAD
 | UI-1b per-hop passphrase transport coverage | B: B4 adds the transport behavior tests; UX registers them with the isolated Secret Service tier | `linux/crates/transport/src/lib.rs` | `linux/scripts/isolated-tests.json` and generated `linux/docs/ignored-tests.md` |
-=======
 | UI-1b bundle import rollback | B: B4 owns the import and credential rollback contract; UX reviews the app-layer implementation | `linux/crates/app/src/ui/app/bundle.rs` and its unit tests | Review sequencing, partial-import reporting and rollback behavior; no unrelated app changes |
->>>>>>> origin/linux
 
 For PERF-9/10, preserve ADR 0007 outcomes and native stored-value oracles, and add
 the regression at the lowest applicable tier in the same commit. UX works only
