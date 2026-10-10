@@ -51,6 +51,11 @@ opens and queries a saved PostgreSQL mTLS connection; agentd proves saved mTLS
 directly and through its saved SSH route, and rejects an untrusted identity.
 These are local source/test results; installed-package and hosted acceptance
 remain separate.
+
+PostgreSQL and MySQL Verify CA and Verify Full use the operating system trust
+store when no custom authority is named. A named authority is added to those
+roots. Verify CA checks the certificate chain; Verify Full also checks the
+service hostname.
 Do not promise certificate pinning or Kerberos qualification without their
 specific native evidence. Typed keyring failure propagates instead of becoming
 a missing password; see [storage](storage.md#secrets).
