@@ -1,9 +1,28 @@
 use std::cell::{Cell, RefCell};
+use std::sync::{Arc, Weak};
 
 use gtk4::glib;
 use gtk4::subclass::prelude::*;
 
-use tablepro_core::Value;
+use tablepro_core::{QueryResult, Value};
+
+#[derive(Clone)]
+pub struct SharedRow {
+    result: Weak<QueryResult>,
+    source_index: usize,
+    projection: Option<Vec<usize>>,
+}
+
+impl SharedRow {
+    fn cell<'a>(&self, result: &'a QueryResult, index: usize) -> Option<&'a Value> {
+        let row = result.rows.get(self.source_index)?;
+        let source_index = match &self.projection {
+            Some(indices) => indices.iter().position(|mapped| *mapped == index)?,
+            None => index,
+        };
+        row.get(source_index)
+    }
+}
 
 mod imp {
     use super::*;
@@ -12,6 +31,7 @@ mod imp {
     pub struct RowObject {
         pub cells: RefCell<Vec<Option<Value>>>,
         pub previews: RefCell<Vec<Option<CellPreview>>>,
+        pub source: RefCell<Option<SharedRow>>,
         /// Local id for draft (uninserted) rows added via the
         /// inline-Insert flow. `None` for persisted rows fetched
         /// from the database. Lets `connect_bind` distinguish a
@@ -65,6 +85,27 @@ impl RowObject {
         Some(obj)
     }
 
+    pub(crate) fn from_shared(
+        result: &Arc<QueryResult>,
+        source_index: usize,
+        projection: Option<(Vec<usize>, usize)>,
+    ) -> Option<Self> {
+        let source_row = result.rows.get(source_index)?;
+        let (indices, width) = match projection {
+            Some((indices, width)) => (Some(indices), width),
+            None => (None, source_row.len()),
+        };
+        let row: Self = glib::Object::new();
+        *row.imp().cells.borrow_mut() = vec![None; width];
+        *row.imp().previews.borrow_mut() = vec![None; width];
+        *row.imp().source.borrow_mut() = Some(SharedRow {
+            result: Arc::downgrade(result),
+            source_index,
+            projection: indices,
+        });
+        Some(row)
+    }
+
     pub fn new_draft(draft_id: u64, cells: Vec<Value>) -> Self {
         let obj = Self::new(cells);
         obj.imp().draft_id.set(Some(draft_id));
@@ -76,17 +117,37 @@ impl RowObject {
     }
 
     pub fn cell_value(&self, idx: usize) -> Value {
-        self.imp()
-            .cells
-            .borrow()
-            .get(idx)
-            .cloned()
-            .flatten()
+        self.with_cell_value(idx, Clone::clone)
             .unwrap_or_else(|| Value::Undecodable("not fetched".into()))
     }
 
     pub fn cell_is_loaded(&self, idx: usize) -> bool {
-        self.imp().cells.borrow().get(idx).is_some_and(Option::is_some)
+        self.with_cell_value(idx, |_| ()).is_some()
+    }
+
+    fn with_cell_value<R>(&self, idx: usize, f: impl FnOnce(&Value) -> R) -> Option<R> {
+        let cells = self.imp().cells.borrow();
+        if let Some(value) = cells.get(idx)?.as_ref() {
+            return Some(f(value));
+        }
+        drop(cells);
+        let source = self.imp().source.borrow();
+        let shared = source.as_ref()?;
+        let result = shared.result.upgrade()?;
+        shared.cell(&result, idx).map(f)
+    }
+
+    pub(crate) fn detach_shared(&self) {
+        let source = self.imp().source.borrow().clone();
+        let Some(shared) = source else { return };
+        let Some(result) = shared.result.upgrade() else { return };
+        let mut cells = self.imp().cells.borrow_mut();
+        for index in 0..cells.len() {
+            if cells[index].is_none() {
+                cells[index] = shared.cell(&result, index).cloned();
+            }
+        }
+        self.imp().source.borrow_mut().take();
     }
 
     pub fn cell_preview(&self, idx: usize) -> Option<CellPreview> {
@@ -94,81 +155,79 @@ impl RowObject {
     }
 
     pub fn preview_long_values(&self, key_indices: &[usize]) {
-        let cells = self.imp().cells.borrow();
-        let mut previews = self.imp().previews.borrow_mut();
         if key_indices.is_empty()
             || key_indices.iter().any(|&index| {
-                cells
-                    .get(index)
-                    .and_then(Option::as_ref)
-                    .is_none_or(|value| matches!(value, Value::Undecodable(_)))
+                self.with_cell_value(index, |value| matches!(value, Value::Undecodable(_)))
+                    .unwrap_or(true)
             })
         {
             return;
         }
-        for (index, cell) in cells.iter().enumerate() {
-            if key_indices.contains(&index) {
-                continue;
-            }
-            let Some(value) = cell.as_ref() else { continue };
-            previews[index] = preview_value(value);
-        }
+        self.update_previews(|index| !key_indices.contains(&index));
     }
 
     pub fn preview_values_from_result(&self) {
-        let cells = self.imp().cells.borrow();
+        self.update_previews(|_| true);
+    }
+
+    fn update_previews(&self, should_preview: impl Fn(usize) -> bool) {
+        let len = self.imp().cells.borrow().len();
+        let updates = (0..len)
+            .filter(|index| should_preview(*index))
+            .map(|index| (index, self.with_cell_value(index, preview_value).flatten()))
+            .collect::<Vec<_>>();
         let mut previews = self.imp().previews.borrow_mut();
-        for (index, cell) in cells.iter().enumerate() {
-            let Some(value) = cell.as_ref() else { continue };
-            previews[index] = preview_value(value);
+        for (index, preview) in updates {
+            previews[index] = preview;
         }
     }
 
     pub fn preview_long_redis_string_values(&self, key_indices: &[usize]) {
-        if self.cell_value(1) == Value::Text("string".into()) {
+        if self.with_cell_value(1, |value| value == &Value::Text("string".into())) == Some(true) {
             self.preview_long_values(key_indices);
         }
     }
 
     pub fn cells_are_complete(&self) -> bool {
-        self.imp().cells.borrow().iter().all(Option::is_some)
+        let len = self.imp().cells.borrow().len();
+        (0..len).all(|index| self.cell_is_loaded(index))
     }
 
     pub fn complete_cells(&self) -> Option<Vec<Value>> {
-        self.imp().cells.borrow().iter().cloned().collect()
+        let len = self.imp().cells.borrow().len();
+        (0..len)
+            .map(|index| self.with_cell_value(index, Clone::clone))
+            .collect()
     }
 
     pub fn loaded_cells(&self) -> Vec<Option<Value>> {
-        self.imp().cells.borrow().clone()
+        let len = self.imp().cells.borrow().len();
+        (0..len)
+            .map(|index| self.with_cell_value(index, Clone::clone))
+            .collect()
     }
 
     pub fn clone_preserving_loading_state(&self) -> Self {
         let row: Self = glib::Object::new();
-        *row.imp().cells.borrow_mut() = self.loaded_cells();
+        *row.imp().cells.borrow_mut() = self.imp().cells.borrow().clone();
         *row.imp().previews.borrow_mut() = self.imp().previews.borrow().clone();
+        *row.imp().source.borrow_mut() = self.imp().source.borrow().clone();
         row.imp().draft_id.set(self.draft_id());
         row
     }
 
     pub fn cells_clone(&self) -> Vec<Value> {
-        self.imp()
-            .cells
-            .borrow()
-            .iter()
-            .cloned()
-            .map(|value| value.unwrap_or_else(|| Value::Undecodable("not fetched".into())))
+        let len = self.imp().cells.borrow().len();
+        (0..len)
+            .map(|index| {
+                self.with_cell_value(index, Clone::clone)
+                    .unwrap_or_else(|| Value::Undecodable("not fetched".into()))
+            })
             .collect()
     }
 
     pub fn with_cells<R>(&self, f: impl FnOnce(&[Value]) -> R) -> R {
-        let cells = self
-            .imp()
-            .cells
-            .borrow()
-            .iter()
-            .cloned()
-            .map(|value| value.unwrap_or_else(|| Value::Undecodable("not fetched".into())))
-            .collect::<Vec<_>>();
+        let cells = self.cells_clone();
         f(&cells)
     }
 
@@ -223,12 +282,54 @@ fn json_exceeds(json: &serde_json::Value, limit: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gtk4::glib::object::CastNone;
+    use gtk4::prelude::ListModelExt;
+    use std::sync::Arc;
+    use tablepro_core::{ColumnInfo, QueryResult};
 
     #[test]
     fn a_json_value_is_measured_without_serialising_small_documents_twice() {
         assert!(!json_exceeds(&serde_json::json!({"a": 1}), 8));
         assert!(json_exceeds(&serde_json::json!({"payload": "x".repeat(20)}), 8));
         assert!(!json_exceeds(&serde_json::json!("12345"), 7));
+    }
+
+    #[test]
+    fn shared_result_rows_do_not_clone_large_cell_payloads_into_row_objects() {
+        let payload = "x".repeat(1_000_000);
+        let result = Arc::new(QueryResult {
+            columns: vec![ColumnInfo {
+                name: "payload".into(),
+                data_type: "TEXT".into(),
+                nullable: false,
+                primary_key: false,
+                is_auto_increment: false,
+                default_value: None,
+                is_generated: false,
+                comment: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            }],
+            rows: vec![vec![Value::Text(payload.clone())]],
+            truncated: false,
+        });
+        let source_pointer = match &result.rows[0][0] {
+            Value::Text(text) => text.as_ptr() as usize,
+            _ => 0,
+        };
+        let store = crate::ui::row_store::RowStore::from_shared_with_result_previews(result.clone());
+        let row = store.item(0).and_downcast::<RowObject>().unwrap();
+
+        let row_pointer = row
+            .with_cell_value(0, |value| match value {
+                Value::Text(text) => text.as_ptr() as usize,
+                _ => 0,
+            })
+            .unwrap();
+        assert_eq!(row_pointer, source_pointer);
+        assert_eq!(row.cell_value(0), Value::Text(payload.clone()));
+        assert_eq!(row.cell_preview(0).unwrap().byte_count, payload.len());
     }
 
     #[test]

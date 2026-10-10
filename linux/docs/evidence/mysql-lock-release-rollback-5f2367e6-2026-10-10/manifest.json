@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "B4-11 MySQL and MariaDB RELEASE_LOCK side effects after failed batch rollback",
+  "source_commit": "5f2367e6bda8d900b70fc088198a578b0dbc556e",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic_parts/advisory_lock_release.rs": "fc1e9b43b32128adc2d7aaf197a0c2820b31bb7cf881f32e58cb30fdd4398738"
+  },
+  "fixtures": [
+    "MySQL 8.1 testcontainers fixture",
+    "MariaDB 11 testcontainers fixture"
+  ],
+  "command": "cargo test --locked -p tablepro-driver-mysql --test integration failed_batch_does_not_restore_a_released_named_lock -- --ignored --test-threads=1",
+  "runtime": "Local Omarchy Linux host with Docker; serialized MySQL and MariaDB selector",
+  "result": "2 passed; 0 failed; 95 filtered out; 12.34 seconds; exit code 0",
+  "assertions": [
+    "A CHECK constraint requires GET_LOCK to succeed inside the failing batch.",
+    "RELEASE_LOCK runs on the same batch session before a later duplicate-key error at statement index 2.",
+    "The transactional insert and update are absent after rollback.",
+    "A separate observer connection confirms the lock remains free after rollback on both MySQL and MariaDB."
+  ],
+  "not_established": [
+    "Optional or vendor-specific MySQL-family storage engines and other side-effect classes remain open.",
+    "Frozen-candidate, package-installed, hosted and Forgejo acceptance remain separate."
+  ]
+}

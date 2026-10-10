@@ -64,7 +64,7 @@ impl Connection for StubConnection {
 
     async fn query_result_sets_controlled(
         &self,
-        _sql: &str,
+        sql: &str,
         _params: &[Value],
         _control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
@@ -85,11 +85,16 @@ impl Connection for StubConnection {
             rows: vec![vec![Value::Text(value.into())]],
             truncated: false,
         };
-        Ok(QueryResultBatch {
-            result_sets: vec![
+        let result_sets = if sql.contains("json_agg") {
+            vec![sensitive("payload", r#"{"pan":"4111111111111111"}"#)]
+        } else {
+            vec![
                 sensitive("password", "first-secret"),
                 sensitive("api_token", "second-secret"),
-            ],
+            ]
+        };
+        Ok(QueryResultBatch {
+            result_sets,
             truncated: false,
         })
     }
@@ -187,4 +192,43 @@ async fn an_agent_guard_masks_sensitive_columns_in_every_result_set() {
     assert_eq!(result.result_sets.len(), 2);
     assert_eq!(result.result_sets[0].rows[0][0], Value::Text("***REDACTED***".into()));
     assert_eq!(result.result_sets[1].rows[0][0], Value::Text("***REDACTED***".into()));
+}
+
+#[tokio::test]
+async fn an_agent_guard_masks_json_aggregates_that_serialize_a_record() {
+    use tablepro_policy::{AutoApproveSink, Principal};
+    use tokio_util::sync::CancellationToken;
+
+    let inner: Arc<dyn Connection> = Arc::new(StubConnection {
+        server_cancellation: false,
+    });
+    let guard = PolicyGuard::new(
+        inner,
+        GuardContext {
+            connection_id: Uuid::new_v4(),
+            connection_name: "json aggregate mask test".into(),
+            driver_id: "postgres".into(),
+            environment: Environment::Prod,
+            read_only: false,
+            principal: Principal::Agent {
+                token: "test-token".into(),
+                client: None,
+                model: None,
+            },
+            policy: Arc::new(PolicyConfig::default()),
+            approval: Arc::new(AutoApproveSink),
+            audit: Arc::new(AcceptingAudit),
+            audit_state: Arc::new(AuditState::new()),
+        },
+    );
+    let result = guard
+        .query_result_sets_controlled(
+            "SELECT json_agg(c) FROM cards c",
+            &[],
+            &OperationControl::new(CancellationToken::new(), None),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.result_sets[0].rows[0][0], Value::Text("***REDACTED***".into()));
 }
