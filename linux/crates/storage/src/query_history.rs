@@ -156,7 +156,7 @@ fn create_private_file_if_missing(path: &PathBuf) -> Result<(), StorageError> {
 fn restrict_permissions(path: &Path) -> Result<(), StorageError> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
+    let Some(file_name) = path.file_name().and_then(std::ffi::OsStr::to_str) else {
         return Ok(());
     };
     for suffix in ["-wal", "-shm"] {

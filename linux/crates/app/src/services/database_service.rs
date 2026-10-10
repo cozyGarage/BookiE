@@ -290,7 +290,7 @@ impl DatabaseService {
         }
         self.connections
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(&id)
             .and_then(|entry| {
                 entry
@@ -303,7 +303,10 @@ impl DatabaseService {
     }
 
     pub fn ssh_environment(&self) -> SshEnvironment {
-        self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.ssh_environment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     pub fn ssh_environment_for_connection(
@@ -329,31 +332,42 @@ impl DatabaseService {
 
     pub fn candidate_guard_factory(&self) -> CandidateGuardFactory {
         CandidateGuardFactory {
-            policy: self.policy.lock().unwrap_or_else(|e| e.into_inner()).clone(),
-            approval: self.approval.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            policy: self
+                .policy
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone(),
+            approval: self
+                .approval
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone(),
             audit: self.audit.clone(),
             audit_state: self.audit_state.clone(),
         }
     }
 
     pub fn enable_system_openssh(&self, openssh: OpenSshEnvironment) {
-        self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).openssh = Some(openssh);
+        self.ssh_environment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .openssh = Some(openssh);
     }
 
     pub fn enable_builtin_ssh_prompter(&self, prompter: Arc<dyn tablepro_ssh::openssh::Prompter>) {
         self.ssh_environment
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .set_builtin_prompter(prompter);
     }
 
     pub fn set_approval_sink(&self, sink: Arc<dyn tablepro_policy::ApprovalSink>) {
-        *self.approval.lock().unwrap_or_else(|e| e.into_inner()) = sink;
+        *self.approval.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = sink;
     }
 
     pub fn reload_policy(&self) -> Result<(), String> {
         let next = load_policy()?;
-        *self.policy.lock().unwrap_or_else(|e| e.into_inner()) = Arc::new(next);
+        *self.policy.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::new(next);
         tracing::info!("policy reloaded");
         Ok(())
     }
@@ -367,7 +381,7 @@ impl DatabaseService {
     pub fn is_active(&self, id: Uuid) -> bool {
         self.connections
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .contains_key(&id)
     }
 
@@ -404,7 +418,10 @@ impl DatabaseService {
         read_only: bool,
         params: ReconnectParams,
     ) -> bool {
-        let mut connections = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+        let mut connections = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if connections.contains_key(&id) {
             return false;
         }
@@ -439,12 +456,18 @@ impl DatabaseService {
     }
 
     pub fn metadata(&self, id: Uuid) -> Option<ConnectionMetadata> {
-        let entries = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+        let entries = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         entries.get(&id).map(|e| e.metadata.clone())
     }
 
     pub fn all_connections(&self) -> Vec<ConnectionMetadata> {
-        let entries = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+        let entries = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut out: Vec<_> = entries.values().map(|e| e.metadata.clone()).collect();
         out.sort_by_key(|connection| connection.name.to_lowercase());
         out
@@ -474,11 +497,22 @@ impl DatabaseService {
     }
 
     fn guard_with_identity(&self, id: Uuid, principal: Principal) -> Option<(PolicyGuard, ConnectionIdentity)> {
-        let entries = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+        let entries = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let entry = entries.get(&id)?;
-        let inner = entry.inner.lock().unwrap_or_else(|e| e.into_inner());
-        let policy = self.policy.lock().unwrap_or_else(|e| e.into_inner()).clone();
-        let approval = self.approval.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let inner = entry.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let policy = self
+            .policy
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let approval = self
+            .approval
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         let ctx = GuardContext {
             connection_id: entry.metadata.id,
             connection_name: entry.metadata.name.clone(),
@@ -511,21 +545,30 @@ impl DatabaseService {
     }
 
     pub fn identity(&self, id: Uuid) -> Option<ConnectionIdentity> {
-        let entries = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+        let entries = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let entry = entries.get(&id)?;
-        let inner = entry.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let inner = entry.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         Some(ConnectionIdentity(Arc::downgrade(&inner.connection)))
     }
 
     pub fn health(&self, id: Uuid) -> Option<ConnectionHealth> {
-        let entries = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+        let entries = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let entry = entries.get(&id)?;
-        let inner = entry.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let inner = entry.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         Some(inner.health.clone())
     }
 
     pub fn close(&self, id: Uuid) {
-        let mut entries = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+        let mut entries = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(entry) = entries.remove(&id) {
             entry.cancel.cancel();
         }
