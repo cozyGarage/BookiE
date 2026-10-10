@@ -1,0 +1,134 @@
+ Image bookie-mssql-kerberos-client Building 
+ Image bookie-mssql-kerberos-mssql Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.29kB done
+#1 DONE 0.0s
+
+#2 [client internal] load build definition from Dockerfile
+#2 transferring dockerfile: 213B done
+#2 DONE 0.0s
+
+#3 [mssql internal] load build definition from Dockerfile
+#3 transferring dockerfile: 509B done
+#3 DONE 0.0s
+
+#4 [mssql internal] load metadata for mcr.microsoft.com/mssql/server@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb
+#4 DONE 0.0s
+
+#5 [client internal] load metadata for docker.io/library/archlinux@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd
+#5 DONE 0.0s
+
+#6 [client internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#7 [mssql 1/5] FROM mcr.microsoft.com/mssql/server@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb
+#7 resolve mcr.microsoft.com/mssql/server@sha256:97b448857967be55e005424a660056fe6d51814435804dc07e8f79f028bab5fb 0.0s done
+#7 DONE 0.0s
+
+#8 [client 1/2] FROM docker.io/library/archlinux@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd
+#8 resolve docker.io/library/archlinux@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd 0.0s done
+#8 DONE 0.0s
+
+#9 [client 2/2] RUN pacman -Sy --noconfirm krb5 openssl     && pacman -Scc --noconfirm
+#9 CACHED
+
+#10 [mssql internal] load build context
+#10 transferring context: 140B done
+#10 DONE 0.0s
+
+#11 [mssql 4/5] COPY mssql/setup.sql /fixture/setup.sql
+#11 CACHED
+
+#12 [mssql 2/5] COPY mssql/entrypoint.sh /fixture/entrypoint.sh
+#12 CACHED
+
+#13 [mssql 3/5] COPY mssql/start-mssql.sh /fixture/start-mssql.sh
+#13 CACHED
+
+#14 [mssql 5/5] RUN mkdir -p /var/opt/mssql/secrets     && chown -R mssql:root /fixture /var/opt/mssql/secrets     && chmod 500 /fixture/entrypoint.sh /fixture/start-mssql.sh
+#14 CACHED
+
+#15 [client] exporting to image
+#15 exporting layers done
+#15 exporting manifest sha256:cf53f9e177d88be2971c3c87916b20f93740874b9bd6423619432aeb7db645a4 done
+#15 exporting config sha256:d8446fc722c06fc4fcaba1c30dd546638c506531d154f95464eb1e3bfcc605f3 done
+#15 exporting attestation manifest sha256:6ed610d683ea88c1b3a92d16e8728f2e84a4293ea2f51e330dc7a9449cf9cacd 0.0s done
+#15 exporting manifest list sha256:bec3c33328e72575c6e6619535d3186f7ecc7185b2c9b4b4c8320197edcf28dc done
+#15 naming to docker.io/library/bookie-mssql-kerberos-client:latest done
+#15 unpacking to docker.io/library/bookie-mssql-kerberos-client:latest 0.0s done
+#15 DONE 0.1s
+
+#16 [mssql] exporting to image
+#16 exporting layers done
+#16 exporting manifest sha256:140a5b5763d66630e80de8fabbe1cd4e68527e8fb89d25508e41eadd50cfabf0 done
+#16 exporting config sha256:0bcf047ba28a0916b73f8d476a9eaa9275c71f5e84d1b4c14726d2ece37fe523 done
+#16 exporting attestation manifest sha256:06b48858ffd96882da3a8294dd9ae915e71c5d37b96377b923f7d6c50476ff5d 0.0s done
+#16 exporting manifest list sha256:e957c31630a3bba3a79ede1de5f39870b1049df15bb5a93f675ffd4092e355ca done
+#16 naming to docker.io/library/bookie-mssql-kerberos-mssql:latest done
+#16 unpacking to docker.io/library/bookie-mssql-kerberos-mssql:latest 0.0s done
+#16 DONE 0.1s
+
+#17 [client] resolving provenance for metadata file
+#17 DONE 0.0s
+
+#18 [mssql] resolving provenance for metadata file
+#18 DONE 0.0s
+ Image bookie-mssql-kerberos-client Built 
+ Image bookie-mssql-kerberos-mssql Built 
+ Network bookie-mssql-kerberos_fixture Creating 
+ Network bookie-mssql-kerberos_fixture Creating 
+ Network bookie-mssql-kerberos_fixture Created 
+ Network bookie-mssql-kerberos_fixture Created 
+ Container bookie-mssql-kerberos-ad-1 Creating 
+ Container bookie-mssql-kerberos-ad-1 Created 
+ Container bookie-mssql-kerberos-ad-1 Starting 
+ Container bookie-mssql-kerberos-ad-1 Started 
+ Container bookie-mssql-kerberos-ad-1 Waiting 
+ Container bookie-mssql-kerberos-ad-1 Healthy 
+User 'bookiekerb' added successfully
+User 'mssqlsvc' added successfully
+Record added successfully
+Record added successfully
+Zone 50.30.172.in-addr.arpa created successfully
+Record added successfully
+Export one principal to /tmp/mssql-spn.keytab
+Export one principal to /tmp/mssql-account.keytab
+ bookie-mssql-kerberos-ad-1 Copying bookie-mssql-kerberos-ad-1:/tmp/mssql-spn.keytab to /home/trung/Projects/tablepro/.worktrees/docs-aud10-ledger-20261010/linux/tests/fixtures/mssql-kerberos/materials/mssql-spn.keytab
+ bookie-mssql-kerberos-ad-1 Copied bookie-mssql-kerberos-ad-1:/tmp/mssql-spn.keytab to /home/trung/Projects/tablepro/.worktrees/docs-aud10-ledger-20261010/linux/tests/fixtures/mssql-kerberos/materials/mssql-spn.keytab
+ bookie-mssql-kerberos-ad-1 Copying bookie-mssql-kerberos-ad-1:/tmp/mssql-account.keytab to /home/trung/Projects/tablepro/.worktrees/docs-aud10-ledger-20261010/linux/tests/fixtures/mssql-kerberos/materials/mssql-account.keytab
+ bookie-mssql-kerberos-ad-1 Copied bookie-mssql-kerberos-ad-1:/tmp/mssql-account.keytab to /home/trung/Projects/tablepro/.worktrees/docs-aud10-ledger-20261010/linux/tests/fixtures/mssql-kerberos/materials/mssql-account.keytab
+ktutil:  </fixtures/mssql-kerberos/materials/mssql-spn.keytab
+ktutil:  <tures/mssql-kerberos/materials/mssql-account.keytab
+ktutil:  <ests/fixtures/mssql-kerberos/materials/mssql.keytab
+ktutil:  quit
+ Container bookie-mssql-kerberos-ad-1 Running 
+ Container bookie-mssql-kerberos-mssql-1 Creating 
+ Container bookie-mssql-kerberos-mssql-1 Created 
+ Container bookie-mssql-kerberos-ad-1 Waiting 
+ Container bookie-mssql-kerberos-ad-1 Healthy 
+ Container bookie-mssql-kerberos-mssql-1 Starting 
+ Container bookie-mssql-kerberos-mssql-1 Started 
+ Container bookie-mssql-kerberos-mssql-1 Waiting 
+ Container bookie-mssql-kerberos-ad-1 Waiting 
+ Container bookie-mssql-kerberos-ad-1 Healthy 
+ Container bookie-mssql-kerberos-mssql-1 Healthy 
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+  Executable tests/mssql_kerberos.rs (target/debug/deps/mssql_kerberos-d9383d05e23e4f3d)
+ Container bookie-mssql-kerberos-mssql-1 Running 
+ Container bookie-mssql-kerberos-ad-1 Running 
+ Container bookie-mssql-kerberos-ad-1 Waiting 
+ Container bookie-mssql-kerberos-ad-1 Healthy 
+ Container bookie-mssql-kerberos-mssql-1 Waiting 
+ Container bookie-mssql-kerberos-mssql-1 Healthy 
+ Container bookie-mssql-kerberos-client-run-9cdcd14a1c03 Creating 
+ Container bookie-mssql-kerberos-client-run-9cdcd14a1c03 Created 
+Password for bookiekerb@DOMAIN1.SINK.TEST: 
+MSSQLSvc/mssql.domain1.sink.test:1433@DOMAIN1.SINK.TEST: kvno = 2, keytab entry valid
+
+running 2 tests
+test kerberos_refuses_an_unregistered_sql_server_spn ... ok
+test kerberos_ticket_connects_over_verified_tls_and_executes_query ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
