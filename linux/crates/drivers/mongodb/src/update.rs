@@ -26,24 +26,25 @@ pub(super) struct KeyedValueSelect {
     pub(super) key: Bson,
 }
 
-pub(super) struct KeysetPageSelect {
+pub(super) struct BrowsePageSelect {
     pub(super) collection: String,
     pub(super) filter: Document,
-    pub(super) key: Bson,
+    pub(super) key: Option<Bson>,
     pub(super) limit: i64,
+    pub(super) offset: u64,
 }
 
-pub(super) fn parse_keyset_page_select(
+pub(super) fn parse_browse_page_select(
     sql: &str,
     params: &[Value],
     database: &str,
-) -> Result<Option<KeysetPageSelect>, DriverError> {
+) -> Result<Option<BrowsePageSelect>, DriverError> {
     let statements = Parser::parse_sql(&GenericDialect {}, sql)
-        .map_err(|error| DriverError::Unsupported(format!("invalid parameterized MongoDB page query: {error}")))?;
+        .map_err(|error| DriverError::Unsupported(format!("invalid MongoDB browse page query: {error}")))?;
     let [Statement::Query(query)] = statements.as_slice() else {
         return Ok(None);
     };
-    let Some((select, limit)) = keyset_page_query(query) else {
+    let Some((select, limit, offset)) = browse_page_query(query) else {
         return Ok(None);
     };
     if !matches!(select.projection.as_slice(), [SelectItem::Wildcard(_)]) {
@@ -59,21 +60,25 @@ pub(super) fn parse_keyset_page_select(
     let Some(selection) = select.selection.as_ref() else {
         return Ok(None);
     };
-    let Some((filter, key)) = keyset_filter(selection, params)? else {
+    let Some((filter, key)) = browse_filter(selection, params)? else {
         return Ok(None);
     };
-    Ok(Some(KeysetPageSelect {
+    if key.is_some() && offset != 0 {
+        return Ok(None);
+    }
+    Ok(Some(BrowsePageSelect {
         collection,
         filter,
         key,
         limit,
+        offset,
     }))
 }
 
-fn keyset_filter(selection: &Expr, params: &[Value]) -> Result<Option<(Document, Bson)>, DriverError> {
+fn browse_filter(selection: &Expr, params: &[Value]) -> Result<Option<(Document, Option<Bson>)>, DriverError> {
     let mut predicates = Vec::new();
     collect_and_predicates(selection, &mut predicates);
-    if predicates.iter().filter(|expr| keyset_cursor(expr).is_some()).count() != 1 {
+    if predicates.iter().filter(|expr| keyset_cursor(expr).is_some()).count() > 1 {
         return Ok(None);
     }
     let mut filter = Document::new();
@@ -96,7 +101,7 @@ fn keyset_filter(selection: &Expr, params: &[Value]) -> Result<Option<(Document,
     if index != params.len() {
         return Ok(None);
     }
-    Ok(key.map(|key| (filter, key)))
+    Ok(Some((filter, key)))
 }
 
 fn collect_and_predicates<'a>(expr: &'a Expr, predicates: &mut Vec<&'a Expr>) {
@@ -126,7 +131,7 @@ fn keyset_cursor(expr: &Expr) -> Option<&Expr> {
     (identifier_from_expr(left).as_deref() == Some("_id")).then_some(right)
 }
 
-fn keyset_page_query(query: &Query) -> Option<(&Select, i64)> {
+fn browse_page_query(query: &Query) -> Option<(&Select, i64, u64)> {
     let mut unpaged_query = query.clone();
     unpaged_query.limit_clause = None;
     simple_value_select(&unpaged_query)?;
@@ -142,13 +147,14 @@ fn keyset_page_query(query: &Query) -> Option<(&Select, i64)> {
         return None;
     };
     let limit = limit.parse::<i64>().ok()?;
-    if limit <= 0 || !limit_by.is_empty() || offset.value.to_string() != "0" {
+    let offset = offset.value.to_string().parse().ok()?;
+    if limit <= 0 || !limit_by.is_empty() {
         return None;
     }
     let SetExpr::Select(select) = query.body.as_ref() else {
         return None;
     };
-    Some((select, limit))
+    Some((select, limit, offset))
 }
 
 pub(super) fn parse_keyed_value_select(
@@ -546,7 +552,7 @@ mod keyset_page_tests {
 
     #[test]
     fn keyset_page_binds_one_id_cursor_and_window() {
-        let parsed = parse_keyset_page_select(
+        let parsed = parse_browse_page_select(
             "SELECT * FROM \"appdb\".\"records\" WHERE \"_id\" > ? LIMIT 50 OFFSET 0",
             &[Value::Text("last".into())],
             "appdb",
@@ -555,8 +561,24 @@ mod keyset_page_tests {
         .unwrap();
 
         assert_eq!(parsed.collection, "records");
-        assert_eq!(parsed.key, Bson::String("last".into()));
+        assert_eq!(parsed.key, Some(Bson::String("last".into())));
         assert_eq!(parsed.limit, 50);
+        assert_eq!(parsed.offset, 0);
+    }
+
+    #[test]
+    fn filtered_offset_page_binds_filters_and_preserves_offset() {
+        let parsed = parse_browse_page_select(
+            "SELECT * FROM \"appdb\".\"records\" WHERE \"group\" = ? LIMIT 2 OFFSET 1",
+            &[Value::Text("keep".into())],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(parsed.key, None);
+        assert_eq!(parsed.offset, 1);
+        assert_eq!(parsed.filter, doc! { "group": "keep" });
     }
 
     #[test]
@@ -571,11 +593,10 @@ mod keyset_page_tests {
             "SELECT * FROM records WHERE _id > ? LIMIT 50 OFFSET 1",
             "SELECT * FROM records WHERE _id > ? ORDER BY value LIMIT 50 OFFSET 0",
         ] {
-            assert!(
-                parse_keyset_page_select(sql, &[Value::Int(1)], "appdb")
-                    .unwrap()
-                    .is_none()
-            );
+            assert!(matches!(
+                parse_browse_page_select(sql, &[Value::Int(1)], "appdb"),
+                Ok(None) | Err(DriverError::Unsupported(_))
+            ));
         }
     }
 }

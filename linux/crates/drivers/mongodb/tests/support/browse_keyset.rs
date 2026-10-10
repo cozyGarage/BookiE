@@ -37,6 +37,50 @@ async fn keyset_page_query_reads_rows_after_the_native_id_cursor() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    client
+        .database("appdb")
+        .collection::<Document>("filtered_offset")
+        .insert_many([
+            doc! { "_id": 1, "group": "keep", "value": Bson::Null },
+            doc! { "_id": 2, "group": "skip" },
+            doc! { "_id": 3, "group": "keep", "value": Bson::Null },
+            doc! { "_id": 4, "group": "keep", "value": "present" },
+        ])
+        .await
+        .unwrap();
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let filtered = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"group\" = ? LIMIT 1 OFFSET 1",
+            &[Value::Text("keep".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(filtered.rows.len(), 1);
+    assert_eq!(filtered.rows[0][0], Value::Int(3));
+
+    let nulls = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"value\" IS NULL LIMIT 2 OFFSET 0",
+            &[],
+        )
+        .await
+        .unwrap();
+    assert_eq!(nulls.rows.len(), 2);
+    assert_eq!(nulls.rows[0][0], Value::Int(1));
+    assert_eq!(nulls.rows[0][2], Value::Json(serde_json::Value::Null));
+    assert_eq!(nulls.rows[1][0], Value::Int(3));
+    assert_eq!(nulls.rows[1][2], Value::Json(serde_json::Value::Null));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn filtered_keyset_page_keeps_the_filter_and_cursor() {
     let (_container, host, port) = super::start_mongo().await;
     let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
