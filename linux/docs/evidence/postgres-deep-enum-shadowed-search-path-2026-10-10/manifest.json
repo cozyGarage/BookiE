@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "branch": "b3/pg-deep-enum-shadow",
+  "baseline_commit": "fe193a209a7ee388f0ded1aae6f5b925b98555ec",
+  "working_tree_dirty": true,
+  "scope": "Cover deep enum-domain scalar parameter inference with a same-named enum shadowing search_path",
+  "source": {
+    "linux/crates/drivers/postgres/tests/support/domain_depth_boundary_contract.rs": "be5912c1d60987f900619fb3f988d9b1ce94738df4d4c684addb924a36f8bbdb"
+  },
+  "engine": "PostgreSQL 16 Alpine in Docker via testcontainers",
+  "contract": [
+    "The fixture creates a 64-level domain-over-enum chain and a same-named shadow enum with an additional label, then puts the shadow schema first on the transaction search_path.",
+    "At domain depths 63 and 64, COALESCE and CASE expressions compare bound text, literal NULL text, empty text and SQL NULL against native untyped-literal inference. The test checks exact result labels, parameter enum type, expression result type and declared domain type.",
+    "This proves only the two named scalar contexts at these depths under this shadowed search_path configuration; it does not establish broader session or parameter-context coverage."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_deep_enum_scalar_contexts_resolve_under_shadowed_search_path -- --ignored --test-threads=1",
+      "result": "1 passed, 235 filtered out",
+      "log": "focused-test.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-test.txt": "0fd1d4d0a1cce826577387216e45603b0da86c0251c1546e8f8c24096d6d8204"
+  },
+  "remaining": [
+    "Other PostgreSQL session/search_path combinations, deep parameter contexts, consumers, native types and the broader B3 matrix remain open; this case does not qualify 0.2.0."
+  ]
+}

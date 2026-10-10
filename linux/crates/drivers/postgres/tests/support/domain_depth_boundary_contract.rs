@@ -563,6 +563,26 @@ async fn value_contract_deep_enum_scalar_contexts_match_native_inference_at_dept
     transaction.rollback().await.unwrap();
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_deep_enum_scalar_contexts_resolve_under_shadowed_search_path() {
+    let (_container, options) = start_pg().await;
+    let setup = connect(options.clone()).await;
+    let schema = "value_contract_enum_scalar_shadow_depth";
+    create_enum_scalar_depth_fixture(setup.as_ref(), schema).await;
+    drop(setup);
+
+    let connection = connect(options).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(&format!("SET LOCAL search_path TO {schema}_shadow, public"))
+        .await
+        .unwrap();
+    assert_scalar_contexts_match_native_inference(&mut *transaction, schema, 63).await;
+    assert_scalar_contexts_match_native_inference(&mut *transaction, schema, 64).await;
+    transaction.rollback().await.unwrap();
+}
+
 async fn create_enum_scalar_depth_fixture(connection: &dyn tablepro_core::Connection, schema: &str) {
     connection.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
     connection
