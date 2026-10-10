@@ -1,0 +1,50 @@
+diff --git a/src/protocol/text/column.rs b/src/protocol/text/column.rs
+index b7c9c7e..eacdbb8 100755
+--- a/src/protocol/text/column.rs
++++ b/src/protocol/text/column.rs
+@@ -175,6 +175,7 @@ impl ColumnType {
+         let is_binary = flags.contains(ColumnFlags::BINARY);
+         let is_unsigned = flags.contains(ColumnFlags::UNSIGNED);
+         let is_enum = flags.contains(ColumnFlags::ENUM);
++        let is_set = flags.contains(ColumnFlags::SET);
+ 
+         match self {
+             ColumnType::Tiny if max_size == Some(1) => "BOOLEAN",
+@@ -203,8 +204,10 @@ impl ColumnType {
+             ColumnType::Geometry => "GEOMETRY",
+             ColumnType::Json => "JSON",
+ 
+-            ColumnType::String if is_binary => "BINARY",
++            // ENUM and SET remain text when a character collation sets the binary flag.
+             ColumnType::String if is_enum => "ENUM",
++            ColumnType::String if is_set => "SET",
++            ColumnType::String if is_binary => "BINARY",
+             ColumnType::VarChar | ColumnType::VarString if is_binary => "VARBINARY",
+ 
+             ColumnType::String => "CHAR",
+diff --git a/src/testing/mod.rs b/src/testing/mod.rs
+index f509f9d..2a24dd4 100755
+--- a/src/testing/mod.rs
++++ b/src/testing/mod.rs
+@@ -144,7 +144,7 @@ async fn test_context(args: &TestArgs) -> Result<TestContext<MySql>, Error> {
+             -- BLOB/TEXT columns can only be used as index keys with a prefix length:
+             -- https://dev.mysql.com/doc/refman/8.4/en/column-indexes.html#column-indexes-prefix
+             primary key(db_name(63))
+-        );        
++        );
+     "#,
+     )
+     .await?;
+diff --git a/src/types/str.rs b/src/types/str.rs
+index 64bc926..02e51aa 100755
+--- a/src/types/str.rs
++++ b/src/types/str.rs
+@@ -36,7 +36,7 @@ impl Type<MySql> for str {
+                 | ColumnType::Enum
+         )
+             // Any collation that *isn't* `binary` generally indicates string data.
+-            // The actual collation used for storage doesn't matter, 
++            // The actual collation used for storage doesn't matter,
+             // because the server will transcode to the charset we specify.
+             //
+             // See comment in `src/collation.rs` for details.

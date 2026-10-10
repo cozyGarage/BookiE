@@ -32,7 +32,7 @@ pub fn diff_to_ops(
     current_fks: &[ForeignKeyInfo],
 ) -> Vec<StructureOp> {
     let mut ops = Vec::new();
-    let schema_owned = schema.map(|s| s.to_string());
+    let schema_owned = schema.map(ToString::to_string);
 
     // RenameTable
     if original_table != current_table && !current_table.trim().is_empty() {

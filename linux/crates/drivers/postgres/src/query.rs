@@ -305,12 +305,12 @@ async fn refresh_enum_type_names(
     Ok(())
 }
 
-async fn collect_query_rows<'a, S>(
+async fn collect_query_rows<S>(
     stream: &mut S,
     limit: usize,
 ) -> Result<(QueryResult, Vec<PgTypeInfo>, Vec<Option<(i64, i16)>>), DriverError>
 where
-    S: futures::Stream<Item = Result<PgRow, sqlx::Error>> + Unpin + 'a,
+    S: futures::Stream<Item = Result<PgRow, sqlx::Error>> + Unpin,
 {
     let mut columns = Vec::new();
     let mut type_infos = Vec::new();

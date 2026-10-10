@@ -36,9 +36,12 @@ fn assert_admin_denied(sql: &str, driver_id: &str) {
         "{driver_id} administrative calls must count as writes: {sql}"
     );
     let decision = agent_decision(sql, driver_id);
+    let Decision::Deny { ref rule, .. } = decision else {
+        panic!("{driver_id} must deny an agent: {sql}, got {decision:?}");
+    };
     assert!(
-        matches!(decision, Decision::Deny { ref rule, .. } if rule == "agent_admin_denied"),
-        "{driver_id} must deny an agent: {sql}, got {decision:?}"
+        rule.split('+').any(|name| name == "agent_admin_denied"),
+        "{driver_id} must retain the admin rule: {sql}, got {decision:?}"
     );
 }
 

@@ -4,7 +4,17 @@ import os
 from pathlib import Path
 import sys
 
-REQUIRED = {"preflight", "fast", "gtk-safety", "integration", "b4-rollback", "driver-tls", "postgres-release", "duckdb"}
+REQUIRED = {
+    "pin-revision",
+    "preflight",
+    "fast",
+    "gtk-safety",
+    "integration",
+    "b4-rollback",
+    "driver-tls",
+    "postgres-release",
+    "duckdb",
+}
 SCHEDULED = "current-stable-clippy"
 MERGE_ONLY = {"gtk-safety", "integration", "b4-rollback", "driver-tls", "postgres-release", "duckdb"}
 

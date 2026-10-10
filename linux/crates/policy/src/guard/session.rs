@@ -130,8 +130,12 @@ impl PolicySession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let facts = classify(sql, &self.guard.ctx.driver_id);
-        let authorization = self.guard.authorize_classified(sql, facts, Some(control)).await?;
+        let analysis = classify_with_effects(sql, &self.guard.ctx.driver_id);
+        let facts = analysis.facts;
+        let authorization = self
+            .guard
+            .authorize_classified(sql, facts, analysis.effects, Some(control))
+            .await?;
         let writes = authorization.facts.writes;
         let result = match self.batch {
             Some(batch) => {
