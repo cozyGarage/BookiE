@@ -4,8 +4,6 @@ use sqlx::{Connection as _, Row as _};
 
 #[path = "mysql_atomic_parts/advisory_lock.rs"]
 mod advisory_lock;
-#[path = "mysql_atomic_parts/advisory_lock_release.rs"]
-mod advisory_lock_release;
 #[path = "mysql_atomic_parts/merge_table.rs"]
 mod merge_table;
 
