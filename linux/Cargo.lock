@@ -6203,6 +6203,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "duckdb",
+ "libc",
  "serde_json",
  "tablepro-core",
  "tempfile",
