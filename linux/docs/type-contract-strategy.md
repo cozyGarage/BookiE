@@ -28,8 +28,9 @@ Keep these open until re-proven on a current SHA. Full wording is in the archive
 
 Unfiltered, unsorted, keyed MongoDB browse switches to `_id` keyset queries at
 the shared 10,000-row threshold. The driver now accepts that generated query
-shape and applies an ascending `_id` seek. Native regressions cover integer,
-ObjectId and binary UUID `_id` cursors on MongoDB 7 ([tests](../crates/drivers/mongodb/tests/support/browse_keyset.rs)). The local 1m-row
+shape and applies an ascending `_id` seek. Parser tests refuse non-`_id`
+predicates and zero-sized windows. Native regressions cover integer, ObjectId
+and binary UUID `_id` cursors on MongoDB 7 ([tests](../crates/drivers/mongodb/tests/support/browse_keyset.rs)). The local 1m-row
 diagnostic measured 2.380 ms at offset 500k and 2.373 ms at offset 999,950,
 compared with 135.902 ms and 266.040 ms through direct offset reads. Raw
 samples and source fingerprints are in the [PR #493 evidence comment](https://github.com/cozyGarage/BookiE/pull/493#issuecomment-6095435772).

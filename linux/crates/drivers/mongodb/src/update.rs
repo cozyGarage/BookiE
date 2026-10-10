@@ -71,17 +71,6 @@ pub(super) fn parse_keyset_page_select(
 }
 
 fn keyset_page_query(query: &Query) -> Option<(&Select, i64)> {
-    if query.with.is_some()
-        || query.order_by.is_some()
-        || query.fetch.is_some()
-        || !query.locks.is_empty()
-        || query.for_clause.is_some()
-        || query.settings.is_some()
-        || query.format_clause.is_some()
-        || !query.pipe_operators.is_empty()
-    {
-        return None;
-    }
     let mut unpaged_query = query.clone();
     unpaged_query.limit_clause = None;
     simple_value_select(&unpaged_query)?;
@@ -519,7 +508,9 @@ mod keyset_page_tests {
         for sql in [
             "SELECT * FROM records WHERE _id >= ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? OR _id = ? LIMIT 50 OFFSET 0",
+            "SELECT * FROM records WHERE value > ? LIMIT 50 OFFSET 0",
             "SELECT value FROM records WHERE _id > ? LIMIT 50 OFFSET 0",
+            "SELECT * FROM records WHERE _id > ? LIMIT 0 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? LIMIT 50 OFFSET 1",
             "SELECT * FROM records WHERE _id > ? ORDER BY value LIMIT 50 OFFSET 0",
         ] {
