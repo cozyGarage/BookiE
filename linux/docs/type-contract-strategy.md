@@ -40,9 +40,11 @@ null pages preserve filters in offset and `_id` keyset queries in
 `filtered_keyset_page_keeps_the_filter_and_cursor`, and
 `null_filtered_keyset_page_excludes_missing_fields`. These cover OR-of-equality,
 bound-parameter order, explicit null versus missing, and SQL's three-valued
-inequality and membership behavior. Null comparison parameters are refused.
-Negated ranges, pattern operators, sorted and keyless deep-page behavior,
-installed Arch/Wayland, Debian/GNOME and network-latency acceptance remain open.
+inequality and membership behavior. Repeated predicates on one field retain
+their conjunction through a MongoDB `$and` selector. Null comparison parameters
+are refused. Negated ranges, pattern operators, sorted and keyless deep-page
+behavior, installed Arch/Wayland, Debian/GNOME and network-latency acceptance
+remain open.
 
 The SQL Server test fixture waits for an authenticated `SELECT 1` as `sa`,
 retrying login rejection for at most 60 seconds after container readiness logs.

@@ -91,11 +91,7 @@ fn browse_filter(selection: &Expr, params: &[Value]) -> Result<Option<(Document,
             }
             key = Some(take_placeholder(cursor, params, &mut index)?);
         } else {
-            for (field, value) in browse_selector_from_expr(predicate, params, &mut index)? {
-                if filter.insert(field, value).is_some() {
-                    return Ok(None);
-                }
-            }
+            filter = merge_browse_selectors(filter, browse_selector_from_expr(predicate, params, &mut index)?);
         }
     }
     if index != params.len() {
@@ -111,15 +107,10 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
             left,
             op: BinaryOperator::And,
             right,
-        } => {
-            let mut filter = browse_selector_from_expr(left, params, index)?;
-            for (field, value) in browse_selector_from_expr(right, params, index)? {
-                if filter.insert(field, value).is_some() {
-                    return Err(browse_filter_error());
-                }
-            }
-            Ok(filter)
-        }
+        } => Ok(merge_browse_selectors(
+            browse_selector_from_expr(left, params, index)?,
+            browse_selector_from_expr(right, params, index)?,
+        )),
         Expr::BinaryOp {
             left,
             op: BinaryOperator::Or,
@@ -162,6 +153,14 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
         }
         _ => Err(browse_filter_error()),
     }
+}
+
+fn merge_browse_selectors(mut left: Document, right: Document) -> Document {
+    if right.keys().any(|field| left.contains_key(field)) {
+        return doc! { "$and": [left, right] };
+    }
+    left.extend(right);
+    left
 }
 
 fn comparison_selector(

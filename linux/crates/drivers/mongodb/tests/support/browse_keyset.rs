@@ -244,6 +244,18 @@ async fn filtered_keyset_page_keeps_the_filter_and_cursor() {
         [&Value::Int(103), &Value::Int(104)]
     );
 
+    let repeated_field = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE \"rank\" > ? AND \"rank\" < ? AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Int(1), Value::Int(5), Value::Int(101)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        repeated_field.rows.iter().map(|row| &row[0]).collect::<Vec<_>>(),
+        [&Value::Int(102), &Value::Int(103)]
+    );
+
     let ranged = connection
         .query_params(
             "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE \"rank\" BETWEEN ? AND ? AND \"_id\" > ? LIMIT 2 OFFSET 0",
