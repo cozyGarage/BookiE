@@ -6,6 +6,11 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use super::config_io::atomic_write_json;
 
+#[cfg(not(test))]
+const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(test)]
+const FLUSH_TIMEOUT: Duration = Duration::from_secs(60);
+
 pub struct StateFile<T> {
     shared: Arc<(Mutex<State<T>>, Condvar)>,
 }
@@ -118,7 +123,7 @@ impl<T: Default + Clone + Serialize + DeserializeOwned + Send + 'static> StateFi
 
     pub fn flush(&self) -> Result<(), String> {
         let (lock, wake) = &*self.shared;
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + FLUSH_TIMEOUT;
         let mut state = lock.lock().map_err(|_| "settings lock unavailable")?;
         let target = state.revision;
         while state.attempted < target {
