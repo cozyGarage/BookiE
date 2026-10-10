@@ -237,3 +237,42 @@ async fn closing_a_session_with_an_open_transaction_rolls_it_back_on_real_postgr
         .expect("verify row on a fresh connection");
     assert_eq!(after.rows, vec![vec![Value::Int(1)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_read_only_repeatable_read_session_keeps_one_snapshot_across_queries() {
+    let (_container, opts) = start_pg().await;
+    let raw = connect(opts.clone()).await;
+    raw.execute("CREATE TABLE snapshot_probe (id INT PRIMARY KEY)")
+        .await
+        .unwrap();
+    raw.execute("INSERT INTO snapshot_probe VALUES (1)").await.unwrap();
+
+    let audit = Arc::new(CapturingAudit::new());
+    let audit_state = Arc::new(AuditState::new());
+    let inner: Arc<dyn Connection> = Arc::from(raw);
+    let guard = PolicyGuard::new(inner, guard_context(audit.clone(), audit_state));
+    let mut session = guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .await
+        .expect("begin read snapshot");
+    let before = run(&mut session, "SELECT count(*)::bigint FROM snapshot_probe")
+        .await
+        .expect("first snapshot read");
+    assert_eq!(before.rows, vec![vec![Value::Int(1)]]);
+
+    let writer = connect(opts).await;
+    writer.execute("INSERT INTO snapshot_probe VALUES (2)").await.unwrap();
+
+    let after = run(&mut session, "SELECT count(*)::bigint FROM snapshot_probe")
+        .await
+        .expect("second snapshot read");
+    assert_eq!(after.rows, vec![vec![Value::Int(1)]]);
+    run(&mut session, "ROLLBACK").await.expect("close snapshot");
+    session.close().await.expect("close session");
+
+    let reads = outcomes_of(&audit, AuditOperationClass::Read);
+    assert_eq!(reads.len(), 3);
+    assert_eq!(reads[0].terminal_status, AuditTerminalStatus::Succeeded);
+}

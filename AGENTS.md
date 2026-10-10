@@ -25,7 +25,11 @@ happens on the `linux` branch in the Rust 1.98 Cargo workspace under `linux/`.
 1. [linux/docs/README.md](linux/docs/README.md): the documentation map and where
    each fact belongs.
 2. [The active sprint](linux/docs/bookie-0.2-sprint.md): milestone order, 0.2.0
-   readiness and acceptance.
+   readiness and acceptance. The [0.2.0 scope](linux/docs/0.2.0-scope.md) lists
+   the blockers; everything else is in the [backlog](linux/docs/backlog.md), and
+   [known limitations](linux/docs/known-limitations.md) says what the application
+   cannot do. 0.2.0 ships as a development release for the Arch and Hyprland
+   target, with hotfixes to follow.
 3. [The ledger](linux/docs/known-issues.md): every open issue with its status,
    evidence and owner. Pick work from your lane's row in
    [Owners and handoff](linux/docs/known-issues.md#owners-and-handoff).
@@ -80,7 +84,13 @@ owner table, and each lane edits only its own files.
    Forgejo only, so a green GitHub pull request only means the cheap tier ran.
 5. Open the GitHub pull request against `linux`, merge it when the Forgejo gate
    is green (squash, subject `<type>(<scope>): <summary> (#N)`), then sync
-   Forgejo's `linux` to GitHub's.
+   Forgejo's `linux` to GitHub's. The UX lane gates and merges every pull request
+   that is green on GitHub, using `--match-head-commit`. A push that only merges
+   `linux` into a branch, or only regenerates `docs/ignored-tests.md`, does not need
+   a new gate: compare the pull request's own diff against `linux` for the gated
+   head and the current head (`git diff origin/linux...<head> -- crates scripts`),
+   and merge when it is unchanged. Re-gate when the pull request's own code or tests
+   changed. Say in the report that the comparison was made.
 6. **Documentation-only changes skip CI.** A change that touches only `*.md`
    files and `linux/docs/` is pushed straight to `linux` after
    `python3 linux/scripts/check-doc-links.py`, `check-known-issues.py` and
@@ -96,7 +106,13 @@ owner table, and each lane edits only its own files.
    wait for each other. Overlapping runs starve the installed GTK jobs of CPU and
    produce accessibility-timeout failures that mean nothing. A GTK or driver
    failure seen while another run was active is inconclusive until it is
-   re-run alone. Never start a second gate by hand to "speed up".
+   re-run alone. Never start a second gate by hand to "speed up". The daily full
+   run (22:00 UTC) and the nightly workflow (23:00 UTC) run on `linux` at night; a
+   queued sync of Forgejo's `linux` waits on the same lock and holds it until its
+   run finishes. Runners carry the label `debian-host` (native GTK, widgets and
+   release fixtures stay there) and `any-host` (all four executors, used by the
+   guard, Clippy, unit, sandbox, supply-chain and distro-floor jobs). A single
+   failed job can be re-run from the Forgejo run page without a new push.
 8. **Do not repeat work between GitHub and Forgejo.** GitHub runs the cheap tier,
    security, Flatpak and the workflow and harness contracts on pull requests,
    plus at most a weekly scheduled backup run. A push to `linux` does not start

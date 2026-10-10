@@ -5,11 +5,13 @@
 ### Added
 - MongoDB table browsing now seeks deep pages in `_id` sort order, including collections with mixed key types.
 - Saved SSH hops now have stable IDs and credential revisions, with separate Secret Service operations for per-hop passwords and key passphrases. Legacy connections-file v1 data loads and migrates to v2 on save; jump-chain editing and per-hop transport use remain disabled until their integration lands.
+- Encrypted connection bundles now write format version 2 with each versioned SSH hop's password or key passphrase; version 1 imports remain supported and plaintext bundles still contain no credentials.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
 - Arbitrary SQL result grids now preview long text, JSON and binary cells with byte counts; View Value reads the complete value from the guarded result already in memory.
 - Previewed grid cells no longer keep a second full value in each cell widget.
+- Materialized result-grid rows share their source values, reducing duplicate memory for long cells while preserving pending edits on replacement.
 - Overlapping View Value requests discard stale replies so an older fetch cannot replace the latest requested cell.
 - ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
 - DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.
@@ -93,6 +95,7 @@
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- A successful rollback request now warns that session state and other non-transactional side effects may remain after a failed save.
 - Startup opens the query history database while the rest of the application starts instead of waiting for it first.
 - The Debian package installs its programs without debug symbols, which makes the installed files about a quarter smaller
 - The distro-floor image installs a pinned, checksum-verified `rustup-init` instead of piping an unverified script to the shell.

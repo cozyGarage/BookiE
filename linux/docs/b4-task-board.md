@@ -13,15 +13,15 @@ execution and installed acceptance are separate states.
 
 Tip includes #458/`Effects`, #459 engine read-only, #460 migration step 2,
 #461 explain-plan masking, #463/#486 DuckDB selected-file pinning (AUD-10
-DONE), #475 `MRG_MyISAM` rollback, #480 joined verdicts (AUD-11 step 3) and
-#490 per-hop SSH secret identities (UI-1b storage groundwork). AUD-11 step 4
-(remove legacy facts and duplicate walkers) remains on open
-[#506](https://github.com/cozyGarage/BookiE/pull/506). That branch shares parsed
-statement analysis across guard classification, masking and blast-radius
-planning, including the transaction-query guard path. Specialized AST helpers
-remain, so the full single-walk cleanup is incomplete. Exact local verification
-and acceptance boundaries are recorded below; local runs do not establish
-Forgejo gate or frozen-candidate/package acceptance.
+DONE), #475 `MRG_MyISAM` rollback, #480 joined verdicts (AUD-11 step 3), #490
+per-hop SSH secret identities (UI-1b storage groundwork), and the shared-analysis
+refactor merged in [#506](https://github.com/cozyGarage/BookiE/pull/506).
+AUD-11 remains open: #506 shares parsed statement analysis through guard
+authorization and transaction-query handling, while classification, sensitive
+projection and blast-radius planning still use specialized AST helpers. The
+single-AST-walk consolidation in migration step 4 is unfinished. Exact local
+verification and acceptance boundaries are recorded below; local runs do not
+establish Forgejo gate or frozen-candidate/package acceptance.
 
 ## AUD-9 query-plan masking regression (2026-10-10)
 
@@ -39,6 +39,18 @@ the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
 This local result does not establish the Forgejo gate, hosted acceptance or
 frozen-candidate/installed acceptance.
 
+## AUD-2 MySQL approval-dialog rerun (2026-10-10)
+
+The exact scenario `mysql_unparseable_routine_dialog_denial_preserves_database`
+passed three consecutive runs from PR #513 candidate `d4cca38` (based on Linux
+`0855cca`). Each run used
+`bash linux/scripts/test-gtk-mysql-approval.sh` with a release binary built from
+that source, Docker MySQL 8.0, a private D-Bus session, Xvfb/X11 and GTK AT-SPI.
+The [run manifest and logs](evidence/aud2-mysql-approval-dialog-current-pr-head-2026-10-10/manifest.json)
+record the binary and log hashes. The earlier empty-dialog failure's cause is
+still unknown. These isolated Xvfb runs do not establish package-installed or
+native Wayland acceptance, and do not replace the Forgejo gate.
+
 ## Retest indicators (from archived checkpoints)
 
 Keep these as “test again” signals until cleared on a current candidate SHA.
@@ -48,7 +60,7 @@ Full dated narratives are in
 | Signal | Status at archive | Action |
 | --- | --- | --- |
 | MongoDB TLS `ConnectionRefused` on `98134709` | Intermittent; later 48/48 TLS passes on `a47b1fb` and hosted `102ef480` | Retest if TLS layer flakes again; do not treat as closed root-cause |
-| Empty MySQL approval dialog (operator observation) | Not reproduced on `b4ee463` / hosted `102ef480`; cause unconfirmed | Retest on installed package / native Wayland |
+| Empty MySQL approval dialog (operator observation) | Three consecutive Xvfb/AT-SPI passes on PR #513 candidate `d4cca38`; earlier `b4ee463` / hosted `102ef480` also passed; cause unconfirmed | Retest on installed package / native Wayland |
 | Build Linux cancelled / pending on superseded tips (`8e5d1b18`, `32b170f`, `e697824`) | Superseded by later green and rate-limited runs | Ignore SHA; retest only current tip |
 | Headless Wayland smoke incomplete (`97e5f55`) | No SIGSEGV; AT-SPI not activated | Retest native Wayland PKG-1 path |
 | Docker Hub rate limits on tip near `c2f3f78b9` | Infrastructure red, not product signal | Retest Build Linux when pulls succeed |
@@ -67,12 +79,12 @@ distribution-package or native Wayland acceptance.
 | --- | --- | --- |
 | B4-7, B4-16 | Complete package-installed/native Wayland trust and reconnect acceptance | At exact current Linux tip `227d846b95d14c2d55c366843bdf6ddc386b1c72`, all seven PostgreSQL SSH/mTLS GTK scenarios passed, including unknown-host decline audit, setup-failure audit, multi-hop trust, changed-key refusal and tunnel-loss retirement/reconnect. Frozen-candidate, package-installed and native Wayland acceptance remain open. See [current release evidence](evidence/b4-current-postgres-release-227d846b-2026-10-10/manifest.json) |
 | B4-9 | Complete package-installed/native Wayland route/auth/TLS acceptance | Exact current Linux tip `227d846b95d14c2d55c366843bdf6ddc386b1c72` passed the PostgreSQL release layer: 1 system OpenSSH test, 3 mTLS tests, 59 release integration tests and all seven SSH/mTLS GTK scenarios. Frozen-candidate, package-installed and native Wayland acceptance remain open; the earlier MongoDB refusal cause remains undetermined. See [current Linux release evidence](evidence/b4-current-postgres-release-227d846b-2026-10-10/manifest.json), [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
-| B4-22 | Complete package-installed/native Wayland bundle audit acceptance | At exact Linux tip `d0debc6`, four GTK safety scenarios passed for sanitized export/import audit outcomes, encrypted credential restoration and cross-profile import. This was a source build under Xvfb/X11; distribution-package installed flow, frozen-candidate and native Wayland acceptance remain open. See [current-tip evidence](evidence/b4-22-bundle-current-tip-d0debc6-2026-10-10/manifest.json); the earlier `d916b3aa` run remains in [its manifest](evidence/b4-22-bundle-current-tip-d916b3aa-2026-10-10/manifest.json) |
+| B4-22 | Complete package-installed/native Wayland bundle audit acceptance | Four GTK safety scenarios passed on exact UI-1b bundle-v2 PR head `3f67c1bf`, covering sanitized export/import audit outcomes, encrypted credential restoration and cross-profile import. This was a source build under Xvfb/X11; distribution-package installed flow, frozen-candidate and native Wayland acceptance remain open. See [current UI-1b evidence](evidence/b4-ui1b-bundle-gtk-3f67c1bf-2026-10-10/manifest.json), [prior current-tip evidence](evidence/b4-22-bundle-current-tip-d0debc6-2026-10-10/manifest.json), and [earlier evidence](evidence/b4-22-bundle-current-tip-d916b3aa-2026-10-10/manifest.json) |
 | B4-12 | ~~PostgreSQL rollback-failure acceptance on the selected frozen candidate~~ | Hosted candidate and local current-product-source (`fc180933`) backend-termination selectors passed. The scenario confirms `TransactionRollbackFailed`, absent transactional rows and persistent identity/trigger-sequence advancement. See [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [local linux-tip evidence](evidence/b4-rollback-linux-tip-2026-10-09/manifest.json) |
-| B4-11 | Extend failed-batch tests to optional/vendor MySQL-family engines and broader side-effect patterns | PR #475 adds `MRG_MyISAM` write-through cases for both MySQL and MariaDB. On exact Linux source tip `43b718ee2dc4b20bff03ac75ad87f4f571501406`, the serialized `mysql_atomic` selector passed 20/20 against Docker MySQL and MariaDB fixtures; see [exact-tip run manifest](evidence/mysql-atomic-linux-43b718ee-2026-10-10/manifest.json). The source matrix covers MyISAM, MEMORY, CSV, ARCHIVE, `MRG_MyISAM`, BLACKHOLE, MariaDB Aria, direct writes, trigger INSERT/UPDATE/DELETE effects, auto-increment allocation, trigger session state, pinned-session `LAST_INSERT_ID()` and advisory locks. The Aria direct and trigger matrix also passed on source `2b79ae3`; see [Aria run manifest](evidence/mysql-aria-batch-effects-linux-2b79ae3-2026-10-10/manifest.json). Optional/vendor engines and other side-effect classes remain open; frozen-candidate, package-installed, hosted and Forgejo acceptance remain separate. Earlier pooled `LAST_INSERT_ID()` observations were invalid because they could use a different connection; pinned-session tests provide the relevant oracle. See [advisory-lock evidence](evidence/mysql-advisory-lock-rollback-2026-10-09/manifest.json) and [session-state evidence](evidence/mysql-session-state-rollback-2026-10-09/manifest.json) |
+| B4-11 | Extend failed-batch tests to optional/vendor MySQL-family engines and broader side-effect patterns | PR #475 adds `MRG_MyISAM` write-through cases for both MySQL and MariaDB. On exact Linux source tip `43b718ee2dc4b20bff03ac75ad87f4f571501406`, the serialized `mysql_atomic` selector passed 20/20 against Docker MySQL and MariaDB fixtures; see [exact-tip run manifest](evidence/mysql-atomic-linux-43b718ee-2026-10-10/manifest.json). The source matrix covers MyISAM, MEMORY, CSV, ARCHIVE, `MRG_MyISAM`, BLACKHOLE, MariaDB Aria, direct writes, trigger INSERT/UPDATE/DELETE effects, auto-increment allocation, trigger session state, pinned-session `LAST_INSERT_ID()` and advisory locks. The Aria direct and trigger matrix also passed on source `2b79ae3`; see [Aria run manifest](evidence/mysql-aria-batch-effects-linux-2b79ae3-2026-10-10/manifest.json). On exact local source `5f2367e6`, paired MySQL/MariaDB tests verify that a `RELEASE_LOCK()` inside a failing batch remains released after rollback; see [lock-release rollback evidence](evidence/mysql-lock-release-rollback-5f2367e6-2026-10-10/manifest.json). On exact source `80b998ef971a94b9600d28e4797a6f4715eb478a`, paired MySQL and MariaDB tests confirm a DML-assigned session user variable survives a later failed statement while InnoDB row data rolls back; the app warning now covers session state and other non-transactional side effects. See [session-variable rollback evidence](evidence/mysql-session-variable-rollback-80b998ef-2026-10-10/manifest.json). Optional/vendor engines and other side-effect classes remain open; frozen-candidate, package-installed, hosted and Forgejo acceptance remain separate. Earlier pooled `LAST_INSERT_ID()` observations were invalid because they could use a different connection; pinned-session tests provide the relevant oracle. See [advisory-lock evidence](evidence/mysql-advisory-lock-rollback-2026-10-09/manifest.json) and [session-state evidence](evidence/mysql-session-state-rollback-2026-10-09/manifest.json) |
 | B4-17 | Complete package-installed/native Wayland trust flow | Exact current Linux tip `227d846b95d14c2d55c366843bdf6ddc386b1c72` passed 1 system OpenSSH test, 3 mTLS tests, 59 PostgreSQL release integration tests and all seven GTK trust scenarios, including multi-hop trust, second-hop decline, changed-key refusal and tunnel-loss recovery. This was a source build under Xvfb/X11; frozen-candidate, package-installed multi-hop trust and native Wayland acceptance remain open. See [current Linux release evidence](evidence/b4-current-postgres-release-227d846b-2026-10-10/manifest.json), [local Arch Wayland evidence](evidence/b4-arch-package-wayland-2026-10-09/manifest.json), [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json), [native SSH evidence](evidence/b4-ssh-native-current-2026-10-09/manifest.json), and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | B4-21 | Preserve Samba Kerberos+VerifyFull proof, then perform Windows AD interoperability | At exact Linux source tip `3b9f2c84`, both Samba AD selectors passed with verified TLS. PR #467 bounds the Kerberos connect future inside its five-second blocking-worker deadline and includes a regression for dropping a pending connect. Windows AD interoperability and distribution-package Kerberos remain open. See [current-tip Kerberos evidence](evidence/b4-21-mssql-kerberos-current-3b9f2c84-2026-10-10/manifest.json) and [PR #467](https://github.com/cozyGarage/BookiE/pull/467) |
-| UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | #490 landed stable hop IDs, credential revisions, v1-to-v2 migration and per-hop Secret Service APIs. Credential migration, per-hop transport/cache identity, encrypted bundle v2, GTK editor and acceptance remain; editing stays refused |
+| UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | #490 landed stable hop IDs, credential revisions, v1-to-v2 migration and per-hop Secret Service APIs. #492 implements hop-scoped transport and cache identity; this PR adds encrypted bundle v2 with GTK bundle-flow evidence. GTK editor, full migration/rollback acceptance and installed trust-flow acceptance remain open; editing stays refused |
 
 ## Remaining tasks
 
@@ -89,6 +101,8 @@ Live acceptance bounds stay above. Open packaging work:
 | ID | Current implementation and validation | Remaining |
 | --- | --- | --- |
 | B4-22 | Complete distribution-package/native Wayland bundle audit acceptance | Hosted installed GTK safety passed 53/53 scenarios on pinned candidate `5db1cfe`, including bundle export/import audit, encrypted credential round-trip and cross-profile import. Package/native Wayland acceptance remains open; see [current candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) |
+| B4-11 | Extend failed-batch session side-effect coverage | The serialized MySQL rollback selector passed 20/20 on local branch commit `0e6ce7c`, including MySQL/MariaDB cases proving successful `RELEASE_LOCK` and its MyISAM witness survive rollback while the InnoDB row does not. Optional/vendor engines and external acceptance remain open; see [release-lock evidence](evidence/mysql-lock-release-2026-10-10/manifest.json) |
+| UI-13b / PERF-8 prerequisite | Policy sessions recognize PostgreSQL `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` and `SERIALIZABLE READ ONLY` as guarded read snapshots; weaker `READ ONLY` starts and unsupported-engine starts are refused. Writes and session/host-file side effects are blocked inside the snapshot. Policy tests and Docker PostgreSQL mutation-between-reads test pass locally; full `preflight.sh` passes. | Wire the session into cursor paging and full export, then complete engine-specific and installed acceptance. Debian package validation was skipped locally because `dpkg-deb` is unavailable. |
 
 ## Completed local slices
 

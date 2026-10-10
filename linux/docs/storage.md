@@ -111,8 +111,11 @@ machine imports. It is not a storage location: nothing reads or writes it
 automatically.
 
 ```json
-{"format": "tablepro.connection-bundle", "version": 1, "producer": "...", "exported_at": "...", "payload": {...}}
+{"format": "tablepro.connection-bundle", "version": 2, "producer": "...", "exported_at": "...", "payload": {...}}
 ```
+
+Version 2 is written by current exports. Imports continue to accept version 1
+bundles, which carry only legacy connection-level SSH secrets when encrypted.
 
 `payload.kind` is `plaintext` or `encrypted`, matched by hand rather than
 through an internally tagged enum, because `#[serde(deny_unknown_fields)]`
@@ -141,9 +144,12 @@ A plaintext bundle carries no credentials at all. Only the encryption
 path populates `secrets`, and the parser rejects a plaintext payload that
 arrives with a non-empty `secrets` list.
 
-An encrypted bundle carries the database password, SSH password and SSH
-key passphrase. It never carries an MCP token in either shape: a token is
-an authorization grant tied to allowlists on the exporting machine, a
+An encrypted version 2 bundle carries the database password, legacy
+connection-level SSH credentials where needed, and each versioned SSH hop's
+password or key passphrase bound to its hop ID and credential revision. A
+version 1 bundle carries only the database password and legacy SSH password
+or passphrase. Neither version carries an MCP token: a token is an
+authorization grant tied to allowlists on the exporting machine, a
 different trust class from a database credential.
 
 ### Encryption

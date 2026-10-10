@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use relm4::ComponentSender;
 use relm4::gtk::prelude::FileExt;
 
@@ -321,11 +323,10 @@ async fn write_bundle(
     organization: Vec<(Uuid, tablepro_storage::ConnectionOrganization)>,
 ) -> Result<usize, BundleError> {
     let count = connections.len();
-    let ids: Vec<Uuid> = connections.iter().map(|connection| connection.id).collect();
     let secrets = if choice.passphrase.is_empty() {
         Vec::new()
     } else {
-        tablepro_storage::collect_bundle_secrets(&ids).await?
+        tablepro_storage::collect_bundle_secrets(&connections).await?
     };
     let export = BundleExport {
         producer: format!("bookie {}", env!("CARGO_PKG_VERSION")),
@@ -396,42 +397,105 @@ async fn apply_plan(
     replace_saved_passwords: bool,
 ) -> Result<(usize, usize), String> {
     let planned = plan.items.len();
-    tablepro_storage::apply_import(&plan)
-        .await
-        .map_err(|_| crate::tr!("The connections could not be saved."))?;
+    let (imported, failure) = apply_items(
+        plan.items,
+        secrets,
+        replace_saved_passwords,
+        |item, carried, replace| async move {
+            let single_item = ImportPlan {
+                items: vec![item.clone()],
+            };
+            if tablepro_storage::apply_import(&single_item).await.is_err() {
+                return Err(ItemApplyFailure::ConnectionSave);
+            }
+            if apply_item_secrets(&item, carried.as_ref(), replace).await.is_err() {
+                if let Some(carried) = carried.as_ref() {
+                    roll_back(&item, carried).await;
+                } else {
+                    let restored = tablepro_storage::restore_connection(item.previous.as_ref(), item.connection.id)
+                        .await
+                        .is_ok();
+                    if !restored {
+                        tracing::warn!("rolling back an imported connection failed");
+                    }
+                }
+                return Err(ItemApplyFailure::CredentialStore);
+            }
+            Ok(())
+        },
+    )
+    .await;
+    if imported == 0 && failure == Some(ItemApplyFailure::ConnectionSave) {
+        return Err(crate::tr!("The connections could not be saved."));
+    }
+    Ok((imported, planned))
+}
 
-    let mut imported = 0usize;
-    for item in &plan.items {
-        let Some(carried) = secrets.iter().find(|entry| entry.connection_id == item.source_id) else {
-            imported += 1;
-            continue;
-        };
-        let stored = tablepro_storage::store_bundle_secrets(
-            item.connection.id,
-            carried,
-            &item.connection.name,
-            replace_saved_passwords,
-        )
-        .await;
-        if stored.is_err() {
-            roll_back(item).await;
-            return Ok((imported, planned));
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ItemApplyFailure {
+    ConnectionSave,
+    CredentialStore,
+}
+
+async fn apply_items<F, Fut>(
+    items: Vec<ImportItem>,
+    secrets: Vec<tablepro_storage::BundleSecrets>,
+    replace_saved_passwords: bool,
+    mut apply: F,
+) -> (usize, Option<ItemApplyFailure>)
+where
+    F: FnMut(ImportItem, Option<tablepro_storage::BundleSecrets>, bool) -> Fut,
+    Fut: Future<Output = Result<(), ItemApplyFailure>>,
+{
+    let mut imported = 0;
+    for item in items {
+        let carried = secrets
+            .iter()
+            .find(|entry| entry.connection_id == item.source_id)
+            .cloned();
+        if let Err(failure) = apply(item, carried, replace_saved_passwords).await {
+            return (imported, Some(failure));
         }
         imported += 1;
     }
-    Ok((imported, planned))
+    (imported, None)
+}
+
+async fn apply_item_secrets(
+    item: &ImportItem,
+    secrets: Option<&tablepro_storage::BundleSecrets>,
+    replace_saved_passwords: bool,
+) -> Result<(), tablepro_storage::StorageError> {
+    let Some(secrets) = secrets else {
+        return Ok(());
+    };
+    tablepro_storage::store_bundle_secrets(
+        item.connection.id,
+        secrets,
+        &item.connection.name,
+        replace_saved_passwords,
+    )
+    .await
 }
 
 /// Undo one item after a failed credential write. An entry that existed
 /// before the import is restored from its snapshot; one this import
 /// created is removed along with whatever it managed to store.
-async fn roll_back(item: &ImportItem) {
-    if let Err(error) = tablepro_storage::restore_connection(item.previous.as_ref(), item.connection.id).await {
-        tracing::warn!(error = %error, "rolling back an imported connection failed");
+async fn roll_back(item: &ImportItem, secrets: &tablepro_storage::BundleSecrets) {
+    let restored = match tablepro_storage::restore_connection(item.previous.as_ref(), item.connection.id).await {
+        Ok(()) => true,
+        Err(error) => {
+            tracing::warn!(error = %error, "rolling back an imported connection failed");
+            false
+        }
+    };
+    if should_forget_imported_secrets(item, restored) {
+        tablepro_storage::forget_imported_bundle_secrets(item.connection.id, secrets).await;
     }
-    if matches!(item.disposition, ImportDisposition::New | ImportDisposition::Remapped) {
-        tablepro_storage::forget_imported_secrets(item.connection.id).await;
-    }
+}
+
+fn should_forget_imported_secrets(item: &ImportItem, restored: bool) -> bool {
+    restored && matches!(item.disposition, ImportDisposition::New | ImportDisposition::Remapped)
 }
 
 #[cfg(test)]
@@ -496,6 +560,39 @@ mod tests {
     fn ticking_nothing_imports_nothing() {
         let plan = ImportPlan { items: vec![item("a")] };
         assert!(accepted_items(&plan, &[]).is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_import_failure_stops_before_saving_later_connections() {
+        let items = vec![item("first"), item("failed"), item("later")];
+        let attempted = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let imported = apply_items(items.clone(), Vec::new(), false, {
+            let attempted = attempted.clone();
+            move |item, _, _| {
+                let attempted = attempted.clone();
+                async move {
+                    attempted.lock().unwrap().push(item.connection.name.clone());
+                    if item.connection.name == "failed" {
+                        Err(ItemApplyFailure::CredentialStore)
+                    } else {
+                        Ok(())
+                    }
+                }
+            }
+        })
+        .await;
+
+        assert_eq!(imported, (1, Some(ItemApplyFailure::CredentialStore)));
+        assert_eq!(*attempted.lock().unwrap(), ["first", "failed"]);
+    }
+
+    #[test]
+    fn a_failed_record_restore_keeps_imported_credentials() {
+        let mut item = item("new");
+        assert!(!should_forget_imported_secrets(&item, false));
+        assert!(should_forget_imported_secrets(&item, true));
+        item.disposition = ImportDisposition::UpdateInPlace;
+        assert!(!should_forget_imported_secrets(&item, true));
     }
 
     #[test]

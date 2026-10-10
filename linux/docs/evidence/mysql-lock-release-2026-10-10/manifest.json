@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "B4-11 MySQL and MariaDB RELEASE_LOCK side effects after failed batch rollback",
+  "source_commit": "0e6ce7cf20480625f65cdeefb9664f13f06be6c5",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic_parts/advisory_lock.rs": "50265cb53d19de1fb98faac2da176a15e0183a5ccca4d8f6cb3bc88b06d92c03"
+  },
+  "fixtures": [
+    "MySQL 8.1 testcontainers fixture",
+    "MariaDB 11 testcontainers fixture"
+  ],
+  "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+  "runtime": "Local Omarchy Linux host with Docker; serialized driver selector",
+  "result": "20 passed; 0 failed; 0 ignored; 75 filtered out; 131.80 seconds; exit code 0",
+  "assertions": [
+    "GET_LOCK succeeds inside the failed batch and a MyISAM witness records its return value on the batch session.",
+    "RELEASE_LOCK succeeds on that same session and its MyISAM witness survives the subsequent duplicate-key failure.",
+    "The transactional InnoDB row is absent after rollback while IS_FREE_LOCK confirms the lock remains released.",
+    "Both MySQL and MariaDB pass the regression."
+  ],
+  "not_established": [
+    "Optional or vendor-specific MySQL-family storage engines and other side-effect classes remain open.",
+    "Frozen-candidate, package-installed, hosted and Forgejo acceptance remain separate."
+  ]
+}

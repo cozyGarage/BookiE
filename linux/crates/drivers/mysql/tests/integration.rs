@@ -30,6 +30,9 @@ mod result_charset;
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;
 
+#[path = "shared/mysql_user_variable.rs"]
+mod mysql_user_variable;
+
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
 

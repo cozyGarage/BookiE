@@ -4,7 +4,7 @@ use std::path::Path;
 
 use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
-use tablepro_storage::{SavedConnection, SavedSshAuth, load_password, load_ssh_passphrase, load_ssh_password};
+use tablepro_storage::{SavedConnection, SavedSshAuth, load_password};
 
 use crate::{TransportError, jump_hop_password_refused, loads_database_password};
 
@@ -56,22 +56,24 @@ async fn append_ssh_material(hasher: &mut MaterialHasher, saved: &SavedConnectio
         return Ok(());
     };
     for (index, hop) in ssh.flatten_hops().into_iter().enumerate() {
+        hasher.tag(b"ssh_hop_id", hop.hop_id.as_bytes());
+        hasher.tag(b"ssh_credential_revision", &hop.credential_revision.to_le_bytes());
+        if hop.agent {
+            hasher.tag(b"ssh_auth", b"agent");
+            continue;
+        }
         match &hop.auth {
-            SavedSshAuth::Password if index > 0 => return Err(jump_hop_password_refused(index)),
             SavedSshAuth::Password => {
-                let password = load_ssh_password(saved.id)
-                    .await
-                    .map_err(|error| crate::secret_error("load ssh password", error))?
-                    .ok_or_else(|| TransportError::Secret("ssh password not in keyring".into()))?;
+                if hop.credential_revision == 0 && index > 0 {
+                    return Err(jump_hop_password_refused(index));
+                }
+                let password = crate::saved_ssh_password(saved.id, hop, index).await?;
                 hasher.tag(b"ssh_password", password.expose_secret().as_bytes());
             }
             SavedSshAuth::PrivateKey { path, has_passphrase } => {
                 hasher.tag(b"ssh_key", &read_material_file(path)?);
                 if *has_passphrase {
-                    match load_ssh_passphrase(saved.id)
-                        .await
-                        .map_err(|error| crate::secret_error("load ssh passphrase", error))?
-                    {
+                    match crate::saved_ssh_passphrase(saved.id, hop, index, *has_passphrase).await? {
                         Some(passphrase) => hasher.tag(b"ssh_passphrase", passphrase.expose_secret().as_bytes()),
                         None => hasher.tag(b"ssh_passphrase", &[]),
                     }
@@ -370,5 +372,18 @@ mod tests {
             !message.contains("not in keyring"),
             "must fail before the keyring: {message}"
         );
+    }
+
+    #[tokio::test]
+    async fn changing_a_hop_credential_revision_changes_session_material() {
+        let directory = tempfile::tempdir().unwrap();
+        let key = directory.path().join("id_ed25519");
+        std::fs::write(&key, b"same key material").unwrap();
+        let mut saved = sqlite_saved();
+        saved.ssh = Some(key_hop(key));
+        let first = session_material_digest(&saved).await.unwrap();
+        saved.ssh.as_mut().unwrap().credential_revision = 1;
+        let second = session_material_digest(&saved).await.unwrap();
+        assert_ne!(first, second);
     }
 }
