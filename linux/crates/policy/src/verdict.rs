@@ -46,10 +46,7 @@ impl Decision {
             return decisions.pop();
         }
 
-        let mut rules = decisions
-            .iter()
-            .map(|decision| decision.rule_name())
-            .collect::<Vec<_>>();
+        let mut rules = decisions.iter().map(Self::rule_name).collect::<Vec<_>>();
         rules.dedup();
         let rule = rules.join("+");
         match severity {
