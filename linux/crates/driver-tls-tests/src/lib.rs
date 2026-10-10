@@ -304,3 +304,18 @@ impl DriverTlsFixture {
         self.options(self.mssql_plaintext_port, TlsMode::Disabled, None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{DriverTlsFixture, TlsMode};
+
+    #[test]
+    fn postgres_options_use_fixture_port_and_system_roots() {
+        let fixture = DriverTlsFixture::from_env();
+        let options = fixture.postgres(TlsMode::VerifyFull, None);
+
+        assert_eq!(options.port, fixture.postgres_port);
+        assert_eq!(options.tls.mode, TlsMode::VerifyFull);
+        assert_eq!(options.tls.root_cert, None);
+    }
+}
