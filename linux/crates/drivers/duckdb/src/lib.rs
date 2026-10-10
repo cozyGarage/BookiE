@@ -102,7 +102,7 @@ fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnecti
             "the selected DuckDB input must be a regular file".into(),
         ));
     }
-    let file = open_selected_file(&canonical).map_err(map_file_error)?;
+    let file = open_selected_file(&canonical, &before_open)?;
     let opened = file.metadata().map_err(map_file_error)?;
     let after_open = std::fs::metadata(&canonical).map_err(map_file_error)?;
     if !opened.is_file() || !same_file_identity(&before_open, &opened) || !same_file_identity(&opened, &after_open) {
@@ -134,13 +134,40 @@ fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnecti
 }
 
 #[cfg(target_os = "linux")]
-fn open_selected_file(path: &std::path::Path) -> std::io::Result<File> {
+fn open_selected_file(path: &std::path::Path, expected: &std::fs::Metadata) -> Result<File, DriverError> {
     use std::os::unix::fs::OpenOptionsExt;
 
-    std::fs::OpenOptions::new()
+    let path_fd = std::fs::OpenOptions::new()
         .read(true)
-        .custom_flags(libc::O_NONBLOCK)
+        .custom_flags(libc::O_PATH | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)
+        .map_err(map_file_error)?;
+    let pinned = path_fd.metadata().map_err(map_file_error)?;
+    if !pinned.is_file() || !same_file_identity(expected, &pinned) {
+        return Err(DriverError::PolicyDenied(
+            "the selected DuckDB input changed during read-only connection setup".into(),
+        ));
+    }
+
+    let proc_fd_dir = std::path::Path::new("/proc/self/fd");
+    if !proc_fd_dir.is_dir() {
+        return Err(DriverError::Unsupported(
+            "read-only DuckDB flat-file access requires Linux procfs file descriptors".into(),
+        ));
+    }
+    let pinned_path = proc_fd_dir.join(path_fd.as_raw_fd().to_string());
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
+        .open(pinned_path)
+        .map_err(map_file_error)?;
+    let opened = file.metadata().map_err(map_file_error)?;
+    if !opened.is_file() || !same_file_identity(&pinned, &opened) {
+        return Err(DriverError::PolicyDenied(
+            "the selected DuckDB input changed during read-only connection setup".into(),
+        ));
+    }
+    Ok(file)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -714,17 +741,17 @@ mod tests {
         assert!(status.success());
 
         let path = fifo.clone();
+        let expected = std::fs::metadata(&fifo).unwrap();
         let (sender, receiver) = std::sync::mpsc::channel();
         let opener = std::thread::spawn(move || {
-            let result = open_selected_file(&path).map(|file| file.metadata().map(|metadata| metadata.is_file()));
+            let result = open_selected_file(&path, &expected).map(|_| ());
             let _ = sender.send(result);
         });
         let result = receiver
             .recv_timeout(Duration::from_secs(1))
             .expect("opening the selected path must not hang on a FIFO");
         opener.join().unwrap();
-        assert!(result.is_ok());
-        assert!(!result.unwrap().unwrap());
+        assert!(matches!(result, Err(DriverError::PolicyDenied(_))));
     }
 
     async fn in_memory_connection() -> Box<dyn Connection> {
