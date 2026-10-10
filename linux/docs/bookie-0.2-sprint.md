@@ -22,10 +22,11 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 - B4 [B4]: B4-12 scoped rollback acceptance is complete. Frozen-candidate and
   installed acceptance remains for the other transport rows; B4-11 optional
   engine/effect coverage, AUD-2 hosted acceptance, AUD-9 remaining lineage
-  cases, AUD-11 verdict migration step 4 ([#506](https://github.com/cozyGarage/BookiE/pull/506)),
-  UI-1b (GTK editor after #490 storage groundwork), UI-13b, TEST-15, PERF-2
-  and PERF-8 remain. AUD-10 is done (#486). See the [B4 board](b4-task-board.md)
-  and [ledger](known-issues.md) for exact status and evidence.
+  cases, AUD-11 remaining single-AST-walk consolidation after
+  [#506](https://github.com/cozyGarage/BookiE/pull/506), UI-1b (GTK editor after
+  #490 storage groundwork), UI-13b, TEST-15, PERF-2 and PERF-8 remain. AUD-10 is
+  done (#486). See the [B4 board](b4-task-board.md) and [ledger](known-issues.md)
+  for exact status and evidence.
 - Desktop acceptance [maintainer]: PKG-1 native Wayland on Arch, PKG-2
   Debian/GNOME, PKG-4 Flathub submission and screenshots, PKG-8 the Flatpak
   file-access decision, TEST-6 the 107-item manual checklist.
@@ -36,23 +37,26 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 ## Current continuation
 
 Merged `linux` baseline includes PRs #459–#461, #463, #475, #480, #482, #484,
-#486, #490, #497, #498, #501 and #504: engine read-only enforcement,
-order-independent script classification, fail-closed explain-plan masking,
-joined policy verdicts (AUD-11 step 3) with the S6/S7 unit pack (#484), DuckDB
-selected-file pinning (AUD-10, #486), typed grid quark keys (#482), per-hop SSH
-secret identities (UI-1b storage, #490), CSV value-path change contracts (#497),
-MySQL invalid calendar mode coverage (#501), DuckDB extended temporal unit pins
-(#504), and the docs sprint/board cleanup tip (#498). AUD-11 step 4 (drop legacy
-facts) remains on open [#506](https://github.com/cozyGarage/BookiE/pull/506);
-UI-1b GTK editor and acceptance remain. Case detail lives on the
-[B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md),
-[value evidence index](value-contracts.md) and [ledger](known-issues.md).
-Dated PR-by-PR continuation notes are in
+#486, #490, #493, #497, #498, #501, #504, #506, #512 and #515: engine read-only
+enforcement, order-independent script classification, fail-closed explain-plan
+masking, joined policy verdicts (AUD-11 step 3) with the S6/S7 unit pack (#484),
+DuckDB selected-file pinning (AUD-10, #486), typed grid quark keys (#482),
+per-hop SSH secret identities (UI-1b storage, #490), MongoDB deep browse seek
+(#493), CSV value-path change contracts (#497), MySQL invalid calendar mode
+coverage (#501), DuckDB extended temporal unit pins (#504), AUD-11 shared
+analysis (#506), the 0.2.0 scope drafts (#512), oracle Part A sample rows (#515),
+and the docs sprint/board cleanup tip (#498). AUD-11's remaining single-AST-walk
+consolidation stays open after #506; UI-1b GTK editor and acceptance remain.
+Case detail lives on the [B3 board](type-contract-strategy.md),
+[B4 board](b4-task-board.md), [value evidence index](value-contracts.md) and
+[ledger](known-issues.md). Dated PR-by-PR continuation notes are in
 [sprint history](archive/bookie-0.2-history.md#archived-from-active-sprint-on-2026-10-09-consolidation).
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review may overlap reserved fixtures; a lane pass
-does not close a milestone. The tip is not release-qualified.
+does not close a milestone. The tip is not release-qualified. Limitations that
+0.2.0 accepts stay in [known limitations](known-limitations.md); fixes after
+0.2.0 stay in the [backlog](backlog.md).
 
 ### Retest indicators (do not drop)
 
