@@ -54,10 +54,12 @@ fi
             ({"TABLEPRO_RC_VERSION": "../unsafe"}, "invalid candidate version"),
         ]:
             result = subprocess.run(runner, env=dict(environment, **overrides), capture_output=True, text=True)
-            assert result.returncode != 0 and expected in result.stderr, result.stderr
+            assert result.returncode != 0, result.stderr
+            assert expected in result.stderr, result.stderr
         (root / "linux/probe").write_text("uncommitted bytes")
         result = subprocess.run(runner, env=environment, capture_output=True, text=True)
-        assert result.returncode != 0 and "dirty tree" in result.stderr, result.stderr
+        assert result.returncode != 0, result.stderr
+        assert "dirty tree" in result.stderr, result.stderr
     print("candidate archive and rejection checks passed")
 
 

@@ -14,7 +14,7 @@ fn escape_duckdb_literal(value: &str) -> String {
 fn derive_view_name(path: &str) -> String {
     std::path::Path::new(path)
         .file_stem()
-        .and_then(|stem| stem.to_str())
+        .and_then(std::ffi::OsStr::to_str)
         .map(|stem| {
             let mut name: String = stem
                 .chars()

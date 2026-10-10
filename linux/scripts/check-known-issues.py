@@ -36,7 +36,7 @@ def problems(text):
 
 
 OWNERS_HEADING = "## Owners and handoff"
-ID = re.compile(r"\b[A-Z0-9]+-[0-9]+[a-z]?\b")
+ID = re.compile(r"\b[A-Z0-9]+-\d+[a-z]?\b")
 
 
 def owner_problems(text):

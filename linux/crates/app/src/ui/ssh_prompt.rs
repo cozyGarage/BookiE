@@ -42,7 +42,7 @@ impl Prompter for GtkPrompter {
     }
 
     fn notify(&self, text: &str) {
-        tracing::info!(message = %text, "ssh notice");
+        tracing::info!(notice = %text, "ssh notice");
     }
 }
 
