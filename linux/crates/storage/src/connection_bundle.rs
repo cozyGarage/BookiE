@@ -641,73 +641,108 @@ pub fn check_ssh_depth(ssh: Option<&SavedSshConfig>) -> Result<(), BundleError> 
 pub async fn collect_bundle_secrets(connections: &[SavedConnection]) -> Result<Vec<BundleSecrets>, BundleError> {
     let mut collected = Vec::with_capacity(connections.len());
     for connection in connections {
-        let id = connection.id;
-        let mut secrets = BundleSecrets::new(
-            id,
-            crate::secrets::load_password(id)
-                .await
-                .map_err(|_| BundleError::SecretUnavailable(id))?,
-            None,
-            None,
-        );
-        if let Some(ssh) = &connection.ssh {
-            let mut hop_secrets = Vec::new();
-            for (index, hop) in ssh.flatten_hops().into_iter().enumerate() {
-                if hop.agent {
-                    continue;
-                }
-                if hop.credential_revision == 0 {
-                    if index == 0 {
-                        match &hop.auth {
-                            crate::connections::SavedSshAuth::Password => {
-                                secrets.ssh_password = crate::secrets::load_ssh_password(id)
-                                    .await
-                                    .map_err(|_| BundleError::SecretUnavailable(id))?;
-                            }
-                            crate::connections::SavedSshAuth::PrivateKey {
-                                has_passphrase: true, ..
-                            } => {
-                                secrets.ssh_passphrase = crate::secrets::load_ssh_passphrase(id)
-                                    .await
-                                    .map_err(|_| BundleError::SecretUnavailable(id))?;
-                            }
-                            crate::connections::SavedSshAuth::PrivateKey {
-                                has_passphrase: false, ..
-                            } => {}
-                        }
-                    }
-                    continue;
-                }
-                let (kind, secret) = match &hop.auth {
-                    crate::connections::SavedSshAuth::Password => (
-                        BundleSshSecretKind::Password,
-                        crate::secrets::load_ssh_hop_password(id, hop.hop_id, hop.credential_revision)
-                            .await
-                            .map_err(|_| BundleError::SecretUnavailable(id))?,
-                    ),
-                    crate::connections::SavedSshAuth::PrivateKey {
-                        has_passphrase: true, ..
-                    } => (
-                        BundleSshSecretKind::Passphrase,
-                        crate::secrets::load_ssh_hop_passphrase(id, hop.hop_id, hop.credential_revision)
-                            .await
-                            .map_err(|_| BundleError::SecretUnavailable(id))?,
-                    ),
-                    crate::connections::SavedSshAuth::PrivateKey {
-                        has_passphrase: false, ..
-                    } => continue,
-                };
-                let secret = secret.ok_or(BundleError::SecretUnavailable(id))?;
-                hop_secrets.push(BundleSshSecret::new(hop.hop_id, hop.credential_revision, kind, secret));
-            }
-            secrets.set_ssh_hop_secrets(hop_secrets);
+        if let Some(secrets) = collect_connection_bundle_secrets(connection).await? {
+            collected.push(secrets);
         }
-        if secrets.is_empty() {
-            continue;
-        }
-        collected.push(secrets);
     }
     Ok(collected)
+}
+
+async fn collect_connection_bundle_secrets(connection: &SavedConnection) -> Result<Option<BundleSecrets>, BundleError> {
+    let id = connection.id;
+    let mut secrets = BundleSecrets::new(
+        id,
+        crate::secrets::load_password(id)
+            .await
+            .map_err(|_| BundleError::SecretUnavailable(id))?,
+        None,
+        None,
+    );
+    if let Some(ssh) = &connection.ssh {
+        collect_ssh_bundle_secrets(id, ssh, &mut secrets).await?;
+    }
+    Ok((!secrets.is_empty()).then_some(secrets))
+}
+
+async fn collect_ssh_bundle_secrets(
+    connection_id: Uuid,
+    ssh: &SavedSshConfig,
+    secrets: &mut BundleSecrets,
+) -> Result<(), BundleError> {
+    let mut hop_secrets = Vec::new();
+    for (index, hop) in ssh.flatten_hops().into_iter().enumerate() {
+        if hop.agent {
+            continue;
+        }
+        if hop.credential_revision == 0 {
+            if index == 0 {
+                collect_legacy_ssh_secret(connection_id, hop, secrets).await?;
+            }
+            continue;
+        }
+        if let Some(secret) = collect_versioned_ssh_secret(connection_id, hop).await? {
+            hop_secrets.push(secret);
+        }
+    }
+    secrets.set_ssh_hop_secrets(hop_secrets);
+    Ok(())
+}
+
+async fn collect_legacy_ssh_secret(
+    connection_id: Uuid,
+    hop: &SavedSshConfig,
+    secrets: &mut BundleSecrets,
+) -> Result<(), BundleError> {
+    match &hop.auth {
+        crate::connections::SavedSshAuth::Password => {
+            secrets.ssh_password = crate::secrets::load_ssh_password(connection_id)
+                .await
+                .map_err(|_| BundleError::SecretUnavailable(connection_id))?;
+        }
+        crate::connections::SavedSshAuth::PrivateKey {
+            has_passphrase: true, ..
+        } => {
+            secrets.ssh_passphrase = crate::secrets::load_ssh_passphrase(connection_id)
+                .await
+                .map_err(|_| BundleError::SecretUnavailable(connection_id))?;
+        }
+        crate::connections::SavedSshAuth::PrivateKey {
+            has_passphrase: false, ..
+        } => {}
+    }
+    Ok(())
+}
+
+async fn collect_versioned_ssh_secret(
+    connection_id: Uuid,
+    hop: &SavedSshConfig,
+) -> Result<Option<BundleSshSecret>, BundleError> {
+    let (kind, secret) = match &hop.auth {
+        crate::connections::SavedSshAuth::Password => (
+            BundleSshSecretKind::Password,
+            crate::secrets::load_ssh_hop_password(connection_id, hop.hop_id, hop.credential_revision)
+                .await
+                .map_err(|_| BundleError::SecretUnavailable(connection_id))?,
+        ),
+        crate::connections::SavedSshAuth::PrivateKey {
+            has_passphrase: true, ..
+        } => (
+            BundleSshSecretKind::Passphrase,
+            crate::secrets::load_ssh_hop_passphrase(connection_id, hop.hop_id, hop.credential_revision)
+                .await
+                .map_err(|_| BundleError::SecretUnavailable(connection_id))?,
+        ),
+        crate::connections::SavedSshAuth::PrivateKey {
+            has_passphrase: false, ..
+        } => return Ok(None),
+    };
+    let secret = secret.ok_or(BundleError::SecretUnavailable(connection_id))?;
+    Ok(Some(BundleSshSecret::new(
+        hop.hop_id,
+        hop.credential_revision,
+        kind,
+        secret,
+    )))
 }
 
 /// Write an imported connection's credentials under `target`. An
