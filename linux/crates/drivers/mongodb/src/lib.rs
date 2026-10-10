@@ -21,7 +21,7 @@ use shell::{
     AggregateQuery, FindQuery, parse_aggregate_shell, parse_delete_many, parse_drop_table_sql, parse_find_shell,
     parse_insert_one,
 };
-use update::{parse_keyed_delete, parse_keyed_update, parse_keyed_value_select};
+use update::{parse_keyed_delete, parse_keyed_update, parse_keyed_value_select, parse_keyset_page_select};
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
@@ -312,6 +312,7 @@ impl Connection for MongodbConnection {
                     filter,
                     skip: 0,
                     limit: MAX_QUERY_ROWS as i64,
+                    sort_by_id: false,
                 })
                 .await;
         }
@@ -323,6 +324,17 @@ impl Connection for MongodbConnection {
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         if params.is_empty() {
             return self.query(sql).await;
+        }
+        if let Some(page) = parse_keyset_page_select(sql, params, &self.database_name)? {
+            return self
+                .run_find(FindQuery {
+                    collection: page.collection,
+                    filter: doc! { "$expr": { "$gt": ["$_id", { "$literal": page.key }] } },
+                    skip: 0,
+                    limit: page.limit,
+                    sort_by_id: true,
+                })
+                .await;
         }
         let Some(query) = parse_keyed_value_select(sql, params, &self.database_name)? else {
             return Err(DriverError::Unsupported(
@@ -494,12 +506,11 @@ impl MongodbConnection {
     async fn run_find(&self, q: FindQuery) -> Result<QueryResult, DriverError> {
         let (mut columns, _) = self.columns_and_page(&q.collection, None).await?;
         let coll = self.db().collection::<Document>(&q.collection);
-        let mut cursor = coll
-            .find(q.filter)
-            .skip(q.skip)
-            .limit(q.limit)
-            .await
-            .map_err(map_mongo_error)?;
+        let mut find = coll.find(q.filter).skip(q.skip).limit(q.limit);
+        if q.sort_by_id {
+            find = find.sort(doc! { "_id": 1 });
+        }
+        let mut cursor = find.await.map_err(map_mongo_error)?;
         let mut docs = Vec::new();
         let mut source_bytes = 0usize;
         let mut source_cells = 0usize;

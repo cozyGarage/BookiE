@@ -27,21 +27,42 @@ pub enum BlastRadiusRewrite {
 pub fn count_sql_for_mutation(sql: &str, driver_id: &str) -> Option<BlastRadiusRewrite> {
     let dialect = dialect_for(driver_id);
     let statements = Parser::parse_sql(dialect.as_ref(), sql.trim()).ok()?;
+    analyze_blast_radius(&statements, driver_id).0
+}
+
+pub(crate) fn analyze_blast_radius(
+    statements: &[Statement],
+    driver_id: &str,
+) -> (Option<BlastRadiusRewrite>, Vec<Option<u64>>) {
     if statements.len() == 1 {
-        return rewrite_for_statement(&statements[0], driver_id);
+        let rewrite = rewrite_for_statement(&statements[0], driver_id);
+        let known_rows = match &rewrite {
+            Some(BlastRadiusRewrite::Known(rows)) => Some(*rows),
+            _ => None,
+        };
+        return (rewrite, vec![known_rows]);
     }
-    // A batch's every statement must resolve to a literal row count with
-    // no database round trip -- a mix of unknowns, or one that needs its
-    // own count query, can't be folded into a single estimate, so the
-    // batch as a whole stays unknown rather than guessing.
     let mut total = 0u64;
-    for statement in &statements {
-        match rewrite_for_statement(statement, driver_id)? {
-            BlastRadiusRewrite::Known(rows) => total += rows,
-            BlastRadiusRewrite::CountQuery(_) => return None,
-        }
-    }
-    Some(BlastRadiusRewrite::Known(total))
+    let mut all_known = !statements.is_empty();
+    let known_rows = statements
+        .iter()
+        .map(|statement| match rewrite_for_statement(statement, driver_id) {
+            Some(BlastRadiusRewrite::Known(rows)) => {
+                total += rows;
+                Some(rows)
+            }
+            Some(BlastRadiusRewrite::CountQuery(_)) | None => {
+                all_known = false;
+                None
+            }
+        })
+        .collect();
+    let rewrite = if all_known {
+        Some(BlastRadiusRewrite::Known(total))
+    } else {
+        None
+    };
+    (rewrite, known_rows)
 }
 
 fn rewrite_for_statement(statement: &Statement, driver_id: &str) -> Option<BlastRadiusRewrite> {
