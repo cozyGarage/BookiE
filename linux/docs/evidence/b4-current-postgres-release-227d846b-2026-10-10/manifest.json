@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-10",
   "branch": "linux",
-  "source_commit": "43b718ee2dc4b20bff03ac75ad87f4f571501406",
+  "source_commit": "227d846b95d14c2d55c366843bdf6ddc386b1c72",
   "environment": "Local Docker PostgreSQL release fixture with isolated D-Bus, Xvfb and AT-SPI",
   "command": "bash scripts/test-postgres-release.sh",
   "result": "passed",
@@ -31,5 +31,6 @@
     "This run does not establish Forgejo or hosted acceptance."
   ],
   "log": "run.log",
-  "log_sha256": "164ad28573ab55ee17c75da4d65cb7793a474857d5587e50a726ef5837016213"
+  "log_normalization": "Trailing horizontal whitespace from captured terminal output was stripped.",
+  "log_sha256": "976202180d50286cad5480a48dd6ad2786bd9013d122e642ec4dab138c014eea"
 }
