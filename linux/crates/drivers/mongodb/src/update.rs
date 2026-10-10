@@ -48,7 +48,11 @@ pub(super) fn parse_keyset_page_select(
     if !matches!(select.projection.as_slice(), [SelectItem::Wildcard(_)]) {
         return Ok(None);
     }
-    let Some(collection) = collection_named(&select.from[0].relation, database) else {
+    let relation = &select.from[0];
+    if !relation.joins.is_empty() {
+        return Ok(None);
+    }
+    let Some(collection) = collection_named(&relation.relation, database) else {
         return Ok(None);
     };
     let Some(Expr::BinaryOp {
@@ -508,6 +512,7 @@ mod keyset_page_tests {
         for sql in [
             "SELECT * FROM records WHERE _id >= ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? OR _id = ? LIMIT 50 OFFSET 0",
+            "SELECT * FROM records JOIN archive ON true WHERE _id > ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records WHERE value > ? LIMIT 50 OFFSET 0",
             "SELECT value FROM records WHERE _id > ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? LIMIT 0 OFFSET 0",
