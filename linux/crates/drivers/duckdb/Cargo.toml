@@ -16,9 +16,9 @@ async-trait.workspace = true
 chrono.workspace = true
 duckdb = { version = "1.10505", features = ["bundled", "json", "parquet", "rust_decimal"] }
 tokio = { workspace = true, features = ["rt"] }
-uuid.workspace = true
 
 [dev-dependencies]
+uuid.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
