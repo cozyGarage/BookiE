@@ -620,174 +620,89 @@ impl PolicyGuard {
     }
 }
 
+async fn run_transaction_query<F>(
+    guard: &PolicyGuard,
+    batch_id: Uuid,
+    sql: &str,
+    authorization: Authorization,
+    operation_name: &'static str,
+    execution: F,
+) -> Result<QueryResult, DriverError>
+where
+    F: std::future::Future<Output = Result<QueryResult, DriverError>> + Send,
+{
+    let operation = guard.operation(
+        sql,
+        Some(batch_id),
+        &authorization.analysis.facts,
+        &authorization.decision,
+        authorization.approval_outcome,
+        authorization.preview_state,
+    );
+    if authorization.analysis.facts.writes() {
+        guard.require_governed_write_available()?;
+        guard.handle_intent_failure(guard.record_intent(&operation).await)?;
+        let mut pending_write = guard.ctx.audit_state.pending_write();
+        let start = Instant::now();
+        let result = guard
+            .caught_write(operation_name, execution)
+            .await
+            .map(|value| guard.mask_result_for_analysis(Some(&authorization.analysis), value));
+        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
+        guard.audit_transaction_result(&operation, start, &result, rows).await?;
+        pending_write.disarm();
+        return result;
+    }
+    guard.prepare_governed_read(&operation).await?;
+    let start = Instant::now();
+    let result = guard
+        .caught_read(operation_name, execution)
+        .await
+        .map(|value| guard.mask_result_for_analysis(Some(&authorization.analysis), value));
+    let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
+    guard.audit_transaction_result(&operation, start, &result, rows).await?;
+    result
+}
+
 #[async_trait]
 impl Transaction for PolicyTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
         let authorization = self.guard.authorize(sql, false, None).await?;
-        if authorization.analysis.facts.writes() {
-            self.guard.require_governed_write_available()?;
-            let operation = self.guard.operation(
-                sql,
-                Some(self.batch_id),
-                &authorization.analysis.facts,
-                &authorization.decision,
-                authorization.approval_outcome,
-                authorization.preview_state,
-            );
-            self.guard
-                .handle_intent_failure(self.guard.record_intent(&operation).await)?;
-            let mut pending_write = self.guard.ctx.audit_state.pending_write();
-            let start = Instant::now();
-            let result = self
-                .guard
-                .caught_write("QUERY", self.inner.query(sql))
-                .await
-                .map(|value| {
-                    self.guard
-                        .mask_result_for_analysis(Some(&authorization.analysis), value)
-                });
-            let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-            self.guard
-                .audit_transaction_result(&operation, start, &result, rows)
-                .await?;
-            pending_write.disarm();
-            return result;
-        }
-        let operation = self.guard.operation(
+        run_transaction_query(
+            &self.guard,
+            self.batch_id,
             sql,
-            Some(self.batch_id),
-            &authorization.analysis.facts,
-            &authorization.decision,
-            authorization.approval_outcome,
-            authorization.preview_state,
-        );
-        self.guard.prepare_governed_read(&operation).await?;
-        let start = Instant::now();
-        let result = self
-            .guard
-            .caught_read("QUERY", self.inner.query(sql))
-            .await
-            .map(|value| {
-                self.guard
-                    .mask_result_for_analysis(Some(&authorization.analysis), value)
-            });
-        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-        self.guard
-            .audit_transaction_result(&operation, start, &result, rows)
-            .await?;
-        result
+            authorization,
+            "QUERY",
+            self.inner.query(sql),
+        )
+        .await
     }
 
     async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
         let authorization = self.guard.authorize(sql, false, Some(control)).await?;
-        if authorization.analysis.facts.writes() {
-            self.guard.require_governed_write_available()?;
-            let operation = self.guard.operation(
-                sql,
-                Some(self.batch_id),
-                &authorization.analysis.facts,
-                &authorization.decision,
-                authorization.approval_outcome,
-                authorization.preview_state,
-            );
-            self.guard
-                .handle_intent_failure(self.guard.record_intent(&operation).await)?;
-            let mut pending_write = self.guard.ctx.audit_state.pending_write();
-            let start = Instant::now();
-            let result = self
-                .guard
-                .caught_write("QUERY", self.inner.query_controlled(sql, control))
-                .await
-                .map(|value| {
-                    self.guard
-                        .mask_result_for_analysis(Some(&authorization.analysis), value)
-                });
-            let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-            self.guard
-                .audit_transaction_result(&operation, start, &result, rows)
-                .await?;
-            pending_write.disarm();
-            return result;
-        }
-        let operation = self.guard.operation(
+        run_transaction_query(
+            &self.guard,
+            self.batch_id,
             sql,
-            Some(self.batch_id),
-            &authorization.analysis.facts,
-            &authorization.decision,
-            authorization.approval_outcome,
-            authorization.preview_state,
-        );
-        self.guard.prepare_governed_read(&operation).await?;
-        let start = Instant::now();
-        let result = self
-            .guard
-            .caught_read("QUERY", self.inner.query_controlled(sql, control))
-            .await
-            .map(|value| {
-                self.guard
-                    .mask_result_for_analysis(Some(&authorization.analysis), value)
-            });
-        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-        self.guard
-            .audit_transaction_result(&operation, start, &result, rows)
-            .await?;
-        result
+            authorization,
+            "QUERY",
+            self.inner.query_controlled(sql, control),
+        )
+        .await
     }
 
     async fn query_params(&mut self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let authorization = self.guard.authorize(sql, true, None).await?;
-        if authorization.analysis.facts.writes() {
-            self.guard.require_governed_write_available()?;
-            let operation = self.guard.operation(
-                sql,
-                Some(self.batch_id),
-                &authorization.analysis.facts,
-                &authorization.decision,
-                authorization.approval_outcome,
-                authorization.preview_state,
-            );
-            self.guard
-                .handle_intent_failure(self.guard.record_intent(&operation).await)?;
-            let mut pending_write = self.guard.ctx.audit_state.pending_write();
-            let start = Instant::now();
-            let result = self
-                .guard
-                .caught_write("QUERY PARAMS", self.inner.query_params(sql, params))
-                .await
-                .map(|value| {
-                    self.guard
-                        .mask_result_for_analysis(Some(&authorization.analysis), value)
-                });
-            let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-            self.guard
-                .audit_transaction_result(&operation, start, &result, rows)
-                .await?;
-            pending_write.disarm();
-            return result;
-        }
-        let operation = self.guard.operation(
+        run_transaction_query(
+            &self.guard,
+            self.batch_id,
             sql,
-            Some(self.batch_id),
-            &authorization.analysis.facts,
-            &authorization.decision,
-            authorization.approval_outcome,
-            authorization.preview_state,
-        );
-        self.guard.prepare_governed_read(&operation).await?;
-        let start = Instant::now();
-        let result = self
-            .guard
-            .caught_read("QUERY PARAMS", self.inner.query_params(sql, params))
-            .await
-            .map(|value| {
-                self.guard
-                    .mask_result_for_analysis(Some(&authorization.analysis), value)
-            });
-        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-        self.guard
-            .audit_transaction_result(&operation, start, &result, rows)
-            .await?;
-        result
+            authorization,
+            "QUERY PARAMS",
+            self.inner.query_params(sql, params),
+        )
+        .await
     }
 
     async fn query_params_controlled(
@@ -797,58 +712,15 @@ impl Transaction for PolicyTransaction {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         let authorization = self.guard.authorize(sql, true, Some(control)).await?;
-        if authorization.analysis.facts.writes() {
-            self.guard.require_governed_write_available()?;
-            let operation = self.guard.operation(
-                sql,
-                Some(self.batch_id),
-                &authorization.analysis.facts,
-                &authorization.decision,
-                authorization.approval_outcome,
-                authorization.preview_state,
-            );
-            self.guard
-                .handle_intent_failure(self.guard.record_intent(&operation).await)?;
-            let mut pending_write = self.guard.ctx.audit_state.pending_write();
-            let start = Instant::now();
-            let result = self
-                .guard
-                .caught_write("QUERY PARAMS", self.inner.query_params_controlled(sql, params, control))
-                .await
-                .map(|value| {
-                    self.guard
-                        .mask_result_for_analysis(Some(&authorization.analysis), value)
-                });
-            let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-            self.guard
-                .audit_transaction_result(&operation, start, &result, rows)
-                .await?;
-            pending_write.disarm();
-            return result;
-        }
-        let operation = self.guard.operation(
+        run_transaction_query(
+            &self.guard,
+            self.batch_id,
             sql,
-            Some(self.batch_id),
-            &authorization.analysis.facts,
-            &authorization.decision,
-            authorization.approval_outcome,
-            authorization.preview_state,
-        );
-        self.guard.prepare_governed_read(&operation).await?;
-        let start = Instant::now();
-        let result = self
-            .guard
-            .caught_read("QUERY PARAMS", self.inner.query_params_controlled(sql, params, control))
-            .await
-            .map(|value| {
-                self.guard
-                    .mask_result_for_analysis(Some(&authorization.analysis), value)
-            });
-        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-        self.guard
-            .audit_transaction_result(&operation, start, &result, rows)
-            .await?;
-        result
+            authorization,
+            "QUERY PARAMS",
+            self.inner.query_params_controlled(sql, params, control),
+        )
+        .await
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
