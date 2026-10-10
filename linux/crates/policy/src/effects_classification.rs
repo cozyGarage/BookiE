@@ -5,6 +5,21 @@ use crate::classify::{StatementClass, StatementFacts, is_administrative_function
 use crate::effects::Effects;
 use sqlparser::ast::{CopySource, CopyTarget, Set, Statement};
 
+pub(crate) fn truncate_facts(tables: Vec<String>) -> StatementFacts {
+    StatementFacts {
+        class: StatementClass::Ddl,
+        writes: true,
+        tables,
+        has_where: false,
+        contains_ddl: true,
+        contains_mutating_dml: true,
+        contains_unscoped_dml: true,
+        contains_unknown_write: false,
+        is_multi_statement: false,
+        parse_error: None,
+    }
+}
+
 pub(crate) fn merge_script_class(current: StatementClass, next: StatementClass) -> StatementClass {
     if current == StatementClass::Administrative || next == StatementClass::Administrative {
         return StatementClass::Administrative;

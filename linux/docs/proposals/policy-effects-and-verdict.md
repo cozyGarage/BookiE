@@ -43,7 +43,9 @@ same result:
 1. Add `Effects` beside the current facts; compute both; assert equal in tests.
 2. Move scripts to the union and drop first-statement classification (S8).
 3. Convert rules to return verdicts and fold them; keep rule names for audit
-   (S6, S7).
+   (S6, S7). Partial: dedicated rules now cover the S6 unparseable bypass and
+   the S7 administrative / unknown-write / `TRUNCATE` gaps; a true
+   Allow < RequireApproval < Deny join across every rule remains.
 4. Delete the old facts fields and the duplicated walkers.
 
 ## Checks

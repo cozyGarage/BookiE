@@ -165,7 +165,10 @@ fn decide_unparseable(principal: &Principal, env_policy: &EnvPolicy) -> Decision
             rule: "fail_closed_unparseable".into(),
             message: "SQL could not be parsed; agents are denied".into(),
         }
-    } else if env_policy.human_approve_unparseable {
+    } else if env_policy.human_approve_unparseable
+        || env_policy.human_approve_writes
+        || env_policy.human_approve_ddl
+    {
         Decision::RequireApproval {
             rule: "fail_closed_unparseable".into(),
             reason: "SQL could not be parsed; confirm before running".into(),
@@ -266,6 +269,22 @@ fn evaluate_human_write_categorical(
     facts: &StatementFacts,
     env_policy: &EnvPolicy,
 ) -> Option<Decision> {
+    if facts.class == StatementClass::Administrative {
+        return Some(Decision::RequireApproval {
+            rule: "human_admin_approve".into(),
+            reason: format!("administrative operation on {}", environment.as_str()),
+            preview: Some(format!("tables: {}", facts.tables.join(", "))),
+        });
+    }
+
+    if facts.contains_unknown_write {
+        return Some(Decision::RequireApproval {
+            rule: "human_unknown_write_approve".into(),
+            reason: "write safety category could not be determined; confirm before running".into(),
+            preview: Some(format!("tables: {}", facts.tables.join(", "))),
+        });
+    }
+
     if facts.contains_unscoped_dml {
         return Some(Decision::RequireApproval {
             rule: "human_unscoped_dml".into(),

@@ -279,7 +279,7 @@ fn classify_statement(stmt: &Statement) -> StatementFacts {
             is_multi_statement: false,
             parse_error: None,
         },
-        Statement::Truncate { table_names, .. } => ddl_facts(table_names.iter().map(|t| t.name.to_string()).collect()),
+        Statement::Truncate { table_names, .. } => crate::effects_classification::truncate_facts(table_names.iter().map(|t| t.name.to_string()).collect()),
         Statement::CreateVirtualTable { .. }
         | Statement::CreateRole { .. }
         | Statement::CreateSecret { .. }

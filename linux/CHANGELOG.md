@@ -146,6 +146,11 @@
 
 ### Security
 
+- When writes or DDL need approval, unparseable SQL asks for confirmation instead of running when the unparseable override would otherwise allow it
+- Administrative host-access statements such as `COPY … TO PROGRAM` ask for approval in Local and Staging, not only for agents
+- Writes whose safety category cannot be determined, including `MERGE … DELETE`, ask for human approval even when ordinary writes are allowed
+- `TRUNCATE` asks for approval in Local as an unscoped row wipe; ordinary local `CREATE TABLE` stays allowed without DDL approval
+- Agent result masking now treats `to_json` / `to_jsonb` and JSON object builders the same as `row_to_json` when deciding which columns to redact
 - `SELECT … INTO` is now treated as a write, so read-only connections and agent read access refuse it instead of letting it create a table
 - The row-count estimate that guards large writes no longer runs a side-effecting function in your WHERE clause before you approve the statement; such statements ask for approval without an estimate
 - A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server
