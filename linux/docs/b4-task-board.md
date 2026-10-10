@@ -39,6 +39,18 @@ the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
 This local result does not establish the Forgejo gate, hosted acceptance or
 frozen-candidate/installed acceptance.
 
+## AUD-2 MySQL approval-dialog rerun (2026-10-10)
+
+The exact scenario `mysql_unparseable_routine_dialog_denial_preserves_database`
+passed three consecutive runs from PR #513 candidate `d4cca38` (based on Linux
+`0855cca`). Each run used
+`bash linux/scripts/test-gtk-mysql-approval.sh` with a release binary built from
+that source, Docker MySQL 8.0, a private D-Bus session, Xvfb/X11 and GTK AT-SPI.
+The [run manifest and logs](evidence/aud2-mysql-approval-dialog-current-pr-head-2026-10-10/manifest.json)
+record the binary and log hashes. The earlier empty-dialog failure's cause is
+still unknown. These isolated Xvfb runs do not establish package-installed or
+native Wayland acceptance, and do not replace the Forgejo gate.
+
 ## Retest indicators (from archived checkpoints)
 
 Keep these as “test again” signals until cleared on a current candidate SHA.
@@ -48,7 +60,7 @@ Full dated narratives are in
 | Signal | Status at archive | Action |
 | --- | --- | --- |
 | MongoDB TLS `ConnectionRefused` on `98134709` | Intermittent; later 48/48 TLS passes on `a47b1fb` and hosted `102ef480` | Retest if TLS layer flakes again; do not treat as closed root-cause |
-| Empty MySQL approval dialog (operator observation) | Not reproduced on `b4ee463` / hosted `102ef480`; cause unconfirmed | Retest on installed package / native Wayland |
+| Empty MySQL approval dialog (operator observation) | Three consecutive Xvfb/AT-SPI passes on PR #513 candidate `d4cca38`; earlier `b4ee463` / hosted `102ef480` also passed; cause unconfirmed | Retest on installed package / native Wayland |
 | Build Linux cancelled / pending on superseded tips (`8e5d1b18`, `32b170f`, `e697824`) | Superseded by later green and rate-limited runs | Ignore SHA; retest only current tip |
 | Headless Wayland smoke incomplete (`97e5f55`) | No SIGSEGV; AT-SPI not activated | Retest native Wayland PKG-1 path |
 | Docker Hub rate limits on tip near `c2f3f78b9` | Infrastructure red, not product signal | Retest Build Linux when pulls succeed |

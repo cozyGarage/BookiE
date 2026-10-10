@@ -48,6 +48,28 @@ class ChangeContractTests(unittest.TestCase):
             actions[0]["required_tests"],
         )
 
+    def test_stream_export_path_maps_to_its_exact_value_contracts(self):
+        actions = CHECKER.select_actions(["crates/core/src/export/stream_tests.rs"], CHECKER.load_map())
+        self.assertEqual(len(actions), 1)
+        self.assertFalse(actions[0]["full_suite"])
+        self.assertEqual(
+            actions[0]["required_tests"],
+            sorted(CHECKER.load_map()["exact_tests"]["crates/core/src/export/stream_tests.rs"]["tests"]),
+        )
+
+    def test_extended_temporal_path_maps_to_its_exact_value_contracts(self):
+        actions = CHECKER.select_actions(
+            ["crates/core/src/import/extended_temporal.rs"], CHECKER.load_map()
+        )
+        self.assertEqual(len(actions), 1)
+        self.assertFalse(actions[0]["full_suite"])
+        self.assertEqual(
+            actions[0]["required_tests"],
+            sorted(
+                CHECKER.load_map()["exact_tests"]["crates/core/src/import/extended_temporal.rs"]["tests"]
+            ),
+        )
+
     def test_other_value_path_maps_to_its_package_suite(self):
         actions = CHECKER.select_actions(["crates/core/src/value.rs"], CHECKER.load_map())
         self.assertEqual(actions, [{

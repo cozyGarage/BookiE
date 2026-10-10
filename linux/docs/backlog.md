@@ -7,21 +7,21 @@ this page keeps the order. Draft of 2026-10-11, for the maintainer.
 
 | Row | What | Notes |
 |---|---|---|
-| SNAP-1 to SNAP-4 | Database snapshots: PostgreSQL, SQL Server, then SQLite and DuckDB file copies | ADR 0015; limit 5 snapshots per database |
+| SNAP-2 to SNAP-4 | Database snapshots: PostgreSQL, SQL Server, then SQLite and DuckDB file copies | ADR 0015 / SNAP-1 accepted the feature for 0.2.x (not a 0.2.0 blocker); limit 5 snapshots per database |
 | UI-1b | Edit SSH jump chains in the form | Storage landed in #490; transport and bundle v2 are in review; edits stay refused until the whole path passes together |
 | UI-19 | Foreign key picker and navigation, enum and set pickers, paste TSV, estimated counts | |
 | UI-20 | Server output (NOTICE, PRINT) and a timing breakdown | with PERF-4 |
-| UI-15b | Null display style preference | |
-| UI-17b, UI-18, UI-22, UI-23, UI-26 | Preview tabs, history as a panel, code folding and split panes, more PostgreSQL catalog objects, editable SSH profiles | accepted for later |
+| UI-15b | Null display style preference | vim keys are already an opt-in preference |
+| UI-17b, UI-18, UI-22, UI-23, UI-26 | Preview tabs, history as a panel, code folding and split panes, typed PostgreSQL activity console, editable SSH profiles | accepted for later; PostgreSQL catalog objects are already built (UI-23) |
 | PKG-2 | Debian and GNOME desktop pass (UI-D1 to D4) | the packages keep building and passing the distro floor in CI; this is the desktop acceptance |
-| PKG-4, PKG-8 | Flatpak build, Flathub submission, and the file-access decision (`--filesystem=home` or portal only) | not part of 0.2.0; decide PKG-8 before PKG-4 |
+| PKG-4, PKG-8 | Flatpak Flathub submission and screenshots, and the file-access decision (`--filesystem=home` or portal only) | guest build/install/launch is proven; not part of 0.2.0; decide PKG-8 before PKG-4 |
 
 ## Performance
 
 | Row | What |
 |---|---|
 | PERF-2, PERF-7, PERF-8 | Stream results instead of materialising up to three caps; progressive loading in the editor |
-| PERF-3 | MongoDB browse on large collections (partly fixed in #493) |
+| PERF-3 | MongoDB browse on large collections | Deep unfiltered `_id` keyset seek landed in #493; filtered, sorted, keyless and installed/network acceptance remain |
 | PERF-4 | Server time next to elapsed time |
 | PERF-5, PERF-6 | Idle memory and binary size, accepted for now |
 
@@ -35,12 +35,16 @@ this page keeps the order. Draft of 2026-10-11, for the maintainer.
 | TEST-30 | Remaining SonarCloud and CodeQL findings |
 | AUD-5 | About 4,700 comment lines in `src/` to move into docs, file by file |
 | DOC-3, DOC-5 | Orca and high contrast pass; value comparison with DBeaver and dbx |
-| B4-9, B4-11, B4-17, B4-21 | Route and TLS acceptance evidence, failed-batch rollback on other MySQL storage engines, native multi-hop trust flow, a deterministic KDC fixture for SQL Server Kerberos |
+| B4-9, B4-11, B4-17, B4-21 | Route and TLS acceptance evidence, failed-batch rollback on optional MySQL engines and package acceptance, native multi-hop trust flow, SQL Server Kerberos Windows AD interoperability and package acceptance |
 | UI-13b | Consistent snapshot for a full export (ADR 0014) |
 
 ## Infrastructure
 
 - Enable Hyper-Threading on two lab hosts, raise executor sizes, split runners by
   job class, then allow two gates to overlap.
+- Stop committing the generated `docs/ignored-tests.md`. Every pull request that adds
+  or moves an ignored test conflicts in it, and each conflict is resolved by
+  regenerating the file. Generate it in CI and check its content there instead, or
+  write it to a build output.
 - Folder layout: separate the platform-neutral crates from the Linux application,
   and test suites from code (see the layout proposal when the maintainer asks for it).
