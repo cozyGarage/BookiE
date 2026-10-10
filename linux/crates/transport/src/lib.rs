@@ -1085,6 +1085,8 @@ mod tests {
     #[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
     async fn password_auth_uses_the_secret_bound_to_each_hop() {
         let connection_id = Uuid::new_v4();
+        let root_secret = Uuid::new_v4().to_string();
+        let jump_secret = Uuid::new_v4().to_string();
         let root = SavedSshConfig {
             hop_id: Uuid::new_v4(),
             credential_revision: 1,
@@ -1102,7 +1104,7 @@ mod tests {
             connection_id,
             hops[0].hop_id,
             hops[0].credential_revision,
-            "root-secret",
+            &root_secret,
             "BookiE test root SSH password",
         )
         .await
@@ -1111,7 +1113,7 @@ mod tests {
             connection_id,
             hops[1].hop_id,
             hops[1].credential_revision,
-            "jump-secret",
+            &jump_secret,
             "BookiE test jump SSH password",
         )
         .await
@@ -1131,7 +1133,7 @@ mod tests {
                 .await
                 .unwrap();
         }
-        assert_eq!(secrets, ["root-secret", "jump-secret"]);
+        assert_eq!(secrets, [root_secret, jump_secret]);
     }
 
     #[tokio::test]
