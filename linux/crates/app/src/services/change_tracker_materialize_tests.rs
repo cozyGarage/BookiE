@@ -338,3 +338,51 @@ fn an_edit_back_to_the_identical_value_is_dropped() {
         assert_eq!(tracker.pending_count(), 0);
     }
 }
+
+fn only_update(tracker: &TabChangeTracker) -> Vec<Value> {
+    let (statements, _) = materialize(tracker);
+    assert_eq!(statements.len(), 1, "{statements:?}");
+    statements[0].1.clone()
+}
+
+fn text(value: &str) -> Value {
+    Value::Text(value.into())
+}
+
+#[test]
+fn undoing_the_second_of_two_edits_keeps_the_first_pending_against_the_stored_value() {
+    let mut tracker = TabChangeTracker::new();
+    tracker.track_cell_edit(key(1), 1, text("a"), text("b"));
+    tracker.track_cell_edit(key(1), 1, text("b"), text("c"));
+
+    tracker.undo().expect("the second edit");
+
+    assert_eq!(tracker.pending_count(), 1);
+    assert_eq!(only_update(&tracker), vec![text("b"), Value::Int(1), text("a")]);
+    tracker.undo().expect("the first edit");
+    assert_eq!(tracker.pending_count(), 0);
+}
+
+#[test]
+fn redoing_an_edit_after_a_partial_undo_still_guards_on_the_stored_value() {
+    let mut tracker = TabChangeTracker::new();
+    tracker.track_cell_edit(key(1), 1, text("a"), text("b"));
+    tracker.track_cell_edit(key(1), 1, text("b"), text("c"));
+    tracker.undo().expect("the second edit");
+
+    tracker.redo().expect("the second edit again");
+
+    assert_eq!(only_update(&tracker), vec![text("c"), Value::Int(1), text("a")]);
+}
+
+#[test]
+fn redoing_after_undoing_everything_restores_the_first_edit() {
+    let mut tracker = TabChangeTracker::new();
+    tracker.track_cell_edit(key(1), 1, text("a"), text("b"));
+    tracker.undo().expect("the edit");
+    assert_eq!(tracker.pending_count(), 0);
+
+    tracker.redo().expect("the edit again");
+
+    assert_eq!(only_update(&tracker), vec![text("b"), Value::Int(1), text("a")]);
+}

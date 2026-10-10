@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tablepro_core::Connection;
-use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use tablepro_mcp::{ConnectionProvider, McpBridge, McpServerConfig, TokenPermissions, TokenStore};
 use tablepro_policy::Principal;
 use tablepro_storage::{SavedConnection, load_connections, store_mcp_token};
 use tokio_util::sync::CancellationToken;
@@ -74,7 +74,8 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
         shutdown.clone(),
     ));
     let bridge_http = bridge.clone();
-    let config = tablepro_mcp::McpServerConfig::default();
+    let test_port = std::env::var("TABLEPRO_TEST_MCP_HTTP_PORT").ok();
+    let config = server_config(test_port.as_deref());
     let server_shutdown = shutdown.clone();
     tracing::info!(host = %config.bind_host, port = config.bind_port, "MCP HTTP server starting");
     let thread = match std::thread::Builder::new().name("tablepro-mcp".into()).spawn(move || {
@@ -102,6 +103,17 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
         shutdown,
         thread: Some(thread),
     })
+}
+
+fn server_config(test_port: Option<&str>) -> McpServerConfig {
+    let mut config = McpServerConfig::default();
+    if let Some(port) = test_port
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|port| *port > 0)
+    {
+        config.bind_port = port;
+    }
+    config
 }
 
 /// Issue a token, store plaintext in libsecret, return plaintext once.
@@ -134,4 +146,17 @@ pub fn revoke_token(bridge: Option<&Arc<McpBridge>>, id: Uuid) -> Result<(), Str
 
 pub fn list_tokens(bridge: Option<&Arc<McpBridge>>) -> Vec<tablepro_mcp::McpToken> {
     bridge.map(|b| b.tokens().list()).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::server_config;
+
+    #[test]
+    fn test_mcp_port_override_accepts_only_nonzero_u16_values() {
+        assert_eq!(server_config(Some("23456")).bind_port, 23456);
+        assert_eq!(server_config(Some("0")).bind_port, 17432);
+        assert_eq!(server_config(Some("65536")).bind_port, 17432);
+        assert_eq!(server_config(None).bind_port, 17432);
+    }
 }

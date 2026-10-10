@@ -1,0 +1,15 @@
+{
+  "case": "MariaDB Aria nontransactional effects survive failed DML batches",
+  "source_sha": "2b79ae352111d5722064ac9aaac8dd2a80be1a02",
+  "command": "cargo test --locked -p tablepro-driver-mysql --test integration mariadb_aria_nontransactional_effects_survive_failed_batches -- --ignored --nocapture",
+  "fixture": "MariaDB 11 Testcontainers fixture",
+  "result": "1 passed; 92 filtered; 5.65 seconds",
+  "assertions": [
+    "Aria TRANSACTIONAL=0 direct UPDATE, DELETE and INSERT effects survive failure of the following statement while each batch reports statement index 1.",
+    "INSERT, UPDATE and DELETE triggers on InnoDB parents leave their Aria TRANSACTIONAL=0 effects after the parent rows roll back."
+  ],
+  "scope_limit": "This is local source-build evidence for one MariaDB 11 fixture. It does not establish other storage engines, additional side-effect classes, frozen-candidate or installed acceptance.",
+  "artifacts": {
+    "run.log": "03faee7ab2b01411541b6f2839b63e28108269d624cfd3f6341ae24adebeeec0"
+  }
+}

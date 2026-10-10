@@ -25,7 +25,7 @@ SHA you need, and recheck current source before trusting words such as "next",
 | People using BookiE | [User guide](user-guide.md), [platforms](platforms.md), [Linux README](../README.md) |
 | Anyone comparing clients | [0.2 feature comparison](0.2-feature-comparison.md) |
 | Contributors writing code | [AGENTS.md](../../AGENTS.md), [architecture](../ARCHITECTURE.md), [code conventions](code-conventions.md), [adding drivers](adding-drivers.md), [state management](state-management.md), [connections](connections.md), [disconnection contracts](disconnection-contracts.md), [storage](storage.md), [error handling](error-handling.md) |
-| Contributors testing | [Validation playbook](validation-playbook.md), [testing](testing.md), [ignored-test inventory](ignored-tests.md) (generated), [manual verification](manual-verification-0.2-features.md), [capability evidence](capability-evidence.md) |
+| Contributors testing | [Validation playbook](validation-playbook.md) (including [CI tiers](validation-playbook.md#ci-tiers): GitHub cheap vs Forgejo merge), [testing](testing.md), [ignored-test inventory](ignored-tests.md) (generated), [manual verification](manual-verification-0.2-features.md), [capability evidence](capability-evidence.md) |
 | Planning and status | [Sprint](bookie-0.2-sprint.md), [ledger](known-issues.md), [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence index](value-contracts.md), [ROADMAP](../ROADMAP.md), [changelog](../CHANGELOG.md) |
 | Decisions | [ADRs](decisions/README.md), [proposals](proposals/) |
 | Proof and history | [evidence](evidence/), [archive](archive/), [upstream sync](upstream-sync.md) |
@@ -75,6 +75,9 @@ them live in the ledger. The
 [changelog engineering history index](../CHANGELOG.md#historical-engineering-records)
 locates dated records.
 
+- [Sprint history](archive/bookie-0.2-history.md) (includes 2026-10-08/09 continuation snapshots)
+- [B4 history](archive/b4-history.md) (includes superseded tip checkpoints)
+- [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 - [Release audit, October 3](archive/release-audit-2026-10-03.md)
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md)
 - [App layer audit](archive/app-layer-external-audit-2026-10-06.md): GUI gaps and the TablePro and dbx comparison

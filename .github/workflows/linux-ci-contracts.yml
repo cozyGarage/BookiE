@@ -3,14 +3,18 @@ name: Linux CI contracts
 on:
   push:
     branches: [linux, main]
-    paths: [".github/workflows/**", "linux/scripts/**", "linux/packaging/**", "linux/docs/**", "**.md"]
+    paths: [".github/workflows/**", ".github/actions/**", "linux/scripts/**", "linux/packaging/**", "linux/docs/**", "**.md"]
   pull_request:
     branches: [linux, main]
-    paths: [".github/workflows/**", "linux/scripts/**", "linux/packaging/**", "linux/docs/**", "**.md"]
+    paths: [".github/workflows/**", ".github/actions/**", "linux/scripts/**", "linux/packaging/**", "linux/docs/**", "**.md"]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: linux-ci-contracts-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
   workflow-lint:

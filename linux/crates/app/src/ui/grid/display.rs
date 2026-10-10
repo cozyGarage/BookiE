@@ -119,7 +119,7 @@ pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPrevi
 pub(crate) fn value_to_full_edit_text(value: &Value) -> String {
     match value {
         Value::Null => String::new(),
-        other => value_to_text(other, |s| s.to_string()),
+        other => value_to_text(other, ToString::to_string),
     }
 }
 
@@ -291,6 +291,16 @@ mod tests {
         assert!(!view.inline_editable);
         assert_eq!(view.text_for_bind(true), "<undecodable NUMERIC>");
         assert_ne!(view.text_for_bind(true), editable_null_sentinel());
+    }
+
+    #[test]
+    fn a_text_value_that_looks_like_the_null_marker_is_text_and_not_null() {
+        let text = Value::Text(editable_null_sentinel());
+        let view = cell_view(&text, &metadata("text"));
+        assert!(!view.is_null);
+        assert!(view.inline_editable);
+        assert_eq!(view.text_for_bind(true), editable_null_sentinel());
+        assert!(cell_view(&Value::Null, &metadata("text")).is_null);
     }
 
     #[test]

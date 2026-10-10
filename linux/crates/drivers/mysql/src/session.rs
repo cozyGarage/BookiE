@@ -8,8 +8,8 @@ use tablepro_core::{
 };
 
 use crate::{
-    confirms_cancellation, connection_id, map_sqlx_error, params_into_result, refuse_non_utc_timestamps,
-    request_cancellation, set_utc_timezone, timezone_is_utc,
+    confirms_cancellation, connection_id, map_sqlx_error, params_into_result, prepare_session,
+    refuse_non_utc_timestamps, request_cancellation, timezone_is_utc,
 };
 
 const SESSION_SETUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -24,6 +24,7 @@ pub(crate) struct MysqlSession {
 pub(crate) async fn open(
     options: &MySqlConnectOptions,
     cancellation_pool: Pool<MySql>,
+    read_only: bool,
 ) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
     let pool = MySqlPoolOptions::new()
         .max_connections(1)
@@ -34,7 +35,7 @@ pub(crate) async fn open(
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;
     connection.close_on_drop();
-    tokio::time::timeout(SESSION_SETUP_TIMEOUT, set_utc_timezone(&mut connection))
+    tokio::time::timeout(SESSION_SETUP_TIMEOUT, prepare_session(&mut connection, read_only))
         .await
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;

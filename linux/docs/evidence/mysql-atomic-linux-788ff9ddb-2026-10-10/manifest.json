@@ -1,0 +1,20 @@
+{
+  "task": "B4-11 MySQL failed-batch side effects",
+  "source_revision": "788ff9ddbf0e75587ca68a6d84597fa6da90bdc8",
+  "source_branch": "fork/linux",
+  "date": "2026-10-10",
+  "environment": {
+    "runner": "local Linux workstation",
+    "docker_server": "29.7.2",
+    "mysql_fixture": "mysql:8.1",
+    "mariadb_fixture": "testcontainers MariaDB image from locked test dependency"
+  },
+  "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
+  "result": "passed: 20 tests; 73 filtered out; 1 suite",
+  "duration_seconds": 132.42,
+  "log": {
+    "path": "run.log",
+    "sha256": "b4188317b7831cbbf869f9617782669ba1b1ad993bf7c64deadeda260ce975a9"
+  },
+  "scope": "Confirms the current Linux source selector covering supported MySQL and MariaDB failed-batch engine and side-effect cases. This does not close optional/vendor engine coverage, frozen-candidate acceptance, or package-installed acceptance."
+}

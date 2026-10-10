@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "AUD-2 repeated MySQL approval-dialog accessibility reproduction on current Linux source",
+  "source_commit": "735baf1e34ddbe32d7996ed74d7863d2d07b2ef9",
+  "binary_path": "linux/target/debug/tablepro-app",
+  "binary_sha256": "3b5889c9630234a3897fd4b19a69a85381ad00a3d783faba70405cbe0f409a07",
+  "command": "bash linux/scripts/test-gtk-mysql-approval.sh",
+  "runtime": "Local Linux host; Docker MySQL 8.0; private D-Bus, GTK AT-SPI and Xvfb X11",
+  "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database",
+  "result": "3 consecutive runs passed",
+  "runs": [
+    {
+      "duration_seconds": 225,
+      "exit_code": 0,
+      "log": "run-1.log",
+      "log_sha256": "510eabe2e432e351cb6ea61c107d974b255b2c790f8c5ad34999cbb86df121ad"
+    },
+    {
+      "duration_seconds": 20,
+      "exit_code": 0,
+      "log": "run-2.log",
+      "log_sha256": "1bfe4f632555cbb6d120955e2acfe8eb8c22816455f2c0b69e848272e142dace"
+    },
+    {
+      "duration_seconds": 20,
+      "exit_code": 0,
+      "log": "run-3.log",
+      "log_sha256": "7eafe30745f5d9cd611c8174cafa59e9179df238cf8e253afe6ad891f5b53964"
+    }
+  ],
+  "not_established": [
+    "The cause of the earlier empty accessibility snapshots in GTK server runs 55 and 56",
+    "A flake-free hosted or distribution-package acceptance result"
+  ]
+}

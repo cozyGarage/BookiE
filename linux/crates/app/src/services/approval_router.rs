@@ -211,7 +211,7 @@ mod tests {
             assert_eq!(request.connection_name, "MySQL approval fixture");
             assert_eq!(request.sql, sql);
             assert_eq!(request.facts.class, StatementClass::Unparseable);
-            assert_eq!(request.rule, "fail_closed_unparseable");
+            assert_eq!(request.rule, "fail_closed_unparseable+human_write_approve");
         }
         assert_eq!(
             agent_calls.load(Ordering::SeqCst),

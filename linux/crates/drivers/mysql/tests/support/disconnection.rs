@@ -125,8 +125,16 @@ async fn mysql_proxy_dropping_update_ack(
 async fn a_committed_write_with_a_lost_ack_is_not_replayed_after_reconnect() {
     use secrecy::ExposeSecret;
 
-    let (_container, opts) = start_mysql().await;
+    let (_container, opts) = super::shared_container::start_mysql_durable().await;
     let observer = connect(opts.clone()).await;
+    assert_eq!(
+        observer
+            .query("SELECT @@GLOBAL.innodb_flush_log_at_trx_commit, @@GLOBAL.innodb_doublewrite, @@GLOBAL.sync_binlog")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1), Value::Text("ON".into()), Value::Int(1)]],
+    );
     observer
         .execute("CREATE TABLE lost_ack_target (id INT PRIMARY KEY, value INT NOT NULL)")
         .await

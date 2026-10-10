@@ -141,6 +141,20 @@ The exact driver list and supplementary targets are owned by
 drivers, MCP BSON, policy PostgreSQL sessions, Unix sockets and SSH. Reuse that
 script rather than a copied list that can omit newly registered targets.
 
+The Forgejo driver matrix sets `TABLEPRO_TEST_RUN_ID` and runs each complete
+integration binary serially. PostgreSQL, MySQL and MariaDB fixtures reuse one
+primary server per engine and recreate the `test` database before each test;
+filtered and exact selectors start their own server. Deliberate restart tests
+also start a separate server. So a full-suite runtime estimate should count
+those cases rather than multiply every test by a database startup.
+
+Disposable PostgreSQL fixtures use tmpfs and disable `fsync`,
+`synchronous_commit` and `full_page_writes`. MySQL and MariaDB use tmpfs and
+disable transaction-log, doublewrite and binlog syncing; SQL Server uses tmpfs
+with writable permissions for its non-root service account. Lost-ack, crash and
+restart cases use durable containers so they still exercise persistent storage.
+The Docker tests assert the database settings and mounted filesystem.
+
 These tests require Docker or a compatible Podman API socket. Keep each container handle alive for the full test because dropping it stops the container.
 
 PostgreSQL integration coverage includes controlled cancellation and timeout against a real server. The tests confirm the query appears in `pg_stat_activity`, trigger cancellation or a deadline, confirm the query leaves server activity, and verify that the pool remains usable. Transaction cancellation is followed by rollback and a data check.
@@ -293,32 +307,25 @@ For ordinary UI changes, test the affected flow manually and include before and 
 
 ## CI
 
-`.github/workflows/build-linux.yml` has these jobs:
+Where each check runs is set by [CI tiers](validation-playbook.md#ci-tiers). In short:
 
-1. Preflight on Rust 1.98 without the GTK application.
-2. GTK formatting, Clippy, and `cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins` in a Debian testing container.
-3. Required installed GTK safety smoke under Xvfb and PyAT-SPI, including a real Secret Service round-trip.
-4. PostgreSQL, MySQL, SQL Server, ClickHouse, and Redis integration tests on Docker.
-5. The PostgreSQL release fixture with TLS, an SSH bastion, and Toxiproxy on Docker.
-6. Scheduled and manually triggered Clippy on current stable Rust.
-7. Supply-chain checks with `cargo deny` and `cargo audit` in the GTK job.
-8. Driver TLS fixtures for MySQL, SQL Server, ClickHouse, Redis, and MongoDB, plus the optional DuckDB driver and application build.
+- **GitHub pull requests and pushes to `linux`** run the cheap tier. `.github/workflows/build-linux.yml` resolves one commit, then runs `preflight` and `fast` in parallel (shared sccache / rust-cache; `fast` uses the pre-baked GHCR GTK image). The regression gate still fails the run if `preflight` fails. The workflow contracts, security, Flatpak, CodeQL and SonarCloud workflows are path filtered and skip documentation-only changes.
+- **Forgejo** runs the merge tier on every branch push: the installed GTK suite under Xvfb and PyAT-SPI with a real Secret Service round-trip, PostgreSQL, MySQL, SQL Server, ClickHouse and Redis integration tests, the PostgreSQL release fixture (TLS, SSH bastion, Toxiproxy), driver TLS fixtures, the DuckDB driver and application build, and supply-chain checks. `.forgejo/workflows/nightly.yml` adds coverage, mutation, the value contracts and the GTK soak.
+- **GitHub schedule and `workflow_dispatch`** still run the merge-tier jobs of `build-linux.yml` as a weekly backup, and `.github/workflows/gtk-soak.yml` runs a daily five-attempt soak.
 
-`.github/workflows/gtk-soak.yml` supplies the independent daily five-attempt soak ledger.
-
-The Debian testing container provides the GNOME 50 libraries required by the selected features.
+The final `Linux regression gate` job rejects failed, cancelled, missing and unexpectedly skipped jobs. Merge-tier jobs may be skipped on a pull request or push only.
 
 ## Measuring how good the tests are
 
 The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests,
 intentional tier exclusions, omitted SSH fixtures and packaging-only green runs.
-Build Linux's final regression gate rejects failed, cancelled, missing and
+The Build Linux regression gate rejects failed, cancelled, missing and
 unexpectedly skipped jobs. Docker SSH fixtures run through `bash scripts/test-ssh.sh`.
 
 Test counts alone do not establish whether regressions catch defects. Mutation
 testing checks whether deliberate code changes are detected; coverage shows
 which code executes. Both run through `.github/workflows/linux-quality.yml`
-on relevant pushes, weekly and on demand. Failed measurements fail their jobs.
+on relevant pushes to `linux`, weekly and on demand. Failed measurements fail their jobs.
 Coverage has no percentage threshold. Mutation survivors require investigation.
 Repository branch-protection requirements are separate from these job results.
 

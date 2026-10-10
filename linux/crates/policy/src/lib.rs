@@ -8,12 +8,16 @@ mod catalog_effect;
 mod classify;
 pub use catalog_effect::{CatalogEffect, catalog_effect};
 mod config;
+mod effects;
+mod effects_classification;
 mod guard;
 mod mask;
 mod principal;
 mod rules;
+mod select_writes;
 mod sensitive_projection;
 mod transaction_control;
+mod verdict;
 
 pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
 pub use audit::{

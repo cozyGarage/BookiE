@@ -57,13 +57,17 @@ pub fn run() {
             None
         }
     };
-    let history = runtime.as_ref().and_then(|runtime| {
-        runtime.block_on(async {
+    let history_open = runtime.as_ref().map(|runtime| {
+        let retention_days = prefs.history_retention_days;
+        runtime.spawn(async move {
             match tablepro_storage::query_history::HistoryStore::open_default().await {
                 Ok(store) => {
-                    if let Err(e) = store.prune_older_than(prefs.history_retention_days).await {
-                        tracing::warn!(error = %e, "history prune failed");
-                    }
+                    let pruning = store.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = pruning.prune_older_than(retention_days).await {
+                            tracing::warn!(error = %e, "history prune failed");
+                        }
+                    });
                     Some(store)
                 }
                 Err(e) => {
@@ -89,6 +93,7 @@ pub fn run() {
     let mcp_server = services::mcp_service::start_background(database.clone());
     let mcp_bridge = mcp_server.as_ref().map(|server| server.bridge.clone());
     enable_system_openssh(database.clone());
+    let history = history_open.and_then(|task| runtime.as_ref()?.block_on(task).ok().flatten());
 
     {
         use gtk4::prelude::*;

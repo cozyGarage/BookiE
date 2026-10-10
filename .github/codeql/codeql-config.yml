@@ -1,0 +1,6 @@
+name: BookiE CodeQL
+
+paths-ignore:
+  - linux/vendor/**
+  - linux/docs/evidence/**
+  - linux/target/**

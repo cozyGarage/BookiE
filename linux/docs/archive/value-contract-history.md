@@ -5901,3 +5901,592 @@ Compilation reused 746 fresh artifacts and rebuilt one package. The runner
 recorded `dirty: true`; `git status` showed only the two preserved B4 scratch
 directories outside `linux/`. The report and all per-suite logs are retained in
 the [evidence packet](../evidence/local-gtk-duckdb-value-tier-results-2026-10-05/manifest.json).
+
+
+---
+
+# Archived value-contracts narrative (2026-10-09 consolidation pass 2)
+
+Moved from [value-contracts.md](../value-contracts.md). Live index is the Scope table and Run section on that page. Manifests under `evidence/` remain authoritative. Do not treat this archive as current completion.
+
+## Intro case narratives
+
+SQL Server `decimal(38,38)` values preserve signed `1e-38`, scaled zero,
+native text and CSV round trips; values outside `rust_decimal`'s exact range
+remain exact text. Non-NULL `sql_variant` values refuse scalar decoding while
+SQL NULL and connection usability are retained. See the merged [PR #443](https://github.com/cozyGarage/BookiE/pull/443)
+for native test and mutation evidence.
+
+Recent PostgreSQL enum-function evidence covers both `enum_range(NULL::type)`
+and bounded `enum_range(start, end)` semantics under a same-named leading
+shadow type, plus `enum_first`/`enum_last` and scalar `min`/`max` results
+([unbounded](../evidence/postgres-enum-range-shadowed-path-results-2026-10-05/manifest.json),
+[bounded](../evidence/postgres-enum-range-bounds-shadowed-results-2026-10-05/manifest.json),
+[first/last](../evidence/postgres-enum-first-last-shadowed-path-results-2026-10-05/manifest.json),
+[min/max](../evidence/postgres-enum-min-max-shadowed-path-results-2026-10-05/manifest.json),
+[same-session label addition](../evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json),
+[same-session label rename](../evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json),
+[same-session type rename/schema move](../evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
+
+The October 6 strict GTK + DuckDB value tier passed 364 selected tests across
+all 11 suites with no missing suites on clean source `cfc99dd1`; see the [complete run packet](../evidence/local-gtk-duckdb-value-tier-results-2026-10-06-cfc99dd1/manifest.json).
+
+The PostgreSQL `timestamp[]` evidence now covers typed rebinding, canonical
+CSV export and SQL replay across a `DateStyle` change, with native array JSON
+and wire-byte checks plus sibling preservation
+([rebind evidence](../evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json),
+[file-consumer evidence](../evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
+
+PostgreSQL `name[]` result decoding and session rebinding cover SQL NULL, empty
+and literal `NULL`, escaped labels, Unicode and the 63-byte UTF-8 boundary,
+checked against native `array_send` bytes in
+`value_contract_arrays_preserve_elements_dimensions_and_exports`. Keyed grid
+edits use the qualified built-in cast and preserve the sibling row in
+`value_contract_array_grid_edit_preserves_array_elements`.
+Typed CSV import of `name[]` uses the same value distinctions and checks the
+restored native wire bytes in `value_contract_builtin_array_families_survive_typed_csv_insert`.
+
+Copied INSERTs and SQL-file exports omit PostgreSQL and SQL Server identity
+values so the destination generates a fresh key; MySQL keeps explicit
+auto-increment values. PostgreSQL `GENERATED ALWAYS` and `BY DEFAULT` identities,
+SQL Server `IDENTITY`, generated columns and identity-only tables are checked
+against native rows in
+`value_contract_postgres_copy_insert_regenerates_identity_values` and
+`value_contract_server_owned_columns_and_identity_copy_inserts_use_defaults`.
+The SQL export writer pins the same per-engine output in
+`sql_export_uses_engine_generated_identity_values`. Explicit identity-value
+preservation is not supported by these copy/export paths.
+
+`value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers`
+checks SQL Server identity, computed and rowversion columns across all four
+consumers. Native metadata makes the grid edit gate reject these columns while
+leaving a normal text column editable. CSV mapping includes hostile values for
+server-owned fields, but the plan inserts only the writable note. Copy as SQL
+omits owned fields, and SQL export replays into a second native table; SQL
+Server generates fresh identities, computed values and rowversions there. The
+test checks both target and source rows.
+
+The same PostgreSQL keyed grid contract covers `oid[]` zero, the unsigned
+32-bit maximum and SQL NULL, using native type/text/`array_send` equality and
+sibling preservation in `value_contract_array_grid_edit_preserves_array_elements`.
+
+The exact Rust Decimal positive/negative mantissa limit and 28-place scale now
+have parser, parameter, PostgreSQL typed-binding and SQL-literal checks. Values
+just outside the crate's range are rejected by explicit Decimal and grid input;
+Auto retains wide integers as text rather than guessing their type
+([evidence](../evidence/rust-decimal-boundary-contract-results-2026-10-06/manifest.json)).
+
+PostgreSQL `xml[]` is covered through result decoding, inferred rebinding, keyed
+grid writes and typed CSV restore. Native `pg_typeof`, array text and
+`array_send` checks include XML fragments, SQL NULL, and a malformed XML
+assignment refused with SQLSTATE `2200N` without changing either row
+([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
+JSON/CSV/XML/HTML/Markdown/XLSX/SQL file exports now also preserve exact array
+text; SQL replay is checked against native JSON and wire bytes in
+`value_contract_xml_array_file_exports_preserve_native_text`.
+
+Custom composite arrays have a focused unsupported-value contract: native
+PostgreSQL type, text, JSON and wire oracles confirm the value while SQL literal
+and parameter paths refuse it without changing either row. Other custom array
+families remain untested. The unlisted built-in `money[]` refusal covers
+populated and NULL elements, native text/JSON/wire snapshots, literal/bind
+refusal, and target/sibling preservation ([validation comment on PR #126](https://github.com/cozyGarage/BookiE/pull/126#issuecomment-6028961640)).
+Built-in geometric arrays `point[]`, `line[]`, `lseg[]`, `box[]`, `path[]`,
+`polygon[]`, and `circle[]` have the same visible-refusal, native oracle, and
+write-preservation contract in
+`value_contract_geometric_array_refusals_preserve_target_and_sibling_rows`.
+
+A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
+
+PostgreSQL enum schema and type identifiers at the 63-byte catalog limit, including a multibyte final character, retain metadata and keyed edits; see the [Docker/local validation comment on PR #125](https://github.com/cozyGarage/BookiE/pull/125#issuecomment-6028822115).
+
+## Case lookup prose (before Scope table)
+
+
+SQLite's declared `ENUM` pseudo-type is covered as SQLite NUMERIC affinity:
+native `typeof()`/`quote()` oracles distinguish text labels, numeric
+INTEGER/REAL values, BLOB bytes and SQL NULL. Grid and typed CSV parsing also
+preserve numeric affinity and refuse unsafe numeric inputs
+([driver test](../../crates/drivers/sqlite/tests/runtime_typed_values.rs), [grid
+test](../../crates/app/src/ui/browse_tab/tests.rs), [CSV
+test](../../crates/core/src/import/cell/tests/sqlite_affinity.rs)). Declared `ANY`
+retains its conservative text path because metadata omits STRICT table status.
+
+Detailed native oracles, exact selectors and dated results are preserved in
+[value-contract history](value-contract-history.md). Use these starting points,
+then search that ledger/test for the specific type and consumer; one starting
+point does not represent all support for that engine.
+
+The shared scalar contract checks native UUID parameters and SQL-literal
+round trips on PostgreSQL, SQL Server, ClickHouse and DuckDB. UUID-shaped text
+and typed SQL NULL are controls; DuckDB uses its logical result type to preserve
+`Value::Uuid`. A mixed DuckDB projection checks the UUID type map across columns
+and rows, including UUID result metadata in populated and zero-row results
+([scalar evidence](../evidence/value-uuid-multidriver-results-2026-10-05/manifest.json),
+[mixed projection evidence](../evidence/duckdb-uuid-mixed-projection-results-2026-10-06/manifest.json)).
+
+PostgreSQL `pg_lsn[]` preserves all 64 LSN bits, its non-default lower bound
+and SQL NULL through result decoding, assignment-inferred binary binding,
+keyed updates and typed CSV import. Native type/text/JSON and `array_send`
+comparisons cover both successful paths and malformed-input refusal with target
+and sibling rows unchanged ([evidence](../evidence/postgres-pg-lsn-array-results-2026-10-06/manifest.json)).
+
+PostgreSQL `macaddr[]` preserves canonical six-octet values, SQL NULL and
+non-default lower bounds through result decoding, inferred typed binding,
+keyed updates and typed CSV import. Native type/text/JSON and `array_send`
+comparisons cover malformed-input refusal and target/sibling preservation
+([evidence](../evidence/postgres-macaddr-array-roundtrip-results-2026-10-06/manifest.json)).
+
+PostgreSQL `macaddr8[]` preserves canonical eight-octet EUI-64 values, SQL NULL
+and non-default lower bounds through result decoding, inferred typed binding,
+keyed updates and typed CSV import. Native type/text/JSON and `array_send`
+comparisons cover malformed-input refusal and target/sibling preservation
+([evidence](../evidence/postgres-macaddr8-array-roundtrip-results-2026-10-06/manifest.json)).
+
+PostgreSQL `inet[]` and `cidr[]` preserve IPv4/IPv6 host and network prefixes,
+SQL NULL and non-default lower bounds through result decoding, inferred typed
+binding, keyed updates and typed CSV import. Native type/text/JSON and
+`array_send` comparisons cover malformed-prefix refusal, CIDR host-bit refusal
+and target/sibling preservation
+([evidence](../evidence/postgres-network-array-roundtrip-results-2026-10-06/manifest.json)).
+
+A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
+elements across JSON, CSV, XLSX and SQL replay ([evidence](../evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
+
+PostgreSQL custom-enum parameters in either `UNION ALL` branch and either
+`VALUES` row preserve the native enum type and wire text; ordinary, empty,
+literal `NULL`, SQL NULL and invalid-label boundaries are checked, including
+prepared-query reuse after a same-named shadow enum leads `search_path`
+([evidence](../evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
+
+A PostgreSQL Unicode schema/type name also survives enum metadata discovery,
+keyed edits, draft inserts, and structured filters with native catalog
+verification ([evidence](../evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json)); typed CSV import preserves the enum type and empty/literal-`NULL`/SQL-NULL values with the sibling row unchanged
+([CSV evidence](../evidence/postgres-enum-unicode-csv-import-results-2026-10-05/manifest.json)).
+
+PostgreSQL `date[]`, `time[]`, `timestamp[]` and `timetz[]` app grid edits
+preserve boundary values, native type and wire bytes through the parser and
+keyed-update builder; invalid date-array input is refused without changing
+either row ([evidence](../evidence/postgres-temporal-array-grid-edit-results-2026-10-05/manifest.json)).
+
+PostgreSQL `smallint[]`, `integer[]` and `bigint[]` app grid edits preserve
+signed endpoints, array lower bounds and SQL NULL, including `9007199254740993`
+in `bigint[]`; overflowing smallint input is refused with both rows unchanged
+([evidence](../evidence/postgres-integer-array-grid-edit-results-2026-10-05/manifest.json)).
+
+The PostgreSQL `text[]` app grid path preserves SQL NULL, literal `NULL`, empty
+text, delimiters, quotes, backslashes, Unicode, markup and formula-shaped text
+through native JSON and wire checks; malformed input is rejected without row
+changes ([evidence](../evidence/postgres-text-array-grid-edit-results-2026-10-05/manifest.json)).
+
+A PostgreSQL custom `enum[]` XLSX cell preserves its NULL-label, empty, Unicode,
+quoted and markup text through LibreOffice Calc's ODS/XLSX re-save
+([evidence](../evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
+
+The custom `enum[]` XLSX cell also survives Gnumeric's ODS/XLSX re-save with
+the formula-shaped `=1+1` label, escaped values and SQL NULL preserved as text
+([evidence](../evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
+The same enum-array workbook preserves that label as text through LibreOffice
+Calc's XLSX/ODS/XLSX re-save, with the complete array string unchanged and no
+formula cells ([evidence](../evidence/postgres-enum-array-formula-calc-reimport-results-2026-10-05/manifest.json)).
+
+A scalar custom-enum XLSX workbook also survives Gnumeric's XLSX/ODS/XLSX
+re-save: literal `NULL`, Unicode, markup and the `=1+1` label remain string
+cells, SQL NULL stays blank, and no formula is created
+([evidence](../evidence/postgres-enum-scalar-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
+PostgreSQL `date[]`, `timestamp[]`, `time[]` and `timetz[]` XLSX text cells
+preserve their boundary values through Gnumeric's XLSX/ODS/XLSX re-save,
+including BC and extended years, infinities, 24:00, maximum offsets and SQL
+NULL ([evidence](../evidence/postgres-temporal-arrays-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `bytea[]` XLSX cell containing binary bytes, empty bytea and SQL
+NULL also survives Calc's ODS/XLSX re-save with its string contents unchanged
+([evidence](../evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)).
+
+A PostgreSQL `text[]` workbook preserves its 84-character array text, including
+NULL distinctions, escaped quotes/backslashes, Unicode and hostile markup,
+through LibreOffice Calc's XLSX-to-ODS-to-XLSX re-save. The shared/string cell
+types remain text and no formulas are created
+([evidence](../evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `uuid[]` workbook preserves two UUIDs and SQL NULL through the same
+Calc round trip as exact text. Native `array_send` bytes match after binding the
+driver's quoted array text, and the re-saved cells remain strings without
+formulas ([evidence](../evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json)).
+The same native contract now checks JSON/CSV text exports and SQL-file replay;
+re-import restores the native UUID[] type, JSON and wire bytes without changing
+a pre-existing sibling row
+([file-writer evidence](../evidence/postgres-uuid-array-filewriter-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `date[]` workbook preserves a BC date, year 10000, both date
+infinities and SQL NULL through Calc's XLSX/ODS/XLSX round trip. The native
+parameter rebind matches both `array_to_json` and `array_send`
+([evidence](../evidence/postgres-date-array-calc-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `timestamp[]` workbook preserves a BC timestamp, year 10000, the
+maximum finite timestamp, both infinities and SQL NULL through Calc's
+XLSX/ODS/XLSX round trip. The native parameter rebind matches both
+`array_to_json` and `array_send`
+([evidence](../evidence/postgres-timestamp-array-calc-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `time[]` workbook preserves midnight, fractional microseconds,
+23:59:59.999999, 24:00 and SQL NULL through Calc's XLSX/ODS/XLSX round trip.
+The native parameter rebind matches both `array_to_json` and `array_send`
+([evidence](../evidence/postgres-time-array-calc-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `timetz[]` workbook preserves fractional wall times, the largest
+positive and negative offsets, and SQL NULL through Calc's XLSX/ODS/XLSX round
+trip. The native parameter rebind matches both `array_to_json` and `array_send`
+([evidence](../evidence/postgres-timetz-array-calc-reimport-results-2026-10-05/manifest.json)).
+The same native offsets also survive typed rebinding, JSON/CSV/XLSX output and
+SQL replay after a session changes from `America/New_York` to UTC; SQL NULL and
+a sibling array remain intact
+([session/consumer evidence](../evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `boolean[]` workbook preserves true, false and SQL NULL through
+Calc's XLSX/ODS/XLSX round trip as a text cell. The native parameter rebind
+matches both `array_to_json` and `array_send`
+([evidence](../evidence/postgres-boolean-array-calc-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `int8[]` workbook preserves a lower bound of zero, `i64::MIN`,
+`9007199254740993`, `i64::MAX` and SQL NULL through Calc's XLSX/ODS/XLSX
+round trip as text. Native `array_to_json` and `array_send` match after rebind
+([evidence](../evidence/postgres-int8-array-calc-reimport-results-2026-10-05/manifest.json)).
+
+PostgreSQL `smallint[]` and `integer[]` workbooks preserve signed boundaries,
+values beyond single-precision exactness, SQL NULL, and lower bounds zero and
+two through Calc's XLSX/ODS/XLSX round trip. Native `array_to_json` and
+`array_send` match after rebinding
+([evidence](../evidence/postgres-integer-arrays-calc-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `timestamptz[]` XLSX cell preserves both sides of a repeated hour,
+a BC instant, infinities and SQL NULL through Calc's ODS/XLSX re-save as exact
+text ([evidence](../evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).
+
+A PostgreSQL `interval[]` XLSX cell preserves mixed-sign intervals,
+microseconds, zero intervals and SQL NULL through Calc's ODS/XLSX re-save as
+exact text ([evidence](../evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).
+
+A PostgreSQL `numeric[]` XLSX cell preserves wide precision, scale, NaN,
+infinities and SQL NULL as one exact text value through Calc's ODS/XLSX re-save
+([evidence](../evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json)).
+The same workbook also survives Gnumeric's XLSX/ODS/XLSX re-save with the
+40-digit integer, high-scale and scale-preserving decimals, NaN, infinities and
+SQL NULL unchanged as a string cell without formulas
+([Gnumeric evidence](../evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL `float8[]` XLSX cell preserves an adjacent double, negative zero,
+the minimum subnormal, NaN, infinities and SQL NULL as exact text through the
+same Calc round trip ([evidence](../evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json)).
+The same `float8[]` workbook also survives Gnumeric's XLSX/ODS/XLSX re-save
+with the adjacent double, negative zero, minimum subnormal, NaN, infinities and
+SQL NULL unchanged as text and without formulas
+([Gnumeric evidence](../evidence/postgres-float8-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
+A PostgreSQL array of a domain over `bytea` preserves binary, empty and NULL
+elements and its declared type through decoding, qualified binding and keyed
+edits; invalid values are refused without changing either row
+([evidence](../evidence/postgres-domain-bytea-array-results-2026-10-04/manifest.json)).
+Its keyed edit also stays bound to the target domain when `search_path` starts
+with a same-named domain whose stricter CHECK rejects the value
+([shadowed-path evidence](../evidence/postgres-shadowed-domain-bytea-array-results-2026-10-04/manifest.json)).
+
+One compound SQLite STRICT `ANY` workbook now preserves numeric `42`, text
+`42` and blank SQL NULL through a LibreOffice Calc import, ODS save and XLSX
+re-save ([evidence](../evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/manifest.json)).
+
+ClickHouse `Enum8` and `Enum16` use label text in result values while retaining
+the native enum type in result and table metadata. A Docker contract checks
+parameter writes, `NULL` label versus SQL NULL, Unicode and quoted labels,
+empty-string labels versus SQL NULL, CSV import with an explicit collision-free
+null marker, and Copy as SQL replay against the native server
+([test](../../crates/drivers/clickhouse/tests/support/enum_values.rs)).
+A Docker-backed app grid contract edits nullable Enum8/Enum16 labels against
+native type and signed-code oracles. It accepts quoted empty, literal `NULL`
+and apostrophe-bearing labels, keeps blank input as SQL NULL, and proves an
+undeclared label leaves all rows unchanged
+([test](../../crates/app/tests/support/clickhouse_enum_contract.rs)).
+Nested `Array(Enum8)`, `Array(Nullable(Enum8))`, `Array(Enum16)`,
+`Array(Nullable(Enum16))`, `Tuple(Enum8, Nullable(Enum8), Enum8)` and
+`Tuple(Enum16, Nullable(Enum16), Enum16)` use native `toJSONString` as the
+value oracle and check JSON/CSV/XLSX export plus refusal by type-less SQL,
+binding and keyed grid writes. Tuple shapes include nullable values and a
+literal `NULL` label; nullable shapes distinguish SQL NULL from that label
+([test](../../crates/drivers/clickhouse/tests/support/nested_values.rs)).
+
+The compound-result and direct table-projection XLSX workbooks both keep `=1+1`
+and `'=1+1` as text through the Calc ODS/XLSX round trip, without creating
+formulas; other spreadsheet applications and workbook shapes remain unverified
+([formula-text evidence](../evidence/sqlite-xlsx-calc-formula-text-results-2026-10-04/manifest.json)).
+
+## Case lookup prose (after Scope table)
+
+
+Additional case packets retained from the October 5 B3 work:
+
+- MySQL/MariaDB: [`EMPTY_STRING_IS_NULL` enum CSV restore](../evidence/mariadb-empty-enum-empty-string-is-null-results-2026-10-05/manifest.json), [combined SQL modes](../evidence/mariadb-empty-enum-set-combined-mode-results-2026-10-05/manifest.json), [collated ENUM labels](../evidence/mysql-mariadb-enum-collation-results-2026-10-05/manifest.json), [binary ENUM](../evidence/mysql-binary-enum-collation-results-2026-10-05/manifest.json), [binary SET](../evidence/mysql-binary-set-collation-results-2026-10-05/manifest.json), [Latin-1 ENUM/SET](../evidence/mysql-latin1-enum-set-collation-results-2026-10-05/manifest.json), and [executable-comment policy](../evidence/mysql-executable-comment-policy-results-2026-10-05/manifest.json).
+- PostgreSQL: [maximum UTF-8 enum-array label](../evidence/postgres-enum-array-max-label-results-2026-10-05/manifest.json), [enum-array boundary whitespace](../evidence/postgres-enum-array-whitespace-label-results-2026-10-05/manifest.json), [malformed dollar-quote consumers](../evidence/postgres-malformed-dollar-quote-consumers-results-2026-10-05/manifest.json), [domain depth 260](../evidence/postgres-domain-260-level-results-2026-10-05/manifest.json), [domain depth 300](../evidence/postgres-domain-300-level-results-2026-10-05/manifest.json), [enum label append](../evidence/postgres-enum-add-value-default-append-results-2026-10-05/manifest.json), [enum label positions](../evidence/postgres-enum-add-value-positions-results-2026-10-05/manifest.json), [ordered enum array aggregate](../evidence/postgres-enum-array-agg-results-2026-10-05/manifest.json), [enum-array `unnest` inference](../evidence/postgres-enum-array-unnest-inference-results-2026-10-05/manifest.json), [cross-session append](../evidence/postgres-enum-cross-session-add-after-results-2026-10-05/manifest.json), [cross-session catalog changes](../evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json), [cross-session type move](../evidence/postgres-enum-cross-session-type-move-results-2026-10-05/manifest.json), [CSV shadow path](../evidence/postgres-enum-csv-shadow-search-path-results-2026-10-05/manifest.json), [quoted identifier shadow path](../evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/manifest.json), [`float4[]` grid edit](evidence/postgres-float4-array-grid-edit-results-2026-10-05/manifest.json), [`interval[]` grid edit](evidence/postgres-interval-array-grid-edit-results-2026-10-05/manifest.json), and [`interval[]` style transition](evidence/postgres-interval-array-style-transition-results-2026-10-05/manifest.json).
+- SQLite: [declared type and runtime-affinity mismatches](../evidence/sqlite-declared-affinity-results-2026-10-05/manifest.json) and [expression-column UTF-8 BLOB values](../evidence/sqlite-utf8-blob-result-results-2026-10-05/manifest.json).
+
+PostgreSQL domain-over-enum CASE parameter inference now has a native contract
+for both result branches under a shadowed `search_path`, including empty and
+literal `NULL` labels distinct from SQL NULL
+([evidence](../evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
+The domain-over-enum `COALESCE` parameter contract now compares both argument
+positions against native casts under that shadowed path, with empty, literal
+`NULL`, SQL NULL and invalid shadow-only labels
+([evidence](../evidence/postgres-domain-coalesce-shadowed-results-2026-10-05/manifest.json)).
+Ordinary enum `COALESCE`, `NULLIF`, `GREATEST` and `LEAST` parameter inference is
+also checked against native target-enum casts after warming metadata and
+switching to a same-named shadow `search_path` on the same backend, for
+empty/literal-`NULL` labels, SQL NULL and invalid shadow-only labels
+([evidence](../evidence/postgres-shadowed-enum-parameter-context-results-2026-10-05/manifest.json)).
+Integer and boolean parameters remain their native types and are refused by
+PostgreSQL in enum comparisons and updates; the same fixture verifies the
+target rows remain unchanged.
+
+MySQL/MariaDB typed CSV import now also preserves an empty VARCHAR under
+`EMPTY_STRING_IS_NULL`, separately from SQL NULL, with native text-byte
+comparison on both CSV and SQL replay
+([evidence](../evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/manifest.json)).
+
+PostgreSQL domain-over-enum arrays now also have a bound text-parameter contract
+for literal `NULL`, empty text, Unicode, comma-containing labels and SQL NULL,
+verified against native `array_send` bytes ([parameter evidence](../evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json)); a separate 2×2 parameter case preserves lower bounds 0 and 3 ([bounds evidence](../evidence/postgres-domain-enum-array-bounds-results-2026-10-04/manifest.json)).
+CSV import now preserves the domain element type and enforces its CHECK constraints ([import evidence](../evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json)).
+It also resolves the target schema when `search_path` contains a same-named shadow domain ([shadowed-path import evidence](../evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
+The app parser and keyed grid edit use the same qualified domain-array cast; invalid values roll back without changing the row ([grid evidence](../evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
+Structured equality filters use the qualified domain-array type and match native array values ([filter evidence](../evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
+JSON, CSV, XML, HTML, Markdown and XLSX exports preserve domain-over-enum array text, and SQL replay restores the native type, JSON values and array wire bytes ([file-writer evidence](../evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)). Its XLSX string cell also survives LibreOffice Calc ODS/XLSX re-import with exact text ([evidence](../evidence/postgres-domain-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
+The same workbook's formula-shaped enum label and escaped array text also survive Gnumeric's XLSX/ODS/XLSX re-save unchanged
+([Gnumeric evidence](../evidence/postgres-domain-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+A separate PostgreSQL custom `enum[]` workbook preserves literal `NULL`, empty,
+Unicode, escaped, formula-shaped and SQL NULL elements through Gnumeric's
+XLSX/ODS/XLSX re-save ([evidence](../evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-06/manifest.json)).
+LibreOffice Calc also preserves that custom `enum[]` workbook through its
+XLSX/ODS/XLSX re-save ([evidence](../evidence/postgres-enum-array-calc-reimport-results-2026-10-06/manifest.json)).
+A separate `enum[]` case preserves a 2×6 array with non-default bounds, empty
+and literal-`NULL` labels, a SQL NULL element, and formula-shaped text through
+Calc and Gnumeric XLSX/ODS/XLSX re-saves. Native type, dimensions, JSON, wire
+bytes, typed rebinding and SQL replay match PostgreSQL
+([Calc evidence](../evidence/postgres-enum-array-shapes-calc-results-2026-10-06/manifest.json),
+[Gnumeric evidence](../evidence/postgres-enum-array-shapes-gnumeric-results-2026-10-06/manifest.json)).
+A UUID-domain array now decodes using its base OID and preserves NULL versus empty arrays, bound round trips, keyed edits, domain CHECK refusal and sibling rows ([UUID-domain array evidence](../evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json)).
+Domain arrays over text, numeric and timestamptz also preserve NULL elements through qualified binding under an Asia/Kathmandu session, checked against native JSON and wire bytes ([base-type matrix evidence](../evidence/postgres-domain-array-family-results-2026-10-04/manifest.json)).
+
+The PostgreSQL shadowed-search-path enum/domain write case now covers six
+through ten levels, plus 63, 64, 65, 128, 129, 256, 257, 258 and 259 levels. Raw inferred text and SQL
+NULL parameters work through 63 levels; at 64 or more levels they return
+explicit unsupported results, including after schema-aware work warms the
+same-backend transaction. Schema-aware writes and filters pass through 259
+levels ([259-level evidence](../evidence/postgres-domain-259-level-results-2026-10-04/manifest.json),
+[258-level evidence](../evidence/postgres-domain-258-level-results-2026-10-04/manifest.json),
+[257-level evidence](../evidence/postgres-domain-257-level-results-2026-10-04/manifest.json)); see the [deep-domain
+boundary evidence](../evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
+[129/256-level follow-up](../evidence/postgres-deep-domain-followup-results-2026-10-04/manifest.json),
+[six/seven-level evidence](../evidence/postgres-seven-domain-results-2026-10-04/manifest.json),
+[eight-level evidence](../evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
+and [nine-level evidence](../evidence/postgres-nine-domain-results-2026-10-04/manifest.json).
+
+Inferred enum-array parameters also preserve type and wire bytes with 62- and
+63-layer enum-domain elements. Text and SQL NULL array parameters at 64 layers
+return an explicit unsupported result; the array container consumes part of
+the type resolver's depth budget ([evidence](../evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json)).
+PostgreSQL's scalar `= ANY(domain_array)` operator lookup itself returns
+`42883` at depth 63; that native refusal is recorded separately from the
+working containment bind path.
+
+PostgreSQL domain-over-enum `COALESCE` now has parameter inference coverage in
+both argument positions for text and SQL NULL; the base-enum result and outer
+domain source type are independently checked
+([evidence](../evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json)).
+A companion `array_append`/`array_prepend` contract checks inferred text/SQL NULL
+parameters and domain-array versus base-enum-array types
+([evidence](../evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json)).
+
+An uncast `ANY($1)` predicate now infers an enum-array parameter when comparing
+against a domain-over-enum column cast to its base enum. The contract checks
+scalar and multidimensional arrays, nondefault lower bounds, quoted and escaped
+labels, empty text, literal `NULL` versus SQL NULL, empty/NULL arrays, native
+type and wire-byte identity, invalid-label SQLSTATE, and refusal before dispatch
+for inconsistent array bounds ([evidence](../evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json)).
+This establishes this `ANY` context only; other implicit enum-array parameter
+contexts remain open.
+
+Follow-up coverage checks inferred enum arrays in containment (`<@`, `@>`) and
+overlap (`&&`) with the parameter on either side. Native literal-array query
+results, `pg_typeof`, source-domain type and `array_send` bytes agree across
+NULL, empty and adversarial enum labels; invalid labels preserve SQLSTATE
+`22P02` ([integration evidence](../evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json)).
+The same four operator forms also pass with a same-named shadow enum first in
+`search_path`, while qualified target type and wire-byte oracles remain exact
+([shadowed-path evidence](../evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).
+
+A PostgreSQL 16 transaction also changes ordinary session `search_path` twice
+on one backend, then verifies target-schema enum metadata and keyed-write safety
+under the final shadowed path ([session evidence](../evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json)).
+
+Quoted schema/type identifiers containing spaces and embedded quotes now have
+metadata, keyed-edit, draft-insert and filter coverage ([evidence](../evidence/postgres-quoted-enum-identifiers-results-2026-10-04/manifest.json)).
+Their CSV-import path also preserves the qualified enum type under a
+transaction-local shadowed `search_path`, keeps SQL NULL distinct from the
+literal `NULL`, and leaves the same-named shadow target unchanged
+([evidence](../evidence/postgres-enum-quoted-csv-shadow-results-2026-10-06/manifest.json)).
+
+PostgreSQL custom-enum scalar and array labels at 63 bytes are verified for
+ASCII and three-byte UTF-8 text, and a 64-byte label is refused without leaving
+a type behind ([accepted boundary](../evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json), [refusal evidence](../evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json)).
+Native enum ordering also follows declaration order rather than lexical text sorting ([ordering evidence](../evidence/postgres-enum-order-results-2026-10-04/manifest.json)).
+
+Raw PostgreSQL enum CSV export, parsing and schema-aware typed import also
+preserve labels containing double quotes, embedded line breaks and backslashes,
+along with formula-shaped text and SQL NULL across all four supported delimiters
+and LF/CRLF/CR record endings. Import format auto-detection identifies every
+combination; restored UTF-8 bytes and native enum type are checked independently
+([evidence](../evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json)).
+
+Separate PostgreSQL expression contexts now infer text and SQL NULL enum
+parameters in `COALESCE` and `array_append` ([evidence](../evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)). A `NULLIF(enum_column, $1)` follow-up checks inferred type, NULL/match behavior and invalid-label refusal ([evidence](../evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)). A domain-over-enum case records the raw `42883` refusal and passing qualified base-enum cast control under a shadowed `search_path` ([evidence](../evidence/postgres-domain-nullif-parameter-results-2026-10-04/manifest.json)).
+
+Inferred text and SQL NULL parameters to PostgreSQL `array_remove` now have
+domain-over-enum coverage against explicitly typed native-query results, with
+parameter and result enum types checked independently
+([evidence](../evidence/postgres-domain-enum-array-remove-results-2026-10-04/manifest.json)).
+The corresponding `array_position` case checks native position results and
+confirms that a SQL NULL parameter matches a NULL array element
+([evidence](../evidence/postgres-domain-enum-array-position-results-2026-10-04/manifest.json)).
+`array_replace` exercises two inferred parameters together for text, SQL NULL,
+and their search/replacement combinations, with native result and enum-type
+oracles ([evidence](../evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json)).
+The same function now preserves both parameter types under a same-named shadow
+enum in `search_path`; native results and wire bytes match, and labels found only
+in the shadow are refused in either slot ([evidence](../evidence/postgres-domain-enum-array-replace-shadowed-results-2026-10-05/manifest.json)).
+`array_position($1, enum_value)`, `array_remove($1, enum_value)`,
+`array_append($1, enum_value)` and `array_prepend(enum_value, $1)` now cover
+inference of the array parameter itself, including lower-bound arrays, empty and
+NULL arrays, NULL elements, literal `NULL`, and shadow-only label refusal
+([evidence](../evidence/postgres-domain-enum-array-input-functions-shadowed-results-2026-10-05/manifest.json)).
+`array_append` and `array_prepend` now also preserve inferred target-enum binding
+when a same-named shadow enum leads transaction `search_path`; the contract
+checks native typed results, `pg_typeof`, result bytes, literal `NULL` versus
+SQL NULL and invalid-label refusal ([evidence](../evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/manifest.json)).
+
+PostgreSQL custom-enum SQL export now preserves a label containing literal `\n`
+when replayed with all four `standard_conforming_strings` and `backslash_quote`
+combinations (`on/safe_encoding`, `on/off`, `off/off`, `off/on`); the writer uses
+an explicit escape string and native type/text checks verify each result
+([initial evidence](../evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json),
+[full setting matrix](../evidence/postgres-enum-sql-literal-session-modes-full-results-2026-10-05/manifest.json)).
+
+One PostgreSQL `text[]` case now checks XML, HTML, Markdown and XLSX output plus
+replayed SQL against native array text, JSON elements and wire bytes; see the
+[array file-writer evidence](../evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
+
+A `numeric[]` file-writer contract checks high precision, scale, NaN, infinities
+and SQL NULL through JSON, CSV, XLSX and replayed SQL. Native JSON and wire
+oracles confirm that the driver's quoted element text remains bindable ([evidence](../evidence/postgres-numeric-array-filewriter-results-2026-10-04/manifest.json)).
+
+A custom enum-array file-writer contract preserves empty text, literal `NULL`,
+Unicode, comma, quote, markup and SQL NULL through JSON, CSV, XLSX and replayed
+SQL. Native `array_to_json` and `array_send` checks verify bound and restored
+values ([evidence](../evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json)).
+The SQL replay also preserves a backslash label under all four
+`standard_conforming_strings`/`backslash_quote` combinations, with native
+array text, JSON, wire-byte and sibling-row checks
+([mode evidence](../evidence/postgres-enum-array-sql-mode-results-2026-10-05/manifest.json)).
+Custom enum-array CSV import now uses a schema-qualified array cast and verifies
+native type, values and sibling-row bytes ([import evidence](../evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json)).
+An explicit null marker also preserves NULL arrays, empty arrays, SQL NULL
+elements, lower bounds and two-dimensional shape ([shape evidence](../evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json)).
+The target enum remains correct when a same-named type shadows it in the active
+`search_path` ([shadowed-path evidence](../evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json)).
+The app parser and live keyed edit now preserve custom enum-array labels and
+refuse invalid labels without mutation ([grid-edit evidence](../evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json)).
+Grid input also keeps blank SQL NULL distinct from the empty array literal
+`{}` ([evidence](../evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).
+Default CSV import also maps a blank whole-array field to SQL NULL while
+retaining `{}` as the empty array ([evidence](../evidence/postgres-enum-array-default-null-results-2026-10-04/manifest.json)).
+
+A `timestamptz[]` file-writer contract preserves distinct repeated-hour
+instants, a BC instant, infinities and SQL NULL through JSON, CSV, XLSX and
+replayed SQL, checked against native JSON and wire bytes ([evidence](../evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json)).
+Under a New York session, a follow-up confirms PostgreSQL's native output uses
+the two fall-back offsets while BookiE's decoded value remains canonical UTC;
+binding and SQL replay in a later Kathmandu session preserve the original wire
+bytes ([session evidence](../evidence/postgres-timestamptz-array-non-utc-session-results-2026-10-05/manifest.json)).
+The workbook created in that session also survives LibreOffice Calc and
+Gnumeric XLSX/ODS/XLSX re-saves with the same canonical UTC text and no formulas
+([spreadsheet evidence](../evidence/postgres-timestamptz-array-non-utc-calc-results-2026-10-05/manifest.json)).
+
+An `interval[]` file-writer case runs under `postgres_verbose` `IntervalStyle`
+on one transaction backend and verifies text binding, all four writers and
+replayed SQL against PostgreSQL JSON/wire oracles ([evidence](../evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json)).
+
+The SQLite STRICT `ANY` computed `CASE` and `COALESCE` paths now have app CSV
+export/import coverage with native storage-class assertions; see the [CASE
+consumer evidence](../evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
+and [COALESCE consumer evidence](../evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json).
+The CASE workbook path now refuses empty TEXT without replacing the existing
+destination ([XLSX refusal evidence](../evidence/sqlite-case-any-xlsx-refusal-results-2026-10-04/manifest.json)).
+Computed COALESCE JSON output checks number/string distinctions, and XLSX output
+checks numeric/shared-string cell kinds, including BLOB text encoding
+([consumer evidence](../evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json)).
+
+SQLite grouped `MAX()` over STRICT `ANY` now round-trips INTEGER, REAL, TEXT,
+BLOB and NULL groups through typed CSV, checked by native `typeof()` and exact
+BLOB-byte comparisons ([evidence](../evidence/sqlite-max-any-results-2026-10-04/manifest.json)).
+
+SQLite grouped `MIN()` covers the same storage classes plus SQLite's native numeric-before-text ordering in a mixed group. Typed CSV re-import
+preserves exact values, `typeof()` results, BLOB bytes and marker-shaped text
+([evidence](../evidence/sqlite-min-any-results-2026-10-04/manifest.json)).
+
+SQLite ordered `group_concat()` over STRICT `ANY` verifies native numeric-to-text
+conversion, NULL skipping, empty-text separators, all-NULL output and marker-shaped
+text. Typed CSV re-import preserves the exact aggregate text and SQL NULL
+([evidence](../evidence/sqlite-group-concat-any-results-2026-10-04/manifest.json)).
+
+SQLite grouped `SUM()` over STRICT `ANY` preserves SQLite's dynamic INTEGER,
+REAL and NULL results through typed CSV re-import. Numeric text coercion,
+nonnumeric text/BLOB coercion to REAL zero, and integer overflow refusal are
+covered with native `typeof()` checks ([evidence](../evidence/sqlite-sum-any-results-2026-10-04/manifest.json)).
+
+SQLite `total()` over STRICT `ANY` always returns REAL, including all-NULL and
+empty input, and accepts an integer sum above `i64::MAX` without SUM's integer
+overflow. Typed CSV re-import preserves every f64 result and native REAL class
+([evidence](../evidence/sqlite-total-any-results-2026-10-04/manifest.json)).
+
+SQLite grouped `AVG()` over STRICT `ANY` returns REAL for non-NULL groups,
+including near-`i64::MAX` values, while all-NULL groups remain SQL NULL. Typed
+CSV re-import preserves computed values and runtime classes ([evidence](../evidence/sqlite-avg-any-results-2026-10-04/manifest.json)).
+
+SQLite `json_group_array()` over STRICT `ANY` preserves numeric and text
+elements, formula-shaped text, Unicode, JSON null, and empty-group output (`[]`)
+as exact JSON text through typed CSV re-import. The native `typeof()` oracle
+checks the restored value remains TEXT; see
+[`sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text`](../../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
+
+SQLite `json_group_object()` over STRICT `ANY` preserves ordered duplicate keys,
+retains NULL values as JSON `null`, and returns `{}` for an empty group. It
+checks version-specific NULL-label behavior: SQLite 3.50.0+ omits NULL keys,
+while older system libraries' malformed native output is preserved exactly.
+Exact output text and restored TEXT storage are checked through typed CSV; see
+[`sqlite_json_group_object_any_csv_round_trip_preserves_native_text`](../../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
+
+SQLite arithmetic expressions over STRICT `ANY` verify numeric coercion,
+integer division, overflow promotion to REAL, divide-by-zero NULL and typed CSV
+restoration ([evidence](../evidence/sqlite-arithmetic-any-results-2026-10-04/manifest.json)).
+
+SQLite `json_extract()` over STRICT `ANY` preserves dynamic numeric/text/NULL
+storage classes through JSON and XLSX export and typed CSV re-import. JSON keeps
+large integers numeric and distinguishes JSON null from a missing path through
+the companion kind column; XLSX uses numeric cells for numeric results and
+shared strings for extracted text without formulas. Native `typeof()` and
+`json_type()` remain the independent SQLite oracles ([evidence](../evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json)).
+
+SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
+ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
+Native `typeof()` and `hex()` check source and restored values
+([evidence](../evidence/sqlite-substr-any-csv-results-2026-10-05/manifest.json)).
+

@@ -180,6 +180,8 @@ mod tests {
 
     fn hop(jump: Option<SavedSshConfig>) -> SavedSshConfig {
         SavedSshConfig {
+            hop_id: uuid::Uuid::new_v4(),
+            credential_revision: 0,
             host: "bastion".into(),
             port: 22,
             username: "me".into(),
