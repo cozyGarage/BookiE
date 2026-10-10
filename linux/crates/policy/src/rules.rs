@@ -81,8 +81,16 @@ fn has_unclosed_shared_transaction(sql: &str, driver_id: &str) -> bool {
     let mut open = false;
     for statement in statements {
         match transaction_control(&statement, driver_id) {
-            Some(TransactionControl::Begin) if open => return true,
-            Some(TransactionControl::Begin) => open = true,
+            Some(
+                TransactionControl::Begin
+                | TransactionControl::BeginReadOnly
+                | TransactionControl::BeginReadOnlySnapshot,
+            ) if open => return true,
+            Some(
+                TransactionControl::Begin
+                | TransactionControl::BeginReadOnly
+                | TransactionControl::BeginReadOnlySnapshot,
+            ) => open = true,
             Some(TransactionControl::Commit { chain } | TransactionControl::Rollback { chain }) => {
                 if !open || chain {
                     return true;
