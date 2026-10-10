@@ -1122,6 +1122,9 @@ async fn decimal_results_preserve_all_fractional_digits() {
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
+#[path = "support/invalid_calendar_mode.rs"]
+mod invalid_calendar_mode;
+
 #[path = "support/database_listing.rs"]
 mod database_listing;
 
