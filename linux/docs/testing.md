@@ -8,73 +8,53 @@ The shared runner retains reports and logs and fails on incomplete execution.
 
 ## Executable gates
 
-`scripts/ci-local.sh full` is shared by local development and hosted fast CI.
-It also checks the ignored-test inventory and candidate packaging contracts.
-`scripts/ci-local.sh widgets` executes the registered Rust GTK regressions in
-separate isolated processes. `scripts/test-secret-service.sh` executes all seven
-registered keyring/transport tests. Registrations live in
-`scripts/isolated-tests.json`; zero selected tests is a failure.
+Command catalogs, layer boundaries and CI ownership live in the
+[validation playbook](validation-playbook.md). Prefer
+`python3 scripts/run-test-layer.py --list` and the playbook’s Start here
+section over copying Cargo invocations from this page.
 
-Every `ci-local.sh` run saves exact-tree evidence in `target/quality/` (commit,
-dirty status, compiler, mode/features, per-binary counts, output and exit status).
-The `release` mode now includes fast, widget, driver, TLS, keyring, PostgreSQL
-release, installed GTK, optional DuckDB and supply-chain checks. It does not
-certify package installation, Wayland, upgrade/rollback or retry-free candidate soak.
-See [0.1.4 review actions and evidence](archive/release-0.1.4.md).
+`scripts/ci-local.sh` remains the shared local/CI entry for full, widgets and
+integration modes. Registrations for isolated GTK and keyring tests live in
+`scripts/isolated-tests.json`; zero selected tests is a failure. Every
+`ci-local.sh` run saves exact-tree evidence under `target/quality/`. Release
+mode does not certify package installation, Wayland, upgrade/rollback or
+retry-free candidate soak. See [0.1.4 review actions and evidence](archive/release-0.1.4.md).
 
-Run test commands from the `linux/` workspace root. Current scope and acceptance are in [the active sprint](bookie-0.2-sprint.md); the [bug and consistency audit](archive/bug-consistency-2026-09.md) records its dated source tree; [the earlier September audit](archive/stabilization-2026-09.md) records historical evidence.
+Run from the `linux/` workspace root. Current scope and acceptance are in
+[the active sprint](bookie-0.2-sprint.md); dated audits stay in
+[archive](archive/).
 
-## Current local checks
+## Local checks and fixtures
 
-The quick non-GTK gate is:
+Use `./scripts/preflight.sh` for the quick non-GTK gate and
+`python3 scripts/run-test-layer.py quick` / `full` for the playbook layers.
+Keep both `--lib` and `--bins` when invoking Cargo unit tests directly.
+`tablepro-app` puts UI and service tests in the `tablepro_app` library;
+`agentd` still has tests in both targets. DuckDB stays out of the default
+gate because its optional native build is large.
 
-```bash
-./scripts/preflight.sh
-```
-
-It runs the file-size guard, formatting, Clippy for the non-GTK package list, library tests for those packages, and the sandbox regression tier (`./scripts/test-sandbox.sh`), which covers every integration target that needs no Docker, database service, or display.
-
-The current full default workspace gate is:
-
-```bash
-./scripts/ci-local.sh
-```
-
-Its Cargo commands are:
-
-```bash
-cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
-cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
-```
-
-Keep both `--lib` and `--bins`. `tablepro-app` now puts its UI and service tests in the `tablepro_app` library; its binary calls that library. `agentd` still has tests in both targets. DuckDB is excluded from the default gate because its optional native build is large.
-
-The workspace lints deny `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, the `print!` family and `dbg!`, and Clippy runs with `-D warnings`, so a violation fails the gate. Unit tests inside a `#[cfg(test)]` module are exempt through `linux/clippy.toml`. Integration tests under `tests/` are separate crates that those settings do not reach, so **a new standalone Cargo test target in a `tests/` directory must start with**:
+The workspace lints deny `unwrap`, `expect`, `panic!`, `todo!`,
+`unimplemented!`, the `print!` family and `dbg!`. Unit tests inside a
+`#[cfg(test)]` module are exempt through `linux/clippy.toml`. A new
+standalone Cargo test target under `tests/` must start with:
 
 ```rust
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 ```
 
-Without it the file compiles locally but fails Clippy. See [error-handling.md](error-handling.md) for the production-path rules.
-
-To run the same unit-test shape without the helper script:
-
-```bash
-cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
-```
+Without it the file compiles locally but fails Clippy. See
+[error-handling.md](error-handling.md) for the production-path rules.
 
 ## Optional features and ignored tests
 
-The default gate excludes DuckDB. Validate it explicitly:
+Validate DuckDB explicitly with the playbook `duckdb` / Build Linux DuckDB
+job commands. JSON and Parquet extensions are bundled; tests disable
+extension installation/loading when checking availability. Flat-file tests
+cover CSV/TSV/JSON/Parquet, quoted filenames and malformed/missing files.
 
-```bash
-cargo test --locked -p tablepro-driver-duckdb
-cargo build --locked -p tablepro-app --features duckdb
-```
-
-The `duckdb` job in `build-linux.yml` runs both commands. JSON and Parquet extensions are bundled; tests disable extension installation/loading when checking their availability. Flat-file tests cover CSV/TSV/JSON/Parquet, quoted filenames and malformed/missing files.
-
-The [ignored-test inventory](ignored-tests.md) names every declaration, prerequisite and activation command, distinguishing subprocess helpers from external-service tests. Regenerate after adding/removing ignored tests:
+The [ignored-test inventory](ignored-tests.md) names every declaration,
+prerequisite and activation command. Regenerate after adding or removing
+ignored tests:
 
 ```bash
 python3 scripts/inventory-ignored-tests.py > docs/ignored-tests.md
@@ -307,33 +287,22 @@ For ordinary UI changes, test the affected flow manually and include before and 
 
 ## CI
 
-Where each check runs is set by [CI tiers](validation-playbook.md#ci-tiers). In short:
-
-- **GitHub pull requests and pushes to `linux`** run the cheap tier. `.github/workflows/build-linux.yml` resolves one commit, then runs `preflight` and `fast` in parallel (shared sccache / rust-cache; `fast` uses the pre-baked GHCR GTK image). The regression gate still fails the run if `preflight` fails. The workflow contracts, security, Flatpak, CodeQL and SonarCloud workflows are path filtered and skip documentation-only changes.
-- **Forgejo** runs the merge tier on every branch push: the installed GTK suite under Xvfb and PyAT-SPI with a real Secret Service round-trip, PostgreSQL, MySQL, SQL Server, ClickHouse and Redis integration tests, the PostgreSQL release fixture (TLS, SSH bastion, Toxiproxy), driver TLS fixtures, the DuckDB driver and application build, and supply-chain checks. `.forgejo/workflows/nightly.yml` adds coverage, mutation, the value contracts and the GTK soak.
-- **GitHub schedule and `workflow_dispatch`** still run the merge-tier jobs of `build-linux.yml` as a weekly backup, and `.github/workflows/gtk-soak.yml` runs a daily five-attempt soak.
-
-The final `Linux regression gate` job rejects failed, cancelled, missing and unexpectedly skipped jobs. Merge-tier jobs may be skipped on a pull request or push only.
+Where each check runs is owned by
+[CI tiers in the validation playbook](validation-playbook.md#ci-tiers).
+GitHub runs the cheap tier on pull requests; Forgejo runs the merge tier on
+branch pushes. Documentation-only changes skip the heavy path. Do not treat a
+skipped GitHub merge-tier job as a pass.
 
 ## Measuring how good the tests are
 
-The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests,
-intentional tier exclusions, omitted SSH fixtures and packaging-only green runs.
-The Build Linux regression gate rejects failed, cancelled, missing and
-unexpectedly skipped jobs. Docker SSH fixtures run through `bash scripts/test-ssh.sh`.
-
-Test counts alone do not establish whether regressions catch defects. Mutation
-testing checks whether deliberate code changes are detected; coverage shows
-which code executes. Both run through `.github/workflows/linux-quality.yml`
-on relevant pushes to `linux`, weekly and on demand. Failed measurements fail their jobs.
-Coverage has no percentage threshold. Mutation survivors require investigation.
-Repository branch-protection requirements are separate from these job results.
+The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed
+tests, intentional exclusions and packaging-only green runs. Mutation and
+coverage run through `.github/workflows/linux-quality.yml`. Coverage has no
+percentage threshold; mutation survivors need investigation. Dated first-run
+mutation notes are in
+[testing history](archive/testing-history.md#mutation-first-run-notes-2026-08-22).
 
 ### Mutation testing
-
-`cargo mutants` changes the code in small ways - flips a comparison,
-replaces a return value, swaps an operator - and reruns the tests. A
-mutant the tests still pass is behaviour nothing pins.
 
 ```bash
 cargo install cargo-mutants --locked
@@ -342,79 +311,14 @@ cargo mutants --package tablepro-core --test-tool cargo -- --lib
 cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --test-tool cargo -- --lib
 ```
 
-`core` and `policy` are the right targets: pure logic, no GTK, no driver,
-and the two crates whose defects reach SQL text and authorization
-decisions. Mutating the app crate mostly reports widget construction no
-unit test can reach.
-
-CI's scheduled `mutation` job (`linux-quality.yml`) also covers `ssh` and
-`driver-redis` — both pure logic with no Docker/GTK dependency, and the two
-crates a 2026-09-17 manual run found real gaps in: a socket-path length
-check whose test could not reach the exact boundary (the boundary depended
-on a nondeterministic temp-directory name; fixed by extracting the check
-into its own pure function), and a CLI-argument escape guard only tested on
-one side of its condition (backslash inside quotes, not outside). Add a
-crate here once it accumulates unit-testable logic worth pinning this way;
-a driver crate whose logic is mostly "call the real client library" is not
-a good target until it grows some.
-
-The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders
-with the crate's unit tests. Docker-backed PostgreSQL value and driver regressions
-run independently in Build Linux, where native server oracles are available without
-rerunning the full container suite for every mutation. Relevant pushes to `linux`
-also trigger the workflow. A scheduled workflow must exist on
-the repository default branch; the fork did not expose this workflow there when
-checked on 2026-09-26, so the schedule alone was not reliable execution evidence.
-
-Mutation steps now fail the job on nonzero exits. Later measurements still run,
-and reports upload even after failures. Missing report files, zero tested
-mutations and missing artifacts fail visibly. Unviable mutations remain separate
-from caught mutations; surviving mutations and timeouts require investigation,
-not a blanket exclusion. This strict gate may expose older unresolved findings.
-
-Measurements now run in independent jobs with fail-fast disabled, four shards
-for core and two for policy. Each shard uploads its own report after a failed or
-timed-out measurement. The measurement timeout leaves time before the job limit
-for evidence upload. Active quality runs are retained across new pushes. Both
-Build Linux and test-quality jobs share an immutable resolved commit.
-
-For native numeric, temporal and collection coverage, follow
-[ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](type-contract-strategy.md). The standard separates exact typed
-support, exact text fallback, explicit refusal and untested paths, with a
-per-driver list of remaining targets. The latest PostgreSQL interval/array
-mutation command and evidence are in [value contracts](value-contracts.md).
-
-The shared value-contract runner checks both process exit and execution evidence:
-every listed test must pass exactly once, with one matching successful summary
-and no ignored or failed tests. Its own regressions exercise zero-test, missing
-output, wrong-test, duplicate-output, timeout and nonzero-exit cases.
-
-Read the output carefully. Many surviving mutants are *equivalent* - a
-different program with identical behaviour - and can never be caught. In
-`sql_lex::skip_span`, replacing `offset + 1` with `offset - 1` shortens a
-comment span by one character, but the scanner then reads that character
-as ordinary text and reaches the same result, so no test can tell the
-difference. Chasing those wastes effort.
-
-The first run on 2026-08-22 tested 87 mutants across `sql_lex.rs` and
-`sql_literal.rs`: 65 caught, 12 missed, 9 timed out. Two of the twelve
-were real gaps rather than equivalents:
-
-- Nothing tested an underscore in a PostgreSQL dollar-quote tag, though
-  the tag validator explicitly allows one. `$my_tag$` had no coverage.
-- `extract_named_parameters` advances by whatever `skip_span` returns
-  without checking it is non-zero, while `statement_spans` filters for
-  exactly that. A zero-length span would hang the parameter scanner. No
-  input produces one today, so this is a missing guard rather than a live
-  defect - but the asymmetry between two callers of the same function is
-  the kind of thing that becomes a defect later.
-
-A timeout is a finding too: it usually means the mutant produced an
-infinite loop, which tells you a loop depends on a value nothing bounds.
+Prefer `core` and `policy`. CI also covers `ssh` and `driver-redis`. The
+PostgreSQL mutation job covers numeric, array, temporal and binary-text
+decoders with unit tests; Docker-backed value regressions stay in the driver
+layers. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and
+the [B3 board](type-contract-strategy.md). Equivalent mutants and timeout
+findings are discussed in the archived first-run notes above.
 
 ### Coverage
-
-`cargo llvm-cov` reports which lines the unit and sandbox tiers execute.
 
 ```bash
 cargo install cargo-llvm-cov --locked
@@ -424,12 +328,8 @@ cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --exclude tablepro-a
   --lib --bins --tests --summary-only
 ```
 
-The app crate and the driver, TLS, release and installed-GTK tiers are
-excluded: they need Docker, a network fixture or a display, so including
-them would make the number depend on the runner rather than on the tests.
-Treat coverage as a map of untested regions, not a score. A well-covered
-line proves a test executed it, never that a test checked its result -
-which is exactly the gap mutation testing measures.
+Exclude app and fixture tiers so the map does not depend on Docker or a
+display. Coverage shows execution, not assertion quality.
 
 ## Upstream test-suite parity
 

@@ -1,6 +1,7 @@
-use crate::classify::{StatementClass, StatementFacts};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub(crate) struct Effects(u16);
 
 impl Effects {
@@ -31,35 +32,11 @@ impl Effects {
     }
 }
 
-pub(crate) fn inferred_effects(facts: &StatementFacts) -> Effects {
-    let mut effects = Effects::EMPTY;
-    if facts.class == StatementClass::Unparseable || facts.contains_unknown_write {
-        effects = effects.union(Effects::UNKNOWN);
-    }
-    if facts.writes {
-        if facts.contains_ddl {
-            effects = effects.union(Effects::WRITES_SCHEMA);
-        }
-        if facts.contains_mutating_dml || !facts.contains_ddl {
-            effects = effects.union(Effects::WRITES_ROWS);
-        }
-    } else {
-        effects = effects.union(Effects::READS);
-    }
-    if facts.class == StatementClass::Administrative {
-        effects = effects.union(Effects::ADMIN);
-    }
-    if facts.class == StatementClass::Transaction {
-        effects = effects.union(Effects::TRANSACTION_CONTROL);
-    }
-    effects
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
         audit::AuditOperationClass,
-        classify::{StatementClass, classify_with_effects},
+        classify::{StatementClass, classify},
     };
 
     use super::Effects;
@@ -83,36 +60,36 @@ mod tests {
             ("BEGIN", "postgres"),
             ("SELECT read_text('/etc/passwd')", "duckdb"),
         ] {
-            let analysis = classify_with_effects(sql, driver);
-            assert_eq!(analysis.effects.writes(), analysis.facts.writes, "SQL: {sql}");
+            let analysis = classify(sql, driver);
+            assert_eq!(analysis.effects.writes(), analysis.writes(), "SQL: {sql}");
         }
 
-        let truncate = classify_with_effects("TRUNCATE TABLE users", "postgres");
-        assert_eq!(truncate.facts.class, StatementClass::Ddl);
+        let truncate = classify("TRUNCATE TABLE users", "postgres");
+        assert_eq!(truncate.class, StatementClass::Ddl);
         assert!(truncate.effects.contains(Effects::WRITES_ROWS));
         assert!(!truncate.effects.contains(Effects::WRITES_SCHEMA));
     }
 
     #[test]
     fn mixed_write_scripts_get_an_order_independent_class() {
-        let delete_then_insert = classify_with_effects(
+        let delete_then_insert = classify(
             "DELETE FROM users WHERE id = 1; INSERT INTO users(id) VALUES (2)",
             "postgres",
         );
-        let insert_then_delete = classify_with_effects(
+        let insert_then_delete = classify(
             "INSERT INTO users(id) VALUES (2); DELETE FROM users WHERE id = 1",
             "postgres",
         );
 
         assert_eq!(delete_then_insert.effects, insert_then_delete.effects);
-        assert_eq!(delete_then_insert.facts.class, StatementClass::Other);
-        assert_eq!(insert_then_delete.facts.class, StatementClass::Other);
+        assert_eq!(delete_then_insert.class, StatementClass::Other);
+        assert_eq!(insert_then_delete.class, StatementClass::Other);
         assert_eq!(
-            AuditOperationClass::from_statement(delete_then_insert.facts.class, delete_then_insert.facts.writes),
-            AuditOperationClass::from_statement(insert_then_delete.facts.class, insert_then_delete.facts.writes)
+            AuditOperationClass::from_statement(delete_then_insert.class, delete_then_insert.writes()),
+            AuditOperationClass::from_statement(insert_then_delete.class, insert_then_delete.writes())
         );
         assert_eq!(
-            AuditOperationClass::from_statement(delete_then_insert.facts.class, delete_then_insert.facts.writes),
+            AuditOperationClass::from_statement(delete_then_insert.class, delete_then_insert.writes()),
             AuditOperationClass::UnknownWrite
         );
         assert!(delete_then_insert.effects.contains(Effects::WRITES_ROWS));
@@ -122,70 +99,80 @@ mod tests {
             "INSERT INTO users(id) VALUES (2); UPDATE users SET id = 3; DELETE FROM users WHERE id = 1",
             "UPDATE users SET id = 3; DELETE FROM users WHERE id = 1; INSERT INTO users(id) VALUES (2)",
         ] {
-            assert_eq!(
-                classify_with_effects(sql, "postgres").facts.class,
-                StatementClass::Other,
-                "SQL: {sql}"
-            );
+            assert_eq!(classify(sql, "postgres").class, StatementClass::Other, "SQL: {sql}");
         }
 
         for sql in [
             "SELECT 1; DELETE FROM users WHERE id = 1",
             "DELETE FROM users WHERE id = 1; SELECT 1",
         ] {
-            assert_eq!(
-                classify_with_effects(sql, "postgres").facts.class,
-                StatementClass::Delete,
-                "SQL: {sql}"
-            );
+            assert_eq!(classify(sql, "postgres").class, StatementClass::Delete, "SQL: {sql}");
         }
     }
 
     #[test]
     fn effects_keep_security_and_session_facts_separate() {
-        let copy = classify_with_effects("COPY users TO PROGRAM 'echo unsafe'", "postgres");
+        let copy = classify("COPY users TO PROGRAM 'echo unsafe'", "postgres");
         assert!(copy.effects.contains(Effects::ADMIN));
         assert!(copy.effects.contains(Effects::HOST_OR_FILE_ACCESS));
 
-        let begin = classify_with_effects("BEGIN", "postgres");
+        let begin = classify("BEGIN", "postgres");
         assert!(begin.effects.contains(Effects::TRANSACTION_CONTROL));
 
-        let set = classify_with_effects("SET work_mem = '64MB'", "postgres");
+        let set = classify("SET work_mem = '64MB'", "postgres");
         assert!(set.effects.contains(Effects::SESSION_STATE));
 
-        let file_read = classify_with_effects("SELECT read_text('/etc/passwd')", "duckdb");
+        let file_read = classify("SELECT read_text('/etc/passwd')", "duckdb");
         assert!(file_read.effects.contains(Effects::READS));
         assert!(file_read.effects.contains(Effects::HOST_OR_FILE_ACCESS));
         assert!(!file_read.effects.writes());
 
-        let malformed = classify_with_effects("SELECCT * FROM users", "postgres");
+        let malformed = classify("SELECCT * FROM users", "postgres");
         assert!(malformed.effects.contains(Effects::UNKNOWN));
     }
 
     #[test]
     fn effects_expose_side_effects_that_legacy_facts_do_not_record() {
-        let mysql_lock = classify_with_effects("SELECT GET_LOCK('bookie', 1)", "mysql");
-        assert_eq!(mysql_lock.facts.class, StatementClass::Select);
-        assert!(!mysql_lock.facts.writes);
+        let mysql_lock = classify("SELECT GET_LOCK('bookie', 1)", "mysql");
+        assert_eq!(mysql_lock.class, StatementClass::Select);
+        assert!(!mysql_lock.writes());
         assert!(mysql_lock.effects.contains(Effects::READS));
         assert!(mysql_lock.effects.contains(Effects::SESSION_STATE));
         assert!(mysql_lock.effects.contains(Effects::ADMIN));
 
-        let duckdb_export = classify_with_effects("SELECT write_csv('users', '/tmp/users.csv')", "duckdb");
-        assert_eq!(duckdb_export.facts.class, StatementClass::Select);
-        assert!(!duckdb_export.facts.writes);
+        let duckdb_export = classify("SELECT write_csv('users', '/tmp/users.csv')", "duckdb");
+        assert_eq!(duckdb_export.class, StatementClass::Select);
+        assert!(!duckdb_export.writes());
         assert!(duckdb_export.effects.contains(Effects::HOST_OR_FILE_ACCESS));
         assert!(duckdb_export.effects.contains(Effects::ADMIN));
     }
 
     #[test]
     fn effects_include_reads_used_to_build_or_mutate_rows() {
-        let create_table = classify_with_effects("CREATE TABLE copy AS SELECT * FROM users", "postgres");
+        let create_table = classify("CREATE TABLE copy AS SELECT * FROM users", "postgres");
         assert!(create_table.effects.contains(Effects::READS));
         assert!(create_table.effects.contains(Effects::WRITES_SCHEMA));
 
-        let insert = classify_with_effects("INSERT INTO copy SELECT * FROM users", "postgres");
+        let insert = classify("INSERT INTO copy SELECT * FROM users", "postgres");
         assert!(insert.effects.contains(Effects::READS));
         assert!(insert.effects.contains(Effects::WRITES_ROWS));
+    }
+
+    #[test]
+    fn statement_facts_round_trip_the_canonical_effect_set() {
+        let facts = classify("SELECT read_text('/etc/passwd')", "duckdb");
+        let encoded = serde_json::to_value(&facts);
+        assert!(encoded.is_ok());
+        let Ok(encoded) = encoded else {
+            return;
+        };
+        let decoded: Result<crate::classify::StatementFacts, _> = serde_json::from_value(encoded);
+        assert!(decoded.is_ok());
+        let Ok(decoded) = decoded else {
+            return;
+        };
+
+        assert_eq!(decoded, facts);
+        assert!(decoded.effects.contains(Effects::HOST_OR_FILE_ACCESS));
     }
 }

@@ -32,7 +32,7 @@ fn assert_admin_denied(sql: &str, driver_id: &str) {
         "{driver_id} must classify as administrative: {sql}"
     );
     assert!(
-        facts.writes,
+        facts.writes(),
         "{driver_id} administrative calls must count as writes: {sql}"
     );
     let decision = agent_decision(sql, driver_id);
@@ -81,7 +81,7 @@ fn an_ordinary_read_stays_a_read_on_every_engine() {
     for driver_id in ["postgres", "mysql", "mssql", "sqlite", "clickhouse"] {
         let facts = classify("SELECT id, name FROM customers WHERE id = 1", driver_id);
         assert_eq!(facts.class, StatementClass::Select, "driver {driver_id}");
-        assert!(!facts.writes, "driver {driver_id}");
+        assert!(!facts.writes(), "driver {driver_id}");
     }
 }
 
@@ -162,14 +162,14 @@ fn postgres_script_consumers_agree_across_crlf_comments_and_formatting() {
 fn an_engine_procedure_name_inside_a_literal_is_not_administrative() {
     let facts = classify("SELECT 'xp_cmdshell is not called here' AS note", "mssql");
     assert_eq!(facts.class, StatementClass::Select);
-    assert!(!facts.writes);
+    assert!(!facts.writes());
 }
 
 #[test]
 fn a_column_named_like_a_control_function_is_not_administrative() {
     let facts = classify("SELECT sleep FROM naps WHERE id = 1", "mysql");
     assert_eq!(facts.class, StatementClass::Select);
-    assert!(!facts.writes);
+    assert!(!facts.writes());
 }
 
 #[test]
@@ -239,7 +239,7 @@ fn copy_through_the_client_is_a_write_but_not_administrative() {
     for sql in ["COPY t TO STDOUT", "COPY t FROM STDIN"] {
         let facts = classify(sql, "postgres");
         assert_ne!(facts.class, StatementClass::Administrative, "{sql}");
-        assert!(facts.writes, "{sql}");
+        assert!(facts.writes(), "{sql}");
     }
 }
 
@@ -247,12 +247,12 @@ fn copy_through_the_client_is_a_write_but_not_administrative() {
 fn pg_sleep_stays_an_ordinary_read_because_timeouts_already_bound_it() {
     let facts = classify("SELECT pg_sleep(30)", "postgres");
     assert_eq!(facts.class, StatementClass::Select);
-    assert!(!facts.writes);
+    assert!(!facts.writes());
 }
 
 #[test]
 fn a_column_named_like_a_host_function_is_not_administrative() {
     let facts = classify("SELECT pg_read_file FROM audit_log", "postgres");
     assert_ne!(facts.class, StatementClass::Administrative);
-    assert!(!facts.writes);
+    assert!(!facts.writes());
 }

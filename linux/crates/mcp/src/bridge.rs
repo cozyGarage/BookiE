@@ -571,7 +571,7 @@ fn operation_control_for(cancellation: CancellationToken, timeout: Duration) -> 
 
 fn sql_looks_like_write(sql: &str, driver_id: &str) -> bool {
     let facts = tablepro_policy::classify(sql, driver_id);
-    facts.writes
+    facts.writes()
 }
 
 #[cfg(test)]
