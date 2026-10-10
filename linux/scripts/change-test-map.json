@@ -176,6 +176,25 @@
         "export::file::tests::file_and_clipboard_agree_and_cancellation_preserves_destination"
       ]
     },
+    "crates/core/src/export/stream_tests.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::file::stream_tests::value_contract_text_exports_retry_interruptions_and_complete_short_writes",
+        "export::file::stream_tests::value_contract_streamed_csv_matches_renderer_with_and_without_header",
+        "export::file::stream_tests::value_contract_every_export_propagates_destination_write_failure"
+      ]
+    },
+    "crates/core/src/import/extended_temporal.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "import::extended_temporal::tests::extended_dates_accept_far_future_leap_days_plus_years_and_bc_era",
+        "import::extended_temporal::tests::extended_dates_reject_ordinary_years_year_zero_and_invalid_leap_days",
+        "import::extended_temporal::tests::timestamptz_nanos_keep_fractional_seconds_across_zone_forms",
+        "import::extended_temporal::tests::timestamptz_nanos_refuse_invalid_dates_zones_and_clocks"
+      ]
+    },
     "crates/core/src/import/csv_import.rs": {
       "package": "tablepro-core",
       "target": "--lib",
