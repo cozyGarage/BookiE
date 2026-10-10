@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "B4-7, B4-9, B4-16 and B4-17 exact-tip PostgreSQL SSH, TLS, audit and GTK trust flow",
+  "source_commit": "100fb6faec985d18aa16a09f362e728f67ca923b",
+  "binary_path": "linux/target/debug/tablepro-app",
+  "binary_sha256": "3b5889c9630234a3897fd4b19a69a85381ad00a3d783faba70405cbe0f409a07",
+  "command": "bash linux/scripts/test-postgres-release.sh",
+  "runtime": "Local Linux host; Docker PostgreSQL and two-hop SSH fixtures; private D-Bus, GTK AT-SPI and Xvfb X11",
+  "result": "passed",
+  "duration_seconds": 70,
+  "native_tests": {
+    "g5_system_openssh": "1 passed",
+    "mtls": "3 passed",
+    "release_tests": "59 passed across 10 integration test binaries"
+  },
+  "specific_regressions": [
+    "a_read_scoped_agent_cannot_read_a_query_plan",
+    "explain_analyze_is_denied_and_leaves_the_table_intact",
+    "explain_analyze_stays_denied_on_a_read_only_connection_with_write_scope"
+  ],
+  "gtk_scenarios": [
+    "postgres_saved_mtls_connection_authenticates_and_queries",
+    "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+    "postgres_ssh_setup_failure_is_durably_audited",
+    "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+    "postgres_ssh_multihop_trusts_both_hops_and_queries",
+    "postgres_ssh_second_hop_decline_does_not_learn_key",
+    "postgres_ssh_changed_second_hop_key_is_refused"
+  ],
+  "not_established": [
+    "Frozen-candidate acceptance",
+    "Distribution-package installation and SSH trust-flow acceptance",
+    "Native Wayland trust-dialog interaction",
+    "Windows Active Directory interoperability",
+    "Hosted candidate acceptance"
+  ],
+  "artifacts": {
+    "run.log": "43b3757d1ce84a33c4b6298a79ec59daeeb55cae3a726df485c046745b17429c"
+  }
+}

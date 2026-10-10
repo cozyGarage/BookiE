@@ -17,7 +17,6 @@ async-trait.workspace = true
 chrono.workspace = true
 futures.workspace = true
 rust_decimal.workspace = true
-serde_json.workspace = true
 sqlx = { workspace = true, features = ["sqlite-unbundled"] }
 sqlparser.workspace = true
 tokio.workspace = true
@@ -25,6 +24,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 tablepro-policy = { path = "../../policy" }
+serde_json.workspace = true
 async-trait.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }

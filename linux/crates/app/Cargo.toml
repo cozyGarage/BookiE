@@ -54,7 +54,7 @@ tracing-subscriber.workspace = true
 uuid.workspace = true
 gettext-rs = { version = "0.8", features = ["gettext-system"] }
 libc = "0.2"
-whoami = "1.6"
+whoami = "2"
 async-trait.workspace = true
 
 [dev-dependencies]
