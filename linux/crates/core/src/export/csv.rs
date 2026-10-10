@@ -460,6 +460,53 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_csv_round_trip_preserves_bool_uuid_and_json() {
+        let mut flag = column("flag");
+        flag.data_type = "BOOLEAN".into();
+        let mut id = column("id");
+        id.data_type = "UUID".into();
+        let mut payload = column("payload");
+        payload.data_type = "JSONB".into();
+        let columns = [flag, id, payload];
+        let rows = vec![
+            vec![
+                Value::Bool(true),
+                Value::Uuid("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()),
+                Value::Json(serde_json::json!({"ok": true, "n": 1})),
+            ],
+            vec![
+                Value::Bool(false),
+                Value::Uuid("00000000-0000-4000-8000-000000000000".parse().unwrap()),
+                Value::Json(serde_json::json!([null, "a,b", {"x": 2}])),
+            ],
+            vec![Value::Null, Value::Null, Value::Null],
+        ];
+        let csv = render_csv(&columns, &rows, &CsvOptions::default());
+        assert_eq!(
+            csv,
+            concat!(
+                "flag,id,payload\n",
+                "true,550e8400-e29b-41d4-a716-446655440000,\"{\"\"ok\"\":true,\"\"n\"\":1}\"\n",
+                "false,00000000-0000-4000-8000-000000000000,\"[null,\"\"a,b\"\",{\"\"x\"\":2}]\"\n",
+                ",,\n",
+            )
+        );
+
+        let options = crate::import::CsvImportOptions::default();
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let restored: Vec<Vec<Value>> = sheet
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(index, row)| {
+                crate::import::row_to_values(row, &[Some(0), Some(1), Some(2)], &columns, &options, index + 2)
+                    .unwrap()
+            })
+            .collect();
+        assert_eq!(restored, rows);
+    }
+
+    #[test]
     fn value_contract_csv_binary_round_trip_preserves_null_empty_and_every_byte() {
         let mut binary_column = column("payload");
         binary_column.data_type = "BYTEA".into();
