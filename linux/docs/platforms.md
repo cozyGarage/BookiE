@@ -5,12 +5,19 @@ approval; [packaging](../packaging/README.md) owns package builds.
 
 ## Supported stacks
 
+Two native-library floors are defined in [ADR 0002](decisions/0002-rust-gtk4-libadwaita.md):
+the **build / CI floor** and the **GNOME 50 package line**.
+
 The build floor is the Ubuntu 24.04 stack: GTK 4.14, GLib 2.80, libadwaita 1.5
 and GtkSourceView 5.12. Debian 13 (GTK 4.18, libadwaita 1.7) and newer are
 above it. `scripts/test-distro-floor.sh` builds and runs the unit and widget
 tiers on both in containers, and the Forgejo job `distro-floor` runs it on
 every push. The installed AT-SPI pass on those distros is still open (PKG-2 in
 the [ledger](known-issues.md)).
+
+The GitHub Release `.deb` that needs GNOME 50 libraries follows the higher
+package line (GTK 4.22, GLib 2.88, libadwaita 1.9, GtkSourceView 5.18). Arch and
+Omarchy packages track current GNOME. Neither floor replaces the other.
 
 Neither distro packages Rust 1.98. Build with rustup.
 
