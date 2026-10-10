@@ -49,7 +49,7 @@ class ChangeContractTests(unittest.TestCase):
         )
 
     def test_other_value_path_maps_to_its_package_suite(self):
-        actions = CHECKER.select_actions(["crates/core/src/export/csv.rs"], CHECKER.load_map())
+        actions = CHECKER.select_actions(["crates/core/src/value.rs"], CHECKER.load_map())
         self.assertEqual(actions, [{
             "package": "tablepro-core",
             "target": "--lib",

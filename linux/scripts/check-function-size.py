@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CRATES = ROOT / "crates"
 BASELINES = ROOT / "function-size-baselines.txt"
 
-RAW_STRING = re.compile(r'(?:b?r)(?P<hashes>#*)"')
-CHAR_LITERAL = re.compile(r"b?'(?:\\\\.|[^\\\\'])'")
+RAW_STRING = re.compile(r'b?r(?P<hashes>#*)"')
+CHAR_LITERAL = re.compile(r"b?'(?:\\.|[^\\'])'")
 
 SIGNATURE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:default\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+\"[^\"]*\"\s+)?fn\s+(\w+)")
 CFG_TEST = re.compile(r"^\s*#\[cfg\(test\)\]")
