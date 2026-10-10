@@ -70,6 +70,38 @@ async fn filtered_keyset_page_keeps_the_filter_and_cursor() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn null_filtered_keyset_page_excludes_missing_fields() {
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    client
+        .database("appdb")
+        .collection::<Document>("null_filtered_keyset")
+        .insert_many([
+            doc! { "_id": 1, "value": Bson::Null },
+            doc! { "_id": 2 },
+            doc! { "_id": 3, "value": Bson::Null },
+        ])
+        .await
+        .unwrap();
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let page = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"null_filtered_keyset\" WHERE \"value\" IS NULL AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Int(1)],
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(page.rows.len(), 1);
+    assert_eq!(page.rows[0][0], Value::Int(3));
+    assert_eq!(page.rows[0][1], Value::Null);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn keyset_page_query_binds_object_id_cursor_values() {
     let (_container, host, port) = super::start_mongo().await;
     let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
