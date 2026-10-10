@@ -45,7 +45,11 @@ mod imp {
         type Interfaces = (gio::ListModel,);
     }
 
-    impl ObjectImpl for RowStore {}
+    impl ObjectImpl for RowStore {
+        fn dispose(&self) {
+            self.obj().detach_cached_rows();
+        }
+    }
 
     impl ListModelImpl for RowStore {
         fn item_type(&self) -> glib::Type {
@@ -63,10 +67,11 @@ mod imp {
                 Slot::Shared(index) => {
                     let source_index = *index;
                     let source = self.source.borrow();
-                    let cells = source.as_ref()?.rows.get(source_index)?.clone();
+                    let result = source.as_ref()?;
                     let projection = self.projection.borrow();
                     let row = row_for_source(
-                        cells,
+                        result,
+                        source_index,
                         projection.as_ref(),
                         &self.preview_keys.borrow(),
                         self.preview_redis_strings.get(),
@@ -83,10 +88,11 @@ mod imp {
                     } else {
                         let source_index = *source_index;
                         let source = self.source.borrow();
-                        let cells = source.as_ref()?.rows.get(source_index)?.clone();
+                        let result = source.as_ref()?;
                         let projection = self.projection.borrow();
                         let row = row_for_source(
-                            cells,
+                            result,
+                            source_index,
                             projection.as_ref(),
                             &self.preview_keys.borrow(),
                             self.preview_redis_strings.get(),
@@ -103,16 +109,14 @@ mod imp {
 }
 
 fn row_for_source(
-    cells: Vec<tablepro_core::Value>,
+    result: &Arc<QueryResult>,
+    source_index: usize,
     projection: Option<&(Vec<usize>, usize)>,
     preview_keys: &[usize],
     preview_redis_strings: bool,
     preview_from_result: bool,
 ) -> Option<RowObject> {
-    let row = match projection {
-        Some((indices, width)) => RowObject::new_projected(cells, indices, *width),
-        None => Some(RowObject::new(cells)),
-    }?;
+    let row = RowObject::from_shared(result, source_index, projection.cloned())?;
     if preview_from_result {
         row.preview_values_from_result();
     } else if preview_redis_strings {
@@ -285,12 +289,27 @@ impl RowStore {
         projection: Option<(Vec<usize>, usize)>,
         preview_keys: Vec<usize>,
     ) {
+        self.detach_cached_rows();
         *self.imp().slots.borrow_mut() = (0..result.rows.len()).map(Slot::Shared).collect();
         *self.imp().source.borrow_mut() = Some(result);
         *self.imp().projection.borrow_mut() = projection;
         *self.imp().preview_keys.borrow_mut() = preview_keys;
         self.imp().preview_redis_strings.set(false);
         self.imp().preview_from_result.set(false);
+    }
+
+    fn detach_cached_rows(&self) {
+        for slot in self.imp().slots.borrow().iter() {
+            match slot {
+                Slot::Cached { object, .. } => {
+                    if let Some(row) = object.upgrade() {
+                        row.detach_shared();
+                    }
+                }
+                Slot::Object(row) => row.detach_shared(),
+                Slot::Shared(_) => {}
+            }
+        }
     }
 
     pub fn source_value_at(&self, position: u32, column: usize) -> Option<tablepro_core::Value> {
@@ -458,7 +477,8 @@ mod tests {
 
     #[test]
     fn replacing_the_rows_reports_one_change_and_drops_old_objects() {
-        let store = RowStore::from_shared(shared(4));
+        let old = shared(4);
+        let store = RowStore::from_shared(old.clone());
         let held = store.item(0).and_downcast::<RowObject>().unwrap();
         let changes = Rc::new(Cell::new((0, 0, 0)));
         let seen = changes.clone();
@@ -469,6 +489,33 @@ mod tests {
         assert_eq!(store.n_items(), 2);
         assert_eq!(store.materialized(), 0);
         assert_eq!(store.find(&held), None);
+        assert_eq!(held.cell_value(0), Value::Int(0));
+        assert_eq!(Arc::strong_count(&old), 1);
+    }
+
+    #[test]
+    fn replacing_shared_rows_preserves_edits_on_held_rows() {
+        let old = shared(2);
+        let store = RowStore::from_shared(old.clone());
+        let held = store.item(0).and_downcast::<RowObject>().unwrap();
+        held.set_cell(0, Value::Int(99));
+
+        store.replace_shared(shared(1));
+
+        assert_eq!(held.cell_value(0), Value::Int(99));
+        assert_eq!(Arc::strong_count(&old), 1);
+    }
+
+    #[test]
+    fn a_held_row_survives_store_disposal_without_retaining_the_result() {
+        let result = shared(2);
+        let store = RowStore::from_shared(result.clone());
+        let held = store.item(1).and_downcast::<RowObject>().unwrap();
+
+        drop(store);
+
+        assert_eq!(held.cell_value(0), Value::Int(1));
+        assert_eq!(Arc::strong_count(&result), 1);
     }
 
     #[test]
@@ -529,7 +576,7 @@ mod tests {
             rows: vec![vec![Value::Null, Value::Text("Ada".into())]],
             truncated: false,
         });
-        let store = RowStore::from_projected(result, vec![0, 2], 3).unwrap();
+        let store = RowStore::from_projected(result.clone(), vec![0, 2], 3).unwrap();
         let row = store.item(0).and_downcast::<RowObject>().unwrap();
 
         assert!(row.cell_is_loaded(0));
@@ -537,6 +584,12 @@ mod tests {
         assert!(!row.cell_is_loaded(1));
         assert!(row.complete_cells().is_none());
         assert_eq!(row.cell_value(2), Value::Text("Ada".into()));
+
+        store.replace_shared(shared(1));
+        assert_eq!(row.cell_value(0), Value::Null);
+        assert!(!row.cell_is_loaded(1));
+        assert_eq!(row.cell_value(2), Value::Text("Ada".into()));
+        assert_eq!(Arc::strong_count(&result), 1);
     }
 
     #[test]
