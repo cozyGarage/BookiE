@@ -200,6 +200,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::display::tests::typed_widget_slots_round_trip_and_keep_same_value_types_apart"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::value_viewer::tests::the_viewer_dialog_builds_and_shows_the_full_value"
     ],
     [
