@@ -88,7 +88,7 @@ def validate_manifest(path, strict=False):
         ):
             (errors if strict else warnings).append(f"{path}: test selector {selector!r} differs from focused command {recorded_selector!r}")
         result = focused.get("result", "")
-        expected_count = re.search(r"(\d+)\s+passed", result)
+        expected_count = re.search(r"\b(\d{1,9}) {1,4}passed", result)
         log_name = focused.get("log")
         log = path.parent / log_name if isinstance(log_name, str) else None
         if not expected_count or not log or not log.is_file():
