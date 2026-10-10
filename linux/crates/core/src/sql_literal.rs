@@ -344,6 +344,51 @@ mod tests {
     }
 
     #[test]
+    fn dialect_specific_decimal_and_temporal_literals_stay_with_their_engines() {
+        let decimal = Value::Decimal("123.4500".parse().unwrap());
+        assert_eq!(
+            render_sql_literal("clickhouse", &decimal).unwrap(),
+            "toDecimal128('123.4500', 4)"
+        );
+        assert_eq!(render_sql_literal("postgres", &decimal).unwrap(), "123.4500");
+
+        let stamp = chrono::NaiveDate::from_ymd_opt(2026, 10, 10)
+            .unwrap()
+            .and_hms_micro_opt(12, 34, 56, 123_400)
+            .unwrap();
+        assert_eq!(
+            render_sql_literal("clickhouse", &Value::DateTime(stamp)).unwrap(),
+            "toDateTime64('2026-10-10 12:34:56.1234', 4)"
+        );
+        assert_eq!(
+            render_sql_literal("clickhouse", &Value::TimestampTz(stamp.and_utc())).unwrap(),
+            "toDateTime64('2026-10-10 12:34:56.1234', 4, 'UTC')"
+        );
+        assert_eq!(
+            render_sql_literal("postgres", &Value::DateTime(stamp)).unwrap(),
+            "'2026-10-10 12:34:56.123400'"
+        );
+        assert_eq!(
+            render_sql_literal("postgres", &Value::TimestampTz(stamp.and_utc())).unwrap(),
+            "'2026-10-10T12:34:56.123400+00:00'"
+        );
+        assert_eq!(
+            render_sql_literal("mssql", &Value::DateTime(stamp)).unwrap(),
+            "CAST(N'2026-10-10 12:34:56.123400' AS datetime2)"
+        );
+    }
+
+    #[test]
+    fn sqlite_refuses_negative_zero_without_refusing_positive_zero() {
+        assert_eq!(
+            render_sql_literal("sqlite", &Value::Float(-0.0)),
+            Err(LiteralError::Unsupported)
+        );
+        assert_eq!(render_sql_literal("sqlite", &Value::Float(0.0)).unwrap(), "0e0");
+        assert_eq!(render_sql_literal("postgres", &Value::Float(-0.0)).unwrap(), "-0e0");
+    }
+
+    #[test]
     fn sql_server_literals_preserve_unicode_and_use_numeric_booleans() {
         assert_eq!(
             render_sql_literal("mssql", &Value::Text("漢字 😀 O'Brien".into())).unwrap(),
