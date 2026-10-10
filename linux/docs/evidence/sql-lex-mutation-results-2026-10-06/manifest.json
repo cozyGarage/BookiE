@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-06",
+  "case": "SQL lexer mutation report and outcome JSON (TEST-2 completed example)",
+  "role": "mutation_report",
+  "note": "Stub added 2026-10-10. The human-readable report is README.md; raw cargo-mutants outcomes are the *-outcomes.json files. Follow-up packets with full schema_version manifests live beside this directory.",
+  "report": "README.md",
+  "artifacts": [
+    "README.md",
+    "full-followup-outcomes.json",
+    "first-survivor-recheck-outcomes.json",
+    "final-survivor-check-outcomes.json",
+    "nested-comment-recheck-outcomes.json",
+    "timeout-recheck-outcomes.json"
+  ],
+  "related_manifests": [
+    "linux/docs/evidence/sql-lex-mysql-dollar-boundary-results-2026-10-06/manifest.json",
+    "linux/docs/evidence/sql-lex-cursor-arithmetic-guard-results-2026-10-06/manifest.json",
+    "linux/docs/evidence/sql-lex-zero-progress-guards-results-2026-10-06/manifest.json"
+  ],
+  "status": "historical completed mutation example; keep linked from ledger TEST-2 and B3 board"
+}

@@ -84,7 +84,7 @@ locates dated records.
 - [App layer audit](archive/app-layer-external-audit-2026-10-06.md): GUI gaps and the TablePro and dbx comparison
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
 - [Upstream main](archive/upstream-main-review-2026-10-03.md) ([inventory](archive/upstream-main-review-2026-10-03-inventory.md)) and [older releases](archive/upstream-older-releases-review-2026-10-03.md) ([inventory](archive/upstream-older-releases-2026-10-03-inventory.md))
-- [External audit and post-0.2 plan](../../external-audit.md) and its [client review](../../external-audit-client-review.md)
+- [External audit and post-0.2 plan](archive/external-audit-2026-10-06.md) and its [client review](archive/external-audit-client-review-2026-10-06.md)
 
 ## Keep context bounded
 

@@ -35,11 +35,14 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 
 ## Current continuation
 
-Merged `linux` baseline includes PRs #459–#461, #463, #475, #480, #486 and
-#490: engine read-only enforcement, order-independent script classification,
-fail-closed explain-plan masking, DuckDB selected-file pinning (AUD-10), MySQL
-merge-table rollback coverage, joined policy verdicts (AUD-11 step 3) and
-per-hop SSH secret identities (UI-1b storage). AUD-11 step 4 (drop legacy
+Merged `linux` baseline includes PRs #459–#461, #463, #475, #480, #482, #484,
+#486, #490, #497, #498, #501 and #504: engine read-only enforcement,
+order-independent script classification, fail-closed explain-plan masking,
+joined policy verdicts (AUD-11 step 3) with the S6/S7 unit pack (#484), DuckDB
+selected-file pinning (AUD-10, #486), typed grid quark keys (#482), per-hop SSH
+secret identities (UI-1b storage, #490), CSV value-path change contracts (#497),
+MySQL invalid calendar mode coverage (#501), DuckDB extended temporal unit pins
+(#504), and the docs sprint/board cleanup tip (#498). AUD-11 step 4 (drop legacy
 facts) remains on open [#506](https://github.com/cozyGarage/BookiE/pull/506);
 UI-1b GTK editor and acceptance remain. Case detail lives on the
 [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md),
