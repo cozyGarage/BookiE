@@ -111,14 +111,8 @@ mod tests {
             duckdb_extended_timestamptz_nanos("+10000-01-01T12:34:56.123456+00"),
             Some(123_456_000)
         );
-        assert_eq!(
-            duckdb_extended_timestamptz_nanos("0001-01-01 (BC) 12:34:56Z"),
-            Some(0)
-        );
-        assert_eq!(
-            duckdb_extended_timestamptz_nanos("1000000-01-01 00:00-05"),
-            Some(0)
-        );
+        assert_eq!(duckdb_extended_timestamptz_nanos("0001-01-01 (BC) 12:34:56Z"), Some(0));
+        assert_eq!(duckdb_extended_timestamptz_nanos("1000000-01-01 00:00-05"), Some(0));
     }
 
     #[test]
