@@ -87,6 +87,12 @@ exclusions = [
     "target/**",
     "vendor/**",
     "docs/evidence/**",
+    "ci/**",
+]
+"sonar.coverage.exclusions" = [
+    "ci/**",
+    "scripts/check-ci-jobs.py",
+    "scripts/tests/test_ci_workflow.py",
 ]
 
 [workspace.lints.clippy]
