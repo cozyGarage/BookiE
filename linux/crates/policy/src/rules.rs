@@ -2,7 +2,7 @@ use tablepro_core::Environment;
 
 use crate::classify::{StatementClass, StatementFacts};
 use crate::config::EnvPolicy;
-use crate::effects::{Effects, inferred_effects};
+use crate::effects::Effects;
 use crate::principal::Principal;
 use crate::transaction_control::{TransactionControl, has_implicit_transaction_starter, transaction_control};
 pub use crate::verdict::Decision;
@@ -19,7 +19,6 @@ pub fn evaluate(
         principal,
         environment,
         facts,
-        inferred_effects(facts),
         connection_read_only,
         env_policy,
         estimated_rows,
@@ -30,15 +29,13 @@ pub(crate) fn evaluate_with_effects(
     principal: &Principal,
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     connection_read_only: bool,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Decision {
-    let mut decisions =
-        evaluate_categorical_decisions(principal, environment, facts, effects, connection_read_only, env_policy);
-    if facts.writes
-        || effects.writes()
+    let effects = facts.effects;
+    let mut decisions = evaluate_categorical_decisions(principal, environment, facts, connection_read_only, env_policy);
+    if effects.writes()
         || facts.class == StatementClass::Unparseable
         || effects.contains(Effects::ADMIN)
         || effects.contains(Effects::HOST_OR_FILE_ACCESS)
@@ -48,7 +45,6 @@ pub(crate) fn evaluate_with_effects(
             principal,
             environment,
             facts,
-            effects,
             env_policy,
             estimated_rows,
         ));
@@ -95,7 +91,7 @@ fn has_unclosed_shared_transaction(sql: &str, driver_id: &str) -> bool {
             }
             None if open => {
                 let facts = crate::classify::classify(&statement, driver_id);
-                if facts.class == StatementClass::Unparseable || (driver_id == "mysql" && facts.contains_ddl) {
+                if facts.class == StatementClass::Unparseable || (driver_id == "mysql" && facts.contains_ddl()) {
                     return true;
                 }
             }
@@ -109,7 +105,6 @@ pub(crate) fn evaluate_categorical(
     principal: &Principal,
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     connection_read_only: bool,
     env_policy: &EnvPolicy,
 ) -> Option<Decision> {
@@ -117,7 +112,6 @@ pub(crate) fn evaluate_categorical(
         principal,
         environment,
         facts,
-        effects,
         connection_read_only,
         env_policy,
     ))
@@ -127,12 +121,12 @@ fn evaluate_categorical_decisions(
     principal: &Principal,
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     connection_read_only: bool,
     env_policy: &EnvPolicy,
 ) -> Vec<Decision> {
+    let effects = facts.effects;
     let mut decisions = Vec::new();
-    if connection_read_only && (facts.writes || effects.writes()) {
+    if connection_read_only && effects.writes() {
         decisions.push(Decision::Deny {
             rule: "connection_read_only".into(),
             message: "connection is marked read-only; statements that may write are not permitted".into(),
@@ -140,7 +134,7 @@ fn evaluate_categorical_decisions(
     }
 
     if facts.class == StatementClass::Unparseable {
-        return evaluate_unparseable_decisions(decisions, principal, environment, facts, effects, env_policy);
+        return evaluate_unparseable_decisions(decisions, principal, environment, facts, env_policy);
     }
 
     if facts.is_multi_statement && principal.is_agent() && !env_policy.agent_allow_multi_statement {
@@ -157,7 +151,7 @@ fn evaluate_categorical_decisions(
         });
     }
 
-    if !facts.writes && !effects.writes() && !effects.contains(Effects::HOST_OR_FILE_ACCESS) {
+    if !effects.writes() && !effects.contains(Effects::HOST_OR_FILE_ACCESS) {
         decisions.push(Decision::Allow {
             rule: "read_allow".into(),
         });
@@ -165,19 +159,9 @@ fn evaluate_categorical_decisions(
     }
 
     if principal.is_agent() {
-        decisions.extend(evaluate_agent_write_categorical(
-            environment,
-            facts,
-            effects,
-            env_policy,
-        ));
+        decisions.extend(evaluate_agent_write_categorical(environment, facts, env_policy));
     } else {
-        decisions.extend(evaluate_human_dangerous_effects(
-            environment,
-            facts,
-            effects,
-            env_policy,
-        ));
+        decisions.extend(evaluate_human_dangerous_effects(environment, facts, env_policy));
     }
     decisions
 }
@@ -187,7 +171,6 @@ fn evaluate_unparseable_decisions(
     principal: &Principal,
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     env_policy: &EnvPolicy,
 ) -> Vec<Decision> {
     let unparseable = decide_unparseable(principal, env_policy);
@@ -197,12 +180,7 @@ fn evaluate_unparseable_decisions(
         return decisions;
     }
     if explicitly_allowed {
-        decisions.extend(evaluate_human_dangerous_effects(
-            environment,
-            facts,
-            effects,
-            env_policy,
-        ));
+        decisions.extend(evaluate_human_dangerous_effects(environment, facts, env_policy));
     } else if env_policy.human_approve_writes {
         decisions.push(Decision::RequireApproval {
             rule: "human_write_approve".into(),
@@ -216,9 +194,9 @@ fn evaluate_unparseable_decisions(
 fn evaluate_human_dangerous_effects(
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     env_policy: &EnvPolicy,
 ) -> Vec<Decision> {
+    let effects = facts.effects;
     let dangerous_effect = effects.contains(Effects::ADMIN)
         || effects.contains(Effects::HOST_OR_FILE_ACCESS)
         || effects.contains(Effects::UNKNOWN);
@@ -245,7 +223,6 @@ pub(crate) fn evaluate_eligible_write(
     principal: &Principal,
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Decision {
@@ -253,7 +230,6 @@ pub(crate) fn evaluate_eligible_write(
         principal,
         environment,
         facts,
-        effects,
         env_policy,
         estimated_rows,
     ))
@@ -267,7 +243,6 @@ fn evaluate_eligible_write_decisions(
     principal: &Principal,
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Vec<Decision> {
@@ -276,10 +251,10 @@ fn evaluate_eligible_write_decisions(
     }
 
     if principal.is_agent() {
-        return evaluate_agent_write_decisions(environment, facts, effects, env_policy, estimated_rows);
+        return evaluate_agent_write_decisions(environment, facts, env_policy, estimated_rows);
     }
 
-    evaluate_human_write_decisions(environment, facts, effects, env_policy, estimated_rows)
+    evaluate_human_write_decisions(environment, facts, env_policy, estimated_rows)
 }
 
 fn decide_unparseable(principal: &Principal, env_policy: &EnvPolicy) -> Decision {
@@ -311,9 +286,9 @@ fn table_preview(facts: &StatementFacts) -> String {
 fn evaluate_agent_write_categorical(
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     env_policy: &EnvPolicy,
 ) -> Vec<Decision> {
+    let effects = facts.effects;
     let mut decisions = Vec::new();
     if effects.contains(Effects::HOST_OR_FILE_ACCESS) {
         decisions.push(Decision::Deny {
@@ -329,14 +304,14 @@ fn evaluate_agent_write_categorical(
         });
     }
 
-    if facts.contains_ddl && !env_policy.agent_allow_ddl {
+    if facts.contains_ddl() && !env_policy.agent_allow_ddl {
         decisions.push(Decision::Deny {
             rule: "agent_ddl_denied".into(),
             message: "agents may not run DDL".into(),
         });
     }
 
-    if facts.contains_unknown_write || effects.contains(Effects::UNKNOWN) {
+    if facts.contains_unknown_write() {
         decisions.push(Decision::Deny {
             rule: "agent_unknown_write_denied".into(),
             message: "agents may not run writes whose safety category cannot be determined".into(),
@@ -356,14 +331,13 @@ fn evaluate_agent_write_categorical(
 fn evaluate_agent_write_decisions(
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Vec<Decision> {
-    let mut decisions = evaluate_agent_write_categorical(environment, facts, effects, env_policy);
+    let mut decisions = evaluate_agent_write_categorical(environment, facts, env_policy);
 
     if let Some(limit) = env_policy.blast_radius_max_rows
-        && facts.contains_mutating_dml
+        && facts.contains_mutating_dml()
     {
         match estimated_rows {
             Some(rows) if rows > limit => {
@@ -414,7 +388,7 @@ fn evaluate_human_write_categorical(
         });
     }
 
-    if facts.contains_ddl && env_policy.human_approve_ddl {
+    if facts.contains_ddl() && env_policy.human_approve_ddl {
         decisions.push(Decision::RequireApproval {
             rule: "human_ddl_approve".into(),
             reason: format!("DDL on {}", environment.as_str()),
@@ -428,14 +402,14 @@ fn evaluate_human_write_categorical(
 fn evaluate_human_write_decisions(
     environment: Environment,
     facts: &StatementFacts,
-    effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Vec<Decision> {
+    let effects = facts.effects;
     let mut decisions = evaluate_human_write_categorical(environment, facts, env_policy);
 
     if let Some(limit) = env_policy.blast_radius_max_rows
-        && facts.contains_mutating_dml
+        && facts.contains_mutating_dml()
     {
         match estimated_rows {
             Some(rows) if rows > limit => {
@@ -482,7 +456,7 @@ fn evaluate_human_write_decisions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::classify::{classify, classify_with_effects};
+    use crate::classify::classify;
     use crate::config::{PolicyConfig, WritePolicy};
 
     fn env_policy(environment: Environment) -> EnvPolicy {
@@ -584,16 +558,8 @@ mod tests {
             "MERGE INTO items USING staged ON items.id = staged.id WHEN MATCHED THEN DELETE; COPY items TO PROGRAM 'echo unsafe'",
         ];
         let decisions = scripts.map(|sql| {
-            let analysis = classify_with_effects(sql, "postgres");
-            evaluate_with_effects(
-                &human,
-                Environment::Local,
-                &analysis.facts,
-                analysis.effects,
-                false,
-                &policies,
-                None,
-            )
+            let analysis = classify(sql, "postgres");
+            evaluate_with_effects(&human, Environment::Local, &analysis, false, &policies, None)
         });
         assert_eq!(decisions[0], decisions[1]);
         assert_eq!(decisions[0].rule_name(), "human_dangerous_effect_approval");
@@ -601,9 +567,9 @@ mod tests {
 
     #[test]
     fn dangerous_effect_verdict_keeps_the_blast_radius_rule_and_reason() {
-        let analysis = classify_with_effects("DELETE FROM items WHERE pg_terminate_backend(pid)", "postgres");
+        let analysis = classify("DELETE FROM items WHERE pg_terminate_backend(pid)", "postgres");
         assert!(analysis.effects.contains(Effects::ADMIN));
-        assert!(analysis.facts.contains_mutating_dml);
+        assert!(analysis.contains_mutating_dml());
 
         let policy = EnvPolicy {
             human_approve_writes: false,
@@ -613,8 +579,7 @@ mod tests {
         let decision = evaluate_with_effects(
             &Principal::human_gui(),
             Environment::Local,
-            &analysis.facts,
-            analysis.effects,
+            &analysis,
             false,
             &policy,
             Some(10),
@@ -637,10 +602,10 @@ mod tests {
 
     #[test]
     fn host_file_reads_do_not_take_the_plain_read_allow_path() {
-        let analysis = classify_with_effects("SELECT read_text('/etc/passwd')", "duckdb");
+        let analysis = classify("SELECT read_text('/etc/passwd')", "duckdb");
         assert!(analysis.effects.contains(Effects::HOST_OR_FILE_ACCESS));
         assert!(!analysis.effects.writes());
-        assert!(!analysis.facts.writes);
+        assert!(!analysis.writes());
 
         let local = EnvPolicy {
             human_approve_writes: false,
@@ -649,8 +614,7 @@ mod tests {
         let decision = evaluate_with_effects(
             &Principal::human_gui(),
             Environment::Local,
-            &analysis.facts,
-            analysis.effects,
+            &analysis,
             false,
             &local,
             None,
@@ -667,15 +631,7 @@ mod tests {
             client: None,
             model: None,
         };
-        let agent_decision = evaluate_with_effects(
-            &agent,
-            Environment::Local,
-            &analysis.facts,
-            analysis.effects,
-            false,
-            &agent_policy,
-            None,
-        );
+        let agent_decision = evaluate_with_effects(&agent, Environment::Local, &analysis, false, &agent_policy, None);
         assert!(
             matches!(
                 agent_decision,
@@ -844,7 +800,6 @@ mod tests {
             let Some(decision) = Decision::join_all(evaluate_agent_write_decisions(
                 Environment::Prod,
                 &facts,
-                inferred_effects(&facts),
                 &policy,
                 Some(1),
             )) else {
@@ -857,7 +812,7 @@ mod tests {
                 rule.split('+').any(|name| name == "agent_writes_denied"),
                 "{sql}: {rule}"
             );
-            if facts.contains_ddl {
+            if facts.contains_ddl() {
                 assert!(rule.split('+').any(|name| name == "agent_ddl_denied"), "{sql}: {rule}");
             }
         }
