@@ -61,7 +61,8 @@ table in the same commit.
 
 | Row | Decision | May edit | Notes |
 | --- | --- | --- | --- |
-| AUD-11 S6/S7 unit pack | B: B4 implements rule fixes + `policy` tests; UX maps cheap-tier selectors | `linux/crates/policy/src/rules.rs`, `effects_classification.rs`, `classify.rs` (Truncate arm only), `sensitive_projection.rs`, `linux/crates/policy/tests/aud11_s6_s7.rs` | Full joined-verdict fold and walker deletion remain B4 |
+| AUD-11 S6/S7 unit pack | B: B4 adds tip-behaviour regressions after #480; UX maps cheap-tier selectors | `linux/crates/policy/tests/aud11_s6_s7.rs` | Step 3 product is on tip via #480; this pack does not edit `rules.rs` / classify; step 4 (drop legacy facts / duplicate walkers) remains B4 |
+| AUD-9 JSON constructors / set-ops | B: B4 extends masking for `to_json` / JSON builders, set-ops and nested CTEs | `linux/crates/policy/src/sensitive_projection.rs` | Unit product and tests; remains OPEN through Forgejo |
 | change-test-map value-path growth | B: B3/UX expand exact selectors for export/import/grid dialog paths | `linux/scripts/change-test-map.json` | Cheap GitHub change-contracts only |
 | TEST-6 first triage slice | B: UX records triage; maintainer keeps remaining manual/Wayland items | `linux/docs/evidence/test-6-triage-2026-10-10/`, `linux/docs/known-issues.md` (TEST-6/AUD-11/AUD-9 rows) | No TEST-28 product fix in this handoff |
 
