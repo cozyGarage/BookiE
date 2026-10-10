@@ -13,7 +13,8 @@ Historical implementation and validation records are indexed in the
 For contributor setup and workspace checks, see the [Linux guide](linux/README.md)
 and [validation playbook](linux/docs/validation-playbook.md).
 
-After 0.2.0, review the [external audit and improvement plan](external-audit.md)
+After 0.2.0, review the
+[external audit and improvement plan](linux/docs/archive/external-audit-2026-10-06.md)
 for root workspace organization, backend ownership checks, GitHub/test tooling,
 docs/examples/evidence synchronization and driver reuse. It is deferred work;
 the active sprint retains current sequencing and acceptance authority.
