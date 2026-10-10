@@ -1,7 +1,8 @@
 use sqlparser::dialect::Dialect;
 use sqlparser::tokenizer::{Token, Tokenizer};
 
-use crate::classify::{StatementClass, StatementDetails, is_administrative_function_name};
+use crate::admin_functions::is_administrative_function_name;
+use crate::classify::{StatementClass, StatementDetails};
 use crate::effects::Effects;
 use sqlparser::ast::{CopySource, CopyTarget, Set, Statement};
 

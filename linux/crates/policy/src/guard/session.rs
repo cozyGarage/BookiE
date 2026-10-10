@@ -130,9 +130,9 @@ impl PolicySession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let facts = classify(sql, &self.guard.ctx.driver_id);
-        let authorization = self.guard.authorize_classified(sql, facts, Some(control)).await?;
-        let writes = authorization.facts.writes();
+        let analysis = self.guard.analyze_statement(sql);
+        let authorization = self.guard.authorize_classified(sql, analysis, Some(control)).await?;
+        let writes = authorization.analysis.facts.writes();
         let result = match self.batch {
             Some(batch) => {
                 self.batch_statement(sql, params, control, authorization, batch.id)
@@ -179,14 +179,14 @@ impl PolicySession {
         authorization: Authorization,
         batch_id: Uuid,
     ) -> Result<QueryResult, DriverError> {
-        let writes = authorization.facts.writes();
+        let writes = authorization.analysis.facts.writes();
         if writes {
             self.guard.require_governed_write_available()?;
         }
         let operation = self.guard.operation(
             sql,
             Some(batch_id),
-            &authorization.facts,
+            &authorization.analysis.facts,
             &authorization.decision,
             authorization.approval_outcome,
             authorization.preview_state,
@@ -205,7 +205,10 @@ impl PolicySession {
             true => self.guard.caught_write("SESSION QUERY", execution).await,
             false => self.guard.caught_read("SESSION QUERY", execution).await,
         }
-        .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
+        .map(|value| {
+            self.guard
+                .mask_result_for_analysis(Some(&authorization.analysis), value)
+        });
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
         self.guard
             .audit_transaction_result(&operation, start, &result, rows)
@@ -227,7 +230,7 @@ impl PolicySession {
         let operation = self.guard.operation(
             sql,
             None,
-            &authorization.facts,
+            &authorization.analysis.facts,
             &authorization.decision,
             authorization.approval_outcome,
             authorization.preview_state,
@@ -243,7 +246,10 @@ impl PolicySession {
                 self.inner.query_params_controlled(sql, params, control),
             )
             .await
-            .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
+            .map(|value| {
+                self.guard
+                    .mask_result_for_analysis(Some(&authorization.analysis), value)
+            });
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
         self.guard.audit_write_result(&operation, start, &result, rows).await?;
         pending_write.disarm();
@@ -260,7 +266,7 @@ impl PolicySession {
         let operation = self.guard.operation(
             sql,
             None,
-            &authorization.facts,
+            &authorization.analysis.facts,
             &authorization.decision,
             authorization.approval_outcome,
             authorization.preview_state,
@@ -274,7 +280,10 @@ impl PolicySession {
                 self.inner.query_params_controlled(sql, params, control),
             )
             .await
-            .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
+            .map(|value| {
+                self.guard
+                    .mask_result_for_analysis(Some(&authorization.analysis), value)
+            });
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
         self.guard
             .audit_controlled_read_result(&operation, start, &result, rows)

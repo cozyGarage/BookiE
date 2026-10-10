@@ -11,9 +11,8 @@ execution and installed acceptance are separate states.
 
 ## Current Linux-tip B4 checkpoint (2026-10-10)
 
-`fork/linux` is `50a4dc14040096903530098a5075e9bae1398a5e` (2026-10-10).
-The latest application-code commit is the dependency cleanup in #485; the tip
-also includes refreshed B4 evidence. PR #458 computes `Effects`
+`fork/linux` is `aaf8464401dcb501455343379be1a40fad1c86ef` (2026-10-10).
+The tip includes the GTK distro-floor wait-setting fix in #507. PR #458 computes `Effects`
 alongside legacy facts, and PR #459 adds engine read-only enforcement; both are
 merged. PR #460 implements migration step 2 (S8) and is merged. PR #463
 implements DuckDB read-only selected-file restrictions and is merged. PR #486
@@ -23,8 +22,10 @@ only allowed path, and direct reads through the selected pathname after
 replacement are denied; AUD-10 is DONE. PR #461 keeps read-scoped explain plans
 redacted, and PR #475 adds the B4-11 `MRG_MyISAM` rollback case; both are
 merged. PR #480 (merged) implements migration step 3 (joined verdicts for
-S6/S7). Migration step 4, removing the legacy facts and duplicate walkers,
-remains. Exact local verification and
+S6/S7). PR #506 is being updated with step 4 guard integration: it shares one
+parsed statement analysis across classification, masking and blast-radius
+planning. Those consumers still use specialized AST helpers, so literal
+single-walk consolidation remains incomplete. Exact local verification and
 acceptance boundaries are recorded below; local runs do not establish Forgejo
 gate or frozen-candidate/package acceptance.
 

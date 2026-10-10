@@ -8,9 +8,11 @@ use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, Po
 use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
+use crate::admin_functions::is_administrative_function_name;
 use crate::effects::Effects;
 use crate::effects_classification::{merge_script_class, sql_effects_from_tokens, statement_effects, truncate_facts};
 use crate::select_writes::select_writes;
+use crate::{blast_radius, sensitive_projection};
 
 /// Coarse statement class used by policy rules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -54,6 +56,13 @@ pub(crate) struct StatementDetails {
     pub(crate) contains_unscoped_dml: bool,
 }
 
+pub(crate) struct StatementAnalysis {
+    pub(crate) facts: StatementFacts,
+    pub(crate) blast_radius: Option<blast_radius::BlastRadiusRewrite>,
+    pub(crate) sensitive_positions: Option<Vec<bool>>,
+    pub(crate) known_statement_rows: Vec<Option<u64>>,
+}
+
 impl StatementFacts {
     pub fn writes(&self) -> bool {
         self.class.is_write()
@@ -89,31 +98,60 @@ pub fn statement_requires_write_capability(sql: &str, driver_id: &str) -> bool {
 }
 
 pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
+    analyze_statement_inner(sql, driver_id, &[], false).facts
+}
+
+pub(crate) fn analyze_statement(sql: &str, driver_id: &str, patterns: &[String]) -> StatementAnalysis {
+    analyze_statement_inner(sql, driver_id, patterns, true)
+}
+
+fn analyze_statement_inner(
+    sql: &str,
+    driver_id: &str,
+    patterns: &[String],
+    include_execution_plans: bool,
+) -> StatementAnalysis {
     let dialect = dialect_for(driver_id);
     let trimmed = sql.trim();
     if trimmed.is_empty() {
-        return unparseable_analysis("empty SQL");
+        return failed_analysis("empty SQL");
     }
 
     if driver_id == "mysql" && sql_contains_mysql_executable_comment(trimmed, dialect.as_ref()) {
-        return unparseable_analysis("MySQL executable comments are not safely classified");
+        return failed_analysis("MySQL executable comments are not safely classified");
     }
 
     let statements = match Parser::parse_sql(dialect.as_ref(), trimmed) {
         Ok(s) => s,
-        Err(e) => return unparseable_analysis(e.to_string()),
+        Err(e) => return failed_analysis(e.to_string()),
     };
 
     if statements.is_empty() {
-        return unparseable_analysis("no statements parsed");
+        return failed_analysis("no statements parsed");
     }
 
     let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
-    classify_statements(statements, effects, contains_administrative_call)
+    let facts = classify_statements(&statements, effects, contains_administrative_call);
+    let (blast_radius, sensitive_positions, known_statement_rows) = if include_execution_plans {
+        let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(&statements, driver_id);
+        (
+            blast_radius,
+            sensitive_projection::projection_from_statements(&statements, patterns),
+            known_statement_rows,
+        )
+    } else {
+        (None, None, Vec::new())
+    };
+    StatementAnalysis {
+        facts,
+        blast_radius,
+        sensitive_positions,
+        known_statement_rows,
+    }
 }
 
 fn classify_statements(
-    statements: Vec<Statement>,
+    statements: &[Statement],
     mut effects: Effects,
     contains_administrative_call: bool,
 ) -> StatementFacts {
@@ -123,7 +161,7 @@ fn classify_statements(
     let mut tables = Vec::new();
     let mut has_where = true;
     let mut contains_unscoped_dml = false;
-    for stmt in &statements {
+    for stmt in statements {
         let facts = classify_statement(stmt);
         effects = effects.union(facts.effects);
         writes |= facts.class.is_write();
@@ -159,8 +197,13 @@ fn classify_statements(
     }
 }
 
-fn unparseable_analysis(message: impl Into<String>) -> StatementFacts {
-    StatementFacts::unparseable(message)
+fn failed_analysis(message: impl Into<String>) -> StatementAnalysis {
+    StatementAnalysis {
+        facts: StatementFacts::unparseable(message),
+        blast_radius: None,
+        sensitive_positions: None,
+        known_statement_rows: Vec::new(),
+    }
 }
 
 fn sql_contains_mysql_executable_comment(sql: &str, dialect: &dyn Dialect) -> bool {
@@ -561,72 +604,6 @@ fn is_administrative_function(name: &ObjectName) -> bool {
     is_administrative_function_name(&name.to_string())
 }
 
-pub(crate) fn is_administrative_function_name(name: &str) -> bool {
-    matches!(
-        name.to_ascii_lowercase().as_str(),
-        "lo_create"
-            | "lo_export"
-            | "lo_import"
-            | "lo_put"
-            | "lo_unlink"
-            | "lowrite"
-            | "nextval"
-            | "pg_advisory_lock"
-            | "pg_advisory_lock_shared"
-            | "pg_advisory_unlock"
-            | "pg_advisory_unlock_all"
-            | "pg_advisory_unlock_shared"
-            | "pg_advisory_xact_lock"
-            | "pg_advisory_xact_lock_shared"
-            | "pg_backup_start"
-            | "pg_backup_stop"
-            | "pg_cancel_backend"
-            | "pg_create_restore_point"
-            | "pg_create_logical_replication_slot"
-            | "pg_create_physical_replication_slot"
-            | "pg_drop_replication_slot"
-            | "pg_log_backend_memory_contexts"
-            | "pg_promote"
-            | "pg_reload_conf"
-            | "pg_rotate_logfile"
-            | "pg_start_backup"
-            | "pg_stop_backup"
-            | "pg_switch_wal"
-            | "pg_terminate_backend"
-            | "pg_try_advisory_lock"
-            | "pg_try_advisory_lock_shared"
-            | "pg_try_advisory_xact_lock"
-            | "pg_try_advisory_xact_lock_shared"
-            | "pg_wal_replay_pause"
-            | "pg_wal_replay_resume"
-            | "lo_from_bytea"
-            | "lo_truncate"
-            | "lo_truncate64"
-            | "set_config"
-            | "setval"
-            | "pg_read_file"
-            | "pg_read_binary_file"
-            | "pg_stat_file"
-            | "pg_ls_dir"
-            | "pg_ls_logdir"
-            | "pg_ls_waldir"
-            | "pg_ls_archive_statusdir"
-            | "pg_ls_tmpdir"
-            | "dblink"
-            | "dblink_exec"
-            | "dblink_connect"
-            | "dblink_connect_u"
-            | "dblink_open"
-            | "dblink_fetch"
-            | "dblink_send_query"
-            | "query_to_xml"
-            | "pg_file_write"
-            | "pg_file_rename"
-            | "pg_file_unlink"
-            | "pg_stat_statements_reset"
-    )
-}
-
 fn function_arguments_are_administrative(arguments: &FunctionArguments) -> bool {
     match arguments {
         FunctionArguments::None => false,
@@ -743,6 +720,28 @@ mod tests {
         assert!(!f.writes());
         assert_eq!(f.class, StatementClass::Select);
         assert!(f.tables.iter().any(|t| t.contains("users")));
+    }
+
+    #[test]
+    fn guard_analysis_supplies_classification_masking_and_blast_radius_from_one_parse() {
+        let patterns = vec!["pan".to_owned()];
+        let read = analyze_statement("SELECT pan AS p FROM cards", "postgres", &patterns);
+        assert!(read.facts.effects.contains(Effects::READS));
+        assert_eq!(read.sensitive_positions, Some(vec![true]));
+        assert!(read.blast_radius.is_none());
+
+        let mutation = analyze_statement("UPDATE cards SET pan = 'x' WHERE id = 1", "postgres", &patterns);
+        assert!(mutation.facts.effects.contains(Effects::WRITES_ROWS));
+        assert!(mutation.sensitive_positions.is_none());
+        assert!(matches!(
+            mutation.blast_radius,
+            Some(blast_radius::BlastRadiusRewrite::CountQuery(_))
+        ));
+        assert_eq!(mutation.known_statement_rows, vec![None]);
+
+        let insert = analyze_statement("INSERT INTO cards (pan) VALUES ('x')", "postgres", &patterns);
+        assert_eq!(insert.known_statement_rows, vec![Some(1)]);
+        assert_eq!(insert.blast_radius, Some(blast_radius::BlastRadiusRewrite::Known(1)));
     }
 
     #[test]

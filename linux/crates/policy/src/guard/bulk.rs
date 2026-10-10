@@ -1,5 +1,6 @@
 use super::*;
 use crate::classify::StatementClass;
+use crate::classify::classify;
 
 /// Rows one approved import may write. A budget larger than this is
 /// refused before the user is asked, so no single approval can cover an
