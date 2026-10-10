@@ -735,6 +735,9 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
     if levels >= 1024 {
         assert_deep_enum_array_parameter_contract(connection.as_ref(), &schema, &base_type, levels).await;
     }
+    if matches!(levels, 63 | 64) {
+        assert_enum_array_parameter_depth_boundary(connection.as_ref(), &schema, &base_type, levels).await;
+    }
     if levels >= 63 {
         assert_deep_enum_array_scalar_parameters(connection.as_ref(), &schema, levels).await;
     }
