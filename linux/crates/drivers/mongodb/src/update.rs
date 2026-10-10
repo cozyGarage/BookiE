@@ -84,9 +84,7 @@ fn keyset_page_query(query: &Query) -> Option<(&Select, i64)> {
     }
     let mut unpaged_query = query.clone();
     unpaged_query.limit_clause = None;
-    if simple_value_select(&unpaged_query).is_none() {
-        return None;
-    }
+    simple_value_select(&unpaged_query)?;
     let Some(LimitClause::LimitOffset {
         limit: Some(Expr::Value(limit)),
         offset: Some(offset),
