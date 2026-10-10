@@ -327,7 +327,7 @@ The lab Forgejo (an internal instance; its address and repository are set throug
 branch push and `.forgejo/workflows/nightly.yml` each night, on three Debian 13
 internal executors (Forgejo runner label `debian-host`, Docker with the userland
 proxy off) and one native Ubuntu 24.04 executor (`ubuntu-host`). All four also carry
-`any-host`: the guards, Clippy, unit, sandbox, supply-chain and distro-floor jobs use it,
+`any-host`: the guards, Clippy, unit, sandbox, supply-chain, driver (the six Docker driver suites) and distro-floor jobs use it,
 while the native GTK, widget and release-fixture jobs stay on `debian-host` because the
 native Ubuntu GTK suite is not yet reliable (TEST-28).
 `scripts/forgejo-gate.sh <branch>` pushes a branch, waits for its run and lists
