@@ -78,6 +78,21 @@ fn value_contract_mysql_invalid_calendar_csv_values_remain_exact_text() {
 }
 
 #[test]
+fn value_contract_duckdb_csv_timestamps_refuse_submicrosecond_precision() {
+    let options = CsvImportOptions::default();
+    let target = column("instant", "TIMESTAMPTZ");
+
+    assert_eq!(
+        value_for("2024-05-06 13:45:01.123456000+00:00", &target, &options, "duckdb"),
+        Ok(Value::TimestampTz("2024-05-06T13:45:01.123456Z".parse().unwrap()))
+    );
+    assert_eq!(
+        value_for("2024-05-06 13:45:01.123456001+00:00", &target, &options, "duckdb"),
+        Err(CellError::NotATimestamp)
+    );
+}
+
+#[test]
 fn value_contract_postgres_csv_restores_chrono_year_zero_as_bc_era_text() {
     let date = column("value", "date");
     let values = row_to_values_for_driver(
