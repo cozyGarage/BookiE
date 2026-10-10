@@ -22,7 +22,7 @@ Keep these open until re-proven on a current SHA. Full wording is in the archive
 | Xvfb GTK enum/SET edits (MySQL, PostgreSQL, ClickHouse) | B3 | Local scenarios do not replace package-installed / native Wayland acceptance |
 | PERF-3 / TEST-12 MongoDB installed Arch and Debian page timing | B3 | Local under-100 ms page timings are not installed acceptance |
 | UI-13b MongoDB multi-page export without ADR 0014 snapshot | B4 / B3 boundary | Independent page requests can mix times; ledger owns the row |
-| Forgejo run 101 PostgreSQL driver failures | B3 | Also on the sprint retest table; local `8e586fb` enum-oracle pin awaits exact-head gate |
+| Forgejo run 101 PostgreSQL driver failures | B3 | Run 127 at `4f552035b2`, which includes `8e586fb`, passed the PostgreSQL driver suite 235/235. Its log includes both mixed-case enum regressions and both byte-budget transaction cases. The latest merged `linux` branch still needs its exact-head gate; run 127's separate `pg-release` failure is B4-owned. |
 
 ## Current evidence and next targets
 

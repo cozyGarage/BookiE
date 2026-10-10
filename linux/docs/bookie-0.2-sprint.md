@@ -15,8 +15,9 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
   TEST-29's fast and durable test-container paths are in PR #457. Published
   head `e0bb6ce` passes the MySQL and MongoDB jobs; Forgejo run 101 found two
   PostgreSQL driver test failures and the known B4 query-plan policy mismatch.
-  Local follow-up `8e586fb` pins the enum oracle query to its session; its
-  focused test passes locally and is awaiting the next serialized gate.
+  Run 127 re-proves the run-101 PostgreSQL driver fixes; the latest merged
+  `linux` branch still needs its exact-head gate. Its separate `pg-release`
+  failure is B4-owned. See the [B3 retest record](type-contract-strategy.md#retest-indicators).
 - B4 [B4]: B4-12 and B4-17 frozen-candidate and installed acceptance, TEST-15
   remaining write paths, AUD-2 approval timeout, PERF-2 and PERF-8 cursor paging
   (ADR 0011), UI-13b guarded read snapshot for full export (ADR 0014).
@@ -48,7 +49,7 @@ These failed or incomplete runs stay open until re-proven on a current SHA:
 
 | Signal | Owner | Note |
 | --- | --- | --- |
-| Forgejo run 101: two PostgreSQL driver failures | B3 | Local follow-up `8e586fb` pins the enum oracle to one session; await exact-head gate |
+| Forgejo run 101: two PostgreSQL driver failures | B3 | Run 127 re-proves these fixes; the current `linux` head still needs its exact-head gate. See the [B3 retest record](type-contract-strategy.md#retest-indicators) |
 | `pg-release` query-plan vs fail-closed masking (`***REDACTED***`) | B4 / AUD-9 | Product intent vs release fixture unresolved |
 | Forgejo run 88 GTK waits: `open_editor`, `audit_failure_denies` | UX | Cause unclassified; run 88 predates #451/#452 |
 | TEST-28 native Ubuntu AT-SPI grid / Columns UI | UX | Container distro-floor passes; native job is the broken surface |
