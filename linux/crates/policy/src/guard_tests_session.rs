@@ -113,18 +113,33 @@ struct Harness {
 }
 
 fn harness(script: SessionScript, read_only: bool) -> Harness {
+    harness_with_driver(script, read_only, "postgres")
+}
+
+fn harness_with_driver(script: SessionScript, read_only: bool, driver_id: &str) -> Harness {
+    harness_with_principal(script, read_only, driver_id, Principal::human_gui(), Environment::Local)
+}
+
+fn harness_with_principal(
+    script: SessionScript,
+    read_only: bool,
+    driver_id: &str,
+    principal: Principal,
+    environment: Environment,
+) -> Harness {
     let script = Arc::new(script);
     let audit = Arc::new(SequenceAuditSink::new(vec![]));
     let audit_state = Arc::new(AuditState::new());
     let mut ctx = context(
-        Principal::human_gui(),
-        Environment::Local,
+        principal,
+        environment,
         PolicyConfig::default(),
         Arc::new(AutoApproveSink),
         audit.clone(),
         audit_state.clone(),
     );
     ctx.read_only = read_only;
+    ctx.driver_id = driver_id.into();
     let inner: Arc<dyn Connection> = Arc::new(SessionConn { script: script.clone() });
     Harness {
         guard: PolicyGuard::new(inner, ctx),
@@ -132,6 +147,151 @@ fn harness(script: SessionScript, read_only: bool) -> Harness {
         audit,
         audit_state,
     }
+}
+
+#[tokio::test]
+async fn postgres_read_only_begin_is_audited_as_a_read_and_refuses_writes_before_dispatch() {
+    let h = harness(SessionScript::default(), false);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .await
+        .expect("read-only transaction begins");
+    assert!(session.transaction_open());
+    let write = run(&mut session, "DELETE FROM items WHERE id = 1")
+        .await
+        .expect_err("read-only transaction refuses writes");
+    assert!(matches!(write, DriverError::ReadOnly), "{write:?}");
+    let session_effect = run(&mut session, "SELECT pg_advisory_lock(1)")
+        .await
+        .expect_err("read-only transaction refuses session side effects");
+    assert!(matches!(session_effect, DriverError::ReadOnly), "{session_effect:?}");
+    assert_eq!(
+        *h.script.sent.lock().expect("sent lock"),
+        vec!["BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY"]
+    );
+    run(&mut session, "COMMIT")
+        .await
+        .expect("read-only transaction commits");
+
+    let events = h.audit.events.lock().expect("event lock");
+    let begin = events
+        .iter()
+        .find(|event| event.operation_class == AuditOperationClass::Read && event.phase == AuditRecordPhase::Outcome)
+        .expect("read-only begin outcome is audited");
+    assert_eq!(begin.operation_class, AuditOperationClass::Read);
+    assert_eq!(begin.terminal_status, AuditTerminalStatus::Succeeded);
+}
+
+#[tokio::test]
+async fn a_read_only_connection_can_open_a_postgres_read_only_session() {
+    let h = harness(SessionScript::default(), true);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .await
+        .expect("read-only connection can start its read snapshot");
+    run(&mut session, "SELECT 1")
+        .await
+        .expect("read-only snapshot permits reads");
+    run(&mut session, "ROLLBACK")
+        .await
+        .expect("read-only snapshot can roll back");
+}
+
+#[tokio::test]
+async fn a_read_scoped_agent_can_open_and_audit_a_postgres_read_snapshot() {
+    let h = harness_with_principal(
+        SessionScript::default(),
+        true,
+        "postgres",
+        Principal::Agent {
+            token: "raw-agent-token".into(),
+            client: Some("session-test".into()),
+            model: None,
+        },
+        Environment::Staging,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .await
+        .expect("read-scoped agent can start a read snapshot");
+    run(&mut session, "SELECT 1").await.expect("read-scoped query");
+    let write = run(&mut session, "DELETE FROM items WHERE id = 1")
+        .await
+        .expect_err("read-scoped agent cannot write in the snapshot");
+    assert!(matches!(write, DriverError::ReadOnly), "{write:?}");
+    assert_eq!(
+        *h.script.sent.lock().expect("sent lock"),
+        vec!["BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY", "SELECT 1"]
+    );
+    run(&mut session, "ROLLBACK").await.expect("rollback snapshot");
+
+    let events = h.audit.events.lock().expect("event lock");
+    let begin_events = events
+        .iter()
+        .filter(|event| event.decision_rule == "read_only_snapshot")
+        .collect::<Vec<_>>();
+    assert_eq!(begin_events.len(), 2);
+    assert!(
+        begin_events
+            .iter()
+            .all(|event| event.operation_class == AuditOperationClass::Read)
+    );
+    assert!(begin_events.iter().any(|event| event.phase == AuditRecordPhase::Intent));
+    assert!(
+        begin_events
+            .iter()
+            .any(|event| event.phase == AuditRecordPhase::Outcome)
+    );
+    let serialized = serde_json::to_string(&*events).expect("serialize events");
+    assert!(!serialized.contains("raw-agent-token"));
+}
+
+#[tokio::test]
+async fn read_only_mode_survives_commit_and_chain() {
+    let h = harness(SessionScript::default(), false);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .await
+        .expect("begin");
+    run(&mut session, "COMMIT AND CHAIN").await.expect("commit and chain");
+    let error = run(&mut session, "DELETE FROM items WHERE id = 1")
+        .await
+        .expect_err("chained transaction keeps read-only mode");
+    assert!(matches!(error, DriverError::ReadOnly), "{error:?}");
+    assert_eq!(
+        *h.script.sent.lock().expect("sent lock"),
+        vec!["BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY", "COMMIT AND CHAIN"]
+    );
+}
+
+#[tokio::test]
+async fn a_read_only_begin_without_snapshot_isolation_is_refused_before_dispatch() {
+    let h = harness(SessionScript::default(), false);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let error = run(&mut session, "BEGIN READ ONLY")
+        .await
+        .expect_err("read committed does not provide a transaction-wide snapshot");
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(!session.transaction_open());
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn a_read_only_begin_is_refused_before_dispatch_on_unsupported_engines() {
+    let h = harness_with_driver(SessionScript::default(), false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let error = run(&mut session, "START TRANSACTION READ ONLY")
+        .await
+        .expect_err("read-only transaction mode is not yet supported for MySQL");
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(!session.transaction_open());
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
 }
 
 async fn run(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Result<QueryResult, DriverError> {
