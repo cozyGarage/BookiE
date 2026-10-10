@@ -88,6 +88,28 @@ async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
     assert_eq!(greater_than.rows[0][0], Value::Int(3));
     assert_eq!(greater_than.rows[1][0], Value::Int(4));
 
+    let not_equal = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"rank\" != ? LIMIT 3 OFFSET 0",
+            &[Value::Int(2)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(not_equal.rows.len(), 3);
+    assert_eq!(
+        not_equal.rows.iter().map(|row| &row[0]).collect::<Vec<_>>(),
+        [&Value::Int(1), &Value::Int(3), &Value::Int(4)]
+    );
+
+    let null_or_missing_not_equal = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"value\" != ? LIMIT 2 OFFSET 0",
+            &[Value::Text("present".into())],
+        )
+        .await
+        .unwrap();
+    assert!(null_or_missing_not_equal.rows.is_empty());
+
     let between = connection
         .query_params(
             "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"rank\" BETWEEN ? AND ? LIMIT 2 OFFSET 0",

@@ -137,7 +137,8 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
                 | BinaryOperator::Gt
                 | BinaryOperator::GtEq
                 | BinaryOperator::Lt
-                | BinaryOperator::LtEq),
+                | BinaryOperator::LtEq
+                | BinaryOperator::NotEq),
             right,
         } => comparison_selector(left, operator, right, params, index),
         Expr::Between {
@@ -176,6 +177,12 @@ fn comparison_selector(
     if *operator == BinaryOperator::Eq && matches!(value, Bson::Null) {
         return Ok(explicit_null_selector(field));
     }
+    if matches!(value, Bson::Null) {
+        return Err(browse_filter_error());
+    }
+    if *operator == BinaryOperator::NotEq {
+        return Ok(doc! { field: { "$exists": true, "$nin": [value, Bson::Null] } });
+    }
     let operator = match operator {
         BinaryOperator::Eq => "$eq",
         BinaryOperator::Gt => "$gt",
@@ -199,6 +206,9 @@ fn between_selector(
     };
     let low = value_to_bson(&take_placeholder_value(low, params, index)?)?;
     let high = value_to_bson(&take_placeholder_value(high, params, index)?)?;
+    if matches!(low, Bson::Null) || matches!(high, Bson::Null) {
+        return Err(browse_filter_error());
+    }
     Ok(doc! { field: { "$gte": low, "$lte": high } })
 }
 
@@ -681,6 +691,43 @@ mod keyset_page_tests {
         assert_eq!(parsed.key, None);
         assert_eq!(parsed.offset, 1);
         assert_eq!(parsed.filter, doc! { "group": { "$eq": "keep" } });
+    }
+
+    #[test]
+    fn not_equal_excludes_missing_and_null_fields() {
+        let parsed = parse_browse_page_select(
+            "SELECT * FROM records WHERE value != ? LIMIT 2 OFFSET 0",
+            &[Value::Int(7)],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            parsed.filter,
+            doc! { "value": { "$exists": true, "$nin": [Bson::Int64(7), Bson::Null] } }
+        );
+    }
+
+    #[test]
+    fn comparison_filters_refuse_null_parameters() {
+        for (predicate, params) in [
+            ("value != ?", vec![Value::Json(serde_json::Value::Null)]),
+            ("value > ?", vec![Value::Json(serde_json::Value::Null)]),
+            (
+                "value BETWEEN ? AND ?",
+                vec![Value::Json(serde_json::Value::Null), Value::Int(7)],
+            ),
+        ] {
+            assert!(matches!(
+                parse_browse_page_select(
+                    &format!("SELECT * FROM records WHERE {predicate} LIMIT 2 OFFSET 0"),
+                    &params,
+                    "appdb",
+                ),
+                Err(DriverError::Unsupported(_))
+            ));
+        }
     }
 
     #[test]
