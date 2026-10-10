@@ -308,12 +308,8 @@ class CiWorkflowTests(unittest.TestCase):
         )
         self.assertIn("hashFiles('linux/flatpak/**')", flatpak)
         self.assertNotIn("github.sha }}", flatpak.split("cache-key:", 1)[1].split("\n", 1)[0])
-        self.assertIn(
-            "matrix.profile == 'default' || github.event_name != 'pull_request'",
-            flatpak,
-        )
-        self.assertIn("profile: default", flatpak)
-        self.assertIn("profile: development", flatpak)
+        self.assertIn("""'["default"]' || '["default","development"]'""", flatpak)
+        self.assertNotIn("matrix.manifest", flatpak)
         contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
         self.assertIn(
             cancel_push_or_pr,
