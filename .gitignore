@@ -46,10 +46,14 @@ secrets/
 Thumbs.db
 
 # Local agent state
-.claude/
+.claude/settings.local.json
 .analysis/
+.buildtmp/
 .docs/
 /plans/reports/
+
+# Cached repository-standards checkout (not vendored; Wave 4 copies scripts)
+.repository-standards/
 
 # Archives
 *.zip
