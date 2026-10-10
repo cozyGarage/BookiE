@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "task": "AUD-2 MySQL unparseable-routine approval-dialog retest",
+  "source_commit": "d4cca38ed129ecadb92b00b7604f8753fb456575",
+  "linux_base_commit": "0855cca53ec35be18443519423bb0ce0a8718619",
+  "binary": {
+    "path": "linux/target/release/tablepro-app",
+    "sha256": "89167935182331dec4c93240f8da4d10637c18f183529cbf345a9d5fce715af7"
+  },
+  "command": "bash linux/scripts/test-gtk-mysql-approval.sh",
+  "runs": {
+    "scenario": "mysql_unparseable_routine_dialog_denial_preserves_database",
+    "count": 3,
+    "result": "passed 3/3 consecutive isolated runs",
+    "runtime": "Local Omarchy Linux; Xvfb/X11; private D-Bus; GTK AT-SPI; Docker MySQL 8.0",
+    "logs": {
+      "run-1.log": "034ba332069441f8cb5fccfec4a2828179be1c9d75cbf019791bff9b7763001c",
+      "run-2.log": "55e963e62406cdebed4b92ec2cef47befb20a321ed60c0ccf47d1c4822311abd",
+      "run-3.log": "af42741fafacc3055f83077fe6a2d956abe9b061abe25efd3c0179fc0da3a18e"
+    }
+  },
+  "not_established": [
+    "Whether the historical empty-dialog failure is fixed; three passes do not identify its cause",
+    "Installed-package acceptance",
+    "Native Wayland interaction",
+    "Hosted or Forgejo acceptance"
+  ]
+}
