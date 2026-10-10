@@ -1,103 +1,11 @@
-use serde::{Deserialize, Serialize};
 use tablepro_core::Environment;
 
 use crate::classify::{StatementClass, StatementFacts};
 use crate::config::EnvPolicy;
-use crate::effects::Effects;
+use crate::effects::{Effects, inferred_effects};
 use crate::principal::Principal;
 use crate::transaction_control::{TransactionControl, has_implicit_transaction_starter, transaction_control};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum Decision {
-    Allow {
-        rule: String,
-    },
-    RequireApproval {
-        rule: String,
-        reason: String,
-        preview: Option<String>,
-    },
-    Deny {
-        rule: String,
-        message: String,
-    },
-}
-
-impl Decision {
-    pub fn rule_name(&self) -> &str {
-        match self {
-            Self::Allow { rule } | Self::RequireApproval { rule, .. } | Self::Deny { rule, .. } => rule,
-        }
-    }
-
-    pub fn is_allow(&self) -> bool {
-        matches!(self, Self::Allow { .. })
-    }
-
-    fn severity(&self) -> u8 {
-        match self {
-            Self::Allow { .. } => 0,
-            Self::RequireApproval { .. } => 1,
-            Self::Deny { .. } => 2,
-        }
-    }
-
-    fn join_all(decisions: impl IntoIterator<Item = Self>) -> Option<Self> {
-        let mut decisions: Vec<Self> = decisions.into_iter().collect();
-        let severity = decisions.iter().map(Self::severity).max()?;
-        decisions.retain(|decision| decision.severity() == severity);
-        decisions.sort_by_key(|decision| (decision.rule_name().to_owned(), decision_detail(decision)));
-        decisions.dedup();
-        if decisions.len() == 1 {
-            return decisions.pop();
-        }
-
-        let mut rules = decisions
-            .iter()
-            .map(|decision| decision.rule_name())
-            .collect::<Vec<_>>();
-        rules.dedup();
-        let rule = rules.join("+");
-        match severity {
-            0 => Some(Self::Allow { rule }),
-            1 => {
-                let reason = decisions
-                    .iter()
-                    .filter_map(|decision| match decision {
-                        Self::RequireApproval { reason, .. } => Some(reason.as_str()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("; ");
-                let preview = decisions.iter().find_map(|decision| match decision {
-                    Self::RequireApproval { preview, .. } => preview.clone(),
-                    _ => None,
-                });
-                Some(Self::RequireApproval { rule, reason, preview })
-            }
-            _ => {
-                let message = decisions
-                    .iter()
-                    .filter_map(|decision| match decision {
-                        Self::Deny { message, .. } => Some(message.as_str()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("; ");
-                Some(Self::Deny { rule, message })
-            }
-        }
-    }
-}
-
-fn decision_detail(decision: &Decision) -> String {
-    match decision {
-        Decision::Allow { .. } => String::new(),
-        Decision::RequireApproval { reason, preview, .. } => format!("{reason}:{preview:?}"),
-        Decision::Deny { message, .. } => message.clone(),
-    }
-}
+pub use crate::verdict::Decision;
 
 pub fn evaluate(
     principal: &Principal,
@@ -127,42 +35,29 @@ pub(crate) fn evaluate_with_effects(
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Decision {
-    let categorical = evaluate_categorical(principal, environment, facts, effects, connection_read_only, env_policy);
-    if let Some(decision) = &categorical
-        && (!decision.is_allow() || !facts.writes && !effects.writes() || facts.class == StatementClass::Unparseable)
+    let mut decisions =
+        evaluate_categorical_decisions(principal, environment, facts, effects, connection_read_only, env_policy);
+    if facts.writes
+        || effects.writes()
+        || facts.class == StatementClass::Unparseable
+        || effects.contains(Effects::ADMIN)
+        || effects.contains(Effects::HOST_OR_FILE_ACCESS)
+        || effects.contains(Effects::UNKNOWN)
     {
-        return decision.clone();
+        decisions.extend(evaluate_eligible_write_decisions(
+            principal,
+            environment,
+            facts,
+            effects,
+            env_policy,
+            estimated_rows,
+        ));
     }
 
-    let eligible = evaluate_eligible_write(principal, environment, facts, effects, env_policy, estimated_rows);
-    Decision::join_all(categorical.into_iter().chain([eligible])).unwrap_or_else(|| Decision::Deny {
+    Decision::join_all(decisions).unwrap_or_else(|| Decision::Deny {
         rule: "no_policy_rules_applied".into(),
         message: "policy evaluation produced no verdict".into(),
     })
-}
-
-fn inferred_effects(facts: &StatementFacts) -> Effects {
-    let mut effects = Effects::EMPTY;
-    if facts.class == StatementClass::Unparseable || facts.contains_unknown_write {
-        effects = effects.union(Effects::UNKNOWN);
-    }
-    if facts.writes {
-        if facts.contains_ddl {
-            effects = effects.union(Effects::WRITES_SCHEMA);
-        }
-        if facts.contains_mutating_dml || !facts.contains_ddl {
-            effects = effects.union(Effects::WRITES_ROWS);
-        }
-    } else {
-        effects = effects.union(Effects::READS);
-    }
-    if facts.class == StatementClass::Administrative {
-        effects = effects.union(Effects::ADMIN);
-    }
-    if facts.class == StatementClass::Transaction {
-        effects = effects.union(Effects::TRANSACTION_CONTROL);
-    }
-    effects
 }
 
 pub(crate) fn shared_connection_decision(sql: &str, driver_id: &str, facts: &StatementFacts) -> Option<Decision> {
@@ -218,6 +113,24 @@ pub(crate) fn evaluate_categorical(
     connection_read_only: bool,
     env_policy: &EnvPolicy,
 ) -> Option<Decision> {
+    Decision::join_all(evaluate_categorical_decisions(
+        principal,
+        environment,
+        facts,
+        effects,
+        connection_read_only,
+        env_policy,
+    ))
+}
+
+fn evaluate_categorical_decisions(
+    principal: &Principal,
+    environment: Environment,
+    facts: &StatementFacts,
+    effects: Effects,
+    connection_read_only: bool,
+    env_policy: &EnvPolicy,
+) -> Vec<Decision> {
     let mut decisions = Vec::new();
     if connection_read_only && (facts.writes || effects.writes()) {
         decisions.push(Decision::Deny {
@@ -235,7 +148,7 @@ pub(crate) fn evaluate_categorical(
                 preview: None,
             });
         }
-        return Decision::join_all(decisions);
+        return decisions;
     }
 
     if facts.is_multi_statement && principal.is_agent() && !env_policy.agent_allow_multi_statement {
@@ -256,7 +169,7 @@ pub(crate) fn evaluate_categorical(
         decisions.push(Decision::Allow {
             rule: "read_allow".into(),
         });
-        return Decision::join_all(decisions);
+        return decisions;
     }
 
     if principal.is_agent() {
@@ -274,7 +187,7 @@ pub(crate) fn evaluate_categorical(
             env_policy,
         ));
     }
-    Decision::join_all(decisions)
+    decisions
 }
 
 fn evaluate_human_dangerous_effects(
@@ -313,15 +226,37 @@ pub(crate) fn evaluate_eligible_write(
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
 ) -> Decision {
+    Decision::join_all(evaluate_eligible_write_decisions(
+        principal,
+        environment,
+        facts,
+        effects,
+        env_policy,
+        estimated_rows,
+    ))
+    .unwrap_or_else(|| Decision::Deny {
+        rule: "no_policy_rules_applied".into(),
+        message: "policy evaluation produced no verdict".into(),
+    })
+}
+
+fn evaluate_eligible_write_decisions(
+    principal: &Principal,
+    environment: Environment,
+    facts: &StatementFacts,
+    effects: Effects,
+    env_policy: &EnvPolicy,
+    estimated_rows: Option<u64>,
+) -> Vec<Decision> {
     if facts.class == StatementClass::Unparseable {
-        return decide_unparseable(principal, env_policy);
+        return vec![decide_unparseable(principal, env_policy)];
     }
 
     if principal.is_agent() {
-        return evaluate_agent_write(environment, facts, effects, env_policy, estimated_rows);
+        return evaluate_agent_write_decisions(environment, facts, effects, env_policy, estimated_rows);
     }
 
-    evaluate_human_write(environment, facts, effects, env_policy, estimated_rows)
+    evaluate_human_write_decisions(environment, facts, effects, env_policy, estimated_rows)
 }
 
 fn decide_unparseable(principal: &Principal, env_policy: &EnvPolicy) -> Decision {
@@ -388,13 +323,13 @@ fn evaluate_agent_write_categorical(
     decisions
 }
 
-fn evaluate_agent_write(
+fn evaluate_agent_write_decisions(
     environment: Environment,
     facts: &StatementFacts,
     effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
-) -> Decision {
+) -> Vec<Decision> {
     let mut decisions = evaluate_agent_write_categorical(environment, facts, effects, env_policy);
 
     if let Some(limit) = env_policy.blast_radius_max_rows
@@ -432,10 +367,7 @@ fn evaluate_agent_write(
             message: format!("agent writes are denied in {}", environment.as_str()),
         },
     });
-    Decision::join_all(decisions).unwrap_or_else(|| Decision::Deny {
-        rule: "no_policy_rules_applied".into(),
-        message: "policy evaluation produced no verdict".into(),
-    })
+    decisions
 }
 
 fn evaluate_human_write_categorical(
@@ -463,13 +395,13 @@ fn evaluate_human_write_categorical(
     decisions
 }
 
-fn evaluate_human_write(
+fn evaluate_human_write_decisions(
     environment: Environment,
     facts: &StatementFacts,
     effects: Effects,
     env_policy: &EnvPolicy,
     estimated_rows: Option<u64>,
-) -> Decision {
+) -> Vec<Decision> {
     let mut decisions = evaluate_human_write_categorical(environment, facts, env_policy);
 
     if let Some(limit) = env_policy.blast_radius_max_rows
@@ -514,10 +446,7 @@ fn evaluate_human_write(
     decisions.push(Decision::Allow {
         rule: "human_write_allow".into(),
     });
-    Decision::join_all(decisions).unwrap_or_else(|| Decision::Deny {
-        rule: "no_policy_rules_applied".into(),
-        message: "policy evaluation produced no verdict".into(),
-    })
+    decisions
 }
 
 #[cfg(test)]
@@ -528,6 +457,10 @@ mod tests {
 
     fn env_policy(environment: Environment) -> EnvPolicy {
         PolicyConfig::default().for_environment(environment)
+    }
+
+    fn has_rule(decision: &Decision, expected: &str) -> bool {
+        decision.rule_name().split('+').any(|rule| rule == expected)
     }
 
     #[test]
@@ -652,6 +585,42 @@ mod tests {
         });
         assert_eq!(decisions[0], decisions[1]);
         assert_eq!(decisions[0].rule_name(), "human_dangerous_effect_approval");
+    }
+
+    #[test]
+    fn dangerous_effect_verdict_keeps_the_blast_radius_rule_and_reason() {
+        let analysis = classify_with_effects("DELETE FROM items WHERE pg_terminate_backend(pid)", "postgres");
+        assert!(analysis.effects.contains(Effects::ADMIN));
+        assert!(analysis.facts.contains_mutating_dml);
+
+        let policy = EnvPolicy {
+            human_approve_writes: false,
+            blast_radius_max_rows: Some(1),
+            ..env_policy(Environment::Local)
+        };
+        let decision = evaluate_with_effects(
+            &Principal::human_gui(),
+            Environment::Local,
+            &analysis.facts,
+            analysis.effects,
+            false,
+            &policy,
+            Some(10),
+        );
+
+        assert!(matches!(decision, Decision::RequireApproval { .. }), "{decision:?}");
+        assert_eq!(
+            decision.rule_name(),
+            "blast_radius_approve+human_dangerous_effect_approval"
+        );
+        let Decision::RequireApproval { reason, .. } = decision else {
+            panic!("the joined verdict must require approval");
+        };
+        assert!(reason.contains("would affect 10 rows"), "{reason}");
+        assert!(
+            reason.contains("administrative, host-access or unknown write effects"),
+            "{reason}"
+        );
     }
 
     #[test]
@@ -855,7 +824,15 @@ mod tests {
             "INSERT INTO t VALUES (1)",
         ] {
             let facts = classify(sql, "postgres");
-            let decision = evaluate_agent_write(Environment::Prod, &facts, inferred_effects(&facts), &policy, Some(1));
+            let Some(decision) = Decision::join_all(evaluate_agent_write_decisions(
+                Environment::Prod,
+                &facts,
+                inferred_effects(&facts),
+                &policy,
+                Some(1),
+            )) else {
+                panic!("{sql} produced no verdict");
+            };
             let Decision::Deny { rule, .. } = &decision else {
                 panic!("{sql} produced {decision:?}");
             };
@@ -1037,7 +1014,8 @@ mod tests {
             &policy,
             None,
         );
-        assert!(matches!(decision, Decision::Deny { ref rule, .. } if rule == "agent_ddl_denied"));
+        assert!(matches!(decision, Decision::Deny { .. }));
+        assert!(has_rule(&decision, "agent_ddl_denied"), "{decision:?}");
     }
 
     #[test]
@@ -1103,7 +1081,8 @@ mod tests {
             &policy,
             None,
         );
-        assert!(matches!(decision, Decision::Deny { ref rule, .. } if rule == "agent_no_unscoped_dml"));
+        assert!(matches!(decision, Decision::Deny { .. }));
+        assert!(has_rule(&decision, "agent_no_unscoped_dml"), "{decision:?}");
     }
 
     #[test]
@@ -1130,7 +1109,11 @@ mod tests {
                 None,
             );
             assert!(
-                matches!(decision, Decision::Deny { ref rule, .. } if rule == "agent_unknown_write_denied"),
+                matches!(decision, Decision::Deny { .. }),
+                "SQL: {sql}, decision: {decision:?}"
+            );
+            assert!(
+                has_rule(&decision, "agent_unknown_write_denied"),
                 "SQL: {sql}, decision: {decision:?}"
             );
         }

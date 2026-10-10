@@ -384,6 +384,7 @@ async fn a_side_effecting_predicate_is_never_run_by_the_blast_radius_count() {
         "UPDATE jobs SET status = 'done' WHERE nextval('job_seq') > 0",
     ] {
         let queries = Arc::new(AtomicUsize::new(0));
+        let audit = Arc::new(SequenceAuditSink::new(vec![]));
         let guard = PolicyGuard::new(
             query_counting_connection(queries.clone()),
             context(
@@ -391,7 +392,7 @@ async fn a_side_effecting_predicate_is_never_run_by_the_blast_radius_count() {
                 Environment::Local,
                 PolicyConfig::default(),
                 Arc::new(AutoApproveSink),
-                Arc::new(SequenceAuditSink::new(vec![])),
+                audit.clone(),
                 Arc::new(AuditState::new()),
             ),
         );
@@ -399,6 +400,17 @@ async fn a_side_effecting_predicate_is_never_run_by_the_blast_radius_count() {
         guard.execute(sql).await.expect("approved write");
 
         assert_eq!(queries.load(Ordering::SeqCst), 0, "{sql}");
+        let events = audit.events.lock().expect("audit events");
+        let Some(event) = events
+            .iter()
+            .find(|event| event.decision_rule.contains("human_dangerous_effect_approval"))
+        else {
+            panic!("the dangerous effect must remain in the approval decision: {events:?}");
+        };
+        assert!(
+            event.decision_rule.contains("blast_radius_unknown"),
+            "the joined verdict must retain the missing estimate reason: {event:?}"
+        );
     }
 }
 

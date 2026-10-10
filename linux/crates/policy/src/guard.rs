@@ -21,7 +21,9 @@ use crate::config::PolicyConfig;
 use crate::effects::Effects;
 use crate::mask::apply_masking;
 use crate::principal::Principal;
-use crate::rules::{Decision, evaluate_categorical, evaluate_eligible_write, shared_connection_decision};
+use crate::rules::{
+    Decision, evaluate_categorical, evaluate_eligible_write, evaluate_with_effects, shared_connection_decision,
+};
 
 const BLAST_RADIUS_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -155,15 +157,26 @@ impl PolicyGuard {
             .ctx
             .policy
             .for_connection(&self.ctx.connection_id.to_string(), self.ctx.environment);
-        if let Some(decision) = evaluate_categorical(
+        if evaluate_categorical(
             &self.ctx.principal,
             self.ctx.environment,
             &facts,
             effects,
             self.ctx.read_only,
             &env_policy,
-        ) {
-            return self.resolve_authorization(sql, facts, decision, None, control).await;
+        )
+        .is_some()
+        {
+            let joined = evaluate_with_effects(
+                &self.ctx.principal,
+                self.ctx.environment,
+                &facts,
+                effects,
+                self.ctx.read_only,
+                &env_policy,
+                None,
+            );
+            return self.resolve_authorization(sql, facts, joined, None, control).await;
         }
 
         self.require_governed_write_available()?;
