@@ -56,6 +56,51 @@ jobs:
           echo "tree under test: $(git rev-parse HEAD)"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+  ensure-ci-gtk-image:
+    name: Ensure CI debian-testing GTK image
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    needs: resolve-ref
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.resolve-ref.outputs.commit }}
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull or build and push
+        id: publish
+        env:
+          IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk
+        run: |
+          set -euo pipefail
+          hash="$(sha256sum linux/ci/debian-testing-gtk/Dockerfile | cut -c1-16)"
+          tag_hash="${IMAGE}:df-${hash}"
+          tag_latest="${IMAGE}:latest"
+          if ! docker pull "$tag_hash"; then
+            docker build --pull \
+              -t "$tag_hash" \
+              -t "$tag_latest" \
+              -f linux/ci/debian-testing-gtk/Dockerfile \
+              linux/ci/debian-testing-gtk
+            docker push "$tag_hash"
+            docker push "$tag_latest"
+          fi
+          echo "image=${tag_hash}" >> "$GITHUB_OUTPUT"
+
   preflight:
     name: Preflight and sandbox tier (no GTK app)
     timeout-minutes: 45
@@ -109,13 +154,13 @@ jobs:
     name: Fast checks (GTK)
     timeout-minutes: 60
     runs-on: ubuntu-24.04
-    needs: resolve-ref
+    needs: [resolve-ref, ensure-ci-gtk-image]
     # The GNOME 50 baseline requires GTK 4.22, GLib 2.88 and libadwaita 1.9.
     # Pre-baked debian:testing + GTK deps from linux/ci/debian-testing-gtk.
     # The integration job stays on the host runner — driver crates depend
     # only on tablepro-core, so they don't pull in libadwaita.
     container:
-      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:latest
+      image: ${{ needs.ensure-ci-gtk-image.outputs.image }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

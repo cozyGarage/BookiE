@@ -146,14 +146,16 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         preflight = workflow.split("  preflight:\n", 1)[1].split("  fast:\n", 1)[0]
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
+        ensure = workflow.split("  ensure-ci-gtk-image:\n", 1)[1].split("  preflight:\n", 1)[0]
         self.assertIn("needs: resolve-ref", preflight)
-        self.assertIn("needs: resolve-ref", fast)
+        self.assertIn("needs: [resolve-ref, ensure-ci-gtk-image]", fast)
         self.assertNotIn("needs: preflight", fast)
         self.assertIn("mozilla-actions/sccache-action@", preflight)
         self.assertIn("mozilla-actions/sccache-action@", fast)
         self.assertIn("shared-key: linux-build", preflight)
         self.assertIn("shared-key: linux-build", fast)
-        self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:latest", fast)
+        self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk", ensure)
+        self.assertIn("needs.ensure-ci-gtk-image.outputs.image", fast)
         self.assertNotIn("prefix-key: linux-preflight", workflow)
         self.assertNotIn("prefix-key: linux-fast-gtk", workflow)
 
@@ -207,11 +209,14 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("echo \"$DOCKERHUB_TOKEN\"", action)
         self.assertNotIn("echo '${{ inputs.password }}'", action)
         fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
-        self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:latest", fast)
+        ensure = re.search(r"^  ensure-ci-gtk-image:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+        self.assertIn("needs.ensure-ci-gtk-image.outputs.image", fast)
         self.assertIn("secrets.GITHUB_TOKEN", fast)
         self.assertIn("./.github/actions/dockerhub-login", fast)
         self.assertIn("secrets.DOCKERHUB_USERNAME", fast)
         self.assertIn("secrets.DOCKERHUB_TOKEN", fast)
+        self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk", ensure)
+        self.assertIn("./.github/actions/dockerhub-login", ensure)
         for job in ["gtk-safety", "current-stable-clippy", "duckdb"]:
             section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
             self.assertIn("image: debian:testing", section, job)
