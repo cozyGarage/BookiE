@@ -7,6 +7,8 @@ use crate::import::csv_import::CsvImportOptions;
 use crate::import::extended_temporal::{duckdb_extended_date, duckdb_extended_timestamptz_nanos};
 use crate::query::{ColumnInfo, Value};
 
+mod mysql_calendar;
+
 /// What a field could not be turned into. Names the failure only: the cell
 /// text never travels with it, because this reaches error lists and logs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -397,6 +399,9 @@ fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver
     {
         return Ok(Value::Text(value.to_owned()));
     }
+    if driver_id == "mysql" && mysql_calendar::invalid_text(text, &column.data_type) {
+        return Ok(Value::Text(text.to_owned()));
+    }
     match parse_cell(text, kind) {
         Ok(Value::TimestampTz(value)) if driver_id == "duckdb" && value.timestamp_subsec_nanos() % 1_000 != 0 => {
             Err(CellError::NotATimestamp)
@@ -650,6 +655,9 @@ mod tests {
 
     #[path = "column_type_tests.rs"]
     mod column_type_tests;
+
+    #[path = "temporal_contracts.rs"]
+    mod temporal_contracts;
 
     fn column(name: &str, data_type: &str) -> ColumnInfo {
         ColumnInfo {
@@ -976,70 +984,6 @@ mod tests {
 
         assert_eq!(values[0], Value::Decimal(Decimal::new(-12345, 2)));
         assert_eq!(values[1], Value::Text("'-123.45".into()));
-    }
-
-    #[test]
-    fn value_contract_postgres_temporal_sentinels_restore_only_recognized_csv_formula_markers() {
-        let cases = [
-            ("date", "'-infinity", "-infinity"),
-            ("timestamp", "infinity", "infinity"),
-            ("timestamptz", "'+infinity", "+infinity"),
-            ("time", "24:00:00", "24:00:00"),
-            ("timetz", "01:02:03+05:45:12", "01:02:03+05:45:12"),
-        ];
-        for (data_type, input, expected) in cases {
-            let columns = vec![column("value", data_type)];
-            let values = row_to_values_for_driver(
-                &[input.to_owned()],
-                &[Some(0)],
-                &columns,
-                &CsvImportOptions::default(),
-                2,
-                "postgres",
-            )
-            .unwrap_or_else(|error| panic!("PostgreSQL {data_type} sentinel should import: {error}"));
-            assert_eq!(values, vec![Value::Text(expected.into())]);
-        }
-
-        let columns = vec![column("value", "date")];
-        assert!(
-            row_to_values_for_driver(
-                &["'=1+1".into()],
-                &[Some(0)],
-                &columns,
-                &CsvImportOptions::default(),
-                2,
-                "postgres",
-            )
-            .is_err()
-        );
-        assert!(
-            row_to_values_for_driver(
-                &["'-infinity".into()],
-                &[Some(0)],
-                &columns,
-                &CsvImportOptions::default(),
-                2,
-                "mysql",
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn value_contract_postgres_csv_restores_chrono_year_zero_as_bc_era_text() {
-        let date = column("value", "date");
-        let values = row_to_values_for_driver(
-            &["0000-01-02".into()],
-            &[Some(0)],
-            &[date],
-            &CsvImportOptions::default(),
-            2,
-            "postgres",
-        )
-        .expect("year zero is PostgreSQL 1 BC");
-
-        assert_eq!(values, vec![Value::Text("0001-01-02 BC".into())]);
     }
 
     #[test]

@@ -1,0 +1,10 @@
+{
+  "scope": "TEST-6 triage: map manual verification items to the lowest automated tier",
+  "date": "2026-10-10",
+  "source": "linux/docs/manual-verification-0.2-features.md",
+  "notes": [
+    "Xvfb/AT-SPI green does not close TEST-6 or PKG-1.",
+    "TEST-28 (native Ubuntu grid context menu / Columns) stays out of this slice.",
+    "Full Wayland OpenQA is deferred to a maintainer desktop."
+  ]
+}
