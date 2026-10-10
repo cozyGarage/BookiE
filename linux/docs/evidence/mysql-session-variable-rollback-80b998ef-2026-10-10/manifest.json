@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "B4-11 MySQL and MariaDB DML-assigned session-variable side effects after failed batch rollback",
+  "source_commit": "80b998ef971a94b9600d28e4797a6f4715eb478a",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_user_variable.rs": "583163b58464bd4f2277b2a79cf7d98985a5a3c9e645974c0f33595f3e40bc0f",
+    "crates/app/src/ui/error_text.rs": "17bd1adb9474cf2a12eed22f05a24353fda1d151e4401d6686b0f9f4a5ccd67d",
+    "po/tablepro.pot": "95798b80a967355f70c907f83018b53eda36ad700ab54b8d47bec30d99626d03"
+  },
+  "fixtures": [
+    "MySQL testcontainers fixture",
+    "MariaDB 11 testcontainers fixture"
+  ],
+  "commands": [
+    "cargo test --locked -p tablepro-driver-mysql --test integration failed_batch_keeps_user_variable_side_effect -- --ignored --test-threads=1",
+    "cargo test --locked -p tablepro-app --lib confirmed_rollback_warns_that_nontransactional_side_effects_may_remain"
+  ],
+  "runtime": "Local Linux host with Docker; serialized MySQL and MariaDB selector",
+  "results": [
+    "MySQL and MariaDB: 2 passed; 0 failed; 97 filtered out; 12.57 seconds; exit code 0",
+    "App warning: 1 passed; 0 failed; 743 filtered out; exit code 0"
+  ],
+  "assertions": [
+    "The first DML statement assigns CONNECTION_ID() to a user variable while updating an InnoDB row.",
+    "A later duplicate-key insert fails at statement index 1 and the InnoDB row returns to its original value.",
+    "The connection returned to the pool retains the assigned user variable; its value matches CONNECTION_ID() on that connection.",
+    "The user-facing confirmed-rollback message warns that session state and other non-transactional side effects may remain."
+  ],
+  "not_established": [
+    "The selector covers the MySQL and MariaDB testcontainers fixtures only; other vendors and side-effect classes remain open.",
+    "Frozen-candidate, package-installed, hosted and Forgejo acceptance remain separate."
+  ]
+}

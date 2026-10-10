@@ -2632,7 +2632,7 @@ msgstr ""
 #, rust-format
 msgid ""
 "Save failed at statement {n}: {error}. The rollback request succeeded; "
-"writes to non-transactional tables may remain."
+"session state and other non-transactional side effects may remain."
 msgstr ""
 
 #: crates/app/src/ui/error_text.rs:78

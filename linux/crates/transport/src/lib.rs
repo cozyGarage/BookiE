@@ -1136,6 +1136,9 @@ mod tests {
         assert_eq!(secrets, [root_secret, jump_secret]);
     }
 
+    #[path = "ssh_passphrase_tests.rs"]
+    mod ssh_passphrase_tests;
+
     #[tokio::test]
     #[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
     async fn legacy_jump_key_passphrase_is_refused_before_keyring_access() {

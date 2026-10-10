@@ -325,6 +325,16 @@
       "tests::legacy_jump_key_passphrase_is_refused_before_keyring_access"
     ],
     [
+      "tablepro-transport",
+      "--lib",
+      "tests::ssh_passphrase_tests::private_key_passphrases_use_the_secret_bound_to_each_hop"
+    ],
+    [
+      "tablepro-transport",
+      "--lib",
+      "tests::ssh_passphrase_tests::a_missing_jump_key_passphrase_does_not_receive_the_root_secret"
+    ],
+    [
       "tablepro-agentd",
       "saved_transport",
       "a_saved_ssh_hop_is_used_instead_of_dialling_the_database_directly"
