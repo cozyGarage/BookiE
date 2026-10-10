@@ -346,7 +346,7 @@ fn evaluate_agent_write_categorical(
     if facts.contains_unscoped_dml {
         decisions.push(Decision::Deny {
             rule: "agent_no_unscoped_dml".into(),
-            message: "agents may not run UPDATE/DELETE without a WHERE clause".into(),
+            message: "agents may not run unscoped UPDATE/DELETE or TRUNCATE".into(),
         });
     }
 
@@ -409,7 +409,7 @@ fn evaluate_human_write_categorical(
     if facts.contains_unscoped_dml {
         decisions.push(Decision::RequireApproval {
             rule: "human_unscoped_dml".into(),
-            reason: "UPDATE/DELETE without WHERE".into(),
+            reason: "unscoped UPDATE/DELETE or TRUNCATE".into(),
             preview: Some(table_preview(facts)),
         });
     }
@@ -552,17 +552,20 @@ mod tests {
             }
         }
 
-        assert!(matches!(
-            evaluate(
-                &human,
-                Environment::Local,
-                &classify("TRUNCATE TABLE items", "postgres"),
-                false,
-                &local,
-                None,
-            ),
-            Decision::Allow { .. }
-        ));
+        let local_truncate = evaluate(
+            &human,
+            Environment::Local,
+            &classify("TRUNCATE TABLE items", "postgres"),
+            false,
+            &local,
+            None,
+        );
+        assert!(matches!(local_truncate, Decision::RequireApproval { .. }));
+        assert!(has_rule(&local_truncate, "human_unscoped_dml"));
+        let Decision::RequireApproval { reason, .. } = local_truncate else {
+            panic!("TRUNCATE must require approval in Local");
+        };
+        assert!(reason.contains("TRUNCATE"), "{reason}");
         assert!(matches!(
             evaluate(
                 &human,
