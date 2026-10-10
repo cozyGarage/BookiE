@@ -66,7 +66,7 @@ pub fn driver_message(error: &DriverError) -> String {
             statement_index,
             source,
         } => {
-            crate::tr!("Save failed at statement {n}: {error}. The rollback request succeeded; writes to non-transactional tables may remain.")
+            crate::tr!("Save failed at statement {n}: {error}. The rollback request succeeded; session state and other non-transactional side effects may remain.")
                 .replace("{n}", &(statement_index + 1).to_string())
                 .replace("{error}", &driver_message(source))
         }
@@ -185,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn confirmed_rollback_does_not_claim_non_transactional_writes_were_reversed() {
+    fn confirmed_rollback_warns_that_nontransactional_side_effects_may_remain() {
         let message = driver_message(&DriverError::Transaction {
             statement_index: 0,
             source: Box::new(DriverError::Query {
@@ -195,7 +195,7 @@ mod tests {
             }),
         });
         assert!(message.contains("rollback request succeeded"));
-        assert!(message.contains("non-transactional tables may remain"));
+        assert!(message.contains("session state and other non-transactional side effects may remain"));
         assert!(!message.contains("no rows were changed"));
     }
 
