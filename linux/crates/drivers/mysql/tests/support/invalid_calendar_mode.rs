@@ -1,0 +1,142 @@
+use tablepro_core::{ConnectOptions, Connection, OperationControl, Session, Value};
+
+use super::{connect, start_mariadb, start_mysql};
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_allow_invalid_dates_preserves_native_calendar_text() {
+    let (_container, options) = start_mysql().await;
+    assert_invalid_calendar_text(&options, "MySQL").await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_allow_invalid_dates_preserves_native_calendar_text() {
+    let (_container, options) = start_mariadb().await;
+    assert_invalid_calendar_text(&options, "MariaDB").await;
+}
+
+async fn assert_invalid_calendar_text(options: &ConnectOptions, engine: &str) {
+    let connection = connect(options.clone()).await;
+    connection
+        .execute("CREATE TABLE allow_invalid_dates (d DATE, dt DATETIME)")
+        .await
+        .unwrap();
+    let mut session = connection.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    session
+        .query_params_controlled("SET SESSION sql_mode = 'ALLOW_INVALID_DATES'", &[], &control)
+        .await
+        .unwrap();
+    session
+        .query_params_controlled(
+            "INSERT INTO allow_invalid_dates VALUES ('2024-02-31', '2024-02-31 12:34:56')",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{engine} must accept the calendar values in ALLOW_INVALID_DATES: {error}"));
+
+    let result = session
+        .query_params_controlled("SELECT d, dt FROM allow_invalid_dates", &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("2024-02-31".into()),
+            Value::Text("2024-02-31 12:34:56".into())
+        ]],
+        "{engine} driver values"
+    );
+    let native = session
+        .query_params_controlled(
+            "SELECT CAST(d AS CHAR), CAST(dt AS CHAR), CAST(d + 0 AS CHAR), CAST(dt + 0 AS CHAR) \
+             FROM allow_invalid_dates",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        native.rows,
+        vec![vec![
+            Value::Text("2024-02-31".into()),
+            Value::Text("2024-02-31 12:34:56".into()),
+            Value::Text("20240231".into()),
+            Value::Text("20240231123456".into()),
+        ]],
+        "{engine} native storage oracle"
+    );
+    assert_invalid_calendar_csv_round_trip(connection.as_ref(), session.as_mut(), &result, &control).await;
+}
+
+async fn assert_invalid_calendar_csv_round_trip(
+    connection: &dyn Connection,
+    session: &mut dyn Session,
+    source: &tablepro_core::QueryResult,
+    control: &OperationControl,
+) {
+    let csv = tablepro_core::export::render_csv(
+        &source.columns,
+        &source.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    session
+        .query_params_controlled(
+            "CREATE TABLE allow_invalid_dates_csv_copy (d DATE, dt DATETIME)",
+            &[],
+            control,
+        )
+        .await
+        .unwrap();
+    let columns = connection
+        .fetch_columns(None, "allow_invalid_dates_csv_copy")
+        .await
+        .unwrap();
+    let mapping = (0..columns.len()).map(Some).collect::<Vec<_>>();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "mysql",
+            schema: None,
+            table: "allow_invalid_dates_csv_copy",
+            columns: &columns,
+            mapping: &mapping,
+        },
+        &sheet,
+        &options,
+    )
+    .expect("CSV import must retain the native invalid calendar values");
+    let imported = plan.rows[0].clone();
+    assert_eq!(
+        imported,
+        vec![
+            Value::Text("2024-02-31".into()),
+            Value::Text("2024-02-31 12:34:56".into())
+        ]
+    );
+    session
+        .query_params_controlled(&plan.statement, &imported, control)
+        .await
+        .unwrap();
+    let restored = session
+        .query_params_controlled(
+            "SELECT CAST(d AS CHAR), CAST(dt AS CHAR), CAST(d + 0 AS CHAR), CAST(dt + 0 AS CHAR) \
+             FROM allow_invalid_dates_csv_copy",
+            &[],
+            control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![vec![
+            Value::Text("2024-02-31".into()),
+            Value::Text("2024-02-31 12:34:56".into()),
+            Value::Text("20240231".into()),
+            Value::Text("20240231123456".into()),
+        ]]
+    );
+}
