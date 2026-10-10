@@ -57,12 +57,13 @@ consumer tier when the ignored MySQL approval-router test hit
 Forgejo run 135 passed all 28 jobs on `0a72980e`; the PR merged as
 `217e3dc7`.
 
-PostgreSQL deep enum-domain parameter inference now also compares COALESCE and
-CASE against native literal inference under a first-position same-named shadow
-enum in `search_path`. At depths 63 and 64, text, literal `NULL`, empty text
-and SQL NULL preserve the expected parameter, expression and column types
-(`value_contract_deep_enum_scalar_contexts_resolve_under_shadowed_search_path`).
-The focused PostgreSQL 16 Docker test passed 1/1; see the [case evidence](evidence/postgres-deep-enum-shadowed-search-path-2026-10-10/manifest.json).
+PostgreSQL deep enum-domain parameter inference compares COALESCE, CASE,
+GREATEST and LEAST against native literal inference at depths 63 and 64, with
+the parameter on either side of GREATEST/LEAST. Text, literal `NULL`, empty
+text and SQL NULL preserve the expected parameter, expression and column types
+with both the regular and first-position shadowed `search_path` variants. The
+two focused PostgreSQL 16 Docker tests passed; see the [initial case evidence](evidence/postgres-deep-enum-shadowed-search-path-2026-10-10/manifest.json)
+and [expanded context evidence](evidence/postgres-deep-enum-scalar-contexts-2026-10-10/manifest.json).
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
