@@ -1,9 +1,12 @@
 # Older TablePro app-release inventory
 
+Companion to [review and reproduction packets](upstream-older-releases-review-2026-10-03.md).
+Keep release-note failure/screen tables here; open Linux work stays in the
+[ledger](../known-issues.md).
+
 Retrieved 2026-10-03 from the paginated GitHub releases API.
 672 records; 128 exact app tags, v0.1.0 through v0.77.0. Plugin tags are excluded.
 
-[Review and reproduction packets](upstream-older-releases-review-2026-10-03.md).
 [Machine-readable snapshot](../evidence/architecture-review-2026-10-03/older-release-manifest.json).
 
 Every row is a release-note screen, not a full source-diff review. Bullet counts are
