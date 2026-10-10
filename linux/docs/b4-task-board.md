@@ -11,15 +11,18 @@ execution and installed acceptance are separate states.
 
 ## Current Linux-tip B4 checkpoint (2026-10-10)
 
-`fork/linux` is `8414041eba9eef573d7daba4c7d49e0f3c738cf4` (2026-10-10); its
-latest product-code tip is `d4d26c8`, followed by CI and validation changes.
-PR #458 computes `Effects` alongside legacy facts; PR #459 adds read-only
-engine enforcement and is merged. PR #460 implements migration step 2 (S8)
-and PR #463 implements DuckDB read-only selected-file restrictions; both are
-open. PR #461 is merged and keeps read-scoped explain plans redacted. PR #475
-adds the B4-11 `MRG_MyISAM` rollback case. Local verification and current
-acceptance boundaries are recorded in the rows below; none of these local
-runs establishes the Forgejo gate or frozen-candidate/package acceptance.
+`fork/linux` is `e65030d9505f7b8ac58601fd883986a041dd25b8` (2026-10-10).
+The latest application-code commit is `79d9e51` (#481); the current branch tip
+also includes the packaging change in #483. PR #458 computes `Effects`
+alongside legacy facts, and PR #459 adds engine read-only enforcement; both are
+merged. PR #460 implements migration step 2 (S8) and is merged. PR #463
+implements DuckDB read-only selected-file restrictions and remains open. PR
+#461 keeps read-scoped explain plans redacted, and PR #475 adds the B4-11
+`MRG_MyISAM` rollback case; both are merged. PR #480 implements migration step
+3 (joined verdicts for S6/S7) and remains open. Migration step 4, removing the
+legacy facts and duplicate walkers, remains. Exact local verification and
+acceptance boundaries are recorded below; local runs do not establish Forgejo
+gate or frozen-candidate/package acceptance.
 
 ## AUD-9 query-plan masking regression (2026-10-10)
 
@@ -29,8 +32,8 @@ The PostgreSQL release fixture reproduced this twice on the post-#456 source;
 the pre-#456 parent passed the same fixture. Merged PR #461 keeps plan output
 masked for read-scoped agents and aligns the tool description and release test
 with that behavior, because a plan may contain server-generated predicates.
-The policy suite passed 216 tests with 4 Docker-only tests ignored. The current
-Linux code tip `d4d26c8` was rechecked on 2026-10-10: system OpenSSH 1/1, mTLS
+The policy suite passed 216 tests with 4 Docker-only tests ignored. Code tip
+`d4d26c8` was rechecked on 2026-10-10: system OpenSSH 1/1, mTLS
 3/3, PostgreSQL release integration 59/59 (including plan denial and both
 `EXPLAIN ANALYZE` denial checks), and seven SSH/mTLS GTK scenarios passed. See
 the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
@@ -63,13 +66,13 @@ distribution-package or native Wayland acceptance.
 
 | Work | Required evidence on the next candidate | Current boundary |
 | --- | --- | --- |
-| B4-7, B4-16 | Complete package-installed/native Wayland trust and reconnect acceptance | Exact current Linux tip `83674cf6` passed all seven PostgreSQL SSH/mTLS GTK scenarios, including unknown-host decline audit, setup-failure audit, multi-hop trust, changed-key refusal and tunnel-loss retirement/reconnect. Candidate, package-installed and native Wayland acceptance remain open. See [current-tip release evidence](evidence/b4-current-postgres-release-2026-10-10/manifest.json) |
-| B4-9 | Complete package-installed/native Wayland route/auth/TLS acceptance | Exact current Linux tip `83674cf6` passed the PostgreSQL release layer: 1 system OpenSSH test, 3 mTLS tests, 59 release integration tests and all seven SSH/mTLS GTK scenarios. Frozen-candidate, package-installed and native Wayland acceptance remain open; the earlier MongoDB refusal cause remains undetermined. See [current-tip release evidence](evidence/b4-current-postgres-release-2026-10-10/manifest.json), [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
+| B4-7, B4-16 | Complete package-installed/native Wayland trust and reconnect acceptance | At exact source `83674cf6`, all seven PostgreSQL SSH/mTLS GTK scenarios passed, including unknown-host decline audit, setup-failure audit, multi-hop trust, changed-key refusal and tunnel-loss retirement/reconnect. Candidate, package-installed and native Wayland acceptance remain open. See [release evidence](evidence/b4-current-postgres-release-2026-10-10/manifest.json) |
+| B4-9 | Complete package-installed/native Wayland route/auth/TLS acceptance | At exact source `83674cf6`, the PostgreSQL release layer passed: 1 system OpenSSH test, 3 mTLS tests, 59 release integration tests and all seven SSH/mTLS GTK scenarios. Frozen-candidate, package-installed and native Wayland acceptance remain open; the earlier MongoDB refusal cause remains undetermined. See [release evidence](evidence/b4-current-postgres-release-2026-10-10/manifest.json), [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | B4-22 | Complete package-installed/native Wayland bundle audit acceptance | On exact source `102ef480`, hosted installed GTK safety passed 53/53 scenarios, including sanitized export/import audits, encrypted credential round-trip and cross-profile import. Debian package lifecycle passed and the installed package's MySQL approval scenario passed on `4bcec064`; package-installed bundle flow and native Wayland remain open. See [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | B4-12 | ~~PostgreSQL rollback-failure acceptance on the selected frozen candidate~~ | Hosted candidate and local current-product-source (`fc180933`) backend-termination selectors passed. The scenario confirms `TransactionRollbackFailed`, absent transactional rows and persistent identity/trigger-sequence advancement. See [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [local linux-tip evidence](evidence/b4-rollback-linux-tip-2026-10-09/manifest.json) |
 | B4-11 | Extend failed-batch tests to optional/vendor MySQL-family engines and broader side-effect patterns | PR #475 adds `MRG_MyISAM` write-through cases for both MySQL and MariaDB. The serialized `mysql_atomic::` selector passed 20/20 locally on branch commit `f8dfee6`, based on then-current `fork/linux` commit `d241ce69d`; the [2026-10-10 run manifest](evidence/mysql-atomic-linux-f8dfee6-2026-10-10/manifest.json) records source hashes and result. Existing coverage includes MySQL/MariaDB advisory locks, `LAST_INSERT_ID()` on the pinned session, trigger session variables, BLACKHOLE, ARCHIVE, CSV, MyISAM, MEMORY, direct/update/delete effects and auto-increment allocation. Optional/vendor engines and other side-effect classes remain open; frozen-candidate, Forgejo, package-installed and native acceptance are separate. Earlier candidate evidence remains in the [hosted acceptance manifest](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) |
-| B4-17 | Complete package-installed/native Wayland trust flow | Exact current Linux tip `83674cf6` passed 1 system OpenSSH test, 3 mTLS tests, 59 PostgreSQL release integration tests and all seven GTK trust scenarios, including multi-hop trust, second-hop decline, changed-key refusal and tunnel-loss recovery. This was a per-user source build under Xvfb/X11; frozen-candidate, package-installed multi-hop trust and native Wayland acceptance remain open. See [current-tip release evidence](evidence/b4-current-postgres-release-2026-10-10/manifest.json), [local Arch Wayland evidence](evidence/b4-arch-package-wayland-2026-10-09/manifest.json), [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json), [native SSH evidence](evidence/b4-ssh-native-current-2026-10-09/manifest.json), and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
-| B4-21 | Preserve current Samba Kerberos+VerifyFull proof, then perform Windows AD interoperability | Exact current Linux tip `e208eb1b` passed both Samba AD Kerberos selectors with verified TLS. Windows AD interoperability and package-installed Kerberos remain open. See [current-tip Kerberos evidence](evidence/b4-mssql-kerberos-linux-tip-2026-10-10/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
+| B4-17 | Complete package-installed/native Wayland trust flow | At exact source `83674cf6`, 1 system OpenSSH test, 3 mTLS tests, 59 PostgreSQL release integration tests and all seven GTK trust scenarios passed, including multi-hop trust, second-hop decline, changed-key refusal and tunnel-loss recovery. This was a per-user source build under Xvfb/X11; frozen-candidate, package-installed multi-hop trust and native Wayland acceptance remain open. See [release evidence](evidence/b4-current-postgres-release-2026-10-10/manifest.json), [local Arch Wayland evidence](evidence/b4-arch-package-wayland-2026-10-09/manifest.json), [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json), [native SSH evidence](evidence/b4-ssh-native-current-2026-10-09/manifest.json), and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
+| B4-21 | Preserve Samba Kerberos+VerifyFull proof, then perform Windows AD interoperability | At exact source `e208eb1b`, both Samba AD Kerberos selectors passed with verified TLS. Windows AD interoperability and package-installed Kerberos remain open. See [Kerberos evidence](evidence/b4-mssql-kerberos-linux-tip-2026-10-10/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | Proposal only; implementation and acceptance are open |
 
 ## Remaining tasks
