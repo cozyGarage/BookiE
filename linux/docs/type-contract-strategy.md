@@ -50,8 +50,11 @@ native storage-class and typed-CSV restore checks. It also covers JSON1
 bytes through typed CSV restore. The JSONB driver and app selectors passed
 locally on SQLite 3.53.4. On commit `db051ced7`,
 `DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh debian:13` also
-passed, including the typed app tests and installed GTK suite; the Forgejo gate
-for the merged branch head has not yet run.
+passed, including the typed app tests and installed GTK suite. Forgejo run 132
+on `da6b85129` passed both JSONB selectors; the overall gate failed in the
+consumer tier when the ignored MySQL approval-router test hit
+`WaitContainer(StartupTimeout)`. That selector passed locally. The current head
+needs a clean Forgejo rerun.
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
