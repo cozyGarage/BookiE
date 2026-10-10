@@ -335,7 +335,11 @@ impl WorkspaceStore {
                 }
             },
             || {
-                let _guard = self.inner.file_lock.lock().unwrap_or_else(|error| error.into_inner());
+                let _guard = self
+                    .inner
+                    .file_lock
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 load_locked()
             },
         )
@@ -345,7 +349,7 @@ impl WorkspaceStore {
         self.inner
             .memory
             .lock()
-            .unwrap_or_else(|error| error.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .cache
             .get(&id)
             .cloned()
@@ -360,12 +364,20 @@ impl WorkspaceStore {
 
     pub fn forget_connection(&self, id: Uuid) {
         {
-            let mut memory = self.inner.memory.lock().unwrap_or_else(|error| error.into_inner());
+            let mut memory = self
+                .inner
+                .memory
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             memory.cache.remove(&id);
             memory.saved_at.remove(&id);
         }
         {
-            let _guard = self.inner.file_lock.lock().unwrap_or_else(|error| error.into_inner());
+            let _guard = self
+                .inner
+                .file_lock
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             match load_locked() {
                 Ok(mut state) => {
                     if state.connections.remove(&id.to_string()).is_some()
@@ -393,14 +405,14 @@ impl WorkspaceStore {
             .writer
             .queue
             .lock()
-            .unwrap_or_else(|error| error.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .flush(sender);
         if !wake_writer(&self.inner.writer) {
             self.inner
                 .writer
                 .queue
                 .lock()
-                .unwrap_or_else(|error| error.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .fail_flushes(WorkspaceFlushError::WriterUnavailable);
         }
         receiver
@@ -419,10 +431,10 @@ fn prefetch_connections_coordinated(
     flush: impl FnOnce(),
     load: impl FnOnce() -> Result<WorkspaceState, WorkspaceFlushError>,
 ) -> Result<(), WorkspaceFlushError> {
-    let started = memory.lock().unwrap_or_else(|error| error.into_inner()).clock;
+    let started = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clock;
     flush();
     let state = load()?;
-    let mut memory = memory.lock().unwrap_or_else(|error| error.into_inner());
+    let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for id in ids {
         if memory.saved_at.get(id).is_some_and(|saved| *saved > started) {
             continue;
@@ -440,12 +452,15 @@ fn save_connection_coordinated(
     id: Uuid,
     state: ConnectionWorkspaceState,
 ) {
-    let mut memory = memory.lock().unwrap_or_else(|error| error.into_inner());
+    let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     memory.clock += 1;
     let clock = memory.clock;
     memory.saved_at.insert(id, clock);
     memory.cache.insert(id, Some(state.clone()));
-    queue.lock().unwrap_or_else(|error| error.into_inner()).save(id, state);
+    queue
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .save(id, state);
 }
 
 fn wake_writer(writer: &WorkspaceWriter) -> bool {
@@ -458,13 +473,16 @@ fn wake_writer(writer: &WorkspaceWriter) -> bool {
 
 fn run_writer(receiver: mpsc::Receiver<()>, queue: Arc<Mutex<WorkspaceQueue>>, file_lock: Arc<Mutex<()>>) {
     while receiver.recv().is_ok() {
-        let pending = queue.lock().unwrap_or_else(|error| error.into_inner()).take_pending();
+        let pending = queue
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take_pending();
         if pending.is_empty() {
             continue;
         }
         let attempted_sequence = pending.iter().map(|(_, entry)| entry.sequence).max().unwrap_or(0);
         let result = {
-            let _guard = file_lock.lock().unwrap_or_else(|error| error.into_inner());
+            let _guard = file_lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             load_locked().and_then(|mut state| {
                 for (id, entry) in &pending {
                     state.connections.insert(id.to_string(), entry.state.clone());
@@ -472,7 +490,7 @@ fn run_writer(receiver: mpsc::Receiver<()>, queue: Arc<Mutex<WorkspaceQueue>>, f
                 save_locked(&state)
             })
         };
-        let mut queue = queue.lock().unwrap_or_else(|error| error.into_inner());
+        let mut queue = queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if result.is_err() {
             queue.restore_pending(pending);
         }

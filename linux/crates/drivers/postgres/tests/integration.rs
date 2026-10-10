@@ -898,7 +898,8 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
     // A single undecodable cell degrades to `Value::Undecodable` instead of
     // aborting the whole result set (or silently becoming NULL): the rest
     // of the row, and other rows in the same result, still come back.
-    for sql in ["SELECT ARRAY[int4range(1, 3)]"] {
+    {
+        let sql = "SELECT ARRAY[int4range(1, 3)]";
         let result = conn.query(sql).await.unwrap_or_else(|e| panic!("{sql}: {e}"));
         assert!(
             matches!(result.rows[0][0], Value::Undecodable(_)),
@@ -906,7 +907,8 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
             result.rows[0][0]
         );
     }
-    for sql in ["SELECT ARRAY[int4range(1, 3)], 42::int"] {
+    {
+        let sql = "SELECT ARRAY[int4range(1, 3)], 42::int";
         let result = conn.query(sql).await.unwrap();
         assert!(matches!(result.rows[0][0], Value::Undecodable(_)));
         assert_eq!(result.rows[0][1], Value::Int(42));

@@ -248,7 +248,7 @@ impl MssqlConnection {
 
     async fn retire(&self) -> Result<(), DriverError> {
         self.usable.store(false, Ordering::Release);
-        let guard = self.fault.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let guard = self.fault.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(fault) = guard.as_ref() {
             fault.notify_one();
         }
@@ -287,7 +287,7 @@ impl MssqlConnection {
 #[async_trait]
 impl Connection for MssqlConnection {
     fn attach_fault_notify(&self, notify: Arc<Notify>) {
-        *self.fault.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(notify);
+        *self.fault.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(notify);
     }
 
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {

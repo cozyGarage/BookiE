@@ -99,7 +99,7 @@ fn flat_file_reader_fn(path: &str) -> Option<&'static str> {
 fn derive_view_name(path: &str) -> String {
     std::path::Path::new(path)
         .file_stem()
-        .and_then(|s| s.to_str())
+        .and_then(std::ffi::OsStr::to_str)
         .map(sanitize_ident)
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "data".to_string())
