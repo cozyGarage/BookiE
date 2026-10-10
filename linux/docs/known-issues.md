@@ -56,6 +56,12 @@ table in the same commit.
 | UI-11 collapsible object tree | C: already done under ADR 0012; no new work to assign | No edits | No edits; implementation and acceptance are recorded in the UI-11 row below |
 | Forgejo GTK MCP port collision (run 91) | B: B3 owns test-only listener-port isolation and gate verification | `linux/crates/app/src/services/mcp_service.rs`, `linux/crates/app/tests/gtk_safety.py`, `.forgejo/workflows/ci.yml`, `.forgejo/workflows/nightly.yml`, `linux/scripts/ci-mcp-port.py`, `linux/scripts/tests/test_ci_workflow.py` | Review the acceptance scenario; no implementation edits |
 
+### B4/UX handoff, 2026-10-10
+
+| Row | Decision | B4 may edit | UX may edit |
+| --- | --- | --- | --- |
+| AUD-11 malformed MySQL routine expectation | B: the joined policy requires approval when malformed SQL has unknown effects, even when the Local unparseable rule is configured to allow. B4 updates this test-only expectation; app runtime remains UX-owned | `linux/crates/app/src/ui/editor/statement_cursor.rs` (test only) | Review the changed assertion and surrounding app behavior |
+
 For PERF-9/10, preserve ADR 0007 outcomes and native stored-value oracles, and add
 the regression at the lowest applicable tier in the same commit. UX works only
 in `~/Projects/tablepro-ux2`; these file boundaries apply there. Neither lane

@@ -888,9 +888,13 @@ SELECT 2";
             &human_policy,
             None,
         );
-        assert!(matches!(
-            configured_human_decision,
-            tablepro_policy::Decision::Allow { ref rule } if rule == "unparseable_human_allow"
-        ));
+        assert!(
+            matches!(
+                configured_human_decision,
+                tablepro_policy::Decision::RequireApproval { ref rule, .. }
+                    if rule == "human_dangerous_effect_approval"
+            ),
+            "{configured_human_decision:?}"
+        );
     }
 }
