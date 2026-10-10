@@ -41,8 +41,9 @@ SQLite's JSON1 `json_each` runtime values are covered by
 `runtime_typed_values::json_each_values_keep_their_runtime_storage_classes`:
 SQLite `type` and `typeof` oracles distinguish integer, real, text, SQL NULL,
 boolean, object and array rows while the driver preserves primitive values and
-the text fallback for nested JSON. The focused
-`cargo test -p tablepro-driver-sqlite --test runtime_typed_values` passed 5/5.
+the text fallback for nested JSON. The app contract also round-trips the values
+through typed CSV into STRICT `ANY`, checking each restored storage class. The
+focused driver and app tests passed 5/5 and 1/1.
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
