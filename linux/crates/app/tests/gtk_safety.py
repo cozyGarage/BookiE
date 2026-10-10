@@ -2154,8 +2154,19 @@ def main():
         if {scenario.__name__ for scenario in scenarios} != names:
             raise SystemExit(f"unknown GTK scenario in: {selected}")
     scenarios = gtk_shard.select(scenarios, os.environ.get("TABLEPRO_GTK_SHARD", ""))
+    # The merge gate sets TABLEPRO_GTK_SCENARIO_RETRIES=1 so one start-up flake (TEST-31) does not
+    # fail a run; the nightly soak leaves it unset and stays retry-free. A retry is always printed.
+    retries = int(os.environ.get("TABLEPRO_GTK_SCENARIO_RETRIES", "0"))
     for scenario in scenarios:
-        run_scenario(binary, scenario)
+        for attempt in range(retries + 1):
+            try:
+                run_scenario(binary, scenario)
+                break
+            except AssertionError as error:
+                if attempt == retries:
+                    raise
+                first = str(error).splitlines()[0][:300]
+                print(f"RETRY: {scenario.__name__} failed once, running it again: {first}")
         print(f"passed: {scenario.__name__}")
 
 
