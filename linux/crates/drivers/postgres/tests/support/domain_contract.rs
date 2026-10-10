@@ -26,6 +26,8 @@ include!("domain_contract_parts/array_equality.rs");
 
 include!("domain_contract_parts/deep_domains.rs");
 
+include!("domain_contract_parts/deep_enum_array_parameters.rs");
+
 include!("domain_contract_parts/deep_enum_expression_contract.rs");
 
 #[tokio::test]
