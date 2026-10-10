@@ -1,0 +1,28 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running tests/integration.rs (linux/target/debug/deps/integration-fc39c0a96012db67)
+
+running 1 test
+warm_page rows=1000 offset=0 samples_us=[1950, 1957, 1960, 2108, 2165] median_us=1960
+warm_page rows=1000 offset=500 samples_us=[2070, 2097, 2108, 2209, 2395] median_us=2108
+warm_page rows=1000 offset=950 samples_us=[2183, 2201, 2211, 2269, 2276] median_us=2211
+census rows=1000 samples_us=[1327, 1332, 1532, 1566, 1746] median_us=1532
+warm_page rows=10000 offset=0 samples_us=[1940, 1942, 1948, 1961, 2079] median_us=1948
+warm_page rows=10000 offset=5000 samples_us=[3354, 3396, 3547, 3747, 4057] median_us=3547
+warm_page rows=10000 offset=9950 samples_us=[4582, 4731, 4816, 4904, 5195] median_us=4816
+census rows=10000 samples_us=[1302, 1318, 1326, 1361, 1992] median_us=1326
+warm_page rows=100000 offset=0 samples_us=[1996, 2009, 2015, 2056, 2066] median_us=2015
+warm_page rows=100000 offset=50000 samples_us=[14836, 15060, 15148, 15379, 15633] median_us=15148
+keyset_page rows=100000 offset=50000 samples_us=[2157, 2274, 2556, 2580, 2704] median_us=2556
+warm_page rows=100000 offset=99950 samples_us=[27817, 28281, 28411, 28952, 29625] median_us=28411
+keyset_page rows=100000 offset=99950 samples_us=[2093, 2103, 2143, 2533, 2907] median_us=2143
+census rows=100000 samples_us=[1411, 1471, 1475, 1500, 2229] median_us=1475
+warm_page rows=1000000 offset=0 samples_us=[2139, 2164, 2200, 2222, 2256] median_us=2200
+warm_page rows=1000000 offset=500000 samples_us=[135506, 135644, 135780, 135949, 137987] median_us=135780
+keyset_page rows=1000000 offset=500000 samples_us=[2236, 2239, 2380, 2425, 2648] median_us=2380
+warm_page rows=1000000 offset=999950 samples_us=[264837, 265198, 266040, 269645, 270286] median_us=266040
+keyset_page rows=1000000 offset=999950 samples_us=[2238, 2258, 2373, 2402, 2672] median_us=2373
+census rows=1000000 samples_us=[1493, 1555, 1556, 1686, 2756] median_us=1556
+test census_cost::value_contract_mongodb_census_scan_cost_profile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 42 filtered out; finished in 10.67s
+

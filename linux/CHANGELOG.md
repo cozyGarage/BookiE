@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- MongoDB table browsing now uses `_id` cursor seeks for deep pages, avoiding slow collection offsets.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
