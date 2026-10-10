@@ -126,6 +126,102 @@ async fn sqlite_json_each_object_typed_csv_round_trip_preserves_text_keys() {
 }
 
 #[tokio::test]
+async fn sqlite_json_operators_typed_csv_round_trip_preserves_json_and_sql_values() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, json_value ANY, json_class TEXT, sql_value ANY, sql_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+    let result = connection
+        .query(
+            r#"WITH source(document) AS (
+                   VALUES (json('{"integer":42,"real":1.25,"text":"text","numeric_text":"42","null":null,
+                                 "boolean":true,"object":{"x":1},"array":[2],"empty":""}'))
+               )
+               SELECT 1, document -> '$.integer', typeof(document -> '$.integer'),
+                      document ->> '$.integer', typeof(document ->> '$.integer') FROM source
+               UNION ALL
+               SELECT 2, document -> '$.real', typeof(document -> '$.real'),
+                      document ->> '$.real', typeof(document ->> '$.real') FROM source
+               UNION ALL
+               SELECT 3, document -> '$.numeric_text', typeof(document -> '$.numeric_text'),
+                      document ->> '$.numeric_text', typeof(document ->> '$.numeric_text') FROM source
+               UNION ALL
+               SELECT 4, document -> '$.text', typeof(document -> '$.text'),
+                      document ->> '$.text', typeof(document ->> '$.text') FROM source
+               UNION ALL
+               SELECT 5, document -> '$.null', typeof(document -> '$.null'),
+                      document ->> '$.null', typeof(document ->> '$.null') FROM source
+               UNION ALL
+               SELECT 6, document -> '$.boolean', typeof(document -> '$.boolean'),
+                      document ->> '$.boolean', typeof(document ->> '$.boolean') FROM source
+               UNION ALL
+               SELECT 7, document -> '$.object', typeof(document -> '$.object'),
+                      document ->> '$.object', typeof(document ->> '$.object') FROM source
+               UNION ALL
+               SELECT 8, document -> '$.array', typeof(document -> '$.array'),
+                      document ->> '$.array', typeof(document ->> '$.array') FROM source
+               UNION ALL
+               SELECT 9, document -> '$.empty', typeof(document -> '$.empty'),
+                      document ->> '$.empty', typeof(document ->> '$.empty') FROM source
+               ORDER BY 1"#,
+        )
+        .await
+        .unwrap();
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[Some(0), Some(1), Some(2), Some(3), Some(4)],
+    )
+    .await;
+
+    let restored = connection
+        .query(
+            "SELECT typeof(json_value), json_value, json_class, typeof(sql_value), sql_value, sql_class \
+             FROM restored ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let expected = [
+        ("42", Value::Int(42), "integer"),
+        ("1.25", Value::Float(1.25), "real"),
+        ("\"42\"", Value::Text("42".into()), "text"),
+        ("\"text\"", Value::Text("text".into()), "text"),
+        ("null", Value::Null, "null"),
+        ("true", Value::Int(1), "integer"),
+        (r#"{"x":1}"#, Value::Text(r#"{"x":1}"#.into()), "text"),
+        ("[2]", Value::Text("[2]".into()), "text"),
+        ("\"\"", Value::Text(String::new()), "text"),
+    ]
+    .into_iter()
+    .map(|(json_value, sql_value, sql_class)| {
+        vec![
+            Value::Text("text".into()),
+            Value::Text(json_value.into()),
+            Value::Text("text".into()),
+            Value::Text(sql_class.into()),
+            sql_value,
+            Value::Text(sql_class.into()),
+        ]
+    })
+    .collect::<Vec<_>>();
+    assert_eq!(restored.rows, expected);
+}
+
+#[tokio::test]
 async fn sqlite_json_constructors_typed_csv_round_trip_preserves_json_text() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
