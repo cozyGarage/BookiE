@@ -21,7 +21,7 @@ env:
 
 jobs:
   guards:
-    runs-on: debian-host
+    runs-on: any-host
     steps:
       - name: Check out
         env:
@@ -43,7 +43,7 @@ jobs:
           cargo fmt --all -- --check
 
   clippy:
-    runs-on: debian-host
+    runs-on: any-host
     steps:
       - name: Check out
         env:
@@ -58,7 +58,7 @@ jobs:
           cd src/linux && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 
   unit:
-    runs-on: debian-host
+    runs-on: any-host
     steps:
       - name: Check out
         env:
@@ -73,7 +73,7 @@ jobs:
           cd src/linux && cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
 
   sandbox:
-    runs-on: debian-host
+    runs-on: any-host
     steps:
       - name: Check out
         env:
@@ -103,7 +103,7 @@ jobs:
           cd src/linux && bash scripts/test-gtk-widgets.sh
 
   distro-floor:
-    runs-on: debian-host
+    runs-on: any-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name == 'push'
     timeout-minutes: 60
@@ -442,7 +442,7 @@ jobs:
           cd src/linux && ./scripts/test-secret-service.sh
 
   supply-chain:
-    runs-on: debian-host
+    runs-on: any-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name == 'push'
     timeout-minutes: 45
