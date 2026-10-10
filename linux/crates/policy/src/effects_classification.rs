@@ -1,7 +1,8 @@
 use sqlparser::dialect::Dialect;
 use sqlparser::tokenizer::{Token, Tokenizer};
 
-use crate::classify::{StatementClass, StatementFacts, is_administrative_function_name};
+use crate::admin_functions::is_administrative_function_name;
+use crate::classify::{StatementClass, StatementDetails};
 use crate::effects::Effects;
 use sqlparser::ast::{CopySource, CopyTarget, Set, Statement};
 
@@ -18,22 +19,17 @@ pub(crate) fn merge_script_class(current: StatementClass, next: StatementClass) 
     StatementClass::Other
 }
 
-pub(crate) fn truncate_facts<T: ToString>(tables: impl IntoIterator<Item = T>) -> StatementFacts {
-    StatementFacts {
+pub(crate) fn truncate_facts<T: ToString>(tables: impl IntoIterator<Item = T>) -> StatementDetails {
+    StatementDetails {
+        effects: Effects::WRITES_ROWS,
         class: StatementClass::Ddl,
-        writes: true,
         tables: tables.into_iter().map(|table| table.to_string()).collect(),
         has_where: false,
-        contains_ddl: true,
-        contains_mutating_dml: true,
         contains_unscoped_dml: true,
-        contains_unknown_write: false,
-        is_multi_statement: false,
-        parse_error: None,
     }
 }
 
-pub(crate) fn statement_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
+pub(crate) fn statement_effects(stmt: &Statement, facts: &StatementDetails) -> Effects {
     read_effects(stmt, facts)
         .union(write_effects(stmt, facts))
         .union(administrative_effects(stmt, facts))
@@ -42,7 +38,7 @@ pub(crate) fn statement_effects(stmt: &Statement, facts: &StatementFacts) -> Eff
         .union(host_access_effects(stmt))
 }
 
-fn read_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
+fn read_effects(stmt: &Statement, facts: &StatementDetails) -> Effects {
     if statement_reads(stmt, facts) {
         Effects::READS
     } else {
@@ -50,15 +46,17 @@ fn read_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
     }
 }
 
-fn write_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
-    let writes_rows = facts.contains_mutating_dml
+fn write_effects(stmt: &Statement, facts: &StatementDetails) -> Effects {
+    let writes_rows = facts.effects.contains(Effects::WRITES_ROWS)
         || matches!(
             stmt,
-            Statement::Merge { .. } | Statement::Truncate { .. } | Statement::Update { .. } | Statement::Delete(_)
+            Statement::Insert(_) | Statement::Truncate { .. } | Statement::Update { .. } | Statement::Delete(_)
         )
         || matches!(stmt, Statement::Copy { to: false, .. });
-    let writes_schema = facts.contains_ddl && !matches!(stmt, Statement::Truncate { .. });
-    let unknown = facts.contains_unknown_write;
+    let writes_schema = facts.effects.contains(Effects::WRITES_SCHEMA)
+        || (facts.class == StatementClass::Ddl && !matches!(stmt, Statement::Truncate { .. }));
+    let unknown = facts.effects.contains(Effects::UNKNOWN)
+        || (facts.class == StatementClass::Other && !matches!(stmt, Statement::Query(_)));
     let mut effects = Effects::EMPTY;
     if writes_rows {
         effects = effects.union(Effects::WRITES_ROWS);
@@ -72,7 +70,7 @@ fn write_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
     effects
 }
 
-fn administrative_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
+fn administrative_effects(stmt: &Statement, facts: &StatementDetails) -> Effects {
     if facts.class == StatementClass::Administrative
         || matches!(
             stmt,
@@ -94,7 +92,7 @@ fn administrative_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
     }
 }
 
-fn transaction_effects(stmt: &Statement, facts: &StatementFacts) -> Effects {
+fn transaction_effects(stmt: &Statement, facts: &StatementDetails) -> Effects {
     if facts.class == StatementClass::Transaction || matches!(stmt, Statement::Set(Set::SetTransaction { .. })) {
         Effects::TRANSACTION_CONTROL
     } else {
@@ -144,7 +142,7 @@ fn host_access_effects(stmt: &Statement) -> Effects {
     }
 }
 
-fn statement_reads(stmt: &Statement, facts: &StatementFacts) -> bool {
+fn statement_reads(stmt: &Statement, facts: &StatementDetails) -> bool {
     if facts.class == StatementClass::Select || matches!(stmt, Statement::Query(_) | Statement::ExplainTable { .. }) {
         return true;
     }

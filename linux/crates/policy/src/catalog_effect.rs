@@ -19,7 +19,7 @@ pub fn catalog_effect(sql: &str, driver_id: &str) -> CatalogEffect {
         [Statement::StartTransaction { .. }] => CatalogEffect::Begin,
         [Statement::Commit { chain, .. }] => CatalogEffect::Commit { chain: *chain },
         [Statement::Rollback { chain, savepoint: None }] => CatalogEffect::Rollback { chain: *chain },
-        [_] if super::classify(sql, driver_id).contains_ddl => CatalogEffect::Ddl,
+        [_] if super::classify(sql, driver_id).contains_ddl() => CatalogEffect::Ddl,
         _ => CatalogEffect::None,
     }
 }

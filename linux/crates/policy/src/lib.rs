@@ -1,6 +1,7 @@
 //! Statement classification, policy decisions, and the connection guard
 //! that every consumer (GUI, MCP, agentd) must pass through.
 
+mod admin_functions;
 mod approval;
 mod audit;
 mod blast_radius;

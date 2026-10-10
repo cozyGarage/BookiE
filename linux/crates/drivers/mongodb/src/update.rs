@@ -1,7 +1,7 @@
 use mongodb::bson::{Bson, Document, doc};
 use sqlparser::ast::{
     AssignmentTarget, BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
-    ObjectNamePart, Query, Select, SelectItem, SetExpr, Statement, TableFactor, Value as SqlValue,
+    LimitClause, ObjectNamePart, Query, Select, SelectItem, SetExpr, Statement, TableFactor, Value as SqlValue,
 };
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
@@ -24,6 +24,79 @@ pub(super) struct KeyedValueSelect {
     pub(super) collection: String,
     pub(super) column: String,
     pub(super) key: Bson,
+}
+
+pub(super) struct KeysetPageSelect {
+    pub(super) collection: String,
+    pub(super) key: Bson,
+    pub(super) limit: i64,
+}
+
+pub(super) fn parse_keyset_page_select(
+    sql: &str,
+    params: &[Value],
+    database: &str,
+) -> Result<Option<KeysetPageSelect>, DriverError> {
+    let statements = Parser::parse_sql(&GenericDialect {}, sql)
+        .map_err(|error| DriverError::Unsupported(format!("invalid parameterized MongoDB page query: {error}")))?;
+    let [Statement::Query(query)] = statements.as_slice() else {
+        return Ok(None);
+    };
+    let Some((select, limit)) = keyset_page_query(query) else {
+        return Ok(None);
+    };
+    if !matches!(select.projection.as_slice(), [SelectItem::Wildcard(_)]) {
+        return Ok(None);
+    }
+    let relation = &select.from[0];
+    if !relation.joins.is_empty() {
+        return Ok(None);
+    }
+    let Some(collection) = collection_named(&relation.relation, database) else {
+        return Ok(None);
+    };
+    let Some(Expr::BinaryOp {
+        left,
+        op: BinaryOperator::Gt,
+        right,
+    }) = select.selection.as_ref()
+    else {
+        return Ok(None);
+    };
+    if identifier_from_expr(left).as_deref() != Some("_id") || params.len() != 1 {
+        return Ok(None);
+    }
+    let mut index = 0;
+    let key = take_placeholder(right, params, &mut index)?;
+    if index != params.len() {
+        return Ok(None);
+    }
+    Ok(Some(KeysetPageSelect { collection, key, limit }))
+}
+
+fn keyset_page_query(query: &Query) -> Option<(&Select, i64)> {
+    let mut unpaged_query = query.clone();
+    unpaged_query.limit_clause = None;
+    simple_value_select(&unpaged_query)?;
+    let Some(LimitClause::LimitOffset {
+        limit: Some(Expr::Value(limit)),
+        offset: Some(offset),
+        limit_by,
+    }) = &query.limit_clause
+    else {
+        return None;
+    };
+    let SqlValue::Number(limit, _) = &limit.value else {
+        return None;
+    };
+    let limit = limit.parse::<i64>().ok()?;
+    if limit <= 0 || !limit_by.is_empty() || offset.value.to_string() != "0" {
+        return None;
+    }
+    let SetExpr::Select(select) = query.body.as_ref() else {
+        return None;
+    };
+    Some((select, limit))
 }
 
 pub(super) fn parse_keyed_value_select(
@@ -410,6 +483,46 @@ mod value_select_tests {
                     .unwrap()
                     .is_none(),
                 "accepted {sql}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod keyset_page_tests {
+    use super::*;
+
+    #[test]
+    fn keyset_page_binds_one_id_cursor_and_window() {
+        let parsed = parse_keyset_page_select(
+            "SELECT * FROM \"appdb\".\"records\" WHERE \"_id\" > ? LIMIT 50 OFFSET 0",
+            &[Value::Text("last".into())],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(parsed.collection, "records");
+        assert_eq!(parsed.key, Bson::String("last".into()));
+        assert_eq!(parsed.limit, 50);
+    }
+
+    #[test]
+    fn keyset_page_refuses_other_predicates_projection_and_windows() {
+        for sql in [
+            "SELECT * FROM records WHERE _id >= ? LIMIT 50 OFFSET 0",
+            "SELECT * FROM records WHERE _id > ? OR _id = ? LIMIT 50 OFFSET 0",
+            "SELECT * FROM records JOIN archive ON true WHERE _id > ? LIMIT 50 OFFSET 0",
+            "SELECT * FROM records WHERE value > ? LIMIT 50 OFFSET 0",
+            "SELECT value FROM records WHERE _id > ? LIMIT 50 OFFSET 0",
+            "SELECT * FROM records WHERE _id > ? LIMIT 0 OFFSET 0",
+            "SELECT * FROM records WHERE _id > ? LIMIT 50 OFFSET 1",
+            "SELECT * FROM records WHERE _id > ? ORDER BY value LIMIT 50 OFFSET 0",
+        ] {
+            assert!(
+                parse_keyset_page_select(sql, &[Value::Int(1)], "appdb")
+                    .unwrap()
+                    .is_none()
             );
         }
     }

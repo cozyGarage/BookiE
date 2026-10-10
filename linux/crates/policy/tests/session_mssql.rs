@@ -88,7 +88,7 @@ async fn sql_server_batches_with_mutations_are_classified_and_denied_before_disp
     for &(sql, expected_class) in &cases {
         let facts = classify(sql, "mssql");
         assert_eq!(facts.class, expected_class, "classification for {sql}");
-        assert!(facts.writes, "batch must require write capability: {sql}");
+        assert!(facts.writes(), "batch must require write capability: {sql}");
         assert!(
             facts.is_multi_statement || sql.starts_with("MERGE"),
             "batch flag for {sql}"

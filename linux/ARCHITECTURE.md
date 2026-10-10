@@ -1,8 +1,23 @@
 # Architecture
 
-BookiE is a Linux-only Rust workspace rooted in `linux/`, forked from TablePro. GTK4 and Relm4 provide the desktop UI. Domain, policy, storage, SSH, MCP, and database drivers are separate crates so they can be tested without starting the application.
+BookiE is a Linux-only native database client. The Rust 1.98 workspace lives under
+`linux/`. The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Domain, policy,
+storage, SSH, transport, MCP and database drivers are separate crates so they can
+be tested without starting the application.
 
-The architecture description below reflects the current `linux` branch. The [cross-session consistency review](docs/archive/architecture-consistency-review-2026-10-03.md) is a dated source snapshot, useful for its document authority, evidence limits and then-open risks. Accepted [decisions](docs/decisions/README.md) constrain implementation; the [active sprint](docs/bookie-0.2-sprint.md) owns delivery sequencing and current acceptance.
+The rename from TablePro covers the display name, installed binaries
+(`bookie`, `bookie-agentd`) and branding only. Cargo crate names stay
+`tablepro-*`. App ID, XDG config and data paths, keyring schema, UUIDs, audit
+format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Meson
+installs `tablepro` and `tablepro-agentd` as symlinks to the BookiE binaries.
+Check the [active sprint](docs/bookie-0.2-sprint.md) before renaming any stable
+identifier.
+
+This page matches the current `linux` tip manifests. The
+[cross-session consistency review](docs/archive/architecture-consistency-review-2026-10-03.md)
+is a dated source snapshot. Accepted [decisions](docs/decisions/README.md)
+constrain implementation; the sprint owns delivery sequencing and acceptance.
+Contributor rules live in [AGENTS.md](../AGENTS.md).
 
 ## Workspace layout
 
@@ -10,32 +25,60 @@ The architecture description below reflects the current `linux` branch. The [cro
 linux/
 ├── Cargo.toml
 ├── crates/
-│   ├── app/                 GTK4 and Relm4 application binary
-│   ├── agentd/              headless MCP daemon
-│   ├── core/                shared domain types and driver traits
-│   ├── policy/              SQL classification, approval, masking, and audit rules
-│   ├── mcp/                 MCP transport, tokens, allowlists, and rate limits
-│   ├── storage/             connections, secrets, query history, and audit journal
-│   ├── transport/           saved connection assembly and shared route ownership
+│   ├── app/                 GTK composition root (crate binary tablepro-app → bookie)
+│   ├── agentd/              headless MCP composition root (→ bookie-agentd)
+│   ├── core/                domain types, driver traits, results, registry
+│   ├── policy/              classify, rules, approval, masking, blast radius, audit
+│   ├── mcp/                 auth, scopes, connection allowlists, rate limits, tools
+│   ├── storage/             connections, Secret Service, history, audit journal
+│   ├── transport/           driver options, SSH chain, tunnel, TLS service identity
+│   ├── ssh/                 tunnels via russh or system OpenSSH
 │   ├── driver-tls-tests/    test-only cross-driver certificate fixtures
-│   ├── ssh/                 SSH tunnels and jump chains
-│   ├── release-tests/       deterministic release checks against the PostgreSQL fixture
-│   └── drivers/             one crate per database engine
+│   ├── release-tests/       PostgreSQL release-fixture checks
+│   └── drivers/             one static crate per engine (no app dependency)
 ├── tests/fixtures/          container fixtures for release checks
 ├── packaging/               Arch and Debian GitHub Release files
 ├── flatpak/                 GNOME 50 packaging and CI; publication unqualified
 └── scripts/                 local checks, integration tests, and package helpers
 ```
 
-The workspace currently has these driver crates: PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse, Redis, MongoDB, and DuckDB.
+Workspace driver crates: PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse,
+Redis, MongoDB and DuckDB. `crates/drivers/shared/` holds shared test helpers,
+not a workspace member. Dependencies point toward `core`. Domain and driver
+crates never import GTK or Relm4.
 
 ## Dependency direction
 
 `tablepro-core` defines shared connection options, values, errors, operation control, and driver traits. It does not depend on another workspace crate.
 
-Driver crates implement the core traits. They do not depend on GTK. SQLx backs PostgreSQL, MySQL, and SQLite; Tiberius backs SQL Server, while the remaining engines use their own crates. `rust_decimal` is the shared decimal carrier, with exactness established per engine and consumer under [ADR 0007](docs/decisions/0007-type-and-value-preservation.md). `tablepro-policy` applies authorization and audit rules around core connections. `tablepro-storage` owns saved connections, Secret Service access, query history, and the audit journal; it depends on core, policy audit types, and SSH configuration types. `tablepro-transport` depends on core, SSH and storage to assemble saved credentials and establish routes. `tablepro-mcp` combines core, policy, and storage behavior for MCP clients.
+Driver crates implement the core traits. They do not depend on GTK. SQLx backs PostgreSQL, MySQL, and SQLite; Tiberius backs SQL Server, while the remaining engines use their own crates. `rust_decimal` is the shared decimal carrier, with exactness established per engine and consumer under [ADR 0007](docs/decisions/0007-type-and-value-preservation.md). `tablepro-policy` depends on `core` only and applies authorization and audit rules around core connections. `tablepro-storage` owns saved connections, Secret Service access, query history, and the audit journal; it depends on core, policy audit types, and SSH configuration types. `tablepro-transport` depends on core, SSH and storage to assemble saved credentials and establish routes for the GUI and `agentd`. `tablepro-mcp` combines core, policy, and storage behavior for MCP clients; it never exposes a raw driver connection.
 
-`tablepro-app` and `tablepro-agentd` are composition roots. They register drivers and assemble policy, storage, transport, and connection services for their process. `tablepro-release-tests` is a test-only consumer that assembles core, policy, SSH, storage, and the PostgreSQL driver against the release fixture.
+`tablepro-app` and `tablepro-agentd` are composition roots. They register drivers and assemble policy, storage, transport, and connection services for their process. `tablepro-release-tests` is a test-only consumer that assembles core, policy, SSH, storage, and the PostgreSQL driver against the release fixture. A new engine is a driver crate implementing the `core` contracts, added to both composition roots, with documented maturity in [adding drivers](docs/adding-drivers.md) and tests against a real engine.
+
+## Data flow
+
+Governed work follows one path whether it starts in the GTK app, an MCP tool or
+`bookie-agentd`:
+
+1. Resolve a saved connection and secrets (`storage`), then assemble dial
+   options, SSH chain and TLS service identity (`transport`).
+2. Open a driver connection and wrap it in `PolicyGuard` before any consumer
+   sees it. MCP and agent code never hold a raw driver handle.
+3. For each statement: classify, evaluate rules, request approval when required,
+   apply masking, execute, write the audit outcome. Preview, transaction, retry
+   and batch paths use the same checks as direct execution.
+4. Return bounded results to the consumer. Late async outcomes must not replace
+   state from a newer connection, query or request (generation or request id).
+
+```mermaid
+flowchart LR
+    Consumer[app / MCP / agentd] --> Transport[transport]
+    Transport --> Guard[PolicyGuard]
+    Guard --> Driver[driver crates]
+    Driver --> Guard
+    Guard --> Consumer
+    Guard --> Audit[audit journal]
+```
 
 ## Transport and service identity
 
@@ -72,18 +115,25 @@ graph TD
 
 Database drivers are linked into the binaries and registered in code. There is no runtime plugin ABI or driver discovery.
 
-## Policy boundaries
+## Policy, MCP and agentd boundaries
 
-MCP authorization and SQL policy answer different questions:
+Three checks are required for MCP. They answer different questions and none
+replaces another:
 
 | Boundary | Responsibility |
 |---|---|
-| MCP token scopes and connection allowlists | Decide which saved connections and MCP tools a caller may access. MCP may ask policy whether a statement needs write capability for that scope check; it does not evaluate rules or write audit records. |
-| `PolicyGuard` | Classify SQL, apply environment rules, request approval, mask results, record audit events, and contain a driver that stops mid-operation |
+| MCP token scopes | Who may call which MCP tools. |
+| Connection allowlists | Which saved connections that token may use. |
+| `PolicyGuard` | What SQL may run: classify, evaluate rules, request approval, mask results, record audit, and contain a driver that stops mid-operation. |
 
-A token scope never bypasses `PolicyGuard`. Policy approval never bypasses a token's connection allowlist. The GTK app and `tablepro-agentd` build guarded connection handles before governed operations run.
+MCP may ask policy whether a statement needs write capability for a scope check;
+it does not evaluate rules or write audit records itself. A missing token, scope,
+allowlist entry or policy decision denies access. A token scope never bypasses
+`PolicyGuard`. Policy approval never bypasses a token's connection allowlist.
+The GTK app and `tablepro-agentd` build guarded connection handles before
+governed operations run.
 
-Writes record an audit intent before driver execution and a terminal outcome afterward. Required audit failures deny governed writes. Recovered unresolved outcomes also keep governed writes disabled until they are handled.
+Writes record an audit intent before driver execution and a terminal outcome afterward. Denied, failed, cancelled and timed-out operations still produce their terminal audit state. Required audit failures deny governed writes; audit failure never opens a path around policy. Recovered unresolved outcomes also keep governed writes disabled until they are handled.
 
 A driver that panics is contained at the guard rather than lost with its task. The guard catches the unwind at every forwarded call and turns it into a `DriverError`: reads become `Internal`, and writes become `OperationOutcomeUnknown`, because a driver that stopped mid-statement cannot tell us whether the server applied it. The surrounding audit path then sees an ordinary error and records the required terminal state, so containment does not create a gap in the journal. The caught panic payload currently reaches `tracing`; it is omitted from the returned error, audit fields and interface. This is an implementation description, not a privacy guarantee: the payload and the default panic hook may expose sensitive data. The [privacy follow-up](docs/archive/architecture-consistency-review-2026-10-03.md#remaining-source-risks) remains open. Keep the unwinding panic strategy required by ADR 0006.
 
@@ -148,7 +198,21 @@ cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D wa
 cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
 ```
 
-CI runs GTK build, widget and soak checks in Debian testing containers for the GNOME 50 library baseline. Flatpak CI uses the GNOME 50 builder image. The Ubuntu 24.04 runner host is not the application's runtime baseline; Ubuntu 24.04/25.10 packages lack the required libraries. Driver integration tests run separately against Docker services.
+GitHub pull requests and pushes to `linux` or `main` run the cheap tier only
+(guards, fmt, Clippy, unit, sandbox, GTK widgets, security, Flatpak when paths
+match, workflow contracts). A green GitHub check is not merge acceptance.
+
+The lab Forgejo runs the merge tier on every branch push: Docker drivers,
+installed GTK, distro floor, packages, driver TLS, the PostgreSQL release
+fixture and DuckDB. Gate with `bash linux/scripts/forgejo-gate.sh <branch>` from
+the repository root. Documentation-only tips (only `*.md` and `linux/docs/`)
+skip the heavy tiers after the doc link and ledger checks pass; see
+[AGENTS.md](../AGENTS.md). Job lists and layer commands live in the
+[validation playbook](docs/validation-playbook.md#ci-tiers).
+
+GTK widget and soak checks use Debian testing containers for the GNOME 50
+library baseline. Flatpak CI uses the GNOME 50 builder image. The Ubuntu 24.04
+runner host is not the application's runtime baseline.
 
 ## Deliberate limits
 

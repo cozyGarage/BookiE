@@ -15,8 +15,8 @@ use crate::audit::{
     AuditApprovalOutcome, AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditPreviewState,
     AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome,
 };
-use crate::blast_radius::count_sql_for_mutation;
-use crate::classify::{StatementClass, StatementFacts, classify, classify_with_effects};
+use crate::blast_radius::BlastRadiusRewrite;
+use crate::classify::{StatementAnalysis, StatementClass, StatementFacts, analyze_statement};
 use crate::config::PolicyConfig;
 use crate::effects::Effects;
 use crate::mask::apply_masking;
@@ -63,7 +63,7 @@ struct PolicyTransaction {
 
 struct Authorization {
     decision: Decision,
-    facts: StatementFacts,
+    analysis: StatementAnalysis,
     approval_outcome: AuditApprovalOutcome,
     preview_state: AuditPreviewState,
 }
@@ -106,53 +106,52 @@ impl PolicyGuard {
         &self.ctx
     }
 
+    fn analyze_statement(&self, sql: &str) -> StatementAnalysis {
+        let patterns = self.ctx.policy.effective_mask_patterns();
+        analyze_statement(sql, &self.ctx.driver_id, &patterns)
+    }
+
     async fn authorize(
         &self,
         sql: &str,
         _is_params_exec: bool,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        let analysis = classify_with_effects(sql, &self.ctx.driver_id);
-        let facts = analysis.facts;
-        if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
-            return self.resolve_authorization(sql, facts, decision, None, control).await;
-        }
-        self.authorize_classified(sql, facts, analysis.effects, control).await
+        self.authorize_analysis(sql, self.analyze_statement(sql), None, control)
+            .await
     }
 
-    async fn authorize_bounded(
+    async fn authorize_analysis(
         &self,
         sql: &str,
+        analysis: StatementAnalysis,
         enforced_rows: Option<u64>,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        let analysis = classify_with_effects(sql, &self.ctx.driver_id);
-        let facts = analysis.facts;
-        if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
-            return self.resolve_authorization(sql, facts, decision, None, control).await;
+        if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &analysis.facts) {
+            return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
-        self.authorize_with_bound(sql, facts, analysis.effects, enforced_rows, control)
-            .await
+        self.authorize_with_bound(sql, analysis, enforced_rows, control).await
     }
 
     async fn authorize_classified(
         &self,
         sql: &str,
-        facts: StatementFacts,
-        effects: Effects,
+        analysis: StatementAnalysis,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
-        self.authorize_with_bound(sql, facts, effects, None, control).await
+        self.authorize_with_bound(sql, analysis, None, control).await
     }
 
     async fn authorize_with_bound(
         &self,
         sql: &str,
-        facts: StatementFacts,
-        effects: Effects,
+        analysis: StatementAnalysis,
         enforced_rows: Option<u64>,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
+        let facts = &analysis.facts;
+        let effects = facts.effects;
         let env_policy = self
             .ctx
             .policy
@@ -160,8 +159,7 @@ impl PolicyGuard {
         if evaluate_categorical(
             &self.ctx.principal,
             self.ctx.environment,
-            &facts,
-            effects,
+            facts,
             self.ctx.read_only,
             &env_policy,
         )
@@ -170,17 +168,16 @@ impl PolicyGuard {
             let joined = evaluate_with_effects(
                 &self.ctx.principal,
                 self.ctx.environment,
-                &facts,
-                effects,
+                facts,
                 self.ctx.read_only,
                 &env_policy,
                 None,
             );
-            return self.resolve_authorization(sql, facts, joined, None, control).await;
+            return self.resolve_authorization(sql, analysis, joined, None, control).await;
         }
 
         self.require_governed_write_available()?;
-        let estimated_rows = if facts.contains_mutating_dml
+        let estimated_rows = if facts.contains_mutating_dml()
             && facts.class != StatementClass::Administrative
             && !effects.contains(Effects::ADMIN)
             && !effects.contains(Effects::UNKNOWN)
@@ -188,7 +185,7 @@ impl PolicyGuard {
         {
             match enforced_rows {
                 Some(rows) => Some(rows),
-                None => self.estimate_blast_radius(sql, &facts, control).await?,
+                None => self.estimate_blast_radius(&analysis, control).await?,
             }
         } else {
             None
@@ -196,27 +193,27 @@ impl PolicyGuard {
         let decision = evaluate_eligible_write(
             &self.ctx.principal,
             self.ctx.environment,
-            &facts,
-            effects,
+            facts,
             &env_policy,
             estimated_rows,
         );
-        self.resolve_authorization(sql, facts, decision, estimated_rows, control)
+        self.resolve_authorization(sql, analysis, decision, estimated_rows, control)
             .await
     }
 
     async fn resolve_authorization(
         &self,
         sql: &str,
-        facts: StatementFacts,
+        analysis: StatementAnalysis,
         decision: Decision,
         estimated_rows: Option<u64>,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
+        let facts = &analysis.facts;
         match decision {
             Decision::Allow { .. } => Ok(Authorization {
                 decision,
-                facts,
+                analysis,
                 approval_outcome: AuditApprovalOutcome::NotRequired,
                 preview_state: AuditPreviewState::NotRequested,
             }),
@@ -224,7 +221,7 @@ impl PolicyGuard {
                 let operation = self.operation(
                     sql,
                     None,
-                    &facts,
+                    facts,
                     &decision,
                     AuditApprovalOutcome::NotRequired,
                     AuditPreviewState::NotRequested,
@@ -276,14 +273,8 @@ impl PolicyGuard {
                     None => AuditPreviewState::Unavailable,
                 };
                 let Some(outcome) = outcome else {
-                    let operation = self.operation(
-                        sql,
-                        None,
-                        &facts,
-                        &decision,
-                        AuditApprovalOutcome::Denied,
-                        preview_state,
-                    );
+                    let operation =
+                        self.operation(sql, None, facts, &decision, AuditApprovalOutcome::Denied, preview_state);
                     let audit_result = self
                         .record_outcome(
                             &operation,
@@ -304,20 +295,14 @@ impl PolicyGuard {
                         decision: Decision::Allow {
                             rule: format!("{rule}:approved"),
                         },
-                        facts,
+                        analysis,
                         approval_outcome: AuditApprovalOutcome::Approved,
                         preview_state,
                     }),
                     ApprovalOutcome::Deny => {
                         let message = format!("approval denied: {reason}");
-                        let operation = self.operation(
-                            sql,
-                            None,
-                            &facts,
-                            &decision,
-                            AuditApprovalOutcome::Denied,
-                            preview_state,
-                        );
+                        let operation =
+                            self.operation(sql, None, facts, &decision, AuditApprovalOutcome::Denied, preview_state);
                         let audit_result = self
                             .record_outcome(
                                 &operation,
@@ -338,33 +323,29 @@ impl PolicyGuard {
         }
     }
 
-    fn enforced_batch_rows(&self, statements: &[(String, Vec<Value>)], expect_one: &[usize]) -> Option<u64> {
+    fn enforced_batch_rows(&self, analysis: &StatementAnalysis, expect_one: &[usize]) -> Option<u64> {
         let mut total = 0u64;
-        for (index, (sql, _)) in statements.iter().enumerate() {
+        for (index, rows) in analysis.known_statement_rows.iter().enumerate() {
             if expect_one.contains(&index) {
                 total += 1;
                 continue;
             }
-            match count_sql_for_mutation(sql, &self.ctx.driver_id)? {
-                crate::blast_radius::BlastRadiusRewrite::Known(rows) => total += rows,
-                crate::blast_radius::BlastRadiusRewrite::CountQuery(_) => return None,
-            }
+            total += (*rows)?;
         }
         Some(total)
     }
 
     async fn estimate_blast_radius(
         &self,
-        sql: &str,
-        facts: &StatementFacts,
+        analysis: &StatementAnalysis,
         control: Option<&OperationControl>,
     ) -> Result<Option<u64>, DriverError> {
-        let rewrite = match count_sql_for_mutation(sql, &self.ctx.driver_id) {
+        let rewrite = match &analysis.blast_radius {
             None => return Ok(None),
-            Some(crate::blast_radius::BlastRadiusRewrite::Known(rows)) => return Ok(Some(rows)),
-            Some(crate::blast_radius::BlastRadiusRewrite::CountQuery(rewrite)) => rewrite,
+            Some(BlastRadiusRewrite::Known(rows)) => return Ok(Some(*rows)),
+            Some(BlastRadiusRewrite::CountQuery(rewrite)) => rewrite,
         };
-        let operation = self.metadata_operation("BLAST RADIUS ESTIMATE", facts.tables.clone());
+        let operation = self.metadata_operation("BLAST RADIUS ESTIMATE", analysis.facts.tables.clone());
         self.record_intent(&operation).await.map_err(|error| {
             DriverError::PolicyDenied(format!(
                 "operation denied because audit intent could not be persisted: {error}"
@@ -442,7 +423,7 @@ impl PolicyGuard {
             operation_id: Uuid::new_v4(),
             batch_id,
             sql,
-            class: AuditOperationClass::from_statement(facts.class, facts.writes),
+            class: AuditOperationClass::from_statement(facts.class, facts.writes()),
             targets: facts.tables.clone(),
             decision_rule: decision.rule_name().to_string(),
             approval_outcome,
@@ -643,24 +624,33 @@ impl PolicyGuard {
     }
 
     fn mask_result(&self, result: QueryResult) -> QueryResult {
-        self.mask_result_for_sql(None, result)
+        self.mask_result_for_analysis(None, result)
     }
 
     /// Like `mask_result`, but when `sql` is available it also consults the
     /// parsed statement's projection so an alias or wrapping expression
     /// cannot hide a sensitive source column from the result-set-name match.
-    fn mask_result_for_sql(&self, sql: Option<&str>, result: QueryResult) -> QueryResult {
+    fn mask_result_for_analysis(&self, analysis: Option<&StatementAnalysis>, result: QueryResult) -> QueryResult {
         if !self.should_mask() {
             return result;
         }
         let patterns = self.ctx.policy.effective_mask_patterns();
-        let sensitive_positions = sql.map(|sql| {
-            crate::sensitive_projection::sensitive_projection(sql, &self.ctx.driver_id, &patterns, result.columns.len())
+        let sensitive_positions = analysis.map(|analysis| {
+            analysis
+                .sensitive_positions
+                .as_ref()
+                .filter(|positions| positions.len() == result.columns.len())
+                .cloned()
+                .unwrap_or_else(|| vec![true; result.columns.len()])
         });
         apply_masking(result, &patterns, sensitive_positions.as_deref())
     }
 
-    fn mask_result_batch_for_sql(&self, sql: &str, batch: QueryResultBatch) -> QueryResultBatch {
+    fn mask_result_batch_for_analysis(
+        &self,
+        analysis: &StatementAnalysis,
+        batch: QueryResultBatch,
+    ) -> QueryResultBatch {
         if !self.should_mask() {
             return batch;
         }
@@ -668,7 +658,7 @@ impl PolicyGuard {
         let result_sets = batch
             .result_sets
             .into_iter()
-            .map(|result_set| self.mask_result_for_sql(Some(sql), result_set))
+            .map(|result_set| self.mask_result_for_analysis(Some(analysis), result_set))
             .collect();
         QueryResultBatch { result_sets, truncated }
     }

@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-03",
+  "case": "Upstream U1 SQL Server companion logs (historical)",
+  "role": "historical_companion",
+  "archive_narrative": "linux/docs/archive/upstream-u1-sql-server-2026-10-03.md",
+  "note": "Stub added 2026-10-10 so this directory is not an orphan under the docs map. Not a current pass claim.",
+  "artifacts": [
+    "validation.json",
+    "native-before.txt",
+    "native-after.txt"
+  ],
+  "status": "historical; keep for archive and architecture-review inventory links"
+}

@@ -240,7 +240,7 @@ SELECT 2";
 
         let facts = tablepro_policy::classify(sql, "postgres");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
     }
 
     #[test]
@@ -272,7 +272,7 @@ SELECT 2";
 
         let facts = tablepro_policy::classify(sql, "postgres");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
         let decision = tablepro_policy::evaluate(
             &tablepro_policy::Principal::Agent {
                 token: "test".into(),
@@ -322,7 +322,7 @@ SELECT 2";
 
         let facts = tablepro_policy::classify(sql, "sqlite");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
         let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
         let decision = tablepro_policy::evaluate(
             &tablepro_policy::Principal::Agent {
@@ -362,7 +362,7 @@ SELECT 2";
 
         let facts = tablepro_policy::classify(sql, "clickhouse");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
         let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
         let decision = tablepro_policy::evaluate(
             &tablepro_policy::Principal::Agent {
@@ -413,7 +413,7 @@ SELECT 2";
 
         let facts = tablepro_policy::classify(sql, "duckdb");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
         let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
         let decision = tablepro_policy::evaluate(
             &tablepro_policy::Principal::Agent {
@@ -452,7 +452,7 @@ SELECT 2";
 
         let facts = tablepro_policy::classify(sql, "mssql");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
         let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
         let decision = tablepro_policy::evaluate(
             &tablepro_policy::Principal::Agent {
@@ -532,7 +532,7 @@ SELECT 2";
         assert_eq!(parameters.names, ["id"]);
         let facts = tablepro_policy::classify(&parameters.sql, "mssql");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
     }
 
     #[test]
@@ -568,7 +568,7 @@ SELECT 2";
             })
             .collect::<Vec<_>>();
         assert_eq!(facts[0].class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts[0].writes);
+        assert!(facts[0].writes());
         assert_eq!(facts[1].class, tablepro_policy::StatementClass::Select);
         let decision = tablepro_policy::evaluate(
             &tablepro_policy::Principal::Agent {
@@ -676,7 +676,7 @@ SELECT 2";
 
         let facts = tablepro_policy::classify(&reformatted_script.statements[0], "mysql");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
         assert_eq!(
             tablepro_policy::classify(&reformatted_script.statements[1], "mysql").class,
             tablepro_policy::StatementClass::Select
@@ -844,7 +844,7 @@ SELECT 2";
         assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
         let facts = tablepro_policy::classify(sql, "mysql");
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
-        assert!(facts.writes);
+        assert!(facts.writes());
         let decision = tablepro_policy::evaluate(
             &tablepro_policy::Principal::Agent {
                 token: "test".into(),

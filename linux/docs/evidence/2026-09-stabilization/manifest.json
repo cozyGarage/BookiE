@@ -1,0 +1,13 @@
+{
+  "date": "2026-09",
+  "case": "September stabilization companion samples (historical)",
+  "role": "historical_companion",
+  "archive_narrative": "linux/docs/archive/stabilization-2026-09.md",
+  "note": "Stub added 2026-10-10 so this directory is not an orphan under the docs map. Not a current pass claim.",
+  "artifacts": [
+    "validation.json",
+    "postgres-before.jsonl",
+    "postgres-after.jsonl"
+  ],
+  "status": "historical; keep for archive and performance-history links"
+}

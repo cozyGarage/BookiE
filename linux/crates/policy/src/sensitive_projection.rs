@@ -1,22 +1,28 @@
 use sqlparser::ast::{Expr, Query, SelectItem, SetExpr, Statement, TableFactor};
+#[cfg(test)]
 use sqlparser::parser::Parser;
 
+#[cfg(test)]
 use crate::classify::dialect_for;
 use crate::mask::column_is_sensitive;
 
+#[cfg(test)]
 pub fn sensitive_projection(sql: &str, driver_id: &str, patterns: &[String], output_columns: usize) -> Vec<bool> {
     let dialect = dialect_for(driver_id);
     let trimmed = sql.trim();
-    let statements = Parser::parse_sql(dialect.as_ref(), trimmed);
-    match statements {
-        Ok(statements) => match statements.as_slice() {
-            [Statement::Query(query)] => select_projection_sensitivity(query, patterns)
-                .filter(|positions| positions.len() == output_columns)
-                .unwrap_or_else(|| vec![true; output_columns]),
-            _ => vec![true; output_columns],
-        },
-        Err(_) => vec![true; output_columns],
-    }
+    let Ok(statements) = Parser::parse_sql(dialect.as_ref(), trimmed) else {
+        return vec![true; output_columns];
+    };
+    projection_from_statements(&statements, patterns)
+        .filter(|positions| positions.len() == output_columns)
+        .unwrap_or_else(|| vec![true; output_columns])
+}
+
+pub(crate) fn projection_from_statements(statements: &[Statement], patterns: &[String]) -> Option<Vec<bool>> {
+    let [Statement::Query(query)] = statements else {
+        return None;
+    };
+    select_projection_sensitivity(query, patterns)
 }
 
 fn select_projection_sensitivity(query: &Query, patterns: &[String]) -> Option<Vec<bool>> {

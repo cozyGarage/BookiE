@@ -72,3 +72,61 @@ fn valid_duckdb_zone(zone: &str) -> bool {
         _ => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{duckdb_extended_date, duckdb_extended_timestamptz_nanos};
+
+    #[test]
+    fn extended_dates_accept_far_future_leap_days_plus_years_and_bc_era() {
+        for text in ["1000000-02-29", "+10000-01-01", "0001-01-01 (BC)", "0001-02-29 (BC)"] {
+            assert!(duckdb_extended_date(text), "{text}");
+        }
+    }
+
+    #[test]
+    fn extended_dates_reject_ordinary_years_year_zero_and_invalid_leap_days() {
+        for text in [
+            "2024-02-29",
+            "9999-12-31",
+            "0000-01-01",
+            "1000001-02-29",
+            "1000000-02-30",
+            "1000000-00-01",
+            "1000000-13-01",
+            "ABC-01-01",
+            "1000000-02-29T00:00:00",
+        ] {
+            assert!(!duckdb_extended_date(text), "{text}");
+        }
+    }
+
+    #[test]
+    fn timestamptz_nanos_keep_fractional_seconds_across_zone_forms() {
+        assert_eq!(
+            duckdb_extended_timestamptz_nanos("280000-02-29 12:34:56.123456+05:30"),
+            Some(123_456_000)
+        );
+        assert_eq!(
+            duckdb_extended_timestamptz_nanos("+10000-01-01T12:34:56.123456+00"),
+            Some(123_456_000)
+        );
+        assert_eq!(duckdb_extended_timestamptz_nanos("0001-01-01 (BC) 12:34:56Z"), Some(0));
+        assert_eq!(duckdb_extended_timestamptz_nanos("1000000-01-01 00:00-05"), Some(0));
+    }
+
+    #[test]
+    fn timestamptz_nanos_refuse_invalid_dates_zones_and_clocks() {
+        for text in [
+            "280000-02-29 12:34:56+24:00",
+            "280000-02-29 12:34:56+00:60",
+            "280000-02-29 12:34:56",
+            "280000-02-29 24:00:00+00",
+            "1000001-02-29 12:34:56+00",
+            "2024-01-01 12:34:56+00",
+            "not-a-timestamp",
+        ] {
+            assert_eq!(duckdb_extended_timestamptz_nanos(text), None, "{text}");
+        }
+    }
+}

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- MongoDB table browsing now seeks deep pages in `_id` sort order, including collections with mixed key types.
 - Saved SSH hops now have stable IDs and credential revisions, with separate Secret Service operations for per-hop passwords and key passphrases. Legacy connections-file v1 data loads and migrates to v2 on save; jump-chain editing and per-hop transport use remain disabled until their integration lands.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.
@@ -14,6 +15,7 @@
 - ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
 - DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.
 - MySQL and MariaDB CHAR results now have `PAD_CHAR_TO_FULL_LENGTH` coverage for padding, VARCHAR, empty values and NULL.
+- MySQL and MariaDB CSV imports preserve impossible calendar dates accepted by `ALLOW_INVALID_DATES`.
 - The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
 - Each statement of a script gets a gutter mark after a run: a tick for a statement that returned, a cross for one that failed.
@@ -598,4 +600,5 @@ not current task instructions.
 - **Connections:** [dated connection audit and follow-ups](docs/archive/connections-history.md); current behavior is in [connections](docs/connections.md).
 - **Testing:** [upstream test adoption record](docs/archive/testing-history.md); runnable layers are in [testing](docs/testing.md).
 - **Validation:** [local validation checkpoints](docs/archive/validation-history.md); current commands are in the [validation playbook](docs/validation-playbook.md).
+- **External audit (post-0.2 plan):** [deferred restructuring plan](docs/archive/external-audit-2026-10-06.md) and [client review](docs/archive/external-audit-client-review-2026-10-06.md) (moved from the repository root on 2026-10-10).
 - **BookiE 0.1.1:** retired and superseded by the 0.2 sprint; the earlier release review remains in [September 14 evidence](docs/archive/sprint-2026-09-14.md).
