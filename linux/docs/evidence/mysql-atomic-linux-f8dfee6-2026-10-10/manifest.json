@@ -20,8 +20,8 @@
   "other_validation": {
     "preflight": "passed on the same source tree before commit creation",
     "current_branch_preflight": {
-      "commit": "1d749f7615822f1603538dbb56c778898b7b0dfe",
-      "result": "passed after merging fork/linux 8414041eba9eef573d7daba4c7d49e0f3c738cf4"
+      "commit": "1a0f3fca08f9c9920b739abec0bdf0154ba2149e",
+      "result": "passed after merging fork/linux 8414041eba9eef573d7daba4c7d49e0f3c738cf4 and bb20f7063e3c70fd32530d6278d9ee2bbaa771a8"
     },
     "ignored_test_inventory": "regenerated and check passed",
     "git_diff_check": "passed"
