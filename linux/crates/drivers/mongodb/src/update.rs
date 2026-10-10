@@ -151,12 +151,18 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
             };
             Ok(explicit_null_selector(field))
         }
+        Expr::IsNotNull(inner) => {
+            let Some(field) = identifier_from_expr(inner) else {
+                return Err(browse_filter_error());
+            };
+            Ok(doc! { field: { "$exists": true, "$ne": Bson::Null } })
+        }
         _ => Err(browse_filter_error()),
     }
 }
 
 fn browse_filter_error() -> DriverError {
-    DriverError::Unsupported("MongoDB browse filters support equality and IS NULL predicates".into())
+    DriverError::Unsupported("MongoDB browse filters support equality and null predicates".into())
 }
 
 fn collect_and_predicates<'a>(expr: &'a Expr, predicates: &mut Vec<&'a Expr>) {

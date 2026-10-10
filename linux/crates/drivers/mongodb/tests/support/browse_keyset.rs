@@ -89,6 +89,17 @@ async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
     assert_eq!(nulls.rows[0][2], Value::Json(serde_json::Value::Null));
     assert_eq!(nulls.rows[1][0], Value::Int(3));
     assert_eq!(nulls.rows[1][2], Value::Json(serde_json::Value::Null));
+
+    let present = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"value\" IS NOT NULL LIMIT 2 OFFSET 0",
+            &[],
+        )
+        .await
+        .unwrap();
+    assert_eq!(present.rows.len(), 1);
+    assert_eq!(present.rows[0][0], Value::Int(4));
+    assert_eq!(present.rows[0][2], Value::Json(serde_json::json!("present")));
 }
 
 #[tokio::test]
