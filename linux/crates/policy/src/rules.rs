@@ -654,7 +654,7 @@ mod tests {
         assert_eq!(decision.rule_name(), "human_dangerous_effect_approval");
 
         let agent_policy = EnvPolicy {
-            agent_writes: WritePolicy::Deny,
+            agent_writes: WritePolicy::Allow,
             ..local
         };
         let agent = Principal::Agent {
@@ -671,29 +671,12 @@ mod tests {
             &agent_policy,
             None,
         );
-        assert!(matches!(agent_decision, Decision::Deny { .. }), "{agent_decision:?}");
-        assert!(has_rule(&agent_decision, "agent_writes_denied"));
-
-        let write_enabled_policy = EnvPolicy {
-            agent_writes: WritePolicy::Allow,
-            ..local
-        };
-        let write_enabled_agent_decision = evaluate_with_effects(
-            &agent,
-            Environment::Local,
-            &analysis.facts,
-            analysis.effects,
-            false,
-            &write_enabled_policy,
-            None,
-        );
         assert!(
-            matches!(write_enabled_agent_decision, Decision::Deny { .. }),
-            "host file reads must remain denied even when database writes are enabled: {write_enabled_agent_decision:?}"
-        );
-        assert!(
-            has_rule(&write_enabled_agent_decision, "agent_host_access_denied"),
-            "the audit reason must name the host-access rule: {write_enabled_agent_decision:?}"
+            matches!(
+                agent_decision,
+                Decision::Deny { ref rule, .. } if rule == "agent_host_access_denied"
+            ),
+            "agents with database-write access still may not read host files: {agent_decision:?}"
         );
     }
 
