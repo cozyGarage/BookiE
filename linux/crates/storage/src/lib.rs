@@ -38,6 +38,8 @@ pub use favorites::{
 };
 pub use paths::{config_path, data_path, secret_schema, storage_dir_name};
 pub use secrets::{
-    delete_mcp_token, delete_password, delete_ssh_passphrase, delete_ssh_password, load_mcp_token, load_password,
-    load_ssh_passphrase, load_ssh_password, store_mcp_token, store_password, store_ssh_passphrase, store_ssh_password,
+    SshHopSecretKind, delete_mcp_token, delete_password, delete_ssh_hop_passphrase, delete_ssh_hop_password,
+    delete_ssh_passphrase, delete_ssh_password, load_mcp_token, load_password, load_ssh_hop_passphrase,
+    load_ssh_hop_password, load_ssh_passphrase, load_ssh_password, store_mcp_token, store_password,
+    store_ssh_hop_passphrase, store_ssh_hop_password, store_ssh_passphrase, store_ssh_password,
 };
