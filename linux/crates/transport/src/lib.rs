@@ -563,20 +563,15 @@ pub(crate) async fn resolve_saved_ssh_hop(
 ) -> Result<SshConfig, TransportError> {
     let auth = match &saved.auth {
         _ if saved.agent => SshAuth::Agent,
-        SavedSshAuth::Password if hop_index > 0 => {
-            // The keyring holds one SSH password per connection, not per hop
-            // (storage::secrets keys on connection id and secret kind only),
-            // so a jump hop cannot have its own password. Reusing hop 0's
-            // password here would send it to a different host silently; fail
-            // closed instead.
+        SavedSshAuth::Password if saved.credential_revision == 0 && hop_index > 0 => {
             return Err(jump_hop_password_refused(hop_index));
         }
         SavedSshAuth::Password => SshAuth::Password {
-            password: saved_ssh_password(id).await?,
+            password: saved_ssh_password(id, saved, hop_index).await?,
         },
         SavedSshAuth::PrivateKey { path, has_passphrase } => SshAuth::PrivateKey {
             path: path.clone(),
-            passphrase: saved_ssh_passphrase(id, *has_passphrase).await?,
+            passphrase: saved_ssh_passphrase(id, saved, hop_index, *has_passphrase).await?,
         },
     };
     Ok(SshConfig {
@@ -594,20 +589,41 @@ pub(crate) fn secret_error(context: &str, error: tablepro_storage::StorageError)
     }
 }
 
-async fn saved_ssh_password(id: Uuid) -> Result<SecretString, TransportError> {
-    load_ssh_password(id)
-        .await
-        .map_err(|e| secret_error("load ssh password", e))?
-        .ok_or_else(|| TransportError::Secret("ssh password not in keyring".into()))
+async fn saved_ssh_password(id: Uuid, hop: &SavedSshConfig, hop_index: usize) -> Result<SecretString, TransportError> {
+    let password = if hop.credential_revision == 0 {
+        load_ssh_password(id)
+            .await
+            .map_err(|e| secret_error("load ssh password", e))?
+    } else {
+        tablepro_storage::load_ssh_hop_password(id, hop.hop_id, hop.credential_revision)
+            .await
+            .map_err(|e| secret_error("load ssh hop password", e))?
+    };
+    password.ok_or_else(|| TransportError::Secret(format!("ssh password for hop {hop_index} not in keyring")))
 }
 
-async fn saved_ssh_passphrase(id: Uuid, has_passphrase: bool) -> Result<Option<SecretString>, TransportError> {
+async fn saved_ssh_passphrase(
+    id: Uuid,
+    hop: &SavedSshConfig,
+    hop_index: usize,
+    has_passphrase: bool,
+) -> Result<Option<SecretString>, TransportError> {
     if !has_passphrase {
         return Ok(None);
     }
-    load_ssh_passphrase(id)
+    if hop.credential_revision == 0 {
+        if hop_index > 0 {
+            return Err(TransportError::Secret(format!(
+                "legacy SSH passphrase cannot be assigned to jump hop {hop_index}"
+            )));
+        }
+        return load_ssh_passphrase(id)
+            .await
+            .map_err(|e| secret_error("load ssh passphrase", e));
+    }
+    tablepro_storage::load_ssh_hop_passphrase(id, hop.hop_id, hop.credential_revision)
         .await
-        .map_err(|e| secret_error("load ssh passphrase", e))
+        .map_err(|e| secret_error("load ssh hop passphrase", e))
 }
 
 #[cfg(test)]
@@ -1062,6 +1078,92 @@ mod tests {
         assert!(
             error.to_string().contains("not in keyring"),
             "hop 0 password auth must still reach the keyring lookup: {error}"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+    async fn password_auth_uses_the_secret_bound_to_each_hop() {
+        let connection_id = Uuid::new_v4();
+        let root_secret = Uuid::new_v4().to_string();
+        let jump_secret = Uuid::new_v4().to_string();
+        let root = SavedSshConfig {
+            hop_id: Uuid::new_v4(),
+            credential_revision: 1,
+            auth: SavedSshAuth::Password,
+            jump: Some(Box::new(SavedSshConfig {
+                hop_id: Uuid::new_v4(),
+                credential_revision: 1,
+                auth: SavedSshAuth::Password,
+                ..key_hop("jump.example")
+            })),
+            ..key_hop("root.example")
+        };
+        let hops = root.flatten_hops();
+        tablepro_storage::store_ssh_hop_password(
+            connection_id,
+            hops[0].hop_id,
+            hops[0].credential_revision,
+            &root_secret,
+            "BookiE test root SSH password",
+        )
+        .await
+        .unwrap();
+        tablepro_storage::store_ssh_hop_password(
+            connection_id,
+            hops[1].hop_id,
+            hops[1].credential_revision,
+            &jump_secret,
+            "BookiE test jump SSH password",
+        )
+        .await
+        .unwrap();
+
+        let resolved = resolve_saved_ssh_chain(connection_id, &root).await.unwrap();
+        let secrets = resolved
+            .iter()
+            .map(|hop| match &hop.auth {
+                SshAuth::Password { password } => secrecy::ExposeSecret::expose_secret(password).to_owned(),
+                _ => panic!("expected password auth"),
+            })
+            .collect::<Vec<_>>();
+
+        for hop in hops {
+            tablepro_storage::delete_ssh_hop_password(connection_id, hop.hop_id, hop.credential_revision)
+                .await
+                .unwrap();
+        }
+        assert_eq!(secrets, [root_secret, jump_secret]);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+    async fn legacy_jump_key_passphrase_is_refused_before_keyring_access() {
+        let connection_id = Uuid::new_v4();
+        tablepro_storage::store_ssh_passphrase(connection_id, "root-passphrase", "BookiE test legacy SSH passphrase")
+            .await
+            .unwrap();
+        let bastion = SavedSshConfig {
+            jump: Some(Box::new(SavedSshConfig {
+                auth: SavedSshAuth::PrivateKey {
+                    path: "/unused/jump-key".into(),
+                    has_passphrase: true,
+                },
+                ..key_hop("jump.example")
+            })),
+            ..key_hop("root.example")
+        };
+
+        let error = resolve_saved_ssh_chain(connection_id, &bastion)
+            .await
+            .expect_err("legacy root passphrase must not be reused for a jump key");
+        tablepro_storage::delete_ssh_passphrase(connection_id).await.unwrap();
+
+        let message = error.to_string();
+        assert!(message.contains("hop 1"), "unexpected error: {message}");
+        assert!(
+            !message.contains("keyring"),
+            "must refuse before keyring access: {message}"
         );
     }
 }

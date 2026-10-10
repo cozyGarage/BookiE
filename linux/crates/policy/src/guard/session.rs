@@ -15,15 +15,17 @@ pub(crate) struct PolicySession {
 #[derive(Clone, Copy)]
 struct OpenBatch {
     id: Uuid,
+    read_only: bool,
     wrote: bool,
     uncertain: bool,
     aborted: bool,
 }
 
 impl OpenBatch {
-    fn new() -> Self {
+    fn new(read_only: bool) -> Self {
         Self {
             id: Uuid::new_v4(),
+            read_only,
             wrote: false,
             uncertain: false,
             aborted: false,
@@ -63,6 +65,10 @@ impl Session for PolicySession {
         }
         match transaction_control(sql, &self.guard.ctx.driver_id) {
             Some(TransactionControl::Begin) => self.begin(sql, control).await,
+            Some(TransactionControl::BeginReadOnly) => Err(DriverError::PolicyDenied(
+                "read-only sessions require REPEATABLE READ or SERIALIZABLE isolation".into(),
+            )),
+            Some(TransactionControl::BeginReadOnlySnapshot) => self.begin_read_only(sql, control).await,
             Some(TransactionControl::Commit { chain }) => self.finish(sql, control, Finish::Commit, chain).await,
             Some(TransactionControl::Rollback { chain }) => self.finish(sql, control, Finish::Rollback, chain).await,
             None if hides_transaction_control(sql, &self.guard.ctx.driver_id) => Err(DriverError::PolicyDenied(
@@ -119,8 +125,53 @@ impl PolicySession {
             .await;
         self.note_disconnect(&result);
         if result.is_ok() {
-            self.batch = Some(OpenBatch::new());
+            self.batch = Some(OpenBatch::new(false));
         }
+        result
+    }
+
+    async fn begin_read_only(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+        if self.guard.ctx.driver_id != "postgres" {
+            return Err(DriverError::PolicyDenied(
+                "read-only session transactions are currently supported only by PostgreSQL".into(),
+            ));
+        }
+        if self.batch.is_some() {
+            return Err(DriverError::PolicyDenied(
+                "a transaction is already open on this session; nested BEGIN is refused".into(),
+            ));
+        }
+        let analysis = self.guard.analyze_statement(sql);
+        let authorization = Authorization {
+            decision: Decision::Allow {
+                rule: "read_only_snapshot".into(),
+            },
+            analysis,
+            approval_outcome: AuditApprovalOutcome::NotRequired,
+            preview_state: AuditPreviewState::NotRequested,
+        };
+        let operation = self.guard.operation(
+            sql,
+            None,
+            &authorization.analysis.facts,
+            &authorization.decision,
+            authorization.approval_outcome,
+            authorization.preview_state,
+        );
+        self.guard.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .guard
+            .caught_read("BEGIN READ ONLY", self.inner.query_params_controlled(sql, &[], control))
+            .await;
+        self.note_disconnect(&result);
+        if result.is_ok() {
+            self.batch = Some(OpenBatch::new(true));
+        }
+        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
+        self.guard
+            .audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
         result
     }
 
@@ -131,6 +182,12 @@ impl PolicySession {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         let analysis = self.guard.analyze_statement(sql);
+        let external_effects = Effects::SESSION_STATE.union(Effects::HOST_OR_FILE_ACCESS);
+        if self.batch.is_some_and(|batch| {
+            batch.read_only && (analysis.facts.effects.writes() || analysis.facts.effects.contains(external_effects))
+        }) {
+            return Err(DriverError::ReadOnly);
+        }
         let authorization = self.guard.authorize_classified(sql, analysis, Some(control)).await?;
         let writes = authorization.analysis.facts.writes();
         let result = match self.batch {
@@ -344,7 +401,7 @@ impl PolicySession {
             .await;
         let is_retryable = matches!(result, Err(DriverError::Cancelled | DriverError::TimedOut));
         self.batch = match (&result, kind) {
-            (Ok(_), _) => chain.then(OpenBatch::new),
+            (Ok(_), _) => chain.then(|| OpenBatch::new(batch.read_only)),
             (Err(_), Finish::Commit) if !ambiguous && !is_retryable => None,
             _ => Some(OpenBatch {
                 uncertain: batch.uncertain || ambiguous,

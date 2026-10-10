@@ -1,0 +1,77 @@
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1000 pid=3464826 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[3464837]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=3464849 comm="python3 /home/trung/Projects/tablepro/.worktrees/b")
+dbus-daemon[3464837]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.7' (uid=1000 pid=3464850 comm="/home/trung/Projects/tablepro/.worktrees/b4-ui1b-b")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.7' (uid=1000 pid=3464850 comm="/home/trung/Projects/tablepro/.worktrees/b4-ui1b-b")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.10' (uid=1000 pid=3464921 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.10' (uid=1000 pid=3464921 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.191: Choosing gtk.portal for org.freedesktop.impl.portal.Lockdown via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.191: The preferred method to match portal implementations to desktop environments is to use the portals.conf(5) configuration file
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.10' (uid=1000 pid=3464921 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.371: Choosing gtk.portal for org.freedesktop.impl.portal.Access via the deprecated UseIn key
+
+** (xdg-desktop-portal-gtk:3464943): WARNING **: 11:26:52.388: atk-bridge: Couldn't listen on dbus server: Socket name too long
+
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.399: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.400: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.400: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.400: Choosing gtk.portal for org.freedesktop.impl.portal.Settings via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.403: Choosing gtk.portal for org.freedesktop.impl.portal.FileChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.405: Choosing gtk.portal for org.freedesktop.impl.portal.AppChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.408: Choosing gtk.portal for org.freedesktop.impl.portal.Print via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.411: Choosing gtk.portal for org.freedesktop.impl.portal.Notification via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.414: Choosing gtk.portal for org.freedesktop.impl.portal.Inhibit via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.423: Failed to connect to PipeWire: Couldn't connect to PipeWire
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.423: Choosing gtk.portal for org.freedesktop.impl.portal.Account via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.425: Choosing gtk.portal for org.freedesktop.impl.portal.Email via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.429: Choosing gnome-keyring.portal for org.freedesktop.impl.portal.Secret via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:3464921): xdg-desktop-portal-WARNING **: 11:26:52.429: Choosing gtk.portal for org.freedesktop.impl.portal.DynamicLauncher via the deprecated UseIn key
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+
+(process:3464849): dbind-WARNING **: 11:26:52.665: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.gtk.vfs.UDisks2VolumeMonitor' requested by ':1.7' (uid=1000 pid=3464850 comm="/home/trung/Projects/tablepro/.worktrees/b4-ui1b-b")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.gtk.vfs.UDisks2VolumeMonitor'
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.gtk.vfs.MTPVolumeMonitor' requested by ':1.7' (uid=1000 pid=3464850 comm="/home/trung/Projects/tablepro/.worktrees/b4-ui1b-b")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.gtk.vfs.MTPVolumeMonitor'
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='org.gtk.vfs.Metadata' requested by ':1.14' (uid=1000 pid=3464943 comm="/usr/lib/xdg-desktop-portal-gtk")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'org.gtk.vfs.Metadata'
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Activating service name='ca.desrt.dconf' requested by ':1.14' (uid=1000 pid=3464943 comm="/usr/lib/xdg-desktop-portal-gtk")
+dbus-daemon[3464795]: [session uid=1000 pid=3464795 pidfd=5] Successfully activated service 'ca.desrt.dconf'
+
+(process:3464849): dbind-WARNING **: 11:27:01.090: AT-SPI: Error in GetItems, sender=:1.4, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3464849): dbind-WARNING **: 11:27:10.567: AT-SPI: Error in GetItems, sender=:1.5, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3464849): dbind-WARNING **: 11:27:34.778: AT-SPI: Error in GetItems, sender=:1.6, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:3464849): dbind-WARNING **: 11:27:44.641: AT-SPI: Error in GetItems, sender=:1.7, error=Object does not exist at path “/org/a11y/atspi/cache”
+passed: bundle_export_records_sanitized_audit_outcome
+passed: bundle_import_records_sanitized_audit_outcome
+passed: encrypted_bundle_round_trip_restores_credentials
+passed: a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile
+A connection to the bus can't be made
+A connection to the bus can't be made
+A connection to the bus can't be made
