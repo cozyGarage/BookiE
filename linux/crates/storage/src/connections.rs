@@ -8,10 +8,14 @@ use crate::error::StorageError;
 use crate::file_access::{lock_path, read_bounded, write_atomically};
 use tablepro_core::{AuthMode, Environment, TlsMode};
 
-const CURRENT_VERSION: u32 = 1;
+const CURRENT_VERSION: u32 = 2;
 const MAX_CONNECTIONS_FILE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_CONNECTIONS: usize = 1_000;
 const MAX_CONNECTION_VALUE_BYTES: usize = 64 * 1024;
+
+#[cfg(test)]
+#[path = "connections_migration_tests.rs"]
+mod migration_tests;
 /// Hops one saved SSH chain may declare. `jump` deserializes
 /// recursively, so without a cap here the only thing standing between
 /// an edited connections file and a deep recursive parse is
@@ -109,6 +113,16 @@ impl SavedConnection {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SavedSshConfig {
+    /// Stable identity for this hop's independent Secret Service entries.
+    /// Legacy records receive one when read; the next connection-file write
+    /// persists it so reordering hops cannot move a credential to another host.
+    #[serde(default = "Uuid::new_v4")]
+    pub hop_id: Uuid,
+    /// Rotates when this hop's saved password or key passphrase is replaced.
+    /// Secret Service entries are keyed by this revision so a new entry can
+    /// be staged before the saved connection points at it.
+    #[serde(default)]
+    pub credential_revision: u64,
     pub host: String,
     pub port: u16,
     pub username: String,
@@ -340,7 +354,7 @@ async fn read_raw_file(path: &Path) -> Result<Option<serde_json::Map<String, ser
 }
 
 fn validate_file(file: &ConnectionsFile) -> Result<(), StorageError> {
-    if file.version != CURRENT_VERSION {
+    if !(1..=CURRENT_VERSION).contains(&file.version) {
         return Err(StorageError::Schema(format!(
             "connections.json version {} not supported (expected {})",
             file.version, CURRENT_VERSION,
@@ -511,7 +525,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn postgres_socket_directory_round_trips_without_a_version_bump() {
+    async fn postgres_socket_directory_round_trips_in_the_current_file_version() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("connections.json");
         let mut connection = sample_connection();
@@ -519,32 +533,8 @@ mod tests {
         save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
 
         let raw = std::fs::read_to_string(&path).unwrap();
-        assert!(raw.contains("\"version\": 1"));
+        assert!(raw.contains("\"version\": 2"));
         assert_eq!(load_from(&path).await.unwrap(), vec![connection]);
-    }
-
-    fn ssh_chain(depth: usize) -> SavedSshConfig {
-        let mut hop = SavedSshConfig {
-            host: "bastion".into(),
-            port: 22,
-            username: "jump".into(),
-            auth: SavedSshAuth::Password,
-            jump: None,
-            client: Default::default(),
-            agent: false,
-        };
-        for _ in 1..depth {
-            hop = SavedSshConfig {
-                host: "bastion".into(),
-                port: 22,
-                username: "jump".into(),
-                auth: SavedSshAuth::Password,
-                jump: Some(Box::new(hop)),
-                client: Default::default(),
-                agent: false,
-            };
-        }
-        hop
     }
 
     #[tokio::test]
@@ -612,44 +602,6 @@ mod tests {
 
         let stored = load_from(&path).await.unwrap();
         assert_eq!(stored, vec![original]);
-    }
-
-    #[tokio::test]
-    async fn an_ssh_chain_at_the_hop_cap_is_accepted() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("connections.json");
-        let mut connection = sample_connection();
-        connection.ssh = Some(ssh_chain(MAX_SSH_HOPS));
-
-        save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
-        assert_eq!(load_from(&path).await.unwrap(), vec![connection]);
-    }
-
-    #[tokio::test]
-    async fn an_ssh_chain_past_the_hop_cap_is_refused() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("connections.json");
-        let mut connection = sample_connection();
-        connection.ssh = Some(ssh_chain(MAX_SSH_HOPS + 1));
-
-        let error = save_to(&path, std::slice::from_ref(&connection)).await.unwrap_err();
-        assert!(matches!(error, StorageError::Schema(_)), "{error:?}");
-        assert!(!path.exists());
-    }
-
-    #[tokio::test]
-    async fn a_file_holding_an_over_deep_ssh_chain_is_refused_on_load() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("connections.json");
-        let mut connection = sample_connection();
-        connection.ssh = Some(ssh_chain(MAX_SSH_HOPS + 1));
-        let document = serde_json::json!({
-            "version": 1,
-            "connections": [serde_json::to_value(&connection).unwrap()],
-        });
-        std::fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
-
-        assert!(load_from(&path).await.is_err());
     }
 
     #[tokio::test]
@@ -915,6 +867,8 @@ mod tests {
     #[test]
     fn the_agent_flag_is_written_only_when_set_so_older_builds_still_read_the_file() {
         let mut ssh = SavedSshConfig {
+            hop_id: Uuid::new_v4(),
+            credential_revision: 0,
             host: "bastion".into(),
             port: 22,
             username: "deploy".into(),
@@ -1022,6 +976,8 @@ mod tests {
         let path = dir.path().join("connections.json");
         let mut conn = sample_connection();
         conn.ssh = Some(SavedSshConfig {
+            hop_id: Uuid::new_v4(),
+            credential_revision: 0,
             host: "bastion.example.com".into(),
             port: 22,
             username: "deploy".into(),
@@ -1044,11 +1000,15 @@ mod tests {
         let path = dir.path().join("connections.json");
         let mut conn = sample_connection();
         conn.ssh = Some(SavedSshConfig {
+            hop_id: Uuid::new_v4(),
+            credential_revision: 0,
             host: "edge.example.com".into(),
             port: 22,
             username: "edge".into(),
             auth: SavedSshAuth::Password,
             jump: Some(Box::new(SavedSshConfig {
+                hop_id: Uuid::new_v4(),
+                credential_revision: 0,
                 host: "bastion.example.com".into(),
                 port: 22,
                 username: "deploy".into(),
@@ -1132,6 +1092,8 @@ mod tests {
         connection.tls_root_cert = Some(PathBuf::from("/etc/ca.crt"));
         connection.last_opened_at = Some(Utc::now());
         connection.ssh = Some(SavedSshConfig {
+            hop_id: Uuid::new_v4(),
+            credential_revision: 0,
             host: "bastion".into(),
             port: 22,
             username: "u".into(),

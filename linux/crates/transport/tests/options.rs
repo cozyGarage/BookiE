@@ -34,6 +34,8 @@ fn saved(tls_mode: Option<TlsMode>, use_tls: bool) -> SavedConnection {
 
 fn hop(host: &str, port: u16, username: &str, jump: Option<SavedSshConfig>) -> SavedSshConfig {
     SavedSshConfig {
+        hop_id: uuid::Uuid::new_v4(),
+        credential_revision: 0,
         host: host.into(),
         port,
         username: username.into(),

@@ -791,6 +791,8 @@ mod tests {
         let mut saved = saved_connection();
         saved.driver_id = "sqlite".into();
         saved.ssh = Some(SavedSshConfig {
+            hop_id: uuid::Uuid::new_v4(),
+            credential_revision: 0,
             host: "bastion".into(),
             port: 22,
             username: "tunnel".into(),

@@ -216,6 +216,8 @@ impl SshSection {
                 auth,
             },
             saved: SavedSshConfig {
+                hop_id: uuid::Uuid::new_v4(),
+                credential_revision: 0,
                 host,
                 port,
                 username,
