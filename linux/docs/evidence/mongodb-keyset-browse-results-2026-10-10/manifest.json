@@ -12,10 +12,10 @@
   },
   "case": "MongoDB app browse keyset query and large collection offset cost",
   "regression": {
-    "test": "keyset_page_query_reads_rows_after_the_native_id_cursor",
+    "test": "keyset_page_query_reads_rows_after_the_native_id_cursor; keyset_page_query_binds_object_id_cursor_values",
     "baseline_commit": "43b718ee2",
     "baseline_result": "Failed before the fix with Unsupported: MongoDB bound reads support a single selected value by _id",
-    "fixed_result": "1 passed against MongoDB 7; rows after _id 100 were returned in ascending _id order"
+    "fixed_result": "2 passed against MongoDB 7; integer and canonical ObjectId cursors returned following rows in ascending _id order"
   },
   "validation": {
     "parser_tests": {
@@ -24,8 +24,8 @@
       "log": "parser-tests.txt"
     },
     "native_regression": {
-      "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration browse_keyset::keyset_page_query_reads_rows_after_the_native_id_cursor -- --ignored --nocapture",
-      "result": "1 passed against MongoDB 7",
+      "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration browse_keyset -- --ignored --nocapture",
+      "result": "2 passed against MongoDB 7: integer and ObjectId _id cursors",
       "log": "keyset-regression.txt"
     },
     "large_collection_profile": {
@@ -44,15 +44,15 @@
   },
   "log_sha256": {
     "parser-tests.txt": "bcb59d85a4f6b88554e22a59b7fd27ad5174c4c16a35de37ad1a21dc5b75fb33",
-    "keyset-regression.txt": "772c2d41ac2f878794228811f15fad7e95e819d2bf80f6377db7126972739bed",
+    "keyset-regression.txt": "45ca3048ac1687ca17b7ede4898f8aef2e9d953d593e9ab574e3e4066a9c654d",
     "profile.txt": "c5e10bdcbcd52ab6b64abeed98eb9c6f3ec2cc710c7814b44d13c384d388d177"
   },
   "source_fingerprints_sha256": {
     "linux/crates/drivers/mongodb/src/lib.rs": "a9b3787b71ec134a4069ef20879feb1f931a272bc806e04f3165a7ed76f6ee91",
-    "linux/crates/drivers/mongodb/src/update.rs": "168ebd22dbc43db35239c49931e70c1da7d007a18847277931718b6d8461d79f",
+    "linux/crates/drivers/mongodb/src/update.rs": "37954d76171773e12262535e302534aec15a18f6c0258f61f37182afad1bc355",
     "linux/crates/drivers/mongodb/src/shell.rs": "075d9b4cb68a7f309be75270b947c1893bc6a58c7ea074a5879bf1407a9f832f",
     "linux/crates/drivers/mongodb/tests/integration.rs": "e42336d8cd5e9e62ea8e8517aea99c3a86165aa61ff24c22d611720c63b65718",
-    "linux/crates/drivers/mongodb/tests/support/browse_keyset.rs": "d7ed97abaf00ec719e95fbd202df9a7aad70b6d6fc2021a58dbffc84dfa7c6dd",
+    "linux/crates/drivers/mongodb/tests/support/browse_keyset.rs": "3938eaa3acb78c681ab7ebd9ad40fac94b1beb1df889be9fec6d6069b705367a",
     "linux/crates/drivers/mongodb/tests/support/census_cost.rs": "bb6dbe10174ea2145363919bdc1a25359d1f914130de4d0c6ecb4b7378e2e715"
   },
   "remaining": [
