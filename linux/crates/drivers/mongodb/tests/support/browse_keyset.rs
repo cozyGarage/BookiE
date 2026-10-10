@@ -1,5 +1,5 @@
 use drivers_mongodb::MongodbDriver;
-use mongodb::bson::{Bson, Document, doc, oid::ObjectId};
+use mongodb::bson::{Binary, Bson, Document, doc, oid::ObjectId, spec::BinarySubtype};
 use tablepro_core::{DatabaseDriver, Value};
 
 #[tokio::test]
@@ -65,5 +65,51 @@ async fn keyset_page_query_binds_object_id_cursor_values() {
     assert_eq!(
         page.rows[0][0],
         Value::Json(Bson::ObjectId(second).into_canonical_extjson())
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn keyset_page_query_binds_binary_uuid_cursor_values() {
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    let first = Binary {
+        subtype: BinarySubtype::Uuid,
+        bytes: vec![0; 16],
+    };
+    let second = Binary {
+        subtype: BinarySubtype::Uuid,
+        bytes: vec![1; 16],
+    };
+    let third = Binary {
+        subtype: BinarySubtype::Uuid,
+        bytes: vec![2; 16],
+    };
+    client
+        .database("appdb")
+        .collection::<Document>("keyset_uuid")
+        .insert_many([
+            doc! { "_id": Bson::Binary(third) },
+            doc! { "_id": Bson::Binary(first.clone()) },
+            doc! { "_id": Bson::Binary(second.clone()) },
+        ])
+        .await
+        .unwrap();
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let page = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"keyset_uuid\" WHERE \"_id\" > ? LIMIT 1 OFFSET 0",
+            &[Value::Json(Bson::Binary(first).into_canonical_extjson())],
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(page.rows.len(), 1);
+    assert_eq!(
+        page.rows[0][0],
+        Value::Json(Bson::Binary(second).into_canonical_extjson())
     );
 }
