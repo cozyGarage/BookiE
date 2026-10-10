@@ -1,5 +1,8 @@
 use std::borrow::Cow;
+use std::marker::PhantomData;
+use std::sync::OnceLock;
 
+use gtk4::glib;
 use gtk4::prelude::*;
 
 use tablepro_core::{ColumnInfo, Value};
@@ -157,49 +160,74 @@ pub(super) struct EditSnapshot {
     pub row_key: Vec<Value>,
 }
 
-pub(super) struct WidgetSlot<T: 'static> {
-    key: &'static str,
-    _phantom: std::marker::PhantomData<T>,
+pub(super) trait WidgetDataKey: 'static {
+    type Value: 'static;
+
+    fn quark() -> glib::Quark;
 }
 
-impl<T: 'static> WidgetSlot<T> {
-    const fn new(key: &'static str) -> Self {
-        Self {
-            key,
-            _phantom: std::marker::PhantomData,
+pub(super) struct WidgetSlot<K: WidgetDataKey> {
+    _key: PhantomData<K>,
+}
+
+impl<K: WidgetDataKey> WidgetSlot<K> {
+    const fn new() -> Self {
+        Self { _key: PhantomData }
+    }
+
+    pub(super) fn set(&self, widget: &impl IsA<gtk4::Widget>, value: K::Value) {
+        unsafe { widget.set_qdata(K::quark(), value) };
+    }
+
+    pub(super) fn take(&self, widget: &impl IsA<gtk4::Widget>) -> Option<K::Value> {
+        unsafe { widget.steal_qdata::<K::Value>(K::quark()) }
+    }
+}
+
+impl<K: WidgetDataKey> WidgetSlot<K>
+where
+    K::Value: Clone,
+{
+    pub(super) fn cloned(&self, widget: &impl IsA<gtk4::Widget>) -> Option<K::Value> {
+        unsafe { widget.qdata::<K::Value>(K::quark()).map(|p| p.as_ref().clone()) }
+    }
+}
+
+impl<K: WidgetDataKey> WidgetSlot<K>
+where
+    K::Value: Copy,
+{
+    pub(super) fn get(&self, widget: &impl IsA<gtk4::Widget>) -> Option<K::Value> {
+        unsafe { widget.qdata::<K::Value>(K::quark()).map(|p| *p.as_ref()) }
+    }
+}
+
+macro_rules! define_widget_slot {
+    ($slot:ident, $key:ident, $value:ty, $quark:literal) => {
+        pub(super) enum $key {}
+
+        impl WidgetDataKey for $key {
+            type Value = $value;
+
+            fn quark() -> glib::Quark {
+                static QUARK: OnceLock<glib::Quark> = OnceLock::new();
+                *QUARK.get_or_init(|| glib::Quark::from_str($quark))
+            }
         }
-    }
 
-    pub(super) fn set(&self, widget: &impl IsA<gtk4::Widget>, value: T) {
-        unsafe { widget.set_data(self.key, value) };
-    }
-
-    pub(super) fn take(&self, widget: &impl IsA<gtk4::Widget>) -> Option<T> {
-        unsafe { widget.steal_data::<T>(self.key) }
-    }
+        pub(super) const $slot: WidgetSlot<$key> = WidgetSlot::new();
+    };
 }
 
-impl<T: 'static + Clone> WidgetSlot<T> {
-    pub(super) fn cloned(&self, widget: &impl IsA<gtk4::Widget>) -> Option<T> {
-        unsafe { widget.data::<T>(self.key).map(|p| p.as_ref().clone()) }
-    }
-}
-
-impl<T: 'static + Copy> WidgetSlot<T> {
-    pub(super) fn get(&self, widget: &impl IsA<gtk4::Widget>) -> Option<T> {
-        unsafe { widget.data::<T>(self.key).map(|p| *p.as_ref()) }
-    }
-}
-
-pub(super) const POSITION_SLOT: WidgetSlot<u32> = WidgetSlot::new("tp-position");
-pub(super) const SNAPSHOT_SLOT: WidgetSlot<EditSnapshot> = WidgetSlot::new("tp-snapshot");
-pub(super) const ROW_KEY_SLOT: WidgetSlot<Vec<Value>> = WidgetSlot::new("tp-row-key");
-pub(super) const COLUMN_SLOT: WidgetSlot<usize> = WidgetSlot::new("tp-column");
-pub(super) const SUPPRESS_SLOT: WidgetSlot<bool> = WidgetSlot::new("tp-suppress-toggle");
-pub(super) const POPOVER_SLOT: WidgetSlot<gtk4::Popover> = WidgetSlot::new("tp-popover");
-pub(super) const PREEDIT_SLOT: WidgetSlot<bool> = WidgetSlot::new("tp-preedit-active");
-pub(super) const FULL_EDIT_TEXT_SLOT: WidgetSlot<String> = WidgetSlot::new("tp-full-edit-text");
-pub(super) const IS_NULL_SLOT: WidgetSlot<bool> = WidgetSlot::new("tp-cell-is-null");
+define_widget_slot!(POSITION_SLOT, PositionKey, u32, "tp-position");
+define_widget_slot!(SNAPSHOT_SLOT, SnapshotKey, EditSnapshot, "tp-snapshot");
+define_widget_slot!(ROW_KEY_SLOT, RowKeyKey, Vec<Value>, "tp-row-key");
+define_widget_slot!(COLUMN_SLOT, ColumnKey, usize, "tp-column");
+define_widget_slot!(SUPPRESS_SLOT, SuppressKey, bool, "tp-suppress-toggle");
+define_widget_slot!(POPOVER_SLOT, PopoverKey, gtk4::Popover, "tp-popover");
+define_widget_slot!(PREEDIT_SLOT, PreeditKey, bool, "tp-preedit-active");
+define_widget_slot!(FULL_EDIT_TEXT_SLOT, FullEditTextKey, String, "tp-full-edit-text");
+define_widget_slot!(IS_NULL_SLOT, IsNullKey, bool, "tp-cell-is-null");
 
 pub fn focused_cell_identity(widget: &impl IsA<gtk4::Widget>) -> Option<(u32, usize, Vec<Value>)> {
     let root = widget.root()?;
@@ -485,5 +513,61 @@ mod tests {
         let display = value_to_display_text(&Value::Text(huge));
         assert!(display.len() < 100_000);
         assert!(display.contains("more chars"));
+    }
+
+    #[test]
+    fn grid_widget_data_keys_use_distinct_quarks() {
+        let quarks = [
+            PositionKey::quark(),
+            SnapshotKey::quark(),
+            RowKeyKey::quark(),
+            ColumnKey::quark(),
+            SuppressKey::quark(),
+            PopoverKey::quark(),
+            PreeditKey::quark(),
+            FullEditTextKey::quark(),
+            IsNullKey::quark(),
+        ];
+        for (index, quark) in quarks.iter().enumerate() {
+            for (other_index, other) in quarks.iter().enumerate() {
+                if index != other_index {
+                    assert_ne!(quark, other);
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn typed_widget_slots_round_trip_and_keep_same_value_types_apart() {
+        gtk4::init().unwrap();
+        let label = gtk4::Label::new(None);
+        POSITION_SLOT.set(&label, 7);
+        COLUMN_SLOT.set(&label, 3);
+        assert_eq!(POSITION_SLOT.get(&label), Some(7));
+        assert_eq!(COLUMN_SLOT.get(&label), Some(3));
+
+        SUPPRESS_SLOT.set(&label, true);
+        PREEDIT_SLOT.set(&label, false);
+        IS_NULL_SLOT.set(&label, true);
+        assert_eq!(SUPPRESS_SLOT.get(&label), Some(true));
+        assert_eq!(PREEDIT_SLOT.get(&label), Some(false));
+        assert_eq!(IS_NULL_SLOT.get(&label), Some(true));
+
+        let row_key = vec![Value::Int(11), Value::Text("pk".into())];
+        ROW_KEY_SLOT.set(&label, row_key.clone());
+        assert_eq!(ROW_KEY_SLOT.cloned(&label), Some(row_key));
+
+        FULL_EDIT_TEXT_SLOT.set(&label, "pending".into());
+        assert_eq!(FULL_EDIT_TEXT_SLOT.cloned(&label), Some("pending".into()));
+        assert_eq!(FULL_EDIT_TEXT_SLOT.take(&label), Some("pending".into()));
+        assert_eq!(FULL_EDIT_TEXT_SLOT.cloned(&label), None);
+
+        assert_eq!(POSITION_SLOT.take(&label), Some(7));
+        assert_eq!(POSITION_SLOT.get(&label), None);
+        assert_eq!(COLUMN_SLOT.get(&label), Some(3));
+        assert_eq!(SUPPRESS_SLOT.get(&label), Some(true));
+        assert_eq!(PREEDIT_SLOT.get(&label), Some(false));
+        assert_eq!(IS_NULL_SLOT.get(&label), Some(true));
     }
 }

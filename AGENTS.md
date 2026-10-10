@@ -232,6 +232,26 @@ reach gets manual steps in
 change a test to accept incorrect behaviour; confirm a new regression test fails
 on the unfixed code.
 
+Rules for pull requests that add tests (any agent, including Cursor):
+
+- Assert observable behaviour, such as an outcome, a stored value or an error
+  kind, and not rule names, message text or internal identifiers that the code
+  owner may rename.
+- A test pull request does not change product rules. When a rule looks wrong,
+  tell the lane owner and leave the rule alone.
+- A new test fails on the code before the fix, or its commit says it pins
+  existing behaviour.
+- Merge `origin/linux` into the branch and run `linux/scripts/preflight.sh`
+  before opening the pull request.
+- Do not edit ledger rows, sprint text or files that another lane owns
+  (for example `policy/src/rules.rs`, owned by B4 in the lane table);
+  those edits are what conflict.
+- Check the open pull requests for the same files first. When two change the
+  same map or sentinel (for example `change-test-map.json`), say which one lands
+  first and rebase the other.
+- Say in the pull request when it needs the Forgejo gate; the maintainer or the
+  UX lane gates the exact head, since these agents cannot reach Forgejo.
+
 Every test belongs to one tier with one script and one gate. Use the
 [validation playbook](linux/docs/validation-playbook.md) to pick layers and
 `python3 linux/scripts/run-test-layer.py --list` to discover commands.
