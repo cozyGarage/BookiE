@@ -11,12 +11,13 @@ execution and installed acceptance are separate states.
 
 ## Current Linux-tip B4 checkpoint (2026-10-10)
 
-`fork/linux` is `e65030d9505f7b8ac58601fd883986a041dd25b8` (2026-10-10).
-The latest application-code commit is `79d9e51` (#481); the current branch tip
-also includes the packaging change in #483. PR #458 computes `Effects`
+`fork/linux` is `d9d476f7a9e024eb133373ab4e4f7d67dedcdfb4` (2026-10-10).
+The latest application-code commit is the dependency cleanup in #485; the tip
+also includes refreshed B4 evidence. PR #458 computes `Effects`
 alongside legacy facts, and PR #459 adds engine read-only enforcement; both are
 merged. PR #460 implements migration step 2 (S8) and is merged. PR #463
-implements DuckDB read-only selected-file restrictions and remains open. PR
+implements DuckDB read-only selected-file restrictions and is merged. PR #486
+fixes a selected-file open race and remains open. PR
 #461 keeps read-scoped explain plans redacted, and PR #475 adds the B4-11
 `MRG_MyISAM` rollback case; both are merged. PR #480 implements migration step
 3 (joined verdicts for S6/S7) and remains open. Migration step 4, removing the
