@@ -25,13 +25,14 @@ runs establishes the Forgejo gate or frozen-candidate/package acceptance.
 PR #456's fail-closed fallback treated plain `EXPLAIN SELECT` as an unknown
 projection and redacted the plan returned by the agent `explain_query` tool.
 The PostgreSQL release fixture reproduced this twice on the post-#456 source;
-the pre-#456 parent passed the same fixture. The fix keeps plan output masked
-for read-scoped agents and aligns the tool description and release test with
-that behavior, because a plan may contain server-generated predicates. The
-full policy suite passed 216 tests with 4 Docker-only tests ignored, and the
-PostgreSQL release fixture passed, including the plain-plan masking regression,
-`EXPLAIN ANALYZE` denial/table-preservation case and seven SSH/mTLS GTK
-scenarios. See the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
+the pre-#456 parent passed the same fixture. Merged PR #461 keeps plan output
+masked for read-scoped agents and aligns the tool description and release test
+with that behavior, because a plan may contain server-generated predicates.
+The policy suite passed 216 tests with 4 Docker-only tests ignored. The current
+Linux code tip `d4d26c8` was rechecked on 2026-10-10: system OpenSSH 1/1, mTLS
+3/3, PostgreSQL release integration 51/51 (including plan denial and both
+`EXPLAIN ANALYZE` denial checks), and seven SSH/mTLS GTK scenarios passed. See
+the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
 This local result does not establish the Forgejo gate, hosted acceptance or
 frozen-candidate/installed acceptance.
 
