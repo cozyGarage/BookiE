@@ -11,27 +11,29 @@ execution and installed acceptance are separate states.
 
 ## Current Linux-tip B4 checkpoint (2026-10-10)
 
-`fork/linux` is `ca1080a55c9a47fb0d241d92395820864836491f`, two documentation
-commits after code tip `c2f3f78b954ef0c7cb7d8956f035aa08edc71c7f` and PR #458.
-That PR computes internal `Effects` alongside the legacy facts and leaves the
-S6–S8 verdict behavior unchanged. The serialized MySQL/MariaDB rollback
-selector passed 18/18 locally on this tree; see the B4-11 row below and the
-[rerun manifest](evidence/mysql-atomic-linux-c2f3f78-2026-10-09/manifest.json).
-The run does not establish optional/vendor engines, frozen-candidate, hosted,
-package-installed or native Wayland acceptance.
+`fork/linux` is `8414041eba9eef573d7daba4c7d49e0f3c738cf4` (2026-10-10); its
+latest product-code tip is `d4d26c8`, followed by CI and validation changes.
+PR #458 computes `Effects` alongside legacy facts; PR #459 adds read-only
+engine enforcement and is merged. PR #460 implements migration step 2 (S8)
+and PR #463 implements DuckDB read-only selected-file restrictions; both are
+open. PR #461 is merged and keeps read-scoped explain plans redacted. PR #475
+adds the B4-11 `MRG_MyISAM` rollback case. Local verification and current
+acceptance boundaries are recorded in the rows below; none of these local
+runs establishes the Forgejo gate or frozen-candidate/package acceptance.
 
 ## AUD-9 query-plan masking regression (2026-10-10)
 
 PR #456's fail-closed fallback treated plain `EXPLAIN SELECT` as an unknown
 projection and redacted the plan returned by the agent `explain_query` tool.
 The PostgreSQL release fixture reproduced this twice on the post-#456 source;
-the pre-#456 parent passed the same fixture. The fix keeps plan output masked
-for read-scoped agents and aligns the tool description and release test with
-that behavior, because a plan may contain server-generated predicates. The
-full policy suite passed 216 tests with 4 Docker-only tests ignored, and the
-PostgreSQL release fixture passed, including the plain-plan masking regression,
-`EXPLAIN ANALYZE` denial/table-preservation case and seven SSH/mTLS GTK
-scenarios. See the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
+the pre-#456 parent passed the same fixture. Merged PR #461 keeps plan output
+masked for read-scoped agents and aligns the tool description and release test
+with that behavior, because a plan may contain server-generated predicates.
+The policy suite passed 216 tests with 4 Docker-only tests ignored. The current
+Linux code tip `d4d26c8` was rechecked on 2026-10-10: system OpenSSH 1/1, mTLS
+3/3, PostgreSQL release integration 59/59 (including plan denial and both
+`EXPLAIN ANALYZE` denial checks), and seven SSH/mTLS GTK scenarios passed. See
+the [AUD-9 evidence](evidence/aud9-explain-plan-mask-2026-10-10/manifest.json).
 This local result does not establish the Forgejo gate, hosted acceptance or
 frozen-candidate/installed acceptance.
 
@@ -65,7 +67,7 @@ distribution-package or native Wayland acceptance.
 | B4-9 | Complete package-installed/native Wayland route/auth/TLS acceptance | On exact source `102ef480`, hosted TLS passed all 48 tests and PostgreSQL release GTK passed saved mTLS over SSH. Debian package lifecycle and its installed MySQL approval scenario passed on `4bcec064`; package-installed route/auth/TLS flows and native Wayland remain open. The earlier MongoDB refusal cause remains undetermined. See [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | B4-22 | Complete package-installed/native Wayland bundle audit acceptance | On exact source `102ef480`, hosted installed GTK safety passed 53/53 scenarios, including sanitized export/import audits, encrypted credential round-trip and cross-profile import. Debian package lifecycle passed and the installed package's MySQL approval scenario passed on `4bcec064`; package-installed bundle flow and native Wayland remain open. See [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | B4-12 | ~~PostgreSQL rollback-failure acceptance on the selected frozen candidate~~ | Hosted candidate and local current-product-source (`fc180933`) backend-termination selectors passed. The scenario confirms `TransactionRollbackFailed`, absent transactional rows and persistent identity/trigger-sequence advancement. See [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) and [local linux-tip evidence](evidence/b4-rollback-linux-tip-2026-10-09/manifest.json) |
-| B4-11 | Extend failed-batch tests to optional/vendor MySQL-family engines and broader side-effect patterns | The serialized `mysql_atomic::` selector passed 18/18 locally on tree tip `ca1080a` (nearest code tip `c2f3f78b9`); the [rerun manifest](evidence/mysql-atomic-linux-c2f3f78-2026-10-09/manifest.json) records source hashes and result. Existing coverage includes MySQL/MariaDB advisory locks, `LAST_INSERT_ID()` on the pinned session, trigger session variables, BLACKHOLE, ARCHIVE, CSV, MyISAM, MEMORY, direct/update/delete effects and auto-increment allocation. Optional/vendor engines and other side-effect classes remain open; frozen-candidate, hosted and installed acceptance are separate. Earlier candidate evidence remains in the [hosted acceptance manifest](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) |
+| B4-11 | Extend failed-batch tests to optional/vendor MySQL-family engines and broader side-effect patterns | PR #475 adds `MRG_MyISAM` write-through cases for both MySQL and MariaDB. The serialized `mysql_atomic::` selector passed 20/20 locally on branch commit `f8dfee6`, based on then-current `fork/linux` commit `d241ce69d`; the [2026-10-10 run manifest](evidence/mysql-atomic-linux-f8dfee6-2026-10-10/manifest.json) records source hashes and result. Existing coverage includes MySQL/MariaDB advisory locks, `LAST_INSERT_ID()` on the pinned session, trigger session variables, BLACKHOLE, ARCHIVE, CSV, MyISAM, MEMORY, direct/update/delete effects and auto-increment allocation. Optional/vendor engines and other side-effect classes remain open; frozen-candidate, Forgejo, package-installed and native acceptance are separate. Earlier candidate evidence remains in the [hosted acceptance manifest](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) |
 | B4-17 | Complete package-installed/native Wayland trust flow | Product source `93d2e337` passed the system OpenSSH, mTLS, PostgreSQL release and all seven GTK SSH/mTLS scenarios; package snapshot `8fdbed84` passed the unknown-host-key decline/audit scenario on native Wayland and 11 GTK workflows under Xvfb (10 general workflows plus the MySQL approval regression). The candidate archive was extracted locally but not installed by pacman. Product source advanced to `395bc1826` via PR #432. Docs-only PR #437 and test-only PR #424 later moved the branch tip to `5540db7e`; this is not current-candidate acceptance; package-installed multi-hop trust and reconnect remain open. See [current-tip release evidence](evidence/b4-ssh-release-linux-tip-2026-10-09/manifest.json), [local Arch Wayland evidence](evidence/b4-arch-package-wayland-2026-10-09/manifest.json), [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json), [native SSH evidence](evidence/b4-ssh-native-current-2026-10-09/manifest.json), and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | B4-21 | Preserve current Samba Kerberos+VerifyFull proof, then perform Windows AD interoperability | On exact source `102ef480`, both Samba AD Kerberos selectors passed with verified TLS (2 tests). Debian package lifecycle and its installed MySQL approval scenario passed on `4bcec064`; package-installed Kerberos flow and Windows AD interoperability remain open. See [current Kerberos evidence](evidence/b4-mssql-kerberos-current-2026-10-09/manifest.json) and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | Proposal only; implementation and acceptance are open |

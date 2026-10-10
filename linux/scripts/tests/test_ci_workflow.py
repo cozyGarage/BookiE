@@ -101,7 +101,14 @@ class CiWorkflowTests(unittest.TestCase):
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
-        for required in ["run-test-layer.py app-server", "/var/run/docker.sock:/var/run/docker.sock"]:
+        for required in [
+            "run-test-layer.py app-server",
+            "/var/run/docker.sock:/var/run/docker.sock",
+            "./.github/actions/dockerhub-login",
+            "secrets.DOCKERHUB_USERNAME",
+            "secrets.DOCKERHUB_TOKEN",
+            "credentials:",
+        ]:
             self.assertIn(required, fast)
         self.assertIn(
             "cargo test --locked -p tablepro-app --features duckdb --lib value_contract_duckdb",
@@ -140,7 +147,9 @@ class CiWorkflowTests(unittest.TestCase):
         for name in checker.REQUIRED:
             for state in ["failure", "skipped", "cancelled", "missing"]:
                 results = success | {name: {"result": state}}
-                self.assertEqual(checker.assess(results, "push")[0], [name])
+                deferred = name in checker.MERGE_ONLY and state == "skipped"
+                expected = [] if deferred else [name]
+                self.assertEqual(checker.assess(results, "push")[0], expected, (name, state))
         self.assertEqual(set(checker.assess({}, "push")[0]), checker.REQUIRED | {checker.SCHEDULED})
 
     def test_only_pull_request_runs_are_cancelled_when_a_newer_run_starts(self):
@@ -148,18 +157,49 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", workflow)
         self.assertNotIn("event_name == 'push' }}", workflow.split("concurrency:", 1)[1].split("jobs:", 1)[0])
 
-    def test_a_pull_request_may_defer_only_the_merge_tier_jobs(self):
+    def test_push_and_pull_request_may_defer_only_the_merge_tier_jobs(self):
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
         for name in checker.REQUIRED:
             results = success | {name: {"result": "skipped"}}
             expected = [] if name in checker.MERGE_ONLY else [name]
             self.assertEqual(checker.assess(results, "pull_request")[0], expected, name)
-            self.assertEqual(checker.assess(results, "push")[0], [name], name)
+            self.assertEqual(checker.assess(results, "push")[0], expected, name)
+        for name in checker.MERGE_ONLY:
+            results = success | {name: {"result": "skipped"}}
+            self.assertEqual(checker.assess(results, "schedule")[0], [name], name)
 
-    def test_the_workflow_skips_exactly_the_merge_tier_jobs_on_a_pull_request(self):
+    def test_the_workflow_runs_merge_tier_jobs_only_on_schedule_or_dispatch(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        guarded = set(re.findall(r"^  ([a-z0-9-]+):\n    if: github.event_name != 'pull_request'\n", workflow, re.M))
+        guarded = set(
+            re.findall(
+                r"^  ([a-z0-9-]+):\n    if: github.event_name == 'schedule' \|\| github.event_name == 'workflow_dispatch'\n",
+                workflow,
+                re.M,
+            )
+        )
         self.assertEqual(guarded, checker.MERGE_ONLY)
+        self.assertIn(
+            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+            workflow.split("  current-stable-clippy:\n", 1)[1].split("  integration:\n", 1)[0],
+        )
+
+    def test_github_docker_hub_jobs_authenticate_when_secrets_exist(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        soak = (ROOT / ".github/workflows/gtk-soak.yml").read_text()
+        action = (ROOT / ".github/actions/dockerhub-login/action.yml").read_text()
+        self.assertIn("if: inputs.username != ''", action)
+        self.assertNotIn("echo \"$DOCKERHUB_TOKEN\"", action)
+        self.assertNotIn("echo '${{ inputs.password }}'", action)
+        for job in ["fast", "gtk-safety", "current-stable-clippy", "duckdb"]:
+            section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+            self.assertIn("image: debian:testing", section, job)
+            self.assertIn("secrets.DOCKERHUB_USERNAME", section, job)
+            self.assertIn("secrets.DOCKERHUB_TOKEN", section, job)
+        for job in ["fast", "integration", "b4-rollback", "driver-tls", "postgres-release"]:
+            section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+            self.assertIn("./.github/actions/dockerhub-login", section, job)
+        self.assertIn("secrets.DOCKERHUB_USERNAME", soak)
+        self.assertIn("secrets.DOCKERHUB_TOKEN", soak)
 
     def test_only_push_and_pr_can_skip_current_stable_clippy(self):
         results = {name: {"result": "success"} for name in checker.REQUIRED}
@@ -182,7 +222,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         focused = workflow.split("  b4-rollback:\n", 1)[1].split("  driver-tls:\n", 1)[0]
         for required in [
-            "if: github.event_name != 'pull_request'",
+            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
             "prefix-key: linux-integration",
             "run-test-layer.py b4-rollback",
             "regression-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}",
@@ -247,6 +287,34 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             with self.subTest(scenario=scenario):
                 self.assertIn(scenario, default_scenarios)
+
+    def test_analysis_and_flatpak_skip_docs_and_reuse_cache(self):
+        cancel_push_or_pr = (
+            "cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}"
+        )
+        for name in ["codeql.yml", "sonar-rust.yml"]:
+            workflow = (ROOT / ".github/workflows" / name).read_text()
+            self.assertIn('"!linux/docs/**"', workflow)
+            self.assertIn('"!**.md"', workflow)
+            self.assertIn('"linux/**"', workflow)
+            self.assertIn(
+                cancel_push_or_pr,
+                workflow.split("concurrency:", 1)[1].split("jobs:", 1)[0],
+            )
+        flatpak = (ROOT / ".github/workflows/flatpak-linux.yml").read_text()
+        self.assertIn(
+            "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+            flatpak.split("concurrency:", 1)[1].split("jobs:", 1)[0],
+        )
+        self.assertIn("hashFiles('linux/flatpak/**')", flatpak)
+        self.assertNotIn("github.sha }}", flatpak.split("cache-key:", 1)[1].split("\n", 1)[0])
+        self.assertIn("""'["default"]' || '["default","development"]'""", flatpak)
+        self.assertNotIn("matrix.manifest", flatpak)
+        contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+        self.assertIn(
+            cancel_push_or_pr,
+            contracts.split("concurrency:", 1)[1].split("jobs:", 1)[0],
+        )
 
 
 if __name__ == "__main__":
