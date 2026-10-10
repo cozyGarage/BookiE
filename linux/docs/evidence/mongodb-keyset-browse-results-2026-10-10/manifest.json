@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-10",
   "branch": "b3/mongodb-browse-cost",
-  "source_commit": "bab7ef1c3a739f9cc460a74724057fa54458669c",
+  "source_commit": "8263f2fc3f79063d8c8721dc57110dab51c90495",
   "engine": "MongoDB 7 in Docker via testcontainers",
   "environment": {
     "host": "AMD Ryzen 7 5800U, 16 logical CPUs",
