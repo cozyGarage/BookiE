@@ -93,7 +93,7 @@ async fn keyset_page_query_keeps_mixed_bson_id_types_in_sort_order() {
                 "find": "keyset_mixed_ids",
                 "filter": { "$expr": { "$gt": ["$_id", { "$literal": 1 }] } },
                 "sort": { "_id": 1 },
-                "limit": 2,
+                "limit": 1,
             },
             "verbosity": "queryPlanner",
         })
@@ -104,19 +104,27 @@ async fn keyset_page_query_keeps_mixed_bson_id_types_in_sort_order() {
     let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
     let page = connection
         .query_params(
-            "SELECT * FROM \"appdb\".\"keyset_mixed_ids\" WHERE \"_id\" > ? LIMIT 2 OFFSET 0",
+            "SELECT * FROM \"appdb\".\"keyset_mixed_ids\" WHERE \"_id\" > ? LIMIT 1 OFFSET 0",
             &[Value::Int(1)],
         )
         .await
         .unwrap();
 
-    assert_eq!(page.rows.len(), 2);
+    assert_eq!(page.rows.len(), 1);
     assert_eq!(
         page.rows[0][0],
         Value::Json(Bson::String("middle".into()).into_canonical_extjson())
     );
+    let next_page = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"keyset_mixed_ids\" WHERE \"_id\" > ? LIMIT 1 OFFSET 0",
+            &[Value::Json(Bson::String("middle".into()).into_canonical_extjson())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(next_page.rows.len(), 1);
     assert_eq!(
-        page.rows[1][0],
+        next_page.rows[0][0],
         Value::Json(Bson::ObjectId(object_id).into_canonical_extjson())
     );
 }
