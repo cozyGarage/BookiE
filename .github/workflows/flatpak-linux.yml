@@ -17,6 +17,9 @@ on:
       - ".github/workflows/flatpak-linux.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: flatpak-linux-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
