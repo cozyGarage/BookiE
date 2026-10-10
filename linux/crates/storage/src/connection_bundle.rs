@@ -17,6 +17,9 @@ use crate::connection_bundle_crypto::{
 use crate::connection_organization::ConnectionOrganization;
 use crate::connections::{SavedConnection, SavedSshConfig};
 
+#[path = "connection_bundle_secret_transaction.rs"]
+mod secret_transaction;
+
 pub const BUNDLE_FORMAT: &str = "tablepro.connection-bundle";
 pub const BUNDLE_VERSION: u32 = 2;
 const LEGACY_BUNDLE_VERSION: u32 = 1;
@@ -754,58 +757,7 @@ pub async fn store_bundle_secrets(
     label: &str,
     replace_existing: bool,
 ) -> Result<(), crate::error::StorageError> {
-    if let Some(value) = secrets.db_password()
-        && should_write(crate::secrets::load_password(target).await?, replace_existing)
-    {
-        crate::secrets::store_password(target, value.expose_secret(), label).await?;
-    }
-    if let Some(value) = secrets.ssh_password()
-        && should_write(crate::secrets::load_ssh_password(target).await?, replace_existing)
-    {
-        crate::secrets::store_ssh_password(target, value.expose_secret(), label).await?;
-    }
-    if let Some(value) = secrets.ssh_passphrase()
-        && should_write(crate::secrets::load_ssh_passphrase(target).await?, replace_existing)
-    {
-        crate::secrets::store_ssh_passphrase(target, value.expose_secret(), label).await?;
-    }
-    for secret in secrets.ssh_hop_secrets() {
-        let should_store = match secret.kind {
-            BundleSshSecretKind::Password => should_write(
-                crate::secrets::load_ssh_hop_password(target, secret.hop_id, secret.credential_revision).await?,
-                replace_existing,
-            ),
-            BundleSshSecretKind::Passphrase => should_write(
-                crate::secrets::load_ssh_hop_passphrase(target, secret.hop_id, secret.credential_revision).await?,
-                replace_existing,
-            ),
-        };
-        if should_store {
-            match secret.kind {
-                BundleSshSecretKind::Password => {
-                    crate::secrets::store_ssh_hop_password(
-                        target,
-                        secret.hop_id,
-                        secret.credential_revision,
-                        secret.secret.expose_secret(),
-                        label,
-                    )
-                    .await?;
-                }
-                BundleSshSecretKind::Passphrase => {
-                    crate::secrets::store_ssh_hop_passphrase(
-                        target,
-                        secret.hop_id,
-                        secret.credential_revision,
-                        secret.secret.expose_secret(),
-                        label,
-                    )
-                    .await?;
-                }
-            }
-        }
-    }
-    Ok(())
+    secret_transaction::store_bundle_secrets(target, secrets, label, replace_existing).await
 }
 
 pub(crate) fn should_write(existing: Option<SecretString>, replace_existing: bool) -> bool {
