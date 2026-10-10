@@ -107,3 +107,43 @@ fn value_contract_postgres_csv_restores_chrono_year_zero_as_bc_era_text() {
 
     assert_eq!(values, vec![Value::Text("0001-01-02 BC".into())]);
 }
+
+#[test]
+fn value_contract_postgres_csv_preserves_native_bc_temporal_text() {
+    let options = CsvImportOptions::default();
+    for (data_type, text) in [
+        ("date", "0001-01-01 BC"),
+        ("timestamp", "0001-01-01 12:34:56.123456 BC"),
+        ("timestamptz", "0001-01-01 12:34:56.123456+00:00 BC"),
+    ] {
+        let values = row_to_values_for_driver(
+            &[text.into()],
+            &[Some(0)],
+            &[column("value", data_type)],
+            &options,
+            2,
+            "postgres",
+        );
+        assert_eq!(values, Ok(vec![Value::Text(text.into())]), "{data_type}");
+    }
+
+    for (data_type, text) in [
+        ("date", "0001-02-30 BC"),
+        ("timestamp", "0002-02-29 12:34:56 BC"),
+        ("timestamptz", "0001-01-01 12:34:56+24:00 BC"),
+        ("timestamptz", "0001-01-01 12:34:56.1234567+00:00 BC"),
+    ] {
+        assert!(
+            row_to_values_for_driver(
+                &[text.into()],
+                &[Some(0)],
+                &[column("value", data_type)],
+                &options,
+                2,
+                "postgres",
+            )
+            .is_err(),
+            "malformed {data_type} should be refused: {text}"
+        );
+    }
+}
