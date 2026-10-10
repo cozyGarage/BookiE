@@ -194,11 +194,11 @@ async fn filtered_keyset_page_keeps_the_filter_and_cursor() {
         .database("appdb")
         .collection::<Document>("filtered_keyset")
         .insert_many([
-            doc! { "_id": 104, "group": "keep", "region": "east" },
-            doc! { "_id": 101, "group": "keep", "region": "east" },
-            doc! { "_id": 103, "group": "keep", "region": "east" },
-            doc! { "_id": 102, "group": "skip", "region": "east" },
-            doc! { "_id": 105, "group": "keep", "region": "west" },
+            doc! { "_id": 104, "group": "keep", "rank": 4, "region": "east" },
+            doc! { "_id": 101, "group": "keep", "rank": 1, "region": "east" },
+            doc! { "_id": 103, "group": "keep", "rank": 3, "region": "east" },
+            doc! { "_id": 102, "group": "skip", "rank": 2, "region": "east" },
+            doc! { "_id": 105, "group": "keep", "rank": 5, "region": "west" },
         ])
         .await
         .unwrap();
@@ -215,11 +215,93 @@ async fn filtered_keyset_page_keeps_the_filter_and_cursor() {
     assert_eq!(page.rows.len(), 2);
     assert_eq!(
         page.rows[0],
-        vec![Value::Int(101), Value::Text("keep".into()), Value::Text("east".into())]
+        vec![
+            Value::Int(101),
+            Value::Text("keep".into()),
+            Value::Int(1),
+            Value::Text("east".into())
+        ]
     );
     assert_eq!(
         page.rows[1],
-        vec![Value::Int(103), Value::Text("keep".into()), Value::Text("east".into())]
+        vec![
+            Value::Int(103),
+            Value::Text("keep".into()),
+            Value::Int(3),
+            Value::Text("east".into())
+        ]
+    );
+
+    let compared = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE \"rank\" > ? AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Int(2), Value::Int(101)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        compared.rows.iter().map(|row| &row[0]).collect::<Vec<_>>(),
+        [&Value::Int(103), &Value::Int(104)]
+    );
+
+    let ranged = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE \"rank\" BETWEEN ? AND ? AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Int(2), Value::Int(4), Value::Int(101)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        ranged.rows.iter().map(|row| &row[0]).collect::<Vec<_>>(),
+        [&Value::Int(102), &Value::Int(103)]
+    );
+
+    let not_equal = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE \"group\" != ? AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Text("skip".into()), Value::Int(101)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        not_equal.rows.iter().map(|row| &row[0]).collect::<Vec<_>>(),
+        [&Value::Int(103), &Value::Int(104)]
+    );
+
+    let excluded_members = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE \"group\" NOT IN (?) AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Text("skip".into()), Value::Int(101)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        excluded_members.rows.iter().map(|row| &row[0]).collect::<Vec<_>>(),
+        [&Value::Int(103), &Value::Int(104)]
+    );
+
+    let members = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE \"group\" IN (?) AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Text("keep".into()), Value::Int(101)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        members.rows.iter().map(|row| &row[0]).collect::<Vec<_>>(),
+        [&Value::Int(103), &Value::Int(104)]
+    );
+
+    let alternatives = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_keyset\" WHERE (\"group\" = ? OR \"group\" = ?) AND \"_id\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Text("skip".into()), Value::Text("keep".into()), Value::Int(102)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        alternatives.rows.iter().map(|row| &row[0]).collect::<Vec<_>>(),
+        [&Value::Int(103), &Value::Int(104)]
     );
 }
 

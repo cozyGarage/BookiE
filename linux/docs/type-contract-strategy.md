@@ -34,16 +34,15 @@ and binary UUID `_id` cursors on MongoDB 7 ([tests](../crates/drivers/mongodb/te
 diagnostic measured 2.380 ms at offset 500k and 2.373 ms at offset 999,950,
 compared with 135.902 ms and 266.040 ms through direct offset reads. Raw
 samples and source fingerprints are in the [PR #493 evidence comment](https://github.com/cozyGarage/BookiE/pull/493#issuecomment-6095435772).
-Generated equality, inequality, comparison, `BETWEEN` and `IN`/`NOT IN` pages preserve the filter and offset in
-`filtered_offset_pages_keep_filters_with_and_without_parameters` and preserve
-equality and OR-of-equality filters with the `_id` cursor in
-`filtered_keyset_page_keeps_the_filter_and_cursor`. The offset case also covers
-parameter-free `IS NULL` and `IS NOT NULL`; explicit null and missing BSON
-fields stay distinct; inequality and set membership exclude null and missing
-values according to SQL's three-valued comparisons. Negated ranges, pattern
-operators, sorted and
-keyless deep-page behavior, installed Arch/Wayland, Debian/GNOME and
-network-latency acceptance remain open.
+Generated equality, inequality, comparison, `BETWEEN`, `IN`/`NOT IN`, and
+null pages preserve filters in offset and `_id` keyset queries in
+`filtered_offset_pages_keep_filters_with_and_without_parameters`,
+`filtered_keyset_page_keeps_the_filter_and_cursor`, and
+`null_filtered_keyset_page_excludes_missing_fields`. These cover OR-of-equality,
+bound-parameter order, explicit null versus missing, and SQL's three-valued
+inequality and membership behavior. Null comparison parameters are refused.
+Negated ranges, pattern operators, sorted and keyless deep-page behavior,
+installed Arch/Wayland, Debian/GNOME and network-latency acceptance remain open.
 
 The SQL Server test fixture waits for an authenticated `SELECT 1` as `sa`,
 retrying login rejection for at most 60 seconds after container readiness logs.
