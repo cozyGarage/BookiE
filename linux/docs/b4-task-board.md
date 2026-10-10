@@ -101,7 +101,7 @@ Live acceptance bounds stay above. Open packaging work:
 | ID | Current implementation and validation | Remaining |
 | --- | --- | --- |
 | B4-22 | Complete distribution-package/native Wayland bundle audit acceptance | Hosted installed GTK safety passed 53/53 scenarios on pinned candidate `5db1cfe`, including bundle export/import audit, encrypted credential round-trip and cross-profile import. Package/native Wayland acceptance remains open; see [current candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json) |
-| B4-11 | Extend failed-batch session side-effect coverage | The serialized MySQL rollback selector passed 22/22 on local branch commit `f1c303d`, including new MySQL/MariaDB cases proving a successful `RELEASE_LOCK` and its MyISAM witness survive rollback while the InnoDB row does not. Optional/vendor engines and external acceptance remain open; see [release-lock evidence](evidence/mysql-lock-release-2026-10-10/manifest.json) |
+| B4-11 | Extend failed-batch session side-effect coverage | The serialized MySQL rollback selector passed 20/20 on local branch commit `0e6ce7c`, including MySQL/MariaDB cases proving successful `RELEASE_LOCK` and its MyISAM witness survive rollback while the InnoDB row does not. Optional/vendor engines and external acceptance remain open; see [release-lock evidence](evidence/mysql-lock-release-2026-10-10/manifest.json) |
 
 ## Completed local slices
 

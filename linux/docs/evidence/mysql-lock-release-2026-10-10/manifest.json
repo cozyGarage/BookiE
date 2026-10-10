@@ -2,10 +2,9 @@
   "schema_version": 1,
   "date": "2026-10-10",
   "scope": "B4-11 MySQL and MariaDB RELEASE_LOCK side effects after failed batch rollback",
-  "source_commit": "f1c303d08220e2e7d9876ca2265a927bcf2740f1",
+  "source_commit": "0e6ce7cf20480625f65cdeefb9664f13f06be6c5",
   "source_sha256": {
-    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "2ed873c17110de44a3bf24a4372744a9d373e2a500caeb5424e4828e5037fb65",
-    "crates/drivers/mysql/tests/shared/mysql_atomic_parts/advisory_lock_release.rs": "660a5c8d4f2c7521e255fffe8cafe4a756e104c4d6ab2e81825169c87d6ab0c9"
+    "crates/drivers/mysql/tests/shared/mysql_atomic_parts/advisory_lock.rs": "50265cb53d19de1fb98faac2da176a15e0183a5ccca4d8f6cb3bc88b06d92c03"
   },
   "fixtures": [
     "MySQL 8.1 testcontainers fixture",
@@ -13,7 +12,7 @@
   ],
   "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic -- --include-ignored --test-threads=1",
   "runtime": "Local Omarchy Linux host with Docker; serialized driver selector",
-  "result": "22 passed; 0 failed; 0 ignored; 75 filtered out; 146.42 seconds; exit code 0",
+  "result": "20 passed; 0 failed; 0 ignored; 75 filtered out; 131.80 seconds; exit code 0",
   "assertions": [
     "GET_LOCK succeeds inside the failed batch and a MyISAM witness records its return value on the batch session.",
     "RELEASE_LOCK succeeds on that same session and its MyISAM witness survives the subsequent duplicate-key failure.",
