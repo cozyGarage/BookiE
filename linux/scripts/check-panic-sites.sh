@@ -94,6 +94,7 @@ done
 # left. Sources are rustfmt-formatted, so the closing brace of a test
 # item is a lone `}` at the indentation of its attribute.
 count_panic_sites() {
+  local file=$1
   awk '
     function flush_pending() { pending = 0; indent = "" }
     skipping {
@@ -125,7 +126,7 @@ count_panic_sites() {
       total += n
     }
     END { print total + 0 }
-  ' "$1"
+  ' "$file"
 }
 
 errors=0

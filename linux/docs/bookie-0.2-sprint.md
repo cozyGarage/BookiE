@@ -22,10 +22,10 @@ No 0.2 release is approved. Before a frozen candidate SHA, these stay open
 - B4 [B4]: B4-12 scoped rollback acceptance is complete. Frozen-candidate and
   installed acceptance remains for the other transport rows; B4-11 optional
   engine/effect coverage, AUD-2 hosted acceptance, AUD-9 remaining lineage
-  cases, AUD-11 verdict migration step 4, UI-1b (GTK editor after #490 storage
-  groundwork), UI-13b, TEST-15, PERF-2 and PERF-8 remain. AUD-10 is done
-  (#486). See the [B4 board](b4-task-board.md) and [ledger](known-issues.md)
-  for exact status and evidence.
+  cases, AUD-11 verdict migration step 4 ([#506](https://github.com/cozyGarage/BookiE/pull/506)),
+  UI-1b (GTK editor after #490 storage groundwork), UI-13b, TEST-15, PERF-2
+  and PERF-8 remain. AUD-10 is done (#486). See the [B4 board](b4-task-board.md)
+  and [ledger](known-issues.md) for exact status and evidence.
 - Desktop acceptance [maintainer]: PKG-1 native Wayland on Arch, PKG-2
   Debian/GNOME, PKG-4 Flathub submission and screenshots, PKG-8 the Flatpak
   file-access decision, TEST-6 the 107-item manual checklist.
@@ -40,8 +40,9 @@ Merged `linux` baseline includes PRs #459–#461, #463, #475, #480, #486 and
 fail-closed explain-plan masking, DuckDB selected-file pinning (AUD-10), MySQL
 merge-table rollback coverage, joined policy verdicts (AUD-11 step 3) and
 per-hop SSH secret identities (UI-1b storage). AUD-11 step 4 (drop legacy
-facts) remains; UI-1b GTK editor and acceptance remain. Case detail lives on
-the [B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md),
+facts) remains on open [#506](https://github.com/cozyGarage/BookiE/pull/506);
+UI-1b GTK editor and acceptance remain. Case detail lives on the
+[B3 board](type-contract-strategy.md), [B4 board](b4-task-board.md),
 [value evidence index](value-contracts.md) and [ledger](known-issues.md).
 Dated PR-by-PR continuation notes are in
 [sprint history](archive/bookie-0.2-history.md#archived-from-active-sprint-on-2026-10-09-consolidation).
@@ -62,6 +63,7 @@ These failed or incomplete runs stay open until re-proven on a current SHA:
 | TEST-28 native Ubuntu AT-SPI grid / Columns UI | UX | Container distro-floor passes; native job is the broken surface |
 | TEST-31 intermittent Forgejo GTK / distro-floor timeouts | UX / lab | Executor capacity 3→2 on Debian hosts; next ten full runs decide; tip green alone is not enough |
 | Build Linux on `c2f3f78b9`: Docker Hub `toomanyrequests` | lab | Auth wired (#476); treat as infra retest if anonymous pull returns |
+
 
 Feature gaps against other clients are in
 [the feature comparison](0.2-feature-comparison.md); none is a 0.2 blocker unless

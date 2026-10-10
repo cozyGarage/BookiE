@@ -1,14 +1,57 @@
 {
   "schema_version": 1,
   "scopes": [
-    { "prefix": "crates/core/src/", "package": "tablepro-core", "target": "--lib" },
-    { "prefix": "crates/core/tests/", "package": "tablepro-core", "target": "--tests" },
-    { "prefix": "crates/app/src/", "package": "tablepro-app", "target": "--lib" },
-    { "prefix": "crates/app/tests/", "package": "tablepro-app", "target": "--tests" },
-    { "prefix": "crates/drivers/sqlite/tests/", "package": "tablepro-driver-sqlite", "target": "--tests" },
-    { "prefix": "crates/drivers/postgres/tests/", "package": "tablepro-driver-postgres", "target": "--test=integration" },
-    { "prefix": "crates/mcp/src/", "package": "tablepro-mcp", "target": "--lib" },
-    { "prefix": "crates/drivers/", "path_contains": "/src/", "package_from_manifest": true, "target": "--lib" }
+    {
+      "prefix": "crates/core/src/",
+      "package": "tablepro-core",
+      "target": "--lib"
+    },
+    {
+      "prefix": "crates/core/tests/",
+      "package": "tablepro-core",
+      "target": "--tests"
+    },
+    {
+      "prefix": "crates/app/src/",
+      "package": "tablepro-app",
+      "target": "--lib"
+    },
+    {
+      "prefix": "crates/app/tests/",
+      "package": "tablepro-app",
+      "target": "--tests"
+    },
+    {
+      "prefix": "crates/drivers/sqlite/tests/",
+      "package": "tablepro-driver-sqlite",
+      "target": "--tests"
+    },
+    {
+      "prefix": "crates/drivers/postgres/tests/",
+      "package": "tablepro-driver-postgres",
+      "target": "--test=integration"
+    },
+    {
+      "prefix": "crates/mcp/src/",
+      "package": "tablepro-mcp",
+      "target": "--lib"
+    },
+    {
+      "prefix": "crates/drivers/",
+      "path_contains": "/src/",
+      "package_from_manifest": true,
+      "target": "--lib"
+    },
+    {
+      "prefix": "crates/policy/src/",
+      "package": "tablepro-policy",
+      "target": "--lib"
+    },
+    {
+      "prefix": "crates/policy/tests/",
+      "package": "tablepro-policy",
+      "target": "--tests"
+    }
   ],
   "exact_tests": {
     "crates/core/src/query.rs": {
@@ -99,6 +142,184 @@
         "tests::clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls",
         "tests::clickhouse_response_preserves_explicit_null_cells",
         "tests::clickhouse_json_row_preserves_wide_integer_tokens_exactly"
+      ]
+    },
+    "crates/core/src/export/csv.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::csv::tests::value_contract_csv_keeps_empty_text_distinct_from_null",
+        "export::csv::tests::value_contract_csv_binary_round_trip_preserves_null_empty_and_every_byte",
+        "export::csv::tests::value_contract_csv_round_trip_preserves_signed_integer_boundaries",
+        "export::csv::tests::value_contract_csv_round_trip_preserves_decimal_trailing_zeroes",
+        "export::csv::tests::value_contract_csv_round_trip_keeps_nonfinite_floats_distinct_from_null",
+        "export::csv::tests::value_contract_csv_round_trip_preserves_bool_uuid_and_json"
+      ]
+    },
+    "crates/core/src/export/paged.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::paged::tests::every_page_lands_in_one_file_in_order",
+        "export::paged::tests::a_failing_page_publishes_nothing",
+        "export::paged::tests::cancelling_between_rows_publishes_nothing",
+        "export::paged::tests::a_value_equal_to_the_null_marker_is_refused_instead_of_written"
+      ]
+    },
+    "crates/core/src/export/file.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::file::tests::value_contract_workbook_empty_text_is_refused_without_losing_destination",
+        "export::file::tests::safe_csv_preserves_numbers_and_raw_mode_preserves_text",
+        "export::file::tests::streamed_sqlite_any_csv_preserves_runtime_value_tags",
+        "export::file::tests::file_and_clipboard_agree_and_cancellation_preserves_destination"
+      ]
+    },
+    "crates/core/src/import/csv_import.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "import::csv_import::tests::a_quoted_field_keeps_its_delimiters_and_newlines",
+        "import::csv_import::tests::a_doubled_quote_inside_a_quoted_field_is_one_quote",
+        "import::csv_import::tests::a_field_over_the_length_limit_is_refused_and_names_the_line"
+      ]
+    },
+    "crates/core/src/export/json.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::json::tests::value_contract_nonfinite_numbers_remain_distinct_from_sql_null",
+        "export::json::tests::value_contract_single_row_json_export_preserves_value_types",
+        "export::json::tests::value_contract_clickhouse_wide_integers_remain_exact_json_strings"
+      ]
+    },
+    "crates/core/src/export/html.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::html::tests::value_contract_html_preserves_carriage_returns_through_parser_normalization",
+        "export::html::tests::a_cell_cannot_inject_markup_into_the_exported_page"
+      ]
+    },
+    "crates/core/src/export/xml.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::xml::tests::value_contract_xml_preserves_carriage_returns_and_literal_entity_text",
+        "export::xml::tests::a_cell_cannot_close_its_element_or_open_another"
+      ]
+    },
+    "crates/core/src/export/sql.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::sql::tests::one_insert_is_written_for_each_row_and_the_table_is_qualified_and_quoted",
+        "export::sql::tests::a_value_and_a_column_name_cannot_close_the_statement_they_sit_in"
+      ]
+    },
+    "crates/core/src/export/markdown.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::markdown::tests::markdown_renderer_quotes_text_and_escapes_table_and_inline_markup",
+        "export::markdown::tests::markdown_renderer_distinguishes_text_null_from_sql_null"
+      ]
+    },
+    "crates/core/src/export/in_clause.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::in_clause::tests::in_clause_renderer_quotes_values_and_reports_unusable_values",
+        "export::in_clause::tests::in_clause_uses_dialect_escaping_and_preserves_fractional_time"
+      ]
+    },
+    "crates/core/src/export/xlsx.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "export::xlsx::tests::value_contract_workbook_preserves_wide_integers_and_exact_decimals_as_text",
+        "export::xlsx::tests::a_result_over_the_sheet_limit_is_refused_with_the_limit_in_the_message"
+      ]
+    },
+    "crates/core/src/import/infer.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "import::infer::tests::sqlite_import_types_preserve_storage_affinity_for_numeric_and_binary_kinds",
+        "import::infer::tests::the_narrowest_kind_that_fits_every_value_wins"
+      ]
+    },
+    "crates/core/src/import/plan.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "import::plan::tests::value_contract_postgres_wide_numeric_csv_rows_share_text_cast_parameters",
+        "import::plan::tests::mysql_empty_enum_set_and_varchar_csv_cells_are_reconstructed_without_binding_empty_text"
+      ]
+    },
+    "crates/app/src/ui/export_dialog.rs": {
+      "package": "tablepro-app",
+      "target": "--lib",
+      "tests": [
+        "ui::export_dialog::tests::a_connection_without_sql_literals_is_not_offered_the_statement_format",
+        "ui::export_dialog::tests::the_csv_options_group_belongs_to_csv_alone",
+        "ui::export_dialog::tests::every_offered_format_has_its_own_extension_and_media_type",
+        "ui::export_dialog::tests::a_qualified_result_name_becomes_a_schema_and_table_for_sql_statements"
+      ]
+    },
+    "crates/app/src/ui/connection_row.rs": {
+      "package": "tablepro-app",
+      "target": "--lib",
+      "tests": [
+        "ui::connection_row::tests::kerberos_rows_hide_the_username_separator",
+        "ui::connection_row::tests::a_group_and_tags_extend_the_subtitle",
+        "ui::connection_row::tests::a_palette_colour_adds_its_class_to_the_swatch"
+      ]
+    },
+    "crates/policy/src/rules.rs": {
+      "package": "tablepro-policy",
+      "target": "--lib",
+      "tests": [
+        "rules::tests::human_unscoped_and_ddl_approval_survive_permissive_write_defaults",
+        "rules::tests::agent_unparseable_denied",
+        "rules::tests::read_only_human_cannot_approve_unparseable_sql"
+      ]
+    },
+    "crates/policy/src/sensitive_projection.rs": {
+      "package": "tablepro-policy",
+      "target": "--lib",
+      "tests": [
+        "sensitive_projection::tests::a_cte_alias_keeps_sensitive_lineage",
+        "sensitive_projection::tests::row_to_json_of_a_record_is_treated_as_sensitive",
+        "sensitive_projection::tests::set_operations_and_nested_ctes_fail_closed_for_sensitive_lineage"
+      ]
+    },
+    "crates/policy/src/effects_classification.rs": {
+      "package": "tablepro-policy",
+      "target": "--lib",
+      "tests": [
+        "effects::tests::effects_match_legacy_write_facts_without_changing_legacy_classes",
+        "effects::tests::mixed_write_scripts_get_an_order_independent_class"
+      ]
+    },
+    "crates/policy/src/classify.rs": {
+      "package": "tablepro-policy",
+      "target": "--lib",
+      "tests": [
+        "classify::tests::grant_copy_and_merge_name_their_targets",
+        "classify::tests::delete_without_where",
+        "effects::tests::effects_match_legacy_write_facts_without_changing_legacy_classes"
+      ]
+    },
+    "crates/policy/tests/aud11_s6_s7.rs": {
+      "package": "tablepro-policy",
+      "target": "--test=aud11_s6_s7",
+      "tests": [
+        "malformed_writes_still_need_approval_when_write_approval_is_on",
+        "administrative_host_access_needs_human_approval_in_local_and_staging",
+        "merge_delete_needs_human_approval_in_local_and_staging",
+        "truncate_needs_human_approval_even_when_local_ddl_is_permissive"
       ]
     }
   }

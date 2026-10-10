@@ -13,6 +13,7 @@
 - ClickHouse long text refetch now has a guarded 12,000-byte contract with composite-key and native-value checks.
 - DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.
 - MySQL and MariaDB CHAR results now have `PAD_CHAR_TO_FULL_LENGTH` coverage for padding, VARCHAR, empty values and NULL.
+- MySQL and MariaDB CSV imports preserve impossible calendar dates accepted by `ALLOW_INVALID_DATES`.
 - The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
 - Each statement of a script gets a gutter mark after a run: a tick for a statement that returned, a cross for one that failed.
@@ -149,6 +150,7 @@
 
 ### Security
 
+- Agent result masking now treats `to_json` / `to_jsonb` and JSON object builders the same as `row_to_json` when deciding which columns to redact
 - `SELECT … INTO` is now treated as a write, so read-only connections and agent read access refuse it instead of letting it create a table
 - The row-count estimate that guards large writes no longer runs a side-effecting function in your WHERE clause before you approve the statement; such statements ask for approval without an estimate
 - A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server

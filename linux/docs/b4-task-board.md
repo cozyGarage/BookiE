@@ -15,9 +15,10 @@ Tip includes #458/`Effects`, #459 engine read-only, #460 migration step 2,
 #461 explain-plan masking, #463/#486 DuckDB selected-file pinning (AUD-10
 DONE), #475 `MRG_MyISAM` rollback, #480 joined verdicts (AUD-11 step 3) and
 #490 per-hop SSH secret identities (UI-1b storage groundwork). AUD-11 step 4
-(remove legacy facts and duplicate walkers) remains. Exact local verification
-and acceptance boundaries are recorded below; local runs do not establish
-Forgejo gate or frozen-candidate/package acceptance.
+(remove legacy facts and duplicate walkers) remains on open
+[#506](https://github.com/cozyGarage/BookiE/pull/506). Exact local
+verification and acceptance boundaries are recorded below; local runs do not
+establish Forgejo gate or frozen-candidate/package acceptance.
 
 ## AUD-9 query-plan masking regression (2026-10-10)
 
