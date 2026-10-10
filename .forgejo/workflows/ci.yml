@@ -464,3 +464,6 @@ jobs:
       - name: Advisories, licenses and sources
         run: |
           cd src/linux && python3 scripts/run-test-layer.py supply-chain
+      - name: Vendored crates equal upstream plus their patches
+        run: |
+          cd src/linux && python3 scripts/vendor-patches.py check

@@ -870,7 +870,7 @@ impl ConnectDialog {
         let (username, password) = if self.form.shows_credentials() {
             let entered = self.username.text().trim().to_string();
             let username = if socket && entered.is_empty() {
-                whoami::fallible::username().unwrap_or_default()
+                whoami::username().unwrap_or_default()
             } else {
                 entered
             };
