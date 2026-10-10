@@ -53,8 +53,16 @@ locally on SQLite 3.53.4. On commit `db051ced7`,
 passed, including the typed app tests and installed GTK suite. Forgejo run 132
 on `da6b85129` passed both JSONB selectors; the overall gate failed in the
 consumer tier when the ignored MySQL approval-router test hit
-`WaitContainer(StartupTimeout)`. That selector passed locally. The current head
-needs a clean Forgejo rerun.
+`WaitContainer(StartupTimeout)`. That selector passed locally. PR #488's
+Forgejo run 135 passed all 28 jobs on `0a72980e`; the PR merged as
+`217e3dc7`.
+
+PostgreSQL deep enum-domain parameter inference compares COALESCE, CASE,
+GREATEST and LEAST against native literal inference at depths 63 and 64, with
+the parameter on either side of GREATEST/LEAST. Text, literal `NULL`, empty
+text and SQL NULL preserve the expected parameter, expression and column types
+with both the regular and first-position shadowed `search_path` variants. The
+two focused PostgreSQL 16 Docker tests passed; see the [run evidence and current-head rerun](https://github.com/cozyGarage/BookiE/pull/491#issuecomment-6095567613).
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
