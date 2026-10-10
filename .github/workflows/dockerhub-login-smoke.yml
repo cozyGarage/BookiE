@@ -1,0 +1,38 @@
+name: Docker Hub login smoke
+
+on:
+  pull_request:
+    branches: [linux, main]
+    paths:
+      - ".github/actions/dockerhub-login/**"
+      - ".github/workflows/dockerhub-login-smoke.yml"
+      - ".github/workflows/build-linux.yml"
+      - ".github/workflows/gtk-soak.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhub-login-smoke-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  smoke:
+    name: Login and pull from Docker Hub
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Pull a Hub library image
+        run: |
+          set -euo pipefail
+          docker pull hello-world:latest
+          docker pull debian:testing
+          docker image inspect hello-world:latest debian:testing >/dev/null
+          echo "Authenticated or anonymous Hub pulls succeeded"

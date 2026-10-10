@@ -101,7 +101,14 @@ class CiWorkflowTests(unittest.TestCase):
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
-        for required in ["run-test-layer.py app-server", "/var/run/docker.sock:/var/run/docker.sock"]:
+        for required in [
+            "run-test-layer.py app-server",
+            "/var/run/docker.sock:/var/run/docker.sock",
+            "./.github/actions/dockerhub-login",
+            "secrets.DOCKERHUB_USERNAME",
+            "secrets.DOCKERHUB_TOKEN",
+            "credentials:",
+        ]:
             self.assertIn(required, fast)
         self.assertIn(
             "cargo test --locked -p tablepro-app --features duckdb --lib value_contract_duckdb",
@@ -175,6 +182,24 @@ class CiWorkflowTests(unittest.TestCase):
             "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
             workflow.split("  current-stable-clippy:\n", 1)[1].split("  integration:\n", 1)[0],
         )
+
+    def test_github_docker_hub_jobs_authenticate_when_secrets_exist(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        soak = (ROOT / ".github/workflows/gtk-soak.yml").read_text()
+        action = (ROOT / ".github/actions/dockerhub-login/action.yml").read_text()
+        self.assertIn("if: inputs.username != ''", action)
+        self.assertNotIn("echo \"$DOCKERHUB_TOKEN\"", action)
+        self.assertNotIn("echo '${{ inputs.password }}'", action)
+        for job in ["fast", "gtk-safety", "current-stable-clippy", "duckdb"]:
+            section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+            self.assertIn("image: debian:testing", section, job)
+            self.assertIn("secrets.DOCKERHUB_USERNAME", section, job)
+            self.assertIn("secrets.DOCKERHUB_TOKEN", section, job)
+        for job in ["fast", "integration", "b4-rollback", "driver-tls", "postgres-release"]:
+            section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+            self.assertIn("./.github/actions/dockerhub-login", section, job)
+        self.assertIn("secrets.DOCKERHUB_USERNAME", soak)
+        self.assertIn("secrets.DOCKERHUB_TOKEN", soak)
 
     def test_only_push_and_pr_can_skip_current_stable_clippy(self):
         results = {name: {"result": "success"} for name in checker.REQUIRED}
@@ -283,6 +308,8 @@ class CiWorkflowTests(unittest.TestCase):
         )
         self.assertIn("hashFiles('linux/flatpak/**')", flatpak)
         self.assertNotIn("github.sha }}", flatpak.split("cache-key:", 1)[1].split("\n", 1)[0])
+        self.assertIn("""'["default"]' || '["default","development"]'""", flatpak)
+        self.assertNotIn("matrix.manifest", flatpak)
         contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
         self.assertIn(
             cancel_push_or_pr,

@@ -22,7 +22,10 @@ class MutationWorkflowTests(unittest.TestCase):
             self.assertIn(f"package: tablepro-policy, shard: {shard}/2", mutation)
         self.assertIn("name: mutants-${{ matrix.label }}-${{ github.run_id }}", mutation)
         self.assertIn("if-no-files-found: error", mutation)
-        self.assertIn("branches: [linux]", mutation)
+        triggers = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+        self.assertIn("schedule:", triggers)
+        self.assertIn("workflow_dispatch:", triggers)
+        self.assertNotIn("push:", triggers)
         self.assertIn("cancel-in-progress: false", mutation)
         self.assertIn("--file crates/drivers/postgres/src/decode.rs", mutation)
         self.assertIn("-- --lib", mutation)
