@@ -59,6 +59,47 @@ Forgejo run 115 passed. PR #465 merged as `5727bc8`. The readiness probe does
 not prove the executor's earlier `AuthFailed` was caused by SQL Server's
 script-upgrade window.
 
+SQL-backed browse rows now keep an 8 KiB text/JSON/binary sample and original
+byte count in each materialized grid row. View Value refetches one column using
+the complete primary key through the policy-guarded connection; the query caps
+at two rows and refuses missing or ambiguous matches. PostgreSQL enum/domain
+key casts have planner regressions. Arbitrary SQL editor result grids now use the
+same typed 8 KiB preview and byte count. View Value reads the exact full value
+from the already-returned guarded result instead of rerunning arbitrary SQL.
+The shared result still retains full values and remains the main memory owner.
+Materialized grid rows now read from it without cloning long cell payloads;
+rows detach only when the store replaces its source, preserving held rows and
+pending edits without pinning the old result. A 1 MiB text pointer regression
+checks the full value and preview. The projection test preserves SQL NULL versus
+unfetched cells after replacement (`shared_result_rows_do_not_clone_large_cell_payloads_into_row_objects`);
+`replacing_shared_rows_preserves_edits_on_held_rows` covers pending edits during detachment.
+MongoDB refetches selected fields by `_id`; Redis string refetch binds arbitrary
+key bytes. Local SQLite and
+Docker MySQL service tests refetch a 9,000-byte BLOB by
+composite key and compare its exact returned bytes with native storage oracles;
+the MySQL test also checks `LONGBLOB`, byte length and the native hex prefix. A
+Docker PostgreSQL 16 test uses catalog enum/domain key metadata, confirms both
+native types with `pg_typeof`, and refetches the same-size BLOB through the
+typed composite key. The SQLite test also runs the same parameterized refetch
+through `PolicyGuard` and compares the exact bytes. MySQL and PostgreSQL also
+run the same guarded query; the Docker cases retain native storage and key-type
+oracles. SQL Server now covers the guarded refetch with a composite VARBINARY/
+BIGINT key and checks the 9,000-byte payload against native `DATALENGTH` and
+`fn_varbintohexstr` results (`mssql_value_query_refetches_the_exact_blob_for_a_composite_key`).
+DuckDB now has a feature-gated app-service contract that refetches a 9,000-byte
+BLOB through `PolicyGuard` using a hostile composite key; native storage class,
+length and prefix checks prove the value before refetch. ClickHouse also checks
+a guarded 12,000-byte String refetch with native type/length/prefix oracles.
+MongoDB browse cells now also preview long text, binary and structured values
+and refetch one selected field through a bound `_id` query under `PolicyGuard`.
+Its Docker app-service contract binds an ObjectId and checks exact 9,000-byte
+text, generic binary and nested BSON document values against native MongoDB
+storage. MongoDB browse and paged find requests sort by unique _id before
+applying skip/limit, so page boundaries remain deterministic. Redis string
+refetch binds arbitrary key bytes and checks an exact
+9,000-byte value through `PolicyGuard` against native Redis GET. Arbitrary SQL,
+shared result memory, installed GTK and memory profiling remain open under
+PERF-10.
 SQLite's JSON1 `json_each` runtime values are covered by
 `runtime_typed_values::json_each_values_keep_their_runtime_storage_classes`:
 SQLite `type` and `typeof` oracles distinguish integer, real, text, SQL NULL,
