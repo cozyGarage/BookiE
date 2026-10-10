@@ -46,10 +46,10 @@ async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
         .database("appdb")
         .collection::<Document>("filtered_offset")
         .insert_many([
-            doc! { "_id": 1, "group": "keep", "value": Bson::Null },
-            doc! { "_id": 2, "group": "skip" },
-            doc! { "_id": 3, "group": "keep", "value": Bson::Null },
-            doc! { "_id": 4, "group": "keep", "value": "present" },
+            doc! { "_id": 1, "group": "keep", "rank": 1, "value": Bson::Null },
+            doc! { "_id": 2, "group": "skip", "rank": 2 },
+            doc! { "_id": 3, "group": "keep", "rank": 3, "value": Bson::Null },
+            doc! { "_id": 4, "group": "keep", "rank": 4, "value": "present" },
         ])
         .await
         .unwrap();
@@ -77,6 +77,28 @@ async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
     assert_eq!(alternatives.rows[1][0], Value::Int(2));
     assert_eq!(alternatives.rows[2][0], Value::Int(3));
 
+    let greater_than = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"rank\" > ? LIMIT 2 OFFSET 0",
+            &[Value::Int(2)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(greater_than.rows.len(), 2);
+    assert_eq!(greater_than.rows[0][0], Value::Int(3));
+    assert_eq!(greater_than.rows[1][0], Value::Int(4));
+
+    let between = connection
+        .query_params(
+            "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"rank\" BETWEEN ? AND ? LIMIT 2 OFFSET 0",
+            &[Value::Int(2), Value::Int(3)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(between.rows.len(), 2);
+    assert_eq!(between.rows[0][0], Value::Int(2));
+    assert_eq!(between.rows[1][0], Value::Int(3));
+
     let nulls = connection
         .query_params(
             "SELECT * FROM \"appdb\".\"filtered_offset\" WHERE \"value\" IS NULL LIMIT 2 OFFSET 0",
@@ -84,11 +106,12 @@ async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
         )
         .await
         .unwrap();
+    let value_index = nulls.columns.iter().position(|column| column.name == "value").unwrap();
     assert_eq!(nulls.rows.len(), 2);
     assert_eq!(nulls.rows[0][0], Value::Int(1));
-    assert_eq!(nulls.rows[0][2], Value::Json(serde_json::Value::Null));
+    assert_eq!(nulls.rows[0][value_index], Value::Json(serde_json::Value::Null));
     assert_eq!(nulls.rows[1][0], Value::Int(3));
-    assert_eq!(nulls.rows[1][2], Value::Json(serde_json::Value::Null));
+    assert_eq!(nulls.rows[1][value_index], Value::Json(serde_json::Value::Null));
 
     let present = connection
         .query_params(
@@ -97,9 +120,14 @@ async fn filtered_offset_pages_keep_filters_with_and_without_parameters() {
         )
         .await
         .unwrap();
+    let value_index = present
+        .columns
+        .iter()
+        .position(|column| column.name == "value")
+        .unwrap();
     assert_eq!(present.rows.len(), 1);
     assert_eq!(present.rows[0][0], Value::Int(4));
-    assert_eq!(present.rows[0][2], Value::Json(serde_json::json!("present")));
+    assert_eq!(present.rows[0][value_index], Value::Json(serde_json::json!("present")));
 }
 
 #[tokio::test]

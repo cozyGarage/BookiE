@@ -132,19 +132,20 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
         }),
         Expr::BinaryOp {
             left,
-            op: BinaryOperator::Eq,
+            op:
+                operator @ (BinaryOperator::Eq
+                | BinaryOperator::Gt
+                | BinaryOperator::GtEq
+                | BinaryOperator::Lt
+                | BinaryOperator::LtEq),
             right,
-        } => {
-            let Some(field) = identifier_from_expr(left) else {
-                return Err(browse_filter_error());
-            };
-            let value = value_to_bson(&take_placeholder_value(right, params, index)?)?;
-            Ok(if matches!(value, Bson::Null) {
-                explicit_null_selector(field)
-            } else {
-                doc! { field: value }
-            })
-        }
+        } => comparison_selector(left, operator, right, params, index),
+        Expr::Between {
+            expr,
+            negated: false,
+            low,
+            high,
+        } => between_selector(expr, low, high, params, index),
         Expr::IsNull(inner) => {
             let Some(field) = identifier_from_expr(inner) else {
                 return Err(browse_filter_error());
@@ -161,8 +162,48 @@ fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -
     }
 }
 
+fn comparison_selector(
+    left: &Expr,
+    operator: &BinaryOperator,
+    right: &Expr,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let Some(field) = identifier_from_expr(left) else {
+        return Err(browse_filter_error());
+    };
+    let value = value_to_bson(&take_placeholder_value(right, params, index)?)?;
+    if *operator == BinaryOperator::Eq && matches!(value, Bson::Null) {
+        return Ok(explicit_null_selector(field));
+    }
+    let operator = match operator {
+        BinaryOperator::Eq => "$eq",
+        BinaryOperator::Gt => "$gt",
+        BinaryOperator::GtEq => "$gte",
+        BinaryOperator::Lt => "$lt",
+        BinaryOperator::LtEq => "$lte",
+        _ => return Err(browse_filter_error()),
+    };
+    Ok(doc! { field: { operator: value } })
+}
+
+fn between_selector(
+    expr: &Expr,
+    low: &Expr,
+    high: &Expr,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let Some(field) = identifier_from_expr(expr) else {
+        return Err(browse_filter_error());
+    };
+    let low = value_to_bson(&take_placeholder_value(low, params, index)?)?;
+    let high = value_to_bson(&take_placeholder_value(high, params, index)?)?;
+    Ok(doc! { field: { "$gte": low, "$lte": high } })
+}
+
 fn browse_filter_error() -> DriverError {
-    DriverError::Unsupported("MongoDB browse filters support equality and null predicates".into())
+    DriverError::Unsupported("MongoDB browse filters support equality, comparison, range, and null predicates".into())
 }
 
 fn collect_and_predicates<'a>(expr: &'a Expr, predicates: &mut Vec<&'a Expr>) {
@@ -639,16 +680,14 @@ mod keyset_page_tests {
 
         assert_eq!(parsed.key, None);
         assert_eq!(parsed.offset, 1);
-        assert_eq!(parsed.filter, doc! { "group": "keep" });
+        assert_eq!(parsed.filter, doc! { "group": { "$eq": "keep" } });
     }
 
     #[test]
     fn keyset_page_refuses_other_predicates_projection_and_windows() {
         for sql in [
-            "SELECT * FROM records WHERE _id >= ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? OR _id = ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records JOIN archive ON true WHERE _id > ? LIMIT 50 OFFSET 0",
-            "SELECT * FROM records WHERE value > ? LIMIT 50 OFFSET 0",
             "SELECT value FROM records WHERE _id > ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? LIMIT 0 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? LIMIT 50 OFFSET 1",
