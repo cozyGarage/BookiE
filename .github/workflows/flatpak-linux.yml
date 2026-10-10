@@ -34,6 +34,7 @@ jobs:
           - profile: development
             bundle: bookie-devel.flatpak
             manifest: linux/flatpak/com.tablepro.linux.Devel.json
+    if: ${{ matrix.profile == 'default' || github.event_name != 'pull_request' }}
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
       options: --privileged
