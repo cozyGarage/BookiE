@@ -4,6 +4,8 @@ use sqlx::{Connection as _, Row as _};
 
 #[path = "mysql_atomic_parts/advisory_lock.rs"]
 mod advisory_lock;
+#[path = "mysql_atomic_parts/merge_table.rs"]
+mod merge_table;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -257,6 +259,44 @@ async fn mysql_failed_batch_keeps_direct_inserts_on_nontransactional_engines() {
             "{engine} direct INSERT effects must match its rollback contract"
         );
     }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_failed_batch_merge_table_insert_survives_rollback() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE TABLE merge_backing (id INT NOT NULL) ENGINE=MyISAM")
+        .await
+        .unwrap();
+    conn.execute(
+        "CREATE TABLE merge_effects (id INT NOT NULL) \
+         ENGINE=MRG_MyISAM UNION=(merge_backing) INSERT_METHOD=LAST",
+    )
+    .await
+    .unwrap();
+    conn.execute("INSERT INTO merge_effects VALUES (1)").await.unwrap();
+
+    let batch = vec![
+        ("INSERT INTO merge_effects VALUES (2)".into(), vec![]),
+        ("INSERT INTO missing_merge_effects VALUES (99)".into(), vec![]),
+    ];
+    let error = conn
+        .execute_in_transaction(&batch)
+        .await
+        .expect_err("the missing table must fail after the MERGE write");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+        "MERGE failure must identify statement 1, got {error:?}"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM merge_backing ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+        "the underlying MyISAM write through MERGE survives rollback"
+    );
 }
 
 #[tokio::test]
