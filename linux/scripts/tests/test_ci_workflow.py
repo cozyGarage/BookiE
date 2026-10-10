@@ -163,7 +163,13 @@ class CiWorkflowTests(unittest.TestCase):
         )
         self.assertIn("persist-credentials: false", preflight)
         self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk", ensure)
-        self.assertIn("needs.ensure-ci-gtk-image.outputs.image", fast)
+        self.assertIn('echo "tag=${tag}" >> "$GITHUB_OUTPUT"', ensure)
+        self.assertNotIn('echo "image=', ensure)
+        self.assertIn(
+            "image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}",
+            fast,
+        )
+        self.assertNotIn("needs.ensure-ci-gtk-image.outputs.image", fast)
         self.assertNotIn("prefix-key: linux-preflight", workflow)
         self.assertNotIn("prefix-key: linux-fast-gtk", workflow)
 
@@ -218,12 +224,17 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("echo '${{ inputs.password }}'", action)
         fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
         ensure = re.search(r"^  ensure-ci-gtk-image:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
-        self.assertIn("needs.ensure-ci-gtk-image.outputs.image", fast)
+        self.assertIn(
+            "image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}",
+            fast,
+        )
+        self.assertNotIn("needs.ensure-ci-gtk-image.outputs.image", fast)
         self.assertIn("secrets.GITHUB_TOKEN", fast)
         self.assertIn("./.github/actions/dockerhub-login", fast)
         self.assertIn("secrets.DOCKERHUB_USERNAME", fast)
         self.assertIn("secrets.DOCKERHUB_TOKEN", fast)
         self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk", ensure)
+        self.assertIn("tag: ${{ steps.publish.outputs.tag }}", ensure)
         self.assertIn("./.github/actions/dockerhub-login", ensure)
         for job in ["gtk-safety", "current-stable-clippy", "duckdb"]:
             section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
