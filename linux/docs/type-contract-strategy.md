@@ -48,7 +48,10 @@ key coverage for empty, numeric-looking, literal `NULL` and Unicode text, with
 native storage-class and typed-CSV restore checks. It also covers JSON1
 `json_object()` and `json_array()` as exact text, plus JSONB as native BLOB
 bytes through typed CSV restore. The JSONB driver and app selectors passed
-locally on SQLite 3.53.4; the branch gate has not yet completed.
+locally on SQLite 3.53.4. On commit `db051ced7`,
+`DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh debian:13` also
+passed, including the typed app tests and installed GTK suite; the Forgejo gate
+for the merged branch head has not yet run.
 
 Pick one remaining-scope cell below. Do not treat “Retain established
 contracts” as a fresh runtime pass; look up exact cases in
