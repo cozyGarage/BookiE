@@ -58,7 +58,7 @@ Both processes register the same static drivers and must obtain a `PolicyGuard` 
 
 ## Containers (crates)
 
-Dependencies point downward. `tablepro-core` is the dependency-free contract layer. The UI never depends on a concrete driver crate.
+Dependencies point downward. `tablepro-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; only the two composition roots (`app` and `agentd`) depend on the driver crates.
 
 ```mermaid
 flowchart TB

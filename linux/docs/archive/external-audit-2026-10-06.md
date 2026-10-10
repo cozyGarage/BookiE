@@ -5,8 +5,8 @@ Archived 2026-10-10 from the repository root into `linux/docs/archive/`
 deferred improvement plan for BookiE's Linux application and Rust backend.
 Start implementation after finishing 0.2.0. The
 [active sprint](../bookie-0.2-sprint.md) retains current delivery and
-acceptance authority. [ROADMAP](../../ROADMAP.md) links here for later review.
-No workspace move,
+acceptance authority. [PLAN](../../../PLAN.md) and
+[ROADMAP](../../ROADMAP.md) link here for later review. No workspace move,
 workflow rollout or driver addition was implemented in this audit.
 
 The objective is a clear root workspace, independently testable Rust services,
@@ -52,7 +52,7 @@ Proposed layout:
 
 ```text
 Cargo.toml / Cargo.lock / rust-toolchain.toml
-README.md / CONTRIBUTING.md / CHANGELOG.md / ROADMAP.md
+README.md / CONTRIBUTING.md / CHANGELOG.md / PLAN.md / ROADMAP.md
 CLAUDE.md / LICENSE / docs/archive/external-audit-2026-10-06.md
 .github/                 forms, PR template, workflows, GitHub-specific helpers
 crates/                  existing app/core/policy/storage/ssh/transport/mcp/
