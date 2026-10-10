@@ -97,6 +97,11 @@ fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnecti
 
     let canonical = std::fs::canonicalize(path).map_err(map_file_error)?;
     let before_open = std::fs::metadata(&canonical).map_err(map_file_error)?;
+    if !before_open.is_file() {
+        return Err(DriverError::PolicyDenied(
+            "the selected DuckDB input must be a regular file".into(),
+        ));
+    }
     let file = File::open(&canonical).map_err(map_file_error)?;
     let opened = file.metadata().map_err(map_file_error)?;
     let after_open = std::fs::metadata(&canonical).map_err(map_file_error)?;

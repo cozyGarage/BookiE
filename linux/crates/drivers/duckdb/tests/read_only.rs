@@ -153,6 +153,37 @@ async fn a_read_only_flat_file_connection_fails_closed_if_the_selected_path_is_r
 }
 
 #[cfg(target_os = "linux")]
+#[test]
+fn a_read_only_flat_file_connection_refuses_a_fifo_without_blocking() {
+    use std::{process::Command, sync::mpsc, time::Duration};
+
+    let dir = tempfile::tempdir().unwrap();
+    let fifo = dir.path().join("pipe.csv");
+    let status = Command::new("mkfifo").arg(&fifo).status().unwrap();
+    assert!(status.success());
+
+    let path = fifo.to_string_lossy().into_owned();
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = runtime.block_on(DuckdbDriver.connect(ConnectOptions {
+            database: path,
+            read_only: true,
+            ..ConnectOptions::default()
+        }));
+        let _ = sender.send(result.is_err());
+    });
+
+    let refused = receiver
+        .recv_timeout(Duration::from_secs(2))
+        .expect("FIFO detection must finish without waiting for a writer");
+    assert!(refused, "a FIFO is not a regular data file");
+}
+
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn a_read_only_flat_file_connection_accepts_a_symlink_to_the_selected_file() {
     use std::os::unix::fs::symlink;
