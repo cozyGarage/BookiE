@@ -1,7 +1,7 @@
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::{Document, doc};
 use std::time::Instant;
-use tablepro_core::DatabaseDriver;
+use tablepro_core::{DatabaseDriver, KEYSET_OFFSET_THRESHOLD, Value};
 
 #[tokio::test]
 #[ignore = "requires docker; diagnostic timing only"]
@@ -45,6 +45,27 @@ async fn value_contract_mongodb_census_scan_cost_profile() {
                 page_samples.iter().map(|sample| sample.as_micros()).collect::<Vec<_>>(),
                 page_samples[2].as_micros(),
             );
+            if offset >= KEYSET_OFFSET_THRESHOLD {
+                let cursor = i64::try_from(offset - 1).expect("profile cursor fits int64");
+                let query =
+                    format!("SELECT * FROM \"appdb\".\"{collection_name}\" WHERE \"_id\" > ? LIMIT 50 OFFSET 0");
+                let mut keyset_samples = Vec::with_capacity(5);
+                for _ in 0..5 {
+                    let started = Instant::now();
+                    let page = connection.query_params(&query, &[Value::Int(cursor)]).await.unwrap();
+                    keyset_samples.push(started.elapsed());
+                    assert_eq!(page.rows.len(), 50);
+                }
+                keyset_samples.sort_unstable();
+                println!(
+                    "keyset_page rows={size} offset={offset} samples_us={:?} median_us={}",
+                    keyset_samples
+                        .iter()
+                        .map(|sample| sample.as_micros())
+                        .collect::<Vec<_>>(),
+                    keyset_samples[2].as_micros(),
+                );
+            }
         }
         census_samples.sort_unstable();
         println!(
