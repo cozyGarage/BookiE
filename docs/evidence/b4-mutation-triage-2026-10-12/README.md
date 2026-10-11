@@ -1,6 +1,6 @@
 # B4 bounded mutation triage
 
-The focused checks below ran on 2026-10-12 in branch `b4/durable-audit-sync-triage`, after merging `linux` at `3f7791d576cb7edac7732c263035f4da6ba52092`. The maintainer-designated TEST-15 candidate was `bbdc39a430ede9382bc5dfa7164e51a065e2bd88`. The B4 policy, SSH, storage, transport, MCP, agent and driver source trees are unchanged between those SHAs. The branch also contains later ledger-checker and documentation changes, so this is not a claim that the full repository tree is identical.
+The initial masking and SSH mutation probes ran on 2026-10-12 in branch `b4/durable-audit-sync-triage` after merging `linux` at `3f7791d576cb7edac7732c263035f4da6ba52092`. `linux` then advanced to `eff1a52d019b34b6b68e1c5e149cf2083389f6bf`; after that merge, the bundle rollback mutants and unmutated cleanup selectors passed on branch commit `1d40fbedb25add03ef1233575774fd04a1de00f5`. The intervening `linux` change was outside the B4 source trees. The maintainer-designated TEST-15 candidate was `bbdc39a430ede9382bc5dfa7164e51a065e2bd88`; B4 policy, SSH, storage, transport, MCP, agent and driver source trees match that candidate. This is not a claim that the full repository tree is identical.
 
 ## Results
 
