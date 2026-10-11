@@ -12,7 +12,7 @@ The [0.2.0 scope](0.2.0-scope.md) owns blockers. The three demonstrated implemen
 
 | Work | Implementation | Exit before candidate freeze |
 | --- | --- | --- |
-| AUD-9 hidden projection sources | [#537](https://github.com/cozyGarage/BookiE/pull/537) merged: unknown derived/renamed sources and whole records fail closed, ordinary qualified columns remain visible | Explicit native outer-alias regression and mutation survivor tests pass locally; exact frozen-candidate PostgreSQL release/Forgejo acceptance remains |
+| AUD-9 hidden projection sources | [#537](https://github.com/cozyGarage/BookiE/pull/537) merged: unknown derived/renamed sources and whole records fail closed, ordinary qualified columns remain visible | Explicit native outer-alias and human-visibility regressions pass locally; exact frozen-candidate PostgreSQL release/Forgejo acceptance remains |
 | Early session refusal audit | [#538](https://github.com/cozyGarage/BookiE/pull/538) merged: snapshot writes, structural refusals, retired-session calls and write-lockdown refusals record a Denied terminal outcome without dispatch | No further implementation; frozen-candidate audit acceptance remains |
 | UI-13b snapshot-or-refusal | [#539](https://github.com/cozyGarage/BookiE/pull/539) merged: unsupported full export is refused before source/destination access; loaded-result and current-page export remain | No further B4 implementation; the UX lane owns remaining app/package acceptance |
 
