@@ -13,10 +13,11 @@ The focused checks below ran on 2026-10-12 in branch `b4/durable-audit-sync-tria
 | Host-key refusal | Accept every key in `check_server_key` | The existing decline test still passes. This mutation is redundant at the authentication boundary: `connect_and_auth` checks the recorded unknown-key outcome before authentication. The handshake return value alone does not grant a session. See [log](host-key-accept-all-mutant.txt) and the source trace recorded there. |
 | Per-hop secrets | Return an empty saved password for every SSH hop | Killed by `password_auth_uses_the_secret_bound_to_each_hop`. |
 | Per-hop secrets | Omit every saved private-key passphrase | Killed by `private_key_passphrases_use_the_secret_bound_to_each_hop`. |
-| Bundle rollback | Make the bundle secret-storage adapter a no-op | Killed by `rolling_back_a_bundle_import_removes_its_per_hop_credentials`. |
+| Bundle rollback | Make the bundle storage adapter a no-op | Killed by `rolling_back_a_bundle_import_removes_its_per_hop_credentials`, which requires the imported secret to exist before cleanup. This alone did not mutate the rollback path. |
+| Bundle rollback | Make legacy credential deletion a no-op, then make per-hop password deletion a no-op | Both mutations are killed by their cleanup selectors after a successful store. Both selectors pass on unmutated source. See [log](bundle-rollback-mutants.txt). |
 | Durable audit | Skip parent sync, invert the created-file guard, or skip parent-directory sync | All three mutations were killed by the new `durable_creation_propagates_parent_sync_failure` regression. See [log](durable-parent-sync-mutation.txt). |
 
-The two new regressions pass without mutations. The mutation runs are targeted probes, not a full mutation campaign. The host-key accept-all result is not treated as a killed mutant; it identifies an equivalent mutation for the tested externally visible authentication flow.
+The two new regressions pass without mutations. The mutation runs are targeted probes, not a full mutation campaign. The host-key accept-all result is not treated as a killed mutant; it identifies an equivalent mutation for the tested externally visible authentication flow. The bundle adapter no-op probe is retained as supporting evidence, but the explicit cleanup mutants above provide the rollback-path proof.
 
 ## Remaining acceptance
 
