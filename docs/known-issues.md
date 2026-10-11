@@ -85,7 +85,7 @@ table in the same commit.
 
 | Row | Decision | B4 may edit | UX may edit |
 | --- | --- | --- | --- |
-| TEST-15 terminal refusal audit | B: B4 keeps write-lockdown refusals on the existing guard audit path; UX reviews consumer expectations | `linux/crates/policy/src/guard.rs`, session refusal helpers and tests, `linux/crates/mcp/tests/timeout_audit.rs` | Review consumer audit expectations; no MCP or app runtime change outside policy |
+| TEST-15 terminal refusal audit | B: B4 keeps write-lockdown refusals on the existing guard audit path; UX reviews consumer expectations | `crates/policy/src/guard.rs`, session refusal helpers and tests, `crates/mcp/tests/timeout_audit.rs` | Review consumer audit expectations; no MCP or app runtime change outside policy |
 
 ### B4/UX handoff, 2026-10-10
 
