@@ -13,4 +13,5 @@ This page is a pointer. The pre-migration board (release wrap-up, TEST-15 accept
 | 0.2.0 blockers and order | [Sprint](bookie-0.2-sprint.md), [0.2.0 scope](0.2.0-scope.md) |
 | Frozen-candidate TEST-15 and installed acceptance commands | [Archived board](archive/b4-task-board-pre-project-migration-2026-10-12.md#test-15-release-acceptance-list) |
 | Focused release triage | [evidence/b4-release-triage-2026-10-11/triage.md](evidence/b4-release-triage-2026-10-11/triage.md) |
+| Bounded mutation survivor triage | [evidence/b4-mutation-triage-2026-10-12/README.md](evidence/b4-mutation-triage-2026-10-12/README.md) |
 | Frozen-candidate local TEST-15 checks | [evidence/test15-bbdc39a/manifest.json](evidence/test15-bbdc39a/manifest.json) |
