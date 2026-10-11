@@ -85,7 +85,7 @@ table in the same commit.
 
 | Row | Decision | B4 may edit | UX may edit |
 | --- | --- | --- | --- |
-| UI-13b snapshot-or-refusal | B: B4 enforces ADR 0014 before exposing unsupported full exports; UX reviews the dialog and user-facing copy | `linux/crates/app/src/ui/export_dialog.rs`, `linux/crates/app/src/ui/export_dialog/file.rs`, their tests, `linux/scripts/isolated-tests.json`, generated ignored-test inventory, translation catalog and related release/user documentation | Review dialog, current-result export preservation and installed acceptance; snapshot implementation remains backlog |
+| UI-13b snapshot-or-refusal | B: B4 enforces ADR 0014 before exposing unsupported full exports; UX reviews the dialog and user-facing copy | `crates/app/src/ui/export_dialog.rs`, `crates/app/src/ui/export_dialog/file.rs`, their tests, `scripts/isolated-tests.json`, generated ignored-test inventory, translation catalog and related release/user documentation | Review dialog, current-result export preservation and installed acceptance; snapshot implementation remains backlog |
 
 ### B4/UX handoff, 2026-10-10
 
