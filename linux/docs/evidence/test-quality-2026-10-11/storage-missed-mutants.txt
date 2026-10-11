@@ -1,0 +1,231 @@
+crates/storage/src/audit_journal.rs:67:9: replace AuditJournalRecovery::unresolved_operation_ids -> &[Uuid] with Vec::leak(Vec::new())
+crates/storage/src/audit_journal.rs:177:29: replace > with == in AuditJournal::recent
+crates/storage/src/audit_journal.rs:177:29: replace > with >= in AuditJournal::recent
+crates/storage/src/audit_journal.rs:178:56: replace - with + in AuditJournal::recent
+crates/storage/src/audit_journal.rs:178:56: replace - with / in AuditJournal::recent
+crates/storage/src/audit_journal.rs:196:5: replace writer_for -> Arc<Mutex<()>> with Arc::new(Mutex::new(()))
+crates/storage/src/audit_journal.rs:198:54: replace > with == in writer_for
+crates/storage/src/audit_journal.rs:198:54: replace > with < in writer_for
+crates/storage/src/audit_journal.rs:198:54: replace > with >= in writer_for
+crates/storage/src/audit_journal.rs:290:71: replace | with ^ in try_exclusive_lock
+crates/storage/src/audit_journal.rs:302:5: replace acquire_shared_lock -> Result<(), StorageError> with Ok(())
+crates/storage/src/audit_journal.rs:310:19: delete ! in open_file_with_options
+crates/storage/src/audit_journal.rs:322:5: replace sync_created_file_and_parent -> Result<(), StorageError> with Ok(())
+crates/storage/src/audit_journal.rs:322:8: delete ! in sync_created_file_and_parent
+crates/storage/src/audit_journal.rs:330:5: replace sync_parent -> Result<(), StorageError> with Ok(())
+crates/storage/src/audit_journal.rs:446:28: replace && with || in verify_locked
+crates/storage/src/audit_journal.rs:446:16: delete ! in verify_locked
+crates/storage/src/audit_journal.rs:456:23: replace match guard !terminated && recover_partial with true in verify_locked
+crates/storage/src/audit_journal.rs:456:35: replace && with || in verify_locked
+crates/storage/src/audit_journal.rs:471:24: replace && with || in verify_locked
+crates/storage/src/audit_journal.rs:640:5: replace legacy_default_session -> String with String::new()
+crates/storage/src/audit_journal.rs:640:5: replace legacy_default_session -> String with "xyzzy".into()
+crates/storage/src/audit_journal.rs:689:9: replace <impl Drop for FileLock>::drop with ()
+crates/storage/src/audit_journal.rs:700:5: replace journal_path -> Result<PathBuf, StorageError> with Ok(Default::default())
+crates/storage/src/audit_journal.rs:708:13: replace || with && in <impl AuditSink for AuditJournal>::record
+crates/storage/src/audit_journal.rs:707:13: replace || with && in <impl AuditSink for AuditJournal>::record
+crates/storage/src/audit_journal.rs:706:35: replace == with != in <impl AuditSink for AuditJournal>::record
+crates/storage/src/audit_journal.rs:707:38: replace == with != in <impl AuditSink for AuditJournal>::record
+crates/storage/src/connection_bundle.rs:27:47: replace * with +
+crates/storage/src/connection_bundle.rs:27:40: replace * with +
+crates/storage/src/connection_bundle.rs:243:9: replace <impl std::fmt::Debug for BundleSshSecret>::fmt -> std::fmt::Result with Ok(Default::default())
+crates/storage/src/connection_bundle.rs:283:9: replace BundleSecrets::is_empty -> bool with true
+crates/storage/src/connection_bundle.rs:283:9: replace BundleSecrets::is_empty -> bool with false
+crates/storage/src/connection_bundle.rs:286:13: replace && with || in BundleSecrets::is_empty
+crates/storage/src/connection_bundle.rs:285:13: replace && with || in BundleSecrets::is_empty
+crates/storage/src/connection_bundle.rs:284:13: replace && with || in BundleSecrets::is_empty
+crates/storage/src/connection_bundle.rs:298:9: replace BundleSecrets::ssh_passphrase -> Option<&SecretString> with None
+crates/storage/src/connection_bundle.rs:452:19: replace > with == in finish
+crates/storage/src/connection_bundle.rs:452:19: replace > with >= in finish
+crates/storage/src/connection_bundle.rs:475:9: replace <impl std::fmt::Debug for EncryptedBundle>::fmt -> std::fmt::Result with Ok(Default::default())
+crates/storage/src/connection_bundle.rs:480:20: replace > with >= in parse_bundle
+crates/storage/src/connection_bundle.rs:506:58: replace || with && in parse_plaintext
+crates/storage/src/connection_bundle.rs:506:30: replace || with && in parse_plaintext
+crates/storage/src/connection_bundle.rs:528:25: replace > with == in parse_encrypted
+crates/storage/src/connection_bundle.rs:528:25: replace > with >= in parse_encrypted
+crates/storage/src/connection_bundle.rs:560:31: replace > with == in check_body_bounds
+crates/storage/src/connection_bundle.rs:560:31: replace > with >= in check_body_bounds
+crates/storage/src/connection_bundle.rs:612:17: replace || with && in check_body_bounds
+crates/storage/src/connection_bundle.rs:611:17: replace || with && in check_body_bounds
+crates/storage/src/connection_bundle.rs:645:5: replace collect_bundle_secrets -> Result<Vec<BundleSecrets>, BundleError> with Ok(vec![])
+crates/storage/src/connection_bundle.rs:655:5: replace collect_connection_bundle_secrets -> Result<Option<BundleSecrets>, BundleError> with Ok(None)
+crates/storage/src/connection_bundle.rs:667:9: delete ! in collect_connection_bundle_secrets
+crates/storage/src/connection_bundle.rs:675:5: replace collect_ssh_bundle_secrets -> Result<(), BundleError> with Ok(())
+crates/storage/src/connection_bundle.rs:680:36: replace == with != in collect_ssh_bundle_secrets
+crates/storage/src/connection_bundle.rs:681:22: replace == with != in collect_ssh_bundle_secrets
+crates/storage/src/connection_bundle.rs:699:5: replace collect_legacy_ssh_secret -> Result<(), BundleError> with Ok(())
+crates/storage/src/connection_bundle.rs:723:5: replace collect_versioned_ssh_secret -> Result<Option<BundleSshSecret>, BundleError> with Ok(None)
+crates/storage/src/connection_bundle.rs:760:5: replace store_bundle_secrets -> Result<(), crate::error::StorageError> with Ok(())
+crates/storage/src/connection_bundle.rs:783:5: replace forget_imported_bundle_secrets with ()
+crates/storage/src/connection_bundle.rs:771:5: replace forget_imported_secrets with ()
+crates/storage/src/connection_bundle.rs:900:5: replace stricter_tls -> TlsMode with Default::default()
+crates/storage/src/connection_bundle.rs:900:24: replace > with >= in stricter_tls
+crates/storage/src/connection_bundle.rs:913:32: replace > with >= in higher_environment
+crates/storage/src/connection_bundle_crypto.rs:110:46: replace || with && in open
+crates/storage/src/connection_organization.rs:12:53: replace * with +
+crates/storage/src/connection_organization.rs:12:46: replace * with +
+crates/storage/src/connection_organization.rs:45:5: replace is_not_set -> bool with false
+crates/storage/src/connection_organization.rs:104:31: replace || with && in ConnectionOrganization::sanitized
+crates/storage/src/connection_organization.rs:104:54: replace > with == in ConnectionOrganization::sanitized
+crates/storage/src/connection_organization.rs:104:54: replace > with >= in ConnectionOrganization::sanitized
+crates/storage/src/connection_organization.rs:149:9: replace <impl PartialEq for ConnectionOrganizationIndex>::eq -> bool with true
+crates/storage/src/connection_organization.rs:183:9: replace ConnectionOrganizationIndex::remove with ()
+crates/storage/src/connection_organization.rs:211:5: replace load_organization -> Result<ConnectionOrganizationIndex, StorageError> with Ok(Default::default())
+crates/storage/src/connection_organization.rs:215:5: replace save_organization -> Result<(), StorageError> with Ok(())
+crates/storage/src/connection_organization.rs:240:31: replace > with == in load_file
+crates/storage/src/connection_organization.rs:240:31: replace > with >= in load_file
+crates/storage/src/connection_organization.rs:251:22: replace > with == in sanitized_entries
+crates/storage/src/connection_organization.rs:251:22: replace > with >= in sanitized_entries
+crates/storage/src/connection_organization.rs:284:51: replace != with == in save_to
+crates/storage/src/connection_organization.rs:299:22: replace > with == in save_to
+crates/storage/src/connection_organization.rs:299:22: replace > with >= in save_to
+crates/storage/src/connection_organization.rs:310:19: replace > with == in save_to
+crates/storage/src/connection_organization.rs:310:19: replace > with >= in save_to
+crates/storage/src/connection_organization.rs:320:5: replace organization_path -> Result<PathBuf, StorageError> with Ok(Default::default())
+crates/storage/src/connection_organization.rs:331:33: replace < with <= in distinct_labels
+crates/storage/src/connection_organization.rs:342:30: replace > with >= in validate_label
+crates/storage/src/connection_url.rs:45:18: replace > with == in parse_connection_url
+crates/storage/src/connection_url.rs:45:18: replace > with >= in parse_connection_url
+crates/storage/src/connection_url.rs:48:43: replace || with && in parse_connection_url
+crates/storage/src/connection_url.rs:85:33: replace match guard !secret.is_empty() with true in parse_connection_url
+crates/storage/src/connection_url.rs:168:19: replace > with == in validate_host
+crates/storage/src/connection_url.rs:168:19: replace > with >= in validate_host
+crates/storage/src/connection_url.rs:183:18: replace > with == in decode_field
+crates/storage/src/connection_url.rs:183:18: replace > with >= in decode_field
+crates/storage/src/connection_url.rs:225:9: delete match arm b'a'..= b'f' in hex_value
+crates/storage/src/connection_url.rs:225:41: replace + with - in hex_value
+crates/storage/src/connection_url.rs:225:34: replace - with + in hex_value
+crates/storage/src/connection_url.rs:225:34: replace - with / in hex_value
+crates/storage/src/connections.rs:12:46: replace * with +
+crates/storage/src/connections.rs:14:46: replace * with +
+crates/storage/src/connections.rs:145:9: replace SshClient::is_builtin -> bool with true
+crates/storage/src/connections.rs:145:9: replace SshClient::is_builtin -> bool with false
+crates/storage/src/connections.rs:145:15: replace == with != in SshClient::is_builtin
+crates/storage/src/connections.rs:180:5: replace load_connections -> Result<Vec<SavedConnection>, StorageError> with Ok(vec![])
+crates/storage/src/connections.rs:184:5: replace save_connections -> Result<(), StorageError> with Ok(())
+crates/storage/src/connections.rs:188:5: replace delete_connection -> Result<(), StorageError> with Ok(())
+crates/storage/src/connections.rs:195:5: replace apply_import -> Result<(), StorageError> with Ok(())
+crates/storage/src/connections.rs:216:5: replace restore_connection -> Result<(), StorageError> with Ok(())
+crates/storage/src/connections.rs:266:48: replace != with == in delete_from
+crates/storage/src/connections.rs:276:5: replace touch_last_opened -> Result<(), StorageError> with Ok(())
+crates/storage/src/connections.rs:280:5: replace touch_last_opened_from -> Result<(), StorageError> with Ok(())
+crates/storage/src/connections.rs:282:80: replace == with != in touch_last_opened_from
+crates/storage/src/connections.rs:305:5: replace upsert_to -> Result<(), StorageError> with Ok(())
+crates/storage/src/connections.rs:327:19: replace > with >= in save_to_unlocked
+crates/storage/src/connections.rs:361:26: replace > with >= in validate_connections
+crates/storage/src/connections.rs:418:13: replace > with >= in validate_value_size
+crates/storage/src/favorites.rs:12:51: replace * with +
+crates/storage/src/connections.rs:468:5: replace connections_path -> Result<PathBuf, StorageError> with Ok(Default::default())
+crates/storage/src/favorites.rs:12:44: replace * with +
+crates/storage/src/favorites.rs:14:44: replace * with +
+crates/storage/src/favorites.rs:63:5: replace load_favorites -> Result<Vec<SavedQuery>, StorageError> with Ok(vec![])
+crates/storage/src/favorites.rs:67:5: replace save_favorite -> Result<Vec<SavedQuery>, StorageError> with Ok(vec![])
+crates/storage/src/favorites.rs:71:5: replace delete_favorite -> Result<Vec<SavedQuery>, StorageError> with Ok(vec![])
+crates/storage/src/favorites.rs:75:5: replace touch_favorite -> Result<(), StorageError> with Ok(())
+crates/storage/src/favorites.rs:88:5: replace delete_favorite_from -> Result<Vec<SavedQuery>, StorageError> with Ok(vec![])
+crates/storage/src/favorites.rs:90:44: replace != with == in delete_favorite_from
+crates/storage/src/favorites.rs:96:5: replace touch_favorite_from -> Result<(), StorageError> with Ok(())
+crates/storage/src/favorites.rs:98:74: replace == with != in touch_favorite_from
+crates/storage/src/favorites.rs:142:28: replace > with == in validate_favorite
+crates/storage/src/favorites.rs:142:28: replace > with >= in validate_favorite
+crates/storage/src/favorites.rs:156:20: replace > with == in validate_required_text
+crates/storage/src/favorites.rs:156:20: replace > with >= in validate_required_text
+crates/storage/src/favorites.rs:203:29: replace > with == in load_document
+crates/storage/src/favorites.rs:203:29: replace > with >= in load_document
+crates/storage/src/favorites.rs:243:19: replace > with == in save_to_unlocked
+crates/storage/src/favorites.rs:243:19: replace > with >= in save_to_unlocked
+crates/storage/src/favorites.rs:290:5: replace favorites_path -> Result<PathBuf, StorageError> with Ok(Default::default())
+crates/storage/src/file_access.rs:28:52: replace > with < in lock_path
+crates/storage/src/file_access.rs:28:52: replace > with == in lock_path
+crates/storage/src/file_access.rs:28:52: replace > with >= in lock_path
+crates/storage/src/file_access.rs:71:39: replace | with & in open_and_lock
+crates/storage/src/file_access.rs:71:39: replace | with ^ in open_and_lock
+crates/storage/src/file_access.rs:79:25: replace != with == in open_and_lock
+crates/storage/src/file_access.rs:99:23: replace match guard error.kind() == std::io::ErrorKind::NotFound with true in read_bounded_blocking
+crates/storage/src/file_access.rs:95:39: replace | with & in read_bounded_blocking
+crates/storage/src/file_access.rs:95:39: replace | with ^ in read_bounded_blocking
+crates/storage/src/file_access.rs:103:13: replace > with == in read_bounded_blocking
+crates/storage/src/file_access.rs:103:13: replace > with >= in read_bounded_blocking
+crates/storage/src/file_access.rs:109:20: replace > with == in read_bounded_blocking
+crates/storage/src/file_access.rs:109:20: replace > with >= in read_bounded_blocking
+crates/storage/src/paths.rs:22:5: replace config_path -> Result<PathBuf, StorageError> with Ok(Default::default())
+crates/storage/src/paths.rs:30:5: replace data_path -> Result<PathBuf, StorageError> with Ok(Default::default())
+crates/storage/src/query_history.rs:12:37: replace * with +
+crates/storage/src/query_history.rs:40:13: delete match arm "browse" in Source::from_stored
+crates/storage/src/query_history.rs:95:5: replace default_db_path -> Option<PathBuf> with Some(Default::default())
+crates/storage/src/query_history.rs:95:5: replace default_db_path -> Option<PathBuf> with None
+crates/storage/src/query_history.rs:118:20: replace && with || in HistoryStore::open
+crates/storage/src/query_history.rs:118:50: replace < with <= in HistoryStore::open
+crates/storage/src/query_history.rs:145:29: replace == with != in create_private_file_if_missing
+crates/storage/src/query_history.rs:263:21: replace match guard meta.file_type().is_file() with true in backup_before_migration
+crates/storage/src/query_history.rs:263:21: replace match guard meta.file_type().is_file() with false in backup_before_migration
+crates/storage/src/query_history.rs:265:19: replace match guard e.kind() == std::io::ErrorKind::NotFound with true in backup_before_migration
+crates/storage/src/query_history.rs:297:5: replace to_unix -> i64 with 0
+crates/storage/src/query_history.rs:297:5: replace to_unix -> i64 with 1
+crates/storage/src/query_history.rs:297:5: replace to_unix -> i64 with -1
+crates/storage/src/query_history.rs:299:19: delete - in to_unix
+crates/storage/src/query_history.rs:305:20: replace + with - in from_unix
+crates/storage/src/query_history.rs:307:20: replace - with + in from_unix
+crates/storage/src/query_history.rs:307:54: delete - in from_unix
+crates/storage/src/query_history.rs:313:30: replace > with >= in HistoryStore::record
+crates/storage/src/query_history.rs:384:37: replace == with != in HistoryStore::search
+crates/storage/src/query_history.rs:438:32: replace != with == in HistoryStore::row_to_entry
+crates/storage/src/query_history.rs:439:36: replace != with == in HistoryStore::row_to_entry
+crates/storage/src/query_history.rs:440:30: replace != with == in HistoryStore::row_to_entry
+crates/storage/src/query_history.rs:447:9: replace HistoryStore::set_pinned -> Result<(), StorageError> with Ok(())
+crates/storage/src/query_history.rs:457:9: replace HistoryStore::delete -> Result<(), StorageError> with Ok(())
+crates/storage/src/query_history.rs:466:9: replace HistoryStore::delete_many -> Result<usize, StorageError> with Ok(0)
+crates/storage/src/query_history.rs:466:9: replace HistoryStore::delete_many -> Result<usize, StorageError> with Ok(1)
+crates/storage/src/query_history.rs:481:9: replace HistoryStore::clear_all -> Result<usize, StorageError> with Ok(0)
+crates/storage/src/query_history.rs:481:9: replace HistoryStore::clear_all -> Result<usize, StorageError> with Ok(1)
+crates/storage/src/query_history.rs:487:9: replace HistoryStore::prune_older_than -> Result<usize, StorageError> with Ok(0)
+crates/storage/src/query_history.rs:487:9: replace HistoryStore::prune_older_than -> Result<usize, StorageError> with Ok(1)
+crates/storage/src/query_history.rs:487:27: replace == with != in HistoryStore::prune_older_than
+crates/storage/src/query_history.rs:491:40: replace - with + in HistoryStore::prune_older_than
+crates/storage/src/query_history.rs:491:95: replace * with + in HistoryStore::prune_older_than
+crates/storage/src/query_history.rs:491:95: replace * with / in HistoryStore::prune_older_than
+crates/storage/src/query_history.rs:502:9: replace HistoryStore::fetch_by_ids -> Result<Vec<Entry>, StorageError> with Ok(vec![])
+crates/storage/src/query_history.rs:521:9: replace HistoryStore::export_sql -> Result<String, StorageError> with Ok(String::new())
+crates/storage/src/query_history.rs:521:9: replace HistoryStore::export_sql -> Result<String, StorageError> with Ok("xyzzy".into())
+crates/storage/src/query_history.rs:543:16: delete ! in HistoryStore::export_sql
+crates/storage/src/query_history.rs:552:9: replace HistoryStore::export_csv -> Result<String, StorageError> with Ok(String::new())
+crates/storage/src/query_history.rs:552:9: replace HistoryStore::export_csv -> Result<String, StorageError> with Ok("xyzzy".into())
+crates/storage/src/secrets.rs:32:5: replace store_password -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:36:5: replace load_password -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/secrets.rs:36:5: replace load_password -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/secrets.rs:40:5: replace delete_password -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:44:5: replace store_ssh_password -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:48:5: replace load_ssh_password -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/secrets.rs:48:5: replace load_ssh_password -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/secrets.rs:52:5: replace delete_ssh_password -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:56:5: replace store_ssh_passphrase -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:60:5: replace load_ssh_passphrase -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/secrets.rs:60:5: replace load_ssh_passphrase -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/secrets.rs:64:5: replace delete_ssh_passphrase -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:74:5: replace store_ssh_hop_password -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:87:5: replace load_ssh_hop_password -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/secrets.rs:87:5: replace load_ssh_hop_password -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/secrets.rs:101:5: replace delete_ssh_hop_password -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:117:5: replace store_ssh_hop_passphrase -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:130:5: replace load_ssh_hop_passphrase -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/secrets.rs:130:5: replace load_ssh_hop_passphrase -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/secrets.rs:144:5: replace delete_ssh_hop_passphrase -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:154:5: replace store_mcp_token -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:158:5: replace load_mcp_token -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/secrets.rs:158:5: replace load_mcp_token -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/secrets.rs:162:5: replace delete_mcp_token -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:166:5: replace store_secret -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:174:5: replace store_secret_with_attrs -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:183:5: replace load_secret -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/secrets.rs:183:5: replace load_secret -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/secrets.rs:187:5: replace load_secret_with_attrs -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/secrets.rs:187:5: replace load_secret_with_attrs -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/secrets.rs:198:5: replace delete_secret -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:202:5: replace delete_secret_with_attrs -> Result<(), StorageError> with Ok(())
+crates/storage/src/secrets.rs:226:53: replace match guard names_missing_service(&zbus_error.to_string()) with true in keyring_failure
+crates/storage/src/secrets.rs:226:53: replace match guard names_missing_service(&zbus_error.to_string()) with false in keyring_failure
+crates/storage/src/connection_bundle_secret_transaction.rs:27:9: replace <impl BundleSecretStore for Keyring>::load -> Result<Option<SecretString>, StorageError> with Ok(None)
+crates/storage/src/connection_bundle_secret_transaction.rs:27:9: replace <impl BundleSecretStore for Keyring>::load -> Result<Option<SecretString>, StorageError> with Ok(Some(Default::default()))
+crates/storage/src/connection_bundle_secret_transaction.rs:49:9: replace <impl BundleSecretStore for Keyring>::store -> Result<(), StorageError> with Ok(())
+crates/storage/src/connection_bundle_secret_transaction.rs:85:9: replace <impl BundleSecretStore for Keyring>::delete -> Result<(), StorageError> with Ok(())
+crates/storage/src/connection_bundle_secret_transaction.rs:107:5: replace store_bundle_secrets -> Result<(), StorageError> with Ok(())
