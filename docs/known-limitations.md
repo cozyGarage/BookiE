@@ -35,7 +35,7 @@ What the application does not do, or does differently from what you might expect
 
 - **SSH jump chains cannot be edited in the form** (UI-1b / [#548](https://github.com/cozyGarage/BookiE/issues/548)). They connect and run, but the form refuses to edit them until per-hop secrets, transport identity and the bundle format all land and pass together.
 - **Reusable SSH profiles cannot be edited** (UI-26).
-- **MySQL and MariaDB have no Unix socket endpoint in the connect dialog** ([#579](https://github.com/cozyGarage/BookiE/issues/579)). PostgreSQL sockets work; MySQL/MariaDB use TCP in the UI, and `Transport::Socket` is only for SSH-forwarded rendezvous.
+- **Local socket endpoint differences:** PostgreSQL selects a socket directory plus port; MySQL and MariaDB select the full socket-file path. Both local routes reject TLS and SSH and never fall back to TCP ([#579](https://github.com/cozyGarage/BookiE/issues/579)).
 - **SQL Server with Kerberos** has a Samba AD and verified-TLS fixture that passed the Kerberos selectors; Windows AD interoperability and package acceptance remain open (B4-21).
 - **DuckDB read-only flat files** need Linux and a writable directory on the same filesystem as the file (the application pins the file through a private link there). A read-only in-memory DuckDB connection is refused.
 

@@ -223,6 +223,7 @@ struct SessionKey {
     host: String,
     port: u16,
     socket_dir: Option<PathBuf>,
+    socket_path: Option<PathBuf>,
     database: String,
     username: String,
     tls_mode: TlsMode,
@@ -239,6 +240,7 @@ impl SessionKey {
             host: saved.host.clone(),
             port: saved.port,
             socket_dir: saved.socket_dir.clone(),
+            socket_path: saved.socket_path.clone(),
             database: saved.database.clone(),
             username: saved.username.clone(),
             tls_mode: saved.effective_tls_mode(),
@@ -523,6 +525,7 @@ mod tests {
             host: "db.example".into(),
             port: 5432,
             socket_dir: None,
+            socket_path: None,
             database: "warehouse".into(),
             username: "reader".into(),
             use_tls: true,
@@ -608,6 +611,11 @@ mod tests {
 
         changed = original.clone();
         changed.socket_dir = Some(PathBuf::from("/run/postgresql"));
+
+        assert!(original_key != SessionKey::from_saved(&changed, [0; 32]));
+
+        changed = original.clone();
+        changed.socket_path = Some(PathBuf::from("/run/mysqld/mysqld.sock"));
 
         assert!(original_key != SessionKey::from_saved(&changed, [0; 32]));
     }

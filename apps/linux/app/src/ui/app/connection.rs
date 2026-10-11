@@ -867,6 +867,7 @@ mod recovery_tests {
             host: "h".into(),
             port: 5432,
             socket_dir: None,
+            socket_path: None,
             database: "d".into(),
             username: "u".into(),
             use_tls: false,
