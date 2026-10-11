@@ -6,9 +6,10 @@ for the maintainer; an entry is removed when the row closes.
 
 ## Data and values
 
-- **A full export is not a consistent snapshot** (UI-13b). Rows changed while a
-  large export runs can be missed or repeated, because pages are read one after
-  another. Export from a quiet database when exactness matters.
+- **Full-table export is unavailable** (UI-13b). The current drivers do not have
+  a verified snapshot export path, so the application refuses full-table export
+  before opening the destination dialog or publishing a file. Export the current
+  page or a loaded query result instead. Snapshot export support is planned.
 - **Large results are capped and held in memory** (PERF-2, PERF-8). Results stop at
   1 million rows, 10 million cells or 64 MiB estimated size. The historical grid
   measurement was about 2.5 times the result memory; #518 now shares immutable
