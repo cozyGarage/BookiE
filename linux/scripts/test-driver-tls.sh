@@ -42,4 +42,6 @@ export TABLEPRO_FIXTURE_DRIVER_TLS=1
 export TABLEPRO_DRIVER_TLS_MATERIALS="$FIXTURE/materials"
 export TABLEPRO_DRIVER_TLS_SSH_KEY="$FIXTURE/materials/ssh_client"
 
-cargo test --locked -p tablepro-driver-tls-tests --tests -- --include-ignored --test-threads=1
+cargo test --locked -p tablepro-driver-tls-tests --tests -- --include-ignored --test-threads=1 --skip system_store_
+SSL_CERT_FILE="$FIXTURE/materials/ca.crt" SSL_CERT_DIR="$FIXTURE/materials/empty-system-store" \
+  cargo test --locked -p tablepro-driver-tls-tests --test system_trust -- --include-ignored --test-threads=1

@@ -69,3 +69,27 @@ fn sqlite_unrecognized_numeric_affinity_types_parse_numeric_values_safely() {
         Ok(Value::Text("3.5".into()))
     );
 }
+
+#[test]
+fn sqlite_csv_tagged_values_follow_any_unknown_and_blob_column_contracts() {
+    let options = CsvImportOptions::default();
+    let tagged_integer = "bookie:sqlite-any:v1:integer:42";
+    let tagged_bytes = "bookie:sqlite-any:v1:blob:00ff";
+
+    for data_type in ["", "NULL"] {
+        assert_eq!(
+            value_for(tagged_integer, &column("value", data_type), &options, "sqlite"),
+            Ok(Value::Int(42)),
+            "unknown SQLite column type {data_type:?} must retain tagged runtime types"
+        );
+    }
+
+    assert_eq!(
+        value_for(tagged_bytes, &column("value", "BLOB"), &options, "sqlite"),
+        Ok(Value::Bytes(vec![0, 255]))
+    );
+    assert_eq!(
+        value_for(tagged_bytes, &column("value", "TEXT"), &options, "sqlite"),
+        Err(CellError::NotBytes)
+    );
+}

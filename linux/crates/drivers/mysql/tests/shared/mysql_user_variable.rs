@@ -40,18 +40,26 @@ async fn assert_failed_batch_keeps_user_variable_side_effect(connection: Box<dyn
         .unwrap();
     assert_eq!(rows.rows, vec![vec![Value::Int(0)]], "InnoDB changes roll back");
 
-    let session_state = connection
-        .query("SELECT CONNECTION_ID(), @bookie_rollback_var")
-        .await
-        .unwrap();
-    let [row] = session_state.rows.as_slice() else {
-        panic!("expected one session-state row, got {:?}", session_state.rows);
-    };
+    // The pool holds up to four connections and returns the batch's connection in the background, so a
+    // single query may land on a fresh one. Hold all four at once and look for the one that kept the variable.
+    let probe = || connection.query("SELECT CONNECTION_ID(), @bookie_rollback_var, SLEEP(0.3)");
+    let (first, second, third, fourth) = tokio::join!(probe(), probe(), probe(), probe());
+    let mut kept = 0;
+    for result in [first, second, third, fourth] {
+        let result = result.unwrap();
+        let [row] = result.rows.as_slice() else {
+            panic!("expected one session-state row, got {:?}", result.rows);
+        };
+        assert!(matches!(row[0], Value::Int(_)), "got {:?}", row[0]);
+        if row[1] != Value::Null {
+            assert_eq!(row[0], row[1], "a session holds only its own connection ID");
+            kept += 1;
+        }
+    }
     assert_eq!(
-        row[0], row[1],
-        "the returned pooled session retains the connection ID assigned inside the batch"
+        kept, 1,
+        "exactly one pooled session retains the variable set inside the failed batch"
     );
-    assert!(matches!(row[0], Value::Int(_)), "got {:?}", row[0]);
 }
 
 #[tokio::test]

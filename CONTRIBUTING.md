@@ -8,7 +8,7 @@ The rules every change follows (code style, tests, security, commits, the Forgej
 
 ## Development setup
 
-The workspace requires Rust 1.98. Install GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (the Ubuntu 24.04 and Debian 13 floor), OpenSSL, Secret Service, Kerberos, Clang, `pkg-config`, and standard build tools. Distro-specific package commands are in [`linux/README.md`](linux/README.md).
+The workspace requires Rust 1.98. For the build / CI floor install GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (Ubuntu 24.04 and Debian 13), plus OpenSSL, Secret Service, Kerberos, Clang, `pkg-config`, and standard build tools. The GNOME 50 package line is higher; see [`README.md`](README.md) and [ADR 0002](linux/docs/decisions/0002-rust-gtk4-libadwaita.md).
 
 ```bash
 git clone https://github.com/<your-name>/TablePro.git
@@ -23,20 +23,7 @@ Use a short-lived local branch when useful, then open the pull request against `
 
 ## Project layout
 
-```text
-linux/crates/app             GTK4/libadwaita app and Relm4 components
-linux/crates/core            Domain types and driver contracts
-linux/crates/drivers         Static database driver crates
-linux/crates/policy          Classification, approvals, masking, and audit types
-linux/crates/mcp             MCP authentication, allowlists, rate limits, and tools
-linux/crates/agentd          Headless MCP process
-linux/crates/storage         Secret Service, saved state, history, and audit journal
-linux/crates/ssh             SSH tunnels
-linux/docs                   Architecture, testing, and driver documentation
-linux/packaging              Linux packaging files
-```
-
-Read [`linux/ARCHITECTURE.md`](linux/ARCHITECTURE.md) before changing crate boundaries, policy enforcement, connection ownership, or async execution.
+The Cargo workspace is under `linux/`. Crate roles, the governed request pipeline and the import DAG are in [`linux/ARCHITECTURE.md`](linux/ARCHITECTURE.md). Read that page before changing crate boundaries, policy enforcement, connection ownership, or async execution. Packaging lives in `linux/packaging/`; the documentation map is [`linux/docs/README.md`](linux/docs/README.md).
 
 ## Code style
 
