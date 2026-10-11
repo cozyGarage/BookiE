@@ -46,5 +46,5 @@ this page keeps the order. Draft of 2026-10-11, for the maintainer.
   or moves an ignored test conflicts in it, and each conflict is resolved by
   regenerating the file. Generate it in CI and check its content there instead, or
   write it to a build output.
-- Folder layout: separate the platform-neutral crates from the Linux application,
-  and test suites from code (see the layout proposal when the maintainer asks for it).
+- Folder layout ([proposal](proposals/folder-restructure.md)): separate the platform-neutral crates from the Linux application,
+  and test suites from code.
