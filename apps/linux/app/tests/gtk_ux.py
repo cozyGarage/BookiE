@@ -1163,6 +1163,22 @@ def scenarios(ui):
         assert ui.find_node(name="Approve once") is None, "a plain enum grid edit asked for approval"
         ui.wait_for_node(name="1 unsaved change", present=False)
 
+    def postgres_filter_schemas_hides_a_schema_from_the_sidebar(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.wait_for_node(name="archive.old_rows", role=pyatspi.ROLE_LIST_ITEM)
+        ui.invoke_accessible_action("win.filter-schemas")
+        apply = ui.wait_for_node(name="Apply", role=pyatspi.ROLE_PUSH_BUTTON)
+        switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
+        archive = next(
+            node for node in ui.descendants(ui.application_node())
+            if ui.node_name(node) == "archive" and ui.node_role(node) in switch_roles and node.queryAction().nActions > 0
+        )
+        ui.invoke(archive)
+        ui.invoke(apply)
+        ui.wait_for_node(name="archive.old_rows", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        ui.wait_for_node(name="public.enum_grid", role=pyatspi.ROLE_LIST_ITEM)
+
     def mysql_grid_edit_and_delete_commit_to_the_server(database, base):
         grid_edit_and_delete_commit_to_the_server(ui.MYSQL_CONNECTION_NAME, "bookie_test.people", mysql)
 
@@ -1245,6 +1261,7 @@ def scenarios(ui):
         result.append(postgres_hidden_projection_refresh_and_edit_preserve_hidden_value)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
         result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
+        result.append(postgres_filter_schemas_hides_a_schema_from_the_sidebar)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
         result.append(postgres_saved_mtls_connection_authenticates_and_queries)

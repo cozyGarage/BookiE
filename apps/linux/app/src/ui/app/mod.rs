@@ -109,6 +109,7 @@ pub struct App {
     sidebar_collapsed: std::rc::Rc<std::cell::RefCell<crate::services::sidebar_tree::CollapseState>>,
     sidebar_visible: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<usize>>>,
     sidebar_views: Vec<tablepro_core::TableInfo>,
+    hidden_schemas: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
     sidebar_tables: Vec<tablepro_core::TableInfo>,
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
@@ -507,6 +508,7 @@ impl SimpleComponent for App {
             sidebar_collapsed: sidebar.collapsed,
             sidebar_visible: sidebar.visible,
             sidebar_views: Vec::new(),
+            hidden_schemas: Default::default(),
             sidebar_tables: Vec::new(),
             catalog_generation: std::cell::Cell::new(0),
             catalog_cancel: Default::default(),
@@ -902,6 +904,28 @@ impl SimpleComponent for App {
                 &self.database,
                 &self.preferences,
             ),
+            AppMsg::ShowSchemaFilter => {
+                let schemas =
+                    crate::services::sidebar_tree::distinct_schemas(&self.sidebar_tables, &self.sidebar_views);
+                let hidden = self.hidden_schemas.borrow().clone();
+                let apply_sender = sender.clone();
+                crate::ui::schema_filter_dialog::present(
+                    self.window.upcast_ref::<gtk::Window>(),
+                    schemas,
+                    &hidden,
+                    move |hidden| apply_sender.input(AppMsg::SetHiddenSchemas(hidden)),
+                );
+            }
+            AppMsg::SetHiddenSchemas(hidden) => {
+                let count = hidden.len();
+                self.set_hidden_schemas(hidden);
+                let message = if count == 0 {
+                    crate::tr!("All schemas are shown")
+                } else {
+                    crate::tr!("{n} schema(s) hidden from the sidebar").replace("{n}", &count.to_string())
+                };
+                self.show_toast(&message);
+            }
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
             AppMsg::ShowPreferences => super::preferences::present(
                 &self.window,

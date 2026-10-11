@@ -74,6 +74,8 @@ CREATE TABLE public.enum_grid (id integer PRIMARY KEY, state public.gtk_enum_sta
 INSERT INTO public.enum_grid VALUES
   (1, 'ready', 'target'), (2, 'NULL', 'literal NULL'),
   (3, NULL, 'SQL NULL'), (4, '', 'empty'), (5, 'ready', 'sibling');
+CREATE SCHEMA archive;
+CREATE TABLE archive.old_rows (id integer PRIMARY KEY);
 SQL
 
 eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
@@ -87,5 +89,5 @@ TABLEPRO_GTK_POSTGRES_CONTAINER="$container" \
   TABLEPRO_GTK_DBUS_ACTIVE=1 \
   TABLEPRO_GTK_POSTGRES_HOST=127.0.0.1 \
   TABLEPRO_GTK_POSTGRES_PORT="$port" \
-  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_hidden_projection_refresh_and_edit_preserve_hidden_value,postgres_grid_edit_and_delete_commit_to_the_server,postgres_enum_grid_edit_preserves_native_label_and_siblings,postgres_database_switcher_reconnects_to_the_chosen_database}" \
+  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_hidden_projection_refresh_and_edit_preserve_hidden_value,postgres_grid_edit_and_delete_commit_to_the_server,postgres_enum_grid_edit_preserves_native_label_and_siblings,postgres_filter_schemas_hides_a_schema_from_the_sidebar,postgres_database_switcher_reconnects_to_the_chosen_database}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

@@ -54,6 +54,7 @@ fn commands() -> Vec<(&'static str, String)> {
         ("new-window", crate::tr!("New window")),
         ("show-history", crate::tr!("Query history")),
         ("show-catalog", crate::tr!("Catalog objects")),
+        ("filter-schemas", crate::tr!("Filter schemas")),
         ("show-activity", crate::tr!("Server activity")),
         ("explain-query", crate::tr!("Explain query")),
         ("jump-column", crate::tr!("Jump to column")),

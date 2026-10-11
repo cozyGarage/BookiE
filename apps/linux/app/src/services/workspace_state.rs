@@ -148,6 +148,8 @@ pub struct ConnectionWorkspaceState {
     pub active_idx: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub collapsed_groups: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_schemas: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -507,6 +509,8 @@ fn clamp(state: &mut WorkspaceState) {
 fn clamp_connection(conn: &mut ConnectionWorkspaceState) {
     conn.collapsed_groups.retain(|key| key.len() <= MAX_COLLAPSED_KEY_BYTES);
     conn.collapsed_groups.truncate(MAX_COLLAPSED_GROUPS);
+    conn.hidden_schemas.retain(|name| name.len() <= MAX_COLLAPSED_KEY_BYTES);
+    conn.hidden_schemas.truncate(MAX_COLLAPSED_GROUPS);
     // Preserve the identity of the selected tab when forward-compatible
     // records are removed. A removed selection falls back to the first tab.
     let selected = conn.active_idx as usize;
@@ -1142,6 +1146,30 @@ mod tests {
         let older: ConnectionWorkspaceState = serde_json::from_str(r#"{"tabs":[],"active_idx":0}"#).unwrap();
         assert!(older.collapsed_groups.is_empty());
         assert!(!serde_json::to_string(&older).unwrap().contains("collapsed_groups"));
+    }
+
+    #[test]
+    fn hidden_schemas_round_trip_are_bounded_and_an_older_file_has_none() {
+        let mut conn = connection("SELECT 1");
+        conn.hidden_schemas = vec!["tenant_1".into(), "tenant_2".into()];
+        let restored: ConnectionWorkspaceState = serde_json::from_str(&serde_json::to_string(&conn).unwrap()).unwrap();
+        assert_eq!(restored.hidden_schemas, ["tenant_1", "tenant_2"]);
+
+        let older: ConnectionWorkspaceState = serde_json::from_str(r#"{"tabs":[],"active_idx":0}"#).unwrap();
+        assert!(older.hidden_schemas.is_empty());
+        assert!(!serde_json::to_string(&older).unwrap().contains("hidden_schemas"));
+
+        conn.hidden_schemas = (0..MAX_COLLAPSED_GROUPS + 10)
+            .map(|index| format!("s{index}"))
+            .collect();
+        conn.hidden_schemas.push("x".repeat(MAX_COLLAPSED_KEY_BYTES + 1));
+        clamp_connection(&mut conn);
+        assert_eq!(conn.hidden_schemas.len(), MAX_COLLAPSED_GROUPS);
+        assert!(
+            conn.hidden_schemas
+                .iter()
+                .all(|name| name.len() <= MAX_COLLAPSED_KEY_BYTES)
+        );
     }
 
     #[test]

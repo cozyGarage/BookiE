@@ -158,6 +158,13 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 - [ ] Paste a value that does not parse for its column type: a toast names the column and row and nothing changes.
 - [ ] Paste with no cell focused: a toast asks you to click a cell first.
 
+## Filter Schemas
+
+- [ ] On a connection with at least two schemas, menu, Filter Schemas…: switching a schema off and pressing Apply removes its tables from the sidebar and a toast says how many schemas are hidden.
+- [ ] Reopen the connection (or restart the app): the same schemas are still hidden.
+- [ ] Show all restores every schema; the Apply button is disabled while every switch is off.
+- [ ] On a one-schema connection the command explains there is nothing to filter.
+
 ## Explain tree
 
 - [ ] On PostgreSQL, Explain a join: the dialog opens on a Tree tab with nested steps, a cost bar per step and the filter or condition lines under their step; the Text tab shows the raw plan.

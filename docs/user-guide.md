@@ -29,6 +29,8 @@ Click a table in the sidebar. The sidebar groups tables and views under each sch
 - **Row inspector**: shows every column of the selected row with its type.
 - **Selection totals**: select several rows to see sums and averages of numeric columns in the selection badge tooltip.
 
+Menu, **Filter Schemas…** chooses which schemas appear in the sidebar when a connection has more than one (useful for multi-tenant PostgreSQL). Hidden schemas stay on the server and in tabs you already opened; the choice is remembered per connection. Open Quickly (Ctrl+P) lists the command too.
+
 ## Run SQL
 
 Ctrl+E opens a SQL editor tab for the current connection.

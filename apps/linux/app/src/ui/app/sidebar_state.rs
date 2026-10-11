@@ -3,13 +3,17 @@ use tablepro_core::TableInfo;
 
 use super::App;
 use super::init_sidebar::refresh_visible;
-use crate::services::sidebar_tree::{CollapseState, build_nodes};
+use crate::services::sidebar_tree::{CollapseState, build_nodes, without_hidden_schemas};
 use crate::ui::sidebar_row::{GroupInit, SidebarObjectKind, SidebarRowInit, SidebarRowMsg};
 
 impl App {
     pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo]) {
         self.sidebar_tables = tables.to_vec();
-        let nodes = build_nodes(tables, &self.sidebar_views);
+        let hidden = self.hidden_schemas.borrow().clone();
+        let nodes = build_nodes(
+            &without_hidden_schemas(tables, &hidden),
+            &without_hidden_schemas(&self.sidebar_views, &hidden),
+        );
         let mut guard = self.sidebar_factory.guard();
         guard.clear();
         for node in &nodes {
@@ -51,9 +55,16 @@ impl App {
         let saved = self
             .connection_id
             .and_then(|id| self.workspace.load_connection(id))
-            .map(|state| state.collapsed_groups)
             .unwrap_or_default();
-        *self.sidebar_collapsed.borrow_mut() = CollapseState::from_keys(saved);
+        *self.sidebar_collapsed.borrow_mut() = CollapseState::from_keys(saved.collapsed_groups);
+        *self.hidden_schemas.borrow_mut() = saved.hidden_schemas;
+    }
+
+    pub(super) fn set_hidden_schemas(&mut self, hidden: Vec<String>) {
+        *self.hidden_schemas.borrow_mut() = hidden;
+        let tables = self.sidebar_tables.clone();
+        self.repopulate_sidebar(&tables);
+        self.persist_workspace_state();
     }
 }
 

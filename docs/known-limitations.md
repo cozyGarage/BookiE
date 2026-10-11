@@ -45,7 +45,7 @@ What the application does not do, or does differently from what you might expect
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles; a typed activity console is deferred and the activity dialog stays a plain result grid (UI-23).
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
 - No foreign key picker, enum or set pickers, or paste of tab-separated rows (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)).
-- No Filter Schemas control for large PostgreSQL catalogs ([#580](https://github.com/cozyGarage/BookiE/issues/580)); sidebar schema groups exist (UI-11).
+- **Filter Schemas hides schemas from the sidebar only** ([#580](https://github.com/cozyGarage/BookiE/issues/580)). The choice is saved per connection, but the catalog queries still read every schema, so a database with thousands of schemas connects no faster; slimming those queries and scoping the catalog dialog and MCP statistics to the chosen schemas remain open. Sidebar schema groups exist (UI-11).
 - No database snapshots or restore (SNAP-1 accepted the feature for 0.2.x; build is SNAP-2 to SNAP-4 / [#547](https://github.com/cozyGarage/BookiE/issues/547)).
 - Accessibility with Orca, keyboard-only order and high contrast has not been verified (DOC-3).
 

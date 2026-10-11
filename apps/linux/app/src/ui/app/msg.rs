@@ -118,6 +118,8 @@ pub enum AppMsg {
     ShowAbout,
     ShowActivity,
     ShowCatalog,
+    ShowSchemaFilter,
+    SetHiddenSchemas(Vec<String>),
     ExplainActiveQuery,
     ShowPreferences,
     NewWindow,

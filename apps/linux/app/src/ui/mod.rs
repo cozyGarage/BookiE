@@ -23,6 +23,7 @@ mod row_inspector;
 mod row_object;
 mod row_store;
 mod saved_queries_dialog;
+mod schema_filter_dialog;
 pub(crate) mod shortcut;
 mod sidebar_row;
 mod ssh_prompt;

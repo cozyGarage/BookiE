@@ -67,6 +67,23 @@ fn schema_names(tables: &[TableInfo], views: &[TableInfo]) -> BTreeSet<Option<St
     tables.iter().chain(views).map(|object| object.schema.clone()).collect()
 }
 
+pub fn without_hidden_schemas(objects: &[TableInfo], hidden: &[String]) -> Vec<TableInfo> {
+    objects
+        .iter()
+        .filter(|object| object.schema.as_ref().is_none_or(|schema| !hidden.contains(schema)))
+        .cloned()
+        .collect()
+}
+
+pub fn distinct_schemas(tables: &[TableInfo], views: &[TableInfo]) -> Vec<String> {
+    let found: std::collections::BTreeSet<&str> = tables
+        .iter()
+        .chain(views)
+        .filter_map(|object| object.schema.as_deref())
+        .collect();
+    found.into_iter().map(str::to_owned).collect()
+}
+
 pub fn build_nodes(tables: &[TableInfo], views: &[TableInfo]) -> Vec<TreeNode> {
     let schemas = schema_names(tables, views);
     let several_schemas = schemas.iter().filter(|schema| schema.is_some()).count() > 1;
@@ -189,6 +206,27 @@ mod tests {
 
     fn all(nodes: &[TreeNode]) -> Vec<usize> {
         (0..nodes.len()).collect()
+    }
+
+    #[test]
+    fn hidden_schemas_drop_out_of_the_tree_but_schemaless_objects_stay() {
+        let tables = [info(Some("a"), "t1"), info(Some("b"), "t2"), info(None, "plain")];
+        let hidden = vec!["b".to_string()];
+        let kept = without_hidden_schemas(&tables, &hidden);
+        assert_eq!(
+            kept.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(),
+            ["t1", "plain"]
+        );
+        assert_eq!(without_hidden_schemas(&tables, &[]).len(), 3);
+        let nodes = build_nodes(&kept, &[]);
+        assert!(nodes.iter().all(|node| !node.label.contains("t2") && node.label != "b"));
+    }
+
+    #[test]
+    fn the_schema_list_is_distinct_and_sorted_across_tables_and_views() {
+        let tables = [info(Some("zeta"), "t"), info(Some("alpha"), "t")];
+        let views = [info(Some("alpha"), "v"), info(Some("mid"), "v"), info(None, "x")];
+        assert_eq!(distinct_schemas(&tables, &views), ["alpha", "mid", "zeta"]);
     }
 
     #[test]
