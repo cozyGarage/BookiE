@@ -1,7 +1,7 @@
 use relm4::ComponentSender;
 use relm4::gtk::{gdk, glib};
 
-use super::value_parse::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_grid_cell};
+use super::value_parse::parse_grid_cell_input;
 use super::*;
 
 const MAX_PASTE_CELLS: usize = 5_000;
@@ -116,12 +116,8 @@ impl BrowseTab {
                     .replace("{row}", &(cell.row + 1).to_string()),
             );
         }
-        let text = match column.map(|column| classify_type(&column.data_type.to_ascii_lowercase())) {
-            Some(TypeKind::Json) => cell.text.clone(),
-            _ => normalize_single_line_input(&cell.text),
-        };
         let current = row.as_ref().map(|row| row.cell_value(cell.col));
-        parse_input_for_grid_cell(&text, column, &self.driver_id, current.as_ref())
+        parse_grid_cell_input(&cell.text, column, &self.driver_id, current.as_ref())
             .map(|_| ())
             .map_err(|message| {
                 crate::tr!("{column} on row {row}: {message}. Nothing was pasted.")
