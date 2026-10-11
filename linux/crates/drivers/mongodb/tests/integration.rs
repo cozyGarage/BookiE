@@ -72,7 +72,7 @@ async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
 
     let mut valid_options = connection_options.clone();
     valid_options.password = secrecy::SecretString::new("correct-password".to_string().into());
-    let ready = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+    let ready = tokio::time::timeout(std::time::Duration::from_secs(120), async {
         loop {
             match MongodbDriver.connect(valid_options.clone()).await {
                 Ok(connection) => break connection,
@@ -84,7 +84,7 @@ async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
         }
     })
     .await
-    .expect("authenticated MongoDB must become ready within 30 seconds");
+    .expect("authenticated MongoDB must become ready within 120 seconds");
     drop(ready);
 
     let error = match MongodbDriver.connect(connection_options).await {
