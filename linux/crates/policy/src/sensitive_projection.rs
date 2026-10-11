@@ -332,6 +332,7 @@ mod tests {
             "SELECT c FROM cards c",
             "SELECT array_agg(c) FROM cards c",
             "SELECT CAST(c AS text) FROM cards c",
+            "SELECT CAST(array_agg(c.*) AS text) FROM cards c",
             "SELECT array_agg(\"κ\") FROM cards AS \"κ\"",
             "SELECT p FROM cards c JOIN (SELECT pan AS p FROM cards) d ON true",
         ] {

@@ -43,6 +43,7 @@ pub(super) fn references_record(expr: &Expr, records: &[String]) -> bool {
             return true;
         }
         matches!(token, Token::Word(word) if records.contains(&word.value.to_lowercase()))
-            && !matches!(tokens.get(index + 1), Some(Token::Period))
+            && (!matches!(tokens.get(index + 1), Some(Token::Period))
+                || matches!(tokens.get(index + 2), Some(Token::Mul)))
     })
 }

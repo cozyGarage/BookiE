@@ -304,6 +304,7 @@ async fn an_agent_cannot_expose_sensitive_sources_through_renamed_or_record_proj
         "SELECT CAST(c AS text) AS payload FROM cards c",
         "SELECT array_agg(c)::text AS payload FROM cards c",
         "SELECT (SELECT p FROM cards AS c(p, amount)) AS payload",
+        "SELECT CAST(array_agg(c.*) AS text) AS payload FROM cards c",
     ] {
         let result = guard.query_params_controlled(sql, &[], &no_timeout()).await.unwrap();
         assert_eq!(result.rows, vec![vec![Value::Text("***REDACTED***".into())]], "{sql}");
