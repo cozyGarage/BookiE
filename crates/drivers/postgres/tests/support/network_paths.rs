@@ -139,14 +139,34 @@ async fn pgbouncer_in_transaction_mode_without_prepared_statements_explains_itse
     );
 }
 
+async fn forward_ipv6_loopback_to(upstream_port: u16) -> Option<u16> {
+    let listener = tokio::net::TcpListener::bind("[::1]:0").await.ok()?;
+    let port = listener.local_addr().ok()?.port();
+    tokio::spawn(async move {
+        while let Ok((mut inbound, _)) = listener.accept().await {
+            tokio::spawn(async move {
+                if let Ok(mut outbound) = tokio::net::TcpStream::connect(("127.0.0.1", upstream_port)).await {
+                    let _ = tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await;
+                }
+            });
+        }
+    });
+    Some(port)
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn an_ipv6_loopback_host_connects_bare_or_in_brackets() {
     let (_server, upstream) = start_pg().await;
+    let Some(port) = forward_ipv6_loopback_to(upstream.port).await else {
+        eprintln!("skipped: this host has no IPv6 loopback");
+        return;
+    };
     for host in ["::1", "[::1]"] {
         let connection = drivers_postgres::PgDriver
             .connect(ConnectOptions {
                 host: host.into(),
+                port,
                 ..upstream.clone()
             })
             .await
