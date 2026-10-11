@@ -560,6 +560,8 @@ async fn value_contract_deep_enum_scalar_contexts_match_native_inference_at_dept
     transaction.execute("SET LOCAL search_path TO public").await.unwrap();
     assert_scalar_contexts_match_native_inference(&mut *transaction, schema, 63).await;
     assert_scalar_contexts_match_native_inference(&mut *transaction, schema, 64).await;
+    assert_deep_enum_between_parameters(&mut *transaction, schema, 63).await;
+    assert_deep_enum_between_parameters(&mut *transaction, schema, 64).await;
     transaction.rollback().await.unwrap();
 }
 
@@ -580,6 +582,8 @@ async fn value_contract_deep_enum_scalar_contexts_resolve_under_shadowed_search_
         .unwrap();
     assert_scalar_contexts_match_native_inference(&mut *transaction, schema, 63).await;
     assert_scalar_contexts_match_native_inference(&mut *transaction, schema, 64).await;
+    assert_deep_enum_between_parameters(&mut *transaction, schema, 63).await;
+    assert_deep_enum_between_parameters(&mut *transaction, schema, 64).await;
     transaction.rollback().await.unwrap();
 }
 
@@ -676,13 +680,53 @@ async fn assert_scalar_contexts_match_native_inference(
     }
 }
 
-fn scalar_contexts(depth: usize) -> [(String, String); 6] {
+async fn assert_deep_enum_between_parameters(session: &mut dyn tablepro_core::Transaction, schema: &str, depth: usize) {
+    for parameters in [
+        [Value::Text("ready".into()), Value::Text("paused".into())],
+        [Value::Text("NULL".into()), Value::Text(String::new())],
+        [Value::Null, Value::Text("paused".into())],
+    ] {
+        session.execute("SAVEPOINT between_contract").await.unwrap();
+        let native = session
+            .query(&format!(
+                "SELECT status_{depth} BETWEEN 'ready' AND 'paused' FROM {schema}.rows"
+            ))
+            .await
+            .expect_err("PostgreSQL does not resolve BETWEEN over a domain-over-enum");
+        session.execute("ROLLBACK TO SAVEPOINT between_contract").await.unwrap();
+        let inferred = session
+            .query_params(
+                &format!("SELECT status_{depth} BETWEEN $1 AND $2 FROM {schema}.rows"),
+                &parameters,
+            )
+            .await
+            .expect_err("parameterized BETWEEN must not invent domain comparison support");
+        session.execute("ROLLBACK TO SAVEPOINT between_contract").await.unwrap();
+        session.execute("RELEASE SAVEPOINT between_contract").await.unwrap();
+        assert!(
+            matches!(&native, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
+            "depth {depth}: {native:?}"
+        );
+        assert!(
+            matches!(&inferred, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
+            "depth {depth}: {inferred:?}"
+        );
+        assert_eq!(session.query("SELECT 1").await.unwrap().rows, vec![vec![Value::Int(1)]]);
+    }
+}
+
+fn scalar_contexts(depth: usize) -> [(String, String); 8] {
     let column = format!("status_{depth}");
     [
         (format!("COALESCE($1, {column})"), format!("COALESCE($ARG, {column})")),
+        (format!("COALESCE({column}, $1)"), format!("COALESCE({column}, $ARG)")),
         (
             format!("CASE WHEN id = 1 THEN $1 ELSE {column} END"),
             format!("CASE WHEN id = 1 THEN $ARG ELSE {column} END"),
+        ),
+        (
+            format!("CASE WHEN id = 1 THEN {column} ELSE $1 END"),
+            format!("CASE WHEN id = 1 THEN {column} ELSE $ARG END"),
         ),
         (format!("GREATEST($1, {column})"), format!("GREATEST($ARG, {column})")),
         (format!("GREATEST({column}, $1)"), format!("GREATEST({column}, $ARG)")),

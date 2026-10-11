@@ -258,6 +258,26 @@ mod tests {
     }
 
     #[test]
+    fn export_progress_reports_completed_rows_from_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("result.csv");
+        let mut data = result();
+        data.rows.push(data.rows[0].clone());
+        let progress = std::cell::RefCell::new(Vec::new());
+
+        write_result_file(
+            &path,
+            &data,
+            &plain(ResultFormat::Csv, &CsvOptions::default()),
+            || false,
+            |rows| progress.borrow_mut().push(rows),
+        )
+        .unwrap();
+
+        assert_eq!(*progress.borrow(), [1, 2]);
+    }
+
+    #[test]
     fn file_and_clipboard_agree_and_cancellation_preserves_destination() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("result");
