@@ -426,6 +426,25 @@ mod tests {
     }
 
     #[test]
+    fn mysql_text_import_without_empty_cells_keeps_the_simple_insert_plan() {
+        let columns = vec![column("note", "text")];
+        let mapping = vec![Some(0)];
+        let sheet = sheet(&[&["plain"]], &["note"]);
+        let target = ImportTarget {
+            driver_id: "mysql",
+            schema: None,
+            table: "people",
+            columns: &columns,
+            mapping: &mapping,
+        };
+
+        let plan = build_insert_plan(&target, &sheet, &CsvImportOptions::default()).expect("plan");
+
+        assert_eq!(plan.statement, "INSERT INTO `people` (`note`) VALUES (?)");
+        assert_eq!(plan.rows, vec![vec![Value::Text("plain".into())]]);
+    }
+
+    #[test]
     fn postgres_enum_import_plan_uses_catalog_type_for_text_rows() {
         let mut status = column("status", "value_contract_enum_schema.value_contract_status");
         status.enum_type = Some(crate::query::QualifiedTypeName {

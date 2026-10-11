@@ -30,6 +30,7 @@ tablepro-driver-clickhouse = { path = "../drivers/clickhouse" }
 tablepro-driver-mongodb = { path = "../drivers/mongodb" }
 tablepro-driver-mssql = { path = "../drivers/mssql" }
 tablepro-driver-mysql = { path = "../drivers/mysql" }
+tablepro-driver-postgres = { path = "../drivers/postgres" }
 tablepro-driver-redis = { path = "../drivers/redis" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 

@@ -57,6 +57,7 @@ pub struct DriverTlsFixture {
     pub mysql_port: u16,
     pub mysql_plaintext_port: u16,
     pub mysql_mtls_port: u16,
+    pub postgres_port: u16,
     pub clickhouse_port: u16,
     pub clickhouse_plaintext_port: u16,
     pub mssql_port: u16,
@@ -97,6 +98,7 @@ impl DriverTlsFixture {
             mysql_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_PORT", 3307),
             mysql_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_PLAINTEXT_PORT", 3308),
             mysql_mtls_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_MTLS_PORT", 3309),
+            postgres_port: env_port("TABLEPRO_DRIVER_TLS_POSTGRES_PORT", 5436),
             clickhouse_port: env_port("TABLEPRO_DRIVER_TLS_CLICKHOUSE_PORT", 8444),
             clickhouse_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_CLICKHOUSE_PLAINTEXT_PORT", 8445),
             mssql_port: env_port("TABLEPRO_DRIVER_TLS_MSSQL_PORT", 1434),
@@ -160,6 +162,10 @@ impl DriverTlsFixture {
 
     pub fn mysql(&self, mode: TlsMode, root_cert: Option<PathBuf>) -> ConnectOptions {
         self.options(self.mysql_port, mode, root_cert)
+    }
+
+    pub fn postgres(&self, mode: TlsMode, root_cert: Option<PathBuf>) -> ConnectOptions {
+        self.options(self.postgres_port, mode, root_cert)
     }
 
     pub fn mysql_mtls(
@@ -296,5 +302,20 @@ impl DriverTlsFixture {
 
     pub fn mssql_plaintext(&self) -> ConnectOptions {
         self.options(self.mssql_plaintext_port, TlsMode::Disabled, None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DriverTlsFixture, TlsMode};
+
+    #[test]
+    fn postgres_options_use_fixture_port_and_system_roots() {
+        let fixture = DriverTlsFixture::from_env();
+        let options = fixture.postgres(TlsMode::VerifyFull, None);
+
+        assert_eq!(options.port, fixture.postgres_port);
+        assert_eq!(options.tls.mode, TlsMode::VerifyFull);
+        assert_eq!(options.tls.root_cert, None);
     }
 }

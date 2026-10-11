@@ -41,6 +41,10 @@ Accepted ADRs constrain architecture. The sprint owns sequencing and acceptance;
 ROADMAP and PLAN only point to it. Dated reviews and archives prove their
 recorded source only; they do not override current decisions.
 
+## Product context and specs
+
+[PRODUCT.md](PRODUCT.md) says what BookiE is and is not, [docs/personas.md](docs/personas.md) says who it serves, and [PRINCIPLES.md](PRINCIPLES.md) holds the standing principles. [specs/](specs/README.md) describe current behaviour extracted from the code. They are drafts until reviewed: this file and accepted ADRs rank above them, and when a spec and the code disagree, check the code and fix the spec.
+
 ## Lanes and ownership
 
 Work is split into lanes. Each open ledger row has exactly one owner in the

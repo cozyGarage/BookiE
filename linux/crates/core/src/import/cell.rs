@@ -8,6 +8,7 @@ use crate::import::extended_temporal::{duckdb_extended_date, duckdb_extended_tim
 use crate::query::{ColumnInfo, Value};
 
 mod mysql_calendar;
+mod postgres_temporal;
 
 /// What a field could not be turned into. Names the failure only: the cell
 /// text never travels with it, because this reaches error lists and logs.
@@ -367,7 +368,7 @@ fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver
         return Ok(Value::Text(value.to_owned()));
     }
     if driver_id == "postgres"
-        && let Some(value) = postgres_extended_temporal(text, &column.data_type)
+        && let Some(value) = postgres_temporal::parse_extended(text, &column.data_type)
     {
         return Ok(Value::Text(value));
     }
@@ -508,31 +509,6 @@ fn postgres_text_temporal<'a>(text: &'a str, data_type: &str) -> Option<&'a str>
         }
     }
     None
-}
-
-fn postgres_extended_temporal(text: &str, data_type: &str) -> Option<String> {
-    let kind = data_type.trim().to_ascii_lowercase();
-    let value = text.strip_prefix('\'').unwrap_or(text);
-    if kind == "date" {
-        let value = value.strip_prefix('+').unwrap_or(value);
-        return duckdb_extended_date(value).then(|| value.to_owned());
-    }
-    if matches!(kind.as_str(), "timestamptz" | "timestamp with time zone") {
-        return duckdb_extended_timestamptz_nanos(value)
-            .filter(|nanos| nanos % 1_000 == 0)
-            .map(|_| value.strip_prefix('+').unwrap_or(value).replace('T', " "));
-    }
-    if !matches!(kind.as_str(), "timestamp" | "timestamp without time zone") {
-        return None;
-    }
-    let (date, time) = value.split_once(' ').or_else(|| value.split_once('T'))?;
-    if !duckdb_extended_date(date) {
-        return None;
-    }
-    let time = NaiveTime::parse_from_str(time, "%H:%M:%S%.f")
-        .or_else(|_| NaiveTime::parse_from_str(time, "%H:%M"))
-        .ok()?;
-    (time.nanosecond() % 1_000 == 0).then(|| value.strip_prefix('+').unwrap_or(value).replace('T', " "))
 }
 
 fn duckdb_formula_safe_interval<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
