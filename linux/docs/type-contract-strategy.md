@@ -34,8 +34,19 @@ and binary UUID `_id` cursors on MongoDB 7 ([tests](../crates/drivers/mongodb/te
 diagnostic measured 2.380 ms at offset 500k and 2.373 ms at offset 999,950,
 compared with 135.902 ms and 266.040 ms through direct offset reads. Raw
 samples and source fingerprints are in the [PR #493 evidence comment](https://github.com/cozyGarage/BookiE/pull/493#issuecomment-6095435772).
-Filtered, sorted and keyless deep-page behavior, installed Arch/Wayland,
-Debian/GNOME and network-latency acceptance remain open.
+Generated equality, inequality, comparison, `BETWEEN`, `IN`/`NOT IN`, null,
+`LIKE`, and `ILIKE` pages preserve filters in offset and `_id` keyset queries in
+`filtered_offset_pages_keep_filters_with_and_without_parameters`,
+`filtered_keyset_page_keeps_the_filter_and_cursor`, and
+`null_filtered_keyset_page_excludes_missing_fields` and
+`pattern_keyset_filters_match_like_wildcards_without_matching_nulls`. These
+cover OR-of-equality, bound-parameter order, explicit null versus missing,
+SQL's three-valued inequality and membership behavior, wildcard matching,
+case-insensitive matching, literal regex metacharacters, and `ESCAPE` handling.
+Repeated predicates on one field retain their conjunction through a MongoDB
+`$and` selector. Null comparison parameters are refused. Negated ranges, sorted
+and keyless deep-page behavior, installed Arch/Wayland, Debian/GNOME and
+network-latency acceptance remain open.
 
 The SQL Server test fixture waits for an authenticated `SELECT 1` as `sa`,
 retrying login rejection for at most 60 seconds after container readiness logs.

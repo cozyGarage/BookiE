@@ -21,7 +21,7 @@ use shell::{
     AggregateQuery, FindQuery, parse_aggregate_shell, parse_delete_many, parse_drop_table_sql, parse_find_shell,
     parse_insert_one,
 };
-use update::{parse_keyed_delete, parse_keyed_update, parse_keyed_value_select, parse_keyset_page_select};
+use update::{parse_browse_page_select, parse_keyed_delete, parse_keyed_update, parse_keyed_value_select};
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
@@ -322,19 +322,30 @@ impl Connection for MongodbConnection {
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        if params.is_empty() {
-            return self.query(sql).await;
-        }
-        if let Some(page) = parse_keyset_page_select(sql, params, &self.database_name)? {
+        if let Some(page) = parse_browse_page_select(sql, params, &self.database_name)? {
+            let filter = match page.key {
+                Some(key) => {
+                    let cursor = doc! { "$expr": { "$gt": ["$_id", { "$literal": key }] } };
+                    if page.filter.is_empty() {
+                        cursor
+                    } else {
+                        doc! { "$and": [page.filter, cursor] }
+                    }
+                }
+                None => page.filter,
+            };
             return self
                 .run_find(FindQuery {
                     collection: page.collection,
-                    filter: doc! { "$expr": { "$gt": ["$_id", { "$literal": page.key }] } },
-                    skip: 0,
+                    filter,
+                    skip: page.offset,
                     limit: page.limit,
                     sort_by_id: true,
                 })
                 .await;
+        }
+        if params.is_empty() {
+            return self.query(sql).await;
         }
         let Some(query) = parse_keyed_value_select(sql, params, &self.database_name)? else {
             return Err(DriverError::Unsupported(

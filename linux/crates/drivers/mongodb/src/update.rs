@@ -26,23 +26,25 @@ pub(super) struct KeyedValueSelect {
     pub(super) key: Bson,
 }
 
-pub(super) struct KeysetPageSelect {
+pub(super) struct BrowsePageSelect {
     pub(super) collection: String,
-    pub(super) key: Bson,
+    pub(super) filter: Document,
+    pub(super) key: Option<Bson>,
     pub(super) limit: i64,
+    pub(super) offset: u64,
 }
 
-pub(super) fn parse_keyset_page_select(
+pub(super) fn parse_browse_page_select(
     sql: &str,
     params: &[Value],
     database: &str,
-) -> Result<Option<KeysetPageSelect>, DriverError> {
+) -> Result<Option<BrowsePageSelect>, DriverError> {
     let statements = Parser::parse_sql(&GenericDialect {}, sql)
-        .map_err(|error| DriverError::Unsupported(format!("invalid parameterized MongoDB page query: {error}")))?;
+        .map_err(|error| DriverError::Unsupported(format!("invalid MongoDB browse page query: {error}")))?;
     let [Statement::Query(query)] = statements.as_slice() else {
         return Ok(None);
     };
-    let Some((select, limit)) = keyset_page_query(query) else {
+    let Some((select, limit, offset)) = browse_page_query(query) else {
         return Ok(None);
     };
     if !matches!(select.projection.as_slice(), [SelectItem::Wildcard(_)]) {
@@ -55,26 +57,329 @@ pub(super) fn parse_keyset_page_select(
     let Some(collection) = collection_named(&relation.relation, database) else {
         return Ok(None);
     };
-    let Some(Expr::BinaryOp {
-        left,
-        op: BinaryOperator::Gt,
-        right,
-    }) = select.selection.as_ref()
-    else {
+    let Some(selection) = select.selection.as_ref() else {
         return Ok(None);
     };
-    if identifier_from_expr(left).as_deref() != Some("_id") || params.len() != 1 {
+    let Some((filter, key)) = browse_filter(selection, params)? else {
+        return Ok(None);
+    };
+    if key.is_some() && offset != 0 {
         return Ok(None);
     }
+    Ok(Some(BrowsePageSelect {
+        collection,
+        filter,
+        key,
+        limit,
+        offset,
+    }))
+}
+
+fn browse_filter(selection: &Expr, params: &[Value]) -> Result<Option<(Document, Option<Bson>)>, DriverError> {
+    let mut predicates = Vec::new();
+    collect_and_predicates(selection, &mut predicates);
+    if predicates.iter().filter(|expr| keyset_cursor(expr).is_some()).count() > 1 {
+        return Ok(None);
+    }
+    let mut filter = Document::new();
+    let mut key = None;
     let mut index = 0;
-    let key = take_placeholder(right, params, &mut index)?;
+    for predicate in predicates {
+        if let Some(cursor) = keyset_cursor(predicate) {
+            if key.is_some() {
+                return Ok(None);
+            }
+            key = Some(take_placeholder(cursor, params, &mut index)?);
+        } else {
+            filter = merge_browse_selectors(filter, browse_selector_from_expr(predicate, params, &mut index)?);
+        }
+    }
     if index != params.len() {
         return Ok(None);
     }
-    Ok(Some(KeysetPageSelect { collection, key, limit }))
+    Ok(Some((filter, key)))
 }
 
-fn keyset_page_query(query: &Query) -> Option<(&Select, i64)> {
+fn browse_selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Document, DriverError> {
+    match expr {
+        Expr::Nested(inner) => browse_selector_from_expr(inner, params, index),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::And,
+            right,
+        } => Ok(merge_browse_selectors(
+            browse_selector_from_expr(left, params, index)?,
+            browse_selector_from_expr(right, params, index)?,
+        )),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::Or,
+            right,
+        } => Ok(doc! {
+            "$or": [
+                browse_selector_from_expr(left, params, index)?,
+                browse_selector_from_expr(right, params, index)?,
+            ]
+        }),
+        _ => browse_leaf_selector(expr, params, index),
+    }
+}
+
+fn browse_leaf_selector(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Document, DriverError> {
+    match expr {
+        Expr::BinaryOp {
+            left,
+            op:
+                operator @ (BinaryOperator::Eq
+                | BinaryOperator::Gt
+                | BinaryOperator::GtEq
+                | BinaryOperator::Lt
+                | BinaryOperator::LtEq
+                | BinaryOperator::NotEq),
+            right,
+        } => comparison_selector(left, operator, right, params, index),
+        Expr::Like {
+            negated,
+            any: false,
+            expr,
+            pattern,
+            escape_char,
+        } => pattern_selector(expr, pattern, escape_char.as_ref(), *negated, false, params, index),
+        Expr::ILike {
+            negated,
+            any: false,
+            expr,
+            pattern,
+            escape_char,
+        } => pattern_selector(expr, pattern, escape_char.as_ref(), *negated, true, params, index),
+        Expr::Between {
+            expr,
+            negated: false,
+            low,
+            high,
+        } => between_selector(expr, low, high, params, index),
+        Expr::InList { expr, list, negated } => in_list_selector(expr, list, *negated, params, index),
+        Expr::IsNull(inner) => {
+            let Some(field) = identifier_from_expr(inner) else {
+                return Err(browse_filter_error());
+            };
+            Ok(explicit_null_selector(field))
+        }
+        Expr::IsNotNull(inner) => {
+            let Some(field) = identifier_from_expr(inner) else {
+                return Err(browse_filter_error());
+            };
+            Ok(doc! { field: { "$exists": true, "$ne": Bson::Null } })
+        }
+        _ => Err(browse_filter_error()),
+    }
+}
+
+fn merge_browse_selectors(mut left: Document, right: Document) -> Document {
+    if right.keys().any(|field| left.contains_key(field)) {
+        return doc! { "$and": [left, right] };
+    }
+    left.extend(right);
+    left
+}
+
+fn comparison_selector(
+    left: &Expr,
+    operator: &BinaryOperator,
+    right: &Expr,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let Some(field) = identifier_from_expr(left) else {
+        return Err(browse_filter_error());
+    };
+    let value = value_to_bson(&take_placeholder_value(right, params, index)?)?;
+    if *operator == BinaryOperator::Eq && matches!(value, Bson::Null) {
+        return Ok(explicit_null_selector(field));
+    }
+    if matches!(value, Bson::Null) {
+        return Err(browse_filter_error());
+    }
+    if *operator == BinaryOperator::NotEq {
+        return Ok(doc! { field: { "$exists": true, "$nin": [value, Bson::Null] } });
+    }
+    let operator = match operator {
+        BinaryOperator::Eq => "$eq",
+        BinaryOperator::Gt => "$gt",
+        BinaryOperator::GtEq => "$gte",
+        BinaryOperator::Lt => "$lt",
+        BinaryOperator::LtEq => "$lte",
+        _ => return Err(browse_filter_error()),
+    };
+    Ok(doc! { field: { operator: value } })
+}
+
+fn between_selector(
+    expr: &Expr,
+    low: &Expr,
+    high: &Expr,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let Some(field) = identifier_from_expr(expr) else {
+        return Err(browse_filter_error());
+    };
+    let low = value_to_bson(&take_placeholder_value(low, params, index)?)?;
+    let high = value_to_bson(&take_placeholder_value(high, params, index)?)?;
+    if matches!(low, Bson::Null) || matches!(high, Bson::Null) {
+        return Err(browse_filter_error());
+    }
+    Ok(doc! { field: { "$gte": low, "$lte": high } })
+}
+
+fn in_list_selector(
+    expr: &Expr,
+    list: &[Expr],
+    negated: bool,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let Some(field) = identifier_from_expr(expr) else {
+        return Err(browse_filter_error());
+    };
+    let values = list
+        .iter()
+        .map(|item| value_to_bson(&take_placeholder_value(item, params, index)?))
+        .collect::<Result<Vec<_>, _>>()?;
+    let has_null = values.iter().any(|value| matches!(value, Bson::Null));
+    let values = values
+        .into_iter()
+        .filter(|value| !matches!(value, Bson::Null))
+        .collect::<Vec<_>>();
+    if (negated && has_null) || values.is_empty() {
+        return Ok(doc! { "_id": { "$in": [] } });
+    }
+    if negated {
+        let mut excluded = values;
+        excluded.push(Bson::Null);
+        Ok(doc! { field: { "$exists": true, "$nin": excluded } })
+    } else {
+        Ok(doc! { field: { "$in": values } })
+    }
+}
+
+fn pattern_selector(
+    expr: &Expr,
+    pattern: &Expr,
+    escape_char: Option<&SqlValue>,
+    negated: bool,
+    insensitive: bool,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let Some(field) = identifier_from_expr(expr) else {
+        return Err(browse_filter_error());
+    };
+    let pattern = match take_placeholder_value(pattern, params, index)? {
+        Value::Text(pattern) => pattern,
+        Value::Null => return Ok(doc! { "_id": { "$in": [] } }),
+        _ => return Err(browse_filter_error()),
+    };
+    let escape = match escape_char {
+        Some(value) => Some(value.clone().into_string().ok_or_else(browse_filter_error)?),
+        None => None,
+    };
+    let escape = match escape {
+        None => '\\',
+        Some(escape) => {
+            let mut chars = escape.chars();
+            let Some(ch) = chars.next() else {
+                return Err(browse_filter_error());
+            };
+            if chars.next().is_some() {
+                return Err(browse_filter_error());
+            }
+            ch
+        }
+    };
+    Ok(doc! {
+        field: like_regex_selector(&pattern, escape, negated, insensitive)
+    })
+}
+
+fn like_regex_selector(pattern: &str, escape: char, negated: bool, insensitive: bool) -> Document {
+    let mut regex = String::with_capacity(pattern.len() + 2);
+    regex.push('^');
+    let mut escaped = false;
+    for ch in pattern.chars() {
+        if escaped {
+            push_regex_literal(&mut regex, ch);
+            escaped = false;
+        } else if ch == escape {
+            escaped = true;
+        } else {
+            match ch {
+                '%' => regex.push_str("[\\s\\S]*"),
+                '_' => regex.push_str("[\\s\\S]"),
+                _ => push_regex_literal(&mut regex, ch),
+            }
+        }
+    }
+    if escaped {
+        push_regex_literal(&mut regex, escape);
+    }
+    regex.push('$');
+    let mut expression = doc! { "$regex": regex };
+    if insensitive {
+        expression.insert("$options", "i");
+    }
+    if negated {
+        doc! { "$type": "string", "$not": expression }
+    } else {
+        expression.insert("$type", "string");
+        expression
+    }
+}
+
+fn push_regex_literal(regex: &mut String, ch: char) {
+    if matches!(
+        ch,
+        '\\' | '.' | '^' | '$' | '|' | '?' | '*' | '+' | '(' | ')' | '[' | ']' | '{' | '}'
+    ) {
+        regex.push('\\');
+    }
+    regex.push(ch);
+}
+
+fn browse_filter_error() -> DriverError {
+    DriverError::Unsupported(
+        "MongoDB browse filters support comparison, range, pattern, set-membership, and null predicates".into(),
+    )
+}
+
+fn collect_and_predicates<'a>(expr: &'a Expr, predicates: &mut Vec<&'a Expr>) {
+    match expr {
+        Expr::Nested(inner) => collect_and_predicates(inner, predicates),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::And,
+            right,
+        } => {
+            collect_and_predicates(left, predicates);
+            collect_and_predicates(right, predicates);
+        }
+        _ => predicates.push(expr),
+    }
+}
+
+fn keyset_cursor(expr: &Expr) -> Option<&Expr> {
+    let Expr::BinaryOp {
+        left,
+        op: BinaryOperator::Gt,
+        right,
+    } = expr
+    else {
+        return None;
+    };
+    (identifier_from_expr(left).as_deref() == Some("_id")).then_some(right)
+}
+
+fn browse_page_query(query: &Query) -> Option<(&Select, i64, u64)> {
     let mut unpaged_query = query.clone();
     unpaged_query.limit_clause = None;
     simple_value_select(&unpaged_query)?;
@@ -90,13 +395,14 @@ fn keyset_page_query(query: &Query) -> Option<(&Select, i64)> {
         return None;
     };
     let limit = limit.parse::<i64>().ok()?;
-    if limit <= 0 || !limit_by.is_empty() || offset.value.to_string() != "0" {
+    let offset = offset.value.to_string().parse().ok()?;
+    if limit <= 0 || !limit_by.is_empty() {
         return None;
     }
     let SetExpr::Select(select) = query.body.as_ref() else {
         return None;
     };
-    Some((select, limit))
+    Some((select, limit, offset))
 }
 
 pub(super) fn parse_keyed_value_select(
@@ -494,7 +800,7 @@ mod keyset_page_tests {
 
     #[test]
     fn keyset_page_binds_one_id_cursor_and_window() {
-        let parsed = parse_keyset_page_select(
+        let parsed = parse_browse_page_select(
             "SELECT * FROM \"appdb\".\"records\" WHERE \"_id\" > ? LIMIT 50 OFFSET 0",
             &[Value::Text("last".into())],
             "appdb",
@@ -503,27 +809,134 @@ mod keyset_page_tests {
         .unwrap();
 
         assert_eq!(parsed.collection, "records");
-        assert_eq!(parsed.key, Bson::String("last".into()));
+        assert_eq!(parsed.key, Some(Bson::String("last".into())));
         assert_eq!(parsed.limit, 50);
+        assert_eq!(parsed.offset, 0);
+    }
+
+    #[test]
+    fn filtered_offset_page_binds_filters_and_preserves_offset() {
+        let parsed = parse_browse_page_select(
+            "SELECT * FROM \"appdb\".\"records\" WHERE \"group\" = ? LIMIT 2 OFFSET 1",
+            &[Value::Text("keep".into())],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(parsed.key, None);
+        assert_eq!(parsed.offset, 1);
+        assert_eq!(parsed.filter, doc! { "group": { "$eq": "keep" } });
+    }
+
+    #[test]
+    fn not_equal_excludes_missing_and_null_fields() {
+        let parsed = parse_browse_page_select(
+            "SELECT * FROM records WHERE value != ? LIMIT 2 OFFSET 0",
+            &[Value::Int(7)],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            parsed.filter,
+            doc! { "value": { "$exists": true, "$nin": [Bson::Int64(7), Bson::Null] } }
+        );
+    }
+
+    #[test]
+    fn comparison_filters_refuse_null_parameters() {
+        for (predicate, params) in [
+            ("value != ?", vec![Value::Json(serde_json::Value::Null)]),
+            ("value > ?", vec![Value::Json(serde_json::Value::Null)]),
+            (
+                "value BETWEEN ? AND ?",
+                vec![Value::Json(serde_json::Value::Null), Value::Int(7)],
+            ),
+        ] {
+            assert!(matches!(
+                parse_browse_page_select(
+                    &format!("SELECT * FROM records WHERE {predicate} LIMIT 2 OFFSET 0"),
+                    &params,
+                    "appdb",
+                ),
+                Err(DriverError::Unsupported(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn pattern_filters_translate_wildcards_and_regex_literals() {
+        let parsed = parse_browse_page_select(
+            "SELECT * FROM records WHERE label LIKE ? LIMIT 2 OFFSET 0",
+            &[Value::Text("a.%_".into())],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            parsed.filter,
+            doc! { "label": { "$regex": r"^a\.[\s\S]*[\s\S]$", "$type": "string" } }
+        );
+    }
+
+    #[test]
+    fn escaped_case_insensitive_negated_pattern_is_string_only() {
+        let parsed = parse_browse_page_select(
+            "SELECT * FROM records WHERE label NOT ILIKE ? ESCAPE '!' LIMIT 2 OFFSET 0",
+            &[Value::Text("A!%".into())],
+            "appdb",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            parsed.filter,
+            doc! { "label": { "$type": "string", "$not": { "$regex": "^A%$", "$options": "i" } } }
+        );
+    }
+
+    #[test]
+    fn in_filters_bind_values_and_keep_sql_null_semantics() {
+        for (predicate, params, expected) in [
+            (
+                "value IN (?, ?, ?)",
+                vec![Value::Int(4), Value::Json(serde_json::Value::Null), Value::Int(8)],
+                doc! { "value": { "$in": [Bson::Int64(4), Bson::Int64(8)] } },
+            ),
+            (
+                "value NOT IN (?, ?)",
+                vec![Value::Int(4), Value::Int(8)],
+                doc! { "value": { "$exists": true, "$nin": [Bson::Int64(4), Bson::Int64(8), Bson::Null] } },
+            ),
+            (
+                "value NOT IN (?, ?)",
+                vec![Value::Int(4), Value::Json(serde_json::Value::Null)],
+                doc! { "_id": { "$in": [] } },
+            ),
+        ] {
+            let sql = format!("SELECT * FROM records WHERE {predicate} LIMIT 2 OFFSET 0");
+            let parsed = parse_browse_page_select(&sql, &params, "appdb").unwrap().unwrap();
+            assert_eq!(parsed.filter, expected);
+        }
     }
 
     #[test]
     fn keyset_page_refuses_other_predicates_projection_and_windows() {
         for sql in [
-            "SELECT * FROM records WHERE _id >= ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? OR _id = ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records JOIN archive ON true WHERE _id > ? LIMIT 50 OFFSET 0",
-            "SELECT * FROM records WHERE value > ? LIMIT 50 OFFSET 0",
             "SELECT value FROM records WHERE _id > ? LIMIT 50 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? LIMIT 0 OFFSET 0",
             "SELECT * FROM records WHERE _id > ? LIMIT 50 OFFSET 1",
             "SELECT * FROM records WHERE _id > ? ORDER BY value LIMIT 50 OFFSET 0",
         ] {
-            assert!(
-                parse_keyset_page_select(sql, &[Value::Int(1)], "appdb")
-                    .unwrap()
-                    .is_none()
-            );
+            assert!(matches!(
+                parse_browse_page_select(sql, &[Value::Int(1)], "appdb"),
+                Ok(None) | Err(DriverError::Unsupported(_))
+            ));
         }
     }
 }
