@@ -1,0 +1,12 @@
+crates/ssh/src/bin/tablepro-askpass.rs:14:5: replace main -> ExitCode with Default::default()
+crates/ssh/src/bin/tablepro-askpass.rs:29:5: replace request_answer -> Option<Zeroizing<Vec<u8>>> with None
+crates/ssh/src/bin/tablepro-askpass.rs:29:5: replace request_answer -> Option<Zeroizing<Vec<u8>>> with Some(Zeroizing::new(vec![]))
+crates/ssh/src/bin/tablepro-askpass.rs:29:5: replace request_answer -> Option<Zeroizing<Vec<u8>>> with Some(Zeroizing::from(vec![]))
+crates/ssh/src/bin/tablepro-askpass.rs:29:5: replace request_answer -> Option<Zeroizing<Vec<u8>>> with Some(Zeroizing::new(vec![0]))
+crates/ssh/src/bin/tablepro-askpass.rs:29:5: replace request_answer -> Option<Zeroizing<Vec<u8>>> with Some(Zeroizing::from(vec![0]))
+crates/ssh/src/bin/tablepro-askpass.rs:29:5: replace request_answer -> Option<Zeroizing<Vec<u8>>> with Some(Zeroizing::new(vec![1]))
+crates/ssh/src/bin/tablepro-askpass.rs:29:5: replace request_answer -> Option<Zeroizing<Vec<u8>>> with Some(Zeroizing::from(vec![1]))
+crates/ssh/src/bin/tablepro-askpass.rs:41:5: replace write_frame -> Option<()> with Some(())
+crates/ssh/src/openssh/session.rs:415:30: replace - with + in append_bounded
+crates/ssh/src/openssh/session.rs:417:13: replace += with *= in append_bounded
+crates/ssh/src/openssh/stderr_classify.rs:183:15: replace += with *= in protocol_detail
