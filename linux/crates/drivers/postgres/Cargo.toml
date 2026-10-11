@@ -19,6 +19,7 @@ rust_decimal.workspace = true
 secrecy.workspace = true
 serde_json.workspace = true
 sqlx = { workspace = true, features = ["postgres", "tls-rustls-aws-lc-rs"] }
+sqlx-core = { workspace = true, features = ["rustls-native-certs"] }
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- PostgreSQL TLS verification now trusts the operating system certificate store when no custom authority is configured.
 - MongoDB table browsing now seeks deep pages in `_id` sort order, including collections with mixed key types.
 - MongoDB offset and `_id` keyset pages apply equality, inequality, comparison, range, set-membership, null, `LIKE` and `ILIKE` filters with SQL null behavior.
 - Saved SSH hops now have stable IDs and credential revisions, with separate Secret Service operations for per-hop passwords and key passphrases. Legacy connections-file v1 data loads and migrates to v2 on save; jump-chain editing and per-hop transport use remain disabled until their integration lands.
@@ -18,6 +19,7 @@
 - DuckDB BLOB values now have guarded exact-refetch coverage against an embedded database and native storage oracle.
 - MySQL and MariaDB CHAR results now have `PAD_CHAR_TO_FULL_LENGTH` coverage for padding, VARCHAR, empty values and NULL.
 - MySQL and MariaDB CSV imports preserve impossible calendar dates accepted by `ALLOW_INVALID_DATES`.
+- PostgreSQL CSV imports preserve native BC date, timestamp and timestamptz values.
 - The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
 - Each statement of a script gets a gutter mark after a run: a tick for a statement that returned, a cross for one that failed.
