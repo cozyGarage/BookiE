@@ -854,3 +854,36 @@ async fn a_nested_begin_and_a_retired_session_each_audit_their_refusal_once() {
     );
     assert_eq!(*h.script.sent.lock().expect("sent"), vec!["BEGIN", "SELECT 1"]);
 }
+
+#[tokio::test]
+async fn journal_lockdown_refusals_audit_without_dispatch_and_leave_rollback_available() {
+    for (begin, sql) in [
+        (true, "COMMIT"),
+        (true, "INSERT INTO items VALUES (1)"),
+        (false, "INSERT INTO items VALUES (1)"),
+    ] {
+        let h = harness(SessionScript::default(), false);
+        let mut session = h.guard.open_session().await.expect("open session");
+        if begin {
+            run(&mut session, "BEGIN").await.expect("begin");
+        }
+        h.audit_state.disable_after_audit_failure();
+        let before = h.audit.events.lock().expect("events").len();
+        assert!(matches!(
+            run(&mut session, sql).await,
+            Err(DriverError::PolicyDenied(_))
+        ));
+        {
+            let events = h.audit.events.lock().expect("events");
+            assert_eq!(events.len() - before, 1, "{sql}");
+            assert_eq!(events[before].terminal_status, AuditTerminalStatus::Denied);
+            assert_eq!(events[before].phase, AuditRecordPhase::Outcome);
+        }
+        assert_eq!(h.script.sent.lock().expect("sent").len(), usize::from(begin));
+        assert_eq!(session.transaction_open(), begin);
+        if begin {
+            run(&mut session, "ROLLBACK").await.expect("rollback");
+            assert!(!session.transaction_open());
+        }
+    }
+}

@@ -267,7 +267,7 @@ impl PolicySession {
     ) -> Result<QueryResult, DriverError> {
         let writes = authorization.analysis.facts.writes();
         if writes {
-            self.guard.require_governed_write_available()?;
+            self.require_writable(sql).await?;
         }
         let operation = self.guard.operation(
             sql,
@@ -312,7 +312,7 @@ impl PolicySession {
         control: &OperationControl,
         authorization: Authorization,
     ) -> Result<QueryResult, DriverError> {
-        self.guard.require_governed_write_available()?;
+        self.require_writable(sql).await?;
         let operation = self.guard.operation(
             sql,
             None,
@@ -392,7 +392,7 @@ impl PolicySession {
                 .await;
         };
         if kind == Finish::Commit {
-            self.guard.require_governed_write_available()?;
+            self.require_writable(sql).await?;
         }
         let operation = finish_operation(kind, batch.id);
         self.guard.record_intent(&operation).await.map_err(|error| {

@@ -1,6 +1,13 @@
 use super::*;
 
 impl PolicySession {
+    pub(super) async fn require_writable(&mut self, sql: &str) -> Result<(), DriverError> {
+        match self.guard.require_governed_write_available() {
+            Ok(()) => Ok(()),
+            Err(error) => self.refuse(sql, "governed_write_lockdown", error).await.map(|_| ()),
+        }
+    }
+
     pub(super) async fn refuse_policy(
         &mut self,
         sql: &str,
