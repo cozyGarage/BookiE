@@ -38,6 +38,7 @@ not represent all support for an engine.
 
 | Scope | Evidence entry points |
 | --- | --- |
+| DuckDB empty `LIST<ENUM>` versus SQL NULL | [Native type and JSON oracle; explicit refusal in literal and parameter paths](../crates/app/tests/support/duckdb_enum_contract.rs) |
 | SQLite JSON1 and JSONB results | [`json_each.value` and `atom` preserve primitive runtime values, SQL NULL, and text fallback for object/array rows; array-index and object-member keys retain native storage classes against `type`/`typeof` oracles; `json_object()`/`json_array()` results remain exact text; JSONB remains native BLOB bytes; typed CSV round trips preserve JSON text, values and storage classes](../crates/drivers/sqlite/tests/runtime_typed_values.rs), [app consumer](../crates/app/tests/support/sqlite_any_contract/json_each_csv.rs) |
 | SQLite JSON result operators | [`->` and `->>` native storage classes, including numeric-looking text and nested JSON](../crates/drivers/sqlite/tests/runtime_typed_values.rs), [typed CSV restore into STRICT `ANY`](../crates/app/tests/support/sqlite_any_contract/json_each_csv.rs) |
 | PostgreSQL deep enum-array parameters | [63/64-layer comparison boundary](../crates/drivers/postgres/tests/support/domain_contract_parts/deep_enum_array_parameters.rs), [63/64-layer containment and overlap boundary](../crates/drivers/postgres/tests/support/deep_enum_array_operator_parameters.rs) |

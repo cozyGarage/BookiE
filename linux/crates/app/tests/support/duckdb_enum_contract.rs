@@ -243,6 +243,61 @@ async fn value_contract_duckdb_enum_list_result_matches_native_json() {
 
 #[cfg(feature = "duckdb")]
 #[tokio::test]
+async fn value_contract_duckdb_empty_enum_list_stays_distinct_from_sql_null() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_duckdb::DuckdbDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE mood_empty_list AS ENUM ('NULL', 'ready')")
+        .await
+        .unwrap();
+
+    let values = connection
+        .query("SELECT []::mood_empty_list[] AS empty, NULL::mood_empty_list[] AS missing")
+        .await
+        .unwrap();
+    assert_eq!(values.rows, vec![vec![Value::Undecodable("LIST".into()), Value::Null]]);
+    assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", &values.rows[0][0]).is_err());
+    assert!(
+        connection
+            .query_params("SELECT ?", std::slice::from_ref(&values.rows[0][0]))
+            .await
+            .is_err()
+    );
+
+    let native = connection
+        .query(
+            "SELECT typeof(value), to_json(value) \
+             FROM (SELECT []::mood_empty_list[] AS value \
+                   UNION ALL SELECT NULL::mood_empty_list[]) AS source \
+             ORDER BY CASE WHEN value IS NULL THEN 1 ELSE 0 END",
+        )
+        .await
+        .unwrap();
+    let Value::Text(list_type) = &native.rows[0][0] else {
+        panic!("native empty-list type oracle returned {:?}", native.rows[0][0]);
+    };
+    assert!(
+        list_type.starts_with("ENUM(") && list_type.ends_with("[]"),
+        "{list_type}"
+    );
+    assert_eq!(
+        native.rows,
+        vec![
+            vec![Value::Text(list_type.clone()), Value::Text("[]".into())],
+            vec![Value::Text(list_type.clone()), Value::Null],
+        ]
+    );
+}
+
+#[cfg(feature = "duckdb")]
+#[tokio::test]
 async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
