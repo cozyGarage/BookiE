@@ -1,22 +1,16 @@
 # Documentation map
 
-Read this page before loading long plans or evidence. Rules for agents and
-contributors are in the repository [AGENTS.md](../AGENTS.md). The active sprint
-sets work order; accepted ADRs set technical rules. A dated result proves only
-its recorded source, environment and consumer.
+Read this page before loading long plans or evidence. Rules for agents and contributors are in the repository [AGENTS.md](../AGENTS.md). The active sprint sets work order; accepted ADRs set technical rules. A dated result proves only its recorded source, environment and consumer.
 
 ## Minimum context for a task
 
 1. [AGENTS.md](../AGENTS.md).
 2. The [active sprint](bookie-0.2-sprint.md), including 0.2.0 readiness.
 3. Your lane's rows in the [ledger](known-issues.md#owners-and-handoff).
-4. The governing [ADR](decisions/README.md); for every type or value change,
-   [ADR 0007](decisions/0007-type-and-value-preservation.md).
+4. The governing [ADR](decisions/README.md); for every type or value change, [ADR 0007](decisions/0007-type-and-value-preservation.md).
 5. The affected checks in the [validation playbook](validation-playbook.md).
 
-Do not load archives as mandatory context. Look up the heading, test selector or
-SHA you need, and recheck current source before trusting words such as "next",
-"current" or "pending" in a dated document.
+Do not load archives as mandatory context. Look up the heading, test selector or SHA you need, and recheck current source before trusting words such as "next", "current" or "pending" in a dated document.
 
 ## Documents by audience
 
@@ -55,28 +49,16 @@ SHA you need, and recheck current source before trusting words such as "next",
 
 ## Adding a document
 
-- Look for the owner in the table above first; most new facts are a row, a
-  section or an ADR, not a new file.
-- A new reference document goes in `docs/` with a lowercase, hyphenated
-  name and a line in the audience table above. Keep it under about 3,000 words;
-  split by concern before it grows past that.
-- Number ADRs sequentially (`decisions/NNNN-title.md`) and add them to the ADR
-  index with their status.
-- Evidence directories are named `<topic>-<YYYY-MM-DD>` and hold only what a
-  reviewer needs to check a claim. Large or raw logs stay in the PR or CI run.
-- When a document stops being current, move it to `archive/` with its date in
-  the name, update links (`scripts/check-doc-links.py` finds the broken ones) and
-  leave its open items in the ledger.
-- Do not move or rename a current document casually: scripts, CI and other lanes
-  link to these paths.
+- Look for the owner in the table above first; most new facts are a row, a section or an ADR, not a new file.
+- A new reference document goes in `docs/` with a lowercase, hyphenated name and a line in the audience table above. Keep it under about 3,000 words; split by concern before it grows past that.
+- Number ADRs sequentially (`decisions/NNNN-title.md`) and add them to the ADR index with their status.
+- Evidence directories are named `<topic>-<YYYY-MM-DD>` and hold only what a reviewer needs to check a claim. Large or raw logs stay in the PR or CI run.
+- When a document stops being current, move it to `archive/` with its date in the name, update links (`scripts/check-doc-links.py` finds the broken ones) and leave its open items in the ledger.
+- Do not move or rename a current document casually: scripts, CI and other lanes link to these paths.
 
 ## Archive starting points
 
-[archive/](archive/) holds dated reviews, audits, inventories and long
-histories. They are source-pinned evidence, not instructions; open items from
-them live in the ledger. The
-[changelog engineering history index](../CHANGELOG.md#historical-engineering-records)
-locates dated records.
+[archive/](archive/) holds dated reviews, audits, inventories and long histories. They are source-pinned evidence, not instructions; open items from them live in the ledger. The [changelog engineering history index](../CHANGELOG.md#historical-engineering-records) locates dated records.
 
 - [Sprint history](archive/bookie-0.2-history.md) (includes 2026-10-08/09 continuation snapshots)
 - [B4 history](archive/b4-history.md) (includes superseded tip checkpoints, [completed local slices](archive/b4-history.md#archived-completed-local-slices-2026-10-10-consolidation) and [remaining-task prose](archive/b4-history.md#archived-remaining-task-prose-2026-10-10-pass-4))
@@ -91,7 +73,4 @@ locates dated records.
 
 ## Keep context bounded
 
-Record a rule once in an ADR and a task once on its board or in the ledger. Do
-not copy old test counts into a current claim. Keep ignored `target/quality`
-paths as plain text, and when output is unavailable, say so instead of leaving a
-dead link.
+Record a rule once in an ADR and a task once on its board or in the ledger. Do not copy old test counts into a current claim. Keep ignored `target/quality` paths as plain text, and when output is unavailable, say so instead of leaving a dead link.

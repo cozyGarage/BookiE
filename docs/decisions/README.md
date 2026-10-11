@@ -51,9 +51,7 @@ Other options and why they were rejected.
 | [0014](0014-full-table-export-snapshot.md) | Full table exports use one read snapshot | Accepted | Paged exports must read one guarded database snapshot or refuse before publishing a file |
 | [0015](0015-database-snapshots.md) | Database snapshots and restore | Accepted (0.2.x after 0.2.0) | Per-engine native snapshots behind a capability flag, generated names, one guarded and audited operation per action, a safety copy on restore |
 
-Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted
-means the architecture choice is recorded; implementation and runtime acceptance
-remain on the [active sprint](../bookie-0.2-sprint.md) and owning boards.
+Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted means the architecture choice is recorded; implementation and runtime acceptance remain on the [active sprint](../bookie-0.2-sprint.md) and owning boards.
 
 ## Adding a decision
 
