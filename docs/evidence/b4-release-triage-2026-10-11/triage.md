@@ -4,7 +4,9 @@ Source reviewed: BookiE `fork/linux` at `63f6d2eb320e309f2663f257fbddf7f4e54a37e
 Pending fixes are separate PRs, not properties of this baseline. This is a
 bounded source/test review of security-relevant mutation survivors, not a new
 full mutation run, hosted acceptance or a power-loss experiment. The
-[manifest](manifest.json) records the local commands and paired regression logs.
+[manifest](manifest.json) records the original baseline commands and paired
+reproduction logs. The later current-tip closeout checks are in the
+[B4 closeout manifest](../b4-closeout-2026-10-11/manifest.json).
 
 | Boundary | Disposition | Evidence and next proof |
 | --- | --- | --- |
