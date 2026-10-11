@@ -9,6 +9,67 @@ owns the decisions. Use the current Git tip for its revision because this board 
 independently of source commits. B4 remains open. Implementation, local execution, hosted
 execution and installed acceptance are separate states.
 
+## Release wrap-up review (2026-10-11)
+
+[The source and worktree review](archive/b4-release-wrapup-review-2026-10-11.md)
+records the integrated branches, the finite finish order and the scope conflicts.
+It reproduced an AUD-9 named derived-projection leak and a missing terminal
+audit outcome for a write refused inside a read-only snapshot. The old code
+branches are merged. Their unique historical evidence was preserved in
+`63f6d2eb3`, and the 16 old worktrees were retired without deleting the shared
+build cache. This review does not establish candidate acceptance.
+
+### Finite code finish and candidate handoff
+
+The [0.2.0 scope](0.2.0-scope.md) owns blockers. Finish the three demonstrated
+defects below; broader features remain in the backlog. Pending PRs do not close
+their ledger rows.
+
+| Work | Implementation | Exit before candidate freeze |
+| --- | --- | --- |
+| AUD-9 hidden projection sources | [#537](https://github.com/cozyGarage/BookiE/pull/537): unknown derived/renamed sources and whole records fail closed, ordinary qualified columns remain visible | GitHub and Forgejo green on its exact head, then merge; native PostgreSQL cases include `array_agg(c.*)` cast to text |
+| Early session refusal audit | [#538](https://github.com/cozyGarage/BookiE/pull/538): snapshot writes, structural refusals and retired-session calls record a Denied terminal outcome without dispatch | GitHub and Forgejo green on its exact head, then merge; keep transaction state and journal-failure lockdown |
+| UI-13b snapshot-or-refusal | [#539](https://github.com/cozyGarage/BookiE/pull/539): refuse unsupported full export before source/destination access, preserve loaded-result and current-page export | App preflight, widget tier, GitHub and Forgejo; merge the refusal, defer verified snapshot implementations |
+
+Mutation triage is bounded to masking, host-key refusal, per-hop secret selection,
+bundle rollback and durable audit. Existing fixture coverage and remaining proof
+gaps are recorded in [the focused triage](evidence/b4-release-triage-2026-10-11/triage.md).
+Do not turn a survivor percentage into release approval or a new blocker.
+
+After the code merges, freeze one SHA. UX/maintainer runs the affected Forgejo
+layers and installed Arch/Hyprland acceptance for AUD-2, B4-7, B4-16 and B4-22.
+Use the finite TEST-15 list below, then the sprint's retry-free soak and release
+decision. Source-build Xvfb, extracted package binaries and older green runs
+do not substitute for this candidate.
+
+### TEST-15 release acceptance list
+
+Run the existing driver layer and PostgreSQL release fixture on the frozen SHA.
+The six network-engine lost-ack scenarios below need independent stored-state
+or request-count evidence of one application, plus a usable reconnect. A later
+successful read must not dispatch the failed write again.
+
+| Path | Existing selector or contract | Candidate evidence required |
+| --- | --- | --- |
+| PostgreSQL pooled UPDATE | `a_committed_write_with_a_lost_ack_is_not_replayed_after_reconnect` | Target and trigger witness stay exactly once after reconnect |
+| MySQL pooled/prepared UPDATE | Same selector in the MySQL integration target | Target and trigger witness stay exactly once; new TCP connection is observed |
+| Redis Lua write | `a_lost_eval_ack_is_not_replayed_after_redis_reconnects` | Independent target and audit keys stay one |
+| ClickHouse HTTP INSERT | `a_committed_insert_with_a_lost_http_ack_is_not_replayed` | Native target and materialized-view witness stay one |
+| SQL Server UPDATE batch | `a_committed_update_with_a_lost_ack_is_not_replayed` | Independent committed target/audit rows survive restart exactly once |
+| MongoDB UPDATE | `a_committed_update_with_a_lost_ack_is_not_replayed_after_reconnect` | One proxy-observed request and one server-profile update; standalone fixture does not qualify replica-set retryable-write modes |
+| Pinned sessions and write batches | `guard_tests_session`, `guard_tests_audit`, `session_postgres` and the MySQL atomicity matrix | Unknown post-dispatch outcomes retire/block the affected generation; no pool fallback; close and rollback audit the actual result |
+| Allowed retry boundaries | PostgreSQL `query.rs` stale-type-cache predicate; MySQL `session.rs` prepared-protocol fallback | Source review distinguishes an explicit server rejection from a disconnect, timeout or unknown outcome; keep native session and parameter fixtures green |
+| SQLite and DuckDB | Local-file drivers, read-only and transaction fixtures | Cancellation, file state and rollback contracts; no network acknowledgement scenario is claimed |
+
+The current PostgreSQL session path enables the stale-type-cache retry, as do
+pooled query/execute paths; explicit transactions disable it. MySQL session
+fallback is parameter-free and limited to prepared-protocol rejection. These
+are reviewed code paths, not a proof that arbitrary routines have no side
+effects. MongoDB uses one direct endpoint with SDK defaults; its standalone
+lost-ack fixture must not be advertised as all-topology retry proof. Broader
+topologies, optional engine/effect matrices and fault-injection expansion stay
+open in the backlog unless the maintainer changes release scope.
+
 ## Current Linux-tip B4 checkpoint (2026-10-10)
 
 Tip includes #458/`Effects`, #459 engine read-only, #460 migration step 2,
@@ -84,17 +145,15 @@ distribution-package or native Wayland acceptance.
 | B4-11 | Extend failed-batch tests to optional/vendor MySQL-family engines and broader side-effect patterns | PR #475 adds `MRG_MyISAM` write-through cases for both MySQL and MariaDB. On exact Linux source tip `43b718ee2dc4b20bff03ac75ad87f4f571501406`, the serialized `mysql_atomic` selector passed 20/20 against Docker MySQL and MariaDB fixtures; see [exact-tip run manifest](evidence/mysql-atomic-linux-43b718ee-2026-10-10/manifest.json). The source matrix covers MyISAM, MEMORY, CSV, ARCHIVE, `MRG_MyISAM`, BLACKHOLE, MariaDB Aria, direct writes, trigger INSERT/UPDATE/DELETE effects, auto-increment allocation, trigger session state, pinned-session `LAST_INSERT_ID()` and advisory locks. The Aria direct and trigger matrix also passed on source `2b79ae3`; see [Aria run manifest](evidence/mysql-aria-batch-effects-linux-2b79ae3-2026-10-10/manifest.json). On exact local source `5f2367e6`, paired MySQL/MariaDB tests verify that a `RELEASE_LOCK()` inside a failing batch remains released after rollback; see [lock-release rollback evidence](evidence/mysql-lock-release-rollback-5f2367e6-2026-10-10/manifest.json). On exact source `80b998ef971a94b9600d28e4797a6f4715eb478a`, paired MySQL and MariaDB tests confirm a DML-assigned session user variable survives a later failed statement while InnoDB row data rolls back; the app warning now covers session state and other non-transactional side effects. See [session-variable rollback evidence](evidence/mysql-session-variable-rollback-80b998ef-2026-10-10/manifest.json). Optional/vendor engines and other side-effect classes remain open; frozen-candidate, package-installed, hosted and Forgejo acceptance remain separate. Earlier pooled `LAST_INSERT_ID()` observations were invalid because they could use a different connection; pinned-session tests provide the relevant oracle. See [advisory-lock evidence](evidence/mysql-advisory-lock-rollback-2026-10-09/manifest.json) and [session-state evidence](evidence/mysql-session-state-rollback-2026-10-09/manifest.json) |
 | B4-17 | Complete package-installed/native Wayland trust flow | Exact current Linux tip `227d846b95d14c2d55c366843bdf6ddc386b1c72` passed 1 system OpenSSH test, 3 mTLS tests, 59 PostgreSQL release integration tests and all seven GTK trust scenarios, including multi-hop trust, second-hop decline, changed-key refusal and tunnel-loss recovery. This was a source build under Xvfb/X11; frozen-candidate, package-installed multi-hop trust and native Wayland acceptance remain open. See [current Linux release evidence](evidence/b4-current-postgres-release-227d846b-2026-10-10/manifest.json), [local Arch Wayland evidence](evidence/b4-arch-package-wayland-2026-10-09/manifest.json), [hosted candidate evidence](evidence/b4-hosted-acceptance-2026-10-09/manifest.json), [native SSH evidence](evidence/b4-ssh-native-current-2026-10-09/manifest.json), and [package evidence](evidence/b4-deb-package-lifecycle-2026-10-09/manifest.json) |
 | B4-21 | Preserve Samba Kerberos+VerifyFull proof, then perform Windows AD interoperability | At exact Linux source tip `3b9f2c84`, both Samba AD selectors passed with verified TLS. PR #467 bounds the Kerberos connect future inside its five-second blocking-worker deadline and includes a regression for dropping a pending connect. Windows AD interoperability and distribution-package Kerberos remain open. See [current-tip Kerberos evidence](evidence/b4-21-mssql-kerberos-current-3b9f2c84-2026-10-10/manifest.json) and [PR #467](https://github.com/cozyGarage/BookiE/pull/467) |
-| UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | #490 landed stable hop IDs, credential revisions, v1-to-v2 migration and per-hop Secret Service APIs. #492 implements hop-scoped transport and cache identity; this PR adds encrypted bundle v2 with GTK bundle-flow evidence. GTK editor, full migration/rollback acceptance and installed trust-flow acceptance remain open; editing stays refused |
+| UI-1b | Preserve edit refusal while implementing the [per-hop secrets design](proposals/ui-1b-ssh-jump-chain-editor.md) across storage, transport, bundle compatibility and GTK | #490 landed stable hop IDs, credential revisions, v1-to-v2 migration and per-hop Secret Service APIs. #492 merged hop-scoped transport and cache identity; #494 merged encrypted bundle v2, with per-hop passphrase coverage in #528 and source-build GTK bundle-flow evidence. GTK editor, full migration/rollback acceptance and installed trust-flow acceptance remain open; editing stays refused |
 
 ## Remaining tasks
 
 Implemented local slices (I2, I5, F7, MySQL atomicity matrices) live in
 [B4 history](archive/b4-history.md#archived-remaining-task-prose-2026-10-10-pass-4).
-Live acceptance bounds stay above. Open packaging work:
-
-| ID | Small task and required assertion | Local layers |
-| --- | --- | --- |
-| I1 | In the Debian phase, build/install executable `tablepro-askpass` in debhelper rules and make validator reject its absence; inspect the rules-built package | `packaging-contracts`, Debian package build |
+Live acceptance bounds stay above. I1 is complete under ledger B4-10: the
+Debian builder includes askpass and package validation rejects its absence.
+Debian/GNOME desktop acceptance remains post-0.2.0 work under PKG-2.
 
 ## In-progress local slices
 
@@ -131,8 +190,9 @@ and the [ledger](known-issues.md).
    drivers tls postgres-release widgets ui packaging-contracts`; include keyring
    and optional-feature checks where affected. Avoid repeated overlapping suites.
 4. Installed Arch/Omarchy/Hyprland native Wayland workflows and upgrade/rollback.
-5. I1, then installed Debian/GNOME native Wayland workflows and upgrade/rollback.
-6. B7 retry-free candidate soak and release decision. Publication is separate.
+5. B7 retry-free candidate soak and the maintainer's release decision.
+6. After 0.2.0, installed Debian/GNOME native Wayland workflows and
+   upgrade/rollback under PKG-2. Publication is separate.
 
 Use the shared checkout and `target` cache in the current single-agent
 session. Serialize Cargo and fixture runs. Do not clean the cache to diagnose a
@@ -146,7 +206,8 @@ failure. Record exact source hashes, commands, counts and raw sanitized logs.
 - [ ] MySQL and SQL Server TLS through SSH have positive and negative native proof.
 - [ ] Transport audit, Flatpak refusal and registered GTK session flow pass.
 - [ ] Installed Arch native Wayland and upgrade/rollback evidence recorded.
-- [ ] Debian rules/helper and installed GNOME native Wayland evidence recorded.
+- [ ] Post-0.2.0: installed GNOME native Wayland evidence recorded (PKG-2;
+  Debian rules/helper implementation is complete under B4-10).
 
 ## Historical packets
 

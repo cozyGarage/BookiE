@@ -8,7 +8,7 @@ this page keeps the order. Draft of 2026-10-11, for the maintainer.
 | Row | What | Notes |
 |---|---|---|
 | SNAP-2 to SNAP-4 | Database snapshots: PostgreSQL, SQL Server, then SQLite and DuckDB file copies | ADR 0015 / SNAP-1 accepted the feature for 0.2.x (not a 0.2.0 blocker); limit 5 snapshots per database |
-| UI-1b | Edit SSH jump chains in the form | Storage landed in #490; transport and bundle v2 are in review; edits stay refused until the whole path passes together |
+| UI-1b | Edit SSH jump chains in the form | Storage, transport, bundle v2 and per-hop passphrase coverage merged in #490, #492, #494 and #528; GTK editing stays refused until its complete path passes |
 | UI-19 | Foreign key picker and navigation, enum and set pickers, paste TSV, estimated counts | |
 | UI-20 | Server output (NOTICE, PRINT) and a timing breakdown | with PERF-4 |
 | UI-15b | Null display style preference | vim keys are already an opt-in preference |
@@ -29,7 +29,8 @@ this page keeps the order. Draft of 2026-10-11, for the maintainer.
 
 | Row | What |
 |---|---|
-| TEST-2 | Broad mutation audit: policy and core are measured (see [TEST-32](oracle-review.md)); transport, ssh and storage are not |
+| TEST-2 | Broad mutation audit: policy, core, transport, SSH and storage are measured; remaining survivor triage stays open (see [TEST-32](oracle-review.md) and [reports](evidence/test-quality-2026-10-11/transport-mutants.md)) |
+| AUD-11 consolidation | Finish the single AST walk for classification, masking and blast-radius planning | Behavioural S6/S7/S8 fixes are merged; shared analysis landed in #506. Structural consolidation follows 0.2.0; candidate acceptance of the fixes stays in the ledger |
 | TEST-12 | MongoDB metadata sample consistency |
 | UI-21, TEST-28 | Fake connection for the GTK tier, native Ubuntu AT-SPI menu reachability |
 | TEST-30 | Remaining SonarCloud and CodeQL findings |
