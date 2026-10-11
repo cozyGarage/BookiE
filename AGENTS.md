@@ -115,7 +115,7 @@ owner table, and each lane edits only its own files.
    queued sync of Forgejo's `linux` waits on the same lock and holds it until its
    run finishes. Runners carry the label `debian-host` (native GTK, widgets and
    release fixtures stay there) and `any-host` (all four executors, used by the
-   guard, Clippy, unit, sandbox, supply-chain and distro-floor jobs). A single
+   guard, Clippy, unit, sandbox, supply-chain, driver and distro-floor jobs). A single
    failed job can be re-run from the Forgejo run page without a new push.
 8. **Do not repeat work between GitHub and Forgejo.** GitHub runs the cheap tier,
    security, Flatpak and the workflow and harness contracts on pull requests,

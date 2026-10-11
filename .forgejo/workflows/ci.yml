@@ -150,7 +150,7 @@ jobs:
           fi
           cd src/linux && PREVIOUS_DEB="$released" bash scripts/test-deb-package.sh ${{ matrix.base }}
   driver:
-    runs-on: debian-host
+    runs-on: any-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
