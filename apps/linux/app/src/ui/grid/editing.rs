@@ -43,6 +43,14 @@ pub(super) fn setup_editable_cell(
     label.set_margin_end(8);
     COLUMN_SLOT.set(&label, idx);
     item.set_child(Some(&label));
+    let focus_on_click = gtk::GestureClick::builder().button(1).build();
+    let cell = label.clone();
+    focus_on_click.connect_pressed(move |_, _, _, _| {
+        if !cell.is_editing() {
+            cell.grab_focus();
+        }
+    });
+    label.add_controller(focus_on_click);
 
     if let Some(menus) = menus {
         attach_cell_gesture(

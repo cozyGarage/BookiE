@@ -62,6 +62,7 @@ mod imp {
     impl ObjectImpl for CellEditor {
         fn constructed(&self) {
             self.parent_constructed();
+            self.obj().set_focusable(true);
             // Stable CSS class so app-level selectors can target this
             // widget without depending on the type-name node default.
             self.obj().add_css_class("tp-cell-editor");
