@@ -851,7 +851,6 @@ impl ConnectDialog {
             self.ssh.expander.set_enable_expansion(false);
             self.password.set_title(&crate::tr!("Password (optional)"));
         } else {
-            self.ssh.expander.set_enable_expansion(true);
             self.password.set_title(&crate::tr!("Password"));
         }
         self.auth_combo.set_visible(self.form.shows_method());
