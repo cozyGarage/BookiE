@@ -21,6 +21,7 @@ for branch in "$@"; do
     echo "train: $branch conflicts with the train so far; gate it on its own" >&2
   fi
 done
+(cd "$work" && cargo fmt --all && git commit -qam "train: cargo fmt" 2>/dev/null || true)
 [ "${#merged[@]}" -gt 0 ] || { echo "train: nothing to gate" >&2; exit 1; }
 
 sha="$(git -C "$work" rev-parse HEAD)"
