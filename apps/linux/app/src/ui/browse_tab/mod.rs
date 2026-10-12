@@ -116,6 +116,7 @@ pub struct BrowseTab {
     /// here lets us emit `BrowseTabOutput::DirtyChanged` only on real
     /// transitions and avoid redundant tab-title rewrites in App.
     was_dirty: std::cell::Cell<bool>,
+    save_in_flight: std::cell::Cell<bool>,
     /// Row identity captured before a sort/save/refresh-driven reload
     /// so the focused row can be re-selected and re-scrolled into view
     /// once the new page lands. Persisted rows match by PK; drafts
@@ -857,6 +858,7 @@ impl SimpleComponent for BrowseTab {
             read_only_banner,
             no_pk_banner,
             was_dirty: std::cell::Cell::new(false),
+            save_in_flight: std::cell::Cell::new(false),
             pending_focus_restore: std::cell::RefCell::new(None),
             paginator_label: paginator.paginator_label,
             selection_label: paginator.selection_label,

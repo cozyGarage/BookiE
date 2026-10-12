@@ -479,6 +479,9 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_commit_save(&mut self, sender: ComponentSender<Self>) {
+        if self.save_in_flight.get() {
+            return;
+        }
         let columns = self.current_columns.clone();
         let driver_id = self.driver_id.clone();
         let schema = self.schema.clone();
@@ -494,6 +497,7 @@ impl BrowseTab {
                 // double-click firing two transactions and
                 // matches GNOME's standard "in-progress action"
                 // affordance (busy spinner + disabled control).
+                self.save_in_flight.set(true);
                 self.save_button.set_sensitive(false);
                 self.discard_button.set_sensitive(false);
                 // SaveCompleted will refetch the page; capture
@@ -553,6 +557,7 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_save_completed(&mut self, sender: ComponentSender<Self>) {
+        self.save_in_flight.set(false);
         crate::services::change_tracker::with_tab(self.tab_id, |t| t.clear());
         self.refresh_pending_bar(0);
         self.save_button.set_sensitive(true);
@@ -561,6 +566,7 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_save_failed(&mut self, message: String, sender: ComponentSender<Self>) {
+        self.save_in_flight.set(false);
         self.save_button.set_sensitive(true);
         self.discard_button.set_sensitive(true);
         let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
