@@ -140,6 +140,7 @@ fn ancestor_keys(node: &TreeNode) -> Vec<String> {
     keys
 }
 
+#[cfg(test)]
 pub fn visible_nodes(nodes: &[TreeNode], collapsed: &CollapseState, query: &str) -> Vec<usize> {
     visible_nodes_with_hidden_schemas(nodes, collapsed, query, &HashSet::new())
 }
@@ -172,10 +173,10 @@ pub fn visible_nodes_with_hidden_schemas(
     let mut shown: HashSet<usize> = matching.iter().copied().collect();
     for index in &matching {
         for key in ancestor_keys(&nodes[*index]) {
-            if let Some(parent) = nodes.iter().position(|node| node.key == key) {
-                if schema_is_visible(&nodes[parent], hidden_schemas) {
-                    shown.insert(parent);
-                }
+            if let Some(parent) = nodes.iter().position(|node| node.key == key)
+                && schema_is_visible(&nodes[parent], hidden_schemas)
+            {
+                shown.insert(parent);
             }
         }
     }
