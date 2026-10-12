@@ -259,7 +259,7 @@ impl ExistingColumns {
             button.set_sensitive(available);
         }
         if !available {
-            status.set_text("Saved mappings are unavailable for this connection.");
+            status.set_text(&crate::tr!("Saved mappings are unavailable for this connection."));
         }
         for button in [&remember, &restore, &forget] {
             actions.append(button);
@@ -268,18 +268,8 @@ impl ExistingColumns {
         group.add(&status);
         let headers = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         let has_header = std::rc::Rc::new(std::cell::Cell::new(true));
-        wire_mapping_actions(
-            &remember,
-            &restore,
-            &forget,
-            &status,
-            &rows,
-            &headers,
-            &has_header,
-            columns,
-            store,
-            scope,
-        );
+        MappingActions::new(&status, &rows, &headers, &has_header, columns, store, scope)
+            .connect(&remember, &restore, &forget);
         Self {
             group,
             table: table.to_owned(),
@@ -319,133 +309,121 @@ impl ExistingColumns {
     }
 }
 
-fn wire_mapping_actions(
-    remember: &gtk::Button,
-    restore: &gtk::Button,
-    forget: &gtk::Button,
-    status: &gtk::Label,
-    rows: &[adw::ComboRow],
-    headers: &std::rc::Rc<std::cell::RefCell<Vec<String>>>,
-    has_header: &std::rc::Rc<std::cell::Cell<bool>>,
-    columns: &[ColumnInfo],
+struct MappingActions {
+    status: gtk::Label,
+    rows: Vec<adw::ComboRow>,
+    headers: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+    has_header: std::rc::Rc<std::cell::Cell<bool>>,
+    columns: Vec<ColumnInfo>,
     store: Option<CsvMappingStore>,
     scope: Option<CsvMappingScope>,
-) {
-    connect_remember(
-        remember,
-        status,
-        rows,
-        headers,
-        has_header,
-        columns,
-        store.clone(),
-        scope.clone(),
-    );
-    connect_restore(
-        restore,
-        status,
-        rows,
-        headers,
-        has_header,
-        columns,
-        store.clone(),
-        scope.clone(),
-    );
-    connect_forget(forget, status, store, scope);
 }
 
-fn connect_remember(
-    button: &gtk::Button,
-    status: &gtk::Label,
-    rows: &[adw::ComboRow],
-    headers: &std::rc::Rc<std::cell::RefCell<Vec<String>>>,
-    has_header: &std::rc::Rc<std::cell::Cell<bool>>,
-    columns: &[ColumnInfo],
-    store: Option<CsvMappingStore>,
-    scope: Option<CsvMappingScope>,
-) {
-    let columns = columns.to_vec();
-    let row_handles = rows.to_vec();
-    let active_headers = headers.clone();
-    let header_enabled = has_header.clone();
-    let message = status.clone();
-    let saved = store.clone();
-    let saved_scope = scope.clone();
-    button.connect_clicked(move |_| {
-        let (Some(store), Some(scope)) = (&saved, &saved_scope) else {
-            return;
-        };
-        let selected = row_handles
-            .iter()
-            .map(|row| (row.selected() > 0).then(|| row.selected() as usize - 1))
-            .collect::<Vec<_>>();
-        let selected = editable_existing_mapping(&columns, selected);
-        let result = store.save(
+impl MappingActions {
+    fn new(
+        status: &gtk::Label,
+        rows: &[adw::ComboRow],
+        headers: &std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+        has_header: &std::rc::Rc<std::cell::Cell<bool>>,
+        columns: &[ColumnInfo],
+        store: Option<CsvMappingStore>,
+        scope: Option<CsvMappingScope>,
+    ) -> Self {
+        Self {
+            status: status.clone(),
+            rows: rows.to_vec(),
+            headers: headers.clone(),
+            has_header: has_header.clone(),
+            columns: columns.to_vec(),
+            store,
             scope,
-            &active_headers.borrow(),
-            &columns,
-            &selected,
-            header_enabled.get(),
-        );
-        message.set_text(
-            &result
-                .map(|()| "Mapping saved for this table.".to_string())
-                .unwrap_or_else(|error| error),
-        );
-    });
-}
+        }
+    }
 
-fn connect_restore(
-    button: &gtk::Button,
-    status: &gtk::Label,
-    rows: &[adw::ComboRow],
-    headers: &std::rc::Rc<std::cell::RefCell<Vec<String>>>,
-    has_header: &std::rc::Rc<std::cell::Cell<bool>>,
-    columns: &[ColumnInfo],
-    store: Option<CsvMappingStore>,
-    scope: Option<CsvMappingScope>,
-) {
-    let row_handles = rows.to_vec();
-    let active_headers = headers.clone();
-    let header_enabled = has_header.clone();
-    let message = status.clone();
-    let saved = store.clone();
-    let saved_scope = scope.clone();
-    let columns = columns.to_vec();
-    button.connect_clicked(move |_| {
-        let (Some(store), Some(scope)) = (&saved, &saved_scope) else {
-            return;
-        };
-        match store.restore(scope, &active_headers.borrow(), &columns, header_enabled.get()) {
-            Ok(Some(mapping)) => {
-                for (row, source) in row_handles.iter().zip(mapping) {
-                    row.set_selected(source.map_or(0, |index| index as u32 + 1));
+    fn connect(&self, remember: &gtk::Button, restore: &gtk::Button, forget: &gtk::Button) {
+        self.connect_remember(remember);
+        self.connect_restore(restore);
+        self.connect_forget(forget);
+    }
+
+    fn connect_remember(&self, button: &gtk::Button) {
+        let actions = self.clone_for_signal();
+        button.connect_clicked(move |_| {
+            let (Some(store), Some(scope)) = (&actions.store, &actions.scope) else {
+                return;
+            };
+            let selected = actions
+                .rows
+                .iter()
+                .map(|row| (row.selected() > 0).then(|| row.selected() as usize - 1))
+                .collect();
+            let mapping = editable_existing_mapping(&actions.columns, selected);
+            let result = store.save(
+                scope,
+                &actions.headers.borrow(),
+                &actions.columns,
+                &mapping,
+                actions.has_header.get(),
+            );
+            actions.status.set_text(
+                &result
+                    .map(|()| crate::tr!("Mapping saved for this table."))
+                    .unwrap_or_else(|error| error),
+            );
+        });
+    }
+
+    fn connect_restore(&self, button: &gtk::Button) {
+        let actions = self.clone_for_signal();
+        button.connect_clicked(move |_| {
+            let (Some(store), Some(scope)) = (&actions.store, &actions.scope) else {
+                return;
+            };
+            match store.restore(
+                scope,
+                &actions.headers.borrow(),
+                &actions.columns,
+                actions.has_header.get(),
+            ) {
+                Ok(Some(mapping)) => {
+                    for (row, source) in actions.rows.iter().zip(mapping) {
+                        row.set_selected(source.map_or(0, |index| index as u32 + 1));
+                    }
+                    actions
+                        .status
+                        .set_text(&crate::tr!("Saved mapping restored. Review it before importing."));
                 }
-                message.set_text("Saved mapping restored. Review it before importing.");
+                Ok(None) => actions.status.set_text(&crate::tr!("No saved mapping for this table.")),
+                Err(error) => actions.status.set_text(&error),
             }
-            Ok(None) => message.set_text("No saved mapping for this table."),
-            Err(error) => message.set_text(&error),
-        }
-    });
-}
+        });
+    }
 
-fn connect_forget(
-    button: &gtk::Button,
-    status: &gtk::Label,
-    store: Option<CsvMappingStore>,
-    scope: Option<CsvMappingScope>,
-) {
-    let message = status.clone();
-    button.connect_clicked(move |_| {
-        let (Some(store), Some(scope)) = (&store, &scope) else {
-            return;
-        };
-        match store.forget(scope) {
-            Ok(true) => message.set_text("Saved mapping removed."),
-            Ok(false) => message.set_text("No saved mapping for this table."),
-            Err(error) => message.set_text(&error),
+    fn connect_forget(&self, button: &gtk::Button) {
+        let actions = self.clone_for_signal();
+        button.connect_clicked(move |_| {
+            let (Some(store), Some(scope)) = (&actions.store, &actions.scope) else {
+                return;
+            };
+            match store.forget(scope) {
+                Ok(true) => actions.status.set_text(&crate::tr!("Saved mapping removed.")),
+                Ok(false) => actions.status.set_text(&crate::tr!("No saved mapping for this table.")),
+                Err(error) => actions.status.set_text(&error),
+            }
+        });
+    }
+
+    fn clone_for_signal(&self) -> Self {
+        Self {
+            status: self.status.clone(),
+            rows: self.rows.clone(),
+            headers: self.headers.clone(),
+            has_header: self.has_header.clone(),
+            columns: self.columns.clone(),
+            store: self.store.clone(),
+            scope: self.scope.clone(),
         }
-    });
+    }
 }
 
 fn disambiguated_headers(headers: &[String]) -> Vec<String> {

@@ -33,6 +33,9 @@ Click a table in the sidebar. The sidebar groups tables and views under each sch
 
 Ctrl+E opens a SQL editor tab for the current connection.
 
+Click a sortable result column header to order the rows already loaded in that result. This is a local view change and does not run the SQL again, including for write statements that return rows. SQL NULL values stay last; columns with mixed or undecodable values cannot be sorted. Text uses local value ordering, which can differ from the database collation.
+Use **Split** in the editor toolbar to show the same query in a second side-by-side pane. Edits and the caret are shared; each pane keeps its own scroll position.
+
 - Ctrl+Enter runs the whole script; Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it.
 - A script shows one result per statement. More than five results collapse into a drop-down. **Pin results** keeps the current results above the next run.
 - After a run, the gutter marks each statement with a tick or a cross.
@@ -41,7 +44,7 @@ Ctrl+E opens a SQL editor tab for the current connection.
 - Completion offers tables after `FROM` and `JOIN` and columns elsewhere.
 - **Session** keeps one connection for the tab, so settings, temporary tables and transactions carry over between runs.
 - **Explain** shows the plan of the selected text, or of the whole editor when nothing is selected. For PostgreSQL and SQLite the plan opens as a **Tree** (indented by nesting, with a bar for each step's share of the estimated cost; hover a bar for the numbers) and the **Text** tab keeps the raw plan. Other engines show the text plan only. The costs are the planner's estimates; nothing is executed.
-- Ctrl+H opens query history, Ctrl+D saves the query as a favorite, Ctrl+P opens Open Quickly for favorites, tabs and connections.
+- Ctrl+H opens query history in a panel beneath the workspace. Search, filter, pin, export or reopen queries there; **Close history** returns the full space to your current workspace. Ctrl+D saves the query as a favorite, and Ctrl+P opens Open Quickly for favorites, tabs and connections.
 
 ## Import and export
 

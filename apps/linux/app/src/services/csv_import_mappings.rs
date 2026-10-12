@@ -423,6 +423,11 @@ mod tests {
                 .save(&scope, &headers(&["Column 1"]), &[column("name")], &[Some(0)], false)
                 .is_err()
         );
+        assert!(
+            store
+                .restore(&scope, &headers(&["Column 1"]), &[column("name")], false)
+                .is_err()
+        );
         let mut generated = column("id");
         generated.is_auto_increment = true;
         assert!(
@@ -437,8 +442,19 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let store = CsvMappingStore::load_at(directory.path().join("mappings.json"));
         let scope = scope(Uuid::new_v4(), "appdb", "users");
+        let mut other_scope = scope.clone();
+        other_scope.table = "accounts".into();
         store
             .save(&scope, &headers(&["full name"]), &[column("name")], &[Some(0)], true)
+            .unwrap();
+        store
+            .save(
+                &other_scope,
+                &headers(&["account name"]),
+                &[column("name")],
+                &[Some(0)],
+                true,
+            )
             .unwrap();
         assert!(store.forget(&scope).unwrap());
         assert!(!store.forget(&scope).unwrap());
@@ -447,6 +463,36 @@ mod tests {
                 .restore(&scope, &headers(&["full name"]), &[column("name")], true)
                 .unwrap()
                 .is_none()
+        );
+        assert!(
+            store
+                .restore(&other_scope, &headers(&["account name"]), &[column("name")], true)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn saved_mapping_survives_reopen_and_contains_names_not_row_values() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("mappings.json");
+        let scope = scope(Uuid::new_v4(), "appdb", "users");
+        let store = CsvMappingStore::load_at(path.clone());
+        store
+            .save(&scope, &headers(&["full name"]), &[column("name")], &[Some(0)], true)
+            .unwrap();
+        store.flush().unwrap();
+        let stored = std::fs::read_to_string(path).unwrap();
+        assert!(stored.contains("full name"));
+        assert!(stored.contains("name"));
+        assert!(!stored.contains("private row value"));
+        let reopened = CsvMappingStore::load_at(directory.path().join("mappings.json"));
+        assert_eq!(
+            reopened
+                .restore(&scope, &headers(&["full name"]), &[column("name")], true)
+                .unwrap()
+                .unwrap(),
+            [Some(0)]
         );
     }
 }
