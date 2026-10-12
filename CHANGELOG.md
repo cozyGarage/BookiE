@@ -131,6 +131,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - PostgreSQL `EXPLAIN (ANALYSE)` of a write is classified and gated like the write instead of as a read.
 - The `query_to_xml` family, `crosstab`, `pg_notify`, `pg_logical_*`, `pg_replication_*`, `pg_stat_reset*`, `pg_ls_*` and more large-object functions are administrative, so agents are denied and read-only connections refuse them.
 - A constant-true predicate (`WHERE true`, `WHERE 1=1`, `WHERE id = 1 OR true`) counts as unscoped DML.
+- Opening a second table over a preview tab, dropping a table with open tabs and promoting a new structure tab now remove the old tab page instead of leaving it on screen without its controller, which aborted the app when clicked.
 - A query stopped by a timeout now says "Query exceeded the Ns query timeout." instead of claiming the timeout was configured in Preferences, which was wrong for a per-connection timeout.
 - Closing an editor tab no longer leaves it on screen stuck on "Rolling back and closing session…", including after choosing Save for a file tab; the stale tab used to abort the app when Split was clicked.
 - Screen readers announce the selected-row count on the selection summary.
