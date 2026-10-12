@@ -1,8 +1,11 @@
 use super::{
-    TypeKind, classify_type, normalize_single_line_input, parse_decimal_value, parse_input_for_column,
-    parse_input_for_driver, parse_input_for_grid_cell,
+    TypeKind, classify_type, parse_decimal_value, parse_input_for_column, parse_input_for_driver,
+    parse_input_for_grid_cell,
 };
 use tablepro_core::{ColumnInfo, Value, import::column_kind};
+
+#[path = "grid_multiline_edit.rs"]
+mod grid_multiline_edit;
 
 #[path = "postgres_numeric_csv.rs"]
 mod postgres_numeric_csv;
@@ -705,30 +708,36 @@ fn postgres_numeric_array_grid_literal_stays_text_for_the_shared_cast() {
 }
 
 #[test]
-fn normalize_single_line_leaves_plain_text_untouched() {
-    assert_eq!(normalize_single_line_input("hello world"), "hello world");
+fn grid_text_edit_preserves_line_feed_and_carriage_return_line_feed() {
+    let column = col("text", false);
+    for text in ["first\nsecond", "first\r\nsecond"] {
+        assert_eq!(
+            parse_input_for_grid_cell(text, Some(&column), "sqlite", None).unwrap(),
+            Value::Text(text.into())
+        );
+    }
 }
 
 #[test]
-fn normalize_single_line_collapses_a_multiline_paste_into_one_line() {
-    assert_eq!(
-        normalize_single_line_input("first\nsecond\r\nthird"),
-        "first second  third"
-    );
+fn embedded_line_breaks_do_not_make_invalid_numeric_or_temporal_grid_input_valid() {
+    for (data_type, text) in [("integer", "1\n2"), ("date", "2026-01-01\r\n2026-01-02")] {
+        assert!(parse_input_for_grid_cell(text, Some(&col(data_type, false)), "postgres", None).is_err());
+    }
 }
 
 #[test]
-fn normalize_single_line_preserves_other_whitespace_and_array_literals() {
+fn grid_text_edit_preserves_other_whitespace_and_array_literals() {
     let text = "  padded  CHAR  ";
-    assert_eq!(normalize_single_line_input(text), text);
+    let column = col("text", true);
+    assert_eq!(
+        parse_input_for_driver(text, Some(&column), "postgres").unwrap(),
+        Value::Text(text.into())
+    );
 
     let literal = r#"{"a  b", " c "}"#;
-    let normalized = normalize_single_line_input(literal);
-    assert_eq!(normalized, literal);
-    let column = col("text[]", true);
-    let parsed = parse_input_for_driver(&normalized, Some(&column), "postgres").unwrap();
+    let parsed = parse_input_for_driver(literal, Some(&col("text[]", true)), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let mut columns = vec![col("integer", false), column];
+    let mut columns = vec![col("integer", false), col("text[]", true)];
     columns[0].primary_key = true;
     let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",

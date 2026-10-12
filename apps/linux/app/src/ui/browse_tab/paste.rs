@@ -1,7 +1,7 @@
 use relm4::ComponentSender;
 use relm4::gtk::{gdk, glib};
 
-use super::value_parse::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_grid_cell};
+use super::value_parse::parse_input_for_grid_cell;
 use super::*;
 
 const MAX_PASTE_CELLS: usize = 5_000;
@@ -116,12 +116,8 @@ impl BrowseTab {
                     .replace("{row}", &(cell.row + 1).to_string()),
             );
         }
-        let text = match column.map(|column| classify_type(&column.data_type.to_ascii_lowercase())) {
-            Some(TypeKind::Json) => cell.text.clone(),
-            _ => normalize_single_line_input(&cell.text),
-        };
         let current = row.as_ref().map(|row| row.cell_value(cell.col));
-        parse_input_for_grid_cell(&text, column, &self.driver_id, current.as_ref())
+        parse_input_for_grid_cell(&cell.text, column, &self.driver_id, current.as_ref())
             .map(|_| ())
             .map_err(|message| {
                 crate::tr!("{column} on row {row}: {message}. Nothing was pasted.")
@@ -188,6 +184,34 @@ mod tests {
         );
         assert_eq!(parse_clipboard_grid("x\t\ty\n"), grid(&[&["x", "", "y"]]));
         assert_eq!(parse_clipboard_grid("a\"b\tc"), grid(&[&["a\"b", "c"]]));
+    }
+
+    #[test]
+    fn quoted_multiline_text_survives_paste_validation_and_cell_parsing() {
+        let column = ColumnInfo {
+            name: "body".into(),
+            data_type: "text".into(),
+            nullable: false,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        };
+
+        for (clipboard, expected) in [
+            ("\"first\nsecond\"\tkept", "first\nsecond"),
+            ("\"first\r\nsecond\"\tkept", "first\r\nsecond"),
+        ] {
+            let parsed = parse_clipboard_grid(clipboard);
+            let cells = paste_plan(0, 0, &parsed, 1, 2).unwrap();
+            assert_eq!(cells[1].text, "kept");
+            let value = parse_input_for_grid_cell(&cells[0].text, Some(&column), "sqlite", None).unwrap();
+            assert_eq!(value, Value::Text(expected.into()));
+        }
     }
 
     #[test]
