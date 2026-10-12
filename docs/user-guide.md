@@ -8,6 +8,8 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 2. Pick the database type, then fill in host, port, database and user. For SQLite and DuckDB, choose the file.
 3. Click **Test** to check the details, then **Connect**.
 
+For MySQL and MariaDB, choose a local socket file instead of a host to connect through a Unix socket; the path is saved with the connection and exported in bundles. For PostgreSQL, the schema filter menu hides schema groups per connection and restores them. A wrong PostgreSQL password or database is reported at once and is not retried. The General preferences choose how NULL is shown in the grid (NULL, the empty-set symbol or (null)).
+
 Passwords are kept in your desktop keyring, never in BookiE's own files.
 
 - **SSH**: open the SSH section of the form to reach a database through one or more SSH hosts. BookiE asks before trusting a host key it has not seen.
@@ -27,7 +29,7 @@ Click a table in the sidebar. The sidebar groups tables and views under each sch
 - **Find**: Ctrl+Alt+F lists loaded rows that contain a text.
 - **Long values**: cells longer than 8 KiB show the start of the value and its size. **View Value** opens the whole value; copy, export and edits always use the full value.
 - **Row inspector**: shows every column of the selected row with its type.
-- **Selection totals**: select several rows to see sums and averages of numeric columns in the selection badge tooltip.
+- **Selection statistics**: select several rows and open the selection badge to see count, sum, average, min and max per numeric column; **Copy summary** copies them.
 
 ## Run SQL
 
