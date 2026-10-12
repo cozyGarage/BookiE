@@ -127,7 +127,7 @@ def scenarios(ui):
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
-        activate_menu_item("Columns…")
+        choose_menu_item(9)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switch = next(
@@ -140,11 +140,11 @@ def scenarios(ui):
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("Columns", present=False)
 
-    def activate_menu_item(name):
-        item = ui.wait_for_node(name=name, role=pyatspi.ROLE_MENU_ITEM)
-        actions = item.queryAction()
-        click_action = next(index for index in range(actions.nActions) if actions.getName(index) == "click")
-        assert actions.doAction(click_action), f"could not activate {name!r}"
+    def choose_menu_item(position):
+        for _ in range(position):
+            ui.press_x11_key("Down")
+            time.sleep(0.1)
+        ui.press_x11_key("Return")
 
     def sqlite_grid_context_menu_columns_action_is_reachable_via_atspi(database, _base):
         import sqlite3
@@ -157,8 +157,12 @@ def scenarios(ui):
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-        assert len(items) >= 10, f"grid menu exposed only {len(items)} actionable items"
-        activate_menu_item("Columns…")
+        assert len(items) >= 11, f"grid menu exposed only {len(items)} actionable items"
+        actions = items[10].queryAction()
+        click_action = next(
+            index for index in range(actions.nActions) if actions.getName(index) == "click"
+        )
+        assert actions.doAction(click_action)
         wait_for_adw_dialog("Columns")
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("Columns", present=False)
@@ -520,7 +524,7 @@ GLib.MainLoop().run()
     def view_value_opens_the_whole_cell_with_pretty_json(database, base):
         ui.run_sql("""SELECT '{"a":1}' AS payload""")
         open_cell_menu('{"a":1}')
-        activate_menu_item("View Value…")
+        choose_menu_item(4)
         wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -538,7 +542,7 @@ GLib.MainLoop().run()
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         wait_for_result_column("beta")
         open_cell_menu("1")
-        activate_menu_item("Columns…")
+        choose_menu_item(7)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switches = [
@@ -716,7 +720,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
         open_cell_menu("Ada Lovelace")
-        activate_menu_item("View Value…")
+        choose_menu_item(4)
         wait_for_adw_dialog("name")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.press_x11_key("Escape")
@@ -1050,7 +1054,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        activate_menu_item("Delete row")
+        choose_menu_item(15)
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
