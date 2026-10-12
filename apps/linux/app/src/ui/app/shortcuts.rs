@@ -163,96 +163,96 @@ pub(super) fn build_shortcuts_dialog() -> gtk::ShortcutsWindow {
         .section_name("shortcuts")
         .max_height(10)
         .build();
-    let groups = [
-        (
-            crate::tr!("General"),
-            vec![
-                ("<Primary>e", crate::tr!("Open SQL editor")),
-                ("<Primary>o", crate::tr!("Open a SQL file in a new editor tab")),
-                ("F5", crate::tr!("Refresh table")),
-                ("<Primary>comma", crate::tr!("Open Preferences")),
-                ("<Primary>h", crate::tr!("Open Query History")),
-                ("<Primary>p", crate::tr!("Open Quickly: favorites and open tabs")),
-                ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
-                ("<Primary><Shift>d", crate::tr!("Manage saved queries")),
-                ("<Primary>question", crate::tr!("Show keyboard shortcuts")),
-                ("<Primary>q", crate::tr!("Quit")),
-            ],
-        ),
-        (
-            crate::tr!("Browse table"),
-            vec![
-                ("F2", crate::tr!("Edit focused cell (or press Return)")),
-                ("Tab", crate::tr!("Move to next cell (commits if editing)")),
-                ("<Shift>Tab", crate::tr!("Move to previous cell (commits if editing)")),
-                ("Left", crate::tr!("Move to previous cell")),
-                ("Right", crate::tr!("Move to next cell")),
-                ("Up", crate::tr!("Move to cell above")),
-                ("Down", crate::tr!("Move to cell below")),
-                ("space", crate::tr!("Toggle boolean cell")),
-                ("<Primary>n", crate::tr!("Insert row")),
-                ("Delete", crate::tr!("Delete selected row")),
-                ("<Primary><Shift>n", crate::tr!("Set focused cell to NULL")),
-                ("<Primary>f", crate::tr!("Filter rows")),
-                ("<Primary><Shift>j", crate::tr!("Jump to Column (focused grid)")),
-                ("<Primary><Alt>f", crate::tr!("Find in loaded rows (focused grid)")),
-                ("<Primary>a", crate::tr!("Select all rows")),
-                ("<Primary>c", crate::tr!("Copy selected rows as TSV")),
-                ("Page_Up", crate::tr!("Previous page")),
-                ("Page_Down", crate::tr!("Next page")),
-                ("<Primary>Home", crate::tr!("Jump to first row of page")),
-                ("<Primary>End", crate::tr!("Jump to last row of page")),
-            ],
-        ),
-        (
-            crate::tr!("Row selection"),
-            vec![
-                ("Shift-click", crate::tr!("Extend selection to the clicked row")),
-                ("Ctrl-click", crate::tr!("Toggle the clicked row in selection")),
-            ],
-        ),
-        (
-            crate::tr!("SQL editor"),
-            vec![
-                ("<Primary>Return", crate::tr!("Run query")),
-                ("<Primary><Shift>Return", crate::tr!("Run statement at cursor")),
-                ("<Primary><Shift>s", crate::tr!("Save the SQL file as")),
-                ("<Primary>slash", crate::tr!("Toggle line comment")),
-                ("<Primary>t", crate::tr!("New editor tab")),
-                ("<Primary>w", crate::tr!("Close current tab or window")),
-                ("<Primary>Tab", crate::tr!("Switch to the most recently used tab")),
-                ("<Primary><Shift>Tab", crate::tr!("Previous editor tab")),
-                ("<Primary><Shift>t", crate::tr!("Reopen last closed tab")),
-                ("<Primary><Shift>f", crate::tr!("Format SQL")),
-                ("<Alt><Shift>Down", crate::tr!("Jump to the next statement")),
-                ("<Alt><Shift>Up", crate::tr!("Jump to the previous statement")),
-            ],
-        ),
-        (
-            crate::tr!("Context-sensitive actions"),
-            vec![
-                (
-                    "<Primary>s",
-                    crate::tr!("Save grid edits, the SQL file, or table structure changes"),
-                ),
-                (
-                    "<Primary>z",
-                    crate::tr!("Undo a grid, SQL editor, or table structure change"),
-                ),
-                (
-                    "<Primary>y",
-                    crate::tr!("Redo the current change (or press Ctrl+Shift+Z)"),
-                ),
-                (
-                    "Escape",
-                    crate::tr!("Cancel editing or a query, clear selection, or close a dialog"),
-                ),
-            ],
-        ),
-    ];
-    for (title, entries) in groups {
-        add_shortcut_group(&section, &title, &entries);
-    }
+    add_shortcut_group(
+        &section,
+        &crate::tr!("General"),
+        &[
+            ("<Primary>e", crate::tr!("Open SQL editor")),
+            ("<Primary>o", crate::tr!("Open a SQL file in a new editor tab")),
+            ("F5", crate::tr!("Refresh table")),
+            ("<Primary>comma", crate::tr!("Open Preferences")),
+            ("<Primary>h", crate::tr!("Open Query History")),
+            ("<Primary>p", crate::tr!("Open Quickly: favorites and open tabs")),
+            ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
+            ("<Primary><Shift>d", crate::tr!("Manage saved queries")),
+            ("<Primary>question", crate::tr!("Show keyboard shortcuts")),
+            ("<Primary>q", crate::tr!("Quit")),
+        ],
+    );
+    add_shortcut_group(
+        &section,
+        &crate::tr!("Browse table"),
+        &[
+            ("F2", crate::tr!("Edit focused cell (or press Return)")),
+            ("Tab", crate::tr!("Move to next cell (commits if editing)")),
+            ("<Shift>Tab", crate::tr!("Move to previous cell (commits if editing)")),
+            ("Left", crate::tr!("Move to previous cell")),
+            ("Right", crate::tr!("Move to next cell")),
+            ("Up", crate::tr!("Move to cell above")),
+            ("Down", crate::tr!("Move to cell below")),
+            ("space", crate::tr!("Toggle boolean cell")),
+            ("<Primary>n", crate::tr!("Insert row")),
+            ("Delete", crate::tr!("Delete selected row")),
+            ("<Primary><Shift>n", crate::tr!("Set focused cell to NULL")),
+            ("<Primary>f", crate::tr!("Filter rows")),
+            ("<Primary><Shift>j", crate::tr!("Jump to Column (focused grid)")),
+            ("<Primary><Alt>f", crate::tr!("Find in loaded rows (focused grid)")),
+            ("<Primary>a", crate::tr!("Select all rows")),
+            ("<Primary>c", crate::tr!("Copy selected rows as TSV")),
+            ("Page_Up", crate::tr!("Previous page")),
+            ("Page_Down", crate::tr!("Next page")),
+            ("<Primary>Home", crate::tr!("Jump to first row of page")),
+            ("<Primary>End", crate::tr!("Jump to last row of page")),
+        ],
+    );
+    add_shortcut_group(
+        &section,
+        &crate::tr!("Row selection"),
+        &[
+            ("Shift-click", crate::tr!("Extend selection to the clicked row")),
+            ("Ctrl-click", crate::tr!("Toggle the clicked row in selection")),
+        ],
+    );
+    add_shortcut_group(
+        &section,
+        &crate::tr!("SQL editor"),
+        &[
+            ("<Primary>Return", crate::tr!("Run query")),
+            ("<Primary><Shift>Return", crate::tr!("Run statement at cursor")),
+            ("<Primary><Shift>s", crate::tr!("Save the SQL file as")),
+            ("<Primary>slash", crate::tr!("Toggle line comment")),
+            ("<Primary>t", crate::tr!("New editor tab")),
+            ("<Primary>w", crate::tr!("Close current tab or window")),
+            ("<Primary>Tab", crate::tr!("Switch to the most recently used tab")),
+            ("<Primary><Shift>Tab", crate::tr!("Previous editor tab")),
+            ("<Primary><Shift>t", crate::tr!("Reopen last closed tab")),
+            ("<Primary><Shift>f", crate::tr!("Format SQL")),
+            ("<Alt><Shift>Down", crate::tr!("Jump to the next statement")),
+            ("<Alt><Shift>Up", crate::tr!("Jump to the previous statement")),
+        ],
+    );
+    add_shortcut_group(
+        &section,
+        &crate::tr!("Context-sensitive actions"),
+        &[
+            (
+                "<Primary>s",
+                crate::tr!("Save grid edits, the SQL file, or table structure changes"),
+            ),
+            (
+                "<Primary>z",
+                crate::tr!("Undo a grid, SQL editor, or table structure change"),
+            ),
+            (
+                "<Primary>y",
+                crate::tr!("Redo the current change (or press Ctrl+Shift+Z)"),
+            ),
+            (
+                "Escape",
+                crate::tr!("Cancel editing or a query, clear selection, or close a dialog"),
+            ),
+        ],
+    );
     dialog.add_section(&section);
     dialog
 }
