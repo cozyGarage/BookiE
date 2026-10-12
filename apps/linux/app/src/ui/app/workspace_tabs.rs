@@ -283,8 +283,9 @@ impl App {
                     offset,
                     page_size,
                     sort,
+                    preview,
                 }) => {
-                    self.append_table_tab(schema, table, offset, page_size, sort, false, sender.clone());
+                    self.append_table_tab(schema, table, offset, page_size, sort, preview, sender.clone());
                 }
                 Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table }) => {
                     self.append_existing_structure_tab(schema, table, sender.clone());

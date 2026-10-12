@@ -110,20 +110,8 @@ fn do_persist_workspace_state(
                     file: s.file.as_ref().map(|file| file.path.clone()),
                 }),
                 WorkspaceTab::Structure(_) => None,
-                WorkspaceTab::Table(s) if !table_tab_is_persistable(s.preview, s.table.is_empty()) => None,
-                WorkspaceTab::Table(s) => {
-                    let model = s.browse.model();
-                    let sort = model.current_sort();
-                    Some(WorkspaceTabRecord::Table {
-                        schema: s.schema.clone(),
-                        table: s.table.clone(),
-                        mode: workspace_state::PersistedTableMode::Data,
-                        offset: model.current_offset(),
-                        page_size: model.page_size(),
-                        sort_col: sort.map(|(column, _)| column),
-                        sort_asc: sort.map(|(_, ascending)| ascending),
-                    })
-                }
+                WorkspaceTab::Table(s) if s.table.is_empty() => None,
+                WorkspaceTab::Table(s) => Some(table_record(s)),
             });
         kept.push(record.is_some());
         if let Some(record) = record {
@@ -142,8 +130,19 @@ fn do_persist_workspace_state(
     );
 }
 
-fn table_tab_is_persistable(preview: bool, table_is_empty: bool) -> bool {
-    !preview && !table_is_empty
+fn table_record(slot: &super::TableTabSlot) -> WorkspaceTabRecord {
+    let model = slot.browse.model();
+    let sort = model.current_sort();
+    WorkspaceTabRecord::Table {
+        schema: slot.schema.clone(),
+        table: slot.table.clone(),
+        mode: workspace_state::PersistedTableMode::Data,
+        offset: model.current_offset(),
+        page_size: model.page_size(),
+        sort_col: sort.map(|(column, _)| column),
+        sort_asc: sort.map(|(_, ascending)| ascending),
+        preview: slot.preview,
+    }
 }
 
 fn sorted_hidden_schemas(hidden_schemas: &std::collections::HashSet<String>) -> Vec<String> {
@@ -171,14 +170,7 @@ fn active_idx_among_kept(kept: &[bool], active_raw_index: Option<usize>) -> u32 
 
 #[cfg(test)]
 mod tests {
-    use super::{active_idx_among_kept, table_tab_is_persistable};
-
-    #[test]
-    fn kept_table_tabs_persist_and_preview_tabs_do_not() {
-        assert!(table_tab_is_persistable(false, false));
-        assert!(!table_tab_is_persistable(true, false));
-        assert!(!table_tab_is_persistable(false, true));
-    }
+    use super::active_idx_among_kept;
 
     #[test]
     fn active_idx_matches_raw_index_when_nothing_is_skipped() {
