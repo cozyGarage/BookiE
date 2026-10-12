@@ -1,5 +1,5 @@
 use relm4::ComponentSender;
-use relm4::gtk::{gdk, glib};
+use relm4::gtk::{self, gdk, glib};
 
 use super::value_parse::parse_grid_cell_input;
 use super::*;
@@ -85,8 +85,22 @@ pub(super) fn paste_plan(
     Ok(cells)
 }
 
+pub(super) fn paste_shortcut(sender: ComponentSender<BrowseTab>) -> gtk::Shortcut {
+    gtk::Shortcut::builder()
+        .trigger(&crate::ui::shortcut::parse("<Primary>v"))
+        .action(&gtk::CallbackAction::new(move |widget, _| {
+            match crate::ui::grid::focused_cell_identity(widget).or_else(|| crate::ui::grid::last_clicked_cell(widget))
+            {
+                Some((row, col, row_key)) => sender.input(BrowseTabInput::Paste { row, col, row_key }),
+                None => sender.input(BrowseTabInput::PasteNotSupported),
+            }
+            glib::Propagation::Stop
+        }))
+        .build()
+}
+
 impl BrowseTab {
-    pub(super) fn handle_paste(&mut self, row: u32, col: usize, sender: ComponentSender<Self>) {
+    pub(super) fn handle_paste(&mut self, row: u32, col: usize, row_key: Vec<Value>, sender: ComponentSender<Self>) {
         let Some(display) = gdk::Display::default() else {
             return;
         };
@@ -96,6 +110,7 @@ impl BrowseTab {
                 sender.input(BrowseTabInput::PasteText {
                     row,
                     col,
+                    row_key,
                     text: text.to_string(),
                 });
             }
@@ -127,7 +142,20 @@ impl BrowseTab {
             })
     }
 
-    pub(super) fn handle_paste_text(&mut self, row: u32, col: usize, text: &str, sender: ComponentSender<Self>) {
+    pub(super) fn handle_paste_text(
+        &mut self,
+        row: u32,
+        col: usize,
+        row_key: &[Value],
+        text: &str,
+        sender: ComponentSender<Self>,
+    ) {
+        if !self.row_position_still_holds(row, row_key) {
+            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                "The rows changed since you clicked the cell, so nothing was pasted"
+            )));
+            return;
+        }
         let loaded = self.row_count_loaded();
         let cells = match paste_plan(
             row,
