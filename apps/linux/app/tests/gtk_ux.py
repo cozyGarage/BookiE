@@ -152,7 +152,9 @@ def scenarios(ui):
             connection.execute("INSERT INTO safety_items(id, note) VALUES (1, 'alpha')")
         ui.invoke_named_action_within("safety_items", "Open safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
-        x11_click(900, 132)
+        cell = ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
+        extents = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
         assert len(items) >= 10, f"grid menu exposed only {len(items)} actionable items"
