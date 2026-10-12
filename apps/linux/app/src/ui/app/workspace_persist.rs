@@ -106,7 +106,7 @@ fn do_persist_workspace_state(
                     file: s.file.as_ref().map(|file| file.path.clone()),
                 }),
                 WorkspaceTab::Structure(_) => None,
-                WorkspaceTab::Table(s) if s.table.is_empty() => None,
+                WorkspaceTab::Table(s) if s.preview || s.table.is_empty() => None,
                 WorkspaceTab::Table(s) => {
                     let model = s.browse.model();
                     let sort = model.current_sort();

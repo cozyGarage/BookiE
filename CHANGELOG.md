@@ -5,6 +5,7 @@
 Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the user-facing map for that development line since the last tagged package, [0.1.5](#015---2026-09-27). Compare: [`linux-v0.1.5...linux`](https://github.com/cozyGarage/BookiE/compare/linux-v0.1.5...linux). Entries stay here until the next tagged release.
 
 ### Added
+- Plain-clicking a table opens a temporary preview tab that the next table click can replace; editing or choosing **Keep Tab** makes it persistent.
 - PostgreSQL TLS verification now trusts the operating system certificate store when no custom authority is configured.
 - MongoDB table browsing now seeks deep pages in `_id` sort order, including collections with mixed key types.
 - MongoDB offset and `_id` keyset pages apply equality, inequality, comparison, range, set-membership, null, `LIKE` and `ILIKE` filters with SQL null behavior.
