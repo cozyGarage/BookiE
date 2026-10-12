@@ -8,3 +8,5 @@ mod filter_types;
 mod network_paths;
 #[path = "typed_text_writes.rs"]
 mod typed_text_writes;
+#[path = "xml_oid_values.rs"]
+mod xml_oid_values;

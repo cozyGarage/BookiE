@@ -6,6 +6,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Added
 - SQL query and pinned result grids can filter loaded rows by a cell's native value without running the SQL again; the grid shows the visible and loaded counts.
+- SQL result filters and sorting stay in place when the same statement is rerun or its result is pinned or unpinned, and selected rows stay attached to the same materialized result.
 - Plain-clicking a table opens a temporary preview tab that the next table click can replace; preview tabs are not restored after restart, while editing or choosing **Keep Tab** makes one persistent.
 - PostgreSQL and SQLite query plans open in a Tree tab of the Explain dialog.
 - Ctrl+V pastes tab-separated text from a spreadsheet into grid cells, all or nothing.
@@ -130,6 +131,13 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Fixed
 - Filtering a PostgreSQL column of type `time`, `timetz`, `interval`, `inet`, `bit`, a range, an enum whose name contains a type word such as `update_kind`, or a domain now builds a valid filter instead of misreading the value or comparing it as text.
 - PostgreSQL grid edits, inserts, key lookups and deletes now work for `inet`, `cidr`, `macaddr`, `interval`, `bit`, `varbit`, `xml` and `tsvector` values, which were sent as text and refused by the server, and for padded `char(n)` keys and `json` columns, which reported a false concurrent modification or could not be edited.
+- PostgreSQL `EXPLAIN (ANALYSE)` of a write is classified and gated like the write instead of as a read.
+- The `query_to_xml` family, `crosstab`, `pg_notify`, `pg_logical_*`, `pg_replication_*`, `pg_stat_reset*`, `pg_ls_*` and more large-object functions are administrative, so agents are denied and read-only connections refuse them.
+- A constant-true predicate (`WHERE true`, `WHERE 1`, `WHERE 1=1`, `WHERE 2 > 1`, `WHERE id = 1 OR true`) counts as unscoped DML. Predicates that depend on a column (`WHERE id = id`) are not evaluated and stay scoped.
+- Grid headers and Go to Referenced Row now pick up foreign keys that arrive after the first draw; before, the redraw reused the old headers and menu.
+- Go to Referenced Row on a column that belongs to several foreign keys offers the usable ones even when another key has a NULL value.
+- Picking a PostgreSQL enum label no longer fails when the enum's type name looks like a built-in type such as `date_format` or `timestamp_source`.
+- Opening a second table over a preview tab, dropping a table with open tabs and promoting a new structure tab now remove the old tab page instead of leaving it on screen without its controller, which aborted the app when clicked.
 - A query stopped by a timeout now says "Query exceeded the Ns query timeout." instead of claiming the timeout was configured in Preferences, which was wrong for a per-connection timeout.
 - Closing an editor tab no longer leaves it on screen stuck on "Rolling back and closing session…", including after choosing Save for a file tab; the stale tab used to abort the app when Split was clicked.
 - Screen readers announce the selected-row count on the selection summary.
