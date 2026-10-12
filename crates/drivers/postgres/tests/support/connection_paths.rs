@@ -4,3 +4,5 @@ mod auth_errors;
 mod enum_labels;
 #[path = "network_paths.rs"]
 mod network_paths;
+#[path = "null_binding.rs"]
+mod null_binding;

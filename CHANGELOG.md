@@ -128,6 +128,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- PostgreSQL edits that set a cell to NULL, compare an old NULL, leave a column NULL in a new row, or import an empty field into an integer, date, uuid, boolean, numeric, JSON or inet column no longer fail with "expression is of type text".
 - A query stopped by a timeout now says "Query exceeded the Ns query timeout." instead of claiming the timeout was configured in Preferences, which was wrong for a per-connection timeout.
 - Closing an editor tab no longer leaves it on screen stuck on "Rolling back and closing session…", including after choosing Save for a file tab; the stale tab used to abort the app when Split was clicked.
 - Screen readers announce the selected-row count on the selection summary.

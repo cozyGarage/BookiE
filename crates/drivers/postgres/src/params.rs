@@ -1,4 +1,5 @@
 use sqlx::encode::IsNull;
+use sqlx::postgres::types::Oid;
 use sqlx::postgres::{PgArgumentBuffer, PgConnection, PgTypeInfo, PgTypeKind};
 use sqlx::{Encode, Executor, Postgres, SqlSafeStr, Statement, Type, TypeInfo};
 use tablepro_core::{ColumnInfo, DriverError, Value};
@@ -131,6 +132,24 @@ fn is_inferred_text_element(type_info: &PgTypeInfo, domain_depth: usize) -> Resu
 
 pub(super) fn needs_text_type_inference(params: &[Value]) -> bool {
     params.iter().any(|param| matches!(param, Value::Null | Value::Text(_)))
+}
+
+struct PgUntypedNull;
+
+impl Type<Postgres> for PgUntypedNull {
+    fn type_info() -> PgTypeInfo {
+        PgTypeInfo::with_oid(Oid(0))
+    }
+
+    fn compatible(_: &PgTypeInfo) -> bool {
+        true
+    }
+}
+
+impl Encode<'_, Postgres> for PgUntypedNull {
+    fn encode_by_ref(&self, _: &mut PgArgumentBuffer) -> Result<IsNull, sqlx::error::BoxDynError> {
+        Ok(IsNull::Yes)
+    }
 }
 
 struct PgInferredTextParameter<'a> {
@@ -564,7 +583,7 @@ pub(super) fn bind_pg_params<'q>(
             (Value::Text(value), Some(type_info)) => {
                 query.bind(PgInferredTextParameter::new(Some(value), type_info.clone())?)
             }
-            (Value::Null, None) => query.bind(Option::<&str>::None),
+            (Value::Null, None) => query.bind(PgUntypedNull),
             (Value::Bool(value), _) => query.bind(*value),
             (Value::Int(value), _) => query.bind(*value),
             (Value::Float(value), _) => query.bind(*value),
@@ -591,7 +610,7 @@ pub(super) fn pg_parameter_type_infos(params: &[Value]) -> Vec<PgTypeInfo> {
     params
         .iter()
         .map(|param| match param {
-            Value::Null => <Option<&str> as Type<Postgres>>::type_info(),
+            Value::Null => <PgUntypedNull as Type<Postgres>>::type_info(),
             Value::Bool(_) => <bool as Type<Postgres>>::type_info(),
             Value::Int(_) => <i64 as Type<Postgres>>::type_info(),
             Value::Float(_) => <f64 as Type<Postgres>>::type_info(),
