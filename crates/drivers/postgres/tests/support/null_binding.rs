@@ -48,3 +48,14 @@ async fn a_null_parameter_takes_the_type_of_the_column_it_is_bound_to() {
         .await;
     assert!(inserted.is_ok(), "inserting NULLs: {inserted:?}");
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_null_in_an_ambiguous_placeholder_still_runs() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    for sql in ["SELECT $1 IS NULL AS r", "SELECT $1 AS r"] {
+        let result = conn.query_params(sql, &[Value::Null]).await;
+        assert!(result.is_ok(), "{sql}: {result:?}");
+    }
+}

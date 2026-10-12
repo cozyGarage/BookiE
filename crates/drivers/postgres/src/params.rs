@@ -8,6 +8,7 @@ use crate::array::MAX_ARRAY_TEXT_BYTES;
 use crate::map_sqlx_error;
 use crate::query::{statement_column_origins, statement_columns, statement_type_infos};
 
+const TEXT_OID: u32 = 25;
 const PG_LSN_OID: u32 = 3220;
 const XML_OID: u32 = 142;
 const MACADDR8_OID: u32 = 774;
@@ -62,7 +63,16 @@ pub(super) async fn describe_query_parameters(
         .unwrap_or_default();
     let inferred_text_types = parameters
         .iter()
-        .map(inferred_text_type_info)
+        .enumerate()
+        .map(|(index, type_info)| {
+            let null_for_text =
+                matches!(params.get(index), Some(Value::Null)) && type_info.oid().is_some_and(|oid| oid.0 == TEXT_OID);
+            if null_for_text {
+                Ok(Some(type_info.clone()))
+            } else {
+                inferred_text_type_info(type_info)
+            }
+        })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(PgParameterDescription {
         inferred_text_types,
