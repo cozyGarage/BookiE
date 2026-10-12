@@ -7,7 +7,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Added
 - PostgreSQL and SQLite query plans open in a Tree tab of the Explain dialog.
 - Ctrl+V pastes tab-separated text from a spreadsheet into grid cells, all or nothing.
-- A foreign key cell offers Go to Referenced Row.
+- When a cell belongs to multiple foreign keys, Go to Referenced Row lets you choose the target table.
 - ENUM and SET cells on MySQL and MariaDB, and enum cells on PostgreSQL, are edited from a list of members.
 - A preference chooses how NULL is displayed in the grid.
 - Browse filters can be saved, applied, renamed and deleted per connection, schema and table.
@@ -33,6 +33,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - MySQL and MariaDB CHAR results preserve `PAD_CHAR_TO_FULL_LENGTH` padding, including VARCHAR, empty values and NULL.
 - MySQL and MariaDB CSV imports preserve impossible calendar dates accepted by `ALLOW_INVALID_DATES`.
 - PostgreSQL CSV imports preserve native BC date, timestamp and timestamptz values.
+- CSV imports into existing tables can remember and restore column mappings for a specific connection and table.
 - The sidebar groups tables and views under schemas and groups with object counts; a click collapses a group, a search expands the groups that match, and the choice is remembered per connection.
 - A Pin results button in the SQL editor keeps the current results above the results of the next run, and unpins them again.
 - Each statement of a script gets a gutter mark after a run: a tick for a statement that returned, a cross for one that failed.
@@ -107,6 +108,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- About, Arch package, Flatpak, and translation metadata link to the BookiE repository.
 - Full-table export is refused before a destination file is chosen when a verified read snapshot is not available; current-page and loaded query-result exports remain available.
 - Redis in this development line stays a single host/port endpoint; Sentinel and Cluster topologies stay deferred.
 - A successful rollback request now warns that session state and other non-transactional side effects may remain after a failed save.
