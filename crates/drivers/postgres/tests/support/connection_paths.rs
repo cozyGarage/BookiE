@@ -6,3 +6,5 @@ mod enum_labels;
 mod network_paths;
 #[path = "type_change_default.rs"]
 mod type_change_default;
+#[path = "xml_oid_values.rs"]
+mod xml_oid_values;
