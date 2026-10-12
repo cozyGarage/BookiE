@@ -321,6 +321,18 @@ def invoke_named_action_within(anchor_name, action_name):
     )
 
 
+def open_table_in_new_tab(name):
+    table = wait_for_node(name=name, role=pyatspi.ROLE_LIST_ITEM)
+    actions = table.queryAction()
+    menu_action = next(
+        (index for index in range(actions.nActions) if actions.getName(index) == "sidebar-row.open-in-new-tab"),
+        None,
+    )
+    assert menu_action is not None, f"table {name!r} has no new-tab action"
+    assert actions.doAction(menu_action), f"table {name!r} did not open in a new tab"
+    wait_for_node(name=name, role=pyatspi.ROLE_PAGE_TAB)
+
+
 def invoke_accessible_action(action_name):
     applications = desktop_applications()
     if not applications:
@@ -1649,6 +1661,21 @@ def successful_switch_keeps_database_ownership(database, base):
 successful_switch_keeps_database_ownership.environment = "local"
 
 
+def history_panel_refreshes_after_queries_run_while_closed(database, base):
+    open_saved_connection(CONNECTION_NAME)
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    invoke_accessible_action("win.show-history")
+    close_history = wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON)
+    invoke(close_history)
+    wait_for_node(name="Close history", present=False)
+
+    run_sql("SELECT 918273 AS history_refresh_marker")
+    wait_for_node_containing("done in")
+    invoke_accessible_action("win.show-history")
+    wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON)
+    wait_for_node_containing("history_refresh_marker")
+
+
 def failed_switch_preserves_the_old_workspace(database, _base):
     open_saved_connection(BROKEN_CONNECTION_NAME)
     wait_for_node(name="Connection failed")
@@ -1785,8 +1812,11 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     database_b = base / "safety-b.sqlite"
     with sqlite3.connect(database_b) as connection:
         connection.executemany("INSERT INTO safety_items(id) VALUES (?)", [(1,), (2,), (3,)])
+        connection.execute("CREATE TABLE kept_items (id INTEGER PRIMARY KEY)")
+        connection.execute("INSERT INTO kept_items(id) VALUES (1)")
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    open_table_in_new_tab("kept_items")
     invoke_named_action_within("safety_items", "Open safety_items")
     wait_for_node(name="Rows 1 – 3 of 3")
     invoke_accessible_action("win.open-editor")
@@ -1797,6 +1827,8 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     restart()
     window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     wait_within(window, name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+    wait_within(window, name="kept_items", role=pyatspi.ROLE_PAGE_TAB)
+    wait_within(window, name="safety_items", role=pyatspi.ROLE_PAGE_TAB, present=False)
     texts = []
     for node in descendants(window):
         if node_role(node) == pyatspi.ROLE_TEXT:
@@ -1811,7 +1843,7 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     assert database_ids(database_b) == [1, 2, 3, 901]
     assert database_ids(database) == [], "restored editor wrote to the other connection"
     invoke_named_action_within("safety_items", "Open safety_items")
-    wait_for_node_containing("Rows 1 – 3")
+    wait_for_node(name="Rows 1 – 4 of 4")
 
 
 restart_restores_active_editor_and_connection.environment = "local"
@@ -2141,6 +2173,7 @@ def main():
         named_parameter_binds_a_value,
         favorite_round_trips_through_open_quickly,
         successful_switch_keeps_database_ownership,
+        history_panel_refreshes_after_queries_run_while_closed,
         failed_switch_preserves_the_old_workspace,
         running_query_is_cancelled_before_switch,
         current_page_csv_export_is_pk_ordered,
