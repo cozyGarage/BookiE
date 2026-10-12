@@ -6,3 +6,5 @@ mod enum_labels;
 mod network_paths;
 #[path = "stale_plan.rs"]
 mod stale_plan;
+#[path = "xml_oid_values.rs"]
+mod xml_oid_values;
