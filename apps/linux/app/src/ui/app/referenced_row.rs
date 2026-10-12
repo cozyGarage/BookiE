@@ -8,7 +8,7 @@ use super::{App, WorkspaceTab};
 
 pub(super) fn choose_referenced_row(
     parent: &adw::ApplicationWindow,
-    targets: Vec<crate::ui::browse_tab::ReferencedRowTarget>,
+    targets: Vec<crate::ui::browse_tab::reference::ReferencedRowTarget>,
     sender: ComponentSender<App>,
 ) {
     let dialog = adw::AlertDialog::new(
@@ -50,7 +50,7 @@ pub(super) fn choose_referenced_row(
 impl App {
     pub(super) fn on_choose_referenced_row(
         &self,
-        targets: Vec<crate::ui::browse_tab::ReferencedRowTarget>,
+        targets: Vec<crate::ui::browse_tab::reference::ReferencedRowTarget>,
         sender: ComponentSender<Self>,
     ) {
         choose_referenced_row(&self.window, targets, sender);

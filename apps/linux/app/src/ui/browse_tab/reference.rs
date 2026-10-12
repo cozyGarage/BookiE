@@ -4,12 +4,20 @@ use tablepro_core::{FilterSet, ForeignKeyInfo, Value};
 
 use super::*;
 
+#[derive(Debug)]
+pub(crate) struct ReferencedRowTarget {
+    pub(crate) foreign_key: String,
+    pub(crate) schema: Option<String>,
+    pub(crate) table: String,
+    pub(crate) filter: FilterSet,
+}
+
 pub(super) fn reference_targets(
     foreign_keys: &[ForeignKeyInfo],
     own_schema: Option<&str>,
     column: &str,
     row: &[(String, Value)],
-) -> Result<Vec<super::ReferencedRowTarget>, String> {
+) -> Result<Vec<ReferencedRowTarget>, String> {
     let candidates: Vec<_> = foreign_keys
         .iter()
         .filter(|candidate| candidate.columns.iter().any(|name| name == column))
@@ -27,7 +35,7 @@ fn reference_target(
     foreign_key: &ForeignKeyInfo,
     own_schema: Option<&str>,
     row: &[(String, Value)],
-) -> Result<super::ReferencedRowTarget, String> {
+) -> Result<ReferencedRowTarget, String> {
     let mut rules = Vec::new();
     for (local, referenced) in foreign_key.columns.iter().zip(&foreign_key.ref_columns) {
         let value = row
@@ -43,7 +51,7 @@ fn reference_target(
                 .ok_or_else(|| crate::tr!("Values of this type can't be used as a filter"))?,
         );
     }
-    Ok(super::ReferencedRowTarget {
+    Ok(ReferencedRowTarget {
         foreign_key: foreign_key.name.clone(),
         schema: foreign_key.ref_schema.clone().or_else(|| own_schema.map(str::to_owned)),
         table: foreign_key.ref_table.clone(),

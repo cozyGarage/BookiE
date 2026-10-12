@@ -23,7 +23,7 @@ pub enum AppMsg {
         table: String,
         filter: tablepro_core::FilterSet,
     },
-    ChooseReferencedRow(Vec<crate::ui::browse_tab::ReferencedRowTarget>),
+    ChooseReferencedRow(Vec<crate::ui::browse_tab::reference::ReferencedRowTarget>),
     ColumnsLoaded(Uuid, Vec<ColumnInfo>),
     FetchBrowseForeignKeys(Uuid),
     FetchBrowseEnumLabels(Uuid, Vec<(String, tablepro_core::QualifiedTypeName)>),
