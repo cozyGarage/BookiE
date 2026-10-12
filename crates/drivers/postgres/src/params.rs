@@ -610,7 +610,7 @@ pub(super) fn pg_parameter_type_infos(params: &[Value]) -> Vec<PgTypeInfo> {
     params
         .iter()
         .map(|param| match param {
-            Value::Null => <PgUntypedNull as Type<Postgres>>::type_info(),
+            Value::Null => <String as Type<Postgres>>::type_info(),
             Value::Bool(_) => <bool as Type<Postgres>>::type_info(),
             Value::Int(_) => <i64 as Type<Postgres>>::type_info(),
             Value::Float(_) => <f64 as Type<Postgres>>::type_info(),
