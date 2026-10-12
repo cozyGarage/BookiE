@@ -127,6 +127,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- Screen readers announce the selected-row count on the selection summary.
 - Reopening query history refreshes the list so queries run while it was closed appear immediately.
 - PostgreSQL connections accept a bracketed IPv6 host such as `[::1]`.
 - A PostgreSQL login the server refuses (wrong password or missing database) is reported at once instead of being retried, and a pooler in transaction mode gets an explanatory hint on prepared-statement errors.
