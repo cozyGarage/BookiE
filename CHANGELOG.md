@@ -6,6 +6,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Added
 - MySQL and MariaDB connections can use a local Unix socket file, saved with the connection and exported in version 3 connection bundles.
+- PostgreSQL schema groups can now be hidden per connection and restored from the schema filter menu.
 - PostgreSQL TLS verification now trusts the operating system certificate store when no custom authority is configured.
 - MongoDB table browsing now seeks deep pages in `_id` sort order, including collections with mixed key types.
 - MongoDB offset and `_id` keyset pages apply equality, inequality, comparison, range, set-membership, null, `LIKE` and `ILIKE` filters with SQL null behavior.
@@ -114,6 +115,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- Grid edits and spreadsheet paste preserve line breaks inside text values.
 
 - MySQL and MariaDB connections with TLS Disabled no longer use a saved client certificate or key
 - The window opens without waiting for old query history to be pruned at startup

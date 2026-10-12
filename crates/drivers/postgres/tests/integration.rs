@@ -21,8 +21,8 @@ mod wire_round_trip;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
-#[path = "support/enum_labels.rs"]
-mod enum_labels;
+#[path = "support/connection_paths.rs"]
+mod connection_paths;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
 
@@ -76,6 +76,9 @@ mod query_budget_contract;
 
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
+
+#[path = "support/native_oracle_contract.rs"]
+mod native_oracle_contract;
 
 #[path = "support/enum_contract.rs"]
 mod enum_contract;
