@@ -14,7 +14,7 @@ Real values: before 0.2.0, also run the by-hand value check in [oracle review](o
 
 Package `bookie 0.2.0-1`, built 2026-10-12 from the UX worktree at `d3202c17c` (BookiE `linux` `6cc8bd732` plus the [#618](https://github.com/cozyGarage/BookiE/pull/618) branch). `/usr/bin/bookie` SHA-256 `b2a8431bba1f4eddf4cc28a83110f789d38af75b16681152e2a5e837a35c3e87`. Arch Linux, Hyprland 0.56.2, native Wayland, GTK 4.22.4, libadwaita 1.9.3, GtkSourceView 5.20.0, scale 1, dark theme only. Databases: PostgreSQL 17 and MariaDB 11 in local containers. The UI was driven through AT-SPI, a virtual pointer and keyboard input; screenshots were kept locally and not committed.
 
-Results are written beside each item as "2026-10-12 Hyprland dark". Boxes stay unticked because light theme, GNOME and narrow-width checks were not run. Items without a 2026-10-12 note were not run. Defects found in this run are [#648](https://github.com/cozyGarage/BookiE/issues/648) to [#660](https://github.com/cozyGarage/BookiE/issues/660); [#648](https://github.com/cozyGarage/BookiE/issues/648) aborts the app.
+Results are written beside each item as "2026-10-12 Hyprland dark". Boxes stay unticked because light theme, GNOME and narrow-width checks were not run. Items without a 2026-10-12 note were not run. Defects found in this run are [#648](https://github.com/cozyGarage/BookiE/issues/648) to [#660](https://github.com/cozyGarage/BookiE/issues/660) and [#662](https://github.com/cozyGarage/BookiE/issues/662); [#648](https://github.com/cozyGarage/BookiE/issues/648) aborts the app.
 
 Build first:
 
@@ -61,7 +61,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Confirm a missing or invalid socket path fails without attempting a TCP connection. Local sockets refuse TLS and SSH; existing PostgreSQL socket-directory and SSH-forwarded MySQL socket connections still work.
 - [ ] The current header title and grouped Test/Connect actions fit at narrow width in light and dark; the title does not overlap the actions.
 - [ ] Enter submits the form and Escape dismisses without changing saved data. **2026-10-12 Hyprland dark:** Escape passed; Enter does not submit, [#652](https://github.com/cozyGarage/BookiE/issues/652).
-- [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels.
+- [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels. **2026-10-12 Hyprland dark:** failed. The window is one column taller than the screen, pointer gestures have no key caps and rows repeat, [#662](https://github.com/cozyGarage/BookiE/issues/662).
 
 ## Connection list
 
