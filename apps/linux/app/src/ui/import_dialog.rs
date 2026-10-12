@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::services::csv_import_mappings::{CsvMappingScope, CsvMappingStore};
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tablepro_core::export::CsvDelimiter;
@@ -25,6 +26,8 @@ pub(crate) struct ImportRequest {
     pub bytes: Vec<u8>,
     pub format: CsvFormat,
     pub mode: ImportMode,
+    pub mapping_store: Option<CsvMappingStore>,
+    pub mapping_scope: Option<CsvMappingScope>,
 }
 
 /// What the user settled on. The app re-reads the whole file with these
@@ -168,7 +171,12 @@ enum ColumnSection {
 impl ColumnSection {
     fn new(request: &ImportRequest) -> Self {
         match &request.mode {
-            ImportMode::ExistingTable { table, columns } => Self::Existing(ExistingColumns::new(table, columns)),
+            ImportMode::ExistingTable { table, columns } => Self::Existing(ExistingColumns::new(
+                table,
+                columns,
+                request.mapping_store.clone(),
+                request.mapping_scope.clone(),
+            )),
             ImportMode::NewTable {
                 driver_id,
                 suggested_table,
@@ -185,7 +193,7 @@ impl ColumnSection {
 
     fn refresh(&self, sheet: &CsvSheet, options: &CsvImportOptions) {
         match self {
-            Self::Existing(existing) => existing.refresh(sheet),
+            Self::Existing(existing) => existing.refresh(sheet, options.has_header),
             Self::New(new) => new.refresh(sheet, options),
         }
     }
@@ -209,10 +217,18 @@ struct ExistingColumns {
     table: String,
     columns: Vec<ColumnInfo>,
     rows: Vec<adw::ComboRow>,
+    headers: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+    has_header: std::rc::Rc<std::cell::Cell<bool>>,
+    initialized: std::cell::Cell<bool>,
 }
 
 impl ExistingColumns {
-    fn new(table: &str, columns: &[ColumnInfo]) -> Self {
+    fn new(
+        table: &str,
+        columns: &[ColumnInfo],
+        store: Option<CsvMappingStore>,
+        scope: Option<CsvMappingScope>,
+    ) -> Self {
         let group = adw::PreferencesGroup::builder()
             .title(crate::tr!("Columns"))
             .description(crate::tr!(
@@ -233,22 +249,64 @@ impl ExistingColumns {
         for row in &rows {
             group.add(row);
         }
+        let actions = gtk::Box::builder().spacing(6).build();
+        let remember = gtk::Button::with_label(&crate::tr!("Remember mapping"));
+        let restore = gtk::Button::with_label(&crate::tr!("Restore mapping"));
+        let forget = gtk::Button::with_label(&crate::tr!("Forget mapping"));
+        let status = gtk::Label::builder().xalign(0.0).wrap(true).build();
+        let available = store.is_some() && scope.is_some();
+        for button in [&remember, &restore, &forget] {
+            button.set_sensitive(available);
+        }
+        if !available {
+            status.set_text("Saved mappings are unavailable for this connection.");
+        }
+        for button in [&remember, &restore, &forget] {
+            actions.append(button);
+        }
+        group.add(&actions);
+        group.add(&status);
+        let headers = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let has_header = std::rc::Rc::new(std::cell::Cell::new(true));
+        wire_mapping_actions(
+            &remember,
+            &restore,
+            &forget,
+            &status,
+            &rows,
+            &headers,
+            &has_header,
+            columns,
+            store,
+            scope,
+        );
         Self {
             group,
             table: table.to_owned(),
             columns: columns.to_vec(),
             rows,
+            headers,
+            has_header,
+            initialized: std::cell::Cell::new(false),
         }
     }
 
-    fn refresh(&self, sheet: &CsvSheet) {
+    fn refresh(&self, sheet: &CsvSheet, has_header: bool) {
+        let preserve = self.initialized.get() && *self.headers.borrow() == sheet.headers;
+        *self.headers.borrow_mut() = sheet.headers.clone();
+        self.has_header.set(has_header);
+        if preserve {
+            return;
+        }
         let suggestion = suggested_existing_mapping(&sheet.headers, &self.columns);
-        let mut labels: Vec<&str> = vec![SKIP_LABEL];
-        labels.extend(sheet.headers.iter().map(String::as_str));
+        let mut labels = vec![SKIP_LABEL.to_string()];
+        labels.extend(disambiguated_headers(&sheet.headers));
         for (row, field) in self.rows.iter().zip(suggestion) {
-            row.set_model(Some(&gtk::StringList::new(&labels)));
+            let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+            row.set_model(Some(&gtk::StringList::new(&refs)));
             row.set_selected(field.map_or(0, |index| index as u32 + 1));
         }
+        self.initialized.set(true);
     }
 
     fn mapping(&self) -> Vec<Option<usize>> {
@@ -259,6 +317,151 @@ impl ExistingColumns {
             .collect();
         editable_existing_mapping(&self.columns, selected)
     }
+}
+
+fn wire_mapping_actions(
+    remember: &gtk::Button,
+    restore: &gtk::Button,
+    forget: &gtk::Button,
+    status: &gtk::Label,
+    rows: &[adw::ComboRow],
+    headers: &std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+    has_header: &std::rc::Rc<std::cell::Cell<bool>>,
+    columns: &[ColumnInfo],
+    store: Option<CsvMappingStore>,
+    scope: Option<CsvMappingScope>,
+) {
+    connect_remember(
+        remember,
+        status,
+        rows,
+        headers,
+        has_header,
+        columns,
+        store.clone(),
+        scope.clone(),
+    );
+    connect_restore(
+        restore,
+        status,
+        rows,
+        headers,
+        has_header,
+        columns,
+        store.clone(),
+        scope.clone(),
+    );
+    connect_forget(forget, status, store, scope);
+}
+
+fn connect_remember(
+    button: &gtk::Button,
+    status: &gtk::Label,
+    rows: &[adw::ComboRow],
+    headers: &std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+    has_header: &std::rc::Rc<std::cell::Cell<bool>>,
+    columns: &[ColumnInfo],
+    store: Option<CsvMappingStore>,
+    scope: Option<CsvMappingScope>,
+) {
+    let columns = columns.to_vec();
+    let row_handles = rows.to_vec();
+    let active_headers = headers.clone();
+    let header_enabled = has_header.clone();
+    let message = status.clone();
+    let saved = store.clone();
+    let saved_scope = scope.clone();
+    button.connect_clicked(move |_| {
+        let (Some(store), Some(scope)) = (&saved, &saved_scope) else {
+            return;
+        };
+        let selected = row_handles
+            .iter()
+            .map(|row| (row.selected() > 0).then(|| row.selected() as usize - 1))
+            .collect::<Vec<_>>();
+        let selected = editable_existing_mapping(&columns, selected);
+        let result = store.save(
+            scope,
+            &active_headers.borrow(),
+            &columns,
+            &selected,
+            header_enabled.get(),
+        );
+        message.set_text(
+            &result
+                .map(|()| "Mapping saved for this table.".to_string())
+                .unwrap_or_else(|error| error),
+        );
+    });
+}
+
+fn connect_restore(
+    button: &gtk::Button,
+    status: &gtk::Label,
+    rows: &[adw::ComboRow],
+    headers: &std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+    has_header: &std::rc::Rc<std::cell::Cell<bool>>,
+    columns: &[ColumnInfo],
+    store: Option<CsvMappingStore>,
+    scope: Option<CsvMappingScope>,
+) {
+    let row_handles = rows.to_vec();
+    let active_headers = headers.clone();
+    let header_enabled = has_header.clone();
+    let message = status.clone();
+    let saved = store.clone();
+    let saved_scope = scope.clone();
+    let columns = columns.to_vec();
+    button.connect_clicked(move |_| {
+        let (Some(store), Some(scope)) = (&saved, &saved_scope) else {
+            return;
+        };
+        match store.restore(scope, &active_headers.borrow(), &columns, header_enabled.get()) {
+            Ok(Some(mapping)) => {
+                for (row, source) in row_handles.iter().zip(mapping) {
+                    row.set_selected(source.map_or(0, |index| index as u32 + 1));
+                }
+                message.set_text("Saved mapping restored. Review it before importing.");
+            }
+            Ok(None) => message.set_text("No saved mapping for this table."),
+            Err(error) => message.set_text(&error),
+        }
+    });
+}
+
+fn connect_forget(
+    button: &gtk::Button,
+    status: &gtk::Label,
+    store: Option<CsvMappingStore>,
+    scope: Option<CsvMappingScope>,
+) {
+    let message = status.clone();
+    button.connect_clicked(move |_| {
+        let (Some(store), Some(scope)) = (&store, &scope) else {
+            return;
+        };
+        match store.forget(scope) {
+            Ok(true) => message.set_text("Saved mapping removed."),
+            Ok(false) => message.set_text("No saved mapping for this table."),
+            Err(error) => message.set_text(&error),
+        }
+    });
+}
+
+fn disambiguated_headers(headers: &[String]) -> Vec<String> {
+    headers
+        .iter()
+        .enumerate()
+        .map(|(index, header)| {
+            let occurrence = headers[..=index].iter().filter(|other| *other == header).count();
+            let total = headers.iter().filter(|other| *other == header).count();
+            if total > 1 {
+                format!("{header} [{occurrence}]")
+            } else {
+                header.clone()
+            }
+        })
+        .collect()
 }
 
 fn server_managed(column: &ColumnInfo) -> bool {
@@ -615,5 +818,12 @@ mod tests {
             editable_existing_mapping(&columns, vec![Some(0), Some(1), Some(2)]),
             [None, Some(1), None]
         );
+    }
+
+    #[test]
+    fn duplicate_header_labels_are_distinguishable_without_changing_header_values() {
+        let headers = vec!["tag".to_string(), "tag".to_string(), "email".to_string()];
+        assert_eq!(disambiguated_headers(&headers), ["tag [1]", "tag [2]", "email"]);
+        assert_eq!(headers, ["tag", "tag", "email"]);
     }
 }
