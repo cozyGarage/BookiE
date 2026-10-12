@@ -983,6 +983,7 @@ impl SimpleComponent for BrowseTab {
                 let changed = self.foreign_keys != foreign_keys;
                 self.foreign_keys = foreign_keys;
                 if changed {
+                    self.current_column_view = None;
                     self.render_grid_if_ready(sender);
                 }
             }
