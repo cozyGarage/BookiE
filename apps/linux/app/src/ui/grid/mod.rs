@@ -186,9 +186,11 @@ pub fn build_column_view(
             columns,
             result.truncated,
             driver_id,
-            tab_ctx.tab_id.is_some(),
-            tab_ctx.foreign_key_columns.clone(),
-            tab_ctx.local_result_view.clone(),
+            context_menu::GridMenuOptions {
+                filterable: tab_ctx.tab_id.is_some(),
+                foreign_key_columns: tab_ctx.foreign_key_columns.clone(),
+                local_result_view: tab_ctx.local_result_view.clone(),
+            },
         )
     });
 

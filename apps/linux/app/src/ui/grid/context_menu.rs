@@ -31,21 +31,25 @@ pub(super) struct GridMenus {
     foreign_key_columns: Rc<std::collections::HashSet<String>>,
 }
 
+pub(super) struct GridMenuOptions {
+    pub(super) filterable: bool,
+    pub(super) foreign_key_columns: std::collections::HashSet<String>,
+    pub(super) local_result_view: Option<LocalResultView>,
+}
+
 pub(super) fn install_grid_context_menus(
     column_view: &gtk::ColumnView,
     sender: relm4::Sender<GridMsg>,
     result_columns: &[ColumnInfo],
     truncated: bool,
     driver_id: String,
-    filterable: bool,
-    foreign_key_columns: std::collections::HashSet<String>,
-    local_result_view: Option<LocalResultView>,
+    options: GridMenuOptions,
 ) -> GridMenus {
     let context: Rc<RefCell<Option<CellContext>>> = Rc::new(RefCell::new(None));
     let columns = Rc::new(result_columns.to_vec());
-    let local_result = local_result_view.is_some();
-    let editable_menu = build_menu(true, true, true, filterable, local_result);
-    let readonly_menu = build_menu(false, false, true, filterable, local_result);
+    let local_result = options.local_result_view.is_some();
+    let editable_menu = build_menu(true, true, true, options.filterable, local_result);
+    let readonly_menu = build_menu(false, false, true, options.filterable, local_result);
     let empty_menu = gio::Menu::new();
     empty_menu.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
     empty_menu.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
@@ -309,7 +313,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
-        local_result_view,
+        options.local_result_view,
     );
     let reference_action = go_to_reference_action(context.clone(), sender.clone(), column_view, columns.clone());
     let duplicate_row_action = {
@@ -400,7 +404,7 @@ pub(super) fn install_grid_context_menus(
         readonly_popover,
         edit_action,
         reference_action,
-        foreign_key_columns: Rc::new(foreign_key_columns),
+        foreign_key_columns: Rc::new(options.foreign_key_columns),
     }
 }
 
