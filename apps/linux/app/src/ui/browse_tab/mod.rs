@@ -357,6 +357,14 @@ pub enum BrowseTabInput {
 }
 
 #[derive(Debug)]
+pub(crate) struct ReferencedRowTarget {
+    pub(super) foreign_key: String,
+    pub(super) schema: Option<String>,
+    pub(super) table: String,
+    pub(super) filter: tablepro_core::FilterSet,
+}
+
+#[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum BrowseTabOutput {
     OpenReferencedRow {
@@ -364,6 +372,7 @@ pub enum BrowseTabOutput {
         table: String,
         filter: tablepro_core::FilterSet,
     },
+    ChooseReferencedRow(Vec<ReferencedRowTarget>),
     /// Tab needs the next page of rows fetched (state is in the slot).
     FetchPage,
     /// Tab needs schema columns fetched.
