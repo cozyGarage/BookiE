@@ -186,6 +186,9 @@ pub enum AppMsg {
     ShowToast(String),
     BrowseTabDirtyChanged(Uuid, bool),
     ToggleSidebarGroup(String),
+    HideSidebarSchema(String),
+    ShowSidebarSchema(String),
+    ShowAllSidebarSchemas,
     NewTableTab {
         schema: Option<String>,
     },
