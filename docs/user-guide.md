@@ -43,7 +43,7 @@ Click a sortable result column header to order the rows already loaded in that r
 - Completion offers tables after `FROM` and `JOIN` and columns elsewhere.
 - **Session** keeps one connection for the tab, so settings, temporary tables and transactions carry over between runs.
 - **Explain** shows the plan of the selected text, or of the whole editor when nothing is selected. For PostgreSQL and SQLite the plan opens as a **Tree** (indented by nesting, with a bar for each step's share of the estimated cost; hover a bar for the numbers) and the **Text** tab keeps the raw plan. Other engines show the text plan only. The costs are the planner's estimates; nothing is executed.
-- Ctrl+H opens query history, Ctrl+D saves the query as a favorite, Ctrl+P opens Open Quickly for favorites, tabs and connections.
+- Ctrl+H opens query history in a panel beneath the workspace. Search, filter, pin, export or reopen queries there; **Close history** returns the full space to your current workspace. Ctrl+D saves the query as a favorite, and Ctrl+P opens Open Quickly for favorites, tabs and connections.
 
 ## Import and export
 
@@ -53,6 +53,7 @@ Click a sortable result column header to order the rows already loaded in that r
 - **Import**: right-click a table and choose **Import CSV…** to load a CSV file
   into it, or use the button on a schema header to create a new table from a CSV
   file. Separator, header row and column mapping are detected and can be changed.
+  Auto-increment and generated columns stay on Skip; the database supplies their values.
 
 ## Safety
 
