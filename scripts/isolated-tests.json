@@ -180,6 +180,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::split_view::tests::split_editor_views_share_buffer_and_retain_text_across_toggles"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::filter_presets::tests::applying_two_saved_filters_switches_the_rules_in_the_browse_editor"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::row_inspector::tests::the_inspector_lists_a_row_and_returns_to_its_placeholder"
     ],
     [
@@ -276,6 +286,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::column_order::tests::a_saved_order_is_shown_and_a_new_drag_is_saved"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::local_sort_tests::local_sort_keeps_selection_attached_to_its_source_row"
     ],
     [
       "tablepro-app",

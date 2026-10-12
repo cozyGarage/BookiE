@@ -8,6 +8,8 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 2. Pick the database type, then fill in host, port, database and user. For SQLite and DuckDB, choose the file.
 3. Click **Test** to check the details, then **Connect**.
 
+For MySQL and MariaDB, choose a local socket file instead of a host to connect through a Unix socket; the path is saved with the connection and exported in bundles. For PostgreSQL, the schema filter menu hides schema groups per connection and restores them. A wrong PostgreSQL password or database is reported at once and is not retried. The General preferences choose how NULL is shown in the grid (NULL, the empty-set symbol or (null)).
+
 Passwords are kept in your desktop keyring, never in BookiE's own files.
 
 - **SSH**: open the SSH section of the form to reach a database through one or more SSH hosts. BookiE asks before trusting a host key it has not seen.
@@ -22,16 +24,19 @@ Click a table in the sidebar. It opens as a preview tab, marked with an icon, an
 
 - **Edit**: double-click a cell, or press F2 or Enter. Changes stay pending (shown with a dot on the tab) until you press Ctrl+S. Ctrl+Z and Ctrl+Y undo and redo pending changes.
 - **Insert and delete**: Ctrl+N inserts a row, Delete removes the selected rows. Ctrl+Shift+N sets the focused cell to NULL.
-- **Filter and sort**: Ctrl+F opens the filter bar. Click a column header to sort. Right-click a cell and choose **Filter by This Value** for a quick filter. On a foreign key cell, **Go to Referenced Row** opens the referenced table filtered to that row (composite keys use every column of the key). Click a cell and press Ctrl+V to paste tab-separated text (for example copied from a spreadsheet) into the cells from that one: each value is checked like a typed edit, nothing is applied if any cell is refused, and the result is a set of pending changes you review and save. An empty pasted value on a nullable column becomes NULL. On PostgreSQL (a column whose type is an enum, or a domain over one; not arrays of enums) and on MySQL and MariaDB, double-clicking an ENUM cell opens a list of its members (choose one with the mouse or the arrow keys and Enter), and a SET cell opens a list with a check for each member and an Apply button; the empty member shows as (empty) and is stored as the empty value, not NULL.
+- **Filter and sort**: Ctrl+F opens the filter bar. Save structured filters by name for the current connection, schema and table, then select and apply them later; you can rename or delete saved filters there too. Click a column header to sort. Right-click a cell and choose **Filter by This Value** for a quick filter. On a foreign key cell, **Go to Referenced Row** opens the referenced table filtered to that row (composite keys use every column of the key). Click a cell and press Ctrl+V to paste tab-separated text (for example copied from a spreadsheet) into the cells from that one: each value is checked like a typed edit, nothing is applied if any cell is refused, and the result is a set of pending changes you review and save. An empty pasted value on a nullable column becomes NULL. On PostgreSQL (a column whose type is an enum, or a domain over one; not arrays of enums) and on MySQL and MariaDB, double-clicking an ENUM cell opens a list of its members (choose one with the mouse or the arrow keys and Enter), and a SET cell opens a list with a check for each member and an Apply button; the empty member shows as (empty) and is stored as the empty value, not NULL.
 - **Columns**: the **Columns…** entry in the cell menu hides or shows columns. Drag a header to reorder columns. Both are remembered per table.
 - **Find**: Ctrl+Alt+F lists loaded rows that contain a text.
 - **Long values**: cells longer than 8 KiB show the start of the value and its size. **View Value** opens the whole value; copy, export and edits always use the full value.
 - **Row inspector**: shows every column of the selected row with its type.
-- **Selection totals**: select several rows to see sums and averages of numeric columns in the selection badge tooltip.
+- **Selection statistics**: select several rows and open the selection badge to see count, sum, average, min and max per numeric column; **Copy summary** copies them.
 
 ## Run SQL
 
 Ctrl+E opens a SQL editor tab for the current connection.
+
+Click a sortable result column header to order the rows already loaded in that result. This is a local view change and does not run the SQL again, including for write statements that return rows. SQL NULL values stay last; columns with mixed or undecodable values cannot be sorted. Text uses local value ordering, which can differ from the database collation.
+Use **Split** in the editor toolbar to show the same query in a second side-by-side pane. Edits and the caret are shared; each pane keeps its own scroll position.
 
 - Ctrl+Enter runs the whole script; Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it.
 - A script shows one result per statement. More than five results collapse into a drop-down. **Pin results** keeps the current results above the next run.
@@ -41,7 +46,7 @@ Ctrl+E opens a SQL editor tab for the current connection.
 - Completion offers tables after `FROM` and `JOIN` and columns elsewhere.
 - **Session** keeps one connection for the tab, so settings, temporary tables and transactions carry over between runs.
 - **Explain** shows the plan of the selected text, or of the whole editor when nothing is selected. For PostgreSQL and SQLite the plan opens as a **Tree** (indented by nesting, with a bar for each step's share of the estimated cost; hover a bar for the numbers) and the **Text** tab keeps the raw plan. Other engines show the text plan only. The costs are the planner's estimates; nothing is executed.
-- Ctrl+H opens query history, Ctrl+D saves the query as a favorite, Ctrl+P opens Open Quickly for favorites, tabs and connections.
+- Ctrl+H opens query history in a panel beneath the workspace. Search, filter, pin, export or reopen queries there; **Close history** returns the full space to your current workspace. Ctrl+D saves the query as a favorite, and Ctrl+P opens Open Quickly for favorites, tabs and connections.
 
 ## Import and export
 
@@ -51,6 +56,7 @@ Ctrl+E opens a SQL editor tab for the current connection.
 - **Import**: right-click a table and choose **Import CSV…** to load a CSV file
   into it, or use the button on a schema header to create a new table from a CSV
   file. Separator, header row and column mapping are detected and can be changed.
+  Auto-increment and generated columns stay on Skip; the database supplies their values.
 
 ## Safety
 

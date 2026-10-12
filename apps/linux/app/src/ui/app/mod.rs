@@ -109,12 +109,16 @@ pub struct App {
     sidebar_nodes: std::rc::Rc<std::cell::RefCell<Vec<crate::services::sidebar_tree::TreeNode>>>,
     sidebar_collapsed: std::rc::Rc<std::cell::RefCell<crate::services::sidebar_tree::CollapseState>>,
     sidebar_visible: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<usize>>>,
+    sidebar_hidden_schemas: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<String>>>,
+    schema_filter_button: gtk::MenuButton,
+    schema_filter_list: gtk::Box,
     sidebar_views: Vec<tablepro_core::TableInfo>,
     sidebar_tables: Vec<tablepro_core::TableInfo>,
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     schema_fetch_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     content_holder: adw::ToolbarView,
+    history_paned: gtk::Paned,
     toast_overlay: adw::ToastOverlay,
     /// Persistent "Connecting…" toast handle. Held so we can dismiss it
     /// when the connect attempt resolves (success or failure). Native
@@ -390,6 +394,17 @@ impl SimpleComponent for App {
                                 set_icon_name: "system-search-symbolic",
                                 set_tooltip_text: Some(crate::tr!("Search tables").as_str()),
                             },
+
+                            #[name = "schema_filter_button"]
+                            pack_end = &gtk::MenuButton {
+                                set_icon_name: "view-filter-symbolic",
+                                set_tooltip_text: Some(crate::tr!("Filter schemas").as_str()),
+                                set_visible: false,
+
+                                #[wrap(Some)]
+                                #[name = "schema_filter_popover"]
+                                set_popover = &gtk::Popover {},
+                            },
                         },
 
                         #[wrap(Some)]
@@ -456,6 +471,16 @@ impl SimpleComponent for App {
         } = init;
         let widgets = view_output!();
 
+        let schema_filter_list = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
+            .margin_top(12)
+            .margin_bottom(12)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        widgets.schema_filter_popover.set_child(Some(&schema_filter_list));
+
         init_css::install_pending_change_css();
 
         let window_handles =
@@ -507,12 +532,20 @@ impl SimpleComponent for App {
             sidebar_nodes: sidebar.nodes,
             sidebar_collapsed: sidebar.collapsed,
             sidebar_visible: sidebar.visible,
+            sidebar_hidden_schemas: sidebar.hidden_schemas,
+            schema_filter_button: widgets.schema_filter_button.clone(),
+            schema_filter_list,
             sidebar_views: Vec::new(),
             sidebar_tables: Vec::new(),
             catalog_generation: std::cell::Cell::new(0),
             catalog_cancel: Default::default(),
             schema_fetch_cancel: Default::default(),
             content_holder: widgets.content_holder.clone(),
+            history_paned: gtk::Paned::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .vexpand(true)
+                .wide_handle(true)
+                .build(),
             toast_overlay: widgets.toast_overlay.clone(),
             connect_progress_toast: None,
             connect_cancel: None,
@@ -574,6 +607,7 @@ impl SimpleComponent for App {
             history_prune_source: None,
         };
         sender.input(AppMsg::ReloadConnections);
+        model.content_holder.set_content(Some(&model.history_paned));
         model.show_welcome_page(sender.clone());
 
         widgets
@@ -790,6 +824,9 @@ impl SimpleComponent for App {
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
+            AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),
+            AppMsg::ShowSidebarSchema(schema) => self.show_sidebar_schema(&schema, &sender),
+            AppMsg::ShowAllSidebarSchemas => self.show_all_sidebar_schemas(&sender),
             AppMsg::NewTableTab { schema } => self.on_new_table_tab(schema, sender),
             AppMsg::EditStructureTab { schema, table } => self.on_edit_structure_tab(schema, table, sender),
             AppMsg::ShowCreateTableForExisting { schema, table } => self.on_show_create_table(schema, table, sender),
@@ -871,6 +908,7 @@ impl SimpleComponent for App {
             AppMsg::ShowQuickSwitcher => self.on_show_quick_switcher(sender),
             AppMsg::QuickSwitcherChose(target) => self.on_quick_switcher_chose(target, sender),
             AppMsg::ShowHistory => self.on_show_history(sender),
+            AppMsg::CloseHistory => self.hide_history_panel(),
             AppMsg::OpenHistoryQuery(text) => {
                 if self.connected {
                     self.append_editor_tab(Some(text), sender);

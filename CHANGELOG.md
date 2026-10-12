@@ -6,11 +6,22 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Added
 - Plain-clicking a table opens a temporary preview tab that the next table click can replace; editing or choosing **Keep Tab** makes it persistent.
+- PostgreSQL and SQLite query plans open in a Tree tab of the Explain dialog.
+- Ctrl+V pastes tab-separated text from a spreadsheet into grid cells, all or nothing.
+- A foreign key cell offers Go to Referenced Row.
+- ENUM and SET cells on MySQL and MariaDB, and enum cells on PostgreSQL, are edited from a list of members.
+- A preference chooses how NULL is displayed in the grid.
+- Browse filters can be saved, applied, renamed and deleted per connection, schema and table.
+- MySQL and MariaDB connections can use a local Unix socket file, saved with the connection and exported in version 3 connection bundles.
+- Query history now opens in a docked panel beneath the workspace, which stays visible while you search and reopen queries.
+- SQL result grids can sort supported, homogeneous typed columns in memory without re-running the SQL statement; SQL NULL values stay last in either direction.
+- SQL editors can show a second side-by-side view of the same query, with independent scrolling and shared edits.
+- PostgreSQL schema groups can now be hidden per connection and restored from the schema filter menu.
 - PostgreSQL TLS verification now trusts the operating system certificate store when no custom authority is configured.
 - MongoDB table browsing now seeks deep pages in `_id` sort order, including collections with mixed key types.
 - MongoDB offset and `_id` keyset pages apply equality, inequality, comparison, range, set-membership, null, `LIKE` and `ILIKE` filters with SQL null behavior.
 - Saved SSH hops now have stable IDs and credential revisions, with separate Secret Service operations for per-hop passwords and key passphrases. Legacy connections-file v1 data loads and migrates to v2 on save. Connections use those per-hop secrets for transport; editing a jump chain in the form remains disabled until that editor lands.
-- Encrypted connection bundles now write format version 2 with each versioned SSH hop's password or key passphrase; version 1 imports remain supported and plaintext bundles still contain no credentials.
+- Encrypted connection bundles now write format version 3 with local MySQL socket paths and each versioned SSH hop's password or key passphrase; version 1 and 2 imports remain supported and plaintext bundles still contain no credentials.
 - MongoDB browse long text, binary and structured values use guarded, ObjectId-safe `_id` refetches for full values.
 - Redis string values now use guarded, byte-safe key refetches for full values; collection and container debug strings remain untruncated.
 - SQL-backed table browse cells over 8 KiB now show a typed preview with the original byte count; View Value refetches through the guarded connection by primary key.
@@ -29,7 +40,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - MySQL ENUM and SET grid edits refuse malformed metadata and preserve escaped labels.
 - A failed PostgreSQL statement in the SQL editor shows the line and column of the error.
 - A failed statement in the SQL editor offers a Copy error button.
-- Selecting several rows shows each numeric column's sum and average in the selection badge tooltip, with NULLs skipped.
+- Selecting several rows and opening the selection badge shows each numeric column's count, sum, average, min and max, with NULLs skipped and a Copy summary button.
 - A connection's colour tag now also paints a strip above its workspace tabs, so a window shows which connection it belongs to.
 - PostgreSQL's six built-in scalar range types now have native text/JSON/wire refusal checks; empty ranges remain distinct from SQL NULL, and refused literals and bindings preserve target and sibling rows.
 - MongoDB and Redis unfiltered, unsorted table pages now use native fetches even when metadata finds a primary key; a native MongoDB GTK scenario checks cursor values remain visible until refresh and an approved post-refresh edit preserves sibling fields.
@@ -114,6 +125,10 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- PostgreSQL connections accept a bracketed IPv6 host such as `[::1]`.
+- A PostgreSQL login the server refuses (wrong password or missing database) is reported at once instead of being retried, and a pooler in transaction mode gets an explanatory hint on prepared-statement errors.
+- CSV import previews now keep auto-increment and generated columns on Skip and explain that the database supplies their values.
+- Grid edits and spreadsheet paste preserve line breaks inside text values.
 
 - MySQL and MariaDB connections with TLS Disabled no longer use a saved client certificate or key
 - The window opens without waiting for old query history to be pruned at startup

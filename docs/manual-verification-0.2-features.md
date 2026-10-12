@@ -36,6 +36,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Separator and header-row detection are right for a comma file, a semicolon file, and a file with no header.
 - [ ] The preview grid matches the file.
 - [ ] Column mapping is prefilled sensibly and can be changed.
+- [ ] For SQLite `id INTEGER PRIMARY KEY`, a CSV `id` header stays on Skip, explains that the database generates the value, and importing source IDs 51 and 52 stores generated IDs 1 and 2.
 - [ ] Creating a table shows a name and an inferred type per column, both editable before anything runs.
 - [ ] Approval is requested **once** for the whole import, not per batch.
 - [ ] Progress advances and Cancel stops it.
@@ -45,6 +46,9 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 ## Connection dialog and browse shortcuts
 
 - [ ] New connection defaults match the selected driver; no PostgreSQL defaults leak into another engine. Switching drivers and editing a saved connection preserves intended custom values.
+- [ ] For MySQL/MariaDB, select a local Unix socket and confirm the form shows a socket-file path while hiding host and port. Switch back to Network and confirm the socket path is hidden and host/port return.
+- [ ] Connect through a real local MySQL/MariaDB socket, save the connection, reopen it, and confirm the socket path and endpoint mode remain selected. Export and re-import a bundle and confirm the same endpoint is retained.
+- [ ] Confirm a missing or invalid socket path fails without attempting a TCP connection. Local sockets refuse TLS and SSH; existing PostgreSQL socket-directory and SSH-forwarded MySQL socket connections still work.
 - [ ] The current header title and grouped Test/Connect actions fit at narrow width in light and dark; the title does not overlap the actions.
 - [ ] Enter submits the form and Escape dismisses without changing saved data.
 - [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels.
@@ -57,6 +61,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Duplicate produces a new row with a distinct name, and connecting to it asks for credentials rather than reusing the original's.
 - [ ] The Name field in the connect dialog is used when set, and the derived `user@host` label still appears when it is blank.
 - [ ] Two connections to the same endpoint stay separate after reconnecting to each. This is the regression the id-first identity change fixed.
+- [ ] On PostgreSQL, right-click a schema and hide it. Confirm its tables and views disappear, search cannot reveal them, the filter menu can restore one or all schemas, and each connection retains its own hidden-schema list after reconnecting.
 
 ## Long-query notice
 
@@ -86,6 +91,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Editor and history
 
+- [ ] Toggle **Split** on and off with the mouse and keyboard; edit the query from either pane, confirm both views update, and check that each pane keeps its scroll position at a narrow window width.
 - [ ] Ctrl+O opens a `.sql` file into a new tab titled with the file name.
 - [ ] Typing marks the title with `•`; Ctrl+S saves, clears the mark and shows "Saved".
 - [ ] Ctrl+S on an editor tab never opened from a file asks where to save.
@@ -180,6 +186,13 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 - [ ] A JSON or binary cell shows "Values of this type can't be used as a filter".
 - [ ] The item is absent from SQL editor result grids.
 
+## Named browse filters
+
+- [ ] On one table, build and apply two structured filters, save them under different names, and switch between them without editing the rules.
+- [ ] Rename one preset and delete the other; restart BookiE and confirm the renamed preset remains scoped to the same connection, schema and table.
+- [ ] Save a preset with raw SQL, an empty name, an overlong name and beyond the per-table limit; each is refused with a useful message.
+- [ ] Open the preset on a table whose columns changed; the invalid saved rule is not applied silently.
+
 ## Catalog window
 
 Main menu, then Catalog, on a PostgreSQL connection with a few objects of each kind.
@@ -209,7 +222,7 @@ A text or JSON cell over 40,000 bytes shows a shortened value ending in `… (+N
 ## Result headers, selection statistics, error copy and connection strip
 
 - [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the lower-case type beneath it, in light and dark.
-- [ ] Select several rows of a numeric column: the selection badge tooltip lists the column's sum and average. A text column is not listed.
+- [ ] Select several rows of a numeric column: the selection badge popover lists the column's count, sum, average, min and max, and Copy summary copies them. A text column is not listed.
 - [ ] Run a failing statement in the editor: Copy error places the exact error text on the clipboard.
 - [ ] Tag a connection red and open it: the strip above the workspace tabs is red in light and dark. Change the tag: the strip follows without a restart.
 
@@ -232,5 +245,5 @@ A text or JSON cell over 40,000 bytes shows a shortened value ending in `… (+N
 
 - Creating a table from a CSV file falls back to PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis and DuckDB. Only PostgreSQL, MySQL, SQLite and SQL Server have real type-name tables, and none of the four fallback engines was exercised.
 - Bundle export and import are covered at the byte level in unit tests and by the keyring tier, but no end-to-end round trip between two real profiles has been run.
-- Bundle export and import write **no** audit-journal entries. `AuditEvent` is SQL-shaped and hash-chained, so an administrative-event class needs its own ADR before that gap can be closed. See `storage.md`.
+- Bundle export and import write administrative audit events. Run a bundle round trip and confirm both events appear in `audit.jsonl` (B4-22).
 - SQL-format export and copied INSERT statements now preserve binary values on PostgreSQL, MySQL, SQLite, SQL Server and ClickHouse, with real-engine tests for NULL, empty blobs and all 256 byte values. DuckDB binary SQL literals also have a NULL/empty/all-byte round-trip regression in the B3 ledger; installed acceptance is still pending. Other lossless-contract requirements remain under B3.

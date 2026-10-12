@@ -1,6 +1,6 @@
 # Connection handling
 
-Source checked in the B4 Linux working tree on 2026-10-07. [ADR 0008](decisions/0008-connection-and-session-ownership.md) owns identity and trust, [ADR 0005](decisions/0005-server-side-cancellation.md) cancellation, and remaining B4 acceptance is on [Project #3](https://github.com/users/cozyGarage/projects/3) (Lane B4). The [September connection audit](archive/connections-history.md) retains older source claims and coverage tables; its gaps are not current status.
+Source checked at `72b115e16` on 2026-10-12. [ADR 0008](decisions/0008-connection-and-session-ownership.md) owns identity and trust, [ADR 0005](decisions/0005-server-side-cancellation.md) cancellation, and remaining B4 acceptance is on [Project #3](https://github.com/users/cozyGarage/projects/3) (Lane B4). The [September connection audit](archive/connections-history.md) retains older source claims and coverage tables; its gaps are not current status.
 
 ## Shared assembly and ownership
 
@@ -14,7 +14,7 @@ A login the server refuses is never retried. PostgreSQL reports a wrong password
 
 ## TLS identity and evidence
 
-The dial endpoint and authenticated service hostname are separate. SSH retains the saved service identity. Where supported, verifying connections forward a private Unix socket; other drivers must explicitly verify the original hostname over TCP or refuse. Local PostgreSQL sockets reject SSH and TLS; forwarded sockets retain the remote identity.
+The dial endpoint and authenticated service hostname are separate. SSH retains the saved service identity. Where supported, verifying connections forward a private Unix socket; other drivers must explicitly verify the original hostname over TCP or refuse. Local PostgreSQL sockets use a socket directory plus port. MySQL and MariaDB local sockets use the full socket-file path. Local sockets reject SSH and TLS; forwarded sockets retain the remote identity. Selecting a local socket never falls back to TCP.
 
 PostgreSQL's release fixture covers TLS through SSH. Driver TLS fixtures cover direct CA/hostname/encryption and no-fallback cases, including SQL Server; B4-1 and B4-2 also cover MySQL and SQL Server TLS through real SSH routes. See [testing](testing.md) for commands and [the release audit](archive/release-audit-2026-10-03.md) for historical results.
 

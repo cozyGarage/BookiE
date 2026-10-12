@@ -34,19 +34,19 @@ What the application does not do, or does differently from what you might expect
 ## Editing and connections
 
 - **PostgreSQL behind a connection pooler:** PgBouncer in session mode works. In transaction mode it works when the pooler supports prepared statements (PgBouncer 1.21 or newer with `max_prepared_statements` above 0); without that the server answers "prepared statement already exists" and the error now says so. Session features of the editor (`SET`, temporary tables, an open transaction across statements) need session pooling by design.
-- **SSH jump chains cannot be edited in the form** (UI-1b / [#548](https://github.com/cozyGarage/BookiE/issues/548)). They connect and run, but the form refuses to edit them until per-hop secrets, transport identity and the bundle format all land and pass together.
+- **SSH jump chains cannot be edited in the form** (UI-1b / [#548](https://github.com/cozyGarage/BookiE/issues/548)). They connect and run, but editing remains disabled until the complete GTK editor path is implemented and accepted.
 - **Reusable SSH profiles cannot be edited** (UI-26).
-- **MySQL and MariaDB have no Unix socket endpoint in the connect dialog** ([#579](https://github.com/cozyGarage/BookiE/issues/579)). PostgreSQL sockets work; MySQL/MariaDB use TCP in the UI, and `Transport::Socket` is only for SSH-forwarded rendezvous.
+- **Local socket endpoint differences:** PostgreSQL selects a socket directory plus port; MySQL and MariaDB select the full socket-file path. Both local routes reject TLS and SSH and never fall back to TCP ([#579](https://github.com/cozyGarage/BookiE/issues/579)).
 - **SQL Server with Kerberos** has a Samba AD and verified-TLS fixture that passed the Kerberos selectors; Windows AD interoperability and package acceptance remain open (B4-21).
 - **DuckDB read-only flat files** need Linux and a writable directory on the same filesystem as the file (the application pins the file through a private link there). A read-only in-memory DuckDB connection is refused.
 
 ## Interface
 
-- No code folding, multi-cursor or split panes (UI-22). Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. No preview tabs (UI-17b); history is a dialog (UI-18).
+- No code folding or multi-cursor (UI-22, [#629](https://github.com/cozyGarage/BookiE/issues/629)). Split panes are available from the **Split** toolbar button. Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. No preview tabs (UI-17b). Query history now opens in a docked panel (UI-18).
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles; a typed activity console is deferred and the activity dialog stays a plain result grid (UI-23).
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
-- No foreign key picker, enum or set pickers, or paste of tab-separated rows (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)).
-- No Filter Schemas control for large PostgreSQL catalogs ([#580](https://github.com/cozyGarage/BookiE/issues/580)); sidebar schema groups exist (UI-11).
+- No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
+- PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata remain open under B6.
 - No database snapshots or restore (SNAP-1 accepted the feature for 0.2.x; build is SNAP-2 to SNAP-4 / [#547](https://github.com/cozyGarage/BookiE/issues/547)).
 - Accessibility with Orca, keyboard-only order and high contrast has not been verified (DOC-3).
 
@@ -64,4 +64,4 @@ What the application does not do, or does differently from what you might expect
 ## Test and CI limits
 
 - The installed GTK suite does not pass reliably on a native Ubuntu 24.04 runner (TEST-28); it passes in the Ubuntu container.
-- About 68 percent of the policy crate's and 81 percent of the core crate's mutations are caught by their own tests; the survivors are listed in the [mutation reports](evidence/test-quality-2026-10-11/policy-mutants.md) (TEST-32).
+- About 68 percent of the policy crate's and 81 percent of the core crate's mutations were caught by their own tests when measured at `0d21eb6d4` (2026-10-11); later survivor triage is in the [B4 mutation triage](evidence/b4-mutation-triage-2026-10-12) and the figure has not been re-measured; the survivors are listed in the [mutation reports](evidence/test-quality-2026-10-11/policy-mutants.md) (TEST-32).
