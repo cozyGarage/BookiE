@@ -915,6 +915,22 @@ impl SimpleComponent for BrowseTab {
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+        if self.save_in_flight.get()
+            && matches!(
+                msg,
+                BrowseTabInput::DuplicateRow { .. }
+                    | BrowseTabInput::InsertRow
+                    | BrowseTabInput::DeleteSelectedRow
+                    | BrowseTabInput::GridCellEdited { .. }
+                    | BrowseTabInput::GridSetCellNull { .. }
+                    | BrowseTabInput::GridDeleteRowAt { .. }
+            )
+        {
+            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                "Saving changes. Edit again when the save finishes."
+            )));
+            return;
+        }
         match msg {
             BrowseTabInput::RowsLoaded {
                 request,
