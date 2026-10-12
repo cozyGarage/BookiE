@@ -181,6 +181,9 @@ fn optimistic_predicate(
         "postgres" if column.data_type.trim().eq_ignore_ascii_case("json") => {
             format!("{name}::jsonb IS NOT DISTINCT FROM {placeholder}::jsonb")
         }
+        "postgres" if column.data_type.trim().eq_ignore_ascii_case("xml") => {
+            format!("{name}::text IS NOT DISTINCT FROM {placeholder}::text")
+        }
         "postgres" => {
             let value_sql = text_cast_placeholder(column, old_value, placeholder);
             format!("{name} IS NOT DISTINCT FROM {value_sql}")

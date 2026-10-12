@@ -39,7 +39,6 @@ fn a_text_value_for_a_native_text_decoded_type_is_cast_to_the_column_type() {
         ("bit(3)", "pg_catalog.bit(3)"),
         ("bit", "pg_catalog.bit"),
         ("bit varying(5)", "pg_catalog.varbit(5)"),
-        ("xml", "pg_catalog.xml"),
         ("tsvector", "pg_catalog.tsvector"),
         ("character(5)", "pg_catalog.bpchar"),
     ] {
@@ -82,6 +81,12 @@ fn a_json_column_is_compared_through_jsonb_because_json_has_no_equality() {
         Value::Json(serde_json::json!({"a": 2})),
     );
     assert!(sql.contains("\"v\"::jsonb IS NOT DISTINCT FROM $3::jsonb"), "{sql}");
+}
+
+#[test]
+fn an_xml_column_is_compared_as_text_because_xml_has_no_equality() {
+    let sql = update_sql("xml", Value::Text("<a/>".into()), Value::Text("<b/>".into()));
+    assert!(sql.contains("\"v\"::text IS NOT DISTINCT FROM $3::text"), "{sql}");
 }
 
 #[test]
