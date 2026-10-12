@@ -131,6 +131,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Grid headers and Go to Referenced Row now pick up foreign keys that arrive after the first draw; before, the redraw reused the old headers and menu.
 - Go to Referenced Row on a column that belongs to several foreign keys offers the usable ones even when another key has a NULL value.
 - Picking a PostgreSQL enum label no longer fails when the enum's type name looks like a built-in type such as `date_format` or `timestamp_source`.
+- Closing an editor tab no longer leaves it on screen stuck on "Rolling back and closing session…", including after choosing Save for a file tab; the stale tab used to abort the app when Split was clicked.
 - Screen readers announce the selected-row count on the selection summary.
 - Browse grid headers now show the primary key marker, and the foreign key marker and Go to Referenced Row appear even when the foreign keys arrive after the first draw.
 - Reopening query history refreshes the list so queries run while it was closed appear immediately.
