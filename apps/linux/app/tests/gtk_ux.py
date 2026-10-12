@@ -1379,6 +1379,24 @@ GLib.MainLoop().run()
             owner.terminate()
             owner.wait(timeout=ui.WAIT_SECONDS)
 
+    def window_controls_follow_the_desktop_button_layout(_database, _base, restart):
+        def use_layout(layout):
+            def write(environment):
+                settings = Path(environment["XDG_CONFIG_HOME"]) / "gtk-4.0" / "settings.ini"
+                settings.parent.mkdir(parents=True, exist_ok=True)
+                settings.write_text(f"[Settings]\ngtk-decoration-layout={layout}\n", encoding="utf-8")
+            return write
+
+        restart(use_layout("appmenu:close"))
+        ui.wait_for_node(name="Close", role=pyatspi.ROLE_PUSH_BUTTON)
+        assert ui.find_node(name="Minimize", role=pyatspi.ROLE_PUSH_BUTTON) is None, "a close-only layout showed Minimize"
+        restart(use_layout("icon:minimize,maximize,close"))
+        ui.wait_for_node(name="Minimize", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.wait_for_node(name="Maximize", role=pyatspi.ROLE_PUSH_BUTTON)
+
+    window_controls_follow_the_desktop_button_layout.needs_restart = True
+    window_controls_follow_the_desktop_button_layout.requires_editor = False
+
     result = [
         sqlite_grid_context_menu_columns_action_is_reachable_via_atspi,
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
@@ -1404,6 +1422,7 @@ GLib.MainLoop().run()
         filter_by_this_value_narrows_the_browse_rows,
         selection_statistics_summarise_the_selected_rows,
         paste_past_the_loaded_rows_changes_nothing,
+        window_controls_follow_the_desktop_button_layout,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)
