@@ -128,7 +128,9 @@ pub struct BrowseTab {
     /// or Ctrl+clicks to build a multi-row selection. Updated via
     /// the selection model's connect_selection_changed signal so it
     /// stays in sync without polling.
-    selection_label: gtk::Label,
+    selection_label: gtk::MenuButton,
+    selection_count_label: gtk::Label,
+    selection_details_label: gtk::Label,
     inspector: crate::ui::row_inspector::RowInspector,
     first_button: gtk::Button,
     prev_button: gtk::Button,
@@ -342,12 +344,7 @@ pub enum BrowseTabInput {
         col: usize,
         row_key: Vec<Value>,
     },
-    PasteText {
-        row: u32,
-        col: usize,
-        row_key: Vec<Value>,
-        text: String,
-    },
+    PasteText(paste::PasteTextInput),
     /// Ctrl+A: select every visible row.
     SelectAllRows,
     /// Home / End: scroll-and-focus the first / last row of the
@@ -493,11 +490,12 @@ impl BrowseTab {
     }
 
     fn emit_fetch_page(&self, sender: &ComponentSender<Self>) {
+        self.page_requests.invalidate();
         let _ = sender.output(BrowseTabOutput::FetchPage);
     }
 
     fn emit_fetch_page_and_count(&self, sender: &ComponentSender<Self>) {
-        let _ = sender.output(BrowseTabOutput::FetchPage);
+        self.emit_fetch_page(sender);
         let _ = sender.output(BrowseTabOutput::FetchRowCount);
     }
 }
@@ -848,6 +846,8 @@ impl SimpleComponent for BrowseTab {
             pending_focus_restore: std::cell::RefCell::new(None),
             paginator_label: paginator.paginator_label,
             selection_label: paginator.selection_label,
+            selection_count_label: paginator.selection_count_label,
+            selection_details_label: paginator.selection_details_label,
             inspector,
             first_button: paginator.first_button,
             prev_button: paginator.prev_button,
@@ -980,7 +980,7 @@ impl SimpleComponent for BrowseTab {
                     let last_page_offset = count.saturating_sub(1) / self.page_size * self.page_size;
                     if last_page_offset != self.current_offset {
                         self.current_offset = last_page_offset;
-                        let _ = sender.output(BrowseTabOutput::FetchPage);
+                        self.emit_fetch_page(&sender);
                         let _ = sender.output(BrowseTabOutput::StateChanged);
                     }
                 }
@@ -1015,7 +1015,7 @@ impl SimpleComponent for BrowseTab {
                     &crate::tr!("Loading…"),
                     &crate::tr!("Fetching rows from {table}").replace("{table}", &self.table_label()),
                 );
-                let _ = sender.output(BrowseTabOutput::FetchPage);
+                self.emit_fetch_page(&sender);
                 let _ = sender.output(BrowseTabOutput::FetchRowCount);
             }
             BrowseTabInput::ClearSelection => {
@@ -1043,7 +1043,7 @@ impl SimpleComponent for BrowseTab {
                 if self.current_offset > 0 {
                     self.current_offset = 0;
                     self.keyset_cursor = None;
-                    let _ = sender.output(BrowseTabOutput::FetchPage);
+                    self.emit_fetch_page(&sender);
                     let _ = sender.output(BrowseTabOutput::StateChanged);
                 }
             }
@@ -1053,13 +1053,13 @@ impl SimpleComponent for BrowseTab {
                     // Reverse keyset is not implemented; clear cursor so
                     // the fetch falls back to OFFSET for this page.
                     self.keyset_cursor = None;
-                    let _ = sender.output(BrowseTabOutput::FetchPage);
+                    self.emit_fetch_page(&sender);
                     let _ = sender.output(BrowseTabOutput::StateChanged);
                 }
             }
             BrowseTabInput::NextPage => {
                 self.current_offset += self.page_size;
-                let _ = sender.output(BrowseTabOutput::FetchPage);
+                self.emit_fetch_page(&sender);
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
             BrowseTabInput::LastPage => {
@@ -1076,7 +1076,7 @@ impl SimpleComponent for BrowseTab {
                 if self.current_offset != last_page_offset {
                     self.current_offset = last_page_offset;
                     self.keyset_cursor = None;
-                    let _ = sender.output(BrowseTabOutput::FetchPage);
+                    self.emit_fetch_page(&sender);
                     let _ = sender.output(BrowseTabOutput::StateChanged);
                 }
             }
@@ -1095,7 +1095,7 @@ impl SimpleComponent for BrowseTab {
                 self.current_offset = 0;
                 self.keyset_cursor = None;
                 self.capture_focus_for_restore();
-                let _ = sender.output(BrowseTabOutput::FetchPage);
+                self.emit_fetch_page(&sender);
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
             BrowseTabInput::PageSizeChanged(size) => {
@@ -1105,7 +1105,7 @@ impl SimpleComponent for BrowseTab {
                 self.page_size = size;
                 self.current_offset = 0;
                 self.keyset_cursor = None;
-                let _ = sender.output(BrowseTabOutput::FetchPage);
+                self.emit_fetch_page(&sender);
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
             BrowseTabInput::DuplicateRow { row_position } => self.handle_duplicate_row(row_position, sender),
@@ -1163,12 +1163,7 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::CopySelectedRowsAsTsv => self.handle_copy_selected_rows_as_tsv(sender),
             BrowseTabInput::PasteNotSupported => self.handle_paste_not_supported(sender),
             BrowseTabInput::Paste { row, col, row_key } => self.handle_paste(row, col, row_key, sender),
-            BrowseTabInput::PasteText {
-                row,
-                col,
-                row_key,
-                text,
-            } => self.handle_paste_text(row, col, &row_key, &text, sender),
+            BrowseTabInput::PasteText(input) => self.handle_paste_text(input, sender),
             BrowseTabInput::SelectAllRows => self.handle_select_all_rows(),
             BrowseTabInput::GoToFirstRow => self.handle_go_to_first_row(),
             BrowseTabInput::GoToLastRow => self.handle_go_to_last_row(),
