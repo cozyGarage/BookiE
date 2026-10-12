@@ -128,6 +128,9 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- CSV import into PostgreSQL reads enum and domain columns, bit strings and ranges as text, so an enum named like `maintenance_status` or a `bit(3)` value no longer fails as "not a whole number".
+- Create table from CSV keeps zip codes, phone numbers and other identifiers with a leading zero or plus as text instead of turning `01234` into `1234`.
+- Identifier quoting keeps control characters in a name instead of removing them, so a statement can no longer target a different table than the one named.
 - Opening a second table over a preview tab, dropping a table with open tabs and promoting a new structure tab now remove the old tab page instead of leaving it on screen without its controller, which aborted the app when clicked.
 - A query stopped by a timeout now says "Query exceeded the Ns query timeout." instead of claiming the timeout was configured in Preferences, which was wrong for a per-connection timeout.
 - Closing an editor tab no longer leaves it on screen stuck on "Rolling back and closing session…", including after choosing Save for a file tab; the stale tab used to abort the app when Split was clicked.
