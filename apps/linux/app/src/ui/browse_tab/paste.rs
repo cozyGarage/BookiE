@@ -1,7 +1,7 @@
 use relm4::ComponentSender;
-use relm4::gtk::{gdk, glib};
+use relm4::gtk::{self, gdk, glib};
 
-use super::value_parse::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_grid_cell};
+use super::value_parse::parse_grid_cell_input;
 use super::*;
 
 const MAX_PASTE_CELLS: usize = 5_000;
@@ -16,6 +16,7 @@ pub(in crate::ui) struct PasteSnapshot {
 pub(in crate::ui) struct PasteTextInput {
     pub(in crate::ui) row: u32,
     pub(in crate::ui) col: usize,
+    pub(in crate::ui) row_key: Vec<Value>,
     pub(in crate::ui) text: String,
     pub(in crate::ui) snapshot: PasteSnapshot,
 }
@@ -128,8 +129,28 @@ pub(super) fn paste_plan(
     Ok(cells)
 }
 
+pub(super) fn paste_shortcut(sender: ComponentSender<BrowseTab>) -> gtk::Shortcut {
+    gtk::Shortcut::builder()
+        .trigger(&crate::ui::shortcut::parse("<Primary>v"))
+        .action(&gtk::CallbackAction::new(move |widget, _| {
+            match crate::ui::grid::focused_cell_identity(widget).or_else(|| crate::ui::grid::last_clicked_cell(widget))
+            {
+                Some((row, col, row_key)) => sender.input(BrowseTabInput::Paste { row, col, row_key }),
+                None => sender.input(BrowseTabInput::PasteNotSupported),
+            }
+            glib::Propagation::Stop
+        }))
+        .build()
+}
+
 impl BrowseTab {
-    pub(super) fn handle_paste(&mut self, row: u32, col: usize, sender: ComponentSender<Self>) {
+    pub(super) fn handle_paste(&mut self, row: u32, col: usize, row_key: Vec<Value>, sender: ComponentSender<Self>) {
+        if !self.row_position_still_holds(row, &row_key) {
+            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                "The rows changed since you clicked the cell, so nothing was pasted"
+            )));
+            return;
+        }
         let Some(display) = gdk::Display::default() else {
             return;
         };
@@ -140,6 +161,7 @@ impl BrowseTab {
                 sender.input(BrowseTabInput::PasteText(PasteTextInput {
                     row,
                     col,
+                    row_key,
                     text: text.to_string(),
                     snapshot,
                 }));
@@ -161,12 +183,8 @@ impl BrowseTab {
                     .replace("{row}", &(cell.row + 1).to_string()),
             );
         }
-        let text = match column.map(|column| classify_type(&column.data_type.to_ascii_lowercase())) {
-            Some(TypeKind::Json) => cell.text.clone(),
-            _ => normalize_single_line_input(&cell.text),
-        };
         let current = row.as_ref().map(|row| row.cell_value(cell.col));
-        parse_input_for_grid_cell(&text, column, &self.driver_id, current.as_ref())
+        parse_grid_cell_input(&cell.text, column, &self.driver_id, current.as_ref())
             .map(|_| ())
             .map_err(|message| {
                 crate::tr!("{column} on row {row}: {message}. Nothing was pasted.")
@@ -180,9 +198,17 @@ impl BrowseTab {
         let PasteTextInput {
             row,
             col,
+            row_key,
             text,
             snapshot,
         } = input;
+        if snapshot.page_request_id != self.page_requests.current_id() || !self.row_position_still_holds(row, &row_key)
+        {
+            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                "The rows changed since you clicked the cell, so nothing was pasted"
+            )));
+            return;
+        }
         let loaded = self.row_count_loaded();
         let cells = match paste_plan(
             row,
