@@ -164,11 +164,19 @@ fn alter_column_postgres(
     let name = quote_ident(driver_id, &column.name);
     let changed = ChangedAttributes::of(column);
     let mut stmts: Vec<String> = Vec::new();
+    let default_set_before = column
+        .original
+        .as_ref()
+        .is_some_and(|original| original.default_value.is_some());
+    let reapply_default = changed.data_type && default_set_before;
     if changed.data_type {
         validate_safe_type(&column.data_type)?;
         let collation = collation_clause(driver_id, column)?
             .map(|clause| format!(" {clause}"))
             .unwrap_or_default();
+        if reapply_default {
+            stmts.push(format!("ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT", qualified, name));
+        }
         stmts.push(format!(
             "ALTER TABLE {} ALTER COLUMN {} TYPE {}{} USING {}::{}",
             qualified, name, column.data_type, collation, name, column.data_type,
@@ -182,14 +190,24 @@ fn alter_column_postgres(
         };
         stmts.push(format!("ALTER TABLE {} ALTER COLUMN {} {}", qualified, name, action));
     }
-    if changed.default_value {
-        stmts.push(match validated_default(column.default_value.as_deref())? {
-            Some(default) => format!(
-                "ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {}",
-                qualified, name, default
-            ),
-            None => format!("ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT", qualified, name),
-        });
+    if changed.default_value || reapply_default {
+        match validated_default(column.default_value.as_deref())? {
+            Some(default) => {
+                let value = if changed.default_value {
+                    default.to_string()
+                } else {
+                    format!("({default})::{}", column.data_type)
+                };
+                stmts.push(format!(
+                    "ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {}",
+                    qualified, name, value
+                ));
+            }
+            None if !reapply_default => {
+                stmts.push(format!("ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT", qualified, name));
+            }
+            None => {}
+        }
     }
     if comment_changed(column)
         && let Some(comment_stmt) = column_comment_statement(driver_id, schema, table, column)?
