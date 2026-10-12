@@ -33,6 +33,8 @@ Click a table in the sidebar. The sidebar groups tables and views under each sch
 
 Ctrl+E opens a SQL editor tab for the current connection.
 
+Use **Split** in the editor toolbar to show the same query in a second side-by-side pane. Edits and the caret are shared; each pane keeps its own scroll position.
+
 - Ctrl+Enter runs the whole script; Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it.
 - A script shows one result per statement. More than five results collapse into a drop-down. **Pin results** keeps the current results above the next run.
 - After a run, the gutter marks each statement with a tick or a cross.
