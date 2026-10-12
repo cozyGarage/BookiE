@@ -42,7 +42,7 @@ What the application does not do, or does differently from what you might expect
 
 ## Interface
 
-- No code folding, multi-cursor or split panes (UI-22). Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. No preview tabs (UI-17b). Query history now opens in a docked panel (UI-18).
+- No code folding or multi-cursor (UI-22, [#629](https://github.com/cozyGarage/BookiE/issues/629)). Split panes are available from the **Split** toolbar button. Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. No preview tabs (UI-17b). Query history now opens in a docked panel (UI-18).
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles; a typed activity console is deferred and the activity dialog stays a plain result grid (UI-23).
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
 - No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
@@ -64,4 +64,4 @@ What the application does not do, or does differently from what you might expect
 ## Test and CI limits
 
 - The installed GTK suite does not pass reliably on a native Ubuntu 24.04 runner (TEST-28); it passes in the Ubuntu container.
-- About 68 percent of the policy crate's and 81 percent of the core crate's mutations are caught by their own tests; the survivors are listed in the [mutation reports](evidence/test-quality-2026-10-11/policy-mutants.md) (TEST-32).
+- About 68 percent of the policy crate's and 81 percent of the core crate's mutations were caught by their own tests when measured at `0d21eb6d4` (2026-10-11); later survivor triage is in the [B4 mutation triage](evidence/b4-mutation-triage-2026-10-12) and the figure has not been re-measured; the survivors are listed in the [mutation reports](evidence/test-quality-2026-10-11/policy-mutants.md) (TEST-32).
