@@ -6,5 +6,7 @@ mod enum_labels;
 mod network_paths;
 #[path = "null_binding.rs"]
 mod null_binding;
+#[path = "typed_text_writes.rs"]
+mod typed_text_writes;
 #[path = "xml_oid_values.rs"]
 mod xml_oid_values;

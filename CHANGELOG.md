@@ -130,6 +130,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Fixed
 - PostgreSQL edits that set a cell to NULL, compare an old NULL, leave a column NULL in a new row, or import an empty field into an integer, date, uuid, boolean, numeric, JSON or inet column no longer fail with "expression is of type text".
+- PostgreSQL grid edits, inserts, key lookups and deletes now work for `inet`, `cidr`, `macaddr`, `interval`, `bit` and `varbit` values, which were sent as text and refused by the server, and for padded `char(n)` keys and `json` columns, which reported a false concurrent modification or could not be edited. `xml` and `tsvector` values can be inserted, but editing them still fails because the old value reads back as undecodable (#694).
 - PostgreSQL `EXPLAIN (ANALYSE)` of a write is classified and gated like the write instead of as a read.
 - The `query_to_xml` family, `crosstab`, `pg_notify`, `pg_logical_*`, `pg_replication_*`, `pg_stat_reset*`, `pg_ls_*` and more large-object functions are administrative, so agents are denied and read-only connections refuse them.
 - A constant-true predicate (`WHERE true`, `WHERE 1`, `WHERE 1=1`, `WHERE 2 > 1`, `WHERE id = 1 OR true`) counts as unscoped DML. Predicates that depend on a column (`WHERE id = id`) are not evaluated and stay scoped.
