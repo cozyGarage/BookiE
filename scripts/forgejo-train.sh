@@ -10,7 +10,7 @@ root="$(git rev-parse --show-toplevel)"
 work="$(mktemp -d)"
 trap 'git -C "$root" worktree remove --force "$work" 2>/dev/null || true' EXIT
 git -C "$root" fetch --quiet origin linux "$@"
-git -C "$root" worktree add --quiet --detach "$work" origin/linux
+git -C "$root" worktree add --quiet --detach "$work" "${FORGEJO_TRAIN_BASE:-origin/linux}"
 
 merged=()
 for branch in "$@"; do
