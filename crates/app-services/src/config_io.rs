@@ -87,7 +87,10 @@ mod tests {
         atomic_write_bytes(&path, b"first").unwrap();
         atomic_write_bytes(&path, b"second").unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), b"second");
-        let names: Vec<_> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name()).collect();
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
         assert_eq!(names, ["settings.json"]);
     }
 
