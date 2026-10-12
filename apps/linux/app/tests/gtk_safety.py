@@ -1811,7 +1811,7 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     assert database_ids(database_b) == [1, 2, 3, 901]
     assert database_ids(database) == [], "restored editor wrote to the other connection"
     invoke_named_action_within("safety_items", "Open safety_items")
-    wait_for_node_containing("Rows 1 – 3")
+    wait_for_node(name="Rows 1 – 4 of 4")
 
 
 restart_restores_active_editor_and_connection.environment = "local"
