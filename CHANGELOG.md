@@ -128,7 +128,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
-- PostgreSQL grid edits, inserts, key lookups and deletes now work for `inet`, `cidr`, `macaddr`, `interval`, `bit`, `varbit`, `xml` and `tsvector` values, which were sent as text and refused by the server, and for padded `char(n)` keys and `json` columns, which reported a false concurrent modification or could not be edited.
+- PostgreSQL grid edits, inserts, key lookups and deletes now work for `inet`, `cidr`, `macaddr`, `interval`, `bit` and `varbit` values, which were sent as text and refused by the server, and for padded `char(n)` keys and `json` columns, which reported a false concurrent modification or could not be edited. `xml` and `tsvector` values can be inserted, but editing them still fails because the old value reads back as undecodable (#694).
 - Opening a second table over a preview tab, dropping a table with open tabs and promoting a new structure tab now remove the old tab page instead of leaving it on screen without its controller, which aborted the app when clicked.
 - A query stopped by a timeout now says "Query exceeded the Ns query timeout." instead of claiming the timeout was configured in Preferences, which was wrong for a per-connection timeout.
 - Closing an editor tab no longer leaves it on screen stuck on "Rolling back and closing session…", including after choosing Save for a file tab; the stale tab used to abort the app when Split was clicked.
