@@ -2,7 +2,11 @@ use sqlparser::ast::{BinaryOperator, Expr, UnaryOperator, Value};
 
 pub(crate) fn is_constant_true(expr: &Expr) -> bool {
     match expr {
-        Expr::Value(value) => matches!(value.value, Value::Boolean(true)),
+        Expr::Value(value) => match &value.value {
+            Value::Boolean(true) => true,
+            Value::Number(number, _) => number.parse::<f64>().is_ok_and(|n| n != 0.0),
+            _ => false,
+        },
         Expr::Nested(inner) => is_constant_true(inner),
         Expr::UnaryOp {
             op: UnaryOperator::Not,
@@ -10,9 +14,15 @@ pub(crate) fn is_constant_true(expr: &Expr) -> bool {
         } => is_constant_false(expr),
         Expr::BinaryOp {
             left,
-            op: BinaryOperator::Eq,
+            op:
+                op @ (BinaryOperator::Eq
+                | BinaryOperator::NotEq
+                | BinaryOperator::Lt
+                | BinaryOperator::LtEq
+                | BinaryOperator::Gt
+                | BinaryOperator::GtEq),
             right,
-        } => same_literal(left, right),
+        } => compare_literals(left, op, right),
         Expr::BinaryOp {
             left,
             op: BinaryOperator::And,
@@ -39,15 +49,31 @@ fn is_constant_false(expr: &Expr) -> bool {
     }
 }
 
-fn same_literal(left: &Expr, right: &Expr) -> bool {
-    match (left, right) {
-        (Expr::Value(a), Expr::Value(b)) => match (&a.value, &b.value) {
-            (Value::Number(a, _), Value::Number(b, _)) => a == b,
-            (Value::SingleQuotedString(a), Value::SingleQuotedString(b)) => a == b,
-            _ => false,
+fn literal(expr: &Expr) -> Option<&Value> {
+    match expr {
+        Expr::Value(value) => Some(&value.value),
+        Expr::Nested(inner) => literal(inner),
+        _ => None,
+    }
+}
+
+fn compare_literals(left: &Expr, op: &BinaryOperator, right: &Expr) -> bool {
+    let ordering = match (literal(left), literal(right)) {
+        (Some(Value::Number(a, _)), Some(Value::Number(b, _))) => match (a.parse::<f64>(), b.parse::<f64>()) {
+            (Ok(a), Ok(b)) => a.partial_cmp(&b),
+            _ => None,
         },
-        (Expr::Nested(a), b) | (b, Expr::Nested(a)) => same_literal(a, b),
-        _ => false,
+        (Some(Value::SingleQuotedString(a)), Some(Value::SingleQuotedString(b))) => Some(a.cmp(b)),
+        _ => None,
+    };
+    let Some(ordering) = ordering else { return false };
+    match op {
+        BinaryOperator::Eq => ordering.is_eq(),
+        BinaryOperator::NotEq => ordering.is_ne(),
+        BinaryOperator::Lt => ordering.is_lt(),
+        BinaryOperator::LtEq => ordering.is_le(),
+        BinaryOperator::Gt => ordering.is_gt(),
+        _ => ordering.is_ge(),
     }
 }
 
@@ -69,6 +95,10 @@ mod tests {
             "DELETE FROM t WHERE id = 1 OR true",
             "DELETE FROM t WHERE NOT false",
             "DELETE FROM t WHERE true AND 1 = 1",
+            "DELETE FROM t WHERE 1 <> 2",
+            "DELETE FROM t WHERE 2 > 1",
+            "DELETE FROM t WHERE 'a' < 'b'",
+            "DELETE FROM t WHERE 1",
             "UPDATE t SET a = 1 WHERE true",
             "UPDATE t SET a = 1 WHERE 1=1",
         ] {
@@ -81,6 +111,8 @@ mod tests {
         for sql in [
             "DELETE FROM t WHERE id = 1",
             "DELETE FROM t WHERE 1 = 2",
+            "DELETE FROM t WHERE 0",
+            "DELETE FROM t WHERE 2 < 1",
             "DELETE FROM t WHERE false",
             "DELETE FROM t WHERE id = 1 AND true",
             "UPDATE t SET a = 1 WHERE id = 1",
