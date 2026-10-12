@@ -73,23 +73,29 @@ impl App {
         let structure =
             crate::services::structure_tracker::with_tab_ref(tab_id, |tracker| tracker.has_pending()).unwrap_or(false);
         let combined_dirty = data || structure || dirty;
-        let mut tabs = self.workspace_tabs.borrow_mut();
-        if combined_dirty && let Some(WorkspaceTab::Table(slot)) = tabs.get_mut(&tab_id) {
-            slot.preview = false;
-            slot.page.set_indicator_icon(None::<&gio::Icon>);
+        if combined_dirty {
+            let mut tabs = self.workspace_tabs.borrow_mut();
+            if let Some(WorkspaceTab::Table(slot)) = tabs.get_mut(&tab_id) {
+                slot.preview = false;
+                slot.page.set_indicator_icon(None::<&gio::Icon>);
+            }
         }
-        let Some(WorkspaceTab::Table(slot)) = tabs.get(&tab_id) else {
-            return;
+        let (page, title) = {
+            let tabs = self.workspace_tabs.borrow();
+            let Some(WorkspaceTab::Table(slot)) = tabs.get(&tab_id) else {
+                return;
+            };
+            let label =
+                super::workspace_tabs::qualified_browse_tab_label(schemas_count, slot.schema.as_deref(), &slot.table);
+            let title = if combined_dirty { format!("• {label}") } else { label };
+            (slot.page.clone(), title)
         };
-        let (page, schema, table) = (&slot.page, slot.schema.as_deref(), slot.table.as_str());
-        let label = super::workspace_tabs::qualified_browse_tab_label(schemas_count, schema, table);
-        let title = if combined_dirty { format!("• {label}") } else { label };
         page.set_title(&title);
         let is_selected = self
             .workspace_tab_view
             .as_ref()
             .and_then(|view| view.selected_page())
-            .map(|selected| &selected == page)
+            .map(|selected| selected == page)
             .unwrap_or(false);
         page.set_needs_attention(combined_dirty && !is_selected);
         self.refresh_window_title();
