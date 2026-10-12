@@ -490,16 +490,6 @@ impl BrowseTab {
     pub fn table(&self) -> &str {
         &self.table
     }
-
-    fn emit_fetch_page(&self, sender: &ComponentSender<Self>) {
-        self.page_requests.invalidate();
-        let _ = sender.output(BrowseTabOutput::FetchPage);
-    }
-
-    fn emit_fetch_page_and_count(&self, sender: &ComponentSender<Self>) {
-        self.emit_fetch_page(sender);
-        let _ = sender.output(BrowseTabOutput::FetchRowCount);
-    }
 }
 
 impl SimpleComponent for BrowseTab {
@@ -915,22 +905,9 @@ impl SimpleComponent for BrowseTab {
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
-        if self.save_in_flight.get()
-            && matches!(
-                msg,
-                BrowseTabInput::DuplicateRow { .. }
-                    | BrowseTabInput::InsertRow
-                    | BrowseTabInput::DeleteSelectedRow
-                    | BrowseTabInput::GridCellEdited { .. }
-                    | BrowseTabInput::GridSetCellNull { .. }
-                    | BrowseTabInput::GridDeleteRowAt { .. }
-            )
-        {
-            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
-                "Saving changes. Edit again when the save finishes."
-            )));
+        let Some(msg) = self.reject_while_saving(msg, &sender) else {
             return;
-        }
+        };
         match msg {
             BrowseTabInput::RowsLoaded {
                 request,

@@ -478,6 +478,39 @@ impl BrowseTab {
         );
     }
 
+    pub(super) fn emit_fetch_page(&self, sender: &ComponentSender<Self>) {
+        self.page_requests.invalidate();
+        let _ = sender.output(BrowseTabOutput::FetchPage);
+    }
+
+    pub(super) fn emit_fetch_page_and_count(&self, sender: &ComponentSender<Self>) {
+        self.emit_fetch_page(sender);
+        let _ = sender.output(BrowseTabOutput::FetchRowCount);
+    }
+
+    pub(super) fn reject_while_saving(
+        &self,
+        msg: BrowseTabInput,
+        sender: &ComponentSender<Self>,
+    ) -> Option<BrowseTabInput> {
+        let edits_tracker = matches!(
+            msg,
+            BrowseTabInput::DuplicateRow { .. }
+                | BrowseTabInput::InsertRow
+                | BrowseTabInput::DeleteSelectedRow
+                | BrowseTabInput::GridCellEdited { .. }
+                | BrowseTabInput::GridSetCellNull { .. }
+                | BrowseTabInput::GridDeleteRowAt { .. }
+        );
+        if !(self.save_in_flight.get() && edits_tracker) {
+            return Some(msg);
+        }
+        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+            "Saving changes. Edit again when the save finishes."
+        )));
+        None
+    }
+
     pub(super) fn handle_commit_save(&mut self, sender: ComponentSender<Self>) {
         if self.save_in_flight.get() {
             return;
