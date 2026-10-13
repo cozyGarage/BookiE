@@ -99,7 +99,8 @@ impl FactoryComponent for ConnectionRow {
                 connect_clicked => ConnectionRowMsg::ToggleFavorite,
             },
 
-            group_tags_button = &gtk::Button {
+            #[name = "group_tags_button"]
+            add_suffix = &gtk::Button {
                 set_icon_name: "view-list-bullet-symbolic",
                 set_valign: gtk::Align::Center,
                 set_tooltip_text: Some(crate::tr!("Group and tags").as_str()),
