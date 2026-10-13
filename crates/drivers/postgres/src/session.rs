@@ -92,7 +92,9 @@ impl tablepro_core::Session for PgSession {
         .await;
         self.connection = connection;
         if let Err(error) = result {
-            self.retire_cursor_session();
+            if !matches!(&error, DriverError::Query { sqlstate: Some(code), .. } if code == "25P01") {
+                self.retire_cursor_session();
+            }
             return Err(error);
         }
         let id = QueryCursorId::new();

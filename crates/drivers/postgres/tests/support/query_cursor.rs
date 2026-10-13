@@ -4,6 +4,45 @@ use tokio_util::sync::CancellationToken;
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn query_cursor_requires_an_open_transaction() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let mut session = connection.open_session().await.unwrap();
+    let result = session
+        .open_query_cursor_controlled("SELECT 1", &[], &no_timeout())
+        .await;
+
+    assert!(
+        matches!(&result, Err(DriverError::Query { sqlstate: Some(code), .. }) if code == "25P01"),
+        "{result:?}"
+    );
+    assert!(session.is_usable());
+    session
+        .query_params_controlled("BEGIN READ ONLY ISOLATION LEVEL REPEATABLE READ", &[], &no_timeout())
+        .await
+        .unwrap();
+    let cursor = session
+        .open_query_cursor_controlled("SELECT 1", &[], &no_timeout())
+        .await
+        .unwrap();
+    let page = session
+        .fetch_query_cursor_page_controlled(cursor, &no_timeout())
+        .await
+        .unwrap();
+    assert_eq!(page.result.rows.len(), 1);
+    session
+        .close_query_cursor_controlled(cursor, &no_timeout())
+        .await
+        .unwrap();
+    session
+        .query_params_controlled("ROLLBACK", &[], &no_timeout())
+        .await
+        .unwrap();
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn query_cursor_returns_ordered_pages_and_an_empty_final_page() {
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;
