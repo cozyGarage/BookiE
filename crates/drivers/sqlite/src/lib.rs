@@ -346,6 +346,7 @@ impl Connection for SqliteConnection {
                 .map(|c| c.try_get::<String, _>(2).unwrap_or_default())
                 .collect();
             out.push(IndexInfo {
+                constraint: None,
                 name,
                 columns,
                 unique: unique == 1,
@@ -360,6 +361,7 @@ impl Connection for SqliteConnection {
             let pk_cols = self.primary_key_columns(table).await?;
             if !pk_cols.is_empty() {
                 out.push(IndexInfo {
+                    constraint: None,
                     name: "PRIMARY".into(),
                     columns: pk_cols,
                     unique: true,
@@ -788,6 +790,7 @@ fn bind_sqlite_params<'q>(
             }
             Value::Float(f) => q.bind(*f),
             Value::Text(s) => q.bind(s.clone()),
+            Value::JsonText(s) => q.bind(s.clone()),
             Value::Bytes(b) => q.bind(b.clone()),
             Value::Date(d) => q.bind(*d),
             Value::Time(t) => q.bind(*t),
