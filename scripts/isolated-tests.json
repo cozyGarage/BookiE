@@ -180,6 +180,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::icons::tests::schema_filter_icon_exists_in_the_active_theme"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::explain_dialog::tests::explain_pages_have_available_icons_for_the_view_switcher"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::split_view::tests::split_editor_views_share_buffer_and_retain_text_across_toggles"
     ],
     [
