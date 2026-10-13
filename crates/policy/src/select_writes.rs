@@ -1,9 +1,14 @@
-use sqlparser::ast::{Select, SelectItem};
+use sqlparser::ast::{Select, SelectItem, TableFactor};
 
-use crate::classify::expr_writes;
+use crate::classify::{classify_query, expr_writes};
 
 pub(crate) fn select_writes(select: &Select) -> bool {
     select.into.is_some()
+        || select.from.iter().any(|t| {
+            std::iter::once(&t.relation)
+                .chain(t.joins.iter().map(|j| &j.relation))
+                .any(|factor| matches!(factor, TableFactor::Derived { subquery, .. } if classify_query(subquery).class.is_write()))
+        })
         || select.projection.iter().any(|item| match item {
             SelectItem::ExprWithAlias { expr, .. } | SelectItem::UnnamedExpr(expr) => expr_writes(expr),
             _ => false,
