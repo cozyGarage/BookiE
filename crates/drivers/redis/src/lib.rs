@@ -1133,6 +1133,20 @@ mod tests {
     }
 
     #[test]
+    fn scalar_replies_keep_their_native_type_and_column_type() {
+        let cases = [
+            (RedisValue::Int(7), "integer", Value::Int(7)),
+            (RedisValue::Double(1.5), "double", Value::Float(1.5)),
+            (RedisValue::Boolean(true), "boolean", Value::Bool(true)),
+        ];
+        for (reply, data_type, expected) in cases {
+            let result = redis_value_to_result(reply);
+            assert_eq!(result.columns[0].data_type, data_type);
+            assert_eq!(result.rows, vec![vec![expected]]);
+        }
+    }
+
+    #[test]
     fn redis_resp3_attribute_and_push_keep_their_protocol_markers() {
         let attribute = redis_scalar(RedisValue::Attribute {
             data: Box::new(RedisValue::SimpleString("payload".into())),
