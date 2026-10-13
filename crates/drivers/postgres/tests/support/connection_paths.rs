@@ -4,8 +4,6 @@ mod auth_errors;
 mod enum_labels;
 #[path = "filter_types.rs"]
 mod filter_types;
-#[path = "network_paths.rs"]
-mod network_paths;
 #[path = "float4_display.rs"]
 mod float4_display;
 #[path = "network_paths.rs"]
