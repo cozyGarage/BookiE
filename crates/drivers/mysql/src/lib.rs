@@ -342,6 +342,7 @@ impl Connection for MysqlConnection {
             let non_unique: i64 = r.try_get(1).unwrap_or(0);
             let column: String = r.get(2);
             let entry = by_name.entry(name.clone()).or_insert_with(|| IndexInfo {
+                constraint: None,
                 name: name.clone(),
                 columns: Vec::new(),
                 unique: non_unique == 0,
@@ -816,6 +817,7 @@ fn bind_mysql_params<'q>(
             Value::Int(i) => q.bind(*i),
             Value::Float(f) => q.bind(*f),
             Value::Text(s) => q.bind(s.clone()),
+            Value::JsonText(s) => q.bind(s.clone()),
             Value::Bytes(b) => q.bind(b.clone()),
             Value::Date(d) => q.bind(*d),
             Value::Time(t) => q.bind(*t),
