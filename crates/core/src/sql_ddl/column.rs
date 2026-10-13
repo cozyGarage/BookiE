@@ -198,22 +198,10 @@ fn alter_column_postgres(
         stmts.push(format!("ALTER TABLE {} ALTER COLUMN {} {}", qualified, name, action));
     }
     if changed.default_value || reapply_default {
-        match validated_default(column.default_value.as_deref())? {
-            Some(default) => {
-                let value = if changed.default_value {
-                    default.to_string()
-                } else {
-                    format!("({default})::{}", column.data_type)
-                };
-                stmts.push(format!(
-                    "ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {}",
-                    qualified, name, value
-                ));
-            }
-            None if !reapply_default => {
-                stmts.push(format!("ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT", qualified, name));
-            }
-            None => {}
+        if let Some(statement) =
+            postgres_default_statement(qualified, name, column, changed.default_value, reapply_default)?
+        {
+            stmts.push(statement);
         }
     }
     if comment_changed(column)
@@ -225,6 +213,33 @@ fn alter_column_postgres(
         return Err(BuildDdlError::NoChange);
     }
     Ok(stmts)
+}
+
+fn postgres_default_statement(
+    qualified: &str,
+    name: &str,
+    column: &DraftColumn,
+    default_changed: bool,
+    reapply_default: bool,
+) -> Result<Option<String>, BuildDdlError> {
+    match validated_default(column.default_value.as_deref())? {
+        Some(default) => {
+            let value = if default_changed {
+                default.to_string()
+            } else {
+                format!("({default})::{}", column.data_type)
+            };
+            Ok(Some(format!(
+                "ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {}",
+                qualified, name, value
+            )))
+        }
+        None if !reapply_default => Ok(Some(format!(
+            "ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT",
+            qualified, name
+        ))),
+        None => Ok(None),
+    }
 }
 
 fn alter_column_mssql(
