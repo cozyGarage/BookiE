@@ -256,11 +256,11 @@ impl SimpleComponent for SqlEditor {
         adw::ToolbarView {
             add_top_bar = &gtk::Box {
                 set_orientation: gtk::Orientation::Horizontal,
-                set_spacing: 4,
+                set_spacing: 8,
                 set_margin_top: 8,
                 set_margin_bottom: 8,
-                set_margin_start: 4,
-                set_margin_end: 4,
+                set_margin_start: 8,
+                set_margin_end: 8,
 
                 gtk::Box {
                     set_hexpand: true,
