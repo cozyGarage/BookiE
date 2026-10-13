@@ -132,6 +132,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Fixed
 - Explain view tabs and the schema filter button now use icons available in Adwaita and Yaru themes.
+- The docked query history panel rebuilds each time it opens, so its connection filter lists connections added, renamed or deleted since it was last shown.
 - PostgreSQL browse pages for tables without a primary key now use the row locator as a stable ordering tie-breaker, preventing duplicates and gaps between static pages.
 - Filtering a PostgreSQL column of type `time`, `timetz`, `interval`, `inet`, `bit`, a range, an enum whose name contains a type word such as `update_kind`, or a domain now builds a valid filter instead of misreading the value or comparing it as text.
 - PostgreSQL grid edits, inserts, key lookups and deletes now work for `inet`, `cidr`, `macaddr`, `interval`, `bit`, `varbit`, `xml` and `tsvector` values, which were sent as text and refused by the server, and for padded `char(n)` keys and `json` columns, which reported a false concurrent modification or could not be edited.
