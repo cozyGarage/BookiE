@@ -6,6 +6,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Added
 - Switching database drivers keeps custom connection values and updates fields that still use the previous driver's defaults.
+- SQL editors can collapse multiline SQL blocks at the cursor and unfold them from the gutter or toolbar.
 - Pressing Enter in a connection text field now activates Connect.
 - SQL query and pinned result grids can filter loaded rows by a cell's native value without running the SQL again; the grid shows the visible and loaded counts.
 - View Value shows pending grid edits, including long text and NULL, before they are saved.
@@ -76,6 +77,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - PostgreSQL `citext[]` preserves exact elements, SQL NULL, empty arrays, multidimensional shape, zero lower bounds and case-insensitive comparisons through results, typed parameters, keyed grid edits and CSV round-trips; malformed values are refused without changing target or sibling rows.
 - PostgreSQL custom enum arrays preserve three-dimensional shape and the six-dimensional limit, non-default bounds, SQL NULL, empty and escaped labels through result decoding and typed parameter rebinding, with native type, JSON and wire-byte comparisons.
 - The result grid's cell menu also opens with Shift+F10, and the editor find fields have accessible names.
+- Sidebar table search and saved-filter naming fields have accessible names, and connection colours can be chosen with an accessible button and palette.
 - Result grids have a Columns… menu entry to hide and show columns; the choice is remembered per table and at least one column always stays visible.
 - Table browse refreshes omit hidden non-key columns while retaining keys; full-row copy and current-page export refuse incomplete rows.
 - PostgreSQL `pg_lsn[]` preserves all 64 LSN bits and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
@@ -133,6 +135,8 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- Connection colour tags now paint the workspace tab bar and update when the tag changes.
+- Screen readers can activate the connection form's Driver, Endpoint and TLS selectors and identify its port and timeout inputs.
 - The docked query history panel rebuilds each time it opens, so its connection filter lists connections added, renamed or deleted since it was last shown.
 - PostgreSQL browse pages for tables without a primary key now use the row locator as a stable ordering tie-breaker, preventing duplicates and gaps between static pages.
 - Filtering a PostgreSQL column of type `time`, `timetz`, `interval`, `inet`, `bit`, a range, an enum whose name contains a type word such as `update_kind`, or a domain now builds a valid filter instead of misreading the value or comparing it as text.
