@@ -127,7 +127,9 @@ jobs:
           fi
           status=0
           cargo mutants "${args[@]}" -- --lib || status=$?
-          python3 scripts/check-mutants-baseline.py "${{ matrix.label }}" "/tmp/mutants-${{ matrix.label }}" "$status"
+          partial=()
+          [ "${{ matrix.shard }}" = 0/1 ] || partial=(--partial)
+          python3 scripts/check-mutants-baseline.py "${{ matrix.package }}" "/tmp/mutants-${{ matrix.label }}" "$status" "${partial[@]}"
 
   gtk-soak:
     runs-on: debian-host
