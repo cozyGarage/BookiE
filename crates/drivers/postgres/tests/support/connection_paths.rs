@@ -1,7 +1,11 @@
 #[path = "auth_errors.rs"]
 mod auth_errors;
+#[path = "drop_constraint_index.rs"]
+mod drop_constraint_index;
 #[path = "enum_labels.rs"]
 mod enum_labels;
+#[path = "filter_types.rs"]
+mod filter_types;
 #[path = "float4_display.rs"]
 mod float4_display;
 #[path = "network_paths.rs"]
@@ -10,6 +14,8 @@ mod network_paths;
 mod null_binding;
 #[path = "stale_plan.rs"]
 mod stale_plan;
+#[path = "type_change_default.rs"]
+mod type_change_default;
 #[path = "typed_text_writes.rs"]
 mod typed_text_writes;
 #[path = "xml_oid_values.rs"]
