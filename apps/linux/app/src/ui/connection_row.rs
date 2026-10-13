@@ -100,7 +100,7 @@ impl FactoryComponent for ConnectionRow {
                 connect_clicked => ConnectionRowMsg::ToggleFavorite,
             },
 
-            add_suffix = &self.group_tags_button,
+            add_suffix = &self.group_tags_button.clone(),
 
             add_suffix = &gtk::Button {
                 set_icon_name: "document-edit-symbolic",
