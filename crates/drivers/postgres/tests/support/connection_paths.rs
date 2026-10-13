@@ -10,6 +10,8 @@ mod network_paths;
 mod null_binding;
 #[path = "stale_plan.rs"]
 mod stale_plan;
+#[path = "touched_insert.rs"]
+mod touched_insert;
 #[path = "typed_text_writes.rs"]
 mod typed_text_writes;
 #[path = "xml_oid_values.rs"]
