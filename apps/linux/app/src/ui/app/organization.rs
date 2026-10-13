@@ -1,3 +1,6 @@
+use std::cell::Cell;
+use std::rc::Rc;
+
 use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender, adw, gtk};
 
@@ -32,25 +35,11 @@ impl App {
     }
 
     pub(super) fn apply_connection_strip(&self) {
-        let Some(tab_bar) = self
-            .workspace_tab_view
-            .as_ref()
-            .and_then(|view| view.parent())
-            .and_then(|parent| parent.first_child())
-        else {
+        let Some(tab_bar) = self.workspace_tab_bar.as_ref() else {
             return;
         };
-        for class in tablepro_storage::CONNECTION_STRIP_CLASSES {
-            tab_bar.remove_css_class(class);
-        }
         let color = self.connection_id.map(|id| self.connection_organization.get(id).color);
-        if let Some(class) = color
-            .flatten()
-            .as_deref()
-            .and_then(tablepro_storage::connection_strip_class)
-        {
-            tab_bar.add_css_class(class);
-        }
+        apply_connection_strip_to_tab_bar(tab_bar, color.flatten().as_deref());
     }
 
     fn publish_connection_organization(&self) {
@@ -96,13 +85,7 @@ impl App {
             .build();
         tags_row.set_text(&current.tags.join(", "));
 
-        let color_labels: Vec<String> = color_choice_labels();
-        let color_refs: Vec<&str> = color_labels.iter().map(String::as_str).collect();
-        let color_row = adw::ComboRow::builder()
-            .title(crate::tr!("Colour"))
-            .model(&gtk::StringList::new(&color_refs))
-            .build();
-        color_row.set_selected(color_choice_index(current.color.as_deref()));
+        let (color_row, selected_color) = color_chooser(color_choice_index(current.color.as_deref()));
 
         let list = gtk::ListBox::builder()
             .selection_mode(gtk::SelectionMode::None)
@@ -127,7 +110,7 @@ impl App {
                 return;
             }
             let tags = split_tags(&tags_row.text());
-            let color = color_for_choice(color_row.selected());
+            let color = color_for_choice(selected_color.get());
             match ConnectionOrganization::new(Some(&group_row.text()), &tags, favorite)
                 .map(|organization| organization.with_color(color))
             {
@@ -233,10 +216,81 @@ impl App {
     }
 }
 
+fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {
+    let labels = color_choice_labels();
+    let selected = Rc::new(Cell::new(initial));
+    let current_label = labels
+        .get(initial as usize)
+        .map_or_else(|| labels[0].clone(), Clone::clone);
+    let button = gtk::Button::with_label(&current_label);
+    button.update_property(&[gtk::accessible::Property::Label(&current_label)]);
+    let popover = gtk::Popover::new();
+    let choices = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(4)
+        .margin_top(6)
+        .margin_bottom(6)
+        .margin_start(6)
+        .margin_end(6)
+        .build();
+    for (index, label) in labels.iter().enumerate() {
+        append_color_choice(&choices, &popover, &button, &selected, index as u32, label);
+    }
+    popover.set_child(Some(&choices));
+    popover.set_parent(&button);
+    let popover_ref = popover.downgrade();
+    button.connect_clicked(move |_| {
+        if let Some(popover) = popover_ref.upgrade() {
+            popover.popup();
+        }
+    });
+
+    let row = adw::ActionRow::builder().title(crate::tr!("Colour")).build();
+    row.add_suffix(&button);
+    (row, selected)
+}
+
+fn append_color_choice(
+    choices: &gtk::Box,
+    popover: &gtk::Popover,
+    button: &gtk::Button,
+    selected: &Rc<Cell<u32>>,
+    index: u32,
+    label: &str,
+) {
+    let choice = gtk::Button::with_label(label);
+    choice.update_property(&[gtk::accessible::Property::Label(label)]);
+    choice.set_halign(gtk::Align::Fill);
+    let selected = Rc::clone(selected);
+    let button_ref = button.downgrade();
+    let popover_ref = popover.downgrade();
+    let label = label.to_owned();
+    choice.connect_clicked(move |_| {
+        selected.set(index);
+        if let Some(button) = button_ref.upgrade() {
+            button.set_label(&label);
+            button.update_property(&[gtk::accessible::Property::Label(&label)]);
+        }
+        if let Some(popover) = popover_ref.upgrade() {
+            popover.popdown();
+        }
+    });
+    choices.append(&choice);
+}
+
 enum OrganizationMutation {
     ToggleFavorite(Uuid),
     Set(Uuid, ConnectionOrganization),
     RetainKnown,
+}
+
+fn apply_connection_strip_to_tab_bar(tab_bar: &adw::TabBar, color: Option<&str>) {
+    for class in tablepro_storage::CONNECTION_STRIP_CLASSES {
+        tab_bar.remove_css_class(class);
+    }
+    if let Some(class) = color.and_then(tablepro_storage::connection_strip_class) {
+        tab_bar.add_css_class(class);
+    }
 }
 
 fn persist_connection_organization(mutation: OrganizationMutation, sender: ComponentSender<App>) {
@@ -320,6 +374,30 @@ fn split_tags(raw: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn changing_a_connection_colour_updates_the_retained_tab_bar() {
+        gtk::init().unwrap();
+        let view = adw::TabView::new();
+        let tab_bar = adw::TabBar::builder().view(&view).build();
+        let inner = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        inner.append(&gtk::Label::new(Some("Toolbar")));
+        inner.append(&tab_bar);
+        inner.append(&view);
+        let _overview = adw::TabOverview::builder().view(&view).child(&inner).build();
+
+        apply_connection_strip_to_tab_bar(&tab_bar, Some("red"));
+        assert!(tab_bar.has_css_class("tp-strip-red"));
+        assert!(!inner.first_child().unwrap().has_css_class("tp-strip-red"));
+
+        apply_connection_strip_to_tab_bar(&tab_bar, Some("teal"));
+        assert!(tab_bar.has_css_class("tp-strip-teal"));
+        assert!(!tab_bar.has_css_class("tp-strip-red"));
+
+        apply_connection_strip_to_tab_bar(&tab_bar, None);
+        assert!(!tab_bar.has_css_class("tp-strip-teal"));
+    }
 
     #[test]
     fn the_colour_picker_round_trips_every_palette_entry() {
