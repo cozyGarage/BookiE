@@ -143,3 +143,17 @@ fn a_postgres_type_change_that_also_edits_the_default_uses_the_edited_default() 
         ]
     );
 }
+
+#[test]
+fn a_postgres_primary_key_or_identity_toggle_on_an_existing_column_is_refused_not_ignored() {
+    let mut key = loaded(None);
+    key.primary_key = true;
+    let mut identity = loaded(None);
+    identity.auto_increment = true;
+    for column in [key, identity] {
+        assert!(matches!(
+            build_alter_column("postgres", None, "t", &column),
+            Err(super::BuildDdlError::PostgresNotSupported(_))
+        ));
+    }
+}
