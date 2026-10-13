@@ -213,7 +213,9 @@ fn function_prefix_is_system_scoped(tokens: &[Token], index: usize) -> bool {
     }
     matches!(
         previous.next(),
-        Some(Token::Word(schema)) if schema.value.eq_ignore_ascii_case("pg_catalog")
+        Some(Token::Word(schema))
+            if schema.value == "pg_catalog"
+                || (schema.quote_style.is_none() && schema.value.eq_ignore_ascii_case("pg_catalog"))
     )
 }
 

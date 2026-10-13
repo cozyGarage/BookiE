@@ -50,6 +50,7 @@ fn dynamic_sql_and_side_effect_functions_are_administrative() {
         "SELECT pg_ls_logicalsnapdir()",
         "SELECT pg_ls_replslotdir('x')",
         "SELECT pg_catalog.pg_ls_future_builtin()",
+        "SELECT PG_CATALOG.pg_ls_future_builtin()",
         "SELECT pg_ls_future_builtin()",
         "SELECT * FROM crosstab('select 1, 2')",
         "SELECT * FROM public.crosstab('select 1, 2')",
@@ -80,6 +81,7 @@ fn schema_qualified_user_functions_with_admin_prefixes_stay_reads() {
         "SELECT reporting.pg_replication_status()",
         "SELECT app.pg_stat_reset_report()",
         "SELECT app.crosstab_report()",
+        "SELECT \"PG_CATALOG\".pg_ls_customer_data()",
     ] {
         assert_eq!(class(sql), StatementClass::Select, "{sql}");
     }
