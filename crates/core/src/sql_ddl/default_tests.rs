@@ -127,3 +127,17 @@ fn another_engine_drops_the_index_by_name_even_when_a_constraint_is_recorded() {
         vec!["ALTER TABLE `t` DROP INDEX `t_email_key`"]
     );
 }
+
+#[test]
+fn a_postgres_primary_key_or_identity_toggle_on_an_existing_column_is_refused_not_ignored() {
+    let mut key = loaded(None);
+    key.primary_key = true;
+    let mut identity = loaded(None);
+    identity.auto_increment = true;
+    for column in [key, identity] {
+        assert!(matches!(
+            build_alter_column("postgres", None, "t", &column),
+            Err(super::BuildDdlError::PostgresNotSupported(_))
+        ));
+    }
+}
