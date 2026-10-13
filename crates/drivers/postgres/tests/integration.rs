@@ -23,6 +23,8 @@ mod shared_container;
 
 #[path = "support/connection_paths.rs"]
 mod connection_paths;
+#[path = "support/null_binding.rs"]
+mod null_binding;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
 
