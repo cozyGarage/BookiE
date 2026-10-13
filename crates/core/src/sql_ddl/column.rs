@@ -199,7 +199,7 @@ fn alter_column_postgres(
     }
     if changed.default_value || reapply_default {
         if let Some(statement) =
-            postgres_default_statement(qualified, name, column, changed.default_value, reapply_default)?
+            postgres_default_statement(&qualified, &name, column, changed.default_value, reapply_default)?
         {
             stmts.push(statement);
         }
