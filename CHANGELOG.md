@@ -7,6 +7,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Added
 - Switching database drivers keeps custom connection values and updates fields that still use the previous driver's defaults.
 - SQL query and pinned result grids can filter loaded rows by a cell's native value without running the SQL again; the grid shows the visible and loaded counts.
+- View Value shows pending grid edits, including long text and NULL, before they are saved.
 - SQL result filters and sorting stay in place when the same statement is rerun or its result is pinned or unpinned, and selected rows stay attached to the same materialized result.
 - Plain-clicking a table opens a temporary preview tab that the next table click can replace; preview tabs are not restored after restart, while editing or choosing **Keep Tab** makes one persistent.
 - PostgreSQL and SQLite query plans open in a Tree tab of the Explain dialog.
@@ -112,6 +113,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- The Keyboard Shortcuts window splits table browsing into shorter groups, describes mouse selection gestures separately and combines repeated context-sensitive save, undo and cancel actions.
 - About, Arch package, Flatpak, and translation metadata link to the BookiE repository.
 - Full-table export is refused before a destination file is chosen when a verified read snapshot is not available; current-page and loaded query-result exports remain available.
 - Redis in this development line stays a single host/port endpoint; Sentinel and Cluster topologies stay deferred.
@@ -130,6 +132,9 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- PostgreSQL browse pages for tables without a primary key now use the row locator as a stable ordering tie-breaker, preventing duplicates and gaps between static pages.
+- Filtering a PostgreSQL column of type `time`, `timetz`, `interval`, `inet`, `bit`, a range, an enum whose name contains a type word such as `update_kind`, or a domain now builds a valid filter instead of misreading the value or comparing it as text.
+- PostgreSQL grid edits, inserts, key lookups and deletes now work for `inet`, `cidr`, `macaddr`, `interval`, `bit`, `varbit`, `xml` and `tsvector` values, which were sent as text and refused by the server, and for padded `char(n)` keys and `json` columns, which reported a false concurrent modification or could not be edited.
 - CSV import into PostgreSQL reads enum and domain columns, bit strings and ranges as text, so an enum named like `maintenance_status` or a `bit(3)` value no longer fails as "not a whole number".
 - Create table from CSV keeps zip codes, phone numbers and other identifiers with a leading zero or plus as text instead of turning `01234` into `1234`.
 - Identifier quoting keeps control characters in a name instead of removing them, so a statement can no longer target a different table than the one named.
@@ -157,6 +162,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - The window opens without waiting for old query history to be pruned at startup
 - Undoing or redoing one of several edits to the same cell keeps the earlier edit pending against the value stored in the database, so saving no longer drops it or reports a changed row
 - A table's column and foreign key lists from a superseded refresh are no longer applied after a newer refresh started
+- Returning to a table after a Structure rename refreshes its browse columns before fetching rows, so exports use the current column names.
 - Saving the window layout no longer waits for a slow disk read at startup, so the window stays responsive while saved tabs load
 - Pressing Cancel while a connection is finishing no longer opens that connection anyway
 - Refreshing, closing or pressing Kill twice in the activity dialog no longer cancels a Kill that is already running, so its result is always shown
