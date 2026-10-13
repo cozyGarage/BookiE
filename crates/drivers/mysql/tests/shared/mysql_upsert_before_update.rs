@@ -40,31 +40,15 @@ async fn assert_before_update_effect_survives_later_batch_rollback(conn: Box<dyn
         ),
         ("INSERT INTO missing_before_update_upsert VALUES (1)".into(), vec![]),
     ];
-    let error = conn
-        .execute_in_transaction(&batch)
-        .await
-        .expect_err("the later insert must fail after the upsert trigger runs");
-    assert!(
-        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
-        "the second statement must be reported as the failure, got {error:?}"
-    );
-
-    assert_eq!(
-        conn.query("SELECT id, value FROM before_update_upsert_parent")
-            .await
-            .unwrap()
-            .rows,
+    crate::mysql_atomic_assertions::assert_failed_batch_preserves_rows(
+        conn.as_ref(),
+        &batch,
+        "SELECT id, value FROM before_update_upsert_parent",
         vec![vec![Value::Int(1), Value::Int(10)]],
-        "the InnoDB duplicate-key update is rolled back"
-    );
-    assert_eq!(
-        conn.query("SELECT id, old_value, new_value FROM before_update_upsert_myisam_effect")
-            .await
-            .unwrap()
-            .rows,
+        "SELECT id, old_value, new_value FROM before_update_upsert_myisam_effect",
         vec![vec![Value::Int(1), Value::Int(10), Value::Int(11)]],
-        "the MyISAM BEFORE UPDATE trigger effect survives rollback exactly once"
-    );
+    )
+    .await;
 }
 
 async fn create_before_update_trigger(opts: &ConnectOptions) -> Result<(), sqlx::Error> {
