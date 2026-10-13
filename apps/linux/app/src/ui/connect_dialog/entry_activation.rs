@@ -23,6 +23,7 @@ mod tests {
     use std::rc::Rc;
 
     #[test]
+    #[ignore = "requires an isolated GTK display"]
     fn activating_a_nested_entry_row_invokes_submit() {
         relm4::adw::init().unwrap();
         let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
