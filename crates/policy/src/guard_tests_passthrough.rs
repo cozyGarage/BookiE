@@ -133,8 +133,15 @@ impl Connection for CatalogConn {
 }
 
 fn catalog_guard(fail: bool) -> (PolicyGuard, Arc<AtomicUsize>, Arc<SequenceAuditSink>) {
+    catalog_guard_with(fail, vec![])
+}
+
+fn catalog_guard_with(
+    fail: bool,
+    audit_failures: Vec<AuditRecordPhase>,
+) -> (PolicyGuard, Arc<AtomicUsize>, Arc<SequenceAuditSink>) {
     let calls = Arc::new(AtomicUsize::new(0));
-    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let audit = Arc::new(SequenceAuditSink::new(audit_failures));
     let guard = PolicyGuard::new(
         Arc::new(CatalogConn {
             calls: calls.clone(),
@@ -375,4 +382,56 @@ async fn closing_the_guard_closes_the_connection_and_the_session_is_not_offered_
     guard.ping().await.unwrap();
     assert!(matches!(guard.open_session().await, Err(DriverError::Unsupported(_))));
     Box::new(guard).close().await.unwrap();
+}
+
+#[tokio::test]
+async fn a_controlled_write_that_returns_rows_is_governed_like_a_plain_one() {
+    let (guard, calls, audit) = catalog_guard(false);
+    let control = control();
+    let one = Value::Int(1);
+    guard
+        .query_controlled("INSERT INTO t VALUES (1) RETURNING id", &control)
+        .await
+        .unwrap();
+    guard
+        .query_params_controlled(
+            "INSERT INTO t VALUES ($1) RETURNING id",
+            std::slice::from_ref(&one),
+            &control,
+        )
+        .await
+        .unwrap();
+    guard
+        .query_result_sets_controlled("INSERT INTO t VALUES (1) RETURNING id", &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    let mutations = audit
+        .events
+        .lock()
+        .expect("events")
+        .iter()
+        .filter(|event| {
+            event.phase == AuditRecordPhase::Intent && event.operation_class == AuditOperationClass::Mutation
+        })
+        .count();
+    assert_eq!(mutations, 3);
+}
+
+#[tokio::test]
+async fn a_rollback_is_denied_when_its_audit_intent_cannot_be_written() {
+    for controlled in [false, true] {
+        let (guard, calls, _audit) = catalog_guard_with(false, vec![AuditRecordPhase::Intent]);
+        let tx = guard.begin().await.unwrap();
+        let outcome = if controlled {
+            tx.rollback_controlled(&control()).await
+        } else {
+            tx.rollback().await
+        };
+        assert!(
+            matches!(&outcome, Err(DriverError::PolicyDenied(message)) if message.contains("audit intent")),
+            "controlled={controlled}: {outcome:?}"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 0, "the rollback never reached the driver");
+    }
 }
