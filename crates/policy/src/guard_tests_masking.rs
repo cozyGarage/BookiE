@@ -3,8 +3,6 @@ use crate::approval::AutoApproveSink;
 
 const SECRET: &str = "duplicate key value (card 4111111111111111)";
 
-struct FailingConn(fn() -> DriverError);
-
 fn leak() -> DriverError {
     DriverError::Query {
         message: SECRET.into(),
@@ -13,48 +11,9 @@ fn leak() -> DriverError {
     }
 }
 
-#[async_trait]
-impl Connection for FailingConn {
-    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        Ok(vec![])
-    }
-
-    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        Ok(vec![])
-    }
-
-    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
-        Ok(empty_result())
-    }
-
-    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
-        Err((self.0)())
-    }
-
-    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
-        Err((self.0)())
-    }
-
-    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
-        Err((self.0)())
-    }
-
-    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        Err((self.0)())
-    }
-
-    async fn ping(&self) -> Result<(), DriverError> {
-        Ok(())
-    }
-
-    async fn close(self: Box<Self>) -> Result<(), DriverError> {
-        Ok(())
-    }
-}
-
 fn guard_for(principal: Principal, failure: fn() -> DriverError) -> PolicyGuard {
     PolicyGuard::new(
-        Arc::new(FailingConn(failure)),
+        Arc::new(ErrorConn(failure)),
         context(
             principal,
             Environment::Local,
