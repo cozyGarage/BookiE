@@ -129,6 +129,11 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- After a table changes (for example a column is added from the Structure tab or another client), `SELECT *` on PostgreSQL shows the new column instead of failing with "cached plan must not change result type" on every refresh.
+- PostgreSQL grid edits, inserts, key lookups and deletes now work for `inet`, `cidr`, `macaddr`, `interval`, `bit` and `varbit` values, which were sent as text and refused by the server, and for padded `char(n)` keys and `json` columns, which reported a false concurrent modification or could not be edited. `xml` and `tsvector` values can be inserted, but editing them still fails because the old value reads back as undecodable (#694).
+- PostgreSQL `EXPLAIN (ANALYSE)` of a write is classified and gated like the write instead of as a read.
+- The `query_to_xml` family, `crosstab`, `pg_notify`, `pg_logical_*`, `pg_replication_*`, `pg_stat_reset*`, `pg_ls_*` and more large-object functions are administrative, so agents are denied and read-only connections refuse them.
+- A constant-true predicate (`WHERE true`, `WHERE 1`, `WHERE 1=1`, `WHERE 2 > 1`, `WHERE id = 1 OR true`) counts as unscoped DML. Predicates that depend on a column (`WHERE id = id`) are not evaluated and stay scoped.
 - Grid headers and Go to Referenced Row now pick up foreign keys that arrive after the first draw; before, the redraw reused the old headers and menu.
 - Go to Referenced Row on a column that belongs to several foreign keys offers the usable ones even when another key has a NULL value.
 - Picking a PostgreSQL enum label no longer fails when the enum's type name looks like a built-in type such as `date_format` or `timestamp_source`.
