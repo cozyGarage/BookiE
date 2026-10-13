@@ -140,44 +140,89 @@ async fn mariadb_failed_batch_federated_trigger_effect_survives_rollback() {
 }
 
 async fn assert_federated_trigger_effect_survives_rollback(conn: &dyn Connection, opts: &ConnectOptions) {
-    conn.execute("CREATE TABLE federated_remote_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
-        .await
-        .unwrap();
-    conn.execute(
-        "CREATE TABLE federated_trigger_target (id INT PRIMARY KEY) ENGINE=FEDERATED \
-         CONNECTION='mysql://root:tablepro_test@127.0.0.1:3306/test/federated_remote_effects'",
-    )
-    .await
-    .unwrap();
-    conn.execute("CREATE TABLE federated_trigger_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
-        .await
-        .unwrap();
-    conn.execute("INSERT INTO federated_trigger_parent VALUES (1)")
-        .await
-        .unwrap();
-    create_federated_trigger(opts).await;
-    let batch = vec![
-        ("INSERT INTO federated_trigger_parent VALUES (2)".into(), vec![]),
-        ("INSERT INTO federated_trigger_parent VALUES (1)".into(), vec![]),
+    let cases = [
+        (
+            "CREATE TRIGGER federated_parent_after_insert AFTER INSERT ON federated_trigger_parent \
+             FOR EACH ROW INSERT INTO federated_trigger_target VALUES (NEW.id)",
+            "INSERT INTO federated_trigger_parent VALUES (3)",
+            "INSERT INTO federated_trigger_parent VALUES (1)",
+            "INSERT INTO federated_trigger_parent VALUES (1)",
+            vec![],
+            vec![vec![Value::Int(1)]],
+            vec![3],
+        ),
+        (
+            "CREATE TRIGGER federated_parent_after_update AFTER UPDATE ON federated_trigger_parent \
+             FOR EACH ROW UPDATE federated_trigger_target SET id = NEW.id WHERE id = OLD.id",
+            "UPDATE federated_trigger_parent SET id = 3 WHERE id = 1",
+            "INSERT INTO federated_trigger_parent VALUES (3)",
+            "INSERT INTO federated_trigger_parent VALUES (1), (2)",
+            vec![1],
+            vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+            vec![3],
+        ),
+        (
+            "CREATE TRIGGER federated_parent_after_delete AFTER DELETE ON federated_trigger_parent \
+             FOR EACH ROW DELETE FROM federated_trigger_target WHERE id = OLD.id",
+            "DELETE FROM federated_trigger_parent WHERE id = 1",
+            "INSERT INTO federated_trigger_parent VALUES (2)",
+            "INSERT INTO federated_trigger_parent VALUES (1), (2)",
+            vec![1],
+            vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+            vec![],
+        ),
     ];
-    let error = conn.execute_in_transaction(&batch).await.unwrap_err();
-    assert!(
-        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
-        "the duplicate parent must fail statement 2, got {error:?}"
-    );
-    assert_eq!(
-        conn.query("SELECT id FROM federated_trigger_parent ORDER BY id")
+    for (trigger, statement, failing_statement, parent_rows, initial_remote, expected_parent, expected_remote) in cases
+    {
+        conn.execute("DROP TABLE IF EXISTS federated_trigger_target")
             .await
-            .unwrap()
-            .rows,
-        vec![vec![Value::Int(1)]],
-        "the transactional parent insert rolls back"
-    );
-    assert_eq!(
-        remote_federated_rows(opts).await,
-        vec![2],
-        "the trigger's remote FEDERATED write survives local rollback"
-    );
+            .unwrap();
+        conn.execute("DROP TABLE IF EXISTS federated_trigger_parent")
+            .await
+            .unwrap();
+        conn.execute("DROP TABLE IF EXISTS federated_remote_effects")
+            .await
+            .unwrap();
+        conn.execute("CREATE TABLE federated_remote_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
+            .await
+            .unwrap();
+        for id in &initial_remote {
+            conn.execute(&format!("INSERT INTO federated_remote_effects VALUES ({id})"))
+                .await
+                .unwrap();
+        }
+        assert_eq!(remote_federated_rows(opts).await, initial_remote);
+        conn.execute(
+            "CREATE TABLE federated_trigger_target (id INT PRIMARY KEY) ENGINE=FEDERATED \
+             CONNECTION='mysql://root:tablepro_test@127.0.0.1:3306/test/federated_remote_effects'",
+        )
+        .await
+        .unwrap();
+        conn.execute("CREATE TABLE federated_trigger_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
+            .await
+            .unwrap();
+        conn.execute(parent_rows).await.unwrap();
+        create_federated_trigger(opts, trigger).await;
+        let batch = vec![(statement.into(), vec![]), (failing_statement.into(), vec![])];
+        let error = conn.execute_in_transaction(&batch).await.unwrap_err();
+        assert!(
+            matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+            "the second statement must fail after trigger {trigger:?}, got {error:?}"
+        );
+        assert_eq!(
+            conn.query("SELECT id FROM federated_trigger_parent ORDER BY id")
+                .await
+                .unwrap()
+                .rows,
+            expected_parent,
+            "the parent table rolls back after trigger {trigger:?}"
+        );
+        assert_eq!(
+            remote_federated_rows(opts).await,
+            expected_remote,
+            "the remote FEDERATED trigger effect remains after {trigger:?}"
+        );
+    }
 }
 
 async fn start_mariadb_with_federated() -> (testcontainers::ContainerAsync<GenericImage>, ConnectOptions) {
@@ -225,7 +270,7 @@ async fn start_mysql_with_federated() -> (testcontainers::ContainerAsync<Mysql>,
     (container, opts)
 }
 
-async fn create_federated_trigger(opts: &ConnectOptions) {
+async fn create_federated_trigger(opts: &ConnectOptions, trigger: &'static str) {
     let mut setup = sqlx::MySqlConnection::connect_with(
         &sqlx::mysql::MySqlConnectOptions::new()
             .host(&opts.host)
@@ -236,13 +281,7 @@ async fn create_federated_trigger(opts: &ConnectOptions) {
     )
     .await
     .unwrap();
-    sqlx::raw_sql(
-        "CREATE TRIGGER federated_parent_after_insert AFTER INSERT ON federated_trigger_parent \
-         FOR EACH ROW INSERT INTO federated_trigger_target VALUES (NEW.id)",
-    )
-    .execute(&mut setup)
-    .await
-    .unwrap();
+    sqlx::raw_sql(trigger).execute(&mut setup).await.unwrap();
     setup.close().await.unwrap();
 }
 
