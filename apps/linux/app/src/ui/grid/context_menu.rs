@@ -967,7 +967,7 @@ mod tests {
     #[test]
     fn full_value_edit_requires_a_persisted_key_or_a_draft_identity() {
         assert!(!has_persisted_row_key(&[]));
-        assert!(!has_persisted_row_key(&[Value::Null]));
+        assert!(!has_persisted_row_key(&[Value::Undecodable("text".into())]));
         assert!(has_persisted_row_key(&[Value::Int(7)]));
     }
 
