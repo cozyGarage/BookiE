@@ -2244,6 +2244,16 @@ def mysql_unix_socket_endpoint_is_available_in_installed_form(_database, _base):
         raise AssertionError(f"{name} combo is not keyboard reachable: {accessible_snapshot()}")
 
     def choose_combo_option(name, arrow_count):
+        choice_labels = {
+            ("Driver", 2): ("PostgreSQL", "MySQL"),
+            ("Endpoint", 1): ("Network", "Unix socket"),
+            ("Endpoint", 0): ("Unix socket", "Network"),
+        }
+        if find_node(name=name, role=pyatspi.ROLE_COMBO_BOX) is None:
+            current, selected = choice_labels[(name, arrow_count)]
+            invoke(wait_for_node(name=current, role=pyatspi.ROLE_PUSH_BUTTON))
+            invoke(wait_for_node(name=selected, role=pyatspi.ROLE_PUSH_BUTTON))
+            return
         focus_combo(name)
         press_x11_key("space")
         press_x11_key("Home")
