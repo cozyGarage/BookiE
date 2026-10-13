@@ -180,6 +180,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::folding::tests::folding_hides_lines_without_changing_query_text_and_can_be_cleared"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::split_view::tests::split_editor_views_share_buffer_and_retain_text_across_toggles"
     ],
     [
