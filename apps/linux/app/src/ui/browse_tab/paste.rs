@@ -50,21 +50,44 @@ impl PasteSnapshot {
     }
 }
 
+fn is_spreadsheet_quoted_cell(after_open: &[char]) -> bool {
+    let mut needs_quoting = false;
+    let mut index = 0;
+    while let Some(&c) = after_open.get(index) {
+        index += 1;
+        match c {
+            '"' if after_open.get(index) == Some(&'"') => {
+                needs_quoting = true;
+                index += 1;
+            }
+            '"' => {
+                let ends_cell = matches!(after_open.get(index), None | Some('\t' | '\n' | '\r'));
+                return ends_cell && needs_quoting;
+            }
+            '\t' | '\n' | '\r' => needs_quoting = true,
+            _ => {}
+        }
+    }
+    false
+}
+
 pub(super) fn parse_clipboard_grid(text: &str) -> Vec<Vec<String>> {
     let mut rows = Vec::new();
     let mut row = Vec::new();
     let mut cell = String::new();
     let mut quoted = false;
     let mut was_quoted = false;
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
+    let chars: Vec<char> = text.chars().collect();
+    let mut index = 0;
+    while let Some(&c) = chars.get(index) {
+        index += 1;
         match c {
-            '"' if quoted && chars.peek() == Some(&'"') => {
+            '"' if quoted && chars.get(index) == Some(&'"') => {
                 cell.push('"');
-                chars.next();
+                index += 1;
             }
             '"' if quoted => quoted = false,
-            '"' if cell.is_empty() && !was_quoted => {
+            '"' if cell.is_empty() && !was_quoted && is_spreadsheet_quoted_cell(&chars[index..]) => {
                 quoted = true;
                 was_quoted = true;
             }
@@ -72,7 +95,7 @@ pub(super) fn parse_clipboard_grid(text: &str) -> Vec<Vec<String>> {
                 row.push(std::mem::take(&mut cell));
                 was_quoted = false;
             }
-            '\r' if !quoted && chars.peek() == Some(&'\n') => {}
+            '\r' if !quoted && chars.get(index) == Some(&'\n') => {}
             '\n' if !quoted => {
                 row.push(std::mem::take(&mut cell));
                 rows.push(std::mem::take(&mut row));
@@ -292,6 +315,15 @@ mod tests {
     }
 
     #[test]
+    fn a_leading_quote_on_ordinary_text_is_kept() {
+        assert_eq!(parse_clipboard_grid("\"abc\""), grid(&[&["\"abc\""]]));
+        assert_eq!(parse_clipboard_grid("\"a\", \"b\"\tx"), grid(&[&["\"a\", \"b\"", "x"]]));
+        assert_eq!(parse_clipboard_grid("\"abc\tdef"), grid(&[&["\"abc", "def"]]));
+        assert_eq!(parse_clipboard_grid("\"\"\n\"x\""), grid(&[&["\"\""], &["\"x\""]]));
+        assert_eq!(parse_clipboard_grid("\"a\tb\"x"), grid(&[&["\"a", "b\"x"]]));
+    }
+
+    #[test]
     fn a_plan_places_every_cell_from_the_anchor_and_refuses_to_run_off_the_grid() {
         let plan = paste_plan(2, 1, &grid(&[&["a", "b"], &["c", "d"]]), 10, 5).unwrap();
         let places: Vec<(u32, usize, &str)> = plan.iter().map(|c| (c.row, c.col, c.text.as_str())).collect();
@@ -338,5 +370,92 @@ mod tests {
             replaced_draft[position as usize].clone()
         }));
         assert!(!snapshot.matches(Some(generation), &[0, 1], |position| missing[position as usize].clone()));
+    }
+}
+
+#[cfg(test)]
+mod roundtrip_tests {
+    use super::parse_clipboard_grid;
+
+    fn spreadsheet_encode(rows: &[Vec<String>]) -> String {
+        rows.iter()
+            .map(|row| {
+                row.iter()
+                    .map(|cell| {
+                        if cell.contains(['\t', '\n', '\r', '"']) {
+                            format!("\"{}\"", cell.replace('"', "\"\""))
+                        } else {
+                            cell.clone()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\t")
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn strings(alphabet: &[char], max_len: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut frontier = vec![String::new()];
+        for _ in 0..max_len {
+            frontier = frontier
+                .iter()
+                .flat_map(|prefix| alphabet.iter().map(move |c| format!("{prefix}{c}")))
+                .collect();
+            all.extend(frontier.iter().cloned());
+        }
+        all
+    }
+
+    #[test]
+    fn whatever_a_spreadsheet_copies_is_pasted_back_unchanged() {
+        let cells = strings(&['a', '"', '\t', '\n', ' '], 3);
+        let mut failures = Vec::new();
+        for first in &cells {
+            for second in &cells {
+                let grid = vec![vec![first.clone(), second.clone()]];
+                let text = spreadsheet_encode(&grid);
+                if text.is_empty() {
+                    continue;
+                }
+                let parsed = parse_clipboard_grid(&text);
+                if parsed != grid {
+                    failures.push((grid, text, parsed));
+                }
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{} of {} copies changed; first: {:?}",
+            failures.len(),
+            cells.len() * cells.len(),
+            failures.first()
+        );
+    }
+    #[test]
+    fn carriage_returns_and_several_rows_survive_the_same_round_trip() {
+        let with_returns = strings(&['a', '"', '\t', '\n', '\r', ' '], 2);
+        for first in &with_returns {
+            for second in &with_returns {
+                let grid = vec![vec![first.clone(), second.clone()]];
+                let text = spreadsheet_encode(&grid);
+                if !text.is_empty() {
+                    assert_eq!(parse_clipboard_grid(&text), grid, "{text:?}");
+                }
+            }
+        }
+        let small = strings(&['a', '"', '\t', '\n', '\r', ' '], 1);
+        for a in &small {
+            for b in &small {
+                for c in &small {
+                    for d in &small {
+                        let grid = vec![vec![a.clone(), b.clone()], vec![c.clone(), d.clone()]];
+                        let text = spreadsheet_encode(&grid);
+                        assert_eq!(parse_clipboard_grid(&text), grid, "{text:?}");
+                    }
+                }
+            }
+        }
     }
 }

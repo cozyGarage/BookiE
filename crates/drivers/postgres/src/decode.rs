@@ -9,6 +9,9 @@ pub(crate) fn decode_pg_binary_text(type_name: &str, bytes: &[u8]) -> Option<Str
         "PG_LSN" => decode_pg_lsn(bytes),
         "XML" => String::from_utf8(bytes.to_vec()).ok(),
         "TSVECTOR" => decode_tsvector(bytes),
+        "POINT" => decode_point(bytes),
+        "INT4RANGE" => decode_int_range(bytes, 4),
+        "INT8RANGE" => decode_int_range(bytes, 8),
         "OID" | "XID" | "CID" => Some(u32::from_be_bytes(bytes.try_into().ok()?).to_string()),
         _ => None,
     }
@@ -190,6 +193,84 @@ fn format_lexeme(word: &str, raw_positions: &[u8]) -> String {
     } else {
         format!("'{quoted}':{}", positions.join(","))
     }
+}
+
+fn decode_point(bytes: &[u8]) -> Option<String> {
+    let pair = <[u8; 16]>::try_from(bytes).ok()?;
+    let (x, y) = pair.split_at(8);
+    let coordinate = |half: &[u8]| Some(float8_text(f64::from_be_bytes(half.try_into().ok()?)));
+    Some(format!("({},{})", coordinate(x)?, coordinate(y)?))
+}
+
+pub(crate) fn float8_text(value: f64) -> String {
+    float_text(
+        value.is_finite().then(|| format!("{value:e}")),
+        value.to_string(),
+        value,
+        15,
+    )
+}
+
+pub(crate) fn float4_text(value: f32) -> String {
+    float_text(
+        value.is_finite().then(|| format!("{value:e}")),
+        value.to_string(),
+        f64::from(value),
+        6,
+    )
+}
+
+fn float_text(scientific: Option<String>, plain: String, value: f64, exponent_limit: i32) -> String {
+    let Some(scientific) = scientific else {
+        return if value.is_nan() {
+            "NaN".into()
+        } else if value > 0.0 {
+            "Infinity".into()
+        } else {
+            "-Infinity".into()
+        };
+    };
+    let Some((mantissa, exponent)) = scientific.split_once('e') else {
+        return plain;
+    };
+    match exponent.parse::<i32>() {
+        Ok(exponent) if exponent < -4 || exponent >= exponent_limit => {
+            let sign = if exponent < 0 { '-' } else { '+' };
+            format!("{mantissa}e{sign}{:02}", exponent.abs())
+        }
+        _ => plain,
+    }
+}
+
+fn decode_int_range(bytes: &[u8], width: usize) -> Option<String> {
+    let (&flags, mut rest) = bytes.split_first()?;
+    if flags & 0x01 != 0 {
+        return rest.is_empty().then(|| "empty".to_string());
+    }
+    let mut bound = |infinite: bool| -> Option<String> {
+        if infinite {
+            return Some(String::new());
+        }
+        let (length, tail) = rest.split_first_chunk::<4>()?;
+        if u32::from_be_bytes(*length) as usize != width || tail.len() < width {
+            return None;
+        }
+        let (value, tail) = tail.split_at(width);
+        rest = tail;
+        Some(if width == 4 {
+            i32::from_be_bytes(value.try_into().ok()?).to_string()
+        } else {
+            i64::from_be_bytes(value.try_into().ok()?).to_string()
+        })
+    };
+    let lower = bound(flags & 0x08 != 0)?;
+    let upper = bound(flags & 0x10 != 0)?;
+    if !rest.is_empty() {
+        return None;
+    }
+    let open = if flags & 0x02 != 0 { '[' } else { '(' };
+    let close = if flags & 0x04 != 0 { ']' } else { ')' };
+    Some(format!("{open}{lower},{upper}{close}"))
 }
 
 #[cfg(test)]
@@ -444,5 +525,116 @@ mod tests {
             Some("'it''s':1,3B 'b'")
         );
         assert_eq!(decode_tsvector(&vector[..vector.len() - 1]), None);
+    }
+    #[test]
+    fn value_contract_point_and_integer_range_wire_values_use_postgres_text() {
+        let mut point = 1.5_f64.to_be_bytes().to_vec();
+        point.extend(2.0_f64.to_be_bytes());
+        assert_eq!(decode_pg_binary_text("POINT", &point).as_deref(), Some("(1.5,2)"));
+        assert_eq!(decode_point(&point[..15]), None);
+
+        let int4 = |value: i32| [&4_u32.to_be_bytes()[..], &value.to_be_bytes()].concat();
+        let range = [vec![0x02], int4(1), int4(5)].concat();
+        assert_eq!(decode_pg_binary_text("INT4RANGE", &range).as_deref(), Some("[1,5)"));
+        assert_eq!(decode_int_range(&[0x01], 4).as_deref(), Some("empty"));
+        let unbounded = [vec![0x02 | 0x10], int4(7)].concat();
+        assert_eq!(decode_int_range(&unbounded, 4).as_deref(), Some("[7,)"));
+        let int8 = |value: i64| [&8_u32.to_be_bytes()[..], &value.to_be_bytes()].concat();
+        let wide = [vec![0x02 | 0x04], int8(i64::MAX), int8(i64::MAX)].concat();
+        assert_eq!(
+            decode_pg_binary_text("INT8RANGE", &wide).as_deref(),
+            Some("[9223372036854775807,9223372036854775807]")
+        );
+        assert_eq!(decode_int_range(&range[..range.len() - 1], 4), None);
+        assert_eq!(decode_int_range(&[range, vec![0]].concat(), 4), None);
+    }
+
+    fn all_short_inputs() -> Vec<Vec<u8>> {
+        let alphabet = [0_u8, 1, 2, 4, 8, 0x10, 0x7f, 0x80, 0xff];
+        let mut all = vec![Vec::new()];
+        let mut frontier = vec![Vec::new()];
+        for _ in 0..3 {
+            frontier = frontier
+                .iter()
+                .flat_map(|prefix: &Vec<u8>| {
+                    alphabet.iter().map(move |byte| {
+                        let mut next = prefix.clone();
+                        next.push(*byte);
+                        next
+                    })
+                })
+                .collect();
+            all.extend(frontier.iter().cloned());
+        }
+        all
+    }
+
+    #[test]
+    fn malformed_wire_values_are_refused_and_never_panic() {
+        let types = [
+            "INTERVAL",
+            "BIT",
+            "VARBIT",
+            "MACADDR",
+            "MACADDR8",
+            "INET",
+            "CIDR",
+            "PG_LSN",
+            "XML",
+            "OID",
+            "XID",
+            "CID",
+            "POINT",
+            "INT4RANGE",
+            "INT8RANGE",
+            "TSVECTOR",
+            "NOT_A_TYPE",
+        ];
+        let mut random = crate::test_rng::Xorshift::new(0x9E37_79B9_7F4A_7C15);
+        let mut inputs = all_short_inputs();
+        inputs.extend((0..30_000).map(|_| random.bytes(48)));
+        for bytes in &inputs {
+            for type_name in types {
+                let _ = decode_pg_binary_text(type_name, bytes);
+            }
+            let _ = crate::numeric::decode_binary(bytes);
+            for type_name in ["DATE", "TIMESTAMP", "TIMESTAMPTZ"] {
+                let _ = crate::temporal::decode_temporal(bytes, type_name);
+            }
+            for with_zone in [false, true] {
+                let _ = crate::temporal::decode_time(bytes, with_zone);
+            }
+        }
+    }
+
+    #[test]
+    fn floats_switch_to_exponent_form_where_the_server_does() {
+        for (value, expected) in [
+            (1e14, "100000000000000"),
+            (1e15, "1e+15"),
+            (1.5e-4, "0.00015"),
+            (1e-4, "0.0001"),
+            (1e-5, "1e-05"),
+            (1.5e21, "1.5e+21"),
+            (5e-324, "5e-324"),
+            (-2.5e-7, "-2.5e-07"),
+            (0.0, "0"),
+            (-0.0, "-0"),
+            (123456789.5, "123456789.5"),
+        ] {
+            assert_eq!(float8_text(value), expected, "float8 {value:e}");
+        }
+        for (value, expected) in [
+            (999999.0_f32, "999999"),
+            (1e6, "1e+06"),
+            (1.6777216e7, "1.6777216e+07"),
+            (1.5e-5, "1.5e-05"),
+            (0.1, "0.1"),
+        ] {
+            assert_eq!(float4_text(value), expected, "float4 {value:e}");
+        }
+        assert_eq!(float8_text(f64::NAN), "NaN");
+        assert_eq!(float8_text(f64::INFINITY), "Infinity");
+        assert_eq!(float4_text(f32::NEG_INFINITY), "-Infinity");
     }
 }
