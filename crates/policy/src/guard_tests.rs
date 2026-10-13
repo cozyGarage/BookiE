@@ -605,7 +605,11 @@ mod audit;
 mod bulk;
 #[path = "guard_tests_checked.rs"]
 mod checked;
+#[path = "guard_tests_fault.rs"]
+mod fault;
 #[path = "guard_tests_gating.rs"]
 mod gating;
+#[path = "guard_tests_passthrough.rs"]
+mod guard_tests_passthrough;
 #[path = "guard_tests_session.rs"]
 mod session;
