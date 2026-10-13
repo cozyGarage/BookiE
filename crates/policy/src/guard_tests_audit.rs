@@ -4,55 +4,11 @@ struct WaitingApproval {
     started: Arc<Notify>,
 }
 
-struct DisconnectedBatchConn {
-    batch_dispatches: Arc<AtomicUsize>,
-}
-
 #[async_trait]
 impl ApprovalSink for WaitingApproval {
     async fn request(&self, _request: ApprovalRequest) -> ApprovalOutcome {
         self.started.notify_one();
         std::future::pending().await
-    }
-}
-
-#[async_trait]
-impl Connection for DisconnectedBatchConn {
-    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        Ok(vec![])
-    }
-
-    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        Ok(vec![])
-    }
-
-    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
-        Ok(empty_result())
-    }
-
-    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
-        Ok(empty_result())
-    }
-
-    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
-        Ok(ExecResult { rows_affected: 1 })
-    }
-
-    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
-        Ok(ExecResult { rows_affected: 1 })
-    }
-
-    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        self.batch_dispatches.fetch_add(1, Ordering::SeqCst);
-        Err(DriverError::Disconnected)
-    }
-
-    async fn ping(&self) -> Result<(), DriverError> {
-        Ok(())
-    }
-
-    async fn close(self: Box<Self>) -> Result<(), DriverError> {
-        Ok(())
     }
 }
 
@@ -356,20 +312,9 @@ async fn batch_query_error_records_unknown_and_poisons_state() {
 async fn disconnected_batch_outcome_is_audited_unknown_and_blocks_redispatch() {
     let state = Arc::new(AuditState::new());
     let audit = Arc::new(SequenceAuditSink::new(vec![]));
-    let batch_dispatches = Arc::new(AtomicUsize::new(0));
-    let guard = PolicyGuard::new(
-        Arc::new(DisconnectedBatchConn {
-            batch_dispatches: batch_dispatches.clone(),
-        }),
-        context(
-            Principal::human_gui(),
-            Environment::Prod,
-            PolicyConfig::default(),
-            Arc::new(AutoApproveSink),
-            audit.clone(),
-            state.clone(),
-        ),
-    );
+    let connection = DisconnectedConn::default();
+    let batch_dispatches = connection.batch_dispatches.clone();
+    let guard = gui_guard(Arc::new(connection), audit.clone(), state.clone());
     let statements = vec![("UPDATE jobs SET value = 2 WHERE id = 1".into(), vec![])];
 
     let error = guard
@@ -987,7 +932,7 @@ async fn an_operation_that_does_not_panic_reports_no_fault() {
 
 fn disconnected_guard(reports: Arc<AtomicUsize>) -> PolicyGuard {
     PolicyGuard::new(
-        Arc::new(DisconnectedConn),
+        Arc::new(DisconnectedConn::default()),
         context(
             Principal::human_gui(),
             Environment::Prod,
