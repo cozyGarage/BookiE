@@ -33,6 +33,9 @@ mod schema_introspection;
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;
 
+#[path = "shared/mysql_trigger_engine_error.rs"]
+mod mysql_trigger_engine_error;
+
 #[path = "shared/mysql_temp_table_rollback.rs"]
 mod mysql_temp_table_rollback;
 
