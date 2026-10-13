@@ -382,13 +382,17 @@ fn connect_options_follow_the_transport_and_refuse_a_socket_file() {
     use std::path::Path;
     let tcp = ConnectOptions::default();
     assert!(postgres_connect_options(&tcp).is_ok());
-    let mut file = ConnectOptions::default();
-    file.local_socket_path = Some(Path::new("/tmp/pg.sock").to_path_buf());
+    let file = ConnectOptions {
+        local_socket_path: Some(Path::new("/tmp/pg.sock").to_path_buf()),
+        ..ConnectOptions::default()
+    };
     assert!(matches!(
         postgres_connect_options(&file),
         Err(DriverError::Unsupported(_))
     ));
-    let mut directory = ConnectOptions::default();
-    directory.local_socket_dir = Some(Path::new("/var/run/postgresql").to_path_buf());
+    let directory = ConnectOptions {
+        local_socket_dir: Some(Path::new("/var/run/postgresql").to_path_buf()),
+        ..ConnectOptions::default()
+    };
     assert!(postgres_connect_options(&directory).is_ok());
 }
