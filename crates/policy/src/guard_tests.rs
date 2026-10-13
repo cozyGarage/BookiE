@@ -611,5 +611,7 @@ mod fault;
 mod gating;
 #[path = "guard_tests_passthrough.rs"]
 mod guard_tests_passthrough;
+#[path = "guard_tests_masking.rs"]
+mod masking;
 #[path = "guard_tests_session.rs"]
 mod session;
