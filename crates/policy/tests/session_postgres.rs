@@ -311,13 +311,15 @@ async fn a_read_only_connection_cannot_enable_writes_with_begin_read_write() {
     assert_eq!(large_objects.rows, vec![vec![Value::Int(0)]]);
 
     let events = audit.events.lock().expect("event lock");
-    let denied = events
+    let denied_transactions = events
         .iter()
         .filter(|event| {
-            event.phase == AuditRecordPhase::Outcome && event.terminal_status == AuditTerminalStatus::Denied
+            event.operation_class == AuditOperationClass::Transaction
+                && event.phase == AuditRecordPhase::Outcome
+                && event.terminal_status == AuditTerminalStatus::Denied
         })
         .count();
-    assert_eq!(denied, 1);
+    assert_eq!(denied_transactions, 1);
 }
 
 #[tokio::test]
