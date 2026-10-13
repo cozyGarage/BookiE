@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use drivers_postgres::PgDriver;
+use sha2::{Digest, Sha256};
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, Value};
 use tablepro_policy::{
     AuditError, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus,
@@ -147,6 +148,60 @@ async fn a_commit_on_a_server_aborted_postgres_transaction_is_audited_as_rolled_
         .await
         .expect("verify row count");
     assert_eq!(after.rows, vec![vec![Value::Int(0)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_read_scoped_agent_sleep_times_out_is_audited_and_keeps_its_session_usable() {
+    let (_container, opts) = start_pg().await;
+    let raw = connect(opts).await;
+    let audit = Arc::new(CapturingAudit::new());
+    let mut context = guard_context(audit.clone(), Arc::new(AuditState::new()));
+    context.read_only = true;
+    context.principal = Principal::Agent {
+        token: "read-only".into(),
+        client: None,
+        model: None,
+    };
+    let guard = PolicyGuard::new(Arc::from(raw), context);
+    let mut session = guard.open_session().await.expect("open agent session");
+
+    let timed_out = session
+        .query_params_controlled(
+            "SELECT pg_sleep(5)",
+            &[],
+            &OperationControl::with_timeout(Duration::from_millis(300)),
+        )
+        .await;
+    assert!(matches!(timed_out, Err(DriverError::TimedOut)), "{timed_out:?}");
+
+    let recovered = session
+        .query_params_controlled("SELECT 1", &[], &OperationControl::with_timeout(Duration::from_secs(2)))
+        .await
+        .expect("session remains usable after the server cancels pg_sleep");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+    session.close().await.expect("close agent session");
+
+    let sleep_hash = hex::encode(Sha256::digest(b"SELECT pg_sleep(5)"));
+    let sleep_events = audit
+        .events
+        .lock()
+        .expect("event lock")
+        .iter()
+        .filter(|event| event.sql_hash == sleep_hash)
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(sleep_events.len(), 2);
+    assert_eq!(sleep_events[0].phase, AuditRecordPhase::Intent);
+    assert_eq!(sleep_events[1].phase, AuditRecordPhase::Outcome);
+    assert_eq!(sleep_events[0].operation_id, sleep_events[1].operation_id);
+    assert_eq!(sleep_events[1].operation_class, AuditOperationClass::Read);
+    assert!(matches!(&sleep_events[1].principal, Principal::Agent { .. }));
+    assert_eq!(sleep_events[1].terminal_status, AuditTerminalStatus::TimedOut);
+    assert_eq!(
+        sleep_events[1].error_category,
+        Some(tablepro_policy::AuditErrorCategory::Timeout)
+    );
 }
 
 #[tokio::test]
@@ -314,6 +369,49 @@ async fn a_read_only_repeatable_read_session_keeps_one_snapshot_across_offset_pa
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_read_only_connection_cannot_enable_writes_with_begin_read_write() {
+    let (_container, mut opts) = start_pg().await;
+    opts.read_only = true;
+    let raw = connect(opts.clone()).await;
+    let audit = Arc::new(CapturingAudit::new());
+    let mut context = guard_context(audit.clone(), Arc::new(AuditState::new()));
+    context.read_only = true;
+    let guard = PolicyGuard::new(Arc::from(raw), context);
+    let mut session = guard.open_session().await.expect("open session");
+
+    let begin = run(&mut session, "BEGIN READ WRITE").await;
+    assert!(matches!(begin, Err(DriverError::PolicyDenied(_))), "{begin:?}");
+    assert!(!session.transaction_open());
+    assert!(run(&mut session, "SELECT lo_creat(-1)").await.is_err());
+    run(&mut session, "BEGIN")
+        .await
+        .expect("default read-only transaction begins");
+    assert!(session.transaction_open());
+    assert!(run(&mut session, "SELECT lo_creat(-1)").await.is_err());
+    run(&mut session, "ROLLBACK")
+        .await
+        .expect("close read-only transaction");
+    session.close().await.expect("close session");
+
+    let verify = connect(opts).await;
+    let large_objects = verify
+        .query("SELECT count(*)::bigint FROM pg_largeobject_metadata")
+        .await
+        .expect("read large object metadata");
+    assert_eq!(large_objects.rows, vec![vec![Value::Int(0)]]);
+
+    let events = audit.events.lock().expect("event lock");
+    let denied = events
+        .iter()
+        .filter(|event| {
+            event.phase == AuditRecordPhase::Outcome && event.terminal_status == AuditTerminalStatus::Denied
+        })
+        .count();
+    assert_eq!(denied, 3);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn an_agent_cannot_expose_sensitive_sources_through_renamed_or_record_projections() {
     let (_container, opts) = start_pg().await;
     let raw = connect(opts).await;
@@ -372,6 +470,38 @@ async fn an_agent_cannot_expose_sensitive_json_through_an_outer_alias() {
     let result = guard
         .query_params_controlled(
             "SELECT outer_row.payload FROM (SELECT json_agg(card) AS payload FROM cards AS card) AS outer_row",
+            &[],
+            &no_timeout(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.rows, vec![vec![Value::Text("***REDACTED***".into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_agent_cannot_expose_sensitive_columns_through_table_to_xml() {
+    let (_container, opts) = start_pg().await;
+    let raw = connect(opts).await;
+    raw.execute("CREATE TABLE cards (pan TEXT NOT NULL, amount BIGINT NOT NULL)")
+        .await
+        .unwrap();
+    raw.execute("INSERT INTO cards VALUES ('4111111111111111', 7)")
+        .await
+        .unwrap();
+    let mut context = guard_context(Arc::new(CapturingAudit::new()), Arc::new(AuditState::new()));
+    context.environment = Environment::Prod;
+    context.principal = Principal::Agent {
+        token: "mask-test".into(),
+        client: None,
+        model: None,
+    };
+    let guard = PolicyGuard::new(Arc::from(raw), context);
+
+    let result = guard
+        .query_params_controlled(
+            "SELECT table_to_xml('cards'::regclass, true, false, '')",
             &[],
             &no_timeout(),
         )
