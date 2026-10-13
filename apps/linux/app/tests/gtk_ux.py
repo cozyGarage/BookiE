@@ -631,23 +631,16 @@ GLib.MainLoop().run()
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
         row = ui.wait_for_node(name=ui.CONNECTION_NAME, role=pyatspi.ROLE_LIST_ITEM)
         ui.invoke(ui.wait_within(row, name="Group and tags", role=pyatspi.ROLE_PUSH_BUTTON))
-        dialog = ui.wait_for_node(name="Group and tags", role=pyatspi.ROLE_ALERT)
-        chooser = next(
-            (
-                node for node in ui.descendants(dialog)
-                if ui.node_name(node) == "No colour" and ui.node_role(node) == pyatspi.ROLE_PUSH_BUTTON
-            ),
-            None,
-        )
-        assert chooser is not None, f"colour row has no button:\n{ui.accessible_snapshot()}"
+        chooser = ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON)
         actions = chooser.queryAction()
         assert any(actions.getName(index) == "click" for index in range(actions.nActions)), (
             f"colour chooser has no accessible click action:\n{ui.accessible_snapshot()}"
         )
         ui.invoke(chooser)
-        option = ui.wait_within(dialog, name="blue", role=pyatspi.ROLE_PUSH_BUTTON)
+        option = ui.wait_for_node(name="blue", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(option)
-        ui.wait_within(dialog, name="blue", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+        ui.wait_for_node(name="blue", role=pyatspi.ROLE_PUSH_BUTTON)
 
     def alt_arrows_jump_between_statements(database, base):
         sql = "select 1;\nselect 2;\nselect 3"
