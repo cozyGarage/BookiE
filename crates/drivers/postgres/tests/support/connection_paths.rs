@@ -12,6 +12,8 @@ mod null_binding;
 mod stale_plan;
 #[path = "touched_insert.rs"]
 mod touched_insert;
+#[path = "type_change_default.rs"]
+mod type_change_default;
 #[path = "typed_text_writes.rs"]
 mod typed_text_writes;
 #[path = "xml_oid_values.rs"]
