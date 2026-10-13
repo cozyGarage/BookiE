@@ -55,6 +55,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Connection dialog and browse shortcuts
 
+- [ ] Screen readers can activate Driver, Endpoint and TLS, and announce Port, Connect timeout and Query timeout. GTK AT-SPI scenario passed in Xvfb on 2026-10-13; native Hyprland verification is pending. The sidebar search, saved-filter name and colour picker are outside this connection-form check, [#658](https://github.com/cozyGarage/BookiE/issues/658).
 - [ ] New connection defaults match the selected driver; no PostgreSQL defaults leak into another engine. Switching drivers and editing a saved connection preserves intended custom values. **2026-10-12 Hyprland dark:** defaults passed for all seven drivers; switching drivers resets typed port, database and username, [#653](https://github.com/cozyGarage/BookiE/issues/653).
 - [ ] For MySQL/MariaDB, select a local Unix socket and confirm the form shows a socket-file path while hiding host and port. Switch back to Network and confirm the socket path is hidden and host/port return.
 - [ ] Connect through a real local MySQL/MariaDB socket, save the connection, reopen it, and confirm the socket path and endpoint mode remain selected. Export and re-import a bundle and confirm the same endpoint is retained.
@@ -68,6 +69,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Connections are grouped, with one section per group and an ungrouped section.
 - [ ] A group that appears twice in the ordering still renders one section.
 - [ ] The colour swatch shows on a tagged row and the picker sets it. **2026-10-12 Hyprland dark:** the picker saved the colour; the swatch was not checked.
+- [ ] With Orca, open Group and tags, navigate to Colour, open the named button, choose a palette colour, and confirm the selected colour is announced and saved. Sidebar table search and the saved-filter name field announce their purpose. Native Wayland screen-reader check pending.
 - [ ] Duplicate produces a new row with a distinct name, and connecting to it asks for credentials rather than reusing the original's. **2026-10-12 Hyprland dark:** distinct name passed ("(copy)"); the copy did not reuse the password but did not ask for one either, it failed and offered Edit Connection, [#660](https://github.com/cozyGarage/BookiE/issues/660).
 - [ ] The Name field in the connect dialog is used when set, and the derived `user@host` label still appears when it is blank.
 - [ ] Two connections to the same endpoint stay separate after reconnecting to each. This is the regression the id-first identity change fixed.
@@ -241,6 +243,13 @@ A text or JSON cell over 8 KiB shows the start of the value and `… (N bytes to
 - [ ] On a PostgreSQL connection with two schemas, the sidebar shows each schema with Tables and Views groups and a count. Click a group: its objects hide and the chevron points right; click again to restore. **2026-10-12 Hyprland dark:** groups and counts passed; collapsing not run.
 - [ ] Type in the sidebar search: groups holding a match open even if collapsed; clearing the search restores your collapsed groups. Quit and reopen the connection: the groups you collapsed are still collapsed.
 - [ ] New Table and Table from CSV on a Tables group still open their dialogs for that schema. Light and dark look right.
+
+## SQL code folding
+
+- [ ] Place the cursor inside a multiline CASE block and press Ctrl+Shift+[. The block body folds and its opening and closing lines remain visible.
+- [ ] Click the fold marker in the gutter. The body returns without changing the query text.
+- [ ] Fold two blocks, then use Unfold all and Ctrl+Shift+]. Both show the complete query.
+- [ ] Edit the query while a block is folded. The editor reveals the full query and clears stale fold markers.
 
 ## Pinned results and gutter marks
 
