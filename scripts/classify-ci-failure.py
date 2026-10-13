@@ -28,6 +28,7 @@ SIGNATURES = [
     ("infra", "container startup timed out", r"StartupTimeout"),
     ("infra", "database fixture did not become ready", r"fixture did not become ready"),
     ("infra", "database fixture refused the connection", r"connect: ConnectionRefused"),
+    ("infra", "a test container did not become ready in time (runner load)", r"must become ready within \d+ seconds"),
     ("infra", "Docker Hub rate limit", r"toomanyrequests"),
     ("infra", "compiler crashed", r"Compiler killed by signal|rustc.*SIGSEGV|signal: 11"),
     ("infra", "runner volume path missing on the Docker host", r"bind source path does not exist"),
