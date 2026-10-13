@@ -215,15 +215,14 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 
 ## Grid cell editing: long text and JSON
 
-A text or JSON cell over 8 KiB shows the start of the value and `… (N bytes total)`. Editing used to start from that shortened text; this is now fixed (`FULL_EDIT_TEXT_SLOT` in `apps/linux/app/src/ui/grid/display.rs`) and its isolated GTK regression passed on 2026-09-26. The installed workflow remains open. Use a table with a `text` or `json` column and insert one row with a value of at least 50,000 characters (for example `SELECT repeat('a', 50000)` cast to the column's type, or a JSON array with enough elements).
+Use a keyed table with a nullable text column and values above 8 KiB. Include CRLF, Unicode, trailing spaces and a value near 1 MiB. These are manual acceptance steps; the isolated GTK tests cover dialog actions and empty-text versus NULL dispatch.
 
-- [ ] The cell shows the shortened text ending in `… (+N more chars)`. **2026-10-12 Hyprland dark:** the marker is now `… (N bytes total)`, and the cell offers only View Value, not editing, [#659](https://github.com/cozyGarage/BookiE/issues/659). The rest of this section was not run.
-- [ ] Double-click the cell: the edit field's content is the **full** value, not the shortened one, and does not end in the `more chars` marker. Blocked until [#610](https://github.com/cozyGarage/BookiE/issues/610): previewed values are read-only in the grid today ([#659](https://github.com/cozyGarage/BookiE/issues/659)), so the editing items below cannot be run.
-- [ ] Press Escape without typing anything: no edit is recorded (check the history dialog or the change-tracker highlight), and reopening the cell still shows the full value.
-- [ ] Click away (focus-out) without typing anything: same as Escape, no edit recorded.
-- [ ] Append one character at the end of the full value and commit (Enter or Tab): reload the row and confirm the saved value is the original text plus that one character, not the shortened text.
-- [ ] For a JSON column, open the cell's JSON popover editor: its content is also the full value, not the shortened one. Save without changing anything, then Save after a small change, and confirm the same two outcomes as above.
-- [ ] Do all of the above once more for a value just under 40,000 bytes (no truncation should ever have applied) to confirm normal editing still works unchanged.
+- [ ] The cell shows a shortened preview and byte count. Right-click it and choose **Edit Full Value…**; the dialog contains the complete value, not the preview.
+- [ ] Cancel the dialog; no pending change appears. Reopen it, change the final character and choose **Apply**; the tab shows a pending edit, and saving then reloading preserves all original characters plus the change.
+- [ ] Apply an empty text value and verify it remains empty text. Reopen the cell and choose **Set to NULL**; after saving, the database value is SQL NULL.
+- [ ] Edit a draft text row, save it, and discard a separate pending edit; the dialog stages changes through the normal tracker.
+- [ ] A value over 1 MiB shows a refusal and is not loaded into the editor. Non-text, generated, key and read-only cells do not offer the action.
+- [ ] A JSON preview remains read-only in the full-value dialog. Small JSON cells continue to use the existing JSON popover editor; JSON full-value editing remains open under [#610](https://github.com/cozyGarage/BookiE/issues/610).
 
 ## Server activity view: binary values
 
