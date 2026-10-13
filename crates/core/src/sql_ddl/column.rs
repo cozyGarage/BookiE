@@ -197,12 +197,11 @@ fn alter_column_postgres(
         };
         stmts.push(format!("ALTER TABLE {} ALTER COLUMN {} {}", qualified, name, action));
     }
-    if changed.default_value || reapply_default {
-        if let Some(statement) =
+    if (changed.default_value || reapply_default)
+        && let Some(statement) =
             postgres_default_statement(&qualified, &name, column, changed.default_value, reapply_default)?
-        {
-            stmts.push(statement);
-        }
+    {
+        stmts.push(statement);
     }
     if comment_changed(column)
         && let Some(comment_stmt) = column_comment_statement(driver_id, schema, table, column)?
