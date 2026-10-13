@@ -435,3 +435,25 @@ async fn a_rollback_is_denied_when_its_audit_intent_cannot_be_written() {
         assert_eq!(calls.load(Ordering::SeqCst), 0, "the rollback never reached the driver");
     }
 }
+
+#[tokio::test]
+async fn a_write_that_returns_rows_inside_a_guarded_transaction_is_audited_as_a_mutation() {
+    let (guard, calls, audit) = catalog_guard(false);
+    let mut tx = guard.begin().await.unwrap();
+    tx.query("INSERT INTO t VALUES (1) RETURNING id").await.unwrap();
+    tx.query_params("INSERT INTO t VALUES ($1) RETURNING id", &[Value::Int(1)])
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 2 + 100);
+    let mutations = audit
+        .events
+        .lock()
+        .expect("events")
+        .iter()
+        .filter(|event| {
+            event.phase == AuditRecordPhase::Intent && event.operation_class == AuditOperationClass::Mutation
+        })
+        .count();
+    assert_eq!(mutations, 2);
+}
