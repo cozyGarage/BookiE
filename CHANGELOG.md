@@ -134,6 +134,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- Open Browse tabs reload their rows after Structure changes so grid headers and SQL exports use the current column names.
 - Exporting query results no longer duplicates the selected file extension when the file chooser adds it automatically.
 - Connection colour tags now paint the workspace tab bar and update when the tag changes.
 - Screen readers can activate the connection form's Driver, Endpoint and TLS selectors and identify its port and timeout inputs.
