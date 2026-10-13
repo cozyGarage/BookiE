@@ -99,7 +99,7 @@ impl FactoryComponent for ConnectionRow {
                 connect_clicked => ConnectionRowMsg::ToggleFavorite,
             },
 
-            add_suffix = &gtk::Button {
+            group_tags_button = &gtk::Button {
                 set_icon_name: "view-list-bullet-symbolic",
                 set_valign: gtk::Align::Center,
                 set_tooltip_text: Some(crate::tr!("Group and tags").as_str()),
@@ -158,6 +158,9 @@ impl FactoryComponent for ConnectionRow {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
+        widgets
+            .group_tags_button
+            .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Group and tags"))]);
         // Stash for the destructive-confirm dialog in update().
         self.root = Some(root.clone().upcast::<gtk::Widget>());
         widgets
