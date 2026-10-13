@@ -18,18 +18,18 @@ async fn mariadb_failed_upsert_keeps_nontransactional_trigger_effect() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mysql_failed_duplicate_upsert_keeps_before_insert_trigger_effect() {
+async fn mysql_failed_multirow_duplicate_upsert_keeps_before_insert_trigger_effect() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts.clone()).await;
-    assert_before_insert_trigger_effect_survives_later_batch_rollback(conn, opts).await;
+    assert_multirow_before_insert_trigger_effect_survives_later_batch_rollback(conn, opts).await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mariadb_failed_duplicate_upsert_keeps_before_insert_trigger_effect() {
+async fn mariadb_failed_multirow_duplicate_upsert_keeps_before_insert_trigger_effect() {
     let (_container, opts) = start_mariadb().await;
     let conn = connect(opts.clone()).await;
-    assert_before_insert_trigger_effect_survives_later_batch_rollback(conn, opts).await;
+    assert_multirow_before_insert_trigger_effect_survives_later_batch_rollback(conn, opts).await;
 }
 
 #[tokio::test]
@@ -95,7 +95,7 @@ async fn assert_upsert_trigger_effect_survives_later_batch_rollback(conn: Box<dy
     );
 }
 
-async fn assert_before_insert_trigger_effect_survives_later_batch_rollback(
+async fn assert_multirow_before_insert_trigger_effect_survives_later_batch_rollback(
     conn: Box<dyn Connection>,
     opts: ConnectOptions,
 ) {
@@ -118,7 +118,9 @@ async fn assert_before_insert_trigger_effect_survives_later_batch_rollback(
 
     let batch = vec![
         (
-            "INSERT INTO before_upsert_parent VALUES (1, 11) ON DUPLICATE KEY UPDATE value = 11".into(),
+            "INSERT INTO before_upsert_parent VALUES (1, 11), (2, 20) \
+             ON DUPLICATE KEY UPDATE value = VALUES(value)"
+                .into(),
             vec![],
         ),
         ("INSERT INTO missing_before_upsert_table VALUES (1)".into(), vec![]),
@@ -126,7 +128,7 @@ async fn assert_before_insert_trigger_effect_survives_later_batch_rollback(
     let error = conn
         .execute_in_transaction(&batch)
         .await
-        .expect_err("the duplicate upsert must run its insert trigger before the later failure");
+        .expect_err("the multi-row upsert must run its insert triggers before the later failure");
     assert!(
         matches!(error, DriverError::Transaction { statement_index: 1, .. }),
         "the second statement must be reported as the failure, got {error:?}"
@@ -145,8 +147,8 @@ async fn assert_before_insert_trigger_effect_survives_later_batch_rollback(
             .await
             .unwrap()
             .rows,
-        vec![vec![Value::Int(1), Value::Int(11)]],
-        "the MyISAM BEFORE INSERT trigger effect survives rollback"
+        vec![vec![Value::Int(1), Value::Int(11)], vec![Value::Int(2), Value::Int(20)]],
+        "the MyISAM BEFORE INSERT effects for duplicate and new rows survive rollback"
     );
 }
 
