@@ -20,7 +20,7 @@ pub(super) fn apply_driver_values(
 }
 
 fn apply_values(
-    port: &relm4::adw::SpinRow,
+    port: &relm4::gtk::SpinButton,
     database: &relm4::adw::EntryRow,
     username: &relm4::adw::EntryRow,
     previous: Option<ConnectionFormDefaults>,
