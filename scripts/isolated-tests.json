@@ -326,6 +326,11 @@
       "tablepro-app",
       "--lib",
       "ui::export_dialog::tests::a_full_export_shows_a_refusal_without_opening_its_source"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::import_dialog::tests::finishing_an_import_force_closes_the_non_user_closable_progress_dialog"
     ]
   ],
   "keyring": [
