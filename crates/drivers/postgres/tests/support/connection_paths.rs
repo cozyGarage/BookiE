@@ -10,3 +10,5 @@ mod stale_plan;
 mod typed_text_writes;
 #[path = "xml_oid_values.rs"]
 mod xml_oid_values;
+#[path = "float4_display.rs"]
+mod float4_display;
