@@ -152,9 +152,15 @@ async fn assert_federated_trigger_effect_survives_rollback(conn: &dyn Connection
     ];
     for (trigger, statement, failing_statement, parent_rows, initial_remote, expected_parent, expected_remote) in cases
     {
-        conn.execute("DROP TABLE IF EXISTS federated_trigger_target").await.unwrap();
-        conn.execute("DROP TABLE IF EXISTS federated_trigger_parent").await.unwrap();
-        conn.execute("DROP TABLE IF EXISTS federated_remote_effects").await.unwrap();
+        conn.execute("DROP TABLE IF EXISTS federated_trigger_target")
+            .await
+            .unwrap();
+        conn.execute("DROP TABLE IF EXISTS federated_trigger_parent")
+            .await
+            .unwrap();
+        conn.execute("DROP TABLE IF EXISTS federated_remote_effects")
+            .await
+            .unwrap();
         conn.execute("CREATE TABLE federated_remote_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
             .await
             .unwrap();
