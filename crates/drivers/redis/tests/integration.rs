@@ -1,4 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "support/key_previews.rs"]
+mod key_previews;
+
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 
@@ -6,6 +9,8 @@ mod server_restart;
 mod connect_refusal;
 #[path = "support/disconnection.rs"]
 mod disconnection;
+#[path = "support/full_value_refetch.rs"]
+mod full_value_refetch;
 
 #[tokio::test]
 async fn an_unavailable_redis_server_is_classified_as_connection_refused() {
