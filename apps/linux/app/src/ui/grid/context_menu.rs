@@ -102,11 +102,13 @@ pub(super) fn install_grid_context_menus(
                 &view,
                 &slot.column_name,
                 &initial_text,
-                position(slot),
-                slot.col_index,
-                row_key,
-                column.nullable,
-                sender.clone(),
+                super::full_value_editor::EditContext {
+                    row_position: position(slot),
+                    col_index: slot.col_index,
+                    row_key,
+                    nullable: column.nullable,
+                    sender: sender.clone(),
+                },
             );
         });
     }
@@ -626,16 +628,27 @@ where
         .build()
 }
 
+pub(super) struct CellGestureOptions {
+    pub(super) idx: usize,
+    pub(super) column_name: String,
+    pub(super) is_editable: bool,
+    pub(super) is_text_editable: bool,
+    pub(super) supports_full_value: bool,
+}
+
 pub(super) fn attach_cell_gesture(
     widget: &gtk::Widget,
     column_view: &gtk::ColumnView,
-    idx: usize,
-    column_name: String,
-    is_editable: bool,
-    is_text_editable: bool,
-    supports_full_value: bool,
+    options: CellGestureOptions,
     menus: &GridMenus,
 ) {
+    let CellGestureOptions {
+        idx,
+        column_name,
+        is_editable,
+        is_text_editable,
+        supports_full_value,
+    } = options;
     let popover = if is_editable {
         menus.editable_popover.clone()
     } else {

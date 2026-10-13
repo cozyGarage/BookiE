@@ -51,11 +51,12 @@ fn text_payload(text: &str) -> Result<Value, ()> {
     Ok(Value::Text(text.to_owned()))
 }
 
-struct EditContext {
-    row_position: u32,
-    col_index: usize,
-    row_key: Vec<Value>,
-    sender: relm4::Sender<super::GridMsg>,
+pub(super) struct EditContext {
+    pub(super) row_position: u32,
+    pub(super) col_index: usize,
+    pub(super) row_key: Vec<Value>,
+    pub(super) nullable: bool,
+    pub(super) sender: relm4::Sender<super::GridMsg>,
 }
 
 struct EditorActions {
@@ -69,28 +70,13 @@ pub(super) fn present(
     parent: &impl IsA<gtk::Widget>,
     column_name: &str,
     initial_text: &str,
-    row_position: u32,
-    col_index: usize,
-    row_key: Vec<Value>,
-    nullable: bool,
-    sender: relm4::Sender<super::GridMsg>,
+    context: EditContext,
 ) -> adw::Dialog {
     let view = create_text_view(initial_text);
-    let actions = create_actions(nullable);
+    let actions = create_actions(context.nullable);
     let (content, error) = create_content(&view, &actions.container);
     let dialog = create_dialog(column_name, &content);
-    connect_actions(
-        &dialog,
-        &view.buffer(),
-        &error,
-        actions,
-        EditContext {
-            row_position,
-            col_index,
-            row_key,
-            sender,
-        },
-    );
+    connect_actions(&dialog, &view.buffer(), &error, actions, context);
     dialog.present(Some(parent));
     dialog
 }
@@ -318,7 +304,18 @@ mod tests {
         let parent = adw::Window::new();
         parent.present();
         let (sender, receiver) = relm4::channel::<super::super::GridMsg>();
-        let dialog = present(&parent, "notes", "before", 4, 2, vec![Value::Int(7)], true, sender);
+        let dialog = present(
+            &parent,
+            "notes",
+            "before",
+            EditContext {
+                row_position: 4,
+                col_index: 2,
+                row_key: vec![Value::Int(7)],
+                nullable: true,
+                sender,
+            },
+        );
         text_view(dialog.child().unwrap().upcast_ref()).buffer().set_text("");
         button(dialog.child().unwrap().upcast_ref(), &crate::tr!("Apply")).emit_clicked();
         assert!(matches!(
@@ -341,7 +338,18 @@ mod tests {
         let parent = adw::Window::new();
         parent.present();
         let (sender, receiver) = relm4::channel::<super::super::GridMsg>();
-        let dialog = present(&parent, "notes", "before", 1, 0, vec![Value::Int(3)], true, sender);
+        let dialog = present(
+            &parent,
+            "notes",
+            "before",
+            EditContext {
+                row_position: 1,
+                col_index: 0,
+                row_key: vec![Value::Int(3)],
+                nullable: true,
+                sender,
+            },
+        );
         button(dialog.child().unwrap().upcast_ref(), &crate::tr!("Set to NULL")).emit_clicked();
         assert!(matches!(
             receiver.recv().now_or_never().flatten(),
@@ -352,7 +360,18 @@ mod tests {
             }) if row_key == vec![Value::Int(3)]
         ));
         let (sender, receiver) = relm4::channel::<super::super::GridMsg>();
-        let dialog = present(&parent, "notes", "before", 1, 0, vec![Value::Int(3)], true, sender);
+        let dialog = present(
+            &parent,
+            "notes",
+            "before",
+            EditContext {
+                row_position: 1,
+                col_index: 0,
+                row_key: vec![Value::Int(3)],
+                nullable: true,
+                sender,
+            },
+        );
         button(dialog.child().unwrap().upcast_ref(), &crate::tr!("Cancel")).emit_clicked();
         assert!(receiver.recv().now_or_never().flatten().is_none());
         parent.close();

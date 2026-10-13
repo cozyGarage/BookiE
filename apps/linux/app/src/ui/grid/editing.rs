@@ -54,11 +54,13 @@ pub(super) fn setup_editable_cell(
         attach_cell_gesture(
             label.upcast_ref(),
             column_view,
-            idx,
-            column_name.clone(),
-            true,
-            true,
-            supports_full_value,
+            super::context_menu::CellGestureOptions {
+                idx,
+                column_name: column_name.clone(),
+                is_editable: true,
+                is_text_editable: true,
+                supports_full_value,
+            },
             menus,
         );
     }
@@ -87,11 +89,13 @@ pub(super) fn setup_bool_cell(
         attach_cell_gesture(
             checkbox.upcast_ref(),
             column_view,
-            idx,
-            column_name,
-            true,
-            false,
-            false,
+            super::context_menu::CellGestureOptions {
+                idx,
+                column_name,
+                is_editable: true,
+                is_text_editable: false,
+                supports_full_value: false,
+            },
             menus,
         );
     }
@@ -134,11 +138,13 @@ pub(super) fn setup_readonly_cell(
         attach_cell_gesture(
             label.upcast_ref(),
             column_view,
-            idx,
-            column_name,
-            false,
-            false,
-            false,
+            super::context_menu::CellGestureOptions {
+                idx,
+                column_name,
+                is_editable: false,
+                is_text_editable: false,
+                supports_full_value: false,
+            },
             menus,
         );
     }
