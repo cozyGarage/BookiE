@@ -27,6 +27,8 @@ pub struct IndexInfo {
     pub primary: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predicate: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constraint: Option<String>,
 }
 
 /// Foreign-key constraint metadata. `on_delete` / `on_update` carry
@@ -96,6 +98,7 @@ pub enum Value {
     Decimal(Decimal),
     Uuid(Uuid),
     Json(serde_json::Value),
+    JsonText(String),
     /// A non-NULL cell the driver could not decode (e.g. a wide NUMERIC
     /// sqlx cannot represent). Carries the driver's column type name so the
     /// UI can explain the gap instead of showing it as an editable NULL.
@@ -135,7 +138,7 @@ impl QueryResultBudget {
 
 fn value_size(value: &Value) -> usize {
     match value {
-        Value::Text(text) | Value::Undecodable(text) => text.capacity(),
+        Value::Text(text) | Value::JsonText(text) | Value::Undecodable(text) => text.capacity(),
         Value::Bytes(bytes) => bytes.capacity(),
         Value::Json(value) => json_heap_size(value),
         _ => 0,
@@ -362,6 +365,10 @@ mod tests {
             super::value_size(&Value::Json(serde_json::Value::String(json_string))),
             json_capacity
         );
+
+        let json_text = String::with_capacity(48);
+        let json_text_capacity = json_text.capacity();
+        assert_eq!(super::value_size(&Value::JsonText(json_text)), json_text_capacity);
     }
 
     #[test]

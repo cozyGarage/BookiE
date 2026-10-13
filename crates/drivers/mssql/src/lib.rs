@@ -550,6 +550,7 @@ impl Connection for MssqlConnection {
             match out.iter_mut().find(|ix| ix.name == name) {
                 Some(ix) => ix.columns.push(col),
                 None => out.push(IndexInfo {
+                    constraint: None,
                     name,
                     columns: vec![col],
                     unique,
@@ -766,6 +767,7 @@ fn boxed_params(params: &[Value]) -> Result<Vec<Box<dyn ToSql>>, DriverError> {
                 Value::Int(i) => Box::new(*i),
                 Value::Float(f) => Box::new(*f),
                 Value::Text(s) => Box::new(s.clone()),
+                Value::JsonText(s) => Box::new(s.clone()),
                 Value::Bytes(b) => Box::new(b.clone()),
                 Value::Date(d) => Box::new(*d),
                 Value::Time(t) => Box::new(*t),
