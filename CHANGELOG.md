@@ -5,6 +5,7 @@
 Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the user-facing map for that development line since the last tagged package, [0.1.5](#015---2026-09-27). Compare: [`linux-v0.1.5...linux`](https://github.com/cozyGarage/BookiE/compare/linux-v0.1.5...linux). Entries stay here until the next tagged release.
 
 ### Added
+- At narrow window widths, the navigation sidebar collapses before the editor toolbar is clipped, keeping the main menu and editor actions in view.
 - Pressing Enter in a connection text field now activates Connect.
 - SQL query and pinned result grids can filter loaded rows by a cell's native value without running the SQL again; the grid shows the visible and loaded counts.
 - View Value shows pending grid edits, including long text and NULL, before they are saved.
