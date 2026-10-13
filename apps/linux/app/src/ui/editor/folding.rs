@@ -185,7 +185,8 @@ fn collect_block_ranges(sql: &str, tokens: &[ScriptToken], base: usize, ranges: 
         }
         let word = token_text(sql, token).to_ascii_uppercase();
         if word == "END" {
-            close_block(sql, tokens, index, token, &mut open, &mut skip, base, ranges);
+            let next = next_significant(tokens, index).map(|next| (next, &tokens[next]));
+            close_block(sql, next, token, &mut open, &mut skip, base, ranges);
             continue;
         }
         if let Some(kind) = opener_kind(&word)
@@ -198,28 +199,27 @@ fn collect_block_ranges(sql: &str, tokens: &[ScriptToken], base: usize, ranges: 
 
 fn close_block(
     sql: &str,
-    tokens: &[ScriptToken],
-    index: usize,
+    next: Option<(usize, &ScriptToken)>,
     token: &ScriptToken,
     open: &mut Vec<(BlockKind, Range<usize>)>,
     skip: &mut Option<usize>,
     base: usize,
     ranges: &mut Vec<FoldRange>,
 ) {
-    let Some(next) = next_significant(tokens, index) else {
+    let Some((next_index, next_token)) = next else {
         close_last(sql, token, open, base, ranges);
         return;
     };
-    let suffix = token_text(sql, &tokens[next]).to_ascii_uppercase();
+    let suffix = token_text(sql, next_token).to_ascii_uppercase();
     if let Some(suffix_kind) = opener_kind(&suffix) {
-        *skip = Some(next);
+        *skip = Some(next_index);
         if open.last().is_some_and(|(kind, _)| *kind == suffix_kind) {
             close_last(sql, token, open, base, ranges);
         }
         return;
     }
     if matches!(suffix.as_str(), "TRY" | "CATCH") {
-        *skip = Some(next);
+        *skip = Some(next_index);
     }
     close_last(sql, token, open, base, ranges);
 }
