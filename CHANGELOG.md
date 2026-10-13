@@ -6,6 +6,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Added
 - Switching database drivers keeps custom connection values and updates fields that still use the previous driver's defaults.
+- Pressing Enter in a connection text field now activates Connect.
 - SQL query and pinned result grids can filter loaded rows by a cell's native value without running the SQL again; the grid shows the visible and loaded counts.
 - View Value shows pending grid edits, including long text and NULL, before they are saved.
 - SQL result filters and sorting stay in place when the same statement is rerun or its result is pinned or unpinned, and selected rows stay attached to the same materialized result.
