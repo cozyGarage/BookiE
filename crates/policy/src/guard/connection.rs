@@ -442,7 +442,8 @@ impl Connection for PolicyGuard {
             )
             .await;
         let rows = result.as_ref().ok().map(|values| values.iter().sum());
-        self.audit_transaction_result(&operation, start, &result, rows).await?;
+        self.audit_transaction_result(&operation, start, &result, rows, TransactionAuditMode::AtomicBatch)
+            .await?;
         pending_write.disarm();
         result
     }
@@ -530,7 +531,8 @@ impl Connection for PolicyGuard {
             )
             .await;
         let rows = result.as_ref().ok().map(|values| values.iter().sum());
-        self.audit_transaction_result(&operation, start, &result, rows).await?;
+        self.audit_transaction_result(&operation, start, &result, rows, TransactionAuditMode::AtomicBatch)
+            .await?;
         pending_write.disarm();
         result
     }
