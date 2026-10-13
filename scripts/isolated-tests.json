@@ -295,6 +295,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::local_sort::tests::local_text_sort_follows_the_locale_collation_not_byte_order"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::local_filter::tests::local_filter_and_sort_keep_selection_attached_to_the_source_row"
     ],
     [
