@@ -84,6 +84,16 @@ async fn mysql_failed_batch_federated_write_survives_rollback() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_failed_batch_federated_trigger_effect_survives_rollback() {
+    let (container, opts) = start_mysql_with_federated().await;
+    let conn = connect(opts.clone()).await;
+    assert_federated_trigger_effect_survives_rollback(conn.as_ref(), &opts).await;
+    conn.close().await.unwrap();
+    container.stop().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn mariadb_failed_batch_federated_write_survives_rollback() {
     let (container, opts) = start_mariadb_with_federated().await;
     let conn = connect(opts.clone()).await;
@@ -119,6 +129,57 @@ async fn mariadb_failed_batch_federated_write_survives_rollback() {
     container.stop().await.unwrap();
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_failed_batch_federated_trigger_effect_survives_rollback() {
+    let (container, opts) = start_mariadb_with_federated().await;
+    let conn = connect(opts.clone()).await;
+    assert_federated_trigger_effect_survives_rollback(conn.as_ref(), &opts).await;
+    conn.close().await.unwrap();
+    container.stop().await.unwrap();
+}
+
+async fn assert_federated_trigger_effect_survives_rollback(conn: &dyn Connection, opts: &ConnectOptions) {
+    conn.execute("CREATE TABLE federated_remote_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute(
+        "CREATE TABLE federated_trigger_target (id INT PRIMARY KEY) ENGINE=FEDERATED \
+         CONNECTION='mysql://root:tablepro_test@127.0.0.1:3306/test/federated_remote_effects'",
+    )
+    .await
+    .unwrap();
+    conn.execute("CREATE TABLE federated_trigger_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO federated_trigger_parent VALUES (1)")
+        .await
+        .unwrap();
+    create_federated_trigger(opts).await;
+    let batch = vec![
+        ("INSERT INTO federated_trigger_parent VALUES (2)".into(), vec![]),
+        ("INSERT INTO federated_trigger_parent VALUES (1)".into(), vec![]),
+    ];
+    let error = conn.execute_in_transaction(&batch).await.unwrap_err();
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+        "the duplicate parent must fail statement 2, got {error:?}"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM federated_trigger_parent ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "the transactional parent insert rolls back"
+    );
+    assert_eq!(
+        remote_federated_rows(opts).await,
+        vec![2],
+        "the trigger's remote FEDERATED write survives local rollback"
+    );
+}
+
 async fn start_mariadb_with_federated() -> (testcontainers::ContainerAsync<GenericImage>, ConnectOptions) {
     let image = GenericImage::new("mariadb", "11")
         .with_exposed_port(3306.tcp())
@@ -137,6 +198,52 @@ async fn start_mariadb_with_federated() -> (testcontainers::ContainerAsync<Gener
         ..Default::default()
     };
     (container, opts)
+}
+
+async fn start_mysql_with_federated() -> (testcontainers::ContainerAsync<Mysql>, ConnectOptions) {
+    let container = Mysql::default()
+        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_cmd([
+            "--default-authentication-plugin=mysql_native_password",
+            "--federated",
+            "--innodb-flush-log-at-trx-commit=0",
+            "--innodb-doublewrite=0",
+            "--sync-binlog=0",
+        ])
+        .start()
+        .await
+        .unwrap();
+    let opts = ConnectOptions {
+        host: container.get_host().await.unwrap().to_string(),
+        port: container.get_host_port_ipv4(3306).await.unwrap(),
+        database: "test".into(),
+        username: "root".into(),
+        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        tls: tablepro_core::TlsConfig::disabled(),
+        ..Default::default()
+    };
+    (container, opts)
+}
+
+async fn create_federated_trigger(opts: &ConnectOptions) {
+    let mut setup = sqlx::MySqlConnection::connect_with(
+        &sqlx::mysql::MySqlConnectOptions::new()
+            .host(&opts.host)
+            .port(opts.port)
+            .username(&opts.username)
+            .password(opts.password.expose_secret())
+            .database(&opts.database),
+    )
+    .await
+    .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER federated_parent_after_insert AFTER INSERT ON federated_trigger_parent \
+         FOR EACH ROW INSERT INTO federated_trigger_target VALUES (NEW.id)",
+    )
+    .execute(&mut setup)
+    .await
+    .unwrap();
+    setup.close().await.unwrap();
 }
 
 async fn remote_federated_rows(opts: &ConnectOptions) -> Vec<i32> {
