@@ -1021,20 +1021,6 @@ pub(super) fn structure_tab_title(schemas_count: usize, schema: Option<&str>, ta
     format!("{title} · {}", crate::tr!("Structure"))
 }
 
-#[cfg(test)]
-mod structure_title_tests {
-    use super::*;
-
-    #[test]
-    fn an_existing_structure_tab_keeps_its_kind_in_the_title() {
-        assert_eq!(structure_tab_title(1, None, "orders"), "orders · Structure");
-        assert_eq!(
-            structure_tab_title(2, Some("sales"), "orders"),
-            "sales.orders · Structure"
-        );
-    }
-}
-
 fn default_editor_tab_label(n: usize) -> String {
     crate::tr!("Query {n}").replace("{n}", &n.to_string())
 }
@@ -1151,4 +1137,18 @@ fn editor_tab_tooltip(query: &str, label: &str) -> Option<String> {
     }
     let preview = format!("{}…", &q[..last_idx]);
     if preview == label { None } else { Some(preview) }
+}
+
+#[cfg(test)]
+mod structure_title_tests {
+    use super::*;
+
+    #[test]
+    fn an_existing_structure_tab_keeps_its_kind_in_the_title() {
+        assert_eq!(structure_tab_title(1, None, "orders"), "orders · Structure");
+        assert_eq!(
+            structure_tab_title(2, Some("sales"), "orders"),
+            "sales.orders · Structure"
+        );
+    }
 }
