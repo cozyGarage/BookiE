@@ -25,8 +25,8 @@ What the application does not do, or does differently from what you might expect
 - **Hidden-column projection still needs desktop acceptance** (PERF-9). Merged
   [#384](https://github.com/cozyGarage/BookiE/pull/384) projects hidden non-key
   columns out of the select and refuses full-row copy, row JSON and current-page
-  export while those values are unfetched. Distribution Wayland/GNOME acceptance
-  remains open.
+  export while those values are unfetched. Installed Arch/Hyprland Wayland
+  acceptance remains open; Debian/GNOME acceptance follows after 0.2.0.
 - **A table without a primary key cannot be deleted from the grid** (TEST-14). There
   is no all-column fallback, by design.
 - **ClickHouse ambiguous local times:** a `DateTime64` that falls in a repeated or
@@ -63,15 +63,16 @@ What the application does not do, or does differently from what you might expect
 
 - The 0.2.0 desktop target is Arch Linux / Omarchy under Hyprland as a native Wayland client. Installed package acceptance, including install, upgrade and rollback, remains pending (PKG-1 / [#574](https://github.com/cozyGarage/BookiE/issues/574)); Xvfb results do not count.
 - Native Debian and Ubuntu GNOME desktop acceptance remains open for the later PKG-2 phase, although the packages build and the installed test suite passes in containers.
-- Flatpak build, install and launch checks pass, but Flathub submission and screenshots are not done and the package is not offered (PKG-4, PKG-8).
+- Flatpak is not offered. Flathub submission and screenshots remain open (PKG-4, PKG-8); the earlier manual install and launch checks are recorded in the [platform guide](platforms.md#flathub).
 - Windows and macOS are not supported; the application is built for Linux with GTK 4 and libadwaita.
 
 ## Known bugs
 
+- **Debug panic output can expose sensitive panic text** (SEC-10 / [#849](https://github.com/cozyGarage/BookiE/issues/849)): setting `TABLEPRO_DEBUG_PANICS=1` currently leaves Rust's default hook active, which may print the raw panic payload. Avoid enabling it until the fix lands.
 - **Installed GTK suite is intermittent on Forgejo** (TEST-31 / [#556](https://github.com/cozyGarage/BookiE/issues/556)): the startup restore layout abort was fixed in [#821](https://github.com/cozyGarage/BookiE/pull/821). Intermittent failures remain under investigation; recent failures include an application shutdown with a bad exit status after the scenarios passed. The required consecutive full-run evidence has not been met.
 - **MCP token keyring save can fail after issuance** (UI-43 / [#861](https://github.com/cozyGarage/BookiE/issues/861)): the token is still issued, but the dialog may say it was saved when the keyring write failed.
 
 ## Test and CI limits
 
 - The installed GTK suite does not pass reliably on a native Ubuntu 24.04 runner (TEST-28); it passes in the Debian 13 and Ubuntu 24.04 containers.
-- About 68 percent of the policy crate's and 81 percent of the core crate's mutations were caught by their own tests when measured at `0d21eb6d4` (2026-10-11); later survivor triage is in the [B4 mutation triage](evidence/b4-mutation-triage-2026-10-12) and the figure has not been re-measured. Mutation survivors are tracked under [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559); expected-value provenance is a separate [TEST-32 oracle review](oracle-review.md).
+- Mutation results are tied to their source SHA; use the latest [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559) report for survivor and timeout status. Expected-value provenance is tracked separately by [TEST-32](oracle-review.md).

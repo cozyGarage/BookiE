@@ -4,7 +4,7 @@ Use this page to select checks, hand off work, and review evidence. The executab
 
 ## Current desktop target
 
-The [current continuation](bookie-0.2-sprint.md#current-continuation) orders B3, B4, then Arch/Omarchy/Hyprland native Wayland UI acceptance. GNOME desktop on Debian is the required installed/package phase after Arch; current B3/B4 implementation does not require that VM. GNOME 50 in the layer catalog names GTK/libadwaita development-library requirements, not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
+The [current continuation](bookie-0.2-sprint.md#current-continuation) orders B3, B4, then Arch/Omarchy/Hyprland native Wayland UI acceptance. Debian/GNOME installed-package acceptance follows Arch; current B3/B4 implementation work can proceed before that platform phase. GNOME 50 in the layer catalog names GTK/libadwaita development-library requirements, not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
 
 ## Start here
 
@@ -82,7 +82,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `security-policy` | Policy/MCP permissions, allowlists, bounds and audit behavior | Non-GTK dependencies; does not prove every server authorization mode |
 | `supply-chain` | Advisory, license and dependency-source policy | `cargo-deny`, `cargo-audit`, network; repository exceptions remain explicit |
 | `widgets` | Named GTK widget regressions in isolated processes | GNOME 50, Xvfb and private D-Bus |
-| `app-server` | Registered PostgreSQL/MySQL/MongoDB parser, keyed-edit and metadata contracts | GNOME 50 build libraries and Docker; hosted GTK fast job |
+| `app-server` | App parser and grid-edit contracts against PostgreSQL, MySQL, MongoDB and SQL Server | GNOME 50 build libraries and Docker; hosted GTK fast job |
 | `keyring` | Registered Secret Service contracts | Private D-Bus, gnome-keyring and libsecret tools |
 | `ui` | Real application actions and database postconditions via AT-SPI | GNOME 50, Xvfb, PyAT-SPI; X11 automation, not Wayland acceptance |
 | `mssql-kerberos` | SQL Server integrated authentication, SPN refusal and verified TLS against an isolated test domain | Docker Compose with privileged-container support; opt-in local fixture |
@@ -95,7 +95,7 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Scope | Entry point | Completion evidence |
 | --- | --- | --- |
 | Optional DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus app feature build |
-| Mutation | Linux test quality; [local instructions](testing.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON |
+| Mutation | GitHub Linux test quality; Forgejo nightly; [local instructions](testing.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON; Forgejo also checks missed mutants against package baselines |
 | Coverage | Linux test quality; [local instructions](testing.md#coverage) | LCOV, exclusions and summary; this report has no threshold. Forgejo nightly separately enforces the unit-tier and per-crate floors. |
 | Flatpak | Flatpak Linux (packaging only) | Pull requests build the default profile; push and `workflow_dispatch` also build development; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
@@ -156,7 +156,7 @@ Use [the scenario survey](archive/b3-test-scenario-survey.md) and [value contrac
 | BC/year 10000 SQL export failed | Core SQL literal unit and PostgreSQL date round-trip | Remaining driver-specific calendar limits and non-SQL consumer parity |
 | Decoder and oracle shared the same bug | Array size literal and numeric variant assertions | Independent oracles for other driver decoders |
 | Green CI omitted eight SSH tests | SSH runner, ignored-test inventory and workflow regression | Audit new ignored targets whenever added |
-| Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage core's 88 survivors/16 timeouts; no blanket exclusions |
+| Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage survivors and timeouts from the exact run report tracked under [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559); counts vary by source SHA, so do not carry an old total forward |
 | Test process failed, hung or never ran | Layer-runner negative tests | Keep adding actual infrastructure failure modes |
 
 Secure connection coverage is engine-specific. Track valid auth, rejected auth, wrong CA/hostname, no plaintext fallback, cancellation during connect/read/write, disconnect/reconnect, pool reuse, partial streams, malformed lengths, NULL/empty distinctions, Unicode/binary boundaries and authorization on every consumer. An unchecked scenario is a backlog item, not an implied capability or a pass.
