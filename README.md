@@ -10,7 +10,7 @@ Every shipped feature is free to use. BookiE has no account, license, subscripti
 
 ## Status
 
-The Linux client is under active development toward BookiE 0.2.0. B3 type/value consumer coverage remains open, followed by B4 transport/session acceptance and installed desktop qualification. Workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, audit records, MCP access, and the headless `bookie-agentd` process. Table browsing fetches bounded pages from the database. Arbitrary SQL editor results are still materialized up to configured caps; progressive server-cursor paging is accepted in [ADR 0011](docs/decisions/0011-paged-query-results.md) but not implemented.
+The Linux client is under active development toward BookiE 0.2.0. B3 type/value and B4 transport/session correctness blockers remain alongside installed desktop qualification. Workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, audit records, MCP access, and the headless `bookie-agentd` process. Table browsing fetches bounded pages from the database. Core and PostgreSQL cursor APIs exist, but the policy-governed editor path is not complete, so arbitrary SQL results are still materialized up to configured caps ([ADR 0011](docs/decisions/0011-paged-query-results.md), PERF-2/PERF-8).
 
 PostgreSQL is the furthest along: server-confirmed cancellation, certificate hostname and authority verification, verified TLS through an SSH tunnel, read-only denial, rollback, blocking-lock reporting, and reconnect run as deterministic container checks. MySQL, ClickHouse, Redis, and MongoDB also have driver TLS fixture evidence; those fixtures do not establish full transport or packaging readiness. Packaging is not release-verified. [`ROADMAP.md`](ROADMAP.md) links to current milestone status and the detailed acceptance boards.
 
@@ -19,7 +19,7 @@ PostgreSQL is the furthest along: server-confirmed cancellation, certificate hos
 | PostgreSQL | Implemented; PostgreSQL release fixture |
 | MySQL and MariaDB | Implemented; driver and TLS fixtures |
 | SQLite | Implemented; local and GTK tests |
-| Microsoft SQL Server | Implemented; cancellation and authentication limits |
+| Microsoft SQL Server | Implemented; timed-out query cancellation is not available in BookiE yet |
 | ClickHouse | Implemented; driver and TLS fixtures |
 | Redis | Experimental; single host/port endpoint in 0.2.0 |
 | MongoDB | Experimental |
@@ -38,7 +38,7 @@ BookiE 0.1.5 (tag `linux-v0.1.5`) targets:
 
 `tablepro` and `tablepro-agentd` remain command aliases. Application ID and XDG paths stay `com.tablepro.linux` / `tablepro`.
 
-**Ubuntu 24.04 and 25.10 cannot run this line.** GTK CI builds in Debian testing for the GNOME 50 library baseline.
+**The released `.deb` does not run on the default Ubuntu 24.04 or 25.10 libraries.** It needs the GNOME 50 package line; the separate build / CI floor supports the Ubuntu 24.04 stack. GTK CI builds in Debian testing for the GNOME 50 library baseline.
 
 Build / CI floor: GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (Ubuntu 24.04 and Debian 13). The GNOME 50 GitHub Release `.deb` uses a higher package line (GTK 4.22+, GLib 2.88+, libadwaita 1.9+, GtkSourceView 5.18+). Details: [ADR 0002](docs/decisions/0002-rust-gtk4-libadwaita.md) and [platforms](docs/platforms.md). Build with Rust 1.98. No AUR, Flathub, or Fedora package. No 32-bit or ARM artifacts.
 
@@ -60,7 +60,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 
 ## Architecture
 
-Crate map, Mermaid pipeline diagrams, trait boundaries and deliberate limits live in [`ARCHITECTURE.md`](ARCHITECTURE.md). Every GUI, MCP and agent database handle is a `PolicyGuard`; token scopes and connection allowlists do not replace it. Drivers are linked at build time. The UI is native GTK (no embedded browser).
+Crate map, Mermaid pipeline diagrams, trait boundaries and deliberate limits live in [`ARCHITECTURE.md`](ARCHITECTURE.md). The desktop app uses `tablepro-app-services` for GTK-free application state and service logic. Every GUI, MCP and agent database handle is a `PolicyGuard`; token scopes and connection allowlists do not replace it. Drivers are linked at build time. The UI is native GTK (no embedded browser).
 
 ## Build requirements
 
@@ -126,7 +126,6 @@ bash scripts/preflight.sh
 From the repository root:
 
 ```bash
-./scripts/preflight.sh
 ./scripts/smoke-postgres.sh          # optional smoke against a local PostgreSQL
 ./scripts/test-postgres-socket.sh    # disposable Unix-socket fixture
 ```
@@ -139,7 +138,7 @@ GitHub runs the cheap tier only; merge acceptance is the Forgejo gate (`bash scr
 
 ## Packaging
 
-The current package is BookiE 0.1.5. Download it from the [linux-v0.1.5 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5), or see [the release evidence](docs/archive/release-0.1.4.md) and [apps/linux/packaging/README.md](apps/linux/packaging/README.md). To rebuild the Arch package from a clean commit at the repository root:
+The current package is BookiE 0.1.5. Download it from the [linux-v0.1.5 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5), or see the [0.1.5 release notes](CHANGELOG.md) and [packaging guide](apps/linux/packaging/README.md). To rebuild the Arch package from a clean commit at the repository root:
 
 ```bash
 TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.5 ./scripts/build-arch-rc.sh
