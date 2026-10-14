@@ -34,7 +34,7 @@ Keep code focused and readable:
 - Keep public crate boundaries typed with `thiserror` errors.
 - Add tests for behavior changes.
 - Keep GTK objects on the GLib main context. Run database and service work through the existing Relm4 and Tokio bridge.
-- Add comments only when they explain a constraint that names and types cannot express.
+- Do not add code comments or doc comments except when an external system requires them; follow [AGENTS.md](../AGENTS.md#principles).
 
 ## Database drivers
 
@@ -46,13 +46,13 @@ Read [docs/storage.md](storage.md) before changing persisted data. Do not put pa
 
 ## GTK changes
 
-Keep UI state in Relm4 components and move testable rules into pure Rust services. Add unit tests for extracted logic. Safety-sensitive GTK flows need targeted tests when they can run deterministically. The current release blockers are listed in [docs/production-audit.md](archive/production-audit.md).
+Keep UI state in Relm4 components and move testable rules into pure Rust services. Add unit tests for extracted logic. Safety-sensitive GTK flows need targeted tests when they can run deterministically. Current release blockers and acceptance are listed in the [active sprint](bookie-0.2-sprint.md).
 
 Include before and after screenshots for visible changes. Test both light and dark themes when colors or contrast change.
 
 ## Packaging
 
-GitHub Release packages are Arch x86_64 and a `.deb` for Debian/Ubuntu hosts that already have the GNOME 50 library line. Ubuntu 24.04 and 25.10 cannot run that `.deb`. See [README.md](../README.md#linux-versions) and [platforms](platforms.md). Test `apps/linux/packaging/arch/PKGBUILD`, `scripts/validate-arch-package.sh`, and `scripts/validate-deb-package.sh` when a change affects installed files, native dependencies, desktop integration, or launch behavior. Public AUR and Flathub publication are deferred and must not define current requirements.
+See [platforms](platforms.md) for released artifacts, supported native-library versions and package availability. Test `apps/linux/packaging/arch/PKGBUILD`, `scripts/validate-arch-package.sh`, and `scripts/validate-deb-package.sh` when a change affects installed files, native dependencies, desktop integration, or launch behavior. Public AUR and Flathub publication are deferred and must not define current requirements.
 
 ## Commits and pull requests
 

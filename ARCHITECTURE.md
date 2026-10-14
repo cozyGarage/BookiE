@@ -15,8 +15,6 @@ The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/Bo
 | root | `Cargo.toml` workspace, toolchain and lint config, `meson.build`, this file, `AGENTS.md`, `README.md`. |
 | `baselines/` | Ratchet ceilings for comment lines, function size, file size, panic sites, and the coverage floor. |
 
-A new platform app would sit beside `apps/linux/` and reuse `crates/` unchanged.
-
 This page is the one-page map. Accepted [ADRs](docs/decisions/README.md) constrain behaviour; [AGENTS.md](./AGENTS.md) owns contributor rules; the sprint owns sequencing. Capability behaviour extracted from code lives under [`specs/`](specs/README.md).
 
 | If you want to… | Read |
@@ -71,7 +69,7 @@ Both processes register the same static drivers and must obtain a `PolicyGuard` 
 
 ## Containers (crates)
 
-Dependencies point downward. `tablepro-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; only the two composition roots (`app` and `agentd`) depend on the driver crates.
+Dependencies point downward. `tablepro-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; in production, only the two composition roots (`app` and `agentd`) depend on driver crates. Test crates may depend on drivers to verify real engine behavior.
 
 ```mermaid
 flowchart TB
@@ -82,6 +80,10 @@ flowchart TB
 
     subgraph surfaces["Surfaces"]
         mcp["tablepro-mcp<br/>scopes, allowlists, tools"]
+    end
+
+    subgraph app_logic["GTK-free application logic"]
+        app_services["tablepro-app-services<br/>state and service logic"]
     end
 
     subgraph governance["Governance"]
@@ -104,6 +106,9 @@ flowchart TB
 
     app --> mcp
     agentd --> mcp
+    app --> app_services
+    app_services --> storage
+    app_services --> core
     app --> transport
     agentd --> transport
     mcp --> policy
@@ -126,6 +131,7 @@ flowchart TB
 | `tablepro-agentd` | Headless MCP composition root. Cargo binary `tablepro-agentd`; installed as `bookie-agentd`. |
 | `tablepro-core` | Domain types, driver traits, values, filters, transactions, registry. No workspace dependency. |
 | `tablepro-policy` | Classify, rules, approval, masking, blast radius, audit types, `PolicyGuard`. Depends on `core` only. |
+| `tablepro-app-services` | GTK-free application state and service logic used by the desktop app. Depends on `core` and `storage`. |
 | `tablepro-storage` | Saved connections, Secret Service, query history, audit journal. |
 | `tablepro-ssh` | Built-in `russh` tunnels and optional system OpenSSH backend. |
 | `tablepro-transport` | Saved-connection → dial options, SSH chain, tunnel, TLS service identity. |
@@ -142,7 +148,7 @@ These traits are the seams that keep engines and UI replaceable. Behaviour detai
 | Trait / type | Crate | Job |
 |---|---|---|
 | `DatabaseDriver` | `core` | Connect and advertise engine capabilities. |
-| `Connection` | `core` | Query, execute, schema, transactions, controlled cancel. |
+| `Connection` | `core` | Query, execute, schema, transactions, controlled cancel and optional forward-only query cursors. |
 | `OperationControl` | `core` | Cancellation token + optional deadline that reach the driver. |
 | `PolicyGuard` | `policy` | Only consumer-facing `Connection`. Classify → decide → approve → mask → execute → audit. |
 | `ApprovalSink` / `AuditSink` | `policy` | Pluggable approval UI and durable journal writes. |
@@ -150,6 +156,8 @@ These traits are the seams that keep engines and UI replaceable. Behaviour detai
 | `ConnectionFaultSink` | `policy` | Optional: app/agentd learn the connection is unusable after panic/desync. |
 
 Adding an engine means implementing `DatabaseDriver` + `Connection` behind those traits, not teaching the UI a new driver id ([ADR 0001](docs/decisions/0001-no-plugin-system.md)).
+
+The optional cursor path is governed by `PolicyGuard`: it accepts one read statement in a read-only session snapshot, masks and audits each fetched page under the same operation, and closes the cursor on terminal outcomes. PostgreSQL is the only driver that supports it today. The SQL editor still uses materialized results and their existing caps ([ADR 0011](docs/decisions/0011-paged-query-results.md)).
 
 ## Governed request pipeline
 
@@ -188,7 +196,7 @@ sequenceDiagram
 
 | Stage | Owner | Invariant |
 |---|---|---|
-| Resolve | `storage` | Secrets stay in Secret Service / `secrecy` until the driver boundary. |
+| Resolve | `storage` | Saved database and SSH secrets stay in Secret Service / `secrecy` until their driver or SSH boundary. MCP token delivery follows its issuance path in [storage](docs/storage.md). |
 | Assemble route | `transport` | Dial endpoint and TLS service identity are separate fields. |
 | Guard | `policy` | No raw driver handle leaves MCP or agentd. |
 | Statement | `policy` | Preview, transaction, retry and batch use the same checks as direct execution. |
@@ -200,9 +208,11 @@ sequenceDiagram
 Nothing points back up. Cycles are forbidden. Composition roots sit at the top; `core` is the leaf.
 
 ```text
-tablepro-app ────────┐
-tablepro-agentd ─────┼──► mcp, policy, storage, transport, ssh, drivers, core
-tablepro-release-tests┘
+tablepro-app ────────┬──► app-services, mcp, policy, storage, transport, ssh, drivers, core
+tablepro-agentd ────┘
+
+tablepro-release-tests ──► mcp, policy, storage, transport, ssh, drivers, core
+tablepro-app-services ──► storage, core
 
 tablepro-mcp        ──► policy, storage, core
 tablepro-transport  ──► storage, ssh, policy, core
@@ -215,7 +225,7 @@ tablepro-core       ──► (no workspace crate)
 
 Rules that keep this sound:
 
-1. **Two composition roots only.** `app` and `agentd` register drivers and assemble services. Domain crates do not construct GTK widgets or start Relm4.
+1. **Two production composition roots.** `app` and `agentd` register drivers and assemble services. Domain crates do not construct GTK widgets or start Relm4. Test crates may assemble drivers to exercise their contracts against real engines.
 2. **One governance seam.** Every live database handle a consumer sees is a `PolicyGuard`. Token scopes and connection allowlists never replace it.
 3. **Static drivers.** Engines are linked at build time and registered in code. There is no plugin discovery ABI ([ADR 0001](docs/decisions/0001-no-plugin-system.md)).
 4. **Trust at the edges.** MCP input, saved connection files, imported files, environment variables and database metadata are untrusted input.
@@ -242,7 +252,7 @@ Helpers stay in the crate that owns the behaviour. Do not grow a cross-crate “
 
 - Dependencies point toward `core`. No cycles. Drivers and domain crates never import GTK or Relm4.
 - Consumers never hold a raw driver `Connection`; only a `PolicyGuard`.
-- Secrets stay in Secret Service / `secrecy` until the driver boundary; never in JSON, argv, traces or audit fields.
+- Saved database and SSH secrets stay in Secret Service / `secrecy` until their driver or SSH boundary. MCP tokens follow their issuance path in [storage](docs/storage.md). Secrets never go in connection JSON, argv, traces or audit fields.
 - Dial target and TLS verify hostname are separate fields under SSH ([transport](#transport-and-service-identity)).
 - Late async results apply only when the generation or request id still matches.
 - Preview, transaction, retry and batch paths use the same policy checks as direct execution.
@@ -318,7 +328,7 @@ Each engine exports a type implementing `tablepro_core::DatabaseDriver`. Connect
 | PostgreSQL | SQLx | Separate control pool for server-confirmed cancel; release fixture |
 | MySQL / MariaDB | SQLx | Driver + TLS fixtures |
 | SQLite | SQLx | Local and GTK tests |
-| SQL Server | Tiberius | Cancellation and auth limits; Kerberos optional |
+| SQL Server | Tiberius | BookiE does not yet use the driver's `cancel_query` API; Kerberos optional |
 | ClickHouse | `clickhouse` | Driver + TLS fixtures |
 | Redis | `redis` | Experimental; single host/port in 0.2.0 |
 | MongoDB | `mongodb` | Experimental |
@@ -334,7 +344,7 @@ Each engine exports a type implementing `tablepro_core::DatabaseDriver`. Connect
 | Command scope | Component-scoped commands for tab/component lifetime. Detached Relm4 tasks only for independent persistence/cleanup. |
 | Tabs | `AdwTabView` workspaces; Relm4 controllers keyed by tab UUID. |
 | Browse grid | Bounded pages in `RowStore` (`gio::ListModel`); weakly cached `RowObject`s. |
-| SQL editor results | Materialized up to caps. Progressive server-cursor paging accepted in [ADR 0011](docs/decisions/0011-paged-query-results.md), not implemented (PERF-2/PERF-8). |
+| SQL editor results | Core, PostgreSQL and PolicyGuard cursor paths exist, including per-page masking and audit; the editor does not yet use them, so results remain materialized up to caps ([ADR 0011](docs/decisions/0011-paged-query-results.md), PERF-2/PERF-8). |
 | Identity | Sidebar refresh tokens hold a weak session reference. Tab results keep their tab UUID across connection switches. |
 
 ## Persistence
@@ -349,7 +359,7 @@ Default workspace Clippy/unit checks exclude optional DuckDB. GitHub runs the ch
 
 | Limit | Why |
 |---|---|
-| Linux only (today) | One developer; GTK/libadwaita stack. Shared crates stay UI-free so a later platform can reuse them. |
+| Linux only | GTK/libadwaita desktop and Linux packaging are the product target. UI-free crates support the headless daemon and test boundaries; another desktop platform is out of scope. |
 | Static drivers | Compile-time registration; no plugin ABI. |
 | No embedded browser | Native GTK widgets only. |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |

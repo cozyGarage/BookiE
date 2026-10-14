@@ -8,16 +8,16 @@ BookiE is a native Linux database client. A person runs it on their machine, ope
 
 ## What people do today instead
 
-Another desktop database client, a vendor cloud console, or `psql` / `mysql` in a terminal. Those tools either skip a policy and audit path, or they require an account. BookiE's bet is a local GTK client that still wraps every consumer handle in `PolicyGuard`.
+Alternatives include other desktop database clients, vendor consoles, and command-line tools such as `psql` or `mysql`. BookiE's product bet is to combine a local GTK workflow with one governed and audited database path for the GUI and MCP consumers.
 
 ## Vision
 
-Stay a Linux-only native client. Finish BookiE 0.2.0 as a development release for the Arch and Hyprland target, with hotfixes to follow. Keep drivers compiled in. Keep secrets in Secret Service. Keep MCP, the GUI and the headless daemon on one governed SQL path.
+Stay a Linux-only native client. Finish BookiE 0.2.0 as a development release for the Arch and Hyprland target, with hotfixes to follow. Keep drivers compiled in. Store persistent credentials in Secret Service and issue headless MCP tokens once through an explicit output path. Keep MCP, the GUI and the headless daemon on one governed SQL path.
 
 ## Current state (as of 2026-10)
 
 - **Live:** saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, audit records, MCP access, `bookie-agentd`. Installable 0.1.5 packages on Debian (GNOME 50 libraries) and Arch. PostgreSQL is the furthest-along engine.
-- **In progress:** B3 type/value consumer coverage, B4 transport and session acceptance, installed desktop qualification, progressive server-cursor paging (accepted in ADR 0011, not implemented).
+- **In progress:** B3 type/value consumer coverage, B4 transport and session acceptance, installed desktop qualification, and progressive server-cursor paging. Core, PostgreSQL and PolicyGuard cursor support exists; SQL editor integration remains ([ADR 0011](docs/decisions/0011-paged-query-results.md)).
 - **Left out of 0.2.0:** Flatpak and Flathub, a web UI, runtime driver plugins, accounts or paid tiers.
 
 ## Users / personas
