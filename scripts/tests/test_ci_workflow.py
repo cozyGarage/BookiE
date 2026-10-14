@@ -394,6 +394,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
         runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
         self.assertIn("python3-pyatspi", runtime_image)
+        self.assertIn("gir1.2-gtk-4.0", runtime_image)
         self.assertNotIn("rustup", runtime_image)
 
 
