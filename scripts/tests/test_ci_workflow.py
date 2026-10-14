@@ -362,6 +362,14 @@ class CiWorkflowTests(unittest.TestCase):
             contracts.split("concurrency:", 1)[1].split("jobs:", 1)[0],
         )
 
+    def test_sonar_imports_python_tool_coverage_report(self):
+        workflow = (ROOT / ".github/workflows/sonar-rust.yml").read_text()
+        self.assertIn("coverage==7.10.6", workflow)
+        self.assertIn("coverage run --branch --source=scripts", workflow)
+        self.assertIn("unittest discover -s scripts/tests", workflow)
+        self.assertIn("coverage xml -o target/sonar/python-coverage.xml", workflow)
+        self.assertIn("-Dsonar.python.coverage.reportPaths=target/sonar/python-coverage.xml", workflow)
+
 
     def test_forgejo_distro_floor_reuses_one_package_across_bases(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
