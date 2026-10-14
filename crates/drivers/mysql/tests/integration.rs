@@ -36,6 +36,12 @@ mod mysql_atomic;
 #[path = "shared/mysql_trigger_engine_error.rs"]
 mod mysql_trigger_engine_error;
 
+#[path = "shared/mysql_atomic_assertions.rs"]
+mod mysql_atomic_assertions;
+
+#[path = "shared/mysql_upsert_before_update.rs"]
+mod mysql_upsert_before_update;
+
 #[path = "shared/mysql_temp_table_rollback.rs"]
 mod mysql_temp_table_rollback;
 

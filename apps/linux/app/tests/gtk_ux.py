@@ -1,6 +1,7 @@
 import ctypes
 import json
 import os
+import select
 import subprocess
 import sys
 import time
@@ -23,6 +24,42 @@ class XWindowAttributes(ctypes.Structure):
 
 
 ATSPI_WINDOW_Y_OFFSET = int(os.environ.get("TABLEPRO_GTK_Y_OFFSET", "19"))
+
+
+def x11_resize_window(width, height):
+    x11 = ctypes.CDLL("libX11.so.6")
+    x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+    x11.XDefaultRootWindow.restype = ctypes.c_ulong
+    x11.XQueryTree.argtypes = [
+        ctypes.c_void_p, ctypes.c_ulong, ctypes.POINTER(ctypes.c_ulong), ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_ulong)), ctypes.POINTER(ctypes.c_uint),
+    ]
+    x11.XGetWindowAttributes.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.POINTER(XWindowAttributes)]
+    x11.XResizeWindow.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_uint, ctypes.c_uint]
+    x11.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    x11.XFree.argtypes = [ctypes.c_void_p]
+    x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    display = x11.XOpenDisplay(None)
+    assert display, "X11 display is unavailable"
+    try:
+        root = x11.XDefaultRootWindow(display)
+        root_return, parent, children, count = ctypes.c_ulong(), ctypes.c_ulong(), ctypes.POINTER(ctypes.c_ulong)(), ctypes.c_uint()
+        x11.XQueryTree(display, root, ctypes.byref(root_return), ctypes.byref(parent), ctypes.byref(children), ctypes.byref(count))
+        window = None
+        for index in range(count.value):
+            attrs = XWindowAttributes()
+            x11.XGetWindowAttributes(display, children[index], ctypes.byref(attrs))
+            if attrs.map_state == 2 and attrs.width >= 800 and attrs.height >= 600:
+                window = children[index]
+        if children:
+            x11.XFree(children)
+        assert window is not None, "the application window was not found on the X display"
+        x11.XResizeWindow(display, window, width, height)
+        x11.XSync(display, 0)
+    finally:
+        x11.XCloseDisplay(display)
 
 
 def x11_click(window_x, window_y, button=3, clicks=1):
@@ -212,16 +249,18 @@ gi.require_version('Gdk', '4.0')
 from gi.repository import Gdk, GLib, Gtk
 Gtk.init()
 Gdk.Display.get_default().get_clipboard().set(sys.argv[1])
+GLib.idle_add(lambda: print('ready', flush=True))
 GLib.MainLoop().run()
 """
         clipboard_owner = subprocess.Popen(
             [sys.executable, "-c", clipboard_code, clipboard_text],
             env=os.environ.copy(),
-            stdout=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
         try:
-            time.sleep(0.3)
+            ready, _, _ = select.select([clipboard_owner.stdout], [], [], ui.WAIT_SECONDS)
+            assert ready and clipboard_owner.stdout.readline().strip() == b"ready", "the clipboard owner never took the clipboard"
             assert clipboard_owner.poll() is None, clipboard_owner.stderr.read().decode()
             ui.press_x11_key("v", ("Control_L",))
             ui.wait_for_node(name="2 unsaved changes")
@@ -341,7 +380,7 @@ GLib.MainLoop().run()
                 text = open(status).read()
             except OSError:
                 continue
-            if not executable.endswith("/usr/bin/tablepro"):
+            if not executable.endswith(("/usr/bin/tablepro", "/usr/bin/bookie")):
                 continue
             fields = dict(line.split(":", 1) for line in text.splitlines() if ":" in line)
             return int(fields["VmRSS"].split()[0]), int(fields["VmHWM"].split()[0])
@@ -356,7 +395,7 @@ GLib.MainLoop().run()
                 raw_environment = open(status.replace("status", "environ"), "rb").read()
             except OSError:
                 continue
-            if executable.endswith("/usr/bin/tablepro"):
+            if executable.endswith(("/usr/bin/tablepro", "/usr/bin/bookie")):
                 break
         else:
             raise AssertionError("application process not found")
@@ -538,6 +577,13 @@ GLib.MainLoop().run()
             raise AssertionError(f"the viewer did not show pretty JSON:\n{ui.accessible_snapshot()}")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
 
+    def explain_plan_window_closes_on_escape(_database, _base):
+        ui.run_sql("SELECT 1 AS value")
+        ui.invoke(ui.wait_for_node(name="Explain", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_frame_containing("Explain plan")
+        ui.press_x11_key("Escape")
+        ui.wait_for_frame_containing("Explain plan", present=False)
+
     def columns_dialog_hides_a_column_and_keeps_the_last_one(database, base):
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         wait_for_result_column("beta")
@@ -625,6 +671,32 @@ GLib.MainLoop().run()
         ]
         assert not unnamed, "controls without an accessible name:\n" + "\n".join(unnamed)
 
+    def narrow_window_keeps_main_and_editor_toolbar_actions_reachable(database, base):
+        ui.open_saved_connection(ui.CONNECTION_NAME)
+        window = ui.wait_for_frame_containing(" — BookiE")
+        ui.wait_for_node(name="Split", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        for width in (928, 847, 802):
+            x11_resize_window(width, 760)
+            time.sleep(0.5)
+            bounds = window.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+            assert bounds.width == width, f"window did not resize to {width} px: {bounds.width} px"
+            editor_panel = ui.wait_for_node(name="Query 1", role=pyatspi.ROLE_PANEL)
+            panel_bounds = editor_panel.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+            assert panel_bounds.width >= width - 140, (
+                f"editor content did not reclaim the collapsed sidebar width at {width} px: "
+                f"content width={panel_bounds.width}\n{ui.accessible_snapshot()}"
+            )
+            for name, role in (
+                ("Main menu", pyatspi.ROLE_TOGGLE_BUTTON),
+                ("Split", pyatspi.ROLE_TOGGLE_BUTTON),
+                ("Close", pyatspi.ROLE_PUSH_BUTTON),
+            ):
+                control = ui.wait_for_node(name=name, role=role)
+                extents = control.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+                assert extents.width > 0 and extents.x >= 0 and extents.x + extents.width <= bounds.width, (
+                    f"{name} is outside the {width} px window: "
+                    f"x={extents.x}, width={extents.width}\n{ui.accessible_snapshot()}"
+                )
     def connection_colour_chooser_has_an_accessible_button(database, base):
         ui.invoke_accessible_action("win.disconnect")
         ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON)
@@ -637,10 +709,10 @@ GLib.MainLoop().run()
             f"colour chooser has no accessible click action:\n{ui.accessible_snapshot()}"
         )
         ui.invoke(chooser)
-        option = ui.wait_for_node(name="blue", role=pyatspi.ROLE_PUSH_BUTTON)
+        option = ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(option)
         ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
-        ui.wait_for_node(name="blue", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
 
     def alt_arrows_jump_between_statements(database, base):
         sql = "select 1;\nselect 2;\nselect 3"
@@ -1349,6 +1421,9 @@ GLib.MainLoop().run()
         ui.run_sql("SELECT 3 AS three;")
         pinned = lambda: [name for name in page_tab_names() if "\U0001F4CC" in name]
         wait_until(lambda: len(pinned()) == 2 and len(page_tab_names()) >= 4, "pinned results did not stay")
+        ui.run_sql("SELECT 4 AS four;\nSELECT * FROM missing_table;")
+        ui.wait_for_node(name="Statement 2 failed")
+        ui.wait_for_node(name="Statement 4 failed", present=False)
         unpin = ui.wait_for_node_containing("Unpin results", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(unpin)
         wait_until(lambda: not pinned(), "unpinning did not drop the pinned results")
@@ -1414,11 +1489,17 @@ GLib.MainLoop().run()
     window_controls_follow_the_desktop_button_layout.needs_restart = True
     window_controls_follow_the_desktop_button_layout.requires_editor = False
 
+    def restart_with_an_untouched_editor_restores_without_layout_criticals(_database, _base, restart):
+        restart()
+
+    restart_with_an_untouched_editor_restores_without_layout_criticals.needs_restart = True
+
     result = [
         sqlite_grid_context_menu_columns_action_is_reachable_via_atspi,
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
         find_bar_replaces_every_match_in_the_editor,
         view_value_opens_the_whole_cell_with_pretty_json,
+        explain_plan_window_closes_on_escape,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
         browse_edit_cell_and_save_persists_to_the_database,
@@ -1431,6 +1512,7 @@ GLib.MainLoop().run()
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
+        narrow_window_keeps_main_and_editor_toolbar_actions_reachable,
         connection_colour_chooser_has_an_accessible_button,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
@@ -1441,6 +1523,7 @@ GLib.MainLoop().run()
         selection_statistics_summarise_the_selected_rows,
         paste_past_the_loaded_rows_changes_nothing,
         window_controls_follow_the_desktop_button_layout,
+        restart_with_an_untouched_editor_restores_without_layout_criticals,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)

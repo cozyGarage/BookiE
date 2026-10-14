@@ -102,6 +102,7 @@ pub struct App {
     mcp_bridge: Option<Arc<tablepro_mcp::McpBridge>>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
+    sidebar_reveal: std::rc::Rc<std::cell::Cell<u32>>,
     window_title: adw::WindowTitle,
     sidebar_title: adw::WindowTitle,
     disconnect_action: gio::SimpleAction,
@@ -398,7 +399,7 @@ impl SimpleComponent for App {
 
                             #[name = "schema_filter_button"]
                             pack_end = &gtk::MenuButton {
-                                set_icon_name: "view-filter-symbolic",
+                                set_icon_name: crate::ui::icons::SCHEMA_FILTER_ICON_NAME,
                                 set_tooltip_text: Some(crate::tr!("Filter schemas").as_str()),
                                 set_visible: false,
 
@@ -529,6 +530,7 @@ impl SimpleComponent for App {
             mcp_bridge,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
+            sidebar_reveal: std::rc::Rc::default(),
             window_title: widgets.window_title.clone(),
             sidebar_title: widgets.sidebar_title.clone(),
             disconnect_action,
@@ -692,7 +694,9 @@ impl SimpleComponent for App {
                 self.on_open_referenced_row(schema, table, filter, sender)
             }
             AppMsg::ChooseReferencedRow(targets) => self.on_choose_referenced_row(targets, sender),
-            AppMsg::ColumnsLoaded(tab_id, columns) => self.on_browse_columns_loaded(tab_id, columns, sender),
+            AppMsg::ColumnsLoaded(tab_id, columns, request) => {
+                self.on_browse_columns_loaded(tab_id, columns, request, sender)
+            }
             AppMsg::FetchBrowseForeignKeys(tab_id) => self.fetch_browse_foreign_keys(tab_id, sender),
             AppMsg::FetchBrowseEnumLabels(tab_id, targets) => self.fetch_browse_enum_labels(tab_id, targets, sender),
             AppMsg::EnumLabelsLoaded(tab_id, labels) => {
@@ -1024,7 +1028,10 @@ impl SimpleComponent for App {
             AppMsg::ImportBundleConfirmed(choice) => self.on_import_bundle_confirmed(choice, sender),
             AppMsg::ImportBundleFinished(imported, planned) => self.on_import_bundle_finished(imported, planned),
             AppMsg::BundleFailed(message) => self.on_bundle_failed(&message),
-            AppMsg::DuplicateConnectionSucceeded(name) => self.on_duplicate_connection_succeeded(&name),
+            AppMsg::DuplicateConnectionSucceeded {
+                copy,
+                prompt_for_password,
+            } => self.on_duplicate_connection_succeeded(copy, prompt_for_password, sender),
             AppMsg::DuplicateConnectionFailed => self.on_duplicate_connection_failed(),
             AppMsg::ConnectionOrganizationLoaded(index) => self.on_connection_organization_loaded(index),
             AppMsg::ToggleConnectionFavorite(id) => self.on_toggle_connection_favorite(id, sender),
