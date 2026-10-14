@@ -12,11 +12,11 @@ For MySQL and MariaDB, choose a local socket file instead of a host to connect t
 
 Passwords are kept in your desktop keyring, never in BookiE's own files.
 
-- **SSH**: open the SSH section of the form to reach a database through one or more SSH hosts. BookiE asks before trusting a host key it has not seen.
+- **SSH**: the form configures one SSH host. The built-in transport can use saved multi-hop routes, but the form cannot edit them yet. System OpenSSH uses jump hosts from your SSH configuration. BookiE asks before trusting a built-in host key it has not seen.
 - **TLS**: choose how strictly the server certificate is checked. "Verify full" checks both the certificate authority and the host name.
 - **Environment and read-only**: mark a connection as production, staging or local, and tick **Read-only** to refuse every change on it.
-- **Import from URL** fills the form from a connection URL such as `postgres://user@host:5432/db`.
-- **Share connections**: export or import connections from the menu in the saved list. Give a passphrase to include saved passwords; without one, passwords stay behind.
+- **Import from URL** fills the form from a network connection URL such as `postgres://user@host:5432/db`. Local Unix socket paths must be set in the form or restored from a connection bundle.
+- **Share connections**: export or import connections from the menu in the saved list. Encrypt the export with a passphrase to include stored database and SSH credentials. Plaintext exports contain no credentials.
 
 ## Browse a table
 
@@ -27,7 +27,7 @@ Click a table in the sidebar. It opens as a preview tab, marked with an icon, an
 - **Filter and sort**: Ctrl+F opens the filter bar. Save structured filters by name for the current connection, schema and table, then select and apply them later; you can rename or delete saved filters there too. Click a column header to sort. Right-click a cell and choose **Filter by This Value** for a quick filter. On a foreign key cell, **Go to Referenced Row** opens the referenced table filtered to that row (composite keys use every column of the key). If the column belongs to multiple foreign keys, choose the target table. Click a cell and press Ctrl+V to paste tab-separated text (for example copied from a spreadsheet) into the cells from that one: each value is checked like a typed edit, nothing is applied if any cell is refused, and the result is a set of pending changes you review and save. An empty pasted value on a nullable column becomes NULL. On PostgreSQL (a column whose type is an enum, or a domain over one; not arrays of enums) and on MySQL and MariaDB, double-clicking an ENUM cell opens a list of its members (choose one with the mouse or the arrow keys and Enter), and a SET cell opens a list with a check for each member and an Apply button; the empty member shows as (empty) and is stored as the empty value, not NULL.
 - **Columns**: the **Columns…** entry in the cell menu hides or shows columns. Drag a header to reorder columns. Both are remembered per table.
 - **Find**: Ctrl+Alt+F lists loaded rows that contain a text.
-- **Long text values**: cells longer than 8 KiB show a preview and their size. Right-click an editable text cell and choose **Edit Full Value…** to edit the whole value up to 1 MiB. **Apply** stages the exact text for review; **Set to NULL** is separate, so empty text stays empty. **Cancel** stages nothing. JSON preview editing and values over 1 MiB are not supported in this dialog yet ([#610](https://github.com/cozyGarage/BookiE/issues/610)).
+- **Long values**: cells longer than 8 KiB show a preview and the full value's size. **View Value** opens the whole value, and **Copy Value** copies it in full. Right-click an editable text cell and choose **Edit Full Value…** to edit the entire value up to 1 MiB. **Apply** stages the text for review; **Set to NULL** is separate, so empty text remains empty. **Cancel** stages nothing. JSON previews and values over 1 MiB are not supported in this dialog yet ([#610](https://github.com/cozyGarage/BookiE/issues/610)). SQL result grids remain read-only. Exports use full values when fetched; full-row copy and current-page export are refused if hidden columns leave values unavailable.
 - **Row inspector**: shows every column of the selected row with its type.
 - **Selection statistics**: select several rows and open the selection badge to see count, sum, average, min and max per numeric column; **Copy summary** copies them.
 
@@ -36,12 +36,15 @@ Click a table in the sidebar. It opens as a preview tab, marked with an icon, an
 Ctrl+E opens a SQL editor tab for the current connection.
 
 Click a sortable result column header to order the rows already loaded in that result. This is a local view change and does not run the SQL again, including for write statements that return rows. SQL NULL values stay last; columns with mixed or undecodable values cannot be sorted. Text uses local value ordering, which can differ from the database collation.
+
+Right-click a result cell and choose **Filter by This Value** to filter the loaded rows in that result. This also works on pinned results, shows visible and loaded row counts, and does not run the SQL again.
+
 Use **Split** in the editor toolbar to show the same query in a second side-by-side pane. Edits and the caret are shared; each pane keeps its own scroll position.
 
 To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+Shift+[**. Click its gutter marker to unfold it, or choose **Unfold all** in the toolbar. **Ctrl+Shift+]** also unfolds every block. Folding hides lines in the editor without changing the SQL that runs. Editing the query clears folds so hidden text cannot be mistaken for the current query.
 
 - Ctrl+Enter runs the whole script; Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it.
-- A script shows one result per statement. More than five results collapse into a drop-down. **Pin results** keeps the current results above the next run.
+- Each statement has a result view. SQL Server statements that return multiple result sets show those sets in order within that view. More than five statement results collapse into a drop-down. **Pin results** keeps the current results above the next run.
 - After a run, the gutter marks each statement with a tick or a cross.
 - A failed statement shows the error, with **Copy error**, and on PostgreSQL the line and column of the error inside that statement.
 - `:name` placeholders ask for values before the statement runs and send them as bound parameters, never pasted into the SQL.
@@ -61,6 +64,8 @@ To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+S
   For an existing table, use **Remember mapping** and **Restore mapping** to reuse
   the destination choices for that connection and table. Auto-increment and generated
   columns stay on Skip; the database supplies their values.
+  PostgreSQL `timestamptz` values should include an explicit zone; unzoned values are
+  currently treated as UTC. See [known limitations](known-limitations.md#data-and-values).
 
 ## Safety
 
