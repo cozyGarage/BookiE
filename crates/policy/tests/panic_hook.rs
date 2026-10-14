@@ -16,11 +16,11 @@ fn debug_panic_hook_withholds_payload_and_keeps_diagnostics() {
         panic!("{PANIC_SENTINEL}");
     }
 
-    assert_diagnostics(run_child(true));
-    assert_diagnostics(run_child(false));
+    assert_diagnostics(run_child(true, false));
+    assert_diagnostics(run_child(false, true));
 }
 
-fn run_child(debug_panics: bool) -> std::process::Output {
+fn run_child(debug_panics: bool, rust_backtrace: bool) -> std::process::Output {
     let mut command = Command::new(std::env::current_exe().expect("test executable path"));
     command
         .args([
@@ -28,12 +28,16 @@ fn run_child(debug_panics: bool) -> std::process::Output {
             "debug_panic_hook_withholds_payload_and_keeps_diagnostics",
             "--nocapture",
         ])
-        .env(CHILD_PROCESS, "1")
-        .env("RUST_BACKTRACE", "1");
+        .env(CHILD_PROCESS, "1");
     if debug_panics {
         command.env("TABLEPRO_DEBUG_PANICS", "1");
     } else {
         command.env_remove("TABLEPRO_DEBUG_PANICS");
+    }
+    if rust_backtrace {
+        command.env("RUST_BACKTRACE", "1");
+    } else {
+        command.env_remove("RUST_BACKTRACE");
     }
     command.output().expect("run the isolated panic hook process")
 }
