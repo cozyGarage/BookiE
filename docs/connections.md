@@ -1,6 +1,6 @@
 # Connection handling
 
-Source checked at `72b115e16` on 2026-10-12. [ADR 0008](decisions/0008-connection-and-session-ownership.md) owns identity and trust, [ADR 0005](decisions/0005-server-side-cancellation.md) cancellation, and remaining B4 acceptance is on [Project #3](https://github.com/users/cozyGarage/projects/3) (Lane B4). The [September connection audit](archive/connections-history.md) retains older source claims and coverage tables; its gaps are not current status.
+Reviewed against Linux code tip `f9456ba1e` on 2026-10-14. [ADR 0008](decisions/0008-connection-and-session-ownership.md) owns identity and trust, [ADR 0005](decisions/0005-server-side-cancellation.md) cancellation, and remaining B4 acceptance is on [Project #3](https://github.com/users/cozyGarage/projects/3) (Lane B4). The [September connection audit](archive/connections-history.md) retains older source claims and coverage tables; its gaps are not current status.
 
 ## Shared assembly and ownership
 
@@ -8,7 +8,7 @@ GUI and agentd use `tablepro-transport` to resolve saved configuration/secrets, 
 
 Saved UUID, live handle, editor session and namespace are distinct owners. The GUI monitor watches tunnel closure and driver fault signals as well as ping; replacement changes identity and invalidates old editor sessions. Stop visibility uses the driver's capability, not an engine-name list. Actual loss/cancellation outcomes and test ownership are in [disconnection contracts](disconnection-contracts.md).
 
-GUI uncertainty is scoped to a live connection generation. Journal failure remains shared. Agentd still supplies one shared `AuditState` and has no guard fault sink; headless generation isolation and forced retirement remain open. Successful ping alone cannot prove safe reuse after a caught driver panic.
+GUI and agentd scope connection state to the live generation. Agentd creates an `AuditState` generation for each cached session and attaches a fault sink that retires only the matching session, even if its ping still succeeds. Journal failure remains shared across sessions.
 
 A login the server refuses is never retried. PostgreSQL reports a wrong password or unknown role (28P01) as an authentication failure, and any other class 28 refusal (for example no `pg_hba.conf` entry) or a missing database (3D000) also stops reconnect attempts, so a bad credential cannot lock an account by repeated tries; a busy server (53300) and network faults are still retried.
 
@@ -24,14 +24,14 @@ PostgreSQL and MySQL Verify CA and Verify Full use the operating system trust st
 
 ## Built-in SSH trust
 
-The GUI defaults to `UnknownHostKey::Refuse` and installs a prompter. An unknown key requires explicit consent before persistence; decline/cancel must write no key. A changed key is refused. Each hop owns its own trust decision. Agentd is unattended and refuses unknown keys. Built-in known hosts are distinct from OpenSSH's `~/.ssh/known_hosts`; running system `ssh` does not populate the built-in store. Native and installed acceptance remain on F6/G5 and the [manual checklist](manual-verification-0.2-features.md).
+The GUI defaults to `UnknownHostKey::Refuse` and installs a prompter. An unknown key requires explicit consent before persistence; decline/cancel must write no key. A changed key is refused. Each hop owns its own trust decision. Agentd is unattended and refuses unknown keys. Built-in known hosts are distinct from OpenSSH's `~/.ssh/known_hosts`; running system `ssh` does not populate the built-in store. Installed trust-refusal and audit acceptance remains under B4-7, with overall Arch/Hyprland package acceptance under PKG-1 and steps in the [manual checklist](manual-verification-0.2-features.md).
 
 ## System OpenSSH
 
 A saved tunnel can select `client: open_ssh`. Its ControlMaster/forward lives in a private runtime directory; `StrictHostKeyChecking=ask` applies to the destination. GUI prompts explicitly and agentd declines unanswered prompts. Saved passwords/passphrases answer only a matching destination/key prompt. Jump routing comes from `~/.ssh/config`/`ProxyJump`; saved per-hop chains are refused for this backend. Built-in SSH supports saved chains and ssh-agent.
 
-Inside Flatpak, selecting system OpenSSH fails with an explicit message before resolving saved SSH credentials or dispatching the database driver. The client does not switch to built-in SSH; select that backend explicitly if it is wanted. Native system OpenSSH remains available outside Flatpak. The executable `tablepro-askpass` helper must be installed beside the app or on PATH. The Debian builder installs it with the app binaries; package validation rejects a build without it (B4-10). Flatpak package/runtime behavior remains a separate acceptance check.
+Inside Flatpak, selecting system OpenSSH fails with an explicit message before resolving saved SSH credentials or dispatching the database driver. The client does not switch to built-in SSH; select that backend explicitly if it is wanted. Native system OpenSSH remains available outside Flatpak. The executable `tablepro-askpass` helper must be installed beside the app or on PATH. The Debian builder installs it with the app binaries, and package validation rejects a build without it. Flatpak package/runtime behavior remains a separate acceptance check.
 
 ## Remaining evidence
 
-Use B4 task IDs for TLS, trust, audit, cache and installed route work. U4 owns permanent-error retry classification. U5's source-level and local route/consumer acceptance is recorded in B4-14; installed-package, hosted CI, native engine oracles, Wayland, and package rollback remain separate proof. Preserve safe refusal for combinations without exact support.
+Use the current B4 task IDs in [Project #3](https://github.com/users/cozyGarage/projects/3) for TLS, trust, audit, cache and installed-route work. Source-level and local route results do not replace hosted checks, native engine oracles, Wayland acceptance or package rollback. Preserve safe refusal for combinations without exact support.

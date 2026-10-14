@@ -1,14 +1,12 @@
 # Testing
 
-The [September 29 regression audit](archive/regression-audit-2026-09-29.md) records the latest findings, added tests, structure changes and execution evidence.
-
-Start with the [validation playbook](validation-playbook.md) for the executable layer catalog, local commands, CI ownership, agent handoffs and regression intake. The shared runner retains reports and logs and fails on incomplete execution.
+The [active sprint](bookie-0.2-sprint.md) owns current acceptance. Start with the [validation playbook](validation-playbook.md) for the executable layer catalog, local commands, CI ownership, agent handoffs and regression intake. Dated audits in [archive](archive/) prove only their recorded source and environment.
 
 ## Executable gates
 
 Command catalogs, layer boundaries and CI ownership live in the [validation playbook](validation-playbook.md). Prefer `python3 scripts/run-test-layer.py --list` and the playbook’s Start here section over copying Cargo invocations from this page.
 
-`scripts/ci-local.sh` remains the shared local/CI entry for full, widgets and integration modes. Registrations for isolated GTK and keyring tests live in `scripts/isolated-tests.json`; zero selected tests is a failure. Every `ci-local.sh` run saves exact-tree evidence under `target/quality/`. Release mode does not certify package installation, Wayland, upgrade/rollback or retry-free candidate soak. See [0.1.4 review actions and evidence](archive/release-0.1.4.md).
+`scripts/ci-local.sh` remains the shared local/CI entry for full, widgets and integration modes. Registrations for isolated GTK and keyring tests live in `scripts/isolated-tests.json`; zero selected tests is a failure. Every `ci-local.sh` run saves exact-tree evidence under `target/quality/`. Release mode does not certify package installation, Wayland, upgrade/rollback or retry-free candidate soak. See the [packaging guide](../apps/linux/packaging/README.md) and [manual checklist](manual-verification-0.2-features.md).
 
 Run from the repository root. Current scope and acceptance are in [the active sprint](bookie-0.2-sprint.md); dated audits stay in [archive](archive/).
 
@@ -130,13 +128,13 @@ Run the installed safety suite with:
 ./scripts/test-gtk-safety.sh
 ```
 
-The script builds `tablepro-app`, always starts a private runtime directory, isolated D-Bus session and Xvfb display, and drives the real application through PyAT-SPI. Each scenario gets temporary XDG directories and a production or local SQLite saved connection. The runner uses a standalone AT-SPI D-Bus daemon and passes the Xvfb display to D-Bus activation, so it does not reuse desktop accessibility or portal processes. GTK tests exercise the X11/GTK portal path; they do not replace installed Wayland package testing.
+The script builds `tablepro-app`, always starts a private runtime directory, isolated D-Bus session and Xvfb display, and drives the real application through PyAT-SPI. Each scenario gets temporary XDG directories and a fixture SQLite database. A scenario may mark its saved fixture connection as production to test policy prompts; it never opens a user's saved connection or production database. The runner uses a standalone AT-SPI D-Bus daemon and passes the Xvfb display to D-Bus activation, so it does not reuse desktop accessibility or portal processes. GTK tests exercise the X11/GTK portal path; they do not replace installed Wayland package testing.
 
 When `TABLEPRO_GTK_ARTIFACT_DIR` is set, every scenario writes a JSON result and application stderr, including successful scenarios. Failures additionally retain the accessibility tree and a screenshot when available. Successful runs therefore have uploadable evidence; a missing artifact still fails CI. Python regressions exercise both result paths without needing a display.
 
-The suite verifies:
+Representative end-to-end scenarios in the suite are listed below; the current registry, including scenarios from the GTK workbook, parameter, XML and UX modules, is in [`gtk_safety.py`](../apps/linux/app/tests/gtk_safety.py).
 
-1. Dismissing a production approval leaves SQLite unchanged.
+1. Dismissing approval for a fixture connection marked production leaves its SQLite database unchanged.
 2. Approving once performs one mutation and prompts again for the next operation.
 3. Unavailable audit storage denies the mutation without showing an approval path around the failure.
 4. A named `:parameter` in the editor prompts for a value and writes the bound value, not the placeholder text.
@@ -180,7 +178,7 @@ bash scripts/test-gtk-safety.sh
 
 Use `cancelled_workbook_export_preserves_existing_file` for the cancellation case. Record the binary's commit/checksum; a prebuilt binary is not evidence for later Rust edits. Omit `TABLEPRO_GTK_BINARY` to build the current release profile.
 
-Each scenario declares its own fixture shape through `environment` and `audit_available` attributes, so a scenario can run against a local or production saved connection.
+Each scenario creates a temporary profile and fixture connection/database. Its `environment` attribute selects the policy environment to exercise, and `audit_available` controls whether the fixture audit journal is present. These tests do not use existing saved connections or a user's production database.
 
 The Open Quickly scenario waits for the filtered result set before invoking its single action; the already-visible favorite is not proof that the debounced row rebuild has completed. It still requires the window to close and usage to be persisted.
 
@@ -192,7 +190,9 @@ On Arch or Omarchy, install the harness dependencies with:
 sudo pacman -S --needed dbus xorg-server-xvfb at-spi2-core python-atspi
 ```
 
-Ubuntu CI uses `dbus-daemon`, `gnome-keyring`, `xvfb`, `xauth`, `at-spi2-core`, `python3-pyatspi`, and `scrot`. The PR smoke job is required. A separate daily workflow runs five retry-free attempts and uploads stdout, stderr, accessibility snapshots, and screenshots on failure. RC promotion requires 30 consecutive attempts across at least six runs. Service-level tests still cover pure state and policy behavior, but they do not replace these cross-layer tests.
+Ubuntu CI uses `dbus-daemon`, `gnome-keyring`, `xvfb`, `xauth`, `at-spi2-core`, `python3-pyatspi`, and `scrot`. GitHub pull requests run the required GTK fast checks and widget regressions; the installed GTK safety smoke runs only on a schedule or manual dispatch. The separate daily GTK Safety Soak runs five retry-free attempts and uploads stdout, stderr, accessibility snapshots, and screenshots on failure. 0.2.0 qualification requires 30 consecutive attempts across at least six runs at the same source SHA. Service-level tests still cover pure state and policy behavior, but they do not replace these cross-layer tests.
+
+The nightly workflow runs in stages (unit-tier coverage, then the Docker-tier coverage and mutation jobs, then the soak and package jobs), two shards at a time, so a red stage is a finding and not a lost runner. Each driver crate is measured with its Docker suite against `baselines/coverage-floors-crates.txt` (`scripts/check-crate-coverage-floors.py`). Mutation results are compared with `baselines/mutants/<package>.txt` by `scripts/check-mutants-baseline.py`: a missed mutant that is not in the baseline fails the run, and baseline lines that a test now catches are listed for deletion. A missing baseline file means no missed mutant is accepted. The soak is three runs of five attempts each per night.
 
 SQLite integration regressions also distinguish NULL from zero, false, empty text, and empty blobs in declared columns, and preserve binary values despite declared-type affinity mismatches. Export unit tests overlap writers deterministically and check that pre-existing temporary symlinks cannot redirect writes. Workspace tests preserve active-tab identity when unknown records are removed.
 
@@ -208,7 +208,7 @@ Gates are serialised by a host lock and one full run takes 10 to 20 minutes, so 
 
 ### Reading a red run
 
-`scripts/classify-ci-failure.py --run RUN_ID` (or `--log FILE`) tags each failed job from its log. It reads `FORGEJO_API` or derives it from the `forgejo` remote, and the token from `~/.config/forgejo/token`, like `scripts/forgejo-gate.sh`.
+`scripts/classify-ci-failure.py --run RUN_ID` (or `--log FILE`) tags each failed job from its log. It reads the Forgejo endpoint and token from the same configuration as `scripts/forgejo-gate.sh`.
 
 | Tag | Meaning | What to do |
 |---|---|---|
@@ -221,7 +221,7 @@ The tag is advice only and never changes a result. A new infrastructure signatur
 
 ## Measuring how good the tests are
 
-The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests, intentional exclusions and packaging-only green runs. Mutation and coverage run on a schedule. The Forgejo nightly job measures line coverage of the unit tier only and holds a ratcheted floor in `baselines/coverage-floor.txt` (59%; 59.41% measured on 2026-10-11). Integration, installed GTK and value-contract tests are not part of that percentage. Mutation survivors need investigation. Dated first-run mutation notes are in [testing history](archive/testing-history.md#mutation-first-run-notes-2026-08-22).
+The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests, intentional exclusions and packaging-only green runs. Mutation and coverage run on a schedule. The unit-tier line-coverage score has its own ratcheted floor in `baselines/coverage-floor.txt` (59%; 59.41% measured on 2026-10-11). The nightly workflow separately measures Docker suites for PostgreSQL, MySQL, SQLite, MongoDB, Redis and ClickHouse against `baselines/coverage-floors-crates.txt`. Installed GTK is outside both coverage reports. Mutation survivors need investigation. Dated first-run mutation notes are in [testing history](archive/testing-history.md#mutation-first-run-notes-2026-08-22).
 
 ### Mutation testing
 

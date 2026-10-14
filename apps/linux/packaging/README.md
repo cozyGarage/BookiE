@@ -1,6 +1,6 @@
 # Packaging
 
-GitHub Release `linux-v0.1.5` ships an Arch/Omarchy `.pkg.tar.zst` and an amd64 `.deb`. Nothing here is ready for AUR or Flathub. BookiE keeps the existing repository and application ID. Portal permissions and the public update channel still need release review.
+See [platforms](../../../docs/platforms.md) for released artifacts, native requirements and package support. This guide covers package builds and validation. BookiE keeps the existing repository and application ID. Portal permissions and the public update channel still need release review.
 
 ## Internal Arch RC
 
@@ -27,7 +27,7 @@ Test install, upgrade, downgrade, and removal. Package operations must leave the
 
 ## Debian / Ubuntu package
 
-Current GTK CI uses a Debian testing container. The GitHub Release `.deb` needs the GNOME 50 library line; Ubuntu 24.04 and 25.10 cannot run that package. A distro name alone does not establish compatibility with a rebuilt `.deb`; verify its required libraries. The build floor is the Ubuntu 24.04 stack: GTK 4.14, GLib 2.80, libadwaita 1.5 and GtkSourceView 5.12. Debian 13 (GTK 4.18, libadwaita 1.7) is above it. Neither distro packages Rust 1.98, so build with rustup. Use `apps/linux/flatpak/com.tablepro.linux.Devel.json` for an isolated development Flatpak. Flatpak/Flathub are left out of 0.2.0.
+For native-library and toolchain requirements, see [platforms](../../../docs/platforms.md). Use `apps/linux/flatpak/com.tablepro.linux.Devel.json` for an isolated development Flatpak. Flatpak/Flathub are left out of 0.2.0.
 
 ```bash
 DEB_VERSION=0.1.5-1 ./scripts/build-deb.sh
