@@ -133,7 +133,6 @@ pub async fn issue_token(
 }
 
 pub struct IssuedToken {
-    pub id: Uuid,
     pub plaintext: String,
     pub keyring_saved: bool,
 }
@@ -161,7 +160,6 @@ where
         }
     };
     Ok(IssuedToken {
-        id: meta.id,
         plaintext,
         keyring_saved,
     })
@@ -247,7 +245,7 @@ mod tests {
         .unwrap();
 
         assert!(!issued.keyring_saved);
-        assert_eq!(bridge.tokens().authenticate(&issued.plaintext).unwrap().id, issued.id);
+        assert!(bridge.tokens().authenticate(&issued.plaintext).is_ok());
     }
 
     #[test]
