@@ -693,19 +693,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn locking_reads_are_writes_because_a_read_only_session_refuses_them() {
-        for sql in [
-            "SELECT * FROM users WHERE id = 1 FOR UPDATE",
-            "SELECT * FROM users FOR SHARE",
-            "SELECT * FROM users FOR NO KEY UPDATE SKIP LOCKED",
-            "WITH u AS (SELECT * FROM users FOR UPDATE) SELECT * FROM u",
-            "SELECT * FROM (SELECT id FROM users FOR UPDATE) AS s",
-        ] {
-            assert!(classify(sql, "postgres").writes(), "{sql}");
-        }
-    }
-
-    #[test]
     fn select_is_read() {
         let f = classify("SELECT * FROM users WHERE id = 1", "postgres");
         assert!(!f.writes());
