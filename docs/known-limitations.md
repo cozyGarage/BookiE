@@ -1,18 +1,21 @@
 # Known limitations of BookiE 0.2
 
-What the application does not do, or does differently from what you might expect, and the bugs we know about. Each entry names its ledger row. Draft of 2026-10-11, for the maintainer; an entry is removed when the row closes.
+What the application does not do, or does differently from what you might expect, and the bugs we know about. Entries link to their owning issue, decision or evidence when one exists. Reviewed 2026-10-14.
 
 ## Data and values
 
-- **Full-table export is unavailable** (UI-13b / [#553](https://github.com/cozyGarage/BookiE/issues/553)). The current drivers do not have
+- **Full-table export is unavailable** ([ADR 0014](decisions/0014-full-table-export-snapshot.md)). The current drivers do not have
   a verified snapshot export path, so the application refuses full-table export
   before opening the destination dialog or publishing a file. Export the current
-  page or a loaded query result instead. Snapshot export support is planned.
+  page or a loaded query result instead. A per-engine consistent export path is
+  an unselected future candidate; database snapshots for backup and restore are
+  a separate feature accepted for 0.2.x ([ADR 0015](decisions/0015-database-snapshots.md)).
 - **Large results are capped and held in memory** (PERF-2, PERF-8 / [#554](https://github.com/cozyGarage/BookiE/issues/554)). Results stop at
   1 million rows, 10 million cells or 64 MiB estimated size. The historical grid
   measurement was about 2.5 times the result memory; #518 now shares immutable
-  values with materialized rows, and comparable profiling remains open. Nothing
-  is streamed yet.
+  values with materialized rows, and comparable profiling remains open. Core and
+  PostgreSQL cursor APIs exist, but the guarded editor path is not integrated;
+  SQL editor results are still materialized under these caps (ADR 0011).
 - **SQL result filters apply only to loaded rows** ([#609](https://github.com/cozyGarage/BookiE/issues/609)). Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **Long cells are shown as a preview** (PERF-10). A table cell over 8 KiB shows a
   typed preview and its byte count; View Value fetches the whole value by primary
@@ -39,13 +42,14 @@ What the application does not do, or does differently from what you might expect
 - **Reusable SSH profiles cannot be edited** (UI-26).
 - **Local socket endpoint differences:** PostgreSQL selects a socket directory plus port; MySQL and MariaDB select the full socket-file path. Both local routes reject TLS and SSH and never fall back to TCP ([#579](https://github.com/cozyGarage/BookiE/issues/579)).
 - **SQL Server with Kerberos** has a Samba AD and verified-TLS fixture that passed the Kerberos selectors; Windows AD interoperability and package acceptance remain open (B4-21).
+- **A timed-out SQL Server query cannot be stopped on the server yet.** Its outcome is unknown and BookiE retires that connection or session; Tiberius 0.13 has a cancellation API, but BookiE has not verified it against the session lifecycle (B4-23 / [#850](https://github.com/cozyGarage/BookiE/issues/850)).
 - **DuckDB read-only flat files** need Linux and a writable directory on the same filesystem as the file (the application pins the file through a private link there). A read-only in-memory DuckDB connection is refused.
 
 ## Interface
 
-- Multi-cursor editing is not available (UI-22 / [#552](https://github.com/cozyGarage/BookiE/issues/552)). Split panes are available from the **Split** toolbar button. Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. Preview tabs are temporary and are not restored after restart; tabs you keep are restored (UI-17b). Query history now opens in a docked panel (UI-18).
+- Multi-cursor editing is not available (UI-22 / [#552](https://github.com/cozyGarage/BookiE/issues/552)). Split panes and SQL code folding are available. Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. Preview tabs are temporary and are not restored after restart; tabs you keep are restored (UI-17b). Query history now opens in a docked panel (UI-18).
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles; a typed activity console is deferred and the activity dialog stays a plain result grid (UI-23).
-- Text and JSON values over the preview threshold are read-only in the grid; View Value and Copy value give the full text. Editing them needs the full-value dialog ([#610](https://github.com/cozyGarage/BookiE/issues/610), [#659](https://github.com/cozyGarage/BookiE/issues/659)).
+- Text and JSON values over the preview threshold are read-only in the grid; View Value and Copy Value give the full value. Editing them needs the full-value dialog ([#610](https://github.com/cozyGarage/BookiE/issues/610)).
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
 - No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
 - PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata remain open under B6.
@@ -61,7 +65,7 @@ What the application does not do, or does differently from what you might expect
 
 ## Known bugs
 
-- **Installed GTK suite is intermittent on Forgejo** (TEST-31 / [#556](https://github.com/cozyGarage/BookiE/issues/556)): accessibility timeouts under capacity pressure, and a separate startup restore abort when GTK logs an `AdwBin` width near minus two billion under `G_DEBUG=fatal-criticals`. It is not yet known whether the layout abort can happen outside that test setup, where GTK only warns.
+- **Installed GTK suite is intermittent on Forgejo** (TEST-31 / [#556](https://github.com/cozyGarage/BookiE/issues/556)): the startup restore layout abort was fixed in [#821](https://github.com/cozyGarage/BookiE/pull/821). Intermittent failures remain under investigation; recent failures include an application shutdown with a bad exit status after the scenarios passed. The required consecutive full-run evidence has not been met.
 
 ## Test and CI limits
 
