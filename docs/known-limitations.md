@@ -25,8 +25,8 @@ What the application does not do, or does differently from what you might expect
 - **Hidden-column projection still needs desktop acceptance** (PERF-9). Merged
   [#384](https://github.com/cozyGarage/BookiE/pull/384) projects hidden non-key
   columns out of the select and refuses full-row copy, row JSON and current-page
-  export while those values are unfetched. Distribution Wayland/GNOME acceptance
-  remains open.
+  export while those values are unfetched. Installed Arch/Hyprland Wayland
+  acceptance remains open; Debian/GNOME acceptance follows after 0.2.0.
 - **A table without a primary key cannot be deleted from the grid** (TEST-14). There
   is no all-column fallback, by design.
 - **ClickHouse ambiguous local times:** a `DateTime64` that falls in a repeated or
@@ -34,8 +34,9 @@ What the application does not do, or does differently from what you might expect
   literal, because the instant cannot be known.
 - **SQLite real numbers:** negative zero and NaN cannot be bound as parameters.
 - **SQLite JSON aggregate output** can differ across system SQLite versions (TEST-25).
+- **CSV import cannot restore explicit auto-increment values** ([#634](https://github.com/cozyGarage/BookiE/issues/634)). Auto-increment columns are fixed to Skip along with generated columns, so imported rows receive new IDs; references to the source IDs may no longer match. Generated columns remain database-owned.
 - **Unzoned PostgreSQL `timestamptz` CSV values** are currently interpreted as UTC. [PostgreSQL](https://www.postgresql.org/docs/current/datatype-datetime.html) normally interprets unzoned timestamp input in the session time zone; the import rule is awaiting a decision ([#857](https://github.com/cozyGarage/BookiE/issues/857)). Include an explicit zone in the CSV to avoid ambiguity.
-- **MongoDB:** browse pages are separate observations, not one point-in-time view (TEST-12); a column with mixed types is read-only; deep unfiltered `_id` keyset browse is fast in local Docker ([#493](https://github.com/cozyGarage/BookiE/pull/493)), but filtered, sorted and keyless deep pages plus installed and network acceptance remain open (PERF-3).
+- **MongoDB:** browse pages are separate observations, not one point-in-time view (TEST-12); a column with mixed types is read-only. Compatible `_id` pages can use keyset seeking ([#493](https://github.com/cozyGarage/BookiE/pull/493)), and supported sort requests run server-side ([#837](https://github.com/cozyGarage/BookiE/pull/837)). Sorted pages outside the compatible `_id` keyset path and keyless deep pages still use offset pagination. Installed and representative-network acceptance remain open (PERF-3 / [#555](https://github.com/cozyGarage/BookiE/issues/555)).
 - **MySQL failed batches:** rollback of a failed batch is verified for InnoDB and a Docker matrix that includes MyISAM, MEMORY, CSV, ARCHIVE, `MRG_MyISAM`, BLACKHOLE, Aria and related side effects; optional or vendor engines and package acceptance remain open (B4-11).
 
 ## Editing and connections
@@ -57,21 +58,29 @@ What the application does not do, or does differently from what you might expect
 - No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
 - PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata remain open under B6.
 - No database snapshots or restore (SNAP-1 accepted the feature for 0.2.x; build is SNAP-2 to SNAP-4 / [#547](https://github.com/cozyGarage/BookiE/issues/547)).
-- Accessibility with Orca, keyboard-only order and high contrast has not been verified (DOC-3).
+- Accessibility is not fully verified with Orca, keyboard-only navigation or high contrast (DOC-3). Concrete gaps are tracked in [#658](https://github.com/cozyGarage/BookiE/issues/658): some connection controls and text fields are missing names or actions in the accessibility tree, and grid menu items are not exposed consistently.
 
 ## Platforms and packaging
 
 - The 0.2.0 desktop target is Arch Linux / Omarchy under Hyprland as a native Wayland client. Installed package acceptance, including install, upgrade and rollback, remains pending (PKG-1 / [#574](https://github.com/cozyGarage/BookiE/issues/574)); Xvfb results do not count.
 - Native Debian and Ubuntu GNOME desktop acceptance remains open for the later PKG-2 phase, although the packages build and the installed test suite passes in containers.
-- Flatpak build, install and launch checks pass, but Flathub submission and screenshots are not done and the package is not offered (PKG-4, PKG-8).
+- Flatpak is not offered. Flathub submission and screenshots remain open (PKG-4, PKG-8); the earlier manual install and launch checks are recorded in the [platform guide](platforms.md#flathub).
 - Windows and macOS are not supported; the application is built for Linux with GTK 4 and libadwaita.
 
 ## Known bugs
 
+- **The filter strip offers text operators for some numeric and time columns** ([#854](https://github.com/cozyGarage/BookiE/issues/854)), including MySQL `MEDIUMINT` and PostgreSQL `time without time zone`.
+- **SQL completion can choose the wrong statement context** when a semicolon appears inside a comment or dollar-quoted string ([#855](https://github.com/cozyGarage/BookiE/issues/855)).
+- **Structure validation can accept duplicate column names that the database treats as equal** ([#856](https://github.com/cozyGarage/BookiE/issues/856)); the server then rejects the save.
+- **The CSV import progress dialog can remain open after the import completes**, and Cancel may not close it ([#655](https://github.com/cozyGarage/BookiE/issues/655)).
+- **Several UI details remain inconsistent** ([#660](https://github.com/cozyGarage/BookiE/issues/660)): the ENUM picker may not highlight the current member, text and bytea NULL values render differently, Structure tab chevrons look inverted, and the catalog kind selector can shift the search field.
+- **PostgreSQL `VOID` results are shown as undecodable** ([#660](https://github.com/cozyGarage/BookiE/issues/660)); they should render as empty values.
+- **Two installed launches were reported to abort inside BookiE** ([#666](https://github.com/cozyGarage/BookiE/issues/666)); the cause remains under investigation.
+- **Debug panic output can expose sensitive panic text** (SEC-10 / [#849](https://github.com/cozyGarage/BookiE/issues/849)): setting `TABLEPRO_DEBUG_PANICS=1` currently leaves Rust's default hook active, which may print the raw panic payload. Avoid enabling it until the fix lands.
 - **Installed GTK suite is intermittent on Forgejo** (TEST-31 / [#556](https://github.com/cozyGarage/BookiE/issues/556)): the startup restore layout abort was fixed in [#821](https://github.com/cozyGarage/BookiE/pull/821). Intermittent failures remain under investigation; recent failures include an application shutdown with a bad exit status after the scenarios passed. The required consecutive full-run evidence has not been met.
 - **MCP token keyring save can fail after issuance** (UI-43 / [#861](https://github.com/cozyGarage/BookiE/issues/861)): the token is still issued, but the dialog may say it was saved when the keyring write failed.
 
 ## Test and CI limits
 
 - The installed GTK suite does not pass reliably on a native Ubuntu 24.04 runner (TEST-28); it passes in the Debian 13 and Ubuntu 24.04 containers.
-- About 68 percent of the policy crate's and 81 percent of the core crate's mutations were caught by their own tests when measured at `0d21eb6d4` (2026-10-11); later survivor triage is in the [B4 mutation triage](evidence/b4-mutation-triage-2026-10-12) and the figure has not been re-measured. Mutation survivors are tracked under [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559); expected-value provenance is a separate [TEST-32 oracle review](oracle-review.md).
+- Mutation results are tied to their source SHA; use the latest [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559) report for survivor and timeout status. Expected-value provenance is tracked separately by [TEST-32](oracle-review.md).

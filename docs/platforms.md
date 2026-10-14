@@ -10,7 +10,7 @@ The Cargo compile / CI floor is the Ubuntu 24.04 stack: GTK 4.14, GLib 2.80, lib
 
 The root Meson project declares the higher GNOME 50 library line (GTK 4.22, GLib 2.88, libadwaita 1.9, GtkSourceView 5.18). The released `.deb` has that same runtime baseline. Arch and Omarchy packages track current GNOME. Native installed-package acceptance remains open (PKG-1); Debian and Ubuntu desktop acceptance remains open for the later GNOME target (PKG-2). Neither floor replaces the other.
 
-At the 2026-10-14 review, Arch packaged Rust 1.98.1 while Debian 13 packaged Rust 1.85.1 ([Arch package](https://archlinux.org/packages/extra/x86_64/rust/), [Debian package](https://packages.debian.org/trixie/rust/rustc)). Arch's `rust` package ignores `rust-toolchain.toml`, and Debian 13 is below the workspace MSRV. Use rustup to select the repository's pinned toolchain consistently.
+At the 2026-10-14 review, Arch packaged Rust 1.99.0 while Debian 13 packaged Rust 1.85.1 ([Arch package](https://archlinux.org/packages/extra/x86_64/rust/), [Debian package](https://packages.debian.org/trixie/rust/rustc)). Arch's `rust` package ignores `rust-toolchain.toml`, and Debian 13 is below the workspace MSRV. Use rustup to select the repository's pinned toolchain consistently.
 
 ## Released packages
 
@@ -49,7 +49,7 @@ The Arch package is an internal candidate, not an AUR or Flathub release. It ins
 
 ## Flathub
 
-Flatpak and Flathub are left out of 0.2.0 ([PRODUCT.md](../PRODUCT.md)). The Flatpak manifests (`apps/linux/flatpak/com.tablepro.linux*`) build, but a manifest build is not release qualification or publication. Submission checklist for later packaging work:
+Flatpak and Flathub are left out of 0.2.0 ([PRODUCT.md](../PRODUCT.md)). The Flatpak manifests (`apps/linux/flatpak/com.tablepro.linux*`) build, but a manifest build is not release qualification or publication. Resolve PKG-8's file-access decision before starting Flathub submission; the steps below do not settle it. Submission checklist for later packaging work:
 
 1. Capture screenshots under `apps/linux/flatpak/screenshots/` (1280x800 or larger): welcome, browse, editor, structure; reference them from the metainfo.
 2. `flatpak-builder --user --install build-dir apps/linux/flatpak/com.tablepro.linux.json`.
@@ -57,6 +57,8 @@ Flatpak and Flathub are left out of 0.2.0 ([PRODUCT.md](../PRODUCT.md)). The Fla
 4. Fork flathub/flathub, open the manifest PR, attach a release blurb.
 
 The current manifests allow network and IPC, X11/Wayland display and graphics access, home-directory access, read-only host configuration, the Kerberos credential-cache socket, `org.freedesktop.secrets`, and the SSH-agent socket. Home-directory access versus portal-only access remains undecided (PKG-8). The `ssh-auth` socket supports the built-in client's agent authentication. The system OpenSSH option needs a host `ssh` executable and must refuse explicitly in the sandbox instead of falling back to the built-in client.
+
+A manual run on a Debian 13 guest on October 7–8, 2026 verified building, installing, launching, uninstalling and showing the default manifest's window ([archived PKG-4 record](archive/known-issues-pre-project-migration-2026-10-12.md#packaging-and-qualification)). This is historical packaging evidence, not release qualification for the current source. Flathub submission and screenshots remain open.
 
 ## Accessibility
 

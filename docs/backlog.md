@@ -19,14 +19,14 @@ candidate inventory as a release commitment.
 | UI-20 | Server output (NOTICE, PRINT) and a timing breakdown | with PERF-4 |
 | UI-22, UI-23, UI-26 | Multi-cursor editing, typed PostgreSQL activity console, reusable SSH profiles | accepted for later; preview tabs, split panes, SQL code folding and the docked query history panel have landed (#618, #630, #754, #619); PostgreSQL catalog objects are already built (UI-23) |
 | PKG-2 | Debian and GNOME desktop pass (UI-D1 to D4) | the packages keep building and passing the distro floor in CI; this is the desktop acceptance |
-| PKG-4, PKG-8 | Flatpak Flathub submission and screenshots, and the file-access decision (`--filesystem=home` or portal only) | Build/install/launch checks pass; not part of 0.2.0; decide PKG-8 before PKG-4 |
+| PKG-4, PKG-8 | Flatpak Flathub submission and screenshots, and the file-access decision (`--filesystem=home` or portal only) | A Debian 13 guest build/install/launch check is recorded in [platforms](platforms.md#flathub); it does not qualify current source. Not part of 0.2.0; decide PKG-8 before PKG-4 |
 
 ## Performance
 
 | Row | What |
 |---|---|
 | PERF-2, PERF-7, PERF-8 | Progressively load SQL editor results while keeping the existing budgets. Core, PostgreSQL and PolicyGuard cursor support has landed; editor lifecycle and retained-page behavior remain open. |
-| PERF-3 | MongoDB browse on large collections | Deep unfiltered `_id` keyset seek landed in #493; filtered, sorted, keyless and installed/network acceptance remain |
+| PERF-3 | MongoDB browse on large collections | Compatible `_id` keyset seek landed in #493; supported server-side sorting landed in #837. Other sorted pages and keyless deep pages still use offset pagination; installed and representative-network acceptance remain |
 | PERF-4 | Server time next to elapsed time |
 | PERF-5, PERF-6 | Idle memory and binary size, accepted for now |
 

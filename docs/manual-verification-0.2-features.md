@@ -105,6 +105,8 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Editor and history
 
+- [ ] At 847 px and 802 px window widths, the navigation sidebar collapses and the main menu, editor Split action and window close control remain visible and usable. At an editor-pane width of 900 px or less, Fold block and Unfold all hide from the toolbar; Ctrl+Shift+[ and Ctrl+Shift+] still fold and unfold SQL blocks. The automated Xvfb scenario checks the main menu, Split and close-control bounds, not the folding controls. Ubuntu floor coverage passed in [#824](https://github.com/cozyGarage/BookiE/pull/824); native Hyprland verification remains pending. The original report is [#657](https://github.com/cozyGarage/BookiE/issues/657).
+
 - [ ] Toggle **Split** on and off with the mouse and keyboard; edit the query from either pane, confirm both views update, and check that each pane keeps its scroll position at a narrow window width. **2026-10-12 Hyprland dark:** mouse toggle and shared buffer passed; keyboard and narrow width not run. The orphaned-tab abort was fixed by [#667](https://github.com/cozyGarage/BookiE/pull/667); repeat the installed flow.
 - [ ] Ctrl+O opens a `.sql` file into a new tab titled with the file name. **2026-10-12 Hyprland dark:** passed.
 - [ ] Typing marks the title with `•`; Ctrl+S saves, clears the mark and shows "Saved". **2026-10-12 Hyprland dark:** passed.
@@ -167,7 +169,7 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 
 - [ ] Double-click an ENUM cell: a list of the declared members opens with the current one highlighted; choosing another shows a pending change and Save writes that member. **2026-10-12 Hyprland dark:** passed on PostgreSQL; the keyboard highlight starts on the first member, [#660](https://github.com/cozyGarage/BookiE/issues/660).
 - [ ] Choose the (empty) member of an ENUM that declares one: the cell shows empty and the stored value is the empty string, not NULL.
-- [ ] Double-click a SET cell: each member has a check; toggling and pressing Apply writes the members in declared order; with none checked the stored value is the empty set, not NULL. **2026-10-12 Hyprland dark:** declared order passed on MariaDB (`red,green,blue`); the empty set not run. The popover clips its labels, [#657](https://github.com/cozyGarage/BookiE/issues/657).
+- [ ] Double-click a SET cell: each member has a check; toggling and pressing Apply writes the members in declared order; with none checked the stored value is the empty set, not NULL. **2026-10-12 Hyprland dark:** declared order passed on MariaDB (`red,green,blue`); the empty set not run. That run found the popover clipped its labels; the current popover behavior has not been retested. This was also reported in [#657](https://github.com/cozyGarage/BookiE/issues/657), which is closed after the editor-toolbar fix.
 - [ ] Set to NULL from the cell menu still works on a nullable ENUM or SET.
 - [ ] On PostgreSQL, an enum column offers its labels in declared order; a column of an enum array type still opens the text editor.
 
@@ -180,7 +182,7 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 
 ## Explain tree
 
-- [ ] On PostgreSQL, Explain a join: the dialog opens on a Tree tab with nested steps, a cost bar per step and the filter or condition lines under their step; the Text tab shows the raw plan. **2026-10-12 Hyprland dark:** tree, cost bars and condition lines passed; the Text tab not checked. The Tree and Text switcher shows missing icons, [#656](https://github.com/cozyGarage/BookiE/issues/656).
+- [ ] On PostgreSQL, Explain a join: the dialog opens on a Tree tab with nested steps, a cost bar per step and the filter or condition lines under their step; the Text tab shows the raw plan. **2026-10-12 Hyprland dark:** tree, cost bars and condition lines passed; the Text tab not checked. The Tree and Text switcher showed missing icons, [#656](https://github.com/cozyGarage/BookiE/issues/656); icon names now use icons present in Adwaita and Yaru, awaiting a Hyprland retest.
 - [ ] Press Escape while the Explain plan dialog is open: the dialog closes. The installed GTK scenario `explain_plan_window_closes_on_escape` covers this behavior ([#781](https://github.com/cozyGarage/BookiE/pull/781)); installed Wayland retest pending.
 - [ ] On SQLite, Explain a query that scans and searches: steps nest by their parent.
 - [ ] On MySQL, ClickHouse or DuckDB the dialog shows the text plan with no Tree tab.
@@ -207,6 +209,14 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 - [ ] Rename one preset and delete the other; restart BookiE and confirm the renamed preset remains scoped to the same connection, schema and table. **2026-10-12 Hyprland dark:** passed.
 - [ ] Save a preset with raw SQL, an empty name, an overlong name and beyond the per-table limit; each is refused with a useful message. **2026-10-12 Hyprland dark:** raw SQL and empty name refused; the name field stops at 48 characters; the per-table limit not run.
 - [ ] Open the preset on a table whose columns changed; the invalid saved rule is not applied silently.
+
+## MongoDB sorted browse
+
+Use a stable collection with enough documents to browse multiple pages. These checks confirm installed behavior; pages outside the ascending `_id` keyset path use offset pagination, so record the collection size and query conditions when noting performance.
+
+- [ ] Sort by a supported field in ascending and descending order; each page follows the selected order.
+- [ ] Apply a filter and sort, then move across several pages; each page keeps the requested order and contains the expected rows.
+- [ ] Repeat with a sort other than ascending `_id` and a deep offset; correct ordering is required, but keyset performance is not implied. Installed Arch/Hyprland and representative-network acceptance remain tracked under [#555](https://github.com/cozyGarage/BookiE/issues/555).
 
 ## Catalog window
 

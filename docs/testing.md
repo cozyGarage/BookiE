@@ -4,8 +4,6 @@ The [active sprint](bookie-0.2-sprint.md) owns current acceptance. Start with th
 
 ## Executable gates
 
-Use the [validation playbook](validation-playbook.md) for the command catalog, layer boundaries and CI ownership.
-
 `scripts/ci-local.sh` remains the shared local/CI entry for full, widgets and integration modes. Registrations for isolated GTK and keyring tests live in `scripts/isolated-tests.json`; zero selected tests is a failure. Every `ci-local.sh` run saves exact-tree evidence under `target/quality/`. Release mode does not certify package installation, Wayland, upgrade/rollback or retry-free candidate soak. See the [packaging guide](../apps/linux/packaging/README.md) and [manual checklist](manual-verification-0.2-features.md).
 
 ## What a container run proves
@@ -112,6 +110,8 @@ Run the installed safety suite with:
 
 The script builds `tablepro-app`, always starts a private runtime directory, isolated D-Bus session and Xvfb display, and drives the real application through PyAT-SPI. Each scenario gets temporary XDG directories and a fixture SQLite database. A scenario may mark its saved fixture connection as production to test policy prompts; it never opens a user's saved connection or production database. The runner uses a standalone AT-SPI D-Bus daemon and passes the Xvfb display to D-Bus activation, so it does not reuse desktop accessibility or portal processes. GTK tests exercise the X11/GTK portal path; they do not replace installed Wayland package testing.
 
+After its configured retry, the current runner stops at the first failed scenario; it does not report later scenarios in that run. [#859](https://github.com/cozyGarage/BookiE/issues/859) tracks collecting and reporting all scenario failures.
+
 When `TABLEPRO_GTK_ARTIFACT_DIR` is set, every scenario writes a JSON result and application stderr, including successful scenarios. Failures additionally retain the accessibility tree and a screenshot when available. Successful runs therefore have uploadable evidence; a missing artifact still fails CI. Python regressions exercise both result paths without needing a display.
 
 Representative end-to-end scenarios in the suite are listed below; the current registry, including scenarios from the GTK workbook, parameter, XML and UX modules, is in [`gtk_safety.py`](../apps/linux/app/tests/gtk_safety.py).
@@ -154,7 +154,7 @@ To run one scenario using an already-built candidate (without another Cargo buil
 ```bash
 TABLEPRO_GTK_BINARY=/absolute/path/to/bookie \
 TABLEPRO_GTK_SCENARIO=current_page_workbook_preserves_typed_values \
-TABLEPRO_GTK_ARTIFACT_DIR=/tmp/bookie-workbook-evidence \
+TABLEPRO_GTK_ARTIFACT_DIR=target/gtk-evidence \
 bash scripts/test-gtk-safety.sh
 ```
 
@@ -203,7 +203,7 @@ The tag is advice only and never changes a result. A new infrastructure signatur
 
 ## Measuring how good the tests are
 
-The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests, intentional exclusions and packaging-only green runs. Mutation and coverage run on a schedule. The unit-tier line-coverage score has its own ratcheted floor in `baselines/coverage-floor.txt` (59%; 59.41% measured on 2026-10-11). The nightly workflow separately measures Docker suites for PostgreSQL, MySQL, SQLite, MongoDB, Redis and ClickHouse against `baselines/coverage-floors-crates.txt`. Installed GTK is outside both coverage reports. Mutation survivors need investigation. Dated first-run mutation notes are in [testing history](archive/testing-history.md#mutation-first-run-notes-2026-08-22).
+The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests, intentional exclusions and packaging-only green runs. Mutation and coverage run on a schedule. The unit-tier line-coverage score has its own ratcheted floor in `baselines/coverage-floor.txt` (59%; 59.41% measured on 2026-10-11). The nightly workflow separately measures Docker suites for PostgreSQL, MySQL, SQLite, MongoDB, Redis and ClickHouse against `baselines/coverage-floors-crates.txt`. Installed GTK is outside both coverage reports. These floors do not measure every crate or prove assertion quality; the current manual measurements and unmeasured areas are recorded in [#782](https://github.com/cozyGarage/BookiE/issues/782). Mutation survivors need investigation. Dated first-run mutation notes are in [testing history](archive/testing-history.md#mutation-first-run-notes-2026-08-22).
 
 ### Mutation testing
 
@@ -213,7 +213,7 @@ cargo mutants --package tablepro-core --test-tool cargo -- --lib
 cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --test-tool cargo -- --lib
 ```
 
-Prefer `core` and `policy`. The nightly mutation job also covers `ssh`, `driver-redis` and `agentd`; agentd mutations run against its library, binaries and integration tests, including saved-connection lookup. The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders with unit tests; Docker-backed value regressions stay in the driver layers. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](type-contract-strategy.md). Equivalent mutants and timeout findings are discussed in the archived first-run notes above.
+Prefer `core` and `policy`. GitHub's Linux test quality workflow mutates `core`, `policy`, `ssh`, Redis and selected PostgreSQL decoders. The Forgejo nightly also mutates `agentd`, `transport` and `app-services`; agentd mutations run against its library, binaries and integration tests, including saved-connection lookup. Forgejo compares missed mutants with per-package baselines and fails on unaccepted survivors; GitHub reports survivors for review. The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders with unit tests; Docker-backed value regressions stay in the driver layers. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](type-contract-strategy.md). Equivalent mutants and timeout findings are discussed in the archived first-run notes above.
 
 ### Coverage
 
@@ -228,7 +228,7 @@ Exclude app and fixture tiers so the map does not depend on Docker or a display.
 
 ## Upstream test-suite parity
 
-The [September adoption record](archive/testing-history.md#upstream-test-suite-parity) preserves the original cases and counts. Current case candidates and ownership are in [the scenario survey](archive/b3-test-scenario-survey.md) and the B3/B4 boards. Reproduce a candidate against current source before changing it; a historical claim of zero tests does not establish a current coverage gap.
+The [September adoption record](archive/testing-history.md#upstream-test-suite-parity) preserves the original cases and counts. Current case candidates and ownership are in [the scenario survey](archive/b3-test-scenario-survey.md) and the B3/B4 boards. Competitor issue-derived checks are hypotheses, not confirmed BookiE defects; the open checklist is in [#790](https://github.com/cozyGarage/BookiE/issues/790). Reproduce a candidate against current source before changing it; a historical claim of zero tests does not establish a current coverage gap.
 
 ## File-size guard
 
