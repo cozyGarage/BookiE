@@ -5,6 +5,7 @@
 Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the user-facing map for that development line since the last tagged package, [0.1.5](#015---2026-09-27). Compare: [`linux-v0.1.5...linux`](https://github.com/cozyGarage/BookiE/compare/linux-v0.1.5...linux). Entries stay here until the next tagged release.
 
 ### Added
+- Duplicating a password-authenticated connection with a saved password opens the copy's credential form so its password can be entered before connecting.
 - PostgreSQL results and edits support `json[]`, `jsonb[]`, `int4range`, `int8range` and `point` values.
 - SQL editors can collapse multiline SQL blocks at the cursor and unfold them from the gutter or toolbar.
 - Pressing Enter in a connection text field now activates Connect.
@@ -137,6 +138,9 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Fixed
 - View Value wraps long unbroken values without adding display-only hyphens.
+- Editing a table's structure keeps the Structure label on its tab when unsaved changes are marked.
+- Open Browse tabs reload their rows after Structure changes so grid headers and SQL exports use the current column names.
+- Opening the filter strip with an active structured filter now expands the rule editor instead of showing an empty raw WHERE field.
 - Restoring an editor no longer triggers a GTK sidebar layout failure before the window has completed its first layout.
 - PostgreSQL `SELECT ... FOR UPDATE` statements are treated as writes and follow configured approval and read-only rules.
 - PostgreSQL displays `interval` and `timetz` values and formats `float4` values consistently, including inside point and float arrays.
