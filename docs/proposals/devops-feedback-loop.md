@@ -42,7 +42,7 @@ Next: generate the changelog from per-PR fragments (one file per change) instead
 
 ### 2. Test
 
-Layers: unit, real-driver Docker suites, GUI scenarios, distro-floor containers, installed package, manual checklist. Containers prove the code behaves; only the installed package on a real desktop proves a connection path works (see `docs/testing.md`).
+Layers: unit, real-driver Docker suites, GUI scenarios, distro-floor containers, installed package, manual checklist. Containers prove the code behaves; connection-path acceptance uses the installed package in the target native desktop session (see [testing](../testing.md)).
 
 Gaps: failures are read by hand; the same infrastructure signatures recur.
 
@@ -58,7 +58,7 @@ Next, in order:
 
 Today: an Arch package built locally from a pinned commit; deb and Flatpak recipes; release evidence in the ledger.
 
-Gaps: no release candidate is built and installed by CI; installed acceptance depends on one desktop.
+Gaps: no release candidate is built and installed by CI; installed acceptance needs a supported native desktop session, on the host or in a VM, as described by the current [validation playbook](../validation-playbook.md#release-decision).
 
 Next: on a candidate tag, CI builds the Arch and deb packages, attaches checksums, and runs the installed GUI suite inside a clean container per distro (already the distro-floor shape). Keep the desktop pass (PKG-1) as the human gate it is.
 
@@ -116,4 +116,4 @@ The classifier and gate queue are shipped. Nothing else in this proposal is appr
 
 ## What this does not change
 
-The gate rules (Forgejo and GitHub both green on the same head), the policy and audit seam, and the privacy stance stay as they are.
+The workflow rules in [AGENTS.md](../../AGENTS.md) and the [validation playbook](../validation-playbook.md) continue to govern; this proposal does not change them. The policy and audit seam and the privacy stance also remain unchanged.

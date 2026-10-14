@@ -12,11 +12,11 @@ Run from the repository root. Current scope and acceptance are in [the active sp
 
 ## What a container run proves
 
-Database fixtures, the GTK scenarios and the distro-floor jobs run in containers or virtual displays. A pass there shows the code behaves as designed against a disposable database; it is not acceptance of a connection path. Unix sockets, IPv6 loopback, desktop portals and the Secret Service behave differently on a real host, and a container run has already hidden one such difference (Docker does not publish `::1`). Acceptance for those paths is the installed package connecting to a real database on a native desktop, recorded under PKG-1 and in the [manual checklist](manual-verification-0.2-features.md).
+Database fixtures, the GTK scenarios and the distro-floor jobs run in containers or virtual displays. A pass there shows the code behaves as designed against a disposable database; it is not acceptance of a connection path. Unix sockets, IPv6 loopback, desktop portals and the Secret Service behave differently across containers and desktop sessions; a container run has already hidden one such difference (Docker does not publish `::1`). Acceptance for those paths is the installed package connecting to a real database in the target native desktop session, on the host or a supported VM, as recorded under PKG-1 and in the [manual checklist](manual-verification-0.2-features.md).
 
 ## Local checks and fixtures
 
-Use `./scripts/preflight.sh` for the quick non-GTK gate and `python3 scripts/run-test-layer.py quick` / `full` for the playbook layers. Keep both `--lib` and `--bins` when invoking Cargo unit tests directly. `tablepro-app` puts UI and service tests in the `tablepro_app` library; `agentd` still has tests in both targets. DuckDB stays out of the default gate because its optional native build is large.
+Use `./scripts/preflight.sh` for the quick non-GTK gate and `python3 scripts/run-test-layer.py quick` / `full` for the playbook layers. Select Cargo test targets deliberately: `tablepro-app` puts UI and service tests in the `tablepro_app` library, while `agentd` has library, binary and integration tests. DuckDB stays out of the default gate because its optional native build is large.
 
 The workspace lints deny `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, the `print!` family and `dbg!`. Unit tests inside a `#[cfg(test)]` module are exempt through `clippy.toml`. A new standalone Cargo test target under `tests/` must start with:
 
@@ -231,7 +231,7 @@ cargo mutants --package tablepro-core --test-tool cargo -- --lib
 cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --test-tool cargo -- --lib
 ```
 
-Prefer `core` and `policy`. CI also covers `ssh` and `driver-redis`. The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders with unit tests; Docker-backed value regressions stay in the driver layers. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](type-contract-strategy.md). Equivalent mutants and timeout findings are discussed in the archived first-run notes above.
+Prefer `core` and `policy`. The nightly mutation job also covers `ssh`, `driver-redis` and `agentd`; agentd mutations run against its library, binaries and integration tests, including saved-connection lookup. The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders with unit tests; Docker-backed value regressions stay in the driver layers. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](type-contract-strategy.md). Equivalent mutants and timeout findings are discussed in the archived first-run notes above.
 
 ### Coverage
 
