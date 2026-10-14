@@ -1,7 +1,11 @@
 #[path = "add_column_primary_key.rs"]
 mod add_column_primary_key;
+#[path = "alter_type_no_truncation.rs"]
+mod alter_type_no_truncation;
 #[path = "auth_errors.rs"]
 mod auth_errors;
+#[path = "decoded_text_oracle.rs"]
+mod decoded_text_oracle;
 #[path = "drop_constraint_index.rs"]
 mod drop_constraint_index;
 #[path = "enum_labels.rs"]
@@ -16,6 +20,8 @@ mod network_paths;
 mod null_binding;
 #[path = "scenario_table.rs"]
 mod scenario_table;
+#[path = "schema_introspection.rs"]
+mod schema_introspection;
 #[path = "stale_plan.rs"]
 mod stale_plan;
 #[path = "touched_insert.rs"]

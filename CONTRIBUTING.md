@@ -19,7 +19,7 @@ pkg-config --modversion gtk4 libadwaita-1 gtksourceview-5
 cargo run -p tablepro-app
 ```
 
-Use a short-lived local branch when useful, then open the pull request against `linux`.
+Agents use a lane-named worktree and branch; human contributors may use a local branch. Open pull requests against `linux`.
 
 ## Project layout
 
@@ -43,7 +43,7 @@ The Cargo workspace is at the repository root. Crate roles, the governed request
 
 All database consumers must use a policy-gated connection. MCP requests require a valid token, the required scope, an allowed connection, and a passing policy decision. Do not bypass those checks for preview, retry, transaction, or batch paths.
 
-Changes to policy, MCP, approvals, masking, or audit behavior need tests for both allowed and denied paths. Include timeout, cancellation, and terminal audit outcomes when affected. Keep secrets in Secret Service through `tablepro-storage`.
+Changes to policy, MCP, approvals, masking, or audit behavior need tests for both allowed and denied paths. Include timeout, cancellation, and terminal audit outcomes when affected. Keep database and SSH credentials in Secret Service through `tablepro-storage`. GUI-issued MCP token plaintext is returned once and keyring storage is attempted; headless token issuance emits plaintext once to stdout or an explicitly selected owner-only file.
 
 New dependencies need an advisory, source, and license review through `deny.toml`.
 

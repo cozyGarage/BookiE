@@ -1,10 +1,10 @@
-# Manual verification: the 0.2 upstream feature sprint
+# Manual verification: 0.2.0 features
 
-The features below have logic tests. Four isolated GTK widget regressions passed on 2026-09-26, including long-cell edit seeding; this does not qualify the full installed workflows, layouts or light/dark appearance below. Unchecked items remain pending.
+This checklist records manual acceptance for the 0.2.0 target. GTK unit and widget tests do not qualify installed workflows, layouts or light/dark appearance. An unchecked item remains pending; a failure recorded from an earlier run is historical and must be rerun after its fix.
 
-Current target (2026-09-28): **Arch Linux / Omarchy / Hyprland, native Wayland**, after the B3/B4 continuation tasks. Repeat applicable installed checks on GNOME desktop under Debian Wayland immediately after the Arch pass; this phase is required. Use the [active sprint packets](bookie-0.2-sprint.md#arch--omarchy--wayland-ui-packets); Xvfb success does not establish native Wayland behavior.
+The 0.2.0 desktop target is **Arch Linux / Omarchy / Hyprland, native Wayland**. Debian and Ubuntu GNOME desktop acceptance follows 0.2.0 and is tracked under PKG-2. Use the [active sprint packets](bookie-0.2-sprint.md#arch--omarchy--wayland-ui-packets); Xvfb success does not establish native Wayland behavior.
 
-Record the full binary/package SHA, package checksum when installed, GTK backend, OS/Hyprland/GTK/libadwaita versions, display scale, light/dark mode, result and screenshot paths. Test both normal size and a narrow/resized window, keyboard focus, clipboard and popover/dialog placement. Mark blocked and not-run items explicitly. No boxes were checked by the September 28 documentation review.
+Record the full binary/package SHA, package checksum when installed, GTK backend, OS/Hyprland/GTK/libadwaita versions, display scale, light/dark mode, result and screenshot paths. Test both normal size and a narrow/resized window, keyboard focus, clipboard and popover/dialog placement. Mark blocked and not-run items explicitly.
 
 Take light and dark screenshots for each section, per `AGENTS.md`. Record a result beside each item rather than leaving it blank, because a blank line here reads as "passed" to the next person.
 
@@ -14,7 +14,7 @@ Real values: before 0.2.0, also run the by-hand value check in [oracle review](o
 
 Package `bookie 0.2.0-1`, built 2026-10-12 from the UX worktree at `d3202c17c` (BookiE `linux` `6cc8bd732` plus the [#618](https://github.com/cozyGarage/BookiE/pull/618) branch). `/usr/bin/bookie` SHA-256 `b2a8431bba1f4eddf4cc28a83110f789d38af75b16681152e2a5e837a35c3e87`. Arch Linux, Hyprland 0.56.2, native Wayland, GTK 4.22.4, libadwaita 1.9.3, GtkSourceView 5.20.0, scale 1, dark theme only. Databases: PostgreSQL 17 and MariaDB 11 in local containers. The UI was driven through AT-SPI, a virtual pointer and keyboard input; screenshots were kept locally and not committed.
 
-The maintainer checked the same build by hand on 2026-10-12: dark and light themes both render, and the app follows the system theme when it changes. Results are written beside each item as "2026-10-12 Hyprland dark". Boxes stay unticked because the per-item light-theme pass, GNOME and narrow-width checks were not run. Items without a 2026-10-12 note were not run. Defects found in this run are [#648](https://github.com/cozyGarage/BookiE/issues/648) to [#660](https://github.com/cozyGarage/BookiE/issues/660) and [#662](https://github.com/cozyGarage/BookiE/issues/662); [#648](https://github.com/cozyGarage/BookiE/issues/648) aborts the app.
+The maintainer checked the same build by hand on 2026-10-12: dark and light themes both render, and the app follows the system theme when it changes. Results are written beside each item as "2026-10-12 Hyprland dark". Boxes stay unticked because the per-item light-theme pass, GNOME and narrow-width checks were not run. Items without a 2026-10-12 note were not run. Defects found in this run are [#648](https://github.com/cozyGarage/BookiE/issues/648) to [#660](https://github.com/cozyGarage/BookiE/issues/660) and [#662](https://github.com/cozyGarage/BookiE/issues/662); the editor close defect was fixed in [#667](https://github.com/cozyGarage/BookiE/pull/667) and the shortcut window was updated in [#725](https://github.com/cozyGarage/BookiE/pull/725). Treat these run notes as historical; current retest status is written beside each item.
 
 Build first:
 
@@ -30,7 +30,7 @@ Open a result, then Export Results.
 - [ ] SQL is absent for a MongoDB or Redis connection, present for the others.
 - [ ] The CSV options group shows for CSV and hides for every other format. **2026-10-12 Hyprland dark:** passed for CSV and SQL only.
 - [ ] A SQL options group with an editable Table name shows only for SQL. **2026-10-12 Hyprland dark:** passed.
-- [ ] For a browse tab the Table name is prefilled `schema.table`; for an editor tab it is the tab label, and editing it changes the emitted statements. **2026-10-12 Hyprland dark:** browse tab passed (prefilled `public.customers`, edited name reached the INSERT statements); editor tab not run. Export after a column rename used the old name, [#651](https://github.com/cozyGarage/BookiE/issues/651).
+- [ ] For a browse tab the Table name is prefilled `schema.table`; for an editor tab it is the tab label, and editing it changes the emitted statements. **2026-10-12 Hyprland dark:** browse tab passed (prefilled `public.customers`, edited name reached the INSERT statements); editor tab not run. Export after a column rename used the old name; fixed by [#676](https://github.com/cozyGarage/BookiE/pull/676), installed retest pending.
 - [ ] The written `.xlsx` opens in LibreOffice and the `.html` in a browser.
 - [ ] Cancelling a large export leaves any existing destination file untouched.
 - [ ] An Excel export above the sheet row limit is refused, and the message names the limit.
@@ -56,21 +56,22 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 ## Connection dialog and browse shortcuts
 
 - [ ] Screen readers can activate Driver, Endpoint and TLS, and announce Port, Connect timeout and Query timeout. GTK AT-SPI scenario passed in Xvfb on 2026-10-13; native Hyprland verification is pending. The sidebar search, saved-filter name and colour picker are outside this connection-form check, [#658](https://github.com/cozyGarage/BookiE/issues/658).
-- [ ] New connection defaults match the selected driver; no PostgreSQL defaults leak into another engine. Switching drivers and editing a saved connection preserves intended custom values. **2026-10-12 Hyprland dark:** defaults passed for all seven drivers; switching drivers resets typed port, database and username, [#653](https://github.com/cozyGarage/BookiE/issues/653).
+- [ ] New connection defaults match the selected driver; no PostgreSQL defaults leak into another engine. Switching drivers and editing a saved connection preserves intended custom values. **2026-10-12 historical run:** defaults passed for all seven drivers; switching drivers reset custom port, database and username values. Fixed by [#740](https://github.com/cozyGarage/BookiE/pull/740); transition tests cover all three fields, and installed Hyprland retest remains pending.
 - [ ] For MySQL/MariaDB, select a local Unix socket and confirm the form shows a socket-file path while hiding host and port. Switch back to Network and confirm the socket path is hidden and host/port return.
 - [ ] Connect through a real local MySQL/MariaDB socket, save the connection, reopen it, and confirm the socket path and endpoint mode remain selected. Export and re-import a bundle and confirm the same endpoint is retained.
 - [ ] Confirm a missing or invalid socket path fails without attempting a TCP connection. Local sockets refuse TLS and SSH; existing PostgreSQL socket-directory and SSH-forwarded MySQL socket connections still work.
 - [ ] The current header title and grouped Test/Connect actions fit at narrow width in light and dark; the title does not overlap the actions.
-- [ ] Enter submits the form and Escape dismisses without changing saved data. **2026-10-12 Hyprland dark:** Enter failed, [#652](https://github.com/cozyGarage/BookiE/issues/652). The GTK regression now covers nested entry activation; rerun the keyboard flow on installed Wayland.
-- [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels. **2026-10-12 Hyprland dark:** failed. The window is one column taller than the screen, pointer gestures have no key caps and rows repeat, [#662](https://github.com/cozyGarage/BookiE/issues/662).
+- [ ] Enter submits the form and Escape dismisses without changing saved data. **2026-10-12 Hyprland dark:** Enter failed; fixed by [#737](https://github.com/cozyGarage/BookiE/pull/737). The GTK regression covers nested entry activation; rerun the keyboard flow on installed Wayland.
+- [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels. **2026-10-12 Hyprland dark:** failed before the shortcut window was reorganized in [#725](https://github.com/cozyGarage/BookiE/pull/725); installed retest pending.
 
 ## Connection list
 
 - [ ] Connections are grouped, with one section per group and an ungrouped section.
 - [ ] A group that appears twice in the ordering still renders one section.
 - [ ] The colour swatch shows on a tagged row and the picker sets it. **2026-10-12 Hyprland dark:** the picker saved the colour; the swatch was not checked.
+- [ ] After connecting to a tagged connection, the workspace tab strip shows its colour. Changing or clearing the tag updates the strip, and disconnecting clears it. The GTK regression passes; the installed retest after [#768](https://github.com/cozyGarage/BookiE/pull/768) is pending.
 - [ ] With Orca, open Group and tags, navigate to Colour, open the named button, choose a palette colour, and confirm the selected colour is announced and saved. Sidebar table search and the saved-filter name field announce their purpose. Native Wayland screen-reader check pending.
-- [ ] Duplicate produces a new row with a distinct name, and connecting to it asks for credentials rather than reusing the original's. **2026-10-12 Hyprland dark:** distinct name passed ("(copy)"); the copy did not reuse the password but did not ask for one either, it failed and offered Edit Connection, [#660](https://github.com/cozyGarage/BookiE/issues/660).
+- [ ] Duplicate produces a new row with a distinct name. When the source has a saved database password, the copy's credential form opens with an empty password field; save a new password and verify both connections work independently. **2026-10-12 historical run:** distinct name passed ("(copy)"); the copy did not reuse the password but did not ask for one either, it failed and offered Edit Connection. Fixed in [#823](https://github.com/cozyGarage/BookiE/pull/823); installed retest pending ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
 - [ ] The Name field in the connect dialog is used when set, and the derived `user@host` label still appears when it is blank.
 - [ ] Two connections to the same endpoint stay separate after reconnecting to each. This is the regression the id-first identity change fixed.
 - [ ] On PostgreSQL, right-click a schema and hide it. Confirm its tables and views disappear, search cannot reveal them, the filter menu can restore one or all schemas, and each connection retains its own hidden-schema list after reconnecting. **2026-10-12 Hyprland dark:** hide, search and restore one schema passed; per-connection retention after reconnect not run.
@@ -82,7 +83,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 ## Per-connection timeouts
 
 - [ ] The connect dialog shows Connect timeout and Query timeout rows; 0 means default. **2026-10-12 Hyprland dark:** passed.
-- [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after about 2 seconds, while another connection still uses the Preferences timeout. **2026-10-12 Hyprland dark:** stopped after 2.007 s, passed; the message names Preferences instead of the connection, [#654](https://github.com/cozyGarage/BookiE/issues/654). The second connection not run.
+- [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after about 2 seconds, while another connection still uses the Preferences timeout. **2026-10-12 Hyprland dark:** stopped after 2.007 s, passed; the wording was fixed by [#668](https://github.com/cozyGarage/BookiE/pull/668). The second connection and installed retest remain pending.
 - [ ] A connect timeout of 3 seconds to an unreachable host fails after about 3 seconds.
 
 ## Connection bundles
@@ -95,6 +96,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Structure tab, column comments
 
+- [ ] Open an existing Structure tab and make an unsaved change: its title keeps the `· Structure` suffix alongside the dirty marker. The regression test in [#796](https://github.com/cozyGarage/BookiE/pull/796) covers title state; installed Wayland retest pending.
 - [ ] A Comment row appears per column on PostgreSQL, MySQL, SQL Server and ClickHouse. **2026-10-12 Hyprland dark:** PostgreSQL passed; others not run.
 - [ ] On ClickHouse the field is populated but not editable for an existing column, with a tooltip saying why.
 - [ ] No Comment row appears on SQLite or DuckDB.
@@ -104,13 +106,14 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 ## Editor and history
 
 - [ ] At 847 px and 802 px window widths, the navigation sidebar collapses and the main menu, editor Split action and window close control remain visible and usable. The automated Xvfb scenario checks their bounds; native Hyprland verification remains open under [#657](https://github.com/cozyGarage/BookiE/issues/657).
-- [ ] Toggle **Split** on and off with the mouse and keyboard; edit the query from either pane, confirm both views update, and check that each pane keeps its scroll position at a narrow window width. **2026-10-12 Hyprland dark:** mouse toggle and shared buffer passed; keyboard and narrow width not run. Split on an orphaned tab aborts the app, [#648](https://github.com/cozyGarage/BookiE/issues/648).
+
+- [ ] Toggle **Split** on and off with the mouse and keyboard; edit the query from either pane, confirm both views update, and check that each pane keeps its scroll position at a narrow window width. **2026-10-12 Hyprland dark:** mouse toggle and shared buffer passed; keyboard and narrow width not run. The orphaned-tab abort was fixed by [#667](https://github.com/cozyGarage/BookiE/pull/667); repeat the installed flow.
 - [ ] Ctrl+O opens a `.sql` file into a new tab titled with the file name. **2026-10-12 Hyprland dark:** passed.
 - [ ] Typing marks the title with `•`; Ctrl+S saves, clears the mark and shows "Saved". **2026-10-12 Hyprland dark:** passed.
 - [ ] Ctrl+S on an editor tab never opened from a file asks where to save.
 - [ ] Ctrl+Shift+S saves to a new file and the tab then follows that file.
 - [ ] Change the file in another editor, then press Ctrl+S: the "changed on disk" dialog appears. Cancel leaves both copies alone; Overwrite writes yours; Save As… writes elsewhere. **2026-10-12 Hyprland dark:** Cancel and Overwrite passed; Save As not run.
-- [ ] Closing a tab with unsaved file changes asks Save/Discard/Cancel, and Save closes it only after the file is written. **2026-10-12 Hyprland dark:** the prompt passed; Save wrote the file but the tab stayed open, [#648](https://github.com/cozyGarage/BookiE/issues/648).
+- [ ] Closing a tab with unsaved file changes asks Save/Discard/Cancel, and Save closes it only after the file is written. **2026-10-12 Hyprland dark:** the prompt passed; Save wrote the file but the tab stayed open. Fixed by [#667](https://github.com/cozyGarage/BookiE/pull/667); installed retest pending.
 - [ ] Saving a file that is a symlink updates its target and keeps the link.
 - [ ] Restart with a file tab open: the tab is titled by the file again, unsaved edits still show `•`, and Ctrl+S saves to the same file.
 - [ ] Delete that file, then restart: the tab keeps its text and a toast says it is no longer linked.
@@ -180,20 +183,21 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 ## Explain tree
 
 - [ ] On PostgreSQL, Explain a join: the dialog opens on a Tree tab with nested steps, a cost bar per step and the filter or condition lines under their step; the Text tab shows the raw plan. **2026-10-12 Hyprland dark:** tree, cost bars and condition lines passed; the Text tab not checked. The Tree and Text switcher shows missing icons, [#656](https://github.com/cozyGarage/BookiE/issues/656).
+- [ ] Press Escape while the Explain plan dialog is open: the dialog closes. The installed GTK scenario `explain_plan_window_closes_on_escape` covers this behavior ([#781](https://github.com/cozyGarage/BookiE/pull/781)); installed Wayland retest pending.
 - [ ] On SQLite, Explain a query that scans and searches: steps nest by their parent.
 - [ ] On MySQL, ClickHouse or DuckDB the dialog shows the text plan with no Tree tab.
 - [ ] Explain on an empty editor still shows the existing message.
 
 ## Go to Referenced Row
 
-- [ ] In a table with a foreign key, right-click a non-empty value in the key column: Go to Referenced Row opens the referenced table with one filter rule on the referenced column. **2026-10-12 Hyprland dark:** failed. The item is greyed out on a real foreign key, [#649](https://github.com/cozyGarage/BookiE/issues/649).
+- [ ] In a table with a foreign key, right-click a non-empty value in the key column: Go to Referenced Row opens the referenced table with one filter rule on the referenced column. **2026-10-12 Hyprland dark:** failed because foreign keys arrived after the grid was drawn; fixed by [#664](https://github.com/cozyGarage/BookiE/pull/664). Installed retest pending.
 - [ ] On a cell of a column that is not a foreign key, or on a NULL key, the item is greyed out.
 - [ ] With the referenced table already open, the same action switches to that tab and replaces its filter.
 - [ ] A composite key filters every referenced column from the same row; with one of its columns hidden, a toast says so.
 
 ## Filter by This Value
 
-- [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 Hyprland dark:** passed; also covered by the installed GTK scenario `filter_by_this_value_narrows_the_browse_rows`. The filter strip opens with the rule editor collapsed, [#660](https://github.com/cozyGarage/BookiE/issues/660).
+- [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; installed retest of the expanded editor is pending ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
 - [ ] On a NULL cell it filters with IS NULL.
 - [ ] Doing it again on another value of the same column replaces that rule.
 - [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run.
@@ -216,17 +220,16 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] Switching kind quickly never shows the previous kind's rows under the new one.
 - [ ] Closing the window mid-load leaves no error toast behind.
 
-## Grid cell editing: long text and JSON
+## Grid previews for long values
 
-A text or JSON cell over 8 KiB shows the start of the value and `… (N bytes total)`. Editing used to start from that shortened text; this is now fixed (`FULL_EDIT_TEXT_SLOT` in `apps/linux/app/src/ui/grid/display.rs`) and its isolated GTK regression passed on 2026-09-26. The installed workflow remains open. Use a table with a `text` or `json` column and insert one row with a value of at least 50,000 characters (for example `SELECT repeat('a', 50000)` cast to the column's type, or a JSON array with enough elements).
+In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a typed preview with the original byte count. SQL result grids are read-only. In an editable browse table, confirm that a long text cell opens for inline editing with the full value, not the preview. **View Value** and **Copy Value** expose the complete value. A dedicated multiline editor for large text and JSON remains future work under [#610](https://github.com/cozyGarage/BookiE/issues/610). Use text and JSON values just below and just above the 8 KiB threshold.
 
-- [ ] The cell shows the shortened text ending in `… (+N more chars)`. **2026-10-12 Hyprland dark:** the marker is now `… (N bytes total)`, and the cell offers only View Value, not editing, [#659](https://github.com/cozyGarage/BookiE/issues/659). The rest of this section was not run.
-- [ ] Double-click the cell: the edit field's content is the **full** value, not the shortened one, and does not end in the `more chars` marker. Blocked until [#610](https://github.com/cozyGarage/BookiE/issues/610): previewed values are read-only in the grid today ([#659](https://github.com/cozyGarage/BookiE/issues/659)), so the editing items below cannot be run.
-- [ ] Press Escape without typing anything: no edit is recorded (check the history dialog or the change-tracker highlight), and reopening the cell still shows the full value.
-- [ ] Click away (focus-out) without typing anything: same as Escape, no edit recorded.
-- [ ] Append one character at the end of the full value and commit (Enter or Tab): reload the row and confirm the saved value is the original text plus that one character, not the shortened text.
-- [ ] For a JSON column, open the cell's JSON popover editor: its content is also the full value, not the shortened one. Save without changing anything, then Save after a small change, and confirm the same two outcomes as above.
-- [ ] Do all of the above once more for a value just under 40,000 bytes (no truncation should ever have applied) to confirm normal editing still works unchanged.
+- [ ] A value below the threshold displays in full and remains editable where that type supports grid edits.
+- [ ] Values over the threshold show a prefix and `… (N bytes total)`; SQL result cells and binary/unsupported browse values do not offer inline editing. Editable browse text opens with the full value.
+- [ ] View Value shows the complete text or JSON, including the final characters or JSON structure.
+- [ ] A long unbroken value wraps without display-only hyphens; the GTK widget regression covers this rendering property ([#791](https://github.com/cozyGarage/BookiE/pull/791)); installed retest pending.
+- [ ] Copy Value copies the complete text or JSON rather than the displayed preview.
+- [ ] Repeat with a binary value over the threshold; the preview reports the original byte count and View Value exposes the full bytes.
 
 ## Server activity view: binary values
 
@@ -234,10 +237,9 @@ A text or JSON cell over 8 KiB shows the start of the value and `… (N bytes to
 
 ## Result headers, selection statistics, error copy and connection strip
 
-- [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the lower-case type beneath it, in light and dark. **2026-10-12 Hyprland dark:** name and type passed; key markers missing, [#649](https://github.com/cozyGarage/BookiE/issues/649).
+- [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the lower-case type beneath it, in light and dark. **2026-10-12 Hyprland dark:** name and type passed; key markers were missing before [#664](https://github.com/cozyGarage/BookiE/pull/664). Installed retest pending.
 - [ ] Select several rows of a numeric column: the selection badge popover lists the column's count, sum, average, min and max, and Copy summary copies them. A text column is not listed. **2026-10-12 Hyprland dark:** passed; also covered by the installed GTK scenario `selection_statistics_summarise_the_selected_rows`.
 - [ ] Run a failing statement in the editor: Copy error places the exact error text on the clipboard. **2026-10-12 Hyprland dark:** passed.
-- [ ] Tag a connection red and open it: the strip above the workspace tabs is red in light and dark. Change the tag: the strip follows without a restart. **2026-10-12 Hyprland dark:** failed before the direct tab-bar targeting fix; installed-package retest remains pending, [#650](https://github.com/cozyGarage/BookiE/issues/650).
 
 ## Sidebar tree
 
@@ -254,7 +256,8 @@ A text or JSON cell over 8 KiB shows the start of the value and `… (N bytes to
 
 ## Pinned results and gutter marks
 
-- [ ] Run `SELECT 1; SELECT 2;`, click Pin results, change the script and run it again: the first results stay as tabs marked 📌 ahead of the new ones. The button now reads Unpin results (2); clicking it drops the pinned tabs. **2026-10-12 Hyprland dark:** passed; also covered by the installed GTK scenario `pinned_results_stay_ahead_of_the_next_run`. Statement numbers continue after the pinned tabs, [#660](https://github.com/cozyGarage/BookiE/issues/660).
+- [ ] On SQL Server, run `EXEC sys.sp_executesql N'SELECT 1 AS first_result; SELECT 2 AS second_result;'` as one query. Confirm the result-set selector shows both sets in source order and each displays its own column and value.
+- [ ] Run `SELECT 1 AS one; SELECT 2 AS two;`, pin both results, then run `SELECT 3 AS three;` and `SELECT 4 AS four; SELECT * FROM missing_table;`: pinned results stay first and the failed second statement is labelled **Statement 2**, not Statement 4. Unpin removes the pinned results. **2026-10-12 historical run:** pin ordering passed, but failure numbering after pinning was not checked; fixed by [#785](https://github.com/cozyGarage/BookiE/pull/785). The installed GTK scenario `pinned_results_stay_ahead_of_the_next_run` covers the failure; installed Wayland retest pending ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
 - [ ] After running a script, each statement's first line shows a tick or, for a failed statement, a cross in the gutter, in light and dark. Edit the script and run it again: the marks follow the new run. **2026-10-12 Hyprland dark:** dark theme passed.
 
 ## Carried over from the earlier sprint
