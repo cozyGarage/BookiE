@@ -22,7 +22,7 @@ Walked against the code and living docs after [#532](https://github.com/cozyGara
 | Datastore & persistence model | Decided | Desktop client, not a hosted store. XDG files plus Secret Service. [ADR 0004](0004-libsecret-secret-storage.md), [ADR 0009](0009-persistence-and-identity-compatibility.md). |
 | Schema evolution & migrations | Decided | Compatible adapters and recoverable migrations for saved state. [ADR 0009](0009-persistence-and-identity-compatibility.md). |
 | Async, eventing & background jobs | Decided | Relm4 messages and component-scoped commands. No product job queue. [ADR 0003](0003-relm4-architecture.md). |
-| Caching | N/A | No application cache layer. Query results are bounded pages, not a cache. |
+| Caching | N/A | No general application cache layer. Browse pages and SQL results remain owned by their tabs under separate bounds. |
 | Numerical / semantic compatibility | Decided | Native type and value preservation. [ADR 0007](0007-type-and-value-preservation.md). |
 
 ## Interfaces and contracts
@@ -32,7 +32,7 @@ Walked against the code and living docs after [#532](https://github.com/cozyGara
 | API / contract style & versioning | Decided | No public HTTP product API. MCP tools; `tablepro` protocol contracts stay on the rename boundary. [ARCHITECTURE](../../ARCHITECTURE.md). |
 | Auth & authorization model | Decided | Desktop: Secret Service. MCP: token scopes, connection allowlists, then `PolicyGuard`. [ADR 0004](0004-libsecret-secret-storage.md), [ADR 0008](0008-connection-and-session-ownership.md), [ADR 0016](0016-governed-consumer-seam.md), [AGENTS](../../AGENTS.md). |
 | Error & result modeling | Decided | Typed `thiserror` at crate boundaries. Panic containment: [ADR 0006](0006-driver-panic-containment.md). |
-| Config & secrets management | Decided | Secrets in Secret Service. Never in JSON, argv, traces, errors or audit fields. [ADR 0004](0004-libsecret-secret-storage.md), [AGENTS](../../AGENTS.md). |
+| Config & secrets management | Decided | Database and SSH credentials use Secret Service. GUI-issued MCP token plaintext is returned once and keyring storage is attempted; headless token issuance emits plaintext once to stdout or an explicitly selected owner-only file. Secrets never go in connection JSON, argv, traces, errors or audit fields. [ADR 0004](0004-libsecret-secret-storage.md), [AGENTS](../../AGENTS.md). |
 
 ## Quality and safety
 
@@ -81,7 +81,7 @@ Walked against the code and living docs after [#532](https://github.com/cozyGara
 | Secret Service credentials | [ADR 0004](0004-libsecret-secret-storage.md), [secret-storage spec](../../specs/secret-storage/spec.md) (draft) |
 | Governed consumer seam (`PolicyGuard`) | [ADR 0016](0016-governed-consumer-seam.md), [governed SQL spec](../../specs/governed-sql/spec.md) (draft) |
 | Server-side cancellation | [ADR 0005](0005-server-side-cancellation.md) |
-| Cursor-paged editor results | [ADR 0011](0011-paged-query-results.md) (accepted; not fully implemented) |
+| Cursor-paged editor results | [ADR 0011](0011-paged-query-results.md) (accepted; core/PostgreSQL/PolicyGuard support exists, editor integration remains) |
 | Sidebar object tree | [ADR 0012](0012-sidebar-object-tree.md) |
 | Multiple result sets | [ADR 0013](0013-multiple-query-result-sets.md) |
 | Full-table export read snapshot | [ADR 0014](0014-full-table-export-snapshot.md) (not the same as ADR 0015) |
