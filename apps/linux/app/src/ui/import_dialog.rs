@@ -752,10 +752,26 @@ mod tests {
         window.present();
         let progress = present_progress(&window, "items", 2);
 
-        assert!(progress.dialog.is_mapped());
+        assert!(wait_for_mapping(&progress.dialog, true));
         progress.close();
-        assert!(!progress.dialog.is_mapped());
+        assert!(wait_for_mapping(&progress.dialog, false));
         window.close();
+    }
+
+    fn wait_for_mapping(dialog: &adw::Dialog, mapped: bool) -> bool {
+        let context = gtk::glib::MainContext::default();
+        for _ in 0..200 {
+            for _ in 0..64 {
+                if !context.iteration(false) {
+                    break;
+                }
+            }
+            if dialog.is_mapped() == mapped {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        dialog.is_mapped() == mapped
     }
 
     fn column(name: &str) -> ColumnInfo {
