@@ -541,6 +541,13 @@ GLib.MainLoop().run()
             raise AssertionError(f"the viewer did not show pretty JSON:\n{ui.accessible_snapshot()}")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
 
+    def explain_plan_window_closes_on_escape(_database, _base):
+        ui.run_sql("SELECT 1 AS value")
+        ui.invoke(ui.wait_for_node(name="Explain", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_frame_containing("Explain plan")
+        ui.press_x11_key("Escape")
+        ui.wait_for_frame_containing("Explain plan", present=False)
+
     def columns_dialog_hides_a_column_and_keeps_the_last_one(database, base):
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         wait_for_result_column("beta")
@@ -1352,6 +1359,9 @@ GLib.MainLoop().run()
         ui.run_sql("SELECT 3 AS three;")
         pinned = lambda: [name for name in page_tab_names() if "\U0001F4CC" in name]
         wait_until(lambda: len(pinned()) == 2 and len(page_tab_names()) >= 4, "pinned results did not stay")
+        ui.run_sql("SELECT 4 AS four;\nSELECT * FROM missing_table;")
+        ui.wait_for_node(name="Statement 2 failed")
+        ui.wait_for_node(name="Statement 4 failed", present=False)
         unpin = ui.wait_for_node_containing("Unpin results", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(unpin)
         wait_until(lambda: not pinned(), "unpinning did not drop the pinned results")
@@ -1427,6 +1437,7 @@ GLib.MainLoop().run()
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
         find_bar_replaces_every_match_in_the_editor,
         view_value_opens_the_whole_cell_with_pretty_json,
+        explain_plan_window_closes_on_escape,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
         browse_edit_cell_and_save_persists_to_the_database,
