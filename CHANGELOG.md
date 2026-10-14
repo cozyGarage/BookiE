@@ -5,6 +5,7 @@
 Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the user-facing map for that development line since the last tagged package, [0.1.5](#015---2026-09-27). Compare: [`linux-v0.1.5...linux`](https://github.com/cozyGarage/BookiE/compare/linux-v0.1.5...linux). Entries stay here until the next tagged release.
 
 ### Added
+- At narrow window widths, the navigation sidebar collapses and the Fold block and Unfold all toolbar buttons hide so the remaining editor controls stay in view; their keyboard shortcuts still work.
 - Switching database drivers keeps custom connection values and updates fields that still use the previous driver's defaults.
 - Duplicating a password-authenticated connection with a saved password opens the copy's credential form so its password can be entered before connecting.
 - PostgreSQL results and edits support `json[]`, `jsonb[]`, `int4range`, `int8range` and `point` values.
@@ -115,6 +116,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- Explain view tabs and the schema filter button now use icons available in Adwaita and Yaru themes.
 - The Explain plan window now closes when you press Escape.
 - Pinned results no longer shift the statement numbers shown for a new script's results or errors.
 - View Value wraps long unbroken values without adding display-only hyphens.

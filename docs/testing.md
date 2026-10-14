@@ -4,8 +4,6 @@ The [active sprint](bookie-0.2-sprint.md) owns current acceptance. Start with th
 
 ## Executable gates
 
-Use the [validation playbook](validation-playbook.md) for the command catalog, layer boundaries and CI ownership.
-
 `scripts/ci-local.sh` remains the shared local/CI entry for full, widgets and integration modes. Registrations for isolated GTK and keyring tests live in `scripts/isolated-tests.json`; zero selected tests is a failure. Every `ci-local.sh` run saves exact-tree evidence under `target/quality/`. Release mode does not certify package installation, Wayland, upgrade/rollback or retry-free candidate soak. See the [packaging guide](../apps/linux/packaging/README.md) and [manual checklist](manual-verification-0.2-features.md).
 
 ## What a container run proves
@@ -213,7 +211,7 @@ cargo mutants --package tablepro-core --test-tool cargo -- --lib
 cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --test-tool cargo -- --lib
 ```
 
-Prefer `core` and `policy`. The nightly mutation job also covers `ssh`, `driver-redis` and `agentd`; agentd mutations run against its library, binaries and integration tests, including saved-connection lookup. The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders with unit tests; Docker-backed value regressions stay in the driver layers. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](type-contract-strategy.md). Equivalent mutants and timeout findings are discussed in the archived first-run notes above.
+Prefer `core` and `policy`. GitHub's Linux test quality workflow mutates `core`, `policy`, `ssh`, Redis and selected PostgreSQL decoders. The Forgejo nightly also mutates `agentd`, `transport` and `app-services`; agentd mutations run against its library, binaries and integration tests, including saved-connection lookup. Forgejo compares missed mutants with per-package baselines and fails on unaccepted survivors; GitHub reports survivors for review. The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders with unit tests; Docker-backed value regressions stay in the driver layers. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](type-contract-strategy.md). Equivalent mutants and timeout findings are discussed in the archived first-run notes above.
 
 ### Coverage
 

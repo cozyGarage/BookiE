@@ -25,8 +25,8 @@ What the application does not do, or does differently from what you might expect
 - **Hidden-column projection still needs desktop acceptance** (PERF-9). Merged
   [#384](https://github.com/cozyGarage/BookiE/pull/384) projects hidden non-key
   columns out of the select and refuses full-row copy, row JSON and current-page
-  export while those values are unfetched. Distribution Wayland/GNOME acceptance
-  remains open.
+  export while those values are unfetched. Installed Arch/Hyprland Wayland
+  acceptance remains open; Debian/GNOME acceptance follows after 0.2.0.
 - **A table without a primary key cannot be deleted from the grid** (TEST-14). There
   is no all-column fallback, by design.
 - **ClickHouse ambiguous local times:** a `DateTime64` that falls in a repeated or
@@ -74,4 +74,4 @@ What the application does not do, or does differently from what you might expect
 ## Test and CI limits
 
 - The installed GTK suite does not pass reliably on a native Ubuntu 24.04 runner (TEST-28); it passes in the Debian 13 and Ubuntu 24.04 containers.
-- About 68 percent of the policy crate's and 81 percent of the core crate's mutations were caught by their own tests when measured at `0d21eb6d4` (2026-10-11); later survivor triage is in the [B4 mutation triage](evidence/b4-mutation-triage-2026-10-12) and the figure has not been re-measured. Mutation survivors are tracked under [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559); expected-value provenance is a separate [TEST-32 oracle review](oracle-review.md).
+- Mutation results are tied to their source SHA; use the latest [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559) report for survivor and timeout status. Expected-value provenance is tracked separately by [TEST-32](oracle-review.md).
