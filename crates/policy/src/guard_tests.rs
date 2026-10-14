@@ -46,7 +46,7 @@ struct PanickingConn;
 struct ControlledWriteConn {
     outcome_unknown: bool,
 }
-struct TransactionQueryErrorConn;
+struct ErrorConn(fn() -> DriverError);
 struct TransactionQueryErrorTx;
 struct QueryCountingConn {
     queries: Arc<AtomicUsize>,
@@ -217,7 +217,7 @@ impl Connection for QueryCountingConn {
 }
 
 #[async_trait]
-impl Connection for TransactionQueryErrorConn {
+impl Connection for ErrorConn {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         Ok(vec![])
     }
@@ -231,19 +231,19 @@ impl Connection for TransactionQueryErrorConn {
     }
 
     async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
-        Err(query_error())
+        Err((self.0)())
     }
 
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
-        Err(query_error())
+        Err((self.0)())
     }
 
     async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
-        Err(query_error())
+        Err((self.0)())
     }
 
     async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        Err(query_error())
+        Err((self.0)())
     }
 
     async fn begin(&self) -> Result<Box<dyn Transaction>, DriverError> {
@@ -542,7 +542,10 @@ impl Connection for PanickingConn {
     }
 }
 
-struct DisconnectedConn;
+#[derive(Default)]
+struct DisconnectedConn {
+    batch_dispatches: Arc<AtomicUsize>,
+}
 
 #[async_trait]
 impl Connection for DisconnectedConn {
@@ -571,6 +574,7 @@ impl Connection for DisconnectedConn {
     }
 
     async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        self.batch_dispatches.fetch_add(1, Ordering::SeqCst);
         Err(DriverError::Disconnected)
     }
 
@@ -605,11 +609,15 @@ mod audit;
 mod bulk;
 #[path = "guard_tests_checked.rs"]
 mod checked;
+#[path = "guard_tests_cursor.rs"]
+mod cursor;
 #[path = "guard_tests_fault.rs"]
 mod fault;
 #[path = "guard_tests_gating.rs"]
 mod gating;
 #[path = "guard_tests_passthrough.rs"]
 mod guard_tests_passthrough;
+#[path = "guard_tests_masking.rs"]
+mod masking;
 #[path = "guard_tests_session.rs"]
 mod session;
