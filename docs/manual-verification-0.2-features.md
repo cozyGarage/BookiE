@@ -245,6 +245,14 @@ In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a ty
 - [ ] Type in the sidebar search: groups holding a match open even if collapsed; clearing the search restores your collapsed groups. Quit and reopen the connection: the groups you collapsed are still collapsed.
 - [ ] New Table and Table from CSV on a Tables group still open their dialogs for that schema. Light and dark look right.
 
+## Preferences, About and application icons
+
+- [ ] Open Preferences and confirm the page navigation separates General, Appearance, Editor and MCP.
+- [ ] Change Appearance between System, Light and Dark; confirm the active application style changes and the choice survives a restart.
+- [ ] Confirm the Data browser, Query history and SQL editor controls retain their current values and live-save behavior.
+- [ ] Open About and confirm the BookiE contributor link and upstream TablePro author link are distinct, and the copyright attribution remains visible.
+- [ ] Check the BookiE launcher icon at small and large sizes in the application menu and task switcher; confirm the same artwork is used by the installed package.
+
 ## SQL code folding
 
 - [ ] Place the cursor inside a multiline CASE block and press Ctrl+Shift+[. The block body folds and its opening and closing lines remain visible.
