@@ -752,13 +752,16 @@ mod tests {
         window.present();
         let progress = present_progress(&window, "items", 2);
 
-        assert!(wait_for_mapping(&progress.dialog, true));
+        assert!(wait_until(|| progress.dialog.is_mapped()));
+        let closed = std::rc::Rc::new(std::cell::Cell::new(false));
+        let closed_for_signal = closed.clone();
+        progress.dialog.connect_closed(move |_| closed_for_signal.set(true));
         progress.close();
-        assert!(wait_for_mapping(&progress.dialog, false));
+        assert!(wait_until(|| closed.get()));
         window.close();
     }
 
-    fn wait_for_mapping(dialog: &adw::Dialog, mapped: bool) -> bool {
+    fn wait_until(predicate: impl Fn() -> bool) -> bool {
         let context = gtk::glib::MainContext::default();
         for _ in 0..200 {
             for _ in 0..64 {
@@ -766,12 +769,12 @@ mod tests {
                     break;
                 }
             }
-            if dialog.is_mapped() == mapped {
+            if predicate() {
                 return true;
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        dialog.is_mapped() == mapped
+        predicate()
     }
 
     fn column(name: &str) -> ColumnInfo {
