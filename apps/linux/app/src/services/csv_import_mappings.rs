@@ -317,9 +317,6 @@ mod tests {
 
     #[test]
     fn explicit_auto_increment_values_can_be_saved_and_restored() {
-        let directory = tempfile::tempdir().unwrap();
-        let store = CsvMappingStore::load_at(directory.path().join("mappings.json"));
-        let scope = scope(Uuid::new_v4(), "appdb", "users");
         let headers = headers(&["id", "name"]);
         let columns = [
             ColumnInfo {
@@ -327,42 +324,58 @@ mod tests {
                 ..column("id")
             },
             column("name"),
+            ColumnInfo {
+                is_generated: true,
+                ..column("computed")
+            },
         ];
-        let mapping = [Some(0), Some(1)];
-
-        store.save(&scope, &headers, &columns, &mapping, true).unwrap();
-        let restored = store.restore(&scope, &headers, &columns, true).unwrap().unwrap();
-        assert_eq!(restored, mapping);
-
+        let mapping = [Some(0), Some(1), None];
         let options = tablepro_core::import::CsvImportOptions::default();
         let sheet = tablepro_core::import::read_csv(b"id,name\n901,alpha\n", &options, None).unwrap();
-        let plan = tablepro_core::import::build_insert_plan(
-            &tablepro_core::import::ImportTarget {
-                driver_id: "postgres",
-                schema: None,
-                table: "users",
-                columns: &columns,
-                mapping: &restored,
-            },
-            &sheet,
-            &options,
-        )
-        .unwrap();
 
-        assert_eq!(
-            plan.columns
-                .iter()
-                .map(|column| column.name.as_str())
-                .collect::<Vec<_>>(),
-            ["id", "name"]
-        );
-        assert_eq!(
-            plan.rows,
-            [[
-                tablepro_core::Value::Text("901".into()),
-                tablepro_core::Value::Text("alpha".into())
-            ]]
-        );
+        for driver_id in ["postgres", "mysql", "sqlite"] {
+            let directory = tempfile::tempdir().unwrap();
+            let store = CsvMappingStore::load_at(directory.path().join("mappings.json"));
+            let mut scope = scope(Uuid::new_v4(), "appdb", "users");
+            scope.driver_id = driver_id.into();
+
+            store.save(&scope, &headers, &columns, &mapping, true).unwrap();
+            let restored = store.restore(&scope, &headers, &columns, true).unwrap().unwrap();
+            assert_eq!(restored, mapping, "{driver_id}");
+
+            let plan = tablepro_core::import::build_insert_plan(
+                &tablepro_core::import::ImportTarget {
+                    driver_id,
+                    schema: None,
+                    table: "users",
+                    columns: &columns,
+                    mapping: &restored,
+                },
+                &sheet,
+                &options,
+            )
+            .unwrap();
+
+            assert_eq!(
+                plan.columns
+                    .iter()
+                    .map(|column| column.name.as_str())
+                    .collect::<Vec<_>>(),
+                ["id", "name"],
+                "{driver_id}"
+            );
+            assert_eq!(
+                plan.rows,
+                [[
+                    tablepro_core::Value::Text("901".into()),
+                    tablepro_core::Value::Text("alpha".into())
+                ]],
+                "{driver_id}"
+            );
+            if driver_id == "postgres" {
+                assert!(plan.statement.contains("OVERRIDING SYSTEM VALUE"));
+            }
+        }
     }
 
     #[test]
