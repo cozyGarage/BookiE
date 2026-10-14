@@ -168,23 +168,23 @@ impl Connection for CursorConnection {
     }
 
     async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
-        Ok(empty_result())
+        Err(DriverError::Unsupported("cursor fixture row fetch".into()))
     }
 
     async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
-        Ok(empty_result())
+        Err(DriverError::Unsupported("cursor fixture query".into()))
     }
 
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
-        Ok(ExecResult { rows_affected: 0 })
+        Err(DriverError::Unsupported("cursor fixture execute".into()))
     }
 
     async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
-        Ok(ExecResult { rows_affected: 0 })
+        Err(DriverError::Unsupported("cursor fixture parameterized execute".into()))
     }
 
     async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        Ok(vec![])
+        Err(DriverError::Unsupported("cursor fixture transaction".into()))
     }
 
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
