@@ -35,10 +35,10 @@ candidate inventory as a release commitment.
 | Row | What |
 |---|---|
 | TEST-2 | Broad mutation audit: policy, core, transport, SSH and storage are measured; survivor triage stays open under [#559](https://github.com/cozyGarage/BookiE/issues/559). Expected-value provenance is tracked separately by [TEST-32](oracle-review.md); see the [transport mutation report](evidence/test-quality-2026-10-11/transport-mutants.md) for one measured package. |
-| AUD-11 consolidation | Finish the single AST walk for classification, masking and blast-radius planning | Behavioural fixes are closed on the current policy suite; shared analysis landed in #506. Structural consolidation follows 0.2.0 |
-| TEST-12 | MongoDB metadata sample consistency |
+| AUD-11 consolidation | Finish the single AST walk for classification, masking and blast-radius planning. Behavioural fixes are closed on the current policy suite; shared analysis landed in #506. Structural consolidation follows 0.2.0. |
+| TEST-12 | MongoDB metadata sample consistency; acceptance is blocked until its bounded-sample implementation contract is reconciled with ADR 0007's complete-census requirement |
 | UI-21, TEST-28 | Fake connection for the GTK tier, native Ubuntu AT-SPI menu reachability |
-| TEST-30 | Remaining SonarCloud and CodeQL findings | #562 has no Lane set on Project #3 yet, so it is not listed in the lane index. |
+| TEST-30 | Remaining SonarCloud and CodeQL findings ([#562](https://github.com/cozyGarage/BookiE/issues/562)) |
 | AUD-5 | About 4,700 comment lines in `src/` to move into docs, file by file |
 | DOC-3, DOC-5 | Orca and high contrast pass; value comparison with DBeaver and dbx |
 | B4-9, B4-11, B4-17, B4-21 | Route and TLS acceptance evidence, failed-batch rollback on optional MySQL engines and package acceptance, native multi-hop trust flow, SQL Server Kerberos Windows AD interoperability and package acceptance |
