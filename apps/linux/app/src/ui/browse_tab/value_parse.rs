@@ -123,6 +123,9 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     {
         return result;
     }
+    if driver_id == "postgres" && text == "''" && col.is_some_and(|column| column.enum_type.is_some()) {
+        return Ok(Value::Text(String::new()));
+    }
     if text.is_empty() {
         return parse_input_for_column(text, col);
     }
@@ -914,6 +917,10 @@ mod mssql_max_value_contract;
 #[cfg(test)]
 #[path = "../../../tests/support/mssql_server_owned_columns.rs"]
 mod mssql_server_owned_columns;
+
+#[cfg(test)]
+#[path = "../../../tests/support/postgres_identity_csv_import.rs"]
+mod postgres_identity_csv_import;
 
 #[cfg(test)]
 #[path = "../../../tests/support/mysql_spatial_contract.rs"]

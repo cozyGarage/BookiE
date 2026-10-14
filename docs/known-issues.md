@@ -20,6 +20,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | UI-40 | [#655](https://github.com/cozyGarage/BookiE/issues/655) | UX |
 | UI-42 | [#658](https://github.com/cozyGarage/BookiE/issues/658) | UX |
 | UI-43 | [#861](https://github.com/cozyGarage/BookiE/issues/861) | UX |
+| CSV-1 | [#634](https://github.com/cozyGarage/BookiE/issues/634) | UX |
 | B4-7 | [#566](https://github.com/cozyGarage/BookiE/issues/566) | B4 |
 | B4-9 | [#566](https://github.com/cozyGarage/BookiE/issues/566) | B4 |
 | B4-11 | [#566](https://github.com/cozyGarage/BookiE/issues/566) | B4 |
@@ -39,6 +40,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | TEST-31 | [#556](https://github.com/cozyGarage/BookiE/issues/556) | UX |
 | TEST-32 | [#594](https://github.com/cozyGarage/BookiE/issues/594) | UX |
 | TEST-33 | [#595](https://github.com/cozyGarage/BookiE/issues/595) | B3 |
+| TEST-34 | [#868](https://github.com/cozyGarage/BookiE/issues/868) | UX |
 | DOC-3 | [#561](https://github.com/cozyGarage/BookiE/issues/561) | Maintainer |
 | DOC-5 | [#561](https://github.com/cozyGarage/BookiE/issues/561) | Maintainer |
 | PERF-2 | [#554](https://github.com/cozyGarage/BookiE/issues/554) | B4 |

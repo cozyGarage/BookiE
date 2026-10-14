@@ -5,6 +5,7 @@
 Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the user-facing map for that development line since the last tagged package, [0.1.5](#015---2026-09-27). Compare: [`linux-v0.1.5...linux`](https://github.com/cozyGarage/BookiE/compare/linux-v0.1.5...linux). Entries stay here until the next tagged release.
 
 ### Added
+- Editable text columns open a bounded full-value dialog; Apply stages the exact multiline text, while Set to NULL remains a separate action.
 - At narrow window widths, the navigation sidebar collapses and the Fold block and Unfold all toolbar buttons hide so the remaining editor controls stay in view; their keyboard shortcuts still work.
 - Switching database drivers keeps custom connection values and updates fields that still use the previous driver's defaults.
 - Duplicating a password-authenticated connection with a saved password opens the copy's credential form so its password can be entered before connecting.
@@ -19,6 +20,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Ctrl+V pastes tab-separated text from a spreadsheet into grid cells, all or nothing.
 - When a cell belongs to multiple foreign keys, Go to Referenced Row lets you choose the target table.
 - ENUM and SET cells on MySQL and MariaDB, and enum cells on PostgreSQL, are edited from a list of members.
+- The keyboard selection in an ENUM picker starts on the cell's current member.
 - A preference chooses how NULL is displayed in the grid.
 - Browse filters can be saved, applied, renamed and deleted per connection, schema and table.
 - MySQL and MariaDB connections can use a local Unix socket file, saved with the connection and exported in version 3 connection bundles.
@@ -99,6 +101,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
+- The MCP token dialog reports whether the one-time token was saved in the system keyring and explains what to do if it was not.
 - The Keyboard Shortcuts window splits table browsing into shorter groups, describes mouse selection gestures separately and combines repeated context-sensitive save, undo and cancel actions.
 - About, Arch package, Flatpak, and translation metadata link to the BookiE repository.
 - Full-table export is refused before a destination file is chosen when a verified read snapshot is not available; current-page and loaded query-result exports remain available.
@@ -168,7 +171,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Reopening query history refreshes the list so queries run while it was closed appear immediately.
 - PostgreSQL connections accept a bracketed IPv6 host such as `[::1]`.
 - A PostgreSQL login the server refuses (wrong password or missing database) is reported at once instead of being retried, and a pooler in transaction mode gets an explanatory hint on prepared-statement errors.
-- CSV import previews now keep auto-increment and generated columns on Skip and explain that the database supplies their values.
+- CSV imports can map explicit auto-increment values on PostgreSQL, MySQL/MariaDB and SQLite while generated columns remain excluded.
 - Grid edits and spreadsheet paste preserve line breaks inside text values.
 
 - MySQL and MariaDB connections with TLS Disabled no longer use a saved client certificate or key
@@ -210,6 +213,10 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - SQL Server legacy `datetime` values decode only when their 1/300-second ticks map exactly to nanoseconds; inexact ticks remain undecodable.
 - Cancelling a connection attempt over the system OpenSSH client now stops its ssh master process and cleans up its private directory, instead of leaving it running in the background.
 - If the app is killed or crashes while using the system OpenSSH client, its ssh master process now exits with it instead of continuing to run in the background until the next launch.
+- The "Saving in progress" dialog shown while closing a window now closes when the save ends, instead of staying open if the save failed.
+- The structure editor now refuses column names that differ only in case on databases that ignore case, and refuses duplicate index names, before sending the change to the server.
+- The filter bar now offers comparison operators for MySQL `MEDIUMINT` and PostgreSQL `time without time zone` columns instead of text matching.
+- SQL completion now finds the statement under the cursor correctly when a comment or a PostgreSQL `$$` body contains a semicolon.
 
 ### Security
 
@@ -221,7 +228,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - A session now refuses a script that hides BEGIN, COMMIT or ROLLBACK among other statements, so the transaction BookiE tracks always matches the one on the server.
 - A SQLite, PostgreSQL, MySQL or MariaDB connection marked read-only is now read-only in the database engine itself, so a statement the safety checks mistake for a read still cannot change data; a read-only SQLite connection no longer creates a missing file.
 - Importing a connection bundle now refuses a file over 16 MiB, or anything that is not a regular file, before reading it.
-- Driver panic messages are withheld by default. `TABLEPRO_DEBUG_PANICS=1` restores Rust's default hook and may print query text or credentials; keep it unset when using real database data.
+- Panic diagnostics retain source locations and requested backtraces while always withholding the panic message, including with `TABLEPRO_DEBUG_PANICS=1`.
 - SSH connections refuse a host key marked revoked in `known_hosts` and ignore a relative configuration directory.
 - Agent token files are created with owner-only permissions, and approval prompts strip bidirectional text controls that could disguise displayed text.
 - Shortened agent-token labels stop at character boundaries and never split a UTF-8 character.

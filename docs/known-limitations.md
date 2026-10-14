@@ -53,7 +53,7 @@ What the application does not do, or does differently from what you might expect
 
 - Multi-cursor editing is not available (UI-22 / [#552](https://github.com/cozyGarage/BookiE/issues/552)). Split panes and SQL code folding are available. Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. Preview tabs are temporary and are not restored after restart; tabs you keep are restored (UI-17b). Query history now opens in a docked panel (UI-18).
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles; a typed activity console is deferred and the activity dialog stays a plain result grid (UI-23).
-- In editable browse tables, text cells remain inline-editable and the editor starts from the full value; SQL result grids are read-only. A dedicated multiline editor for large text and JSON remains open under [#610](https://github.com/cozyGarage/BookiE/issues/610).
+- Text values over the 8 KiB preview threshold can be edited in the full-value dialog up to 1 MiB. JSON previews and values over 1 MiB remain read-only; View Value and Copy Value still expose the full value. The JSON editing slice remains open under [#610](https://github.com/cozyGarage/BookiE/issues/610).
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
 - No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
 - PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata remain open under B6.
@@ -69,16 +69,10 @@ What the application does not do, or does differently from what you might expect
 
 ## Known bugs
 
-- **The filter strip offers text operators for some numeric and time columns** ([#854](https://github.com/cozyGarage/BookiE/issues/854)), including MySQL `MEDIUMINT` and PostgreSQL `time without time zone`.
-- **SQL completion can choose the wrong statement context** when a semicolon appears inside a comment or dollar-quoted string ([#855](https://github.com/cozyGarage/BookiE/issues/855)).
-- **Structure validation can accept duplicate column names that the database treats as equal** ([#856](https://github.com/cozyGarage/BookiE/issues/856)); the server then rejects the save.
-- **The CSV import progress dialog can remain open after the import completes**, and Cancel may not close it ([#655](https://github.com/cozyGarage/BookiE/issues/655)).
-- **Several UI details remain inconsistent** ([#660](https://github.com/cozyGarage/BookiE/issues/660)): the ENUM picker may not highlight the current member, text and bytea NULL values render differently, Structure tab chevrons look inverted, and the catalog kind selector can shift the search field.
+- **Several UI details remain inconsistent** ([#660](https://github.com/cozyGarage/BookiE/issues/660)): text and bytea NULL values render differently, Structure tab chevrons look inverted, and the catalog kind selector can shift the search field.
 - **PostgreSQL `VOID` results are shown as undecodable** ([#660](https://github.com/cozyGarage/BookiE/issues/660)); they should render as empty values.
 - **Two installed launches were reported to abort inside BookiE** ([#666](https://github.com/cozyGarage/BookiE/issues/666)); the cause remains under investigation.
-- **Debug panic output can expose sensitive panic text** (SEC-10 / [#849](https://github.com/cozyGarage/BookiE/issues/849)): setting `TABLEPRO_DEBUG_PANICS=1` currently leaves Rust's default hook active, which may print the raw panic payload. Avoid enabling it until the fix lands.
 - **Installed GTK suite is intermittent on Forgejo** (TEST-31 / [#556](https://github.com/cozyGarage/BookiE/issues/556)): the startup restore layout abort was fixed in [#821](https://github.com/cozyGarage/BookiE/pull/821). Intermittent failures remain under investigation; recent failures include an application shutdown with a bad exit status after the scenarios passed. The required consecutive full-run evidence has not been met.
-- **MCP token keyring save can fail after issuance** (UI-43 / [#861](https://github.com/cozyGarage/BookiE/issues/861)): the token is still issued, but the dialog may say it was saved when the keyring write failed.
 
 ## Test and CI limits
 

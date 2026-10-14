@@ -230,7 +230,7 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 
 ## Grid previews for long values
 
-In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a typed preview with the original byte count. SQL result grids are read-only. In an editable browse table, confirm that a long text cell opens for inline editing with the full value, not the preview. **View Value** and **Copy Value** expose the complete value. A dedicated multiline editor for large text and JSON remains future work under [#610](https://github.com/cozyGarage/BookiE/issues/610). Use text and JSON values just below and just above the 8 KiB threshold.
+In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a typed preview with the original byte count. SQL result grids are read-only. In an editable browse table, confirm that a long text cell opens for inline editing with the full value, not the preview. **View Value** and **Copy Value** expose the complete value. Text cells over 8 KiB can be edited in the bounded full-value dialog. JSON full-value editing remains open under [#610](https://github.com/cozyGarage/BookiE/issues/610). Use text and JSON values just below and just above the 8 KiB threshold.
 
 - [ ] A value below the threshold displays in full and remains editable where that type supports grid edits.
 - [ ] Values over the threshold show a prefix and `… (N bytes total)`; SQL result cells and binary/unsupported browse values do not offer inline editing. Editable browse text opens with the full value.
@@ -238,6 +238,17 @@ In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a ty
 - [ ] A long unbroken value wraps without display-only hyphens; the GTK widget regression covers this rendering property ([#791](https://github.com/cozyGarage/BookiE/pull/791)); installed retest pending.
 - [ ] Copy Value copies the complete text or JSON rather than the displayed preview.
 - [ ] Repeat with a binary value over the threshold; the preview reports the original byte count and View Value exposes the full bytes.
+
+## Grid cell editing: long text and JSON
+
+Use a keyed table with a nullable text column and values above 8 KiB. Include CRLF, Unicode, trailing spaces and a value near 1 MiB.
+
+- [ ] The cell shows a shortened preview and byte count. Right-click it and choose **Edit Full Value…**; the dialog contains the complete value.
+- [ ] Cancel stages no change. Reopen the dialog, change the final character and choose **Apply**; save and reload to confirm the exact text.
+- [ ] Apply empty text and confirm it remains empty. Use **Set to NULL** separately and confirm the stored value is SQL NULL.
+- [ ] Edit a draft text row, save it, and discard a separate pending edit.
+- [ ] A value over 1 MiB is refused. Non-text, generated, key and read-only cells do not offer the action.
+- [ ] JSON previews remain read-only in this dialog. Small JSON cells keep using the existing JSON popover editor; full-value JSON editing remains open under [#610](https://github.com/cozyGarage/BookiE/issues/610).
 
 ## Server activity view: binary values
 
@@ -267,6 +278,10 @@ In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a ty
 - [ ] On SQL Server, run `EXEC sys.sp_executesql N'SELECT 1 AS first_result; SELECT 2 AS second_result;'` as one query. Confirm the result-set selector shows both sets in source order and each displays its own column and value.
 - [ ] Run `SELECT 1 AS one; SELECT 2 AS two;`, pin both results, then run `SELECT 3 AS three;` and `SELECT 4 AS four; SELECT * FROM missing_table;`: pinned results stay first and the failed second statement is labelled **Statement 2**, not Statement 4. Unpin removes the pinned results. **2026-10-12 historical run:** pin ordering passed, but failure numbering after pinning was not checked; fixed by [#785](https://github.com/cozyGarage/BookiE/pull/785). The installed GTK scenario `pinned_results_stay_ahead_of_the_next_run` covers the failure; installed Wayland retest pending ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
 - [ ] After running a script, each statement's first line shows a tick or, for a failed statement, a cross in the gutter, in light and dark. Edit the script and run it again: the marks follow the new run. **2026-10-12 Hyprland dark:** dark theme passed.
+
+## Closing a window during a save
+
+- [ ] Start a structure save that fails on the server (for example, add a NOT NULL column without a default to a table that has rows), then close the window while it runs. The "Saving in progress" dialog closes when the save ends, and only the unsaved-changes prompt remains.
 
 ## Carried over from the earlier sprint
 

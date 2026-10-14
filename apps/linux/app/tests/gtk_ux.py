@@ -164,7 +164,7 @@ def scenarios(ui):
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
-        choose_menu_item(8)
+        choose_menu_item(9)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switch = next(
@@ -195,7 +195,7 @@ def scenarios(ui):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
         assert len(items) >= 10, f"grid menu exposed only {len(items)} actionable items"
-        actions = items[9].queryAction()
+        actions = items[10].queryAction()
         click_action = next(
             index for index in range(actions.nActions) if actions.getName(index) == "click"
         )
@@ -260,7 +260,11 @@ GLib.MainLoop().run()
         )
         try:
             ready, _, _ = select.select([clipboard_owner.stdout], [], [], ui.WAIT_SECONDS)
-            assert ready and clipboard_owner.stdout.readline().strip() == b"ready", "the clipboard owner never took the clipboard"
+            announced = clipboard_owner.stdout.readline().strip() if ready else b""
+            if announced != b"ready":
+                clipboard_owner.terminate()
+                detail = clipboard_owner.stderr.read().decode(errors="replace")
+                raise AssertionError(f"the clipboard owner never took the clipboard: {announced!r} {detail}")
             assert clipboard_owner.poll() is None, clipboard_owner.stderr.read().decode()
             ui.press_x11_key("v", ("Control_L",))
             ui.wait_for_node(name="2 unsaved changes")
@@ -1143,7 +1147,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        choose_menu_item(14)
+        choose_menu_item(15)
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
@@ -1301,7 +1305,7 @@ GLib.MainLoop().run()
 
         click_cell("NULL", count=2)
         time.sleep(1.0)
-        ui.press_x11_key("Down")
+        ui.press_x11_key("Up")
         time.sleep(0.3)
         ui.press_x11_key("Return")
         ui.wait_for_node(name="2 unsaved changes")
@@ -1437,7 +1441,7 @@ GLib.MainLoop().run()
         ui.invoke_named_action_within("safety_items", "Open safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         open_cell_menu("beta")
-        invoke_menu_item(4)
+        invoke_menu_item(5)
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL, present=False)
         ui.wait_for_node(name="beta", role=pyatspi.ROLE_LABEL)
 

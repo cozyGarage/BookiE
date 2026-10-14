@@ -1,6 +1,6 @@
 # Backlog after 0.2.0
 
-Rows here are selected work that does not block 0.2.0. The ledger keeps the evidence; this page keeps the order. Reviewed 2026-10-14.
+Rows here are selected work that does not block 0.2.0. The ledger keeps the evidence; this page keeps the order. Reviewed 2026-10-15.
 
 The [feature comparison](0.2-feature-comparison.md) holds the wider parity
 candidate inventory. An item becomes backlog work only after selection; add an
@@ -15,7 +15,7 @@ candidate inventory as a release commitment.
 | UI-1b | Edit SSH jump chains in the form | Storage, transport, bundle v2 and per-hop passphrase coverage merged in #490, #492, #494 and #528; GTK editing stays refused until its complete path passes |
 | UI-19 | Foreign key value picker, estimated counts | FK navigation, paste TSV and the ENUM and SET pickers (PostgreSQL, MySQL, MariaDB) landed |
 | UI-38 | Local filters and sorting for materialized SQL results | Exact-value filtering and local sort are implemented; settings are retained per statement/result set across reruns and pin/unpin. Selection follows the same materialized result, and app-restart persistence is not included |
-| UI-39 | Full-value text and JSON editor | B3 exact PostgreSQL JSON source carrier first; GTK editor remains UX follow-up under #610 |
+| UI-39 | Full-value text and JSON editor | PostgreSQL JSON source carrier landed in #730; bounded text editor is in progress under #610, with JSON editing still open |
 | UI-20 | Server output (NOTICE, PRINT) and a timing breakdown | with PERF-4 |
 | UI-22, UI-23, UI-26 | Multi-cursor editing, typed PostgreSQL activity console, reusable SSH profiles | accepted for later; preview tabs, split panes, SQL code folding and the docked query history panel have landed (#618, #630, #754, #619); PostgreSQL catalog objects are already built (UI-23) |
 | PKG-2 | Debian and GNOME desktop pass (UI-D1 to D4) | the packages keep building and passing the distro floor in CI; this is the desktop acceptance |
@@ -35,10 +35,12 @@ candidate inventory as a release commitment.
 | Row | What |
 |---|---|
 | TEST-2 | Broad mutation audit: policy, core, transport, SSH and storage are measured; survivor triage stays open under [#559](https://github.com/cozyGarage/BookiE/issues/559). Expected-value provenance is tracked separately by [TEST-32](oracle-review.md); see the [transport mutation report](evidence/test-quality-2026-10-11/transport-mutants.md) for one measured package. |
-| AUD-11 consolidation | Finish the single AST walk for classification, masking and blast-radius planning | Behavioural fixes are closed on the current policy suite; shared analysis landed in #506. Structural consolidation follows 0.2.0 |
-| TEST-12 | MongoDB metadata sample consistency |
+| AUD-11 consolidation | Finish the single AST walk for classification, masking and blast-radius planning. Behavioural fixes are closed on the current policy suite; shared analysis landed in #506. Structural consolidation follows 0.2.0. |
+| TEST-12 | Verify MongoDB's bounded 128-document metadata sample and page-observed type union against the non-snapshot contract in [ADR 0007](decisions/0007-type-and-value-preservation.md) |
+| APP-MOD | Keep the app layer thin: finish the staged moves of [ADR 0018](decisions/0018-headless-app-services-crate.md) (first `ui/error_text.rs` and `SchemaIndex`, which services import back from `ui`; then the headless tab and workspace model), and replace hard-coded driver-name branches in the app layer with driver capabilities, starting with `browse_tab/value_parse.rs` |
 | UI-21, TEST-28 | Fake connection for the GTK tier, native Ubuntu AT-SPI menu reachability |
 | TEST-30 | Remaining SonarCloud and CodeQL findings | #562 has no Lane set on Project #3 yet, so it is not listed in the lane index. |
+| TEST-34 | Import Python coverage for repository tooling into SonarCloud without lowering the coverage gate; #830 added tests but SonarCloud reported 0.0% new-code coverage |
 | AUD-5 | About 4,700 comment lines in `src/` to move into docs, file by file |
 | DOC-3, DOC-5 | Orca and high contrast pass; value comparison with DBeaver and dbx |
 | B4-9, B4-11, B4-17, B4-21 | Route and TLS acceptance evidence, failed-batch rollback on optional MySQL engines and package acceptance, native multi-hop trust flow, SQL Server Kerberos Windows AD interoperability and package acceptance |

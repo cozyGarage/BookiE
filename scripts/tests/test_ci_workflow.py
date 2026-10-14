@@ -97,6 +97,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings",
                 "value_contract_mssql_max_values_survive_connection_session_and_consumers",
                 "value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers",
+                "value_contract_postgres_csv_import_preserves_explicit_identity_values",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -361,6 +362,50 @@ class CiWorkflowTests(unittest.TestCase):
             cancel_push_or_pr,
             contracts.split("concurrency:", 1)[1].split("jobs:", 1)[0],
         )
+
+    def test_sonar_imports_python_tool_coverage_report(self):
+        workflow = (ROOT / ".github/workflows/sonar-rust.yml").read_text()
+        self.assertIn("coverage==7.10.6", workflow)
+        self.assertIn("coverage run --branch --source=scripts", workflow)
+        self.assertIn("unittest discover -s scripts/tests", workflow)
+        self.assertIn("coverage xml -o target/sonar/python-coverage.xml", workflow)
+        self.assertIn("-Dsonar.python.coverage.reportPaths=target/sonar/python-coverage.xml", workflow)
+
+
+    def test_arch_package_container_mounts_the_repository_root(self):
+        script = (ROOT / "scripts/test-arch-package-container.sh").read_text()
+        self.assertIn('-v "$PWD:/src:ro"', script)
+        self.assertNotIn('$PWD/..', script)
+
+    def test_nightly_soak_installs_the_binary_under_usr_bin(self):
+        nightly = (ROOT / ".forgejo/workflows/nightly.yml").read_text()
+        soak = nightly.split("\n  gtk-soak:\n", 1)[1].split("\n  arch-package:\n", 1)[0]
+        self.assertIn('binary="$PWD/target-soak-${{ matrix.run }}/usr/bin/tablepro"', soak)
+
+    def test_forgejo_workflows_use_no_node_actions_on_host_executors(self):
+        for workflow in (ROOT / ".forgejo/workflows").glob("*.yml"):
+            self.assertNotIn("uses:", workflow.read_text(), workflow.name)
+
+    def test_forgejo_distro_floor_reuses_one_package_across_bases(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        self.assertNotIn("\n  distro-floor-build:\n", workflow)
+        floor = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  driver:\n", 1)[0]
+        self.assertIn("scripts/distro-floor-package.sh", floor)
+        self.assertIn("DISTRO_FLOOR_PACKAGE=", floor)
+        self.assertIn("PREBUILT_DEB=", floor)
+        builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
+        self.assertIn("BASE=ubuntu:24.04", builder)
+        self.assertIn("scripts/build-deb.sh", builder)
+        self.assertIn("flock", builder)
+        self.assertIn("chown", builder)
+        floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
+        self.assertIn('apt-get install -y -qq "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
+        self.assertLess(floor_script.index('if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]'), floor_script.index("pkg-config --modversion"))
+        self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
+        runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
+        self.assertIn("python3-pyatspi", runtime_image)
+        self.assertIn("gir1.2-gtk-4.0", runtime_image)
+        self.assertNotIn("rustup", runtime_image)
 
 
 if __name__ == "__main__":

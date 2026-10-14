@@ -746,6 +746,7 @@ mod tests {
     fn finishing_an_import_force_closes_the_non_user_closable_progress_dialog() {
         gtk::init().unwrap();
         adw::init().unwrap();
+        gtk::Settings::default().unwrap().set_gtk_enable_animations(false);
         let application = gtk::Application::new(None::<&str>, gtk::gio::ApplicationFlags::NON_UNIQUE);
         application.register(None::<&gtk::gio::Cancellable>).unwrap();
         let window = adw::ApplicationWindow::new(&application);

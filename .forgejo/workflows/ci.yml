@@ -137,9 +137,12 @@ jobs:
         run: bash src/scripts/docker-hub-login.sh
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Build or reuse the distro-floor package
+        run: |
+          cd src && bash scripts/distro-floor-package.sh "${{ github.sha }}" > floor-package-path
       - name: Distro floor
         run: |
-          cd src && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ${{ matrix.base }}
+          cd src && package=$(cat floor-package-path) && DISTRO_FLOOR_PACKAGE="$package" bash scripts/test-distro-floor.sh ${{ matrix.base }}
       - name: Debian package build, install, upgrade from the released package and purge
         run: |
           released=/var/cache/ci/releases/tablepro_0.1.5-1_amd64.deb
@@ -148,7 +151,7 @@ jobs:
             curl -fsSL -o "$released.part" https://github.com/cozyGarage/BookiE/releases/download/linux-v0.1.5/tablepro_0.1.5-1_amd64.deb
             mv "$released.part" "$released"
           fi
-          cd src && PREVIOUS_DEB="$released" bash scripts/test-deb-package.sh ${{ matrix.base }}
+          cd src && package=$(cat floor-package-path) && PREVIOUS_DEB="$released" PREBUILT_DEB="$package" bash scripts/test-deb-package.sh ${{ matrix.base }}
   driver:
     runs-on: any-host
     needs: [guards, clippy, unit, sandbox, widgets]

@@ -103,6 +103,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::postgres_identity_csv_import::value_contract_postgres_csv_import_preserves_explicit_identity_values"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes"
     ],
     [
@@ -255,6 +260,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::full_value_editor::tests::applying_empty_text_stages_empty_text_without_converting_it_to_null"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::full_value_editor::tests::set_null_stages_null_and_cancel_stages_nothing"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::find_bar::tests::find_selects_matches_and_replace_all_rewrites_every_occurrence"
     ],
     [
@@ -276,6 +291,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::column::tests::mysql_spatial_grid_bytes_bind_as_read_only_labels_without_edits"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::choice_editor::tests::enum_picker_selects_the_current_row_for_keyboard_navigation"
     ],
     [
       "tablepro-app",
