@@ -1,5 +1,4 @@
 # Missed mutants accepted for now (cargo mutants --package tablepro-agentd -- --lib --bins, 2026-10-14).
-# Most are the SessionConnection forwarding methods and DaemonProvider::session_is_current: no test checks their behaviour.
 crates/agentd/src/lib.rs:51:9: replace <impl Connection for SessionConnection>::supports_server_cancellation -> bool with true
 crates/agentd/src/lib.rs:51:9: replace <impl Connection for SessionConnection>::supports_server_cancellation -> bool with false
 crates/agentd/src/lib.rs:55:9: replace <impl Connection for SessionConnection>::list_tables -> Result<Vec<TableInfo>, DriverError> with Ok(vec![])
@@ -29,9 +28,6 @@ crates/agentd/src/lib.rs:257:9: replace <impl Connection for SessionConnection>:
 crates/agentd/src/lib.rs:261:9: replace <impl Connection for SessionConnection>::ping -> Result<(), DriverError> with Ok(())
 crates/agentd/src/lib.rs:318:9: replace <impl ConnectionProvider for DaemonProvider>::list_saved_connections -> Result<Vec<SavedConnection>, String> with Ok(vec![])
 crates/agentd/src/lib.rs:326:28: replace == with != in <impl ConnectionProvider for DaemonProvider>::connection
-crates/agentd/src/lib.rs:511:9: replace DaemonProvider::session_is_current -> Result<bool, String> with Ok(true)
-crates/agentd/src/lib.rs:517:56: replace && with || in DaemonProvider::session_is_current
-crates/agentd/src/lib.rs:527:56: replace && with || in DaemonProvider::remove_session
 crates/agentd/src/main.rs:166:53: replace || with && in ask_on_controlling_terminal
 crates/agentd/src/main.rs:173:18: replace match guard answer.trim().eq_ignore_ascii_case("y") with true in ask_on_controlling_terminal
 crates/agentd/src/main.rs:173:18: replace match guard answer.trim().eq_ignore_ascii_case("y") with false in ask_on_controlling_terminal
