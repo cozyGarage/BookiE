@@ -42,7 +42,7 @@ jobs:
   docker-coverage:
     runs-on: debian-host
     needs: coverage
-    if: always()
+    if: ${{ !cancelled() }}
     timeout-minutes: 120
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-docker-cov-${{ matrix.driver }}
@@ -75,14 +75,16 @@ jobs:
             python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
           }
           trap cleanup_testcontainers EXIT
-          cargo llvm-cov --no-report --locked -p "tablepro-driver-${{ matrix.driver }}" --lib --tests -- --include-ignored --test-threads=1
+          targets=(--lib --tests)
+          [ "${{ matrix.driver }}" = postgres ] && targets=(--lib --test integration)
+          cargo llvm-cov --no-report --locked -p "tablepro-driver-${{ matrix.driver }}" "${targets[@]}" -- --include-ignored --test-threads=1
           cargo llvm-cov report --json --summary-only --output-path /tmp/coverage-${{ matrix.driver }}.json
           python3 scripts/check-crate-coverage-floors.py /tmp/coverage-${{ matrix.driver }}.json --only "crates/drivers/${{ matrix.driver }}"
 
   mutation:
     runs-on: debian-host
     needs: coverage
-    if: always()
+    if: ${{ !cancelled() }}
     timeout-minutes: 150
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-mutants-${{ matrix.label }}
@@ -126,13 +128,17 @@ jobs:
                    --file crates/drivers/postgres/src/temporal.rs --file crates/drivers/postgres/src/decode.rs)
           fi
           status=0
-          cargo mutants "${args[@]}" -- --lib || status=$?
-          python3 scripts/check-mutants-baseline.py "${{ matrix.label }}" "/tmp/mutants-${{ matrix.label }}" "$status"
+          test_args=(--lib)
+          [ "${{ matrix.package }}" = tablepro-agentd ] && test_args+=(--bins --tests)
+          cargo mutants "${args[@]}" -- "${test_args[@]}" || status=$?
+          partial=()
+          [ "${{ matrix.shard }}" = 0/1 ] || partial=(--partial)
+          python3 scripts/check-mutants-baseline.py "${{ matrix.package }}" "/tmp/mutants-${{ matrix.label }}" "$status" "${partial[@]}"
 
   gtk-soak:
     runs-on: debian-host
     needs: [docker-coverage, mutation]
-    if: always()
+    if: ${{ !cancelled() }}
     timeout-minutes: 120
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-soak
@@ -169,7 +175,7 @@ jobs:
   arch-package:
     runs-on: debian-host
     needs: [docker-coverage, mutation]
-    if: always()
+    if: ${{ !cancelled() }}
     timeout-minutes: 120
     steps:
       - name: Check out
@@ -186,7 +192,7 @@ jobs:
   values:
     runs-on: debian-host
     needs: [docker-coverage, mutation]
-    if: always()
+    if: ${{ !cancelled() }}
     timeout-minutes: 120
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-values
@@ -205,7 +211,7 @@ jobs:
   gtk-ubuntu:
     runs-on: ubuntu-host
     needs: [docker-coverage, mutation]
-    if: always()
+    if: ${{ !cancelled() }}
     continue-on-error: true
     timeout-minutes: 60
     env:

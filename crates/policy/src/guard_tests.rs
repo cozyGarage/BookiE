@@ -542,7 +542,10 @@ impl Connection for PanickingConn {
     }
 }
 
-struct DisconnectedConn;
+#[derive(Default)]
+struct DisconnectedConn {
+    batch_dispatches: Arc<AtomicUsize>,
+}
 
 #[async_trait]
 impl Connection for DisconnectedConn {
@@ -571,6 +574,7 @@ impl Connection for DisconnectedConn {
     }
 
     async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        self.batch_dispatches.fetch_add(1, Ordering::SeqCst);
         Err(DriverError::Disconnected)
     }
 
@@ -605,6 +609,8 @@ mod audit;
 mod bulk;
 #[path = "guard_tests_checked.rs"]
 mod checked;
+#[path = "guard_tests_cursor.rs"]
+mod cursor;
 #[path = "guard_tests_fault.rs"]
 mod fault;
 #[path = "guard_tests_gating.rs"]

@@ -4,7 +4,7 @@ Use this page to select checks, hand off work, and review evidence. The executab
 
 ## Current desktop target
 
-The [current continuation](bookie-0.2-sprint.md#current-continuation) orders B3, B4, then Arch/Omarchy/Hyprland native Wayland UI acceptance. GNOME desktop on Debian is the required installed/package phase after Arch; current B3/B4 implementation does not require that VM. GNOME 50 in the layer catalog names GTK/libadwaita development-library requirements, not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
+The [current continuation](bookie-0.2-sprint.md#current-continuation) orders B3, B4, then Arch/Omarchy/Hyprland native Wayland UI acceptance. Debian/GNOME installed-package acceptance follows Arch; current B3/B4 implementation work can proceed before that platform phase. GNOME 50 in the layer catalog names GTK/libadwaita development-library requirements, not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
 
 ## Start here
 
@@ -12,15 +12,15 @@ Run commands from the repository root with the toolchain required by the reposit
 
 ### Local pre-push gate
 
-On a strong local host with Docker, run the available hosted-equivalent layers before pushing:
+On a local machine with Docker and the required native libraries, run a broad local regression pass before pushing:
 
 ```bash
-python3 scripts/run-test-layer.py full app-server values drivers tls \
+python3 scripts/run-test-layer.py full app-server values drivers b4-rollback tls \
   postgres-release keyring security-policy supply-chain widgets ui \
   workflow-lint harness packaging-contracts change-contracts
 ```
 
-This runs the fast workspace gate, app-server and cross-driver value contracts, Docker driver/TLS/PostgreSQL fixtures, keyring and dependency policy checks. The runner saves a commit-pinned report and logs under `target/quality/`. Fresh local results and remaining gaps are owned by [the release audit](archive/release-audit-2026-10-03.md); prior October 1–2 counts and cache measurements are in [validation history](archive/validation-history.md).
+This runs the fast workspace gate, app-server and cross-driver value contracts, Docker driver/rollback/TLS/PostgreSQL/SSH fixtures, keyring and dependency policy checks. It does not replace nightly coverage, mutation, soak or installed-package acceptance. Specialized local fixtures are listed below. The runner saves a commit-pinned report and logs under `target/quality/`. Current milestone acceptance is in the [active sprint](bookie-0.2-sprint.md) and owning boards. Dated release audits and validation history are source-pinned records, not current status.
 
 Run `quick` for a short edit loop. Run the pre-push gate after changes that touch shared core/value paths or before handing a B3 slice to review. Keep the hosted workflow as the recorded platform/packaging check.
 
@@ -30,7 +30,7 @@ python3 scripts/run-test-layer.py harness
 python3 scripts/run-test-layer.py quick
 python3 scripts/run-test-layer.py change-contracts
 python3 scripts/run-test-layer.py security-policy supply-chain
-python3 scripts/run-test-layer.py drivers tls postgres-release
+python3 scripts/run-test-layer.py drivers b4-rollback tls postgres-release
 python3 scripts/run-test-layer.py widgets app-server keyring ui
 python3 scripts/run-test-layer.py values
 ```
@@ -74,6 +74,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `full` | Default workspace checks including app logic | GNOME 50 development stack; no display automation or DuckDB |
 | `sandbox` | Integration tests without external servers or a display | Local sockets/processes must be allowed |
 | `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, MCP BSON, policy sessions, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox, DuckDB has its own Build job |
+| `b4-rollback` | MySQL failed-batch rollback and PostgreSQL rollback-failure handling | Docker and native TLS build dependencies |
 | `values` | Exact values across eight drivers, core, app and MCP | Docker, GTK build dependencies, optional DuckDB build; strict selected-test counts |
 | `tls` | CA, hostname, encryption and plaintext refusal against real servers | Docker Compose and generated private fixture certificates |
 | `ssh` | SSH agent authentication and OpenSSH sessions | Docker and OpenSSH client tools |
@@ -81,9 +82,13 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `security-policy` | Policy/MCP permissions, allowlists, bounds and audit behavior | Non-GTK dependencies; does not prove every server authorization mode |
 | `supply-chain` | Advisory, license and dependency-source policy | `cargo-deny`, `cargo-audit`, network; repository exceptions remain explicit |
 | `widgets` | Named GTK widget regressions in isolated processes | GNOME 50, Xvfb and private D-Bus |
-| `app-server` | Registered PostgreSQL/MySQL/MongoDB parser, keyed-edit and metadata contracts | GNOME 50 build libraries and Docker; hosted GTK fast job |
+| `app-server` | App parser and grid-edit contracts against PostgreSQL, MySQL, MongoDB and SQL Server | GNOME 50 build libraries and Docker; hosted GTK fast job |
 | `keyring` | Registered Secret Service contracts | Private D-Bus, gnome-keyring and libsecret tools |
 | `ui` | Real application actions and database postconditions via AT-SPI | GNOME 50, Xvfb, PyAT-SPI; X11 automation, not Wayland acceptance |
+| `mssql-kerberos` | SQL Server integrated authentication, SPN refusal and verified TLS against an isolated test domain | Docker Compose with privileged-container support; opt-in local fixture |
+| `gtk-clickhouse` | Installed GTK Enum16 grid edit against ClickHouse | GNOME 50, Docker, Xvfb, Secret Service and AT-SPI; local release layer |
+| `gtk-mysql-approval` | Approval and dispatch behavior against MySQL | GNOME 50, Docker, Xvfb, Secret Service and AT-SPI; local release layer |
+| `gtk-mongodb` | Installed GTK MongoDB cursor visibility and grid edits | GNOME 50, Docker, Xvfb, Secret Service and AT-SPI; local release layer |
 
 Build/package, mutation, coverage and acceptance retain their existing entrypoints:
 
@@ -91,15 +96,15 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | --- | --- | --- |
 | Optional DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus app feature build |
 | Mutation | Linux test quality; [local instructions](testing.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON |
-| Coverage | Linux test quality; [local instructions](testing.md#coverage) | LCOV, exclusions and summary; no score threshold implied |
+| Coverage | Linux test quality; [local instructions](testing.md#coverage) | LCOV, exclusions and summary; this report has no threshold. Forgejo nightly separately enforces the unit-tier and per-crate floors. |
 | Flatpak | Flatpak Linux (packaging only) | Pull requests build the default profile; push and `workflow_dispatch` also build development; not regression acceptance |
-| Arch / Debian candidate | [Release guide](archive/release-0.1.4.md) and packaging scripts | Immutable SHA, package checksum, validator output |
-| GTK soak | GTK Safety Soak | Five independent retry-free attempts at one resolved SHA |
+| Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
+| GTK soak | GTK Safety Soak | Five independent retry-free attempts per run at one resolved SHA; 0.2.0 qualification requires 30 consecutive attempts across at least six runs at that SHA |
 | Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) and sprint gates | VM/desktop version, Wayland session, package checksum, steps, result and screenshots |
 
 ## Hosted checks
 
-Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier. The current workflow files and [AGENTS.md](../AGENTS.md) define which checks run for each change and where acceptance happens.
+Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier. A `forgejo-train.sh` pass validates only the combined train SHA; it does not satisfy the required gate for each pull request's own head. The current workflow files and [AGENTS.md](../AGENTS.md) define which checks run for each change and where acceptance happens.
 
 Treat static-analysis findings as evidence to review. Fix valid findings in a focused change. For a confirmed false positive or accepted exception, record a short reason in the tool; keep a reusable explanation here only when it helps other contributors.
 

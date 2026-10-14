@@ -5,7 +5,7 @@
 
 ## Context
 
-Browse exports fetch successive pages with separate `fetch_rows` or SQL requests. Concurrent inserts, deletes or updates between requests can make an offset export omit or repeat rows, or combine values from different database states. The current export path does not hold a read transaction across pages.
+Before full-table export was refused, browse exports fetched successive pages with separate `fetch_rows` or SQL requests. Concurrent inserts, deletes or updates between requests could make an offset export omit or repeat rows, or combine values from different database states. The current implementation refuses full-table export until it can hold one read snapshot across the operation.
 
 ## Decision
 
@@ -23,7 +23,7 @@ An exported file is a data result users may save or share. Silently mixing multi
 ## Consequences
 
 - Long exports hold a read transaction or cursor open. The user can cancel; completion and every error path must close it promptly.
-- Snapshot guarantees are engine-specific and require native mutation-between- pages tests. A driver is not enabled for full export until those pass.
+- Snapshot guarantees are engine-specific and require native tests that mutate data between pages. A driver is not enabled for full export until those pass.
 - The guarded read-snapshot start in the B4 plan is a prerequisite, not an exception to the export contract. Cursor paging in [ADR 0011](0011-paged-query-results.md) must use the same guarded snapshot rules.
 
 ## Alternatives considered

@@ -1,6 +1,7 @@
 import ctypes
 import json
 import os
+import select
 import subprocess
 import sys
 import time
@@ -212,16 +213,18 @@ gi.require_version('Gdk', '4.0')
 from gi.repository import Gdk, GLib, Gtk
 Gtk.init()
 Gdk.Display.get_default().get_clipboard().set(sys.argv[1])
+GLib.idle_add(lambda: print('ready', flush=True))
 GLib.MainLoop().run()
 """
         clipboard_owner = subprocess.Popen(
             [sys.executable, "-c", clipboard_code, clipboard_text],
             env=os.environ.copy(),
-            stdout=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
         try:
-            time.sleep(0.3)
+            ready, _, _ = select.select([clipboard_owner.stdout], [], [], ui.WAIT_SECONDS)
+            assert ready and clipboard_owner.stdout.readline().strip() == b"ready", "the clipboard owner never took the clipboard"
             assert clipboard_owner.poll() is None, clipboard_owner.stderr.read().decode()
             ui.press_x11_key("v", ("Control_L",))
             ui.wait_for_node(name="2 unsaved changes")
@@ -538,6 +541,13 @@ GLib.MainLoop().run()
             raise AssertionError(f"the viewer did not show pretty JSON:\n{ui.accessible_snapshot()}")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
 
+    def explain_plan_window_closes_on_escape(_database, _base):
+        ui.run_sql("SELECT 1 AS value")
+        ui.invoke(ui.wait_for_node(name="Explain", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_frame_containing("Explain plan")
+        ui.press_x11_key("Escape")
+        ui.wait_for_frame_containing("Explain plan", present=False)
+
     def columns_dialog_hides_a_column_and_keeps_the_last_one(database, base):
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         wait_for_result_column("beta")
@@ -637,10 +647,10 @@ GLib.MainLoop().run()
             f"colour chooser has no accessible click action:\n{ui.accessible_snapshot()}"
         )
         ui.invoke(chooser)
-        option = ui.wait_for_node(name="blue", role=pyatspi.ROLE_PUSH_BUTTON)
+        option = ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(option)
         ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
-        ui.wait_for_node(name="blue", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
 
     def alt_arrows_jump_between_statements(database, base):
         sql = "select 1;\nselect 2;\nselect 3"
@@ -1349,6 +1359,9 @@ GLib.MainLoop().run()
         ui.run_sql("SELECT 3 AS three;")
         pinned = lambda: [name for name in page_tab_names() if "\U0001F4CC" in name]
         wait_until(lambda: len(pinned()) == 2 and len(page_tab_names()) >= 4, "pinned results did not stay")
+        ui.run_sql("SELECT 4 AS four;\nSELECT * FROM missing_table;")
+        ui.wait_for_node(name="Statement 2 failed")
+        ui.wait_for_node(name="Statement 4 failed", present=False)
         unpin = ui.wait_for_node_containing("Unpin results", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(unpin)
         wait_until(lambda: not pinned(), "unpinning did not drop the pinned results")
@@ -1424,6 +1437,7 @@ GLib.MainLoop().run()
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
         find_bar_replaces_every_match_in_the_editor,
         view_value_opens_the_whole_cell_with_pretty_json,
+        explain_plan_window_closes_on_escape,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
         browse_edit_cell_and_save_persists_to_the_database,

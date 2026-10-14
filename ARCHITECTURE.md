@@ -1,6 +1,6 @@
 # Architecture
 
-**BookiE** is a Linux-only native database client. Two composition roots (the GTK app and the headless MCP daemon) share one governed path: resolve credentials → open a tunnel if needed → wrap the driver in `PolicyGuard` → classify / approve / mask / execute / audit → return bounded results. There is no browser UI, no runtime driver plugin ABI, and no remote entitlement gate.
+**BookiE** is a Linux-only native database client. Two composition roots (the GTK app and the headless MCP daemon) share one governed path: resolve credentials → open a tunnel if needed → wrap the driver in `PolicyGuard` → classify and evaluate → approve when required → write required audit intent → execute → mask eligible returned results → write terminal audit → return bounded results. There is no browser UI, no runtime driver plugin ABI, and no remote entitlement gate.
 
 The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). The Cargo workspace lives at the repository root (Rust 1.98). Crate and Cargo binary names stay `tablepro-*`. Packaging and Meson install `bookie` / `bookie-agentd` and add `tablepro` / `tablepro-agentd` aliases. App ID, XDG paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Check the [active sprint](docs/bookie-0.2-sprint.md) before renaming any of them.
 
@@ -148,14 +148,16 @@ These traits are the seams that keep engines and UI replaceable. Behaviour detai
 | Trait / type | Crate | Job |
 |---|---|---|
 | `DatabaseDriver` | `core` | Connect and advertise engine capabilities. |
-| `Connection` | `core` | Query, execute, schema, transactions, controlled cancel. |
+| `Connection` | `core` | Query, execute, schema, transactions, controlled cancel and optional forward-only query cursors. |
 | `OperationControl` | `core` | Cancellation token + optional deadline that reach the driver. |
-| `PolicyGuard` | `policy` | Only consumer-facing `Connection`. Classify → decide → approve → mask → execute → audit. |
+| `PolicyGuard` | `policy` | Only consumer-facing `Connection`. Classify → decide → approve when required → write required intent → execute → mask eligible returned results → audit terminal outcome. |
 | `ApprovalSink` / `AuditSink` | `policy` | Pluggable approval UI and durable journal writes. |
 | `ConnectionProvider` | `mcp` | Must return a policy-gated handle; no raw driver escape hatch. |
 | `ConnectionFaultSink` | `policy` | Optional: app/agentd learn the connection is unusable after panic/desync. |
 
 Adding an engine means implementing `DatabaseDriver` + `Connection` behind those traits, not teaching the UI a new driver id ([ADR 0001](docs/decisions/0001-no-plugin-system.md)).
+
+The optional cursor path is governed by `PolicyGuard`: it accepts one read statement in a read-only session snapshot, masks and audits each fetched page under the same operation, and closes the cursor on terminal outcomes. PostgreSQL is the only driver that supports it today. The SQL editor still uses materialized results and their existing caps ([ADR 0011](docs/decisions/0011-paged-query-results.md)).
 
 ## Governed request pipeline
 
@@ -185,7 +187,7 @@ sequenceDiagram
         G->>A: audit intent
         G->>D: execute (OperationControl)
         D-->>G: result / error
-        G->>G: mask
+        G->>G: mask eligible returned result
         G->>A: terminal succeeded / failed / cancelled / timed_out
         G-->>U: bounded result
     end
@@ -194,7 +196,7 @@ sequenceDiagram
 
 | Stage | Owner | Invariant |
 |---|---|---|
-| Resolve | `storage` | Secrets stay in Secret Service / `secrecy` until the driver boundary. |
+| Resolve | `storage` | Saved database and SSH secrets stay in Secret Service / `secrecy` until their driver or SSH boundary. MCP token delivery follows its issuance path in [storage](docs/storage.md). |
 | Assemble route | `transport` | Dial endpoint and TLS service identity are separate fields. |
 | Guard | `policy` | No raw driver handle leaves MCP or agentd. |
 | Statement | `policy` | Preview, transaction, retry and batch use the same checks as direct execution. |
@@ -250,7 +252,7 @@ Helpers stay in the crate that owns the behaviour. Do not grow a cross-crate “
 
 - Dependencies point toward `core`. No cycles. Drivers and domain crates never import GTK or Relm4.
 - Consumers never hold a raw driver `Connection`; only a `PolicyGuard`.
-- Secrets stay in Secret Service / `secrecy` until the driver boundary; never in JSON, argv, traces or audit fields.
+- Saved database and SSH secrets stay in Secret Service / `secrecy` until their driver or SSH boundary. MCP tokens follow their issuance path in [storage](docs/storage.md). Secrets never go in connection JSON, argv, traces or audit fields.
 - Dial target and TLS verify hostname are separate fields under SSH ([transport](#transport-and-service-identity)).
 - Late async results apply only when the generation or request id still matches.
 - Preview, transaction, retry and batch paths use the same policy checks as direct execution.
@@ -274,7 +276,7 @@ flowchart LR
     allowlist -->|yes| guard[PolicyGuard]
     guard --> sql{SQL decision}
     sql -->|deny| auditD[audit denied]
-    sql -->|allow| exec[execute + mask + audit]
+    sql -->|allow| exec[execute → mask eligible result → audit]
 ```
 
 MCP may ask policy whether a statement needs write capability for a scope check; it does not evaluate rules or write audit records itself. A missing token, scope, allowlist entry or policy decision denies access.
@@ -315,7 +317,7 @@ flowchart LR
     local -->|dial| driver["driver"]
 ```
 
-PostgreSQL uses the socket form so the certificate is checked against the real database hostname while traffic crosses the bastion. Unsupported combinations fail closed. See [connections.md](docs/connections.md) and B4 C6.
+PostgreSQL uses the socket form so the certificate is checked against the real database hostname while traffic crosses the bastion. Unsupported combinations fail closed. See [connections.md](docs/connections.md) and the [current B4 acceptance board](docs/b4-task-board.md).
 
 ## Driver contract
 
@@ -326,7 +328,7 @@ Each engine exports a type implementing `tablepro_core::DatabaseDriver`. Connect
 | PostgreSQL | SQLx | Separate control pool for server-confirmed cancel; release fixture |
 | MySQL / MariaDB | SQLx | Driver + TLS fixtures |
 | SQLite | SQLx | Local and GTK tests |
-| SQL Server | Tiberius | Cancellation and auth limits; Kerberos optional |
+| SQL Server | Tiberius | BookiE does not yet use the driver's `cancel_query` API; Kerberos optional |
 | ClickHouse | `clickhouse` | Driver + TLS fixtures |
 | Redis | `redis` | Experimental; single host/port in 0.2.0 |
 | MongoDB | `mongodb` | Experimental |
@@ -342,7 +344,7 @@ Each engine exports a type implementing `tablepro_core::DatabaseDriver`. Connect
 | Command scope | Component-scoped commands for tab/component lifetime. Detached Relm4 tasks only for independent persistence/cleanup. |
 | Tabs | `AdwTabView` workspaces; Relm4 controllers keyed by tab UUID. |
 | Browse grid | Bounded pages in `RowStore` (`gio::ListModel`); weakly cached `RowObject`s. |
-| SQL editor results | Materialized up to caps. Progressive server-cursor paging accepted in [ADR 0011](docs/decisions/0011-paged-query-results.md), not implemented (PERF-2/PERF-8). |
+| SQL editor results | Core, PostgreSQL and PolicyGuard cursor paths exist, including per-page masking and audit; the editor does not yet use them, so results remain materialized up to caps ([ADR 0011](docs/decisions/0011-paged-query-results.md), PERF-2/PERF-8). |
 | Identity | Sidebar refresh tokens hold a weak session reference. Tab results keep their tab UUID across connection switches. |
 
 ## Persistence
@@ -357,7 +359,7 @@ Default workspace Clippy/unit checks exclude optional DuckDB. GitHub runs the ch
 
 | Limit | Why |
 |---|---|
-| Linux only (today) | One developer; GTK/libadwaita stack. Shared crates stay UI-free so a later platform can reuse them. |
+| Linux only | GTK/libadwaita desktop and Linux packaging are the product target. UI-free crates support the headless daemon and test boundaries; another desktop platform is out of scope. |
 | Static drivers | Compile-time registration; no plugin ABI. |
 | No embedded browser | Native GTK widgets only. |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |
