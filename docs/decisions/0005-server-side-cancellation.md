@@ -5,7 +5,7 @@
 
 ## Context
 
-`OperationControl` carries a cancellation token and an optional deadline into every `*_controlled` driver call. Until now only the PostgreSQL driver acted on it. Every other driver inherited the default in `tablepro-core`, which races the operation against the token with `tokio::select!` and drops the losing future.
+`OperationControl` carries a cancellation token and an optional deadline into every `*_controlled` driver call. When this decision was written, only the PostgreSQL driver acted on it. Other drivers inherited the default in `tablepro-core`, which races the operation against the token with `tokio::select!` and drops the losing future.
 
 Dropping a future closes the client side of the statement. It does not stop the server. The statement can keep holding locks, keep writing rows, and keep consuming a worker until it finishes on its own. Because the caller cannot know what happened, the default returns `OperationOutcomeUnknown`, and `PolicyGuard` treats that as poisoning: one Stop or one timeout on a write disabled governed writes for the rest of the session while the write was possibly still in flight.
 
@@ -25,9 +25,9 @@ This is deliberately strict. A statement that completes normally during the inte
 
 **SQLite interrupts in process.** It has no second session to kill from, so the driver keeps the raw `sqlite3` handle for the life of the operation and calls `sqlite3_interrupt`, which SQLite documents as safe from another thread. sqlx's progress handler was rejected as the mechanism: it only fires between virtual-machine instructions, so it cannot stop a statement waiting on a database lock, which is one of the cases a Stop has to cover. The unsafe call is isolated in one module holding one pointer and one function.
 
-**SQL Server cannot do this yet, and says so.** tiberius 0.12 defines the TDS attention packet but exposes no way to send one, so there is no mechanism to abort a statement on the connection running it. Measured behaviour before this change: abandoning the statement left it running on the server *and* left the tiberius client with a half-read token stream, so - because the client sits behind a mutex - every later operation on that connection blocked forever. A hang, not an error.
+**SQL Server did not support this at the time of the decision.** The then-used Tiberius 0.12 defined the TDS attention packet but exposed no way to send one. Abandoning a statement left it running on the server and left the client with a half-read token stream; because the client sits behind a mutex, later operations on that connection blocked forever.
 
-So SQL Server keeps `supports_server_cancellation` false and, on an interruption, retires the connection: the outcome is reported unknown, and every later call fails fast with `Disconnected` instead of stranding the caller. The only alternative mechanism, `KILL <spid>` from a second connection, stops the statement but destroys the session, which is a different product decision - whether Stop should drop your SQL Server connection - and is tracked separately rather than decided here.
+The current workspace uses Tiberius 0.13, which exposes [`Client::cancel_query`](https://docs.rs/tiberius/0.13.0/tiberius/struct.Client.html#method.cancel_query) to send TDS Attention and drain the acknowledgement. BookiE still keeps `supports_server_cancellation` false and retires the connection on interruption: the new API has not been integrated or verified against our session lifecycle. B4-23 tracks a real-server read/write regression before the capability can change. Until then, the outcome remains unknown and later calls fail fast with `Disconnected` rather than hanging.
 
 **A driver declares the capability.** `Connection::supports_server_cancellation` defaults to false. Where it is false the outcome of an interrupted operation is genuinely unknown, poisoning is correct, and the UI must not offer a Stop that cannot stop.
 
@@ -35,7 +35,7 @@ So SQL Server keeps `supports_server_cancellation` false and, on an interruption
 
 PostgreSQL's implementation was already release-verified through the fixture, so it is the reference rather than a new design. Extracting it into `core` and re-verifying it against the fixture and the container suite means the remaining drivers adopt a proven sequence instead of four independent ones.
 
-Engines differ in mechanism but not in shape. PostgreSQL has an out-of-band cancel request; MySQL, ClickHouse and SQL Server need a second session to issue `KILL QUERY` or its equivalent; SQLite interrupts in-process. All of them need the same before/after ordering, and all of them need the same rule about what counts as confirmation.
+Engines use different cancellation mechanisms. PostgreSQL sends `pg_cancel_backend` through a separate single-connection control pool. MySQL uses `KILL QUERY` through a separate single-connection pool. ClickHouse tags the request with a unique query id and sends `KILL QUERY` through its client. SQLite calls `sqlite3_interrupt` in-process. SQL Server's Tiberius cancellation API is not integrated, and Redis, MongoDB and DuckDB do not report confirmed server cancellation. The shared coordinator still enforces the same ordering and confirmation rule.
 
 `SLEEP()` is not a valid probe on MySQL. It returns 1 when interrupted and the statement succeeds, so a test built on it passes without proving anything. The integration tests use an interruptible cross join instead, and check the server's own process list before and after the interruption rather than trusting the client's error.
 
@@ -43,7 +43,7 @@ Engines differ in mechanism but not in shape. PostgreSQL has an out-of-band canc
 
 Accepted:
 
-- Each driver holds a second single-connection pool for cancellation requests, so a killed session cannot block the request that kills it.
+- PostgreSQL and MySQL use a separate single-connection pool for cancellation requests, so a busy query cannot block the request that stops it. ClickHouse uses its client to send a second request; SQLite interrupts its active connection in-process.
 - Server cancellation is best-effort. An engine that refuses the request, or a statement that ignores it, still yields `OperationOutcomeUnknown` and still poisons governed writes. That is the honest outcome, not a regression.
 - Verifying a driver needs a real server. These paths cannot be proven by unit tests.
 
@@ -51,7 +51,7 @@ Gained:
 
 - Stop and query timeouts stop the statement rather than only the client's interest in it.
 - A cancelled or timed-out operation no longer disables governed writes for the session on the engines that implement it.
-- The connection is returned to the pool when the outcome is known and hard-closed when it is not, so an unconfirmed statement cannot be handed to the next caller.
+- Drivers report `Cancelled` or `TimedOut` only after the server confirms the abort. An unconfirmed result stays `OperationOutcomeUnknown`; stateful connections are discarded where required, and `PolicyGuard` blocks governed writes after an ambiguous write.
 
 ## Alternatives considered
 

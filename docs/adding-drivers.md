@@ -1,13 +1,13 @@
 # Adding a database driver
 
-Reviewed against Linux `4b7814f5e` on 2026-10-03. Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md). The [active sprint](bookie-0.2-sprint.md) owns engine scope and sequencing. Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common type/value and native proof standard. The [documentation entry point](README.md) identifies the owning boards and selective evidence lookup.
+Reviewed against Linux code tip `e802d600c` on 2026-10-14. Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md). The [active sprint](bookie-0.2-sprint.md) owns engine scope and sequencing. Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common type/value and native proof standard. The [documentation entry point](README.md) identifies the owning boards and selective evidence lookup.
 
 ## Contracts and crate boundaries
 
 Read the actual traits before implementing a driver:
 
 - [DatabaseDriver](../crates/core/src/driver.rs): identity, defaults, maturity, metadata and transport capabilities, row-count and DDL guarantees.
-- [Connection](../crates/core/src/connection.rs): schema-aware reads, bound parameters, transactions, controlled calls and session creation.
+- [Connection](../crates/core/src/connection.rs): schema-aware reads, bound parameters, transactions, controlled calls, session creation and optional query cursors.
 - [Session](../crates/core/src/session.rs): dedicated connection lifetime, transactions, usability and awaited close.
 - [Values](../crates/core/src/query.rs), [errors](../crates/core/src/error.rs) and [operation control](../crates/core/src/operation.rs).
 
@@ -63,13 +63,13 @@ Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`).
 
 | Driver | Maturity | Connect | Browse | Query | Writes | Params | `begin` / MCP preview | Notes |
 |---|---|---|---|---|---|---|---|---|
-| PostgreSQL | Stable | yes | yes | SQL | yes | yes | yes | all five TLS modes, release-verified |
-| MySQL | Stable | yes | yes | SQL | yes | yes | yes | DDL not transactional; TLS release-verified |
+| PostgreSQL | Stable | yes | yes | SQL | yes | yes | yes | Five TLS modes; release fixture covers certificate verification and SSH routes |
+| MySQL | Stable | yes | yes | SQL | yes | yes | yes | DDL not transactional; driver TLS fixture |
 | SQLite | Stable | yes | yes | SQL | yes | yes | yes | File-based |
-| SQL Server | Stable | yes | yes | SQL | yes | yes | no interactive begin | Tiberius; custom CA implemented; Verify Ca and Verify Full are identical; server cancellation unsupported |
-| ClickHouse | Stable | yes | yes | SQL | yes | yes | no | Async mutations; no row counts; TLS release-verified |
-| Redis | Experimental | yes | DBs / SCAN | Redis CLI | via query | no | no | Single host/port endpoint only; Sentinel and Cluster topologies are unsupported; TLS release-verified; Verify Ca behaves as Verify Full |
-| MongoDB | Experimental | yes | collections | find / aggregate | insertOne / deleteMany / drop | no | no | TLS release-verified; Verify Ca behaves as Verify Full; CI integration coverage for browse, find, aggregate, delete and drop |
+| SQL Server | Stable | yes | yes | SQL | yes | yes | no interactive begin | Tiberius; custom CA implemented; driver TLS fixture; Verify CA and Verify Full are identical; server cancellation unsupported |
+| ClickHouse | Stable | yes | yes | SQL | yes | yes | no | Waits for asynchronous mutations to finish; no row counts; driver TLS fixture |
+| Redis | Experimental | yes | DBs / SCAN | Redis CLI | via query | no | no | Single host/port endpoint only; Sentinel and Cluster topologies are unsupported; driver TLS fixture; Verify Ca behaves as Verify Full |
+| MongoDB | Experimental | yes | collections | find / aggregate | insertOne / deleteMany / drop; keyed grid edits use bound values | no | no | TLS fixture coverage; Verify CA behaves as Verify Full; integration coverage includes browse, find, aggregate, stale-edit and stale-delete checks |
 | DuckDB | Experimental | yes | yes | SQL | yes | yes | no | Cargo feature `duckdb`; CSV/TSV/JSON/Parquet files; bundled JSON/Parquet; explicit optional CI |
 
 ### Maturity rules

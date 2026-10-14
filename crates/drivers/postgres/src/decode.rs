@@ -66,56 +66,40 @@ fn decode_interval(bytes: &[u8]) -> Option<String> {
 }
 
 fn format_interval(months: i32, days: i32, microseconds: i64) -> String {
-    let explicit_sign = months < 0 || days < 0 || microseconds < 0;
-    let years = months / 12;
-    let months = months % 12;
-    let mut parts = Vec::new();
-    push_counted(&mut parts, years, "year", "years", explicit_sign);
-    push_counted(&mut parts, months, "mon", "mons", explicit_sign);
-    push_counted(&mut parts, days, "day", "days", explicit_sign);
-    if microseconds != 0 || parts.is_empty() {
-        parts.push(format_interval_time(microseconds, explicit_sign));
+    let mut text = String::new();
+    let mut is_zero = true;
+    let mut is_before = false;
+    for (count, unit) in [(months / 12, "year"), (months % 12, "mon"), (days, "day")] {
+        if count == 0 {
+            continue;
+        }
+        if !is_zero {
+            text.push(' ');
+        }
+        if is_before && count > 0 {
+            text.push('+');
+        }
+        let plural = if count == 1 { "" } else { "s" };
+        text.push_str(&format!("{count} {unit}{plural}"));
+        is_before = count < 0;
+        is_zero = false;
     }
-    parts.join(" ")
-}
-
-fn push_counted(parts: &mut Vec<String>, count: i32, singular: &str, plural: &str, explicit_sign: bool) {
-    if count == 0 {
-        return;
+    if microseconds != 0 || is_zero {
+        if !is_zero {
+            text.push(' ');
+        }
+        if microseconds < 0 {
+            text.push('-');
+        } else if is_before {
+            text.push('+');
+        }
+        if microseconds == i64::MIN {
+            text.push_str("9223372036854.775808 seconds");
+        } else {
+            text.push_str(&crate::temporal::clock_text(microseconds.unsigned_abs()));
+        }
     }
-    let label = if count.unsigned_abs() == 1 { singular } else { plural };
-    let sign = if explicit_sign && count.is_positive() { "+" } else { "" };
-    parts.push(format!("{sign}{count} {label}"));
-}
-
-fn format_interval_time(microseconds: i64, explicit_sign: bool) -> String {
-    let negative = microseconds < 0;
-    let magnitude = microseconds.unsigned_abs();
-    let hours = magnitude / 3_600_000_000;
-    let sign = if negative {
-        "-"
-    } else if explicit_sign {
-        "+"
-    } else {
-        ""
-    };
-    if hours > i32::MAX as u64 {
-        return format!("{sign}{}.{:06} seconds", magnitude / 1_000_000, magnitude % 1_000_000);
-    }
-    let remainder = magnitude % 3_600_000_000;
-    let minutes = remainder / 60_000_000;
-    let remainder = remainder % 60_000_000;
-    let seconds = remainder / 1_000_000;
-    let micros = remainder % 1_000_000;
-    if micros == 0 {
-        format!("{sign}{hours:02}:{minutes:02}:{seconds:02}")
-    } else {
-        let fraction = format!("{micros:06}");
-        format!(
-            "{sign}{hours:02}:{minutes:02}:{seconds:02}.{}",
-            fraction.trim_end_matches('0')
-        )
-    }
+    text
 }
 
 fn decode_inet(bytes: &[u8], force_prefix: bool) -> Option<String> {
@@ -198,17 +182,47 @@ fn format_lexeme(word: &str, raw_positions: &[u8]) -> String {
 fn decode_point(bytes: &[u8]) -> Option<String> {
     let pair = <[u8; 16]>::try_from(bytes).ok()?;
     let (x, y) = pair.split_at(8);
-    let coordinate = |half: &[u8]| Some(format_float8(f64::from_be_bytes(half.try_into().ok()?)));
+    let coordinate = |half: &[u8]| Some(float8_text(f64::from_be_bytes(half.try_into().ok()?)));
     Some(format!("({},{})", coordinate(x)?, coordinate(y)?))
 }
 
-fn format_float8(value: f64) -> String {
-    if value.is_nan() {
-        "NaN".into()
-    } else if value.is_infinite() {
-        if value > 0.0 { "Infinity" } else { "-Infinity" }.into()
-    } else {
-        value.to_string()
+pub(crate) fn float8_text(value: f64) -> String {
+    float_text(
+        value.is_finite().then(|| format!("{value:e}")),
+        value.to_string(),
+        value,
+        15,
+    )
+}
+
+pub(crate) fn float4_text(value: f32) -> String {
+    float_text(
+        value.is_finite().then(|| format!("{value:e}")),
+        value.to_string(),
+        f64::from(value),
+        6,
+    )
+}
+
+fn float_text(scientific: Option<String>, plain: String, value: f64, exponent_limit: i32) -> String {
+    let Some(scientific) = scientific else {
+        return if value.is_nan() {
+            "NaN".into()
+        } else if value > 0.0 {
+            "Infinity".into()
+        } else {
+            "-Infinity".into()
+        };
+    };
+    let Some((mantissa, exponent)) = scientific.split_once('e') else {
+        return plain;
+    };
+    match exponent.parse::<i32>() {
+        Ok(exponent) if exponent < -4 || exponent >= exponent_limit => {
+            let sign = if exponent < 0 { '-' } else { '+' };
+            format!("{mantissa}e{sign}{:02}", exponent.abs())
+        }
+        _ => plain,
     }
 }
 
@@ -323,11 +337,11 @@ mod tests {
     #[test]
     fn value_contract_interval_extremes_and_mixed_signs_are_unambiguous() {
         for (months, days, micros, expected) in [
-            (-1, 2, 3, "-1 mon +2 days +00:00:00.000003"),
-            (1, -2, 3, "+1 mon -2 days +00:00:00.000003"),
-            (1, 2, -3, "+1 mon +2 days -00:00:00.000003"),
+            (-1, 2, 3, "-1 mons +2 days 00:00:00.000003"),
+            (1, -2, 3, "1 mon -2 days +00:00:00.000003"),
+            (1, 2, -3, "1 mon 2 days -00:00:00.000003"),
             (0, 0, i64::MIN, "-9223372036854.775808 seconds"),
-            (0, 0, i64::MAX, "9223372036854.775807 seconds"),
+            (0, 0, i64::MAX, "2562047788:00:54.775807"),
             (0, 0, i64::from(i32::MAX) * 3_600_000_000, "2147483647:00:00"),
         ] {
             assert_eq!(
@@ -517,5 +531,94 @@ mod tests {
         );
         assert_eq!(decode_int_range(&range[..range.len() - 1], 4), None);
         assert_eq!(decode_int_range(&[range, vec![0]].concat(), 4), None);
+    }
+
+    fn all_short_inputs() -> Vec<Vec<u8>> {
+        let alphabet = [0_u8, 1, 2, 4, 8, 0x10, 0x7f, 0x80, 0xff];
+        let mut all = vec![Vec::new()];
+        let mut frontier = vec![Vec::new()];
+        for _ in 0..3 {
+            frontier = frontier
+                .iter()
+                .flat_map(|prefix: &Vec<u8>| {
+                    alphabet.iter().map(move |byte| {
+                        let mut next = prefix.clone();
+                        next.push(*byte);
+                        next
+                    })
+                })
+                .collect();
+            all.extend(frontier.iter().cloned());
+        }
+        all
+    }
+
+    #[test]
+    fn malformed_wire_values_are_refused_and_never_panic() {
+        let types = [
+            "INTERVAL",
+            "BIT",
+            "VARBIT",
+            "MACADDR",
+            "MACADDR8",
+            "INET",
+            "CIDR",
+            "PG_LSN",
+            "XML",
+            "OID",
+            "XID",
+            "CID",
+            "POINT",
+            "INT4RANGE",
+            "INT8RANGE",
+            "TSVECTOR",
+            "NOT_A_TYPE",
+        ];
+        let mut random = crate::test_rng::Xorshift::new(0x9E37_79B9_7F4A_7C15);
+        let mut inputs = all_short_inputs();
+        inputs.extend((0..30_000).map(|_| random.bytes(48)));
+        for bytes in &inputs {
+            for type_name in types {
+                let _ = decode_pg_binary_text(type_name, bytes);
+            }
+            let _ = crate::numeric::decode_binary(bytes);
+            for type_name in ["DATE", "TIMESTAMP", "TIMESTAMPTZ"] {
+                let _ = crate::temporal::decode_temporal(bytes, type_name);
+            }
+            for with_zone in [false, true] {
+                let _ = crate::temporal::decode_time(bytes, with_zone);
+            }
+        }
+    }
+
+    #[test]
+    fn floats_switch_to_exponent_form_where_the_server_does() {
+        for (value, expected) in [
+            (1e14, "100000000000000"),
+            (1e15, "1e+15"),
+            (1.5e-4, "0.00015"),
+            (1e-4, "0.0001"),
+            (1e-5, "1e-05"),
+            (1.5e21, "1.5e+21"),
+            (5e-324, "5e-324"),
+            (-2.5e-7, "-2.5e-07"),
+            (0.0, "0"),
+            (-0.0, "-0"),
+            (123456789.5, "123456789.5"),
+        ] {
+            assert_eq!(float8_text(value), expected, "float8 {value:e}");
+        }
+        for (value, expected) in [
+            (999999.0_f32, "999999"),
+            (1e6, "1e+06"),
+            (1.6777216e7, "1.6777216e+07"),
+            (1.5e-5, "1.5e-05"),
+            (0.1, "0.1"),
+        ] {
+            assert_eq!(float4_text(value), expected, "float4 {value:e}");
+        }
+        assert_eq!(float8_text(f64::NAN), "NaN");
+        assert_eq!(float8_text(f64::INFINITY), "Infinity");
+        assert_eq!(float4_text(f32::NEG_INFINITY), "-Infinity");
     }
 }

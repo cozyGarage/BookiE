@@ -2,11 +2,11 @@
 
 - **Status**: Accepted
 - **Date**: 2026-04-26
-- **Clarified**: 2026-10-03 to match the typed-error contract in storage and transport.
+- **Clarified**: 2026-10-03 for the typed-error contract; 2026-10-14 for best-effort GUI MCP token storage and one-time headless output.
 
 ## Context
 
-Database, SSH, and MCP credentials must persist without being written to JSON files. The storage mechanism must work across common Linux desktop environments, expose an async Rust API, and fail safely when no keyring service is available.
+Database and SSH credentials must persist without being written to JSON files. GUI-issued MCP token plaintext is returned once and Secret Service storage is attempted; the headless agent emits plaintext once to stdout or an explicitly selected owner-only file. The token registry persists only a hash. The storage mechanism must work across common Linux desktop environments, expose an async Rust API, and fail safely when no keyring service is available.
 
 Available choices include the Secret Service D-Bus API, desktop-specific keyring APIs, encrypted application files, plain files, or prompting on every connection.
 
@@ -14,7 +14,7 @@ Available choices include the Secret Service D-Bus API, desktop-specific keyring
 
 BookiE stores credentials through the Secret Service D-Bus API using the `oo7` Rust crate.
 
-Items use the schema `com.tablepro.linux.Password` with connection and secret-kind attributes. The storage crate exposes typed functions for database passwords, SSH passwords, SSH key passphrases, and MCP secrets.
+Items use the schema `com.tablepro.linux.Password` with connection and secret-kind attributes. The storage crate exposes typed functions for database passwords, SSH passwords, SSH key passphrases, and GUI MCP tokens.
 
 An absent keyring item returns `Ok(None)`. Unavailable, locked or cancelled Secret Service access returns a typed `StorageError`; saved transport assembly propagates the error and refuses connection assembly. Callers may offer recovery or an explicit credential prompt, but must not disguise failed access as an absent item. The application never falls back to a plain credential file.
 

@@ -1,6 +1,6 @@
 # SSH transport
 
-> [NEEDS REVIEW] Draft written on 2026-10-11 from `tablepro-ssh`, `tablepro-transport` and ARCHITECTURE. A maintainer review is pending.
+> Reviewed against source and tests at `e802d600` on 2026-10-14, including the host-key refusal and default-path regressions from #783. The transport remains in development; see the active sprint for acceptance status.
 
 **Spec tier:** buildable **Serves:** `Local DBA` **Status:** in-development **Success metric:** A tunnel opens only after the host key is trusted or explicitly learned; TLS still verifies the saved database hostname, not loopback.
 
@@ -14,18 +14,19 @@ Turn a saved SSH hop into a local forward, and decide whether an unknown or chan
 - Host-key outcomes: trusted, learned, changed, unknown, known_hosts I/O failure (`crates/ssh/src/known_hosts.rs`).
 - `UnknownHostKey::{Learn, Refuse}` (`crates/ssh/src/lib.rs`).
 - Transport assembly: saved connection to driver options, SSH chain, tunnel, TLS service identity (`crates/transport`, [ARCHITECTURE](../../ARCHITECTURE.md#transport-and-service-identity)).
+- Independent per-hop credential resolution and connection-material identity (`crates/transport`).
 
 ## Out of scope
 
 - What SQL may run after the driver connects ([governed-sql](../governed-sql/spec.md)).
-- Storing hop passwords and key passphrases ([secret-storage](../secret-storage/spec.md), ADR 0004). Jump-chain editing that is not yet integrated stays on the ledger.
+- Secret Service storage details for hop passwords and key passphrases ([secret-storage](../secret-storage/spec.md), ADR 0004). Jump-chain editing remains incomplete ([#548](https://github.com/cozyGarage/BookiE/issues/548)).
 - Flatpak OpenSSH refuse (I2 / packaging). That is a packaging decision, not this capability's host-key rule.
 
 ## Core concepts
 
 - **Dial target.** Where bytes are sent (forwarded socket or `127.0.0.1:ephemeral`).
 - **TLS service identity.** The hostname the certificate must match (the saved database host).
-- **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (`$XDG_CONFIG_HOME/tablepro/known_hosts`, or `~/.config/tablepro/known_hosts`). System `~/.ssh/known_hosts` is unused by that backend (by construction; no negative test).
+- **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (an absolute `$XDG_CONFIG_HOME/tablepro/known_hosts`, or `~/.config/tablepro/known_hosts` when XDG_CONFIG_HOME is absent, empty or relative). System `~/.ssh/known_hosts` is unused by that backend (by construction; no negative test).
 
 ## Data contracts
 
@@ -74,7 +75,8 @@ OpenSSH backend forces `StrictHostKeyChecking=ask` (`crates/ssh/src/openssh/argv
 `verify_or_prompt` in `crates/ssh/src/known_hosts.rs`.
 
 - Known matching key → `Trusted`.
-- Otherwise prompt. `PromptAnswer::Accept` records the key. Any other answer → `Unknown`.
+- Unknown key → prompt. `PromptAnswer::Accept` records the key. Any other answer → `Unknown`.
+- Changed keys and known_hosts I/O errors return their refusal outcome without prompting.
 
 ### Transport identity
 
@@ -89,10 +91,10 @@ OpenSSH backend forces `StrictHostKeyChecking=ask` (`crates/ssh/src/openssh/argv
 
 ## Algorithms & rules
 
-1. Resolve the saved hop (host, port, username, auth). Secrets remain wrapped until the driver/SSH boundary.
+1. Resolve each saved hop's host, port, username and auth independently. Secrets remain wrapped until the SSH boundary.
 2. Read BookiE `known_hosts` (default from `default_known_hosts_path`).
 3. Compare the presented key.
-4. Match → continue. Change → fail with `HostKeyMismatch`. Missing + `Refuse` → fail with `UnknownHostKey`. Missing + `Learn` or an accepted prompt → append and continue.
+4. A key marked `@revoked` for this host fails closed, even if it also matches a normal known-host entry. Match → continue. Change → fail with `HostKeyMismatch`. Missing + `Refuse` → fail with `UnknownHostKey`. Missing + `Learn` or an accepted prompt → append and continue.
 5. Open the forward. Built-in russh timeouts in `crates/ssh/src/lib.rs`: `CONNECT_TIMEOUT` 10s, `AUTH_TIMEOUT` 20s, `KEEPALIVE_INTERVAL` 15s. Handshake 10s and keepalive 15s have tests; auth 20s is code-only. OpenSSH forces `ConnectTimeout=10` and `ServerAliveInterval=15`; handshake/auth deadlines live in `OpenSshTimeouts`.
 6. Hand transport a local dial target plus the original service hostname for TLS.
 
@@ -114,6 +116,7 @@ OpenSSH: pass `StrictHostKeyChecking=ask` (`FORCED_OPTIONS` in `crates/ssh/src/o
 
 - The system MUST compare the presented host key to BookiE `known_hosts` during handshake, before authentication and local forward bind (`ClientHandler::check_server_key`).
 - A changed key MUST fail closed. The stored line MUST NOT be overwritten automatically.
+- A key marked `@revoked` for this host MUST fail closed and MUST NOT be accepted, learned or prompted for.
 - `UnknownHostKey::Refuse` MUST NOT add a key.
 - System `ssh` writing `~/.ssh/known_hosts` MUST NOT be treated as trust for the built-in backend.
 - TLS through an SSH tunnel MUST verify the saved database hostname when verification is requested.
@@ -122,6 +125,7 @@ OpenSSH: pass `StrictHostKeyChecking=ask` (`FORCED_OPTIONS` in `crates/ssh/src/o
 ## Invariants
 
 - A changed host key MUST NOT be learned over the old line.
+- A revoked host key MUST NOT be trusted, learned or prompted for.
 - A Refuse connection MUST NOT create a new known_hosts entry.
 - TLS identity MUST NOT become `127.0.0.1` merely because the dial target is a local forward.
 
@@ -159,6 +163,8 @@ Each line names the tip proof. When the proof is code only, that is marked.
 - **Known key.** GIVEN a host key that matches BookiE known_hosts WHEN verify runs THEN the outcome is `Trusted`. Proof: `verify_or_learn_trusts_recorded_key_on_repeat`. Forwarding after trust is covered by integration tests such as `password_authentication_succeeds_with_the_correct_password`.
 - **Refuse unknown.** GIVEN `UnknownHostKey::Refuse` AND no matching line WHEN verify_or_learn runs THEN the outcome is `HostKeyOutcome::Unknown` AND the file is unchanged. Proof: `a_refusing_connection_does_not_learn_an_unknown_key_but_still_trusts_a_known_one`. `connect_and_auth` maps that to `SshError::UnknownHostKey`; transport records `TransportError::HostKeyRefused` (`shared_transport_records_builtin_unknown_and_changed_host_key_refusals`).
 - **Changed key.** GIVEN a stored key that does not match WHEN verify runs THEN the outcome is `Changed` and the old line is not overwritten. Proof: `verify_or_learn_detects_key_mismatch`; `a_changed_builtin_host_key_is_refused_without_prompting_or_overwriting`. Tunnel-level `SshError::HostKeyMismatch`: `a_changed_key_on_the_second_hop_is_reported_as_a_host_key_mismatch`.
+- **Revoked key.** GIVEN a key marked `@revoked` for the host WHEN built-in verification runs THEN the connection is refused even if the key also appears in a normal entry, and no prompt or learn path runs. Proof: `a_revoked_key_is_never_trusted_never_learned_and_never_prompted_for`; unrelated revoked hosts and keys do not block a valid entry (`a_revoked_line_for_another_host_or_key_does_not_block_a_good_one`).
+- **Relative XDG config path.** GIVEN `XDG_CONFIG_HOME` is relative WHEN the built-in known-host path is resolved THEN the path falls back to `$HOME/.config/tablepro/known_hosts`. Proof: `the_default_path_ignores_an_empty_or_relative_xdg_config_home`.
 - **Learn new.** GIVEN `UnknownHostKey::Learn` AND no matching line WHEN verify_or_learn succeeds THEN the outcome is `LearnedNew` AND a new line exists. Proof: `verify_or_learn_creates_known_hosts_on_first_use`.
 - **Prompt decline.** GIVEN verify_or_prompt AND the prompter does not accept WHEN the key is unknown THEN the outcome is `Unknown` AND no line is added. Proof: `built_in_host_key_trust_is_persisted_only_after_acceptance`.
 - **TLS identity.** GIVEN SSH plus certificate verification WHEN transport assembles options THEN the TLS hostname is the saved database host, not the local forward. Proof: `socket_forwarding_keeps_the_service_hostname_for_tls`; `verify_full_through_ssh_uses_the_original_database_hostname`; `verify_full_over_a_tcp_tunnel_never_downgrades_to_the_local_dial_address`.
@@ -166,4 +172,4 @@ Each line names the tip proof. When the proof is code only, that is marked.
 
 ## Open questions
 
-None known. Architect review of this draft is still the open checklist fork.
+No additional transport behavior questions were identified in this source review. Jump-chain editing and installed acceptance remain open under [#548](https://github.com/cozyGarage/BookiE/issues/548) and the active sprint.
