@@ -11,7 +11,9 @@ mod inserts;
 mod pg_native_text;
 #[path = "sql_dialect/updates.rs"]
 mod updates;
-pub(crate) use pg_native_text::{postgres_array_cast_type, postgres_native_text_cast_type, text_cast_placeholder};
+pub(crate) use pg_native_text::{
+    postgres_array_cast_type, postgres_native_text_cast_type, postgres_temporal_cast_type, text_cast_placeholder,
+};
 
 pub use error::BuildSqlError;
 pub use inserts::{build_insert_from_draft, build_insert_from_draft_touched};
@@ -277,32 +279,6 @@ pub(crate) fn postgres_numeric_cast_type(data_type: &str) -> Option<&'static str
     Some("pg_catalog.numeric")
 }
 
-fn without_typmod(lowered: &str) -> String {
-    let mut out = String::with_capacity(lowered.len());
-    let mut depth = 0;
-    for c in lowered.chars() {
-        match c {
-            '(' => depth += 1,
-            ')' if depth > 0 => depth -= 1,
-            _ if depth == 0 => out.push(c),
-            _ => {}
-        }
-    }
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-pub(crate) fn postgres_temporal_cast_type(data_type: &str) -> Option<&'static str> {
-    let lowered = without_typmod(&data_type.trim().to_ascii_lowercase());
-    Some(match lowered.as_str() {
-        "date" => "pg_catalog.date",
-        "time" | "time without time zone" => "pg_catalog.time",
-        "timetz" | "time with time zone" => "pg_catalog.timetz",
-        "timestamp" | "timestamp without time zone" => "pg_catalog.timestamp",
-        "timestamptz" | "timestamp with time zone" => "pg_catalog.timestamptz",
-        _ => return None,
-    })
-}
-
 pub fn build_keyed_delete(
     driver_id: &str,
     schema: Option<&str>,
@@ -400,21 +376,6 @@ fn build_where_clause(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn temporal_columns_with_a_precision_still_get_their_cast() {
-        for (reported, cast) in [
-            ("timestamp(3) with time zone", "pg_catalog.timestamptz"),
-            ("timestamp(6) without time zone", "pg_catalog.timestamp"),
-            ("timestamp(0)", "pg_catalog.timestamp"),
-            ("time(2) with time zone", "pg_catalog.timetz"),
-            ("TIME(3)", "pg_catalog.time"),
-            ("date", "pg_catalog.date"),
-        ] {
-            assert_eq!(postgres_temporal_cast_type(reported), Some(cast), "{reported}");
-        }
-        assert_eq!(postgres_temporal_cast_type("interval(3)"), None);
-    }
 
     fn col(name: &str, pk: bool) -> ColumnInfo {
         ColumnInfo {
@@ -924,6 +885,9 @@ mod tests {
 
     #[path = "postgres_domain_cast_tests.rs"]
     mod postgres_domain_cast_tests;
+
+    #[path = "postgres_temporal_cast_tests.rs"]
+    mod postgres_temporal_cast_tests;
 
     #[test]
     fn postgres_typed_numeric_updates_keep_the_native_placeholder() {
