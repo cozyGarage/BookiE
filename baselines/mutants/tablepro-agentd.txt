@@ -1,31 +1,5 @@
 # Missed mutants accepted for now (cargo mutants --package tablepro-agentd -- --lib --bins, 2026-10-14).
-crates/agentd/src/lib.rs:51:9: replace <impl Connection for SessionConnection>::supports_server_cancellation -> bool with true
-crates/agentd/src/lib.rs:51:9: replace <impl Connection for SessionConnection>::supports_server_cancellation -> bool with false
-crates/agentd/src/lib.rs:55:9: replace <impl Connection for SessionConnection>::list_tables -> Result<Vec<TableInfo>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:59:9: replace <impl Connection for SessionConnection>::list_tables_controlled -> Result<Vec<TableInfo>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:88:9: replace <impl Connection for SessionConnection>::fetch_columns -> Result<Vec<ColumnInfo>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:97:9: replace <impl Connection for SessionConnection>::fetch_columns_controlled -> Result<Vec<ColumnInfo>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:166:9: replace <impl Connection for SessionConnection>::execute_in_transaction -> Result<Vec<u64>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:166:9: replace <impl Connection for SessionConnection>::execute_in_transaction -> Result<Vec<u64>, DriverError> with Ok(vec![0])
-crates/agentd/src/lib.rs:166:9: replace <impl Connection for SessionConnection>::execute_in_transaction -> Result<Vec<u64>, DriverError> with Ok(vec![1])
-crates/agentd/src/lib.rs:174:9: replace <impl Connection for SessionConnection>::execute_in_transaction_controlled -> Result<Vec<u64>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:174:9: replace <impl Connection for SessionConnection>::execute_in_transaction_controlled -> Result<Vec<u64>, DriverError> with Ok(vec![0])
-crates/agentd/src/lib.rs:174:9: replace <impl Connection for SessionConnection>::execute_in_transaction_controlled -> Result<Vec<u64>, DriverError> with Ok(vec![1])
-crates/agentd/src/lib.rs:178:9: replace <impl Connection for SessionConnection>::fetch_indexes -> Result<Vec<IndexInfo>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:191:9: replace <impl Connection for SessionConnection>::fetch_foreign_keys -> Result<Vec<ForeignKeyInfo>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:195:9: replace <impl Connection for SessionConnection>::fetch_enum_labels -> Result<Vec<String>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:195:9: replace <impl Connection for SessionConnection>::fetch_enum_labels -> Result<Vec<String>, DriverError> with Ok(vec![String::new()])
-crates/agentd/src/lib.rs:195:9: replace <impl Connection for SessionConnection>::fetch_enum_labels -> Result<Vec<String>, DriverError> with Ok(vec!["xyzzy".into()])
-crates/agentd/src/lib.rs:204:9: replace <impl Connection for SessionConnection>::fetch_enum_labels_controlled -> Result<Vec<String>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:204:9: replace <impl Connection for SessionConnection>::fetch_enum_labels_controlled -> Result<Vec<String>, DriverError> with Ok(vec![String::new()])
-crates/agentd/src/lib.rs:204:9: replace <impl Connection for SessionConnection>::fetch_enum_labels_controlled -> Result<Vec<String>, DriverError> with Ok(vec!["xyzzy".into()])
-crates/agentd/src/lib.rs:217:9: replace <impl Connection for SessionConnection>::list_databases -> Result<Vec<String>, DriverError> with Ok(vec![])
-crates/agentd/src/lib.rs:217:9: replace <impl Connection for SessionConnection>::list_databases -> Result<Vec<String>, DriverError> with Ok(vec![String::new()])
-crates/agentd/src/lib.rs:217:9: replace <impl Connection for SessionConnection>::list_databases -> Result<Vec<String>, DriverError> with Ok(vec!["xyzzy".into()])
-crates/agentd/src/lib.rs:257:9: replace <impl Connection for SessionConnection>::server_version -> Result<Option<String>, DriverError> with Ok(None)
-crates/agentd/src/lib.rs:257:9: replace <impl Connection for SessionConnection>::server_version -> Result<Option<String>, DriverError> with Ok(Some(String::new()))
-crates/agentd/src/lib.rs:257:9: replace <impl Connection for SessionConnection>::server_version -> Result<Option<String>, DriverError> with Ok(Some("xyzzy".into()))
-crates/agentd/src/lib.rs:261:9: replace <impl Connection for SessionConnection>::ping -> Result<(), DriverError> with Ok(())
+# What is left is the process entry point and the terminal prompt in main.rs, the *_controlled fetch forwarders, and DaemonProvider::connection.
 crates/agentd/src/lib.rs:318:9: replace <impl ConnectionProvider for DaemonProvider>::list_saved_connections -> Result<Vec<SavedConnection>, String> with Ok(vec![])
 crates/agentd/src/lib.rs:326:28: replace == with != in <impl ConnectionProvider for DaemonProvider>::connection
 crates/agentd/src/main.rs:166:53: replace || with && in ask_on_controlling_terminal
