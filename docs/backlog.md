@@ -26,7 +26,7 @@ candidate inventory as a release commitment.
 | Row | What |
 |---|---|
 | PERF-2, PERF-7, PERF-8 | Progressively load SQL editor results while keeping the existing budgets. Core, PostgreSQL and PolicyGuard cursor support has landed; editor lifecycle and retained-page behavior remain open. |
-| PERF-3 | MongoDB browse on large collections | Deep unfiltered `_id` keyset seek landed in #493; filtered, sorted, keyless and installed/network acceptance remain |
+| PERF-3 | MongoDB browse on large collections | Compatible `_id` keyset seek landed in #493; supported server-side sorting landed in #837. Other sorted pages and keyless deep pages still use offset pagination; installed and representative-network acceptance remain |
 | PERF-4 | Server time next to elapsed time |
 | PERF-5, PERF-6 | Idle memory and binary size, accepted for now |
 
@@ -38,7 +38,7 @@ candidate inventory as a release commitment.
 | AUD-11 consolidation | Finish the single AST walk for classification, masking and blast-radius planning | Behavioural fixes are closed on the current policy suite; shared analysis landed in #506. Structural consolidation follows 0.2.0 |
 | TEST-12 | MongoDB metadata sample consistency |
 | UI-21, TEST-28 | Fake connection for the GTK tier, native Ubuntu AT-SPI menu reachability |
-| TEST-30 | Remaining SonarCloud and CodeQL findings |
+| TEST-30 | Remaining SonarCloud and CodeQL findings | #562 has no Lane set on Project #3 yet, so it is not listed in the lane index. |
 | AUD-5 | About 4,700 comment lines in `src/` to move into docs, file by file |
 | DOC-3, DOC-5 | Orca and high contrast pass; value comparison with DBeaver and dbx |
 | B4-9, B4-11, B4-17, B4-21 | Route and TLS acceptance evidence, failed-batch rollback on optional MySQL engines and package acceptance, native multi-hop trust flow, SQL Server Kerberos Windows AD interoperability and package acceptance |
