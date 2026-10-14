@@ -69,7 +69,6 @@ What the application does not do, or does differently from what you might expect
 
 ## Known bugs
 
-- **The filter strip offers text operators for some numeric and time columns** ([#854](https://github.com/cozyGarage/BookiE/issues/854)), including MySQL `MEDIUMINT` and PostgreSQL `time without time zone`.
 - **SQL completion can choose the wrong statement context** when a semicolon appears inside a comment or dollar-quoted string ([#855](https://github.com/cozyGarage/BookiE/issues/855)).
 - **Structure validation can accept duplicate column names that the database treats as equal** ([#856](https://github.com/cozyGarage/BookiE/issues/856)); the server then rejects the save.
 - **The CSV import progress dialog can remain open after the import completes**, and Cancel may not close it ([#655](https://github.com/cozyGarage/BookiE/issues/655)).
