@@ -19,11 +19,15 @@ mod table;
 mod types;
 
 #[cfg(test)]
+mod alter_type_using_tests;
+#[cfg(test)]
 mod collation_tests;
 #[cfg(test)]
 mod comment_tests;
 #[cfg(test)]
 mod default_tests;
+#[cfg(test)]
+mod diff_replacement_tests;
 #[cfg(test)]
 mod tests;
 
