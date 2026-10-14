@@ -190,6 +190,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::icons::tests::schema_filter_icon_exists_in_the_active_theme"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::explain_dialog::tests::explain_pages_have_available_icons_for_the_view_switcher"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::folding::tests::folding_hides_lines_without_changing_query_text_and_can_be_cleared"
     ],
     [
@@ -376,6 +386,11 @@
       "tablepro-app",
       "--lib",
       "ui::app::organization::tests::changing_a_connection_colour_updates_the_retained_tab_bar"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::filter_strip::tests::an_externally_applied_rule_expands_the_rule_editor"
     ]
   ],
   "keyring": [

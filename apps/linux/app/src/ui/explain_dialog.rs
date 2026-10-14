@@ -75,9 +75,8 @@ pub fn present(
     let scrolled = gtk::ScrolledWindow::builder().hexpand(true).vexpand(true).build();
     let tree_scrolled = gtk::ScrolledWindow::builder().hexpand(true).vexpand(true).build();
     let stack = adw::ViewStack::new();
-    let tree_page = stack.add_titled(&tree_scrolled, Some("tree"), &tr!("Tree"));
+    let (tree_page, _) = add_explain_pages(&stack, &tree_scrolled, &scrolled);
     tree_page.set_visible(false);
-    stack.add_titled(&scrolled, Some("text"), &tr!("Text"));
     stack.set_visible_child_name("text");
     let switcher = adw::ViewSwitcher::builder()
         .stack(&stack)
@@ -97,6 +96,16 @@ pub fn present(
     scrolled.set_child(Some(&view));
     toolbar.set_content(Some(&stack));
     window.set_content(Some(&toolbar));
+    let window_for_escape = window.clone();
+    let escape = gtk::EventControllerKey::new();
+    escape.connect_key_pressed(move |_, keyval, _, _| {
+        if keyval == gtk::gdk::Key::Escape {
+            window_for_escape.close();
+            return glib::Propagation::Stop;
+        }
+        glib::Propagation::Proceed
+    });
+    window.add_controller(escape);
     window.present();
 
     let buffer = view.buffer();
@@ -117,6 +126,18 @@ pub fn present(
     });
 }
 
+fn add_explain_pages(
+    stack: &adw::ViewStack,
+    tree: &impl IsA<gtk::Widget>,
+    text: &impl IsA<gtk::Widget>,
+) -> (adw::ViewStackPage, adw::ViewStackPage) {
+    let tree_page = stack.add_titled(tree, Some("tree"), &tr!("Tree"));
+    let text_page = stack.add_titled(text, Some("text"), &tr!("Text"));
+    tree_page.set_icon_name(Some(crate::ui::icons::EXPLAIN_TREE_ICON_NAME));
+    text_page.set_icon_name(Some(crate::ui::icons::EXPLAIN_TEXT_ICON_NAME));
+    (tree_page, text_page)
+}
+
 fn format_explain_result(result: &tablepro_core::QueryResult) -> String {
     if result.rows.is_empty() {
         return String::from("(empty plan)");
@@ -131,4 +152,33 @@ fn format_explain_result(result: &tablepro_core::QueryResult) -> String {
         }
     }
     lines.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn explain_pages_have_available_icons_for_the_view_switcher() {
+        gtk::init().unwrap();
+        adw::init().unwrap();
+        let display = gtk::gdk::Display::default().unwrap();
+        let theme = gtk::IconTheme::for_display(&display);
+        let stack = adw::ViewStack::new();
+        let tree = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let (tree_page, text_page) = add_explain_pages(&stack, &tree, &text);
+
+        assert_eq!(
+            tree_page.icon_name().as_deref(),
+            Some(crate::ui::icons::EXPLAIN_TREE_ICON_NAME)
+        );
+        assert_eq!(
+            text_page.icon_name().as_deref(),
+            Some(crate::ui::icons::EXPLAIN_TEXT_ICON_NAME)
+        );
+        assert!(theme.has_icon(crate::ui::icons::EXPLAIN_TREE_ICON_NAME));
+        assert!(theme.has_icon(crate::ui::icons::EXPLAIN_TEXT_ICON_NAME));
+    }
 }
