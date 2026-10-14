@@ -7,7 +7,7 @@
 
 Drivers decode whatever the server sends. A hostile, compromised, or merely buggy server can drive a decoder into a state its author did not anticipate, and some of our dependencies answer that with a panic rather than an error. The SQL Server driver is the concrete case: `tiberius` panics inside its codec on input it cannot parse, and we consume it as a pinned git dependency, so we cannot fix it in our own code.
 
-Nothing in the application caught that. There was no `catch_unwind`, no `JoinError` inspection, and no panic hook anywhere in `app`, `mcp`, or `agentd`. A panic inside a Relm4 command killed that task silently. The component that dispatched it was waiting for a message that would now never arrive, so the interface kept showing "Loading" forever with no error, no log entry tying the hang to a cause, and no audit outcome for an operation that had already recorded its intent.
+At the time, nothing in the application caught that. There was no `catch_unwind`, no `JoinError` inspection, and no panic hook anywhere in `app`, `mcp`, or `agentd`. A panic inside a Relm4 command killed that task silently. The component that dispatched it was waiting for a message that would now never arrive, so the interface kept showing "Loading" forever with no error, no log entry tying the hang to a cause, and no audit outcome for an operation that had already recorded its intent.
 
 The workspace lints deny `unwrap`, `expect` and `panic!` in our own code. They say nothing about a dependency's code, which is where this panic originates.
 
@@ -18,7 +18,7 @@ The workspace lints deny `unwrap`, `expect` and `panic!` in our own code. They s
 - A read becomes `DriverError::Internal`.
 - A write becomes `DriverError::OperationOutcomeUnknown`.
 
-The guard then reports the fault through an optional `ConnectionFaultSink` installed by whoever owns the connection. `app::services::database_service` implements that sink and wakes the connection monitor, which replaces the connection rather than waiting for the next ping.
+The guard reports the fault through an optional `ConnectionFaultSink` installed by the connection owner. `app::services::database_service` wakes its monitor to replace the connection immediately. `agentd` marks its cached session retired; the next session acquisition removes and replaces it. The MCP bridge has no connection cache or monitor of its own and relies on its provider's lifecycle.
 
 Returned errors, audit fields and UI messages must omit the raw panic payload.
 
@@ -38,11 +38,11 @@ The application survives a panicking driver with an honest error, a correct audi
 
 Containment is not a repair. A caught panic means a dependency reached a state its author did not expect, and we resume on a new connection without knowing why.
 
-Known implementation gap: the source still logs the caught payload, and the default panic hook may also print it. That violates the no-secret and no-SQL logging rule. Redaction and headless follow-ups are in [the consistency review](../archive/architecture-consistency-review-2026-10-03.md#remaining-source-risks) and [the release audit](../archive/release-audit-2026-10-03.md#small-release-tasks). Keep unwind enabled while addressing them. The log may keep operation identity; it must not keep arbitrary payload text.
+The app and `agentd` install a panic hook that withholds the payload by default. Current defect: setting `TABLEPRO_DEBUG_PANICS` leaves Rust's standard hook active, which can print sensitive payload text and violates the privacy rule. Do not set it. Until B4 fixes [#849](https://github.com/cozyGarage/BookiE/issues/849), investigate crashes with synthetic data in an isolated run and treat any captured dump as sensitive. `PolicyGuard` separately catches driver panics and logs only the operation and payload byte count; returned errors withhold the payload. These hooks do not cover arbitrary panics in other processes or code that does not install the hook.
 
 `catch_unwind` requires the unwinding panic strategy. Setting `panic = "abort"` in a release profile would silently disable this entire boundary, so that setting must not be introduced without replacing this mechanism.
 
-The sink is opt-in through `PolicyGuard::with_fault_sink` rather than a required `GuardContext` field. That keeps the change additive for the eleven places that build a `GuardContext`, at the cost of making it possible to build a guard that converts panics without replacing the connection. `mcp` and `agentd` do exactly that today, deliberately: they have no connection monitor to wake.
+The sink remains opt-in through `PolicyGuard::with_fault_sink` rather than a required `GuardContext` field. That keeps construction additive, at the cost of allowing a guard to convert panics without reporting the unusable connection. The GUI wakes a monitor immediately; agentd retires its cached session for replacement on the next acquisition. The MCP bridge owns no cached connection lifecycle.
 
 ## Alternatives considered
 

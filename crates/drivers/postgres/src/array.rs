@@ -249,6 +249,8 @@ fn supported(oid: u32) -> bool {
             | XML_OID
             | BIT_OID
             | VARBIT_OID
+            | 114
+            | 3802
             | 1700
             | 2950
             | MACADDR_OID
@@ -285,21 +287,16 @@ fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
         21 => i16::from_be_bytes(bytes.try_into().ok()?).to_string(),
         23 => i32::from_be_bytes(bytes.try_into().ok()?).to_string(),
         26 => u32::from_be_bytes(bytes.try_into().ok()?).to_string(),
-        700 => {
-            let value = f32::from_be_bytes(bytes.try_into().ok()?);
-            if value.is_finite() {
-                value.to_string()
-            } else {
-                float_text(f64::from(value))
-            }
-        }
-        701 => float_text(f64::from_be_bytes(bytes.try_into().ok()?)),
+        700 => crate::decode::float4_text(f32::from_be_bytes(bytes.try_into().ok()?)),
+        701 => crate::decode::float8_text(f64::from_be_bytes(bytes.try_into().ok()?)),
         1700 => match crate::numeric::decode_binary(bytes)? {
             Value::Decimal(value) => value.to_string(),
             Value::Text(value) => value,
             _ => return None,
         },
         2950 => uuid::Uuid::from_slice(bytes).ok()?.to_string(),
+        114 => std::str::from_utf8(bytes).ok()?.to_string(),
+        3802 => std::str::from_utf8(bytes.strip_prefix(&[1])?).ok()?.to_string(),
         PG_LSN_OID => crate::decode::decode_pg_binary_text("PG_LSN", bytes)?,
         1082 | 1083 | 1114 | 1184 | 1186 | 1266 => temporal_element(oid, bytes)?,
         _ => return None,
@@ -316,18 +313,6 @@ fn temporal_element(oid: u32, bytes: &[u8]) -> Option<String> {
         _ => return None,
     };
     crate::temporal::array_text(value)
-}
-
-fn float_text(value: f64) -> String {
-    if value.is_nan() {
-        "NaN".into()
-    } else if value == f64::INFINITY {
-        "Infinity".into()
-    } else if value == f64::NEG_INFINITY {
-        "-Infinity".into()
-    } else {
-        value.to_string()
-    }
 }
 
 #[cfg(test)]
@@ -648,6 +633,75 @@ mod tests {
             bytes.extend(vec![0; payload_bytes]);
             let mut reader = Reader { remaining: &bytes };
             assert_eq!(read_dimensions(&mut reader, 1).is_some(), expected, "{payload_bytes}");
+        }
+    }
+    #[test]
+    fn json_and_jsonb_elements_decode_to_their_text_and_refuse_other_versions() {
+        assert_eq!(
+            element_text(114, false, br#"{"a":   1}"#).as_deref(),
+            Some(r#"{"a":   1}"#)
+        );
+        assert_eq!(element_text(3802, false, b"\x01[1, 2]").as_deref(), Some("[1, 2]"));
+        assert_eq!(element_text(3802, false, b"\x02[1, 2]"), None);
+        assert_eq!(element_text(3802, false, b""), None);
+        assert!(supported(114) && supported(3802));
+    }
+    fn int4_array(values: &[i32]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        for field in [1_i32, 0, 23, values.len() as i32, 1] {
+            bytes.extend(field.to_be_bytes());
+        }
+        for value in values {
+            bytes.extend(4_i32.to_be_bytes());
+            bytes.extend(value.to_be_bytes());
+        }
+        bytes
+    }
+
+    #[test]
+    fn mutated_array_wire_values_are_refused_and_never_panic() {
+        let samples = [
+            int4_array(&[1, 2, 3]),
+            int4_array(&[]),
+            int4_array(&[i32::MIN, i32::MAX]),
+        ];
+        let types = [
+            (23_u32, 23_u32),
+            (25, 25),
+            (114, 114),
+            (3802, 3802),
+            (1700, 1700),
+            (701, 701),
+            (700, 700),
+            (1184, 1184),
+            (2950, 2950),
+            (17, 17),
+            (1082, 1082),
+        ];
+        let mut random = crate::test_rng::Xorshift::new(0xD1B5_4A32_D192_ED03);
+        let mut next = move || random.next();
+        for _ in 0..40_000 {
+            let mut bytes = samples[(next() % 3) as usize].clone();
+            for _ in 0..(next() % 4) {
+                match next() % 4 {
+                    0 if !bytes.is_empty() => {
+                        let at = (next() as usize) % bytes.len();
+                        bytes[at] = (next() >> 8) as u8;
+                    }
+                    1 if !bytes.is_empty() => bytes.truncate((next() as usize) % bytes.len()),
+                    2 => bytes.push((next() >> 8) as u8),
+                    _ if bytes.len() >= 4 => {
+                        let at = (next() as usize) % (bytes.len() - 3);
+                        bytes[at..at + 4].copy_from_slice(&[0x7f, 0xff, 0xff, 0xff]);
+                    }
+                    _ => {}
+                }
+            }
+            for (expected, value) in types {
+                for text_element in [false, true] {
+                    let _ = decode_binary_with_oid(&bytes, expected, value, text_element);
+                }
+            }
         }
     }
 }
