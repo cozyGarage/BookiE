@@ -23,6 +23,13 @@ impl ActiveStream {
     }
 }
 
+fn take_stream_for_generation(streaming: &mut Option<ActiveStream>, generation: u64) -> Option<ActiveStream> {
+    if streaming.as_ref().is_some_and(|stream| stream.generation == generation) {
+        return streaming.take();
+    }
+    None
+}
+
 impl SqlEditor {
     pub(super) fn on_stream_started(
         &mut self,
@@ -113,7 +120,7 @@ impl SqlEditor {
             .duration_since(context.started_at)
             .map(|duration| duration.as_millis() as i64)
             .unwrap_or(0);
-        let stream = self.streaming.take().filter(|stream| stream.generation == generation);
+        let stream = take_stream_for_generation(&mut self.streaming, generation);
         let terminal = stream
             .as_ref()
             .and_then(|stream| stream.error.clone())
@@ -172,6 +179,21 @@ fn waiting_for_stream_page() -> adw::StatusPage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stale_run_completion_keeps_the_newer_stream() {
+        let mut streaming = Some(ActiveStream {
+            generation: 2,
+            identity: StatementIdentity::default(),
+            sql_preview: "SELECT 2".into(),
+            export_query: None,
+            cache: StreamPageCache::default(),
+            error: None,
+        });
+
+        assert!(take_stream_for_generation(&mut streaming, 1).is_none());
+        assert_eq!(streaming.as_ref().map(|stream| stream.generation), Some(2));
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
