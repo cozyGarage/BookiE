@@ -36,6 +36,13 @@ async fn seeded_postgres() -> (ContainerAsync<Postgres>, ConnectOptions) {
     (container, options)
 }
 
+async fn pg_dump_tool() -> ClientTool {
+    let configured = std::env::var_os("TABLEPRO_TEST_PG_DUMP").map(std::path::PathBuf::from);
+    ClientTool::locate("pg_dump", configured.as_deref())
+        .await
+        .expect("pg_dump from TABLEPRO_TEST_PG_DUMP or the host")
+}
+
 fn request<'a>(options: &'a ConnectOptions, output: &'a std::path::Path) -> PgDumpRequest<'a> {
     PgDumpRequest {
         options,
@@ -46,10 +53,10 @@ fn request<'a>(options: &'a ConnectOptions, output: &'a std::path::Path) -> PgDu
 }
 
 #[tokio::test]
-#[ignore = "requires Docker and pg_dump 16 or newer on the host"]
+#[ignore = "requires Docker; run scripts/test-pg-dump.sh"]
 async fn pg_dump_writes_the_schema_and_rows_of_a_real_database() {
     let (_container, options) = seeded_postgres().await;
-    let tool = ClientTool::locate("pg_dump", None).await.expect("pg_dump on the host");
+    let tool = pg_dump_tool().await;
     let dir = tempfile::tempdir().unwrap();
     let output = dir.path().join("postgres.sql");
 
@@ -63,11 +70,11 @@ async fn pg_dump_writes_the_schema_and_rows_of_a_real_database() {
 }
 
 #[tokio::test]
-#[ignore = "requires Docker and pg_dump 16 or newer on the host"]
+#[ignore = "requires Docker; run scripts/test-pg-dump.sh"]
 async fn a_wrong_password_fails_without_leaving_a_file() {
     let (_container, mut options) = seeded_postgres().await;
     options.password = SecretString::from("wrong");
-    let tool = ClientTool::locate("pg_dump", None).await.expect("pg_dump on the host");
+    let tool = pg_dump_tool().await;
     let dir = tempfile::tempdir().unwrap();
     let output = dir.path().join("postgres.sql");
 
