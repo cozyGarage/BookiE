@@ -410,6 +410,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::structure_tab::columns::tests::a_structure_expander_arrow_matches_its_expansion_state"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::export_dialog::tests::a_full_export_shows_a_refusal_without_opening_its_source"
     ],
     [
@@ -426,6 +431,21 @@
       "tablepro-app",
       "--lib",
       "ui::filter_strip::tests::an_externally_applied_rule_expands_the_rule_editor"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::proposals_activate_complete_quoted_references"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::proposals_preserve_aliases_and_replace_only_the_identifier"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::retired_proposals_do_not_edit_the_buffer"
     ]
   ],
   "keyring": [
