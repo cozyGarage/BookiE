@@ -126,6 +126,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Fixed
 - Structure column expanders now point right when collapsed and down when open.
+- The error location for a PostgreSQL SELECT shown page by page pointed past the end of the statement; it now marks the right place.
 
 - PostgreSQL completion keeps quoted case, dots, spaces and embedded quotes distinct when loading table columns.
 - PostgreSQL errors no longer replay queries or writes merely because their error code resembles a stale prepared plan.
