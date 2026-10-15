@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use tablepro_core::sql_syntax::SqlGrammar;
 
+use super::completion_identifiers::{bare_reference, table_key, words};
+
 #[derive(Default)]
 pub struct SchemaIndex {
     pub tables: Vec<String>,
@@ -57,11 +59,11 @@ impl SchemaIndex {
     }
 
     pub fn columns_for(&self, table: &str) -> Option<&Vec<String>> {
-        let key = table_key(table);
+        let key = table_key(table, self.grammar)?;
         if let Some(columns) = self.columns.get(&key) {
             return Some(columns);
         }
-        if key.contains('.') {
+        if key.contains('\0') {
             return None;
         }
         let mut matches = self.columns.iter().filter(|(known, _)| bare_name(known) == key);
@@ -74,7 +76,9 @@ impl SchemaIndex {
     }
 
     pub fn set_columns(&mut self, table: &str, columns: Vec<String>) {
-        self.columns.insert(table_key(table), columns);
+        if let Some(key) = table_key(table, self.grammar) {
+            self.columns.insert(key, columns);
+        }
     }
 }
 
@@ -85,19 +89,8 @@ pub enum Scope {
     TablesAndColumns(Vec<String>),
 }
 
-pub fn table_key(table: &str) -> String {
-    table
-        .split('.')
-        .map(|part| {
-            part.trim_matches(|c| c == '"' || c == '`' || c == '[' || c == ']')
-                .to_ascii_lowercase()
-        })
-        .collect::<Vec<_>>()
-        .join(".")
-}
-
 fn bare_name(key: &str) -> &str {
-    key.rsplit('.').next().unwrap_or(key)
+    key.rsplit('\0').next().unwrap_or(key)
 }
 
 pub fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Vec<String> {
@@ -114,7 +107,7 @@ pub fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Ve
         }
         Scope::Tables => {
             out.extend(index.tables.iter().cloned());
-            out.extend(bare_table_names(&index.tables));
+            out.extend(bare_table_names(&index.tables, index.grammar));
         }
         Scope::TablesAndColumns(tables) => {
             for table in &tables {
@@ -128,7 +121,7 @@ pub fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Ve
                 }
             }
             out.extend(index.tables.iter().cloned());
-            out.extend(bare_table_names(&index.tables));
+            out.extend(bare_table_names(&index.tables, index.grammar));
         }
     }
 
@@ -139,18 +132,16 @@ pub fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Ve
 
 pub fn referenced_tables(sql: &str, cursor_byte: usize, grammar: Option<SqlGrammar>) -> Vec<String> {
     let statement = statement_around(sql, cursor_byte, grammar);
-    table_references(statement.text)
+    table_references(statement.text, grammar)
         .into_iter()
         .map(|(table, _)| table)
         .collect()
 }
 
-fn bare_table_names(tables: &[String]) -> Vec<String> {
+fn bare_table_names(tables: &[String], grammar: Option<SqlGrammar>) -> Vec<String> {
     tables
         .iter()
-        .filter_map(|table| table.rsplit('.').next())
-        .filter(|name| !name.is_empty())
-        .map(str::to_string)
+        .filter_map(|table| bare_reference(table, grammar))
         .collect()
 }
 
@@ -197,16 +188,16 @@ fn floor_char_boundary(text: &str, mut index: usize) -> usize {
 }
 
 fn scope_for(prefix: &str, statement: &str, index: &SchemaIndex) -> Scope {
-    let references = table_references(statement);
-    let keyword = last_keyword(prefix);
+    let references = table_references(statement, index.grammar);
+    let keyword = last_keyword(prefix, index.grammar);
     let in_table_position = keyword
         .as_deref()
         .is_some_and(|keyword| TABLE_KEYWORDS.contains(&keyword));
-    if let Some(qualifier) = trailing_qualifier(prefix) {
+    if let Some(qualifier) = trailing_qualifier(prefix, index.grammar) {
         if in_table_position {
             return Scope::Tables;
         }
-        let resolved = resolve_qualifier(&qualifier, &references);
+        let resolved = resolve_qualifier(&qualifier, &references, index.grammar);
         if index.knows_columns(&resolved) {
             return Scope::ColumnsOf(resolved);
         }
@@ -220,7 +211,7 @@ fn scope_for(prefix: &str, statement: &str, index: &SchemaIndex) -> Scope {
 
 const TABLE_KEYWORDS: [&str; 6] = ["from", "join", "into", "update", "table", "truncate"];
 
-const KEYWORDS: [&str; 44] = [
+pub(super) const KEYWORDS: [&str; 44] = [
     "select",
     "from",
     "where",
@@ -267,9 +258,9 @@ const KEYWORDS: [&str; 44] = [
     "returning",
 ];
 
-fn last_keyword(prefix: &str) -> Option<String> {
+fn last_keyword(prefix: &str, grammar: Option<SqlGrammar>) -> Option<String> {
     let mut last = None;
-    for word in words(prefix) {
+    for word in words(prefix, grammar) {
         let lowered = word.to_ascii_lowercase();
         if KEYWORDS.contains(&lowered.as_str()) {
             last = Some(lowered);
@@ -278,38 +269,40 @@ fn last_keyword(prefix: &str) -> Option<String> {
     last
 }
 
-fn trailing_qualifier(prefix: &str) -> Option<String> {
-    let trailing: String = prefix
-        .chars()
-        .rev()
-        .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '.' || *c == '"')
-        .collect::<Vec<char>>()
-        .into_iter()
-        .rev()
-        .collect();
-    let (qualifier, _) = trailing.rsplit_once('.')?;
-    let qualifier = qualifier.rsplit('.').next().unwrap_or(qualifier);
-    let cleaned = qualifier.trim_matches('"');
-    (!cleaned.is_empty()).then(|| cleaned.to_string())
+fn trailing_qualifier(prefix: &str, grammar: Option<SqlGrammar>) -> Option<String> {
+    if prefix.ends_with(char::is_whitespace) {
+        return None;
+    }
+    let word = words(prefix, grammar).last().copied()?;
+    let plan = super::statement_cursor::plan_for(word, grammar.unwrap_or(SqlGrammar::Sqlite));
+    let dot = plan
+        .tokens(0..word.len())
+        .filter(|token| &word[token.range.clone()] == ".")
+        .last()?;
+    let qualifier = &word[..dot.range.start];
+    table_key(qualifier, grammar)?;
+    Some(qualifier.to_string())
 }
 
-fn resolve_qualifier(qualifier: &str, references: &[(String, Option<String>)]) -> String {
-    let lowered = qualifier.to_ascii_lowercase();
+fn resolve_qualifier(qualifier: &str, references: &[(String, Option<String>)], grammar: Option<SqlGrammar>) -> String {
+    let Some(key) = table_key(qualifier, grammar) else {
+        return qualifier.to_string();
+    };
     for (table, alias) in references {
-        if alias.as_deref().map(str::to_ascii_lowercase) == Some(lowered.clone()) {
+        if alias.as_ref().and_then(|alias| table_key(alias, grammar)).as_ref() == Some(&key) {
             return table.clone();
         }
     }
     for (table, _) in references {
-        if bare_name(&table_key(table)) == lowered {
+        if table_key(table, grammar).is_some_and(|table| bare_name(&table) == key || table == key) {
             return table.clone();
         }
     }
     qualifier.to_string()
 }
 
-fn table_references(statement: &str) -> Vec<(String, Option<String>)> {
-    let tokens: Vec<&str> = words(statement).collect();
+fn table_references(statement: &str, grammar: Option<SqlGrammar>) -> Vec<(String, Option<String>)> {
+    let tokens = words(statement, grammar);
     let mut out: Vec<(String, Option<String>)> = Vec::new();
     let mut index = 0usize;
     while index < tokens.len() {
@@ -321,7 +314,7 @@ fn table_references(statement: &str) -> Vec<(String, Option<String>)> {
             continue;
         }
         let Some(table) = tokens.get(index + 1) else { break };
-        if KEYWORDS.contains(&table.to_ascii_lowercase().as_str()) {
+        if table_key(table, grammar).is_none() || KEYWORDS.contains(&table.to_ascii_lowercase().as_str()) {
             index += 1;
             continue;
         }
@@ -340,11 +333,6 @@ fn table_references(statement: &str) -> Vec<(String, Option<String>)> {
         index = consumed;
     }
     out
-}
-
-fn words(text: &str) -> impl Iterator<Item = &str> {
-    text.split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.' || c == '"'))
-        .filter(|word| !word.is_empty())
 }
 
 #[cfg(test)]
@@ -506,10 +494,54 @@ mod tests {
     }
 
     #[test]
+    fn quoted_aliases_and_whitespace_around_dots_keep_identity() {
+        let mut index = index();
+        index.set_columns(r#""odd.schema"."a.b""#, vec!["exact_column".into()]);
+        for (prefix, tail) in [
+            (r#"SELECT "Case Alias"."#, r#" FROM "odd.schema"."a.b" AS "Case Alias""#),
+            ("SELECT x.", r#" FROM "odd.schema" . "a.b" AS x"#),
+            (r#"SELECT "odd.schema"."a.b"."#, r#" FROM "odd.schema"."a.b""#),
+        ] {
+            let sql = format!("{prefix}{tail}");
+            assert_eq!(candidate_words(&sql, prefix.len(), &index), vec!["exact_column"]);
+        }
+    }
+
+    #[test]
+    fn postgres_quoted_relations_keep_distinct_columns_and_aliases() {
+        let mut index = index();
+        index.set_columns("public.\"Users\"", vec!["quoted_only".into()]);
+        assert_eq!(
+            index.columns_for("public.users").unwrap(),
+            &vec!["id", "email", "created_at"]
+        );
+        assert_eq!(index.columns_for("public.\"Users\"").unwrap(), &vec!["quoted_only"]);
+        let sql = "SELECT u. FROM public.\"Users\" AS u";
+        assert_eq!(candidate_words(sql, "SELECT u.".len(), &index), vec!["quoted_only"]);
+    }
+
+    #[test]
+    fn postgres_quoted_dots_and_spaces_keep_complete_table_references() {
+        let mut index = index();
+        for name in [r#""odd.schema"."a.b""#, r#"public."a""b""#, r#"public."with space""#] {
+            index.set_columns(name, vec!["exact_column".into()]);
+            let sql = format!("SELECT x. FROM {name} AS x");
+            assert_eq!(referenced_tables(&sql, sql.len(), index.grammar), vec![name]);
+            assert_eq!(candidate_words(&sql, "SELECT x.".len(), &index), vec!["exact_column"]);
+        }
+    }
+
+    #[test]
     fn table_key_keeps_the_schema_and_ignores_quoting_and_case() {
-        assert_eq!(table_key("public.\"Users\""), "public.users");
-        assert_eq!(table_key("`orders`"), "orders");
-        assert_eq!(table_key("[dbo].[Items]"), "dbo.items");
+        assert_eq!(table_key("public.\"Users\"", None).as_deref(), Some("public\0users"));
+        assert_eq!(
+            table_key("`orders`", Some(SqlGrammar::MySql)).as_deref(),
+            Some("orders")
+        );
+        assert_eq!(
+            table_key("[dbo].[Items]", Some(SqlGrammar::MsSql)).as_deref(),
+            Some("dbo\0items")
+        );
     }
 
     fn index_with(tables: &[(&str, &[&str])]) -> SchemaIndex {
