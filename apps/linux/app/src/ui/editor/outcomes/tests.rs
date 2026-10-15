@@ -583,6 +583,110 @@ fn stream_export_button(widget: &gtk::Widget) -> Option<gtk::Button> {
     None
 }
 
+fn streamed_result_notebook(
+    pages: Vec<std::sync::Arc<tablepro_core::QueryResult>>,
+    first_page: u64,
+    total_pages: u64,
+    total_rows: usize,
+    terminal: StreamTerminal,
+) -> gtk::Notebook {
+    let streamed = StreamedResult {
+        pages,
+        first_page,
+        total_pages,
+        total_rows,
+        terminal,
+        export: None,
+    };
+    let outcome = super::StatementOutcome {
+        identity: StatementIdentity::default(),
+        sql_preview: "SELECT id FROM items".into(),
+        elapsed_ms: 0,
+        kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
+        pinned: false,
+    };
+    let (grid_sender, _) = relm4::channel::<crate::ui::grid::GridMsg>();
+    let widget = super::build_streamed_result_widget(
+        &outcome,
+        &streamed,
+        &grid_sender,
+        None,
+        std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        Default::default(),
+    );
+    widget.last_child().unwrap().downcast().unwrap()
+}
+
+fn streamed_page_tab_label(notebook: &gtk::Notebook, index: u32) -> String {
+    let page = notebook.nth_page(Some(index)).unwrap();
+    notebook.tab_label_text(&page).unwrap().to_string()
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states() {
+    relm4::adw::init().unwrap();
+    let loading = streamed_result_notebook(
+        vec![
+            std::sync::Arc::new(cursor_page(&[1, 2], true).result),
+            std::sync::Arc::new(cursor_page(&[3], false).result),
+        ],
+        0,
+        2,
+        3,
+        StreamTerminal::Loading,
+    );
+    assert_eq!(loading.n_pages(), 2);
+    assert_eq!(loading.current_page(), Some(1));
+    assert_eq!(streamed_page_tab_label(&loading, 0), "Rows 1-2");
+    assert_eq!(streamed_page_tab_label(&loading, 1), "Rows 5001-5001");
+
+    let empty = streamed_result_notebook(
+        vec![std::sync::Arc::new(cursor_page(&[], false).result)],
+        0,
+        1,
+        0,
+        StreamTerminal::Complete,
+    );
+    assert_eq!(empty.n_pages(), 1);
+    assert_eq!(streamed_page_tab_label(&empty, 0), "Rows 0");
+
+    let failed = streamed_result_notebook(
+        vec![std::sync::Arc::new(cursor_page(&[4], true).result)],
+        0,
+        1,
+        1,
+        StreamTerminal::Failed("later page failed".into()),
+    );
+    assert_eq!(failed.n_pages(), 2);
+    assert_eq!(failed.current_page(), Some(1));
+    assert_eq!(streamed_page_tab_label(&failed, 0), "Rows 1-1");
+    assert_eq!(streamed_page_tab_label(&failed, 1), "Status");
+    let status = failed
+        .nth_page(Some(1))
+        .unwrap()
+        .downcast::<relm4::adw::StatusPage>()
+        .unwrap();
+    assert_eq!(status.description().as_deref(), Some("later page failed"));
+
+    let cancelled = streamed_result_notebook(
+        vec![std::sync::Arc::new(cursor_page(&[5], true).result)],
+        0,
+        1,
+        1,
+        StreamTerminal::Cancelled,
+    );
+    assert_eq!(cancelled.n_pages(), 2);
+    assert_eq!(cancelled.current_page(), Some(1));
+    assert_eq!(streamed_page_tab_label(&cancelled, 0), "Rows 1-1");
+    let status = cancelled
+        .nth_page(Some(1))
+        .unwrap()
+        .downcast::<relm4::adw::StatusPage>()
+        .unwrap();
+    assert_eq!(status.title(), "Query cancelled");
+}
+
 #[tokio::test]
 async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
     let counters = std::sync::Arc::new(CursorCounters::default());
