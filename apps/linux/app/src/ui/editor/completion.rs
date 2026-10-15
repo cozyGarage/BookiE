@@ -302,7 +302,7 @@ fn last_keyword(prefix: &str, grammar: Option<SqlGrammar>) -> Option<String> {
 }
 
 fn trailing_qualifier(prefix: &str, grammar: Option<SqlGrammar>) -> Option<String> {
-    if prefix.ends_with(char::is_whitespace) {
+    if prefix.ends_with(char::is_whitespace) && !prefix.trim_end().ends_with('.') {
         return None;
     }
     let word = words(prefix, grammar).last().copied()?;

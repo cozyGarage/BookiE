@@ -138,6 +138,17 @@ mod tests {
     }
 
     #[test]
+    fn whitespace_after_an_alias_dot_keeps_only_its_columns() {
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_columns("users", vec!["user_column".into()]);
+        index.set_columns("orders", vec!["order_column".into()]);
+        let sql = "SELECT u.  FROM users u JOIN orders o ON true";
+        let values = candidates(sql, "SELECT u. ".len(), &index).values;
+        assert_eq!(values, vec![("user_column".into(), "\"user_column\"".into())]);
+    }
+
+    #[test]
     fn literals_and_comments_do_not_offer_sql_identifiers() {
         let index = SchemaIndex::default();
         for sql in [
