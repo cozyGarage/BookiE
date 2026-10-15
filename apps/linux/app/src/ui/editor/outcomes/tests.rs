@@ -338,6 +338,7 @@ struct CursorCounters {
     rolled_back: std::sync::atomic::AtomicUsize,
     transaction_open: std::sync::atomic::AtomicBool,
     cursor_open: std::sync::atomic::AtomicBool,
+    lifecycle: std::sync::Mutex<Vec<&'static str>>,
 }
 
 struct CursorSession {
@@ -356,12 +357,14 @@ impl tablepro_core::Session for CursorSession {
         _control: &tablepro_core::OperationControl,
     ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
         if sql.starts_with("BEGIN READ ONLY") {
+            self.counters.lifecycle.lock().unwrap().push("begin");
             self.transaction_open = true;
             self.counters
                 .transaction_open
                 .store(true, std::sync::atomic::Ordering::SeqCst);
         }
         if sql == "ROLLBACK" {
+            self.counters.lifecycle.lock().unwrap().push("rollback");
             self.transaction_open = false;
             self.cursor_open = false;
             self.counters
@@ -387,6 +390,7 @@ impl tablepro_core::Session for CursorSession {
         _params: &[tablepro_core::Value],
         _control: &tablepro_core::OperationControl,
     ) -> Result<tablepro_core::QueryCursorId, tablepro_core::DriverError> {
+        self.counters.lifecycle.lock().unwrap().push("open_cursor");
         self.cursor_open = true;
         self.counters
             .cursor_open
@@ -413,6 +417,7 @@ impl tablepro_core::Session for CursorSession {
         _cursor_id: tablepro_core::QueryCursorId,
         _control: &tablepro_core::OperationControl,
     ) -> Result<(), tablepro_core::DriverError> {
+        self.counters.lifecycle.lock().unwrap().push("close_cursor");
         self.cursor_open = false;
         self.counters
             .cursor_open
@@ -856,6 +861,10 @@ async fn cancelling_page_delivery_closes_the_cursor_and_rolls_back() {
     assert_eq!(counters.fetched.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(
+        *counters.lifecycle.lock().unwrap(),
+        ["begin", "open_cursor", "close_cursor", "rollback"]
+    );
 }
 
 #[tokio::test]
