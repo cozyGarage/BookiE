@@ -218,6 +218,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - The filter bar now offers comparison operators for MySQL `MEDIUMINT` and PostgreSQL `time without time zone` columns instead of text matching.
 - SQL completion now finds the statement under the cursor correctly when a comment or a PostgreSQL `$$` body contains a semicolon.
 - MCP `export_data` with CSV now reports `truncated` when the row cap cut the result, as the JSON format already did.
+- An MCP write preview that is cancelled or times out while its transaction is starting now says the outcome is unknown, instead of reporting a plain cancellation.
 
 ### Security
 
