@@ -1124,20 +1124,30 @@ GLib.MainLoop().run()
             state = toggle.getState()
             return state.contains(pyatspi.STATE_PRESSED) or state.contains(pyatspi.STATE_CHECKED)
 
+        def session_node():
+            return ui.wait_for_node_containing("Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
         def session_toggle(on, sensitive=False):
             deadline = time.monotonic() + 30
             while time.monotonic() < deadline:
-                toggle = ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+                toggle = session_node()
                 ready = toggle.getState().contains(pyatspi.STATE_SENSITIVE) or not sensitive
                 if toggle_is_on(toggle) == on and ready:
                     return toggle
                 time.sleep(0.2)
             raise AssertionError(f"Session toggle did not become {'on' if on else 'off'}")
 
-        def reopen_session():
-            if toggle_is_on(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)):
-                ui.invoke(session_toggle(True, sensitive=True))
+        def end_session():
+            toggle = session_toggle(True, sensitive=True)
+            had_transaction = "transaction open" in toggle.name
+            ui.invoke(toggle)
+            if had_transaction:
+                ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
             session_toggle(False, sensitive=True)
+
+        def reopen_session():
+            if toggle_is_on(session_node()):
+                end_session()
             wait_for_stable_connection()
             ui.invoke(session_toggle(False, sensitive=True))
             session_toggle(True)
