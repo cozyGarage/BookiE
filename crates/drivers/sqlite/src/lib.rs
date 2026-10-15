@@ -69,13 +69,12 @@ impl DatabaseDriver for SqliteDriver {
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let in_memory = opts.database.is_empty() || opts.database == ":memory:";
-        let url = if in_memory {
-            "sqlite::memory:".to_string()
+        let base = if in_memory {
+            SqliteConnectOptions::from_str("sqlite::memory:").map_err(map_sqlx_error)?
         } else {
-            format!("sqlite:{}", opts.database)
+            SqliteConnectOptions::new().filename(&opts.database)
         };
-        let connect_opts = SqliteConnectOptions::from_str(&url)
-            .map_err(map_sqlx_error)?
+        let connect_opts = base
             .create_if_missing(!opts.read_only)
             .read_only(opts.read_only && !in_memory);
         let session_options = (!in_memory).then(|| connect_opts.clone());
@@ -114,7 +113,7 @@ impl Connection for SqliteConnection {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         let rows = sqlx::query(
             "SELECT name FROM sqlite_master
-             WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+             WHERE type = 'table' AND substr(name, 1, 7) <> 'sqlite_'
              ORDER BY name",
         )
         .fetch_all(&self.pool)
