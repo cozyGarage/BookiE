@@ -282,8 +282,19 @@ impl ExistingColumns {
         group.add(&status);
         let headers = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         let has_header = std::rc::Rc::new(std::cell::Cell::new(true));
-        MappingActions::new(&status, driver_id, &rows, &headers, &has_header, columns, store, scope)
-            .connect(&remember, &restore, &forget);
+        MappingActions::new(
+            &status,
+            MappingActionsParams {
+                driver_id: driver_id.to_owned(),
+                rows: rows.clone(),
+                headers: headers.clone(),
+                has_header: has_header.clone(),
+                columns: columns.to_vec(),
+                store,
+                scope,
+            },
+        )
+        .connect(&remember, &restore, &forget);
         Self {
             group,
             driver_id: driver_id.to_owned(),
@@ -335,26 +346,27 @@ struct MappingActions {
     scope: Option<CsvMappingScope>,
 }
 
+struct MappingActionsParams {
+    driver_id: String,
+    rows: Vec<adw::ComboRow>,
+    headers: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+    has_header: std::rc::Rc<std::cell::Cell<bool>>,
+    columns: Vec<ColumnInfo>,
+    store: Option<CsvMappingStore>,
+    scope: Option<CsvMappingScope>,
+}
+
 impl MappingActions {
-    fn new(
-        status: &gtk::Label,
-        driver_id: &str,
-        rows: &[adw::ComboRow],
-        headers: &std::rc::Rc<std::cell::RefCell<Vec<String>>>,
-        has_header: &std::rc::Rc<std::cell::Cell<bool>>,
-        columns: &[ColumnInfo],
-        store: Option<CsvMappingStore>,
-        scope: Option<CsvMappingScope>,
-    ) -> Self {
+    fn new(status: &gtk::Label, params: MappingActionsParams) -> Self {
         Self {
             status: status.clone(),
-            driver_id: driver_id.to_owned(),
-            rows: rows.to_vec(),
-            headers: headers.clone(),
-            has_header: has_header.clone(),
-            columns: columns.to_vec(),
-            store,
-            scope,
+            driver_id: params.driver_id,
+            rows: params.rows,
+            headers: params.headers,
+            has_header: params.has_header,
+            columns: params.columns,
+            store: params.store,
+            scope: params.scope,
         }
     }
 
