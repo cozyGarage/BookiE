@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import gtk_input
+import gtk_port_lock
 
 
 class XWindowAttributes(ctypes.Structure):
@@ -340,17 +341,22 @@ GLib.MainLoop().run()
         ui.wait_for_node_containing("Test failed")
         assert ui.find_node_containing("Connection ok") is None
 
+    def connection_dialog_environment_choice_is_operable(database, base):
+        ui.invoke(ui.wait_for_node(name="New connection", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Connect to PostgreSQL")
+        environment = ui.wait_for_node(name="Local", role=pyatspi.ROLE_PUSH_BUTTON)
+        actions = environment.queryAction()
+        names = [actions.getName(index).lower() for index in range(actions.nActions)]
+        assert any(name in {"click", "activate", "press", "toggle", "default.activate"} for name in names), (
+            f"Environment has no accessible activation action: {names!r}"
+        )
+
     def connect_dialog_cancel_stops_a_hanging_connection(database, base):
-        import socket
         import threading
 
-        server = socket.socket()
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind(("127.0.0.1", 5432))
-        server.listen(4)
-        held = []
-        threading.Thread(target=lambda: [held.append(server.accept()) for _ in range(4)], daemon=True).start()
-        try:
+        with gtk_port_lock.listening_on(5432) as server:
+            held = []
+            threading.Thread(target=lambda: [held.append(server.accept()) for _ in range(4)], daemon=True).start()
             ui.invoke(ui.wait_for_node(name="New connection", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node(name="Connect to PostgreSQL")
             set_entry("Host", "127.0.0.1")
@@ -359,8 +365,6 @@ GLib.MainLoop().run()
             ui.wait_for_node_containing("Connection cancelled")
             ui.wait_for_node(name="Connect", role=pyatspi.ROLE_PUSH_BUTTON)
             assert ui.find_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON) is None
-        finally:
-            server.close()
 
         # A cancelled candidate must not take ownership of the workspace or
         # prevent a subsequent saved-connection switch from using its own DB.
@@ -1510,6 +1514,7 @@ GLib.MainLoop().run()
         grid_paste_preserves_multiline_text_and_sibling_rows,
         test_connection_reports_success_in_the_dialog,
         test_connection_reports_failure_in_the_dialog,
+        connection_dialog_environment_choice_is_operable,
         connect_dialog_cancel_stops_a_hanging_connection,
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
