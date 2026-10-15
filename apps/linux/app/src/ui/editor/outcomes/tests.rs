@@ -1,13 +1,15 @@
 use super::super::session_mode::StatementTarget;
 use super::super::stream_pages::{StreamTerminal, StreamedResult};
 use super::{
-    BatchErrorPolicy, ScriptRunResult, StatementIdentity, StatementOutcomeKind, StreamUpdate, run_statements,
-    run_statements_with_stream, sql_preview, statement_identity, summary_label,
+    BatchErrorPolicy, ScriptRunResult, StatementIdentity, StatementOutcomeKind, StatementRun, StreamUpdate,
+    run_statements, run_statements_with_stream, sql_preview, statement_identity, summary_label,
 };
 use super::{statement_subject, uses_drop_down};
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+type ReceivedRows = std::sync::Arc<std::sync::Mutex<Vec<(u64, Vec<tablepro_core::Value>)>>>;
 
 #[test]
 fn a_statement_is_named_by_its_verb_and_the_table_it_touches() {
@@ -458,7 +460,7 @@ fn cursor_target(
 
 fn streamed_update(
     counters: std::sync::Arc<CursorCounters>,
-    received: std::sync::Arc<std::sync::Mutex<Vec<(u64, Vec<tablepro_core::Value>)>>>,
+    received: ReceivedRows,
 ) -> impl FnMut(StreamUpdate) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>> {
     move |update| {
         let counters = counters.clone();
@@ -571,17 +573,19 @@ async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
     let counters = std::sync::Arc::new(CursorCounters::default());
     let received = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let result = run_statements_with_stream(
-        cursor_target(
-            vec![Ok(cursor_page(&[1, 2], true)), Ok(cursor_page(&[3], false))],
-            counters.clone(),
-        ),
-        vec!["SELECT id FROM items".into()],
-        "postgres",
-        &Default::default(),
-        &crate::services::operation_control::bounded(30),
-        BatchErrorPolicy::StopScript,
+        StatementRun {
+            target: cursor_target(
+                vec![Ok(cursor_page(&[1, 2], true)), Ok(cursor_page(&[3], false))],
+                counters.clone(),
+            ),
+            statements: vec!["SELECT id FROM items".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            succeeded: |_: &str| {},
+        },
         streamed_update(counters.clone(), received.clone()),
-        |_| {},
     )
     .await;
 
@@ -604,24 +608,26 @@ async fn a_late_cursor_error_keeps_prior_pages_and_rolls_back_the_snapshot() {
     let counters = std::sync::Arc::new(CursorCounters::default());
     let received = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let result = run_statements_with_stream(
-        cursor_target(
-            vec![
-                Ok(cursor_page(&[1], true)),
-                Err(tablepro_core::DriverError::Query {
-                    message: "later page failed".into(),
-                    sqlstate: Some("XX000".into()),
-                    position: None,
-                }),
-            ],
-            counters.clone(),
-        ),
-        vec!["SELECT id FROM items".into()],
-        "postgres",
-        &Default::default(),
-        &crate::services::operation_control::bounded(30),
-        BatchErrorPolicy::StopScript,
+        StatementRun {
+            target: cursor_target(
+                vec![
+                    Ok(cursor_page(&[1], true)),
+                    Err(tablepro_core::DriverError::Query {
+                        message: "later page failed".into(),
+                        sqlstate: Some("XX000".into()),
+                        position: None,
+                    }),
+                ],
+                counters.clone(),
+            ),
+            statements: vec!["SELECT id FROM items".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            succeeded: |_: &str| {},
+        },
         streamed_update(counters.clone(), received.clone()),
-        |_| {},
     )
     .await;
 
@@ -635,14 +641,16 @@ async fn a_late_cursor_error_keeps_prior_pages_and_rolls_back_the_snapshot() {
 async fn cancelling_page_delivery_closes_the_cursor_and_rolls_back() {
     let counters = std::sync::Arc::new(CursorCounters::default());
     let result = run_statements_with_stream(
-        cursor_target(vec![Ok(cursor_page(&[1], true))], counters.clone()),
-        vec!["SELECT id FROM items".into()],
-        "postgres",
-        &Default::default(),
-        &crate::services::operation_control::bounded(30),
-        BatchErrorPolicy::StopScript,
+        StatementRun {
+            target: cursor_target(vec![Ok(cursor_page(&[1], true))], counters.clone()),
+            statements: vec!["SELECT id FROM items".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            succeeded: |_: &str| {},
+        },
         reject_stream_page(),
-        |_| {},
     )
     .await;
 
@@ -741,7 +749,7 @@ fn exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values() {
         },
         sql_preview: "SELECT id FROM items".into(),
         elapsed_ms: 0,
-        kind: StatementOutcomeKind::Streamed(streamed.clone()),
+        kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
         pinned: false,
     };
     let (grid_sender, receiver) = relm4::channel::<crate::ui::grid::GridMsg>();

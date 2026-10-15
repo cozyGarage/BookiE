@@ -746,8 +746,8 @@ fn page_fetcher_factory(
         })
     });
     std::sync::Arc::new(move |cancel| {
-        let mut fetcher = crate::services::export_pages::page_fetcher(conn.clone(), plan.clone(), run.clone(), cancel);
-        crate::ui::export_dialog::PageFetcher::new(move || fetcher(), || Ok(()))
+        let fetcher = crate::services::export_pages::page_fetcher(conn.clone(), plan.clone(), run.clone(), cancel);
+        crate::ui::export_dialog::PageFetcher::new(fetcher, || Ok(()))
     })
 }
 

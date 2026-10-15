@@ -28,19 +28,17 @@ pub(crate) fn query_cursor_export_factory_for_target(
     runner: crate::services::export_pages::PageRunner,
 ) -> crate::ui::export_dialog::PageFetcherFactory {
     Arc::new(move |cancel| {
-        let cursor = Arc::new(tokio::sync::Mutex::new(None));
-        let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let fetch = export_page_fetcher(
-            target.clone(),
-            cursor.clone(),
-            finished.clone(),
-            runner.clone(),
-            sql.clone(),
-            params.clone(),
+        let source = ExportPageSource {
+            target: target.clone(),
+            cursor: Arc::new(tokio::sync::Mutex::new(None)),
+            finished: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            runner: runner.clone(),
+            sql: sql.clone(),
+            params: params.clone(),
             timeout_secs,
-            cancel,
-        );
-        let finish = export_page_finalizer(cursor, finished, runner.clone());
+        };
+        let fetch = export_page_fetcher(source.clone(), cancel);
+        let finish = export_page_finalizer(source.cursor, source.finished, source.runner);
         crate::ui::export_dialog::PageFetcher::new(fetch, finish)
     })
 }
@@ -57,16 +55,30 @@ fn export_page_runner() -> crate::services::export_pages::PageRunner {
     })
 }
 
-fn export_page_fetcher(
+#[derive(Clone)]
+struct ExportPageSource {
     target: StatementTarget,
     cursor: Arc<tokio::sync::Mutex<Option<StatementCursor>>>,
     finished: Arc<std::sync::atomic::AtomicBool>,
     runner: crate::services::export_pages::PageRunner,
-    query_sql: String,
-    query_params: Vec<Value>,
+    sql: String,
+    params: Vec<Value>,
     timeout_secs: u32,
+}
+
+fn export_page_fetcher(
+    source: ExportPageSource,
     cancel: CancellationToken,
 ) -> impl FnMut() -> Result<Option<RowPage>, ExportError> + Send {
+    let ExportPageSource {
+        target,
+        cursor,
+        finished,
+        runner,
+        sql: query_sql,
+        params: query_params,
+        timeout_secs,
+    } = source;
     move || {
         if finished.load(std::sync::atomic::Ordering::Acquire) {
             return Ok(None);

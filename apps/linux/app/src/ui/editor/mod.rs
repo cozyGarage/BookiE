@@ -43,7 +43,7 @@ pub use schema::{SQL_KEYWORDS, build_schema_buffer, derive_tab_label, update_sch
 pub(crate) use session_mode::query_cursor_export_factory;
 pub use statement_cursor::grammar_for;
 
-use outcomes::{ScriptRunResult, StreamUpdate, clear_box, render_outcomes, run_statements_with_stream};
+use outcomes::{ScriptRunResult, StatementRun, StreamUpdate, clear_box, render_outcomes, run_statements_with_stream};
 use run_generation::{RunGeneration, RunTerminal};
 use schema::{apply_editor_preferences, apply_editor_scheme};
 use sql_text::toggle_line_comment;
@@ -124,7 +124,7 @@ pub struct StatementIdentity {
 #[derive(Debug, Clone)]
 pub enum StatementOutcomeKind {
     Rows(Vec<std::sync::Arc<QueryResult>>),
-    Streamed(StreamedResult),
+    Streamed(Box<StreamedResult>),
     Error(String),
     NotRun,
 }
@@ -1066,14 +1066,16 @@ impl SqlEditor {
                         }) as std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>
                     };
                     let msg = match run_statements_with_stream(
-                        target.clone(),
-                        statements,
-                        &driver_id,
-                        &parameter_values,
-                        &control,
-                        error_policy,
+                        StatementRun {
+                            target: target.clone(),
+                            statements,
+                            driver_id: &driver_id,
+                            parameter_values: &parameter_values,
+                            control: &control,
+                            error_policy,
+                            succeeded,
+                        },
                         stream_update,
-                        succeeded,
                     )
                     .await
                     {

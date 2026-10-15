@@ -31,22 +31,12 @@ pub struct StreamedResult {
     pub(super) export: Option<crate::ui::export_dialog::StreamExportRequest>,
 }
 
+#[derive(Default)]
 pub(super) struct StreamPageCache {
     pages: VecDeque<(u64, Arc<QueryResult>)>,
     columns: Option<Vec<ColumnInfo>>,
     next_page: u64,
     total_rows: usize,
-}
-
-impl Default for StreamPageCache {
-    fn default() -> Self {
-        Self {
-            pages: VecDeque::new(),
-            columns: None,
-            next_page: 0,
-            total_rows: 0,
-        }
-    }
 }
 
 impl StreamPageCache {

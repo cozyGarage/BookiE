@@ -97,6 +97,16 @@ pub(crate) enum StreamUpdate {
     },
 }
 
+pub(crate) struct StatementRun<'a, S> {
+    pub(crate) target: super::session_mode::StatementTarget,
+    pub(crate) statements: Vec<String>,
+    pub(crate) driver_id: &'a str,
+    pub(crate) parameter_values: &'a std::collections::HashMap<String, tablepro_core::Value>,
+    pub(crate) control: &'a OperationControl,
+    pub(crate) error_policy: BatchErrorPolicy,
+    pub(crate) succeeded: S,
+}
+
 #[cfg(test)]
 pub(crate) async fn run_statements(
     target: super::session_mode::StatementTarget,
@@ -108,59 +118,44 @@ pub(crate) async fn run_statements(
     succeeded: impl Fn(&str),
 ) -> ScriptRunResult {
     run_statements_with_stream(
-        target,
-        statements,
-        driver_id,
-        parameter_values,
-        control,
-        error_policy,
+        StatementRun {
+            target,
+            statements,
+            driver_id,
+            parameter_values,
+            control,
+            error_policy,
+            succeeded,
+        },
         |_| async { false },
-        succeeded,
     )
     .await
 }
 
-pub(crate) async fn run_statements_with_stream<F, Fut>(
-    target: super::session_mode::StatementTarget,
-    statements: Vec<String>,
-    driver_id: &str,
-    parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
-    control: &OperationControl,
-    error_policy: BatchErrorPolicy,
-    stream_update: F,
-    succeeded: impl Fn(&str),
-) -> ScriptRunResult
+pub(crate) async fn run_statements_with_stream<S, F, Fut>(run: StatementRun<'_, S>, stream_update: F) -> ScriptRunResult
 where
+    S: Fn(&str),
     F: FnMut(StreamUpdate) -> Fut,
     Fut: Future<Output = bool>,
 {
-    crate::services::approval_wait::track(run_tracked_statements(
+    crate::services::approval_wait::track(run_tracked_statements(run, stream_update)).await
+}
+
+async fn run_tracked_statements<S, F, Fut>(run: StatementRun<'_, S>, mut stream_update: F) -> ScriptRunResult
+where
+    S: Fn(&str),
+    F: FnMut(StreamUpdate) -> Fut,
+    Fut: Future<Output = bool>,
+{
+    let StatementRun {
         target,
         statements,
         driver_id,
         parameter_values,
         control,
         error_policy,
-        stream_update,
         succeeded,
-    ))
-    .await
-}
-
-async fn run_tracked_statements<F, Fut>(
-    target: super::session_mode::StatementTarget,
-    statements: Vec<String>,
-    driver_id: &str,
-    parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
-    control: &OperationControl,
-    error_policy: BatchErrorPolicy,
-    mut stream_update: F,
-    succeeded: impl Fn(&str),
-) -> ScriptRunResult
-where
-    F: FnMut(StreamUpdate) -> Fut,
-    Fut: Future<Output = bool>,
-{
+    } = run;
     if statements.is_empty() {
         return ScriptRunResult::Completed(Vec::new());
     }
@@ -179,31 +174,28 @@ where
         let bound = match bind_statement_for_run(&sql, driver_id, parameter_values, identity, preview.clone()) {
             Ok(bound) => bound,
             Err(reason) => {
-                out.push(reason);
+                out.push(*reason);
                 aborted = stops_on_error;
                 continue;
             }
         };
-        match stream_statement_if_supported(
-            &target,
+        let attempt = StreamAttempt {
+            target: &target,
             single_statement,
             driver_id,
-            &bound.sql,
-            &bound.values,
+            bound_sql: &bound.sql,
+            bound_params: &bound.values,
             identity,
-            preview.clone(),
-            &sql,
+            preview: preview.clone(),
+            sql: &sql,
             started,
             control,
-            &mut stream_update,
-            &succeeded,
-        )
-        .await
-        {
+        };
+        match stream_statement_if_supported(attempt, &mut stream_update, &succeeded).await {
             Ok(Some(result)) => return result,
             Ok(None) => {}
             Err(outcome) => {
-                out.push(outcome);
+                out.push(*outcome);
                 return ScriptRunResult::Completed(out);
             }
         }
@@ -212,13 +204,7 @@ where
             Err(result) => return result,
         };
         aborted |= stops_on_error && matches!(kind, StatementOutcomeKind::Error(_));
-        out.push(StatementOutcome {
-            identity,
-            sql_preview: preview,
-            elapsed_ms: elapsed_without_approval_wait(started, waited_before),
-            kind,
-            pinned: false,
-        });
+        out.push(statement_outcome(identity, preview, started, waited_before, kind));
     }
     ScriptRunResult::Completed(out)
 }
@@ -229,6 +215,22 @@ fn not_run_outcome(identity: StatementIdentity, preview: String) -> StatementOut
         sql_preview: preview,
         elapsed_ms: 0,
         kind: StatementOutcomeKind::NotRun,
+        pinned: false,
+    }
+}
+
+fn statement_outcome(
+    identity: StatementIdentity,
+    preview: String,
+    started: std::time::Instant,
+    waited_before: std::time::Duration,
+    kind: StatementOutcomeKind,
+) -> StatementOutcome {
+    StatementOutcome {
+        identity,
+        sql_preview: preview,
+        elapsed_ms: elapsed_without_approval_wait(started, waited_before),
+        kind,
         pinned: false,
     }
 }
@@ -246,15 +248,15 @@ fn bind_statement_for_run(
     parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
     identity: StatementIdentity,
     preview: String,
-) -> Result<crate::services::query_parameters::BoundStatement, StatementOutcome> {
+) -> Result<crate::services::query_parameters::BoundStatement, Box<StatementOutcome>> {
     crate::services::query_parameters::bind_statement(sql, driver_id, parameter_values).map_err(|reason| {
-        StatementOutcome {
+        Box::new(StatementOutcome {
             identity,
             sql_preview: preview,
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Error(reason),
             pinned: false,
-        }
+        })
     })
 }
 
@@ -279,37 +281,47 @@ async fn query_statement(
     }
 }
 
-async fn stream_statement_if_supported<F, Fut>(
-    target: &super::session_mode::StatementTarget,
+struct StreamAttempt<'a> {
+    target: &'a super::session_mode::StatementTarget,
     single_statement: bool,
-    driver_id: &str,
-    bound_sql: &str,
-    bound_params: &[tablepro_core::Value],
+    driver_id: &'a str,
+    bound_sql: &'a str,
+    bound_params: &'a [tablepro_core::Value],
     identity: StatementIdentity,
     preview: String,
-    sql: &str,
+    sql: &'a str,
     started: std::time::Instant,
-    control: &OperationControl,
+    control: &'a OperationControl,
+}
+
+async fn stream_statement_if_supported<F, Fut>(
+    attempt: StreamAttempt<'_>,
     stream_update: &mut F,
     succeeded: &impl Fn(&str),
-) -> Result<Option<ScriptRunResult>, StatementOutcome>
+) -> Result<Option<ScriptRunResult>, Box<StatementOutcome>>
 where
     F: FnMut(StreamUpdate) -> Fut,
     Fut: Future<Output = bool>,
 {
-    if !single_statement || !stream_candidate(bound_sql, driver_id) {
+    if !attempt.single_statement || !stream_candidate(attempt.bound_sql, attempt.driver_id) {
         return Ok(None);
     }
-    match target.open_query_cursor(bound_sql, bound_params, control).await {
+    match attempt
+        .target
+        .open_query_cursor(attempt.bound_sql, attempt.bound_params, attempt.control)
+        .await
+    {
         Ok(Some(cursor)) => Ok(Some(
             run_streamed_statement(
-                cursor,
-                identity,
-                preview,
-                bound_sql.into(),
-                bound_params.to_vec(),
-                sql,
-                control,
+                StreamExecution {
+                    cursor,
+                    identity: attempt.identity,
+                    preview: attempt.preview,
+                    bound_sql: attempt.bound_sql.into(),
+                    bound_params: attempt.bound_params.to_vec(),
+                    sql: attempt.sql,
+                    control: attempt.control,
+                },
                 stream_update,
                 succeeded,
             )
@@ -318,13 +330,13 @@ where
         Ok(None) => Ok(None),
         Err(DriverError::Cancelled) => Ok(Some(ScriptRunResult::Cancelled)),
         Err(DriverError::TimedOut) => Ok(Some(ScriptRunResult::TimedOut)),
-        Err(error) => Err(StatementOutcome {
-            identity,
-            sql_preview: preview,
-            elapsed_ms: started.elapsed().as_millis(),
-            kind: StatementOutcomeKind::Error(failure_message(&error, sql, bound_sql)),
+        Err(error) => Err(Box::new(StatementOutcome {
+            identity: attempt.identity,
+            sql_preview: attempt.preview,
+            elapsed_ms: attempt.started.elapsed().as_millis(),
+            kind: StatementOutcomeKind::Error(failure_message(&error, attempt.sql, attempt.bound_sql)),
             pinned: false,
-        }),
+        })),
     }
 }
 
@@ -340,14 +352,18 @@ fn stream_candidate(sql: &str, driver_id: &str) -> bool {
         && !facts.contains_ddl()
 }
 
-async fn run_streamed_statement<F, Fut>(
+struct StreamExecution<'a> {
     cursor: super::session_mode::StatementCursor,
     identity: StatementIdentity,
     preview: String,
     bound_sql: String,
     bound_params: Vec<tablepro_core::Value>,
-    sql: &str,
-    control: &OperationControl,
+    sql: &'a str,
+    control: &'a OperationControl,
+}
+
+async fn run_streamed_statement<F, Fut>(
+    execution: StreamExecution<'_>,
     stream_update: &mut F,
     succeeded: &impl Fn(&str),
 ) -> ScriptRunResult
@@ -355,6 +371,15 @@ where
     F: FnMut(StreamUpdate) -> Fut,
     Fut: Future<Output = bool>,
 {
+    let StreamExecution {
+        cursor,
+        identity,
+        preview,
+        bound_sql,
+        bound_params,
+        sql,
+        control,
+    } = execution;
     let started = stream_update(StreamUpdate::Started {
         identity,
         sql_preview: preview,
@@ -558,9 +583,9 @@ fn build_streamed_result_widget(
     if let Some(page) = stream_terminal_page(result, outcome.identity.statement_index) {
         let label = gtk::Label::new(Some(&crate::tr!("Status")));
         page_switcher.append_page(&page, Some(&label));
-        page_switcher.set_current_page(Some((page_switcher.n_pages() - 1) as u32));
+        page_switcher.set_current_page(Some(page_switcher.n_pages() - 1));
     } else if page_switcher.n_pages() > 0 {
-        page_switcher.set_current_page(Some((page_switcher.n_pages() - 1) as u32));
+        page_switcher.set_current_page(Some(page_switcher.n_pages() - 1));
     }
     let progress = crate::tr!("Received {rows} rows · {pages} pages")
         .replace("{rows}", &result.total_rows.to_string())

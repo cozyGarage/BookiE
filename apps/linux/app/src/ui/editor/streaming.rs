@@ -17,7 +17,7 @@ impl ActiveStream {
             identity: self.identity,
             sql_preview: self.sql_preview.clone(),
             elapsed_ms: 0,
-            kind: StatementOutcomeKind::Streamed(self.cache.snapshot(terminal, self.export_query.clone())),
+            kind: StatementOutcomeKind::Streamed(Box::new(self.cache.snapshot(terminal, self.export_query.clone()))),
             pinned: false,
         }
     }
@@ -148,7 +148,7 @@ impl SqlEditor {
                 .set_label(&crate::tr!("done in {ms} ms").replace("{ms}", &elapsed.max(0).to_string())),
             StreamTerminal::Cancelled => self.status.set_label(&crate::tr!("cancelled")),
             StreamTerminal::TimedOut => self.status.set_label(&crate::tr!("timed out")),
-            StreamTerminal::Failed(message) => self.status.set_label(&message),
+            StreamTerminal::Failed(message) => self.status.set_label(message),
             StreamTerminal::Loading => self.status.set_label(&crate::tr!("error")),
         }
         let shown = self.pinned.show(outcomes);
