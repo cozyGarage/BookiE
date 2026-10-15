@@ -402,13 +402,7 @@ impl tablepro_core::Session for CursorSession {
         self.counters.fetched.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         match self.pages.pop_front() {
             Some(Ok(page)) => Ok(page),
-            Some(Err(error)) => {
-                self.cursor_open = false;
-                self.counters
-                    .cursor_open
-                    .store(false, std::sync::atomic::Ordering::SeqCst);
-                Err(error)
-            }
+            Some(Err(error)) => Err(error),
             None => Err(tablepro_core::DriverError::Internal("no scripted cursor page".into())),
         }
     }
