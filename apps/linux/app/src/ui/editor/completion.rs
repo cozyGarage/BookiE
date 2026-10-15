@@ -577,6 +577,54 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_reference_splits_on_dots_outside_quotes() {
+        use super::super::completion_identifiers::split_table_reference;
+        let grammar = Some(SqlGrammar::PostgreSql);
+        assert_eq!(
+            split_table_reference(r#""odd.schema"."a.b""#, grammar),
+            Some((Some("odd.schema".into()), "a.b".into()))
+        );
+        assert_eq!(
+            split_table_reference(r#"public."a""b""#, grammar),
+            Some((Some("public".into()), "a\"b".into()))
+        );
+    }
+
+    #[test]
+    fn quoted_names_with_spaces_unicode_and_reserved_words_keep_their_identity() {
+        use super::super::completion_identifiers::split_table_reference;
+        let grammar = Some(SqlGrammar::PostgreSql);
+        for (reference, schema, table) in [
+            (r#""my schema"."order items""#, "my schema", "order items"),
+            (r#""café"."Таблица""#, "café", "Таблица"),
+            (r#"public."select""#, "public", "select"),
+        ] {
+            assert_eq!(
+                split_table_reference(reference, grammar),
+                Some((Some(schema.into()), table.into()))
+            );
+        }
+        assert_ne!(
+            table_key(r#"public."Select""#, grammar),
+            table_key("public.select", grammar)
+        );
+        assert_eq!(
+            table_key(r#"public."select""#, grammar),
+            table_key("PUBLIC.SELECT", grammar)
+        );
+        assert_ne!(table_key(r#""Café""#, grammar), table_key("café", grammar));
+    }
+
+    #[test]
+    fn invalid_neighbours_of_quoted_names_do_not_panic_or_merge() {
+        let grammar = Some(SqlGrammar::PostgreSql);
+        for invalid in [r#""unterminated"#, r#""a"""#, "", "."] {
+            assert!(table_key(invalid, grammar).is_none());
+        }
+        assert_ne!(table_key(r#""a".b"#, grammar), table_key(r#""a.b""#, grammar));
+    }
+
     fn index_with(tables: &[(&str, &[&str])]) -> SchemaIndex {
         let mut index = SchemaIndex::default();
         for (table, columns) in tables {
