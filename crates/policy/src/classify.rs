@@ -631,28 +631,6 @@ fn set_expr_tables(body: &SetExpr) -> Vec<String> {
     }
 }
 
-pub(crate) fn expr_writes(expr: &Expr) -> bool {
-    match expr {
-        Expr::Subquery(q) => classify_query(q).class.is_write(),
-        Expr::BinaryOp { left, right, .. } => expr_writes(left) || expr_writes(right),
-        Expr::UnaryOp { expr, .. } => expr_writes(expr),
-        Expr::Nested(e) => expr_writes(e),
-        Expr::Case {
-            operand,
-            conditions,
-            else_result,
-            ..
-        } => {
-            operand.as_ref().is_some_and(|e| expr_writes(e))
-                || conditions
-                    .iter()
-                    .any(|c| expr_writes(&c.condition) || expr_writes(&c.result))
-                || else_result.as_ref().is_some_and(|e| expr_writes(e))
-        }
-        _ => false,
-    }
-}
-
 fn object_name_strings(name: &ObjectName) -> Vec<String> {
     vec![name.to_string()]
 }
