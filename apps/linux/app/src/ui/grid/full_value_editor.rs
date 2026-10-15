@@ -646,6 +646,47 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
+    fn invalid_json_stages_nothing_and_valid_apply_keeps_json_typed() {
+        gtk::init().unwrap();
+        adw::init().unwrap();
+        let parent = adw::Window::new();
+        parent.present();
+        let (sender, receiver) = relm4::channel::<super::super::GridMsg>();
+        let dialog = present(
+            &parent,
+            "payload",
+            r#"{"before":1}"#,
+            EditContext {
+                row_position: 2,
+                col_index: 1,
+                row_key: vec![Value::Int(9)],
+                nullable: true,
+                kind: FullValueKind::Json,
+                sender,
+            },
+        );
+        let root = dialog.child().unwrap().upcast_ref::<gtk::Widget>().clone();
+        let buffer = text_view(&root).buffer();
+        assert!(button(&root, &crate::tr!("Format JSON")).is_sensitive());
+        buffer.set_text("{invalid");
+        button(&root, &crate::tr!("Apply")).emit_clicked();
+        assert!(receiver.recv().now_or_never().flatten().is_none());
+        buffer.set_text(r#"{"after":2}"#);
+        button(&root, &crate::tr!("Apply")).emit_clicked();
+        assert!(matches!(
+            receiver.recv().now_or_never().flatten(),
+            Some(super::super::GridMsg::CellEditedValue {
+                row_position: 2,
+                col_index: 1,
+                value: Value::Json(value),
+                row_key,
+            }) if value["after"] == 2 && row_key == vec![Value::Int(9)]
+        ));
+        parent.close();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
     fn set_null_stages_null_and_cancel_stages_nothing() {
         gtk::init().unwrap();
         adw::init().unwrap();
