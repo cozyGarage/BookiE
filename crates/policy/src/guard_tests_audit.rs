@@ -1,10 +1,13 @@
 use super::*;
 
-struct UnresolvedWriteAuditSink;
+struct UnresolvedWriteAuditSink {
+    events: Arc<Mutex<Vec<AuditEvent>>>,
+}
 
 #[async_trait]
 impl AuditSink for UnresolvedWriteAuditSink {
     async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
+        self.events.lock().unwrap().push(event.clone());
         if event.phase == AuditRecordPhase::Intent && event.operation_class.is_write() {
             return Err(AuditError::UnresolvedWrite);
         }
@@ -792,6 +795,7 @@ async fn local_unaudited_write_requires_explicit_opt_in() {
 async fn unresolved_write_refusal_cannot_use_the_local_unaudited_write_exception() {
     let executes = Arc::new(AtomicUsize::new(0));
     let state = Arc::new(AuditState::new());
+    let events = Arc::new(Mutex::new(Vec::new()));
     let mut policy = PolicyConfig::default();
     policy
         .environments
@@ -805,7 +809,7 @@ async fn unresolved_write_refusal_cannot_use_the_local_unaudited_write_exception
             Environment::Local,
             policy,
             Arc::new(AutoApproveSink),
-            Arc::new(UnresolvedWriteAuditSink),
+            Arc::new(UnresolvedWriteAuditSink { events: events.clone() }),
             state.clone(),
         ),
     );
@@ -822,6 +826,15 @@ async fn unresolved_write_refusal_cannot_use_the_local_unaudited_write_exception
         .await
         .expect_err("the same connection remains blocked");
     assert_eq!(executes.load(Ordering::SeqCst), 0);
+    let denied = events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|event| {
+            event.phase == AuditRecordPhase::Outcome && event.terminal_status == AuditTerminalStatus::Denied
+        })
+        .count();
+    assert_eq!(denied, 2);
 }
 
 #[tokio::test]

@@ -503,6 +503,22 @@ impl PolicyGuard {
             .await;
         if matches!(result, Err(AuditError::UnresolvedWrite)) {
             self.ctx.audit_state.disable_governed_writes();
+            if self
+                .record_outcome(
+                    operation,
+                    AuditOutcome {
+                        terminal_status: AuditTerminalStatus::Denied,
+                        transaction_outcome: AuditTransactionOutcome::NotApplicable,
+                        rows_affected: None,
+                        error_category: Some(AuditErrorCategory::Policy),
+                        duration_ms: 0,
+                    },
+                )
+                .await
+                .is_err()
+            {
+                self.ctx.audit_state.disable_after_audit_failure();
+            }
         }
         result
     }
