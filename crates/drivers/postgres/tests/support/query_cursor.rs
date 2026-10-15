@@ -180,7 +180,53 @@ async fn query_cursor_preserves_prior_pages_when_a_later_fetch_errors() {
 
     let later = session.fetch_query_cursor_page_controlled(cursor, &no_timeout()).await;
     assert!(matches!(later, Err(DriverError::Query { .. })), "{later:?}");
-    assert!(!session.is_usable());
+    assert!(session.is_usable(), "a statement error keeps the session");
+    session
+        .close_query_cursor_controlled(cursor, &no_timeout())
+        .await
+        .expect("closing a failed cursor sends nothing");
+    session
+        .query_params_controlled("ROLLBACK", &[], &no_timeout())
+        .await
+        .unwrap();
+    let after = session
+        .query_params_controlled("SELECT 1::bigint", &[], &no_timeout())
+        .await
+        .unwrap();
+    assert_eq!(after.rows, vec![vec![Value::Int(1)]]);
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_cursor_query_with_a_typo_keeps_the_session_and_its_temp_tables() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let mut session = connection.open_session().await.unwrap();
+    session
+        .query_params_controlled("CREATE TEMP TABLE kept (x int)", &[], &no_timeout())
+        .await
+        .unwrap();
+    session
+        .query_params_controlled("BEGIN READ ONLY ISOLATION LEVEL REPEATABLE READ", &[], &no_timeout())
+        .await
+        .unwrap();
+
+    let opened = session
+        .open_query_cursor_controlled("SELECT nope FROM kept", &[], &no_timeout())
+        .await;
+
+    assert!(matches!(opened, Err(DriverError::Query { .. })), "{opened:?}");
+    assert!(session.is_usable());
+    session
+        .query_params_controlled("ROLLBACK", &[], &no_timeout())
+        .await
+        .unwrap();
+    let count = session
+        .query_params_controlled("SELECT count(*)::bigint FROM kept", &[], &no_timeout())
+        .await
+        .unwrap();
+    assert_eq!(count.rows, vec![vec![Value::Int(0)]]);
     session.close().await.unwrap();
 }
 

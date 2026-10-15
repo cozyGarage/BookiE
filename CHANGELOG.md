@@ -126,6 +126,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Fixed
 - Structure column expanders now point right when collapsed and down when open.
+- In a Session editor tab, a PostgreSQL SELECT with a typo or an error partway through no longer ends the session and its temporary tables, and Export all rows of such a result reads through the same session.
 
 - PostgreSQL completion keeps quoted case, dots, spaces and embedded quotes distinct when loading table columns.
 - PostgreSQL errors no longer replay queries or writes merely because their error code resembles a stale prepared plan.
