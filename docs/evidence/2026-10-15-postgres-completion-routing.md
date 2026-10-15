@@ -26,3 +26,7 @@ No search_path resolution, new dependency, core contract or policy rule is intro
 ## Remaining UI qualification
 
 Exact proposal activation is separate from metadata identity. The current GtkSourceView word provider and its editor-buffer fallback do not establish complete dialect-quoted insertion. [#934](https://github.com/cozyGarage/BookiE/issues/934) records that source-backed gap and the required actual-provider regression. This change does not claim installed completion activation for arbitrary quoted identifiers.
+
+## CI observation
+
+The post-merge linux sync for #921 reached Forgejo run 485 at `73ac5c6cf7e286ae80b64b3f4371524a81132587`. Only the Ubuntu 24.04 floor job failed; Debian floor passed. The captured log did not expose a GTK scenario or assertion failure. A minimal shell probe confirmed the summary pipeline can exit before printing its fallback tail under `set -euo pipefail`. [#937](https://github.com/cozyGarage/BookiE/issues/937) tracks that diagnostic defect, and [#556](https://github.com/cozyGarage/BookiE/issues/556#issuecomment-6193746472) holds the run observation. The failure was not counted as a passing gate or attributed to PostgreSQL. This follow-up requires its own exact-head gate.

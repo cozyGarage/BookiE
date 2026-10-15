@@ -147,6 +147,8 @@ Existing issue follow-ups:
 
 - Retry recovery: [#900](https://github.com/cozyGarage/BookiE/issues/900), merged [#921](https://github.com/cozyGarage/BookiE/pull/921), with [native reproduction and boundary evidence](../../evidence/2026-10-15-postgres-safe-cache-retry.md).
 - Completion identity: [#901](https://github.com/cozyGarage/BookiE/issues/901) and concurrent [#922](https://github.com/cozyGarage/BookiE/pull/922); verified remaining routing work is [#933](https://github.com/cozyGarage/BookiE/issues/933), with [regression evidence](../../evidence/2026-10-15-postgres-completion-routing.md).
+- Native completion fixture acceptance is also tracked by [#923](https://github.com/cozyGarage/BookiE/issues/923); tests from [#932](https://github.com/cozyGarage/BookiE/pull/932) are retained in the follow-up.
+- CI diagnostic suppression discovered during validation is tracked by [#937](https://github.com/cozyGarage/BookiE/issues/937).
 - Actual GTK proposal insertion needs separate qualification in [#934](https://github.com/cozyGarage/BookiE/issues/934).
 
 The original source pins and case status above describe the research snapshot. Use the linked implementation evidence and issue states for subsequent changes.
