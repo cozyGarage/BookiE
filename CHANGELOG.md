@@ -235,6 +235,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - After a transaction start is interrupted with an unknown outcome (for example an MCP write preview that times out), the connection stops accepting governed writes until it is replaced, instead of carrying on as if nothing had happened.
 - PostgreSQL column completion now tells apart a quoted mixed-case table such as "Users" from users, and keeps dots and doubled quotes inside quoted names.
 - Browsing or querying a MongoDB collection no longer holds a whole sample of documents in memory while it works out the column types, which could exhaust memory on collections with very large documents.
+- Browse filters Contains, Starts with and Ends with now match a literal % or _ typed in the search on SQLite, DuckDB and SQL Server, and a typed [ on SQL Server, instead of treating them as wildcards or returning wrong rows.
 
 ### Security
 
