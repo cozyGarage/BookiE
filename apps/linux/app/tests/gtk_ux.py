@@ -1090,10 +1090,11 @@ GLib.MainLoop().run()
             ui.wait_for_node_containing("Connection lost — reconnecting")
         finally:
             set_bastion_enabled(True)
-        # The monitor uses a five-second initial backoff. Allow that bounded
-        # attempt to finish; then the stale-session and replacement-session
-        # assertions below provide the observable recovery proof.
-        time.sleep(6)
+        # The monitor retries with backoff, so wait until it reports the
+        # connection back instead of assuming one attempt succeeds in a fixed
+        # time. The stale-session and replacement-session assertions below
+        # provide the observable recovery proof.
+        ui.wait_for_node_containing("Connection lost — reconnecting", present=False, timeout=90)
 
         # The old dedicated session must be retired even though the saved
         # connection has already reconnected. A write through that stale
