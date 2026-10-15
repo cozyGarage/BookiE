@@ -96,13 +96,13 @@ For the deterministic direct Unix-socket fixture:
 
 It exposes a PostgreSQL 16 socket directory from a disposable container and verifies query, write, pre-dispatch cancellation, close, and reconnect without opening a TCP database port.
 
-For the backup runner:
+For the backup and restore runner:
 
 ```bash
 ./scripts/test-pg-dump.sh
 ```
 
-It runs `pg_dump` from the `postgres:18-alpine` image through a wrapper, so the host needs Docker but no PostgreSQL client. Set `TABLEPRO_PG_DUMP_IMAGE` to test another client version. Forgejo runs it as the `pg-dump` job.
+It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through wrappers, so the host needs Docker but no PostgreSQL client. Set `TABLEPRO_PG_DUMP_IMAGE` to test another client version. Forgejo runs it as the `pg-dump` job.
 
 ## Manual verification after the 0.2 feature sprint
 

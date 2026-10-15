@@ -50,6 +50,17 @@ impl ClientTool {
             server_major,
         })
     }
+
+    pub(crate) fn require_at_most(&self, server_major: u32) -> Result<(), DumpError> {
+        if self.major <= server_major {
+            return Ok(());
+        }
+        Err(DumpError::ToolTooNew {
+            tool: self.name.clone(),
+            tool_major: self.major,
+            server_major,
+        })
+    }
 }
 
 fn executable(path: &Path) -> bool {
@@ -98,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn an_older_client_than_the_server_is_refused() {
+    fn client_and_server_versions_must_be_compatible() {
         let tool = ClientTool {
             name: "pg_dump".into(),
             path: PathBuf::from("/usr/bin/pg_dump"),
@@ -106,5 +117,7 @@ mod tests {
         };
         assert!(tool.require_at_least(16).is_ok());
         assert!(matches!(tool.require_at_least(17), Err(DumpError::ToolTooOld { .. })));
+        assert!(tool.require_at_most(16).is_ok());
+        assert!(matches!(tool.require_at_most(15), Err(DumpError::ToolTooNew { .. })));
     }
 }

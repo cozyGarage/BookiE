@@ -10,11 +10,17 @@ pub enum DumpError {
         tool_major: u32,
         server_major: u32,
     },
-    #[error("this connection cannot be used for a backup: {0}")]
+    #[error("{tool} {tool_major} is newer than the server ({server_major}); install the matching client")]
+    ToolTooNew {
+        tool: String,
+        tool_major: u32,
+        server_major: u32,
+    },
+    #[error("this connection cannot be used for a backup or restore: {0}")]
     Unsupported(&'static str),
     #[error("the backup file location must be an absolute path")]
-    OutputNotAbsolute,
-    #[error("the backup was cancelled")]
+    PathNotAbsolute,
+    #[error("the operation was cancelled")]
     Cancelled,
     #[error("{tool} failed{}: {stderr}", status.map(|code| format!(" with exit code {code}")).unwrap_or_default())]
     Failed {

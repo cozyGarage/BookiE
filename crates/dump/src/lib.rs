@@ -5,5 +5,5 @@ mod run;
 mod tool;
 
 pub use error::DumpError;
-pub use postgres::{DumpFormat, PgDumpRequest, pg_dump};
+pub use postgres::{DumpFormat, PgDumpRequest, PgRestoreRequest, pg_dump, pg_restore};
 pub use tool::ClientTool;

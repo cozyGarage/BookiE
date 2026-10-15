@@ -8,7 +8,7 @@ use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
 
 use crate::passfile::PassFile;
-use crate::run::{Finished, run_supervised};
+use crate::run::run_supervised;
 use crate::{ClientTool, DumpError};
 
 const APPLICATION_NAME: &str = "BookiE backup";
@@ -27,6 +27,13 @@ pub struct PgDumpRequest<'a> {
     pub server_major: u32,
 }
 
+#[derive(Debug)]
+pub struct PgRestoreRequest<'a> {
+    pub options: &'a ConnectOptions,
+    pub input: &'a Path,
+    pub server_major: u32,
+}
+
 pub async fn pg_dump(
     tool: &ClientTool,
     request: PgDumpRequest<'_>,
@@ -35,48 +42,62 @@ pub async fn pg_dump(
 ) -> Result<(), DumpError> {
     tool.require_at_least(request.server_major)?;
     if !request.output.is_absolute() {
-        return Err(DumpError::OutputNotAbsolute);
+        return Err(DumpError::PathNotAbsolute);
     }
-    let mut env = libpq_env(request.options)?;
-    let passfile = if request.options.password.expose_secret().is_empty() {
+    let partial = partial_path(request.output);
+    let args = dump_args(request.format, &partial);
+    if let Err(error) = run_pg_tool(tool, request.options, args, runtime_dir, cancel).await {
+        let _ = std::fs::remove_file(&partial);
+        return Err(error);
+    }
+    std::fs::rename(&partial, request.output)?;
+    Ok(())
+}
+
+pub async fn pg_restore(
+    tool: &ClientTool,
+    request: PgRestoreRequest<'_>,
+    runtime_dir: &Path,
+    cancel: CancellationToken,
+) -> Result<(), DumpError> {
+    tool.require_at_most(request.server_major)?;
+    if !request.input.is_absolute() {
+        return Err(DumpError::PathNotAbsolute);
+    }
+    if !request.input.is_file() {
+        return Err(DumpError::Io(std::io::Error::from(std::io::ErrorKind::NotFound)));
+    }
+    let args = restore_args(request.input);
+    run_pg_tool(tool, request.options, args, runtime_dir, cancel).await
+}
+
+async fn run_pg_tool(
+    tool: &ClientTool,
+    options: &ConnectOptions,
+    args: Vec<OsString>,
+    runtime_dir: &Path,
+    cancel: CancellationToken,
+) -> Result<(), DumpError> {
+    let mut env = libpq_env(options)?;
+    let passfile = if options.password.expose_secret().is_empty() {
         None
     } else {
-        Some(PassFile::create(runtime_dir, &request.options.password)?)
+        Some(PassFile::create(runtime_dir, &options.password)?)
     };
     if let Some(passfile) = &passfile {
         env.push(("PGPASSFILE", passfile.path().as_os_str().to_owned()));
     }
-    let partial = partial_path(request.output);
     let mut command = Command::new(&tool.path);
-    command.env_clear().envs(env).args(dump_args(request.format, &partial));
-    let result = run_supervised(command, cancel).await;
-    drop(passfile);
-    finish(tool, request.options, result, &partial, request.output)
-}
-
-fn finish(
-    tool: &ClientTool,
-    options: &ConnectOptions,
-    result: Result<Finished, DumpError>,
-    partial: &Path,
-    output: &Path,
-) -> Result<(), DumpError> {
-    let outcome = result.and_then(|finished| {
-        if finished.status.success() {
-            return Ok(());
-        }
-        Err(DumpError::Failed {
-            tool: tool.name.clone(),
-            status: finished.status.code(),
-            stderr: scrub(&finished.stderr, options),
-        })
-    });
-    if let Err(error) = outcome {
-        let _ = std::fs::remove_file(partial);
-        return Err(error);
+    command.env_clear().envs(env).args(args);
+    let finished = run_supervised(command, cancel).await?;
+    if finished.status.success() {
+        return Ok(());
     }
-    std::fs::rename(partial, output)?;
-    Ok(())
+    Err(DumpError::Failed {
+        tool: tool.name.clone(),
+        status: finished.status.code(),
+        stderr: scrub(&finished.stderr, options),
+    })
 }
 
 fn dump_args(format: DumpFormat, partial: &Path) -> Vec<OsString> {
@@ -87,6 +108,21 @@ fn dump_args(format: DumpFormat, partial: &Path) -> Vec<OsString> {
     let mut file = OsString::from("--file=");
     file.push(partial.as_os_str());
     vec!["--no-password".into(), format.into(), file]
+}
+
+fn restore_args(input: &Path) -> Vec<OsString> {
+    [
+        "--no-password",
+        "--dbname=",
+        "--clean",
+        "--if-exists",
+        "--single-transaction",
+        "--exit-on-error",
+    ]
+    .into_iter()
+    .map(OsString::from)
+    .chain([input.as_os_str().to_owned()])
+    .collect()
 }
 
 fn partial_path(output: &Path) -> PathBuf {

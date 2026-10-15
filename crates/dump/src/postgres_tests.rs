@@ -169,3 +169,52 @@ async fn a_client_older_than_the_server_does_not_run() {
     assert!(matches!(outcome, Err(DumpError::ToolTooOld { .. })), "{outcome:?}");
     assert!(!output.exists());
 }
+
+#[tokio::test]
+async fn a_restore_runs_in_one_transaction_and_stops_at_the_first_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let log = dir.path().join("args.log");
+    let tool = fake_tool(
+        dir.path(),
+        &format!(r#"echo "$* PGDATABASE=$PGDATABASE" > "{}""#, log.display()),
+    );
+    let options = options();
+    let input = dir.path().join("appdb.dump");
+    std::fs::write(&input, "archive").unwrap();
+    let request = PgRestoreRequest {
+        options: &options,
+        input: &input,
+        server_major: 18,
+    };
+
+    pg_restore(&tool, request, dir.path(), CancellationToken::new())
+        .await
+        .unwrap();
+
+    let args = std::fs::read_to_string(&log).unwrap();
+    assert_eq!(
+        args.trim(),
+        format!(
+            "--no-password --dbname= --clean --if-exists --single-transaction --exit-on-error {} PGDATABASE=appdb",
+            input.display()
+        )
+    );
+}
+
+#[tokio::test]
+async fn a_restore_client_newer_than_the_server_does_not_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let marker = dir.path().join("ran");
+    let tool = fake_tool(dir.path(), &format!(r#"touch "{}""#, marker.display()));
+    let options = options();
+    let input = dir.path().join("appdb.dump");
+    std::fs::write(&input, "archive").unwrap();
+    let request = PgRestoreRequest {
+        options: &options,
+        input: &input,
+        server_major: 16,
+    };
+    let outcome = pg_restore(&tool, request, dir.path(), CancellationToken::new()).await;
+    assert!(matches!(outcome, Err(DumpError::ToolTooNew { .. })), "{outcome:?}");
+    assert!(!marker.exists());
+}
