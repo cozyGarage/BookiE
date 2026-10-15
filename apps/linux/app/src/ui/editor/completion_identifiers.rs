@@ -58,6 +58,7 @@ fn quoted_name(raw: &str, grammar: Option<SqlGrammar>) -> Option<String> {
 }
 
 pub(crate) fn table_key(text: &str, grammar: Option<SqlGrammar>) -> Option<String> {
+    let grammar = Some(grammar.unwrap_or(SqlGrammar::PostgreSql));
     let (mut schema, mut table) = split_table_reference(text, grammar)?;
     if grammar != Some(SqlGrammar::PostgreSql) {
         schema = schema.map(|name| name.to_ascii_lowercase());

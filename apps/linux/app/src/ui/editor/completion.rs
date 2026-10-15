@@ -533,7 +533,10 @@ mod tests {
 
     #[test]
     fn table_key_keeps_the_schema_and_ignores_quoting_and_case() {
-        assert_eq!(table_key("public.\"Users\"", None).as_deref(), Some("public\0users"));
+        assert_eq!(
+            table_key("public.\"Users\"", Some(SqlGrammar::Sqlite)).as_deref(),
+            Some("public\0users")
+        );
         assert_eq!(
             table_key("`orders`", Some(SqlGrammar::MySql)).as_deref(),
             Some("orders")

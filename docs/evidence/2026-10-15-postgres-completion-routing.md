@@ -17,6 +17,12 @@ Alias/qualifier parsing, bare-table suggestions, catalog refresh, browse-tab cac
 - Unit cases cover users/Users, dots, doubled quotes, spaces, Unicode, reserved words, quoted aliases, whitespace around dots and invalid neighbors.
 - Dialect quoting round trips cover PostgreSQL, MySQL, SQL Server, SQLite and ClickHouse.
 - Native PostgreSQL fixture creates six exact names and compares controlled column fetches with native SELECT result metadata. This fixture pins existing driver behavior; the app parsing and publication changes fix the defect.
-- Narrow completion checks and the native catalog fixture passed locally during development. Full local and exact-head CI results are recorded on the PR before merge.
+- Completion and dialect round-trip checks, metadata-reference unit cases and the native catalog fixture passed locally.
+- Full local preflight, app-specific Clippy, 46 isolated GTK widget tests, documentation links, issue ledger and ignored-test inventory checks passed.
+- Exact-head GitHub and Forgejo results are recorded on the PR before merge.
 
 No search_path resolution, new dependency, core contract or policy rule is introduced.
+
+## Remaining UI qualification
+
+Exact proposal activation is separate from metadata identity. The current GtkSourceView word provider and its editor-buffer fallback do not establish complete dialect-quoted insertion. [#934](https://github.com/cozyGarage/BookiE/issues/934) records that source-backed gap and the required actual-provider regression. This change does not claim installed completion activation for arbitrary quoted identifiers.
