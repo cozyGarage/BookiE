@@ -5,6 +5,7 @@
 Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the user-facing map for that development line since the last tagged package, [0.1.5](#015---2026-09-27). Compare: [`linux-v0.1.5...linux`](https://github.com/cozyGarage/BookiE/compare/linux-v0.1.5...linux). Entries stay here until the next tagged release.
 
 ### Added
+- Large SQL query results stream in bounded pages, can be pinned, and can be fully exported by running the guarded query again.
 - CSV imports into PostgreSQL, MySQL/MariaDB and SQLite can preserve explicit auto-increment values from mapped columns; generated columns remain database-owned.
 - Editable text columns open a bounded full-value dialog; Apply stages the exact multiline text, while Set to NULL remains a separate action.
 - At narrow window widths, the navigation sidebar collapses and the Fold block and Unfold all toolbar buttons hide so the remaining editor controls stay in view; their keyboard shortcuts still work.
@@ -236,6 +237,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - PostgreSQL column completion now tells apart a quoted mixed-case table such as "Users" from users, and keeps dots and doubled quotes inside quoted names.
 - Browsing or querying a MongoDB collection no longer holds a whole sample of documents in memory while it works out the column types, which could exhaust memory on collections with very large documents.
 - The grid's Set to NULL action now refuses read-only cells and columns that do not accept NULL, with a message, instead of staging a change that would fail on save.
+- SQLite databases whose file names contain a question mark or a percent sign now open that exact file instead of a different one.
 
 ### Security
 
