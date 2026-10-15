@@ -335,6 +335,8 @@ struct CursorCounters {
     fetched: std::sync::atomic::AtomicUsize,
     closed: std::sync::atomic::AtomicUsize,
     rolled_back: std::sync::atomic::AtomicUsize,
+    transaction_open: std::sync::atomic::AtomicBool,
+    cursor_open: std::sync::atomic::AtomicBool,
 }
 
 struct CursorSession {
@@ -354,9 +356,19 @@ impl tablepro_core::Session for CursorSession {
     ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
         if sql.starts_with("BEGIN READ ONLY") {
             self.transaction_open = true;
+            self.counters
+                .transaction_open
+                .store(true, std::sync::atomic::Ordering::SeqCst);
         }
         if sql == "ROLLBACK" {
             self.transaction_open = false;
+            self.cursor_open = false;
+            self.counters
+                .transaction_open
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+            self.counters
+                .cursor_open
+                .store(false, std::sync::atomic::Ordering::SeqCst);
             self.counters
                 .rolled_back
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -375,6 +387,9 @@ impl tablepro_core::Session for CursorSession {
         _control: &tablepro_core::OperationControl,
     ) -> Result<tablepro_core::QueryCursorId, tablepro_core::DriverError> {
         self.cursor_open = true;
+        self.counters
+            .cursor_open
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         self.counters.opened.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(tablepro_core::QueryCursorId::new())
     }
@@ -389,6 +404,9 @@ impl tablepro_core::Session for CursorSession {
             Some(Ok(page)) => Ok(page),
             Some(Err(error)) => {
                 self.cursor_open = false;
+                self.counters
+                    .cursor_open
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
                 Err(error)
             }
             None => Err(tablepro_core::DriverError::Internal("no scripted cursor page".into())),
@@ -401,6 +419,9 @@ impl tablepro_core::Session for CursorSession {
         _control: &tablepro_core::OperationControl,
     ) -> Result<(), tablepro_core::DriverError> {
         self.cursor_open = false;
+        self.counters
+            .cursor_open
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         self.counters.closed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
@@ -658,6 +679,31 @@ async fn cancelling_page_delivery_closes_the_cursor_and_rolls_back() {
     assert_eq!(counters.fetched.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn cancelling_during_fetch_rolls_back_and_keeps_the_session_usable() {
+    let counters = std::sync::Arc::new(CursorCounters::default());
+    let target = cursor_target(vec![Err(tablepro_core::DriverError::Cancelled)], counters.clone());
+    let result = run_statements_with_stream(
+        StatementRun {
+            target: target.clone(),
+            statements: vec!["SELECT id FROM items".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            succeeded: |_: &str| {},
+        },
+        |_update| std::future::ready(true),
+    )
+    .await;
+
+    assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Cancelled)));
+    assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert!(!counters.transaction_open.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(!counters.cursor_open.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(matches!(target.session_state().await, Some((_, false, true))));
 }
 
 #[test]
