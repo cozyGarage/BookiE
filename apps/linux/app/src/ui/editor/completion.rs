@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use tablepro_core::sql_syntax::SqlGrammar;
+use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptToken, ScriptTokenKind};
 
 #[derive(Default)]
 pub struct SchemaIndex {
@@ -87,6 +88,7 @@ pub enum Scope {
 
 const KEY_SEPARATOR: char = '\u{1f}';
 
+#[derive(Clone)]
 pub struct ReferencePart {
     pub text: String,
     pub quoted: bool,
@@ -127,6 +129,12 @@ pub fn split_reference(reference: &str) -> Vec<ReferencePart> {
     }
 }
 
+pub fn parse_reference_parts(reference: &str, grammar: Option<SqlGrammar>) -> Option<Vec<ReferencePart>> {
+    let tokens = lexical_tokens(reference, grammar)?;
+    let (parts, consumed) = parse_identifier_chain(reference, &tokens, 0, grammar)?;
+    (consumed == tokens.len()).then(|| parts.into_iter().map(|(part, _)| part).collect())
+}
+
 pub fn table_key(table: &str) -> String {
     split_reference(table)
         .into_iter()
@@ -159,7 +167,7 @@ pub fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Ve
         }
         Scope::Tables => {
             out.extend(index.tables.iter().cloned());
-            out.extend(bare_table_names(&index.tables));
+            out.extend(bare_table_names(&index.tables, index.grammar));
         }
         Scope::TablesAndColumns(tables) => {
             for table in &tables {
@@ -173,7 +181,7 @@ pub fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Ve
                 }
             }
             out.extend(index.tables.iter().cloned());
-            out.extend(bare_table_names(&index.tables));
+            out.extend(bare_table_names(&index.tables, index.grammar));
         }
     }
 
@@ -184,18 +192,26 @@ pub fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Ve
 
 pub fn referenced_tables(sql: &str, cursor_byte: usize, grammar: Option<SqlGrammar>) -> Vec<String> {
     let statement = statement_around(sql, cursor_byte, grammar);
-    table_references(statement.text)
+    let Some(tokens) = lexical_tokens(statement.text, grammar) else {
+        return Vec::new();
+    };
+    table_references(statement.text, &tokens, grammar)
         .into_iter()
         .map(|(table, _)| table)
         .collect()
 }
 
-fn bare_table_names(tables: &[String]) -> Vec<String> {
+fn bare_table_names(tables: &[String], grammar: Option<SqlGrammar>) -> Vec<String> {
     tables
         .iter()
-        .filter_map(|table| table.rsplit('.').next())
-        .filter(|name| !name.is_empty())
-        .map(str::to_string)
+        .filter_map(|table| parse_reference_parts(table, grammar).and_then(|parts| parts.last().cloned()))
+        .map(|part| {
+            if part.quoted {
+                quote_identifier(grammar, &part.text)
+            } else {
+                part.text
+            }
+        })
         .collect()
 }
 
@@ -242,12 +258,15 @@ fn floor_char_boundary(text: &str, mut index: usize) -> usize {
 }
 
 fn scope_for(prefix: &str, statement: &str, index: &SchemaIndex) -> Scope {
-    let references = table_references(statement);
-    let keyword = last_keyword(prefix);
+    let Some(tokens) = lexical_tokens(statement, index.grammar) else {
+        return Scope::TablesAndColumns(Vec::new());
+    };
+    let references = table_references(statement, &tokens, index.grammar);
+    let keyword = last_keyword(statement, &tokens, prefix.len());
     let in_table_position = keyword
         .as_deref()
         .is_some_and(|keyword| TABLE_KEYWORDS.contains(&keyword));
-    if let Some(qualifier) = trailing_qualifier(prefix) {
+    if let Some(qualifier) = trailing_qualifier(statement, &tokens, prefix.len(), index.grammar) {
         if in_table_position {
             return Scope::Tables;
         }
@@ -255,7 +274,7 @@ fn scope_for(prefix: &str, statement: &str, index: &SchemaIndex) -> Scope {
         if index.knows_columns(&resolved) {
             return Scope::ColumnsOf(resolved);
         }
-        return Scope::ColumnsOf(qualifier);
+        return Scope::ColumnsOf(qualifier.text);
     }
     if in_table_position {
         return Scope::Tables;
@@ -312,84 +331,229 @@ const KEYWORDS: [&str; 44] = [
     "returning",
 ];
 
-fn last_keyword(prefix: &str) -> Option<String> {
-    let mut last = None;
-    for word in words(prefix) {
-        let lowered = word.to_ascii_lowercase();
-        if KEYWORDS.contains(&lowered.as_str()) {
-            last = Some(lowered);
-        }
+fn last_keyword(text: &str, tokens: &[ScriptToken], boundary: usize) -> Option<String> {
+    tokens
+        .iter()
+        .filter(|token| token.range.end <= boundary)
+        .filter_map(|token| {
+            if token.kind != ScriptTokenKind::Word {
+                return None;
+            }
+            let lowered = token_text(text, token).to_ascii_lowercase();
+            KEYWORDS.contains(&lowered.as_str()).then_some(lowered)
+        })
+        .next_back()
+}
+
+fn trailing_qualifier(
+    text: &str,
+    tokens: &[ScriptToken],
+    boundary: usize,
+    grammar: Option<SqlGrammar>,
+) -> Option<ReferencePart> {
+    let mut tokens = tokens.iter().filter(|token| token.range.end <= boundary).rev();
+    let dot = tokens.next()?;
+    if token_text(text, dot) != "." {
+        return None;
     }
-    last
+    identifier_part(text, tokens.next()?, grammar)
 }
 
-fn trailing_qualifier(prefix: &str) -> Option<String> {
-    let trailing: String = prefix
-        .chars()
-        .rev()
-        .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '.' || *c == '"')
-        .collect::<Vec<char>>()
-        .into_iter()
-        .rev()
-        .collect();
-    let (qualifier, _) = trailing.rsplit_once('.')?;
-    let qualifier = qualifier.rsplit('.').next().unwrap_or(qualifier);
-    let cleaned = qualifier.trim_matches('"');
-    (!cleaned.is_empty()).then(|| cleaned.to_string())
-}
-
-fn resolve_qualifier(qualifier: &str, references: &[(String, Option<String>)]) -> String {
-    let lowered = qualifier.to_ascii_lowercase();
+fn resolve_qualifier(qualifier: &ReferencePart, references: &[(String, Option<ReferencePart>)]) -> String {
+    let key = identifier_key(qualifier);
     for (table, alias) in references {
-        if alias.as_deref().map(str::to_ascii_lowercase) == Some(lowered.clone()) {
+        if alias.as_ref().is_some_and(|alias| identifier_key(alias) == key) {
             return table.clone();
         }
     }
     for (table, _) in references {
-        if bare_name(&table_key(table)) == lowered {
+        if bare_name(&table_key(table)) == key {
             return table.clone();
         }
     }
-    qualifier.to_string()
+    qualifier.text.clone()
 }
 
-fn table_references(statement: &str) -> Vec<(String, Option<String>)> {
-    let tokens: Vec<&str> = words(statement).collect();
-    let mut out: Vec<(String, Option<String>)> = Vec::new();
+fn table_references(
+    statement: &str,
+    tokens: &[ScriptToken],
+    grammar: Option<SqlGrammar>,
+) -> Vec<(String, Option<ReferencePart>)> {
+    let mut out = Vec::new();
     let mut index = 0usize;
     while index < tokens.len() {
-        let lowered = tokens[index].to_ascii_lowercase();
-        let expects_table = matches!(lowered.as_str(), "from" | "join" | "update" | "into" | "truncate")
-            || (lowered == "table" && index > 0 && tokens[index - 1].eq_ignore_ascii_case("alter"));
-        if !expects_table {
+        if !expects_table(statement, tokens, index) {
             index += 1;
             continue;
         }
-        let Some(table) = tokens.get(index + 1) else { break };
-        if KEYWORDS.contains(&table.to_ascii_lowercase().as_str()) {
+        if let Some((reference, alias, consumed)) = parse_table_reference(statement, tokens, index + 1, grammar) {
+            out.push((reference, alias));
+            index = consumed;
+        } else {
             index += 1;
-            continue;
         }
-        let mut alias = None;
-        let mut consumed = index + 2;
-        if let Some(next) = tokens.get(consumed) {
-            if next.eq_ignore_ascii_case("as") {
-                alias = tokens.get(consumed + 1).map(ToString::to_string);
-                consumed += 2;
-            } else if !KEYWORDS.contains(&next.to_ascii_lowercase().as_str()) {
-                alias = Some(next.to_string());
-                consumed += 1;
-            }
-        }
-        out.push((table.to_string(), alias));
-        index = consumed;
     }
     out
 }
 
-fn words(text: &str) -> impl Iterator<Item = &str> {
-    text.split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.' || c == '"'))
-        .filter(|word| !word.is_empty())
+fn expects_table(text: &str, tokens: &[ScriptToken], index: usize) -> bool {
+    if tokens[index].kind != ScriptTokenKind::Word {
+        return false;
+    }
+    let word = token_text(text, &tokens[index]);
+    if matches!(
+        word.to_ascii_lowercase().as_str(),
+        "from" | "join" | "update" | "into" | "truncate"
+    ) {
+        return true;
+    }
+    word.eq_ignore_ascii_case("table")
+        && index > 0
+        && tokens[index - 1].kind == ScriptTokenKind::Word
+        && token_text(text, &tokens[index - 1]).eq_ignore_ascii_case("alter")
+}
+
+fn parse_table_reference(
+    text: &str,
+    tokens: &[ScriptToken],
+    start: usize,
+    grammar: Option<SqlGrammar>,
+) -> Option<(String, Option<ReferencePart>, usize)> {
+    let (parts, mut next) = parse_identifier_chain(text, tokens, start, grammar)?;
+    if parts.len() > 2 {
+        return None;
+    }
+    let reference = parts.iter().map(|part| part.1.as_str()).collect::<Vec<_>>().join(".");
+    let alias = if token_word(text, tokens.get(next), "as") {
+        if !tokens_separated(tokens, next - 1, next) {
+            return None;
+        }
+        let alias = identifier_part(text, tokens.get(next + 1)?, grammar)?;
+        if !tokens_separated(tokens, next, next + 1) {
+            return None;
+        }
+        next += 2;
+        Some(alias)
+    } else if is_identifier(tokens.get(next)) && !token_is_keyword(text, tokens.get(next)) {
+        if !tokens_separated(tokens, next - 1, next) {
+            return None;
+        }
+        let alias = identifier_part(text, tokens.get(next)?, grammar)?;
+        next += 1;
+        Some(alias)
+    } else {
+        None
+    };
+    Some((reference, alias, next))
+}
+
+fn tokens_separated(tokens: &[ScriptToken], left: usize, right: usize) -> bool {
+    tokens
+        .get(left)
+        .zip(tokens.get(right))
+        .is_some_and(|(left, right)| left.range.end < right.range.start)
+}
+
+fn parse_identifier_chain(
+    text: &str,
+    tokens: &[ScriptToken],
+    start: usize,
+    grammar: Option<SqlGrammar>,
+) -> Option<(Vec<(ReferencePart, String)>, usize)> {
+    let first = tokens.get(start)?;
+    let mut parts = vec![(
+        identifier_part(text, first, grammar)?,
+        token_text(text, first).to_string(),
+    )];
+    let mut next = start + 1;
+    while tokens.get(next).is_some_and(|token| token_text(text, token) == ".") {
+        let identifier = tokens.get(next + 1)?;
+        let spelling = token_text(text, identifier).to_string();
+        parts.push((identifier_part(text, identifier, grammar)?, spelling));
+        next += 2;
+    }
+    Some((parts, next))
+}
+
+fn lexical_tokens(text: &str, grammar: Option<SqlGrammar>) -> Option<Vec<ScriptToken>> {
+    let grammar = grammar.unwrap_or(SqlGrammar::PostgreSql);
+    let plan = ScriptPlan::build(text, grammar, LexicalSettings::default_for(grammar));
+    if !plan.diagnostics().is_empty() {
+        return None;
+    }
+    Some(
+        plan.tokens(0..text.len())
+            .filter(|token| !token.kind.is_trivia())
+            .collect(),
+    )
+}
+
+fn identifier_part(text: &str, token: &ScriptToken, grammar: Option<SqlGrammar>) -> Option<ReferencePart> {
+    let raw = token_text(text, token);
+    match token.kind {
+        ScriptTokenKind::Word if !KEYWORDS.contains(&raw.to_ascii_lowercase().as_str()) => Some(ReferencePart {
+            text: raw.to_string(),
+            quoted: false,
+        }),
+        ScriptTokenKind::QuotedIdentifier => decode_quoted_identifier(raw, grammar.unwrap_or(SqlGrammar::PostgreSql))
+            .map(|text| ReferencePart { text, quoted: true }),
+        _ => None,
+    }
+}
+
+fn decode_quoted_identifier(raw: &str, grammar: SqlGrammar) -> Option<String> {
+    let (open, close) = match (raw.chars().next()?, raw.chars().last()?) {
+        ('"', '"') => ('"', '"'),
+        ('`', '`') => ('`', '`'),
+        ('[', ']') => ('[', ']'),
+        _ => return None,
+    };
+    let inner = raw.get(open.len_utf8()..raw.len().checked_sub(close.len_utf8())?)?;
+    let escaped_close = format!("{close}{close}");
+    let decoded = inner.replace(&escaped_close, &close.to_string());
+    if grammar == SqlGrammar::ClickHouse {
+        return Some(decoded.replace("\\\\", "\\"));
+    }
+    Some(decoded)
+}
+
+fn token_text<'a>(text: &'a str, token: &ScriptToken) -> &'a str {
+    &text[token.range.clone()]
+}
+
+fn token_word(text: &str, token: Option<&ScriptToken>, expected: &str) -> bool {
+    token.is_some_and(|token| {
+        token.kind == ScriptTokenKind::Word && token_text(text, token).eq_ignore_ascii_case(expected)
+    })
+}
+
+fn token_is_keyword(text: &str, token: Option<&ScriptToken>) -> bool {
+    token.is_some_and(|token| {
+        token.kind == ScriptTokenKind::Word && KEYWORDS.contains(&token_text(text, token).to_ascii_lowercase().as_str())
+    })
+}
+
+fn is_identifier(token: Option<&ScriptToken>) -> bool {
+    token.is_some_and(|token| matches!(token.kind, ScriptTokenKind::Word | ScriptTokenKind::QuotedIdentifier))
+}
+
+fn identifier_key(part: &ReferencePart) -> String {
+    if part.quoted {
+        part.text.clone()
+    } else {
+        part.text.to_ascii_lowercase()
+    }
+}
+
+fn quote_identifier(grammar: Option<SqlGrammar>, name: &str) -> String {
+    let driver_id = match grammar.unwrap_or(SqlGrammar::PostgreSql) {
+        SqlGrammar::PostgreSql => "postgres",
+        SqlGrammar::MySql => "mysql",
+        SqlGrammar::Sqlite => "sqlite",
+        SqlGrammar::MsSql => "mssql",
+        SqlGrammar::ClickHouse => "clickhouse",
+    };
+    tablepro_core::sql_dialect::quote_ident(driver_id, name)
 }
 
 #[cfg(test)]
@@ -449,6 +613,11 @@ mod tests {
         let cursor = sql.find('|').expect("cursor marker");
         let cleaned = sql.replace('|', "");
         candidate_words(&cleaned, cursor, &index())
+    }
+
+    fn candidates_with(sql: &str, index: &SchemaIndex) -> Vec<String> {
+        let cursor = sql.find('|').expect("cursor marker");
+        candidate_words(&sql.replace('|', ""), cursor, index)
     }
 
     #[test]
@@ -527,6 +696,58 @@ mod tests {
             referenced_tables(sql, sql.len(), Some(SqlGrammar::PostgreSql)),
             vec!["public.users".to_string(), "orders".into()]
         );
+    }
+
+    #[test]
+    fn quoted_schema_table_and_alias_are_preserved_in_references() {
+        let sql = "SELECT x. FROM public.\"with space\" AS x";
+        assert_eq!(
+            referenced_tables(sql, sql.len(), Some(SqlGrammar::PostgreSql)),
+            vec!["public.\"with space\"".to_string()]
+        );
+    }
+
+    #[test]
+    fn quoted_alias_and_whitespace_around_qualified_names_resolve_columns() {
+        let mut index = index_with(&[("public.\"with space\"", &["id", "display name"])]);
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        let sql = "SELECT x.| FROM public . \"with space\" AS x";
+        let cursor = sql.find('|').expect("cursor marker");
+        let words = candidate_words(&sql.replace('|', ""), cursor, &index);
+        assert_eq!(words, vec!["display name".to_string(), "id".into()]);
+    }
+
+    #[test]
+    fn quoted_table_suggestions_keep_literal_dots_and_case() {
+        let mut index = SchemaIndex {
+            tables: vec!["\"Public.Dot\".\"User.Table\"".into()],
+            grammar: Some(SqlGrammar::PostgreSql),
+            ..SchemaIndex::default()
+        };
+        index.set_columns("\"Public.Dot\".\"User.Table\"", vec!["id".into()]);
+        let words = candidates_with("SELECT * FROM |", &index);
+        assert!(words.contains(&"\"Public.Dot\".\"User.Table\"".to_string()));
+        assert!(words.contains(&"\"User.Table\"".to_string()));
+        assert!(index.knows_columns("\"Public.Dot\".\"User.Table\""));
+    }
+
+    #[test]
+    fn a_quoted_alias_is_resolved_with_its_exact_spelling() {
+        let mut index = index_with(&[("public.\"Users\"", &["Id"]), ("public.users", &["id"])]);
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        let words = candidates_with("SELECT \"Alias\".| FROM public.\"Users\" AS \"Alias\"", &index);
+        assert_eq!(words, vec!["Id".to_string()]);
+        let words = candidates_with("SELECT alias.| FROM public.\"Users\" AS \"Alias\"", &index);
+        assert!(words.is_empty());
+    }
+
+    #[test]
+    fn malformed_qualified_table_references_are_not_used_for_metadata() {
+        let sql = "SELECT * FROM public..users WHERE |";
+        let cursor = sql.find('|').expect("cursor marker");
+        assert!(referenced_tables(&sql.replace('|', ""), cursor, Some(SqlGrammar::PostgreSql)).is_empty());
+        assert!(referenced_tables("SELECT * FROM db.public.users", 25, Some(SqlGrammar::PostgreSql)).is_empty());
+        assert!(referenced_tables("SELECT * FROM \"users\"alias", 25, Some(SqlGrammar::PostgreSql)).is_empty());
     }
 
     #[test]

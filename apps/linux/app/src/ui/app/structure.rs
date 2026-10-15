@@ -797,7 +797,8 @@ impl App {
         }
         match result {
             Ok((tables, views)) => {
-                self.table_names = tables.iter().chain(&views).map(|table| table.name.clone()).collect();
+                let driver_id = self.current_driver_id.as_deref().unwrap_or("postgres");
+                self.table_names = super::schema_index::completion_catalog_names(driver_id, &tables, &views);
                 self.sidebar_views = views;
                 self.repopulate_sidebar(&tables);
                 self.rebuild_schema_buffer();

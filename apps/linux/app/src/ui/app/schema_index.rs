@@ -20,6 +20,7 @@ impl App {
                 .map(|table| index.request(table))
                 .collect()
         };
+        let grammar = self.schema_index.borrow().grammar;
         if pending.is_empty() {
             return;
         };
@@ -34,13 +35,15 @@ impl App {
                         if token.is_cancelled() {
                             break;
                         }
-                        let (schema, table) = split_table_reference(&request.table);
-                        let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
-                        let result = conn
-                            .fetch_columns_controlled(schema.as_deref(), &table, &control)
-                            .await
-                            .map(|columns| columns.into_iter().map(|column| column.name).collect())
-                            .map_err(|_| ());
+                        let result = if let Some((schema, table)) = split_table_reference(&request.table, grammar) {
+                            let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
+                            conn.fetch_columns_controlled(schema.as_deref(), &table, &control)
+                                .await
+                                .map(|columns| columns.into_iter().map(|column| column.name).collect())
+                                .map_err(|_| ())
+                        } else {
+                            Err(())
+                        };
                         sender_clone.input(AppMsg::SchemaColumnsFetched(request, result));
                     }
                 })
@@ -109,64 +112,149 @@ impl App {
                 if columns.is_empty() {
                     continue;
                 }
-                let reference = match model.schema() {
-                    Some(schema) => format!("{schema}.{}", model.table()),
-                    None => model.table().to_string(),
-                };
+                let reference = completion_relation_reference(
+                    self.current_driver_id.as_deref().unwrap_or("postgres"),
+                    model.schema(),
+                    model.table(),
+                );
                 index.set_columns(&reference, columns);
             }
         }
     }
 }
 
-fn split_table_reference(reference: &str) -> (Option<String>, String) {
-    let mut parts: Vec<String> = crate::ui::editor::split_reference(reference)
+fn split_table_reference(
+    reference: &str,
+    grammar: Option<tablepro_core::sql_syntax::SqlGrammar>,
+) -> Option<(Option<String>, String)> {
+    let mut parts = crate::ui::editor::parse_reference_parts(reference, grammar)?
         .into_iter()
         .map(|part| part.text)
-        .collect();
-    if parts.len() >= 2 && parts.iter().all(|part| !part.is_empty()) {
-        let table = parts.pop().unwrap_or_default();
-        return (parts.pop(), table);
+        .collect::<Vec<_>>();
+    if parts.iter().any(String::is_empty) || parts.len() > 2 {
+        return None;
     }
-    (None, parts.join("."))
+    let table = parts.pop()?;
+    Some((parts.pop(), table))
+}
+
+pub(super) fn completion_table_reference(driver_id: &str, table: &tablepro_core::TableInfo) -> String {
+    completion_relation_reference(driver_id, table.schema.as_deref(), &table.name)
+}
+
+pub(super) fn completion_catalog_names(
+    driver_id: &str,
+    tables: &[tablepro_core::TableInfo],
+    views: &[tablepro_core::TableInfo],
+) -> Vec<String> {
+    tables
+        .iter()
+        .chain(views)
+        .map(|table| completion_table_reference(driver_id, table))
+        .collect()
+}
+
+fn completion_relation_reference(driver_id: &str, schema: Option<&str>, name: &str) -> String {
+    let name = tablepro_core::sql_dialect::quote_ident(driver_id, name);
+    schema.map_or(name.clone(), |schema| {
+        format!("{}.{name}", tablepro_core::sql_dialect::quote_ident(driver_id, schema))
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::split_table_reference;
+    use super::{completion_table_reference, split_table_reference};
+    use tablepro_core::TableInfo;
+    use tablepro_core::sql_syntax::SqlGrammar;
 
     #[test]
     fn a_qualified_reference_splits_into_schema_and_table() {
         assert_eq!(
-            split_table_reference("public.users"),
-            (Some("public".to_string()), "users".to_string())
+            split_table_reference("public.users", Some(SqlGrammar::PostgreSql)),
+            Some((Some("public".to_string()), "users".to_string()))
         );
         assert_eq!(
-            split_table_reference("\"public\".\"Users\""),
-            (Some("public".to_string()), "Users".to_string())
+            split_table_reference("\"public\".\"Users\"", Some(SqlGrammar::PostgreSql)),
+            Some((Some("public".to_string()), "Users".to_string()))
         );
     }
 
     #[test]
     fn a_bare_reference_has_no_schema() {
-        assert_eq!(split_table_reference("users"), (None, "users".to_string()));
-        assert_eq!(split_table_reference("`orders`"), (None, "orders".to_string()));
+        assert_eq!(
+            split_table_reference("users", Some(SqlGrammar::PostgreSql)),
+            Some((None, "users".to_string()))
+        );
+        assert_eq!(
+            split_table_reference("`orders`", Some(SqlGrammar::MySql)),
+            Some((None, "orders".to_string()))
+        );
     }
 
     #[test]
     fn dots_and_doubled_quotes_inside_quotes_stay_in_the_name() {
         assert_eq!(
-            split_table_reference("\"odd.schema\".\"a.b\""),
-            (Some("odd.schema".to_string()), "a.b".to_string())
+            split_table_reference("\"odd.schema\".\"a.b\"", Some(SqlGrammar::PostgreSql)),
+            Some((Some("odd.schema".to_string()), "a.b".to_string()))
         );
         assert_eq!(
-            split_table_reference("public.\"a\"\"b\""),
-            (Some("public".to_string()), "a\"b".to_string())
+            split_table_reference("`odd.schema`.`a``b`", Some(SqlGrammar::MySql)),
+            Some((Some("odd.schema".to_string()), "a`b".to_string()))
+        );
+        assert_eq!(
+            split_table_reference("[dbo].[Items]", Some(SqlGrammar::MsSql)),
+            Some((Some("dbo".to_string()), "Items".to_string()))
+        );
+        assert_eq!(
+            split_table_reference("public.\"a\"\"b\"", Some(SqlGrammar::PostgreSql)),
+            Some((Some("public".to_string()), "a\"b".to_string()))
         );
     }
 
     #[test]
     fn a_trailing_dot_is_not_a_schema_split() {
-        assert_eq!(split_table_reference("users."), (None, "users.".to_string()));
+        assert_eq!(split_table_reference("users.", Some(SqlGrammar::PostgreSql)), None);
+    }
+
+    #[test]
+    fn malformed_or_overqualified_references_are_refused() {
+        assert_eq!(
+            split_table_reference("public..users", Some(SqlGrammar::PostgreSql)),
+            None
+        );
+        assert_eq!(
+            split_table_reference("db.public.users", Some(SqlGrammar::PostgreSql)),
+            None
+        );
+        assert_eq!(
+            split_table_reference("\"unfinished", Some(SqlGrammar::PostgreSql)),
+            None
+        );
+    }
+
+    #[test]
+    fn completion_catalog_names_preserve_quoted_identity_and_schema() {
+        assert_eq!(
+            completion_table_reference(
+                "postgres",
+                &TableInfo {
+                    schema: Some("Public.Dot".into()),
+                    name: "With Space".into(),
+                }
+            ),
+            "\"Public.Dot\".\"With Space\""
+        );
+        let clickhouse_name = completion_table_reference(
+            "clickhouse",
+            &TableInfo {
+                schema: Some("Odd\\Schema".into()),
+                name: "With`Tick".into(),
+            },
+        );
+        assert_eq!(clickhouse_name, "`Odd\\\\Schema`.`With``Tick`");
+        assert_eq!(
+            split_table_reference(&clickhouse_name, Some(SqlGrammar::ClickHouse)),
+            Some((Some("Odd\\Schema".into()), "With`Tick".into()))
+        );
     }
 }
