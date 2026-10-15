@@ -872,15 +872,22 @@ fn build_result_switcher(stack: &adw::ViewStack, outcomes: &[StatementOutcome]) 
     holder
 }
 
+pub(super) fn first_failure(outcomes: &[StatementOutcome]) -> Option<usize> {
+    outcomes.iter().position(|outcome| match &outcome.kind {
+        StatementOutcomeKind::Error(_) => true,
+        StatementOutcomeKind::Streamed(result) => {
+            matches!(result.terminal, StreamTerminal::Failed(_) | StreamTerminal::TimedOut)
+        }
+        _ => false,
+    })
+}
+
 fn build_result_drop_down(stack: &adw::ViewStack, outcomes: &[StatementOutcome]) -> gtk::DropDown {
     let labels: Vec<String> = outcomes.iter().map(outcome_tab_label).collect();
     let label_refs: Vec<&str> = labels.iter().map(String::as_str).collect();
     let drop_down = gtk::DropDown::from_strings(&label_refs);
     drop_down.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Statement result"))]);
-    let first_error = outcomes
-        .iter()
-        .position(|outcome| matches!(outcome.kind, StatementOutcomeKind::Error(_)))
-        .unwrap_or(0);
+    let first_error = first_failure(outcomes).unwrap_or(0);
     drop_down.set_selected(first_error as u32);
     drop_down.connect_selected_notify({
         let stack = stack.downgrade();
@@ -933,10 +940,7 @@ pub(crate) fn render_outcomes(
     }
     holder.append(&build_result_switcher(&stack, outcomes));
     holder.append(&stack);
-    if let Some(err_idx) = outcomes
-        .iter()
-        .position(|o| matches!(o.kind, StatementOutcomeKind::Error(_)))
-    {
+    if let Some(err_idx) = first_failure(outcomes) {
         stack.set_visible_child_name(&format!("r{err_idx}"));
     }
 }

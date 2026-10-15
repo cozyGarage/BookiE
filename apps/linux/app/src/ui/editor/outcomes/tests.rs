@@ -1043,3 +1043,43 @@ fn summary_label_multi_statement_includes_counts() {
     assert!(s.contains("2/3"));
     assert!(s.contains("100"));
 }
+
+fn outcome_with(kind: StatementOutcomeKind, pinned: bool) -> super::StatementOutcome {
+    super::StatementOutcome {
+        identity: StatementIdentity::default(),
+        sql_preview: "SELECT 1".into(),
+        elapsed_ms: 0,
+        kind,
+        pinned,
+    }
+}
+
+fn streamed_kind(terminal: StreamTerminal) -> StatementOutcomeKind {
+    StatementOutcomeKind::Streamed(Box::new(StreamedResult {
+        pages: Vec::new(),
+        first_page: 0,
+        total_pages: 0,
+        total_rows: 0,
+        terminal,
+        export: None,
+    }))
+}
+
+#[test]
+fn a_failed_or_timed_out_stream_is_the_result_shown_first() {
+    for terminal in [
+        StreamTerminal::Failed("division by zero".into()),
+        StreamTerminal::TimedOut,
+    ] {
+        let outcomes = vec![
+            outcome_with(StatementOutcomeKind::Rows(Vec::new()), true),
+            outcome_with(streamed_kind(terminal), false),
+        ];
+        assert_eq!(super::first_failure(&outcomes), Some(1));
+    }
+    let complete = vec![
+        outcome_with(StatementOutcomeKind::Rows(Vec::new()), true),
+        outcome_with(streamed_kind(StreamTerminal::Complete), false),
+    ];
+    assert_eq!(super::first_failure(&complete), None);
+}
