@@ -401,6 +401,8 @@ class CiWorkflowTests(unittest.TestCase):
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('apt-get install -y -qq "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
         self.assertLess(floor_script.index('if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]'), floor_script.index("pkg-config --modversion"))
+        self.assertIn("grep -av Adwaita /tmp/gtk-safety.log | tail -40", floor_script)
+        self.assertNotIn("tail -20 /tmp/gtk-safety.log | grep -av Adwaita", floor_script)
         self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
         runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
         self.assertIn("python3-pyatspi", runtime_image)
