@@ -122,6 +122,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- Structure column expanders now point right when collapsed and down when open.
 - The CSV import progress dialog now closes after the import completes or is cancelled.
 - Explain view tabs and the schema filter button now use icons available in Adwaita and Yaru themes.
 - The Explain plan window now closes when you press Escape.
