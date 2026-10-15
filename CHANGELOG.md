@@ -126,6 +126,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Fixed
 - Structure column expanders now point right when collapsed and down when open.
+- Renaming a MySQL table in a database other than the connection's moved it into the connection's database, and renaming a ClickHouse table failed.
 
 - PostgreSQL completion keeps quoted case, dots, spaces and embedded quotes distinct when loading table columns.
 - PostgreSQL errors no longer replay queries or writes merely because their error code resembles a stale prepared plan.
