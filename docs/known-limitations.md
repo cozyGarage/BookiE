@@ -10,13 +10,15 @@ What the application does not do, or does differently from what you might expect
   page or a loaded query result instead. A per-engine consistent export path is
   an unselected future candidate; database snapshots for backup and restore are
   a separate feature accepted for 0.2.x ([ADR 0015](decisions/0015-database-snapshots.md)).
-- **Large results are capped and held in memory** (PERF-2, PERF-8 / [#554](https://github.com/cozyGarage/BookiE/issues/554)). Results stop at
-  1 million rows, 10 million cells or 64 MiB estimated size. The historical grid
-  measurement was about 2.5 times the result memory; #518 now shares immutable
-  values with materialized rows, and comparable profiling remains open. Core,
-  PostgreSQL and PolicyGuard cursor paths now exist, including per-page masking
-  and audit; the SQL editor does not yet use them and remains materialized under
-  these caps (ADR 0011).
+- **Large results still have materialization limits** (PERF-2, PERF-8 / [#554](https://github.com/cozyGarage/BookiE/issues/554)). Materialized
+  results stop at 1 million rows, 10 million cells or 64 MiB estimated size.
+  Single-statement PostgreSQL `SELECT`s in the SQL editor now stream cursor
+  pages through Core and PolicyGuard, retaining at most four pages of up to
+  5,000 rows each. That cache is bounded by page and row count, not by cell
+  bytes. Other engines and unsupported statement shapes remain materialized.
+  The historical grid measurement was about 2.5 times the result memory; #518
+  now shares immutable values with materialized rows, and comparable profiling
+  remains open (ADR 0011).
 - **SQL result filters apply only to loaded rows** ([#609](https://github.com/cozyGarage/BookiE/issues/609)). Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **Long cells are shown as a preview** (PERF-10). Values over 8 KiB show a typed
   preview and byte count. View Value and Copy Value use the full value, including
@@ -53,7 +55,7 @@ What the application does not do, or does differently from what you might expect
 
 - Multi-cursor editing is not available (UI-22 / [#552](https://github.com/cozyGarage/BookiE/issues/552)). Split panes and SQL code folding are available. Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. Preview tabs are temporary and are not restored after restart; tabs you keep are restored (UI-17b). Query history now opens in a docked panel (UI-18).
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles; a typed activity console is deferred and the activity dialog stays a plain result grid (UI-23).
-- Text values over the 8 KiB preview threshold can be edited in the full-value dialog up to 1 MiB. JSON previews and values over 1 MiB remain read-only; View Value and Copy Value still expose the full value. The JSON editing slice remains open under [#610](https://github.com/cozyGarage/BookiE/issues/610).
+- Text and JSON values over the 8 KiB preview threshold can be edited in the full-value dialog up to 1 MiB. Invalid JSON cannot be staged; SQL NULL, empty text, JSON `null`, and text `null` remain separate values. View Value and Copy Value expose the full value. Values over 1 MiB remain read-only; final acceptance for the JSON editing slice is tracked under [#610](https://github.com/cozyGarage/BookiE/issues/610).
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
 - No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
 - PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata remain open under B6.
