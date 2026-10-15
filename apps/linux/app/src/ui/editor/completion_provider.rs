@@ -28,7 +28,7 @@ mod proposal {
 
     #[glib::object_subclass]
     impl ObjectSubclass for Proposal {
-        const NAME: &'static str = "BookieSqlCompletionProposal";
+        const NAME: &str = "BookieSqlCompletionProposal";
         type Type = super::Proposal;
         type Interfaces = (sourceview5::CompletionProposal,);
     }
@@ -51,7 +51,7 @@ mod provider {
 
     #[glib::object_subclass]
     impl ObjectSubclass for Provider {
-        const NAME: &'static str = "BookieSqlCompletionProvider";
+        const NAME: &str = "BookieSqlCompletionProvider";
         type Type = super::Provider;
         type Interfaces = (sourceview5::CompletionProvider,);
     }

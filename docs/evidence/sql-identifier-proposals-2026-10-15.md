@@ -31,3 +31,5 @@ The incomplete-quote check also has a failing-first MySQL regression: double quo
 Further boundary regressions caught keyword suggestions inside unfinished identifier quotes and an empty replacement range at the start of a quoted identifier. Both failed before their fixes. Quoted positions now offer identifiers only, and activation replaces the existing token at its start. The core lexer owns unfinished-construct classification for all dialects.
 
 At the opening of an unfinished quote, no prefix or closing delimiter identifies a safe replacement suffix. The provider refuses suggestions at that ambiguous position; typing a prefix enables quoted completion. Actual activation tests cover bare and closed-quoted prefixes at both boundaries, unfinished quotes after a typed prefix, and refusal before ambiguous unfinished quotes.
+
+Sonar review reported two minor redundant static lifetimes on GLib subclass name constants. They were removed without changing their inferred static types; app Clippy with warnings denied passed. No security issue was reported.
