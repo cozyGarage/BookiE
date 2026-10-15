@@ -45,11 +45,7 @@ impl SqlEditor {
             error: None,
         });
         clear_box(&self.results_holder);
-        let loading = adw::StatusPage::builder()
-            .title(crate::tr!("Waiting for result pages"))
-            .icon_name("content-loading-symbolic")
-            .vexpand(true)
-            .build();
+        let loading = waiting_for_stream_page();
         self.results_holder.append(&loading);
         let _ = accepted.send(true);
     }
@@ -162,5 +158,28 @@ impl SqlEditor {
             self.database.clone(),
             self.result_view_settings.clone(),
         );
+    }
+}
+
+fn waiting_for_stream_page() -> adw::StatusPage {
+    adw::StatusPage::builder()
+        .title(crate::tr!("Waiting for result pages"))
+        .icon_name("content-loading-symbolic")
+        .vexpand(true)
+        .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_stream_waits_with_a_loading_status_page() {
+        relm4::adw::init().unwrap();
+        let page = waiting_for_stream_page();
+
+        assert_eq!(page.title(), "Waiting for result pages");
+        assert_eq!(page.icon_name().as_deref(), Some("content-loading-symbolic"));
     }
 }
