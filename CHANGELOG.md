@@ -219,6 +219,18 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - The structure editor now refuses column names that differ only in case on databases that ignore case, and refuses duplicate index names, before sending the change to the server.
 - The filter bar now offers comparison operators for MySQL `MEDIUMINT` and PostgreSQL `time without time zone` columns instead of text matching.
 - SQL completion now finds the statement under the cursor correctly when a comment or a PostgreSQL `$$` body contains a semicolon.
+- A database driver that crashes while a write's size is being estimated, or while a session closes, now produces an error and a connection replacement instead of leaving the window waiting.
+- MCP `export_data` with CSV now reports `truncated` when the row cap cut the result, as the JSON format already did.
+- An MCP write preview that is cancelled or times out while its transaction is starting now says the outcome is unknown, instead of reporting a plain cancellation.
+- Query history is left untouched and switched off, instead of being opened as if it were current, when its file was written by a newer version of the app.
+- Saving a favorite or editing saved queries while the favorites list is still loading can no longer bring back an older list.
+- Duplicating a connection while the keyring cannot be read now offers to enter a password for the copy, instead of assuming the original had none.
+- Closing the Explain window now stops its query instead of letting it run until the query timeout.
+- SQL Server queries that return several result sets now show every set inside an editor session or transaction, masked and audited like the first, instead of only the first.
+- A MySQL or MariaDB connection that carries a PostgreSQL-style socket directory is now refused when it connects, instead of being checked against a PostgreSQL socket file.
+- The connection form's Environment and Method choices can now be operated with a screen reader and other assistive tools.
+- After a transaction start is interrupted with an unknown outcome (for example an MCP write preview that times out), the connection stops accepting governed writes until it is replaced, instead of carrying on as if nothing had happened.
+- PostgreSQL column completion now tells apart a quoted mixed-case table such as "Users" from users, and keeps dots and doubled quotes inside quoted names.
 
 ### Security
 

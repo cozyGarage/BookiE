@@ -544,6 +544,36 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_double_quoted_name_keeps_its_case_and_stays_distinct() {
+        let grammar = Some(SqlGrammar::PostgreSql);
+        assert_ne!(
+            table_key("public.\"Users\"", grammar),
+            table_key("public.users", grammar)
+        );
+        assert_eq!(
+            table_key("public.\"users\"", grammar),
+            table_key("public.users", grammar)
+        );
+        assert_ne!(table_key("\"a.b\"", grammar), table_key("a.b", grammar));
+        assert_ne!(table_key("public.\"a\"\"b\"", grammar), table_key("public.ab", grammar));
+    }
+
+    #[test]
+    fn two_spellings_keep_their_own_columns() {
+        let mut index = SchemaIndex {
+            grammar: Some(SqlGrammar::PostgreSql),
+            ..SchemaIndex::default()
+        };
+        index.set_columns("public.users", vec!["id".into()]);
+        index.set_columns("public.\"Users\"", vec!["Id".into(), "name".into()]);
+        assert_eq!(index.columns_for("public.users"), Some(&vec!["id".to_string()]));
+        assert_eq!(
+            index.columns_for("public.\"Users\""),
+            Some(&vec!["Id".to_string(), "name".to_string()])
+        );
+    }
+
     fn index_with(tables: &[(&str, &[&str])]) -> SchemaIndex {
         let mut index = SchemaIndex::default();
         for (table, columns) in tables {
@@ -556,7 +586,7 @@ mod tests {
     fn same_named_tables_in_two_schemas_keep_separate_columns() {
         let index = index_with(&[("a.items", &["a_id"]), ("b.items", &["b_id"])]);
         assert_eq!(index.columns_for("a.items"), Some(&vec!["a_id".to_string()]));
-        assert_eq!(index.columns_for("b.\"Items\""), Some(&vec!["b_id".to_string()]));
+        assert_eq!(index.columns_for("B.Items"), Some(&vec!["b_id".to_string()]));
     }
 
     #[test]
