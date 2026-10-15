@@ -1,0 +1,23 @@
+# Exact SQL completion proposals, 2026-10-15
+
+Issue: [#934](https://github.com/cozyGarage/BookiE/issues/934).
+
+## Change
+
+GtkSourceView now receives proposal objects containing separate display names and complete insertion SQL. Raw column names use the existing dialect quoting helper. Table proposals retain their catalog-qualified references. Arbitrary editor words are no longer a second source of candidates. The shared word buffer and its cursor-driven rebuilds are removed.
+
+Activation checks the metadata generation, source text and cursor before editing. It replaces the complete current identifier, or the qualified relation in table position, in one undo action. Alias-qualified columns retain the alias. Suggestions stay out of literals and comments.
+
+## Regression evidence
+
+The initial direct GtkSourceView provider-population regression failed with the word provider: the requested complete relation proposal was absent. The replacement provider passes actual GtkSourceView population and activation tests for mixed case beside lowercase, dotted names and schemas, escaped quotes, reserved words and Unicode names with spaces. Tests also assert mid-identifier replacement, preserved aliases and refusal of retired proposals.
+
+The final isolated widget tier passed all 52 registered tests, including the three new provider regressions and atomic undo. App Clippy passed with warnings denied. Pure tests cover qualification, all five dialect delimiters, scoped candidates and refusal inside literals and comments.
+
+The native PostgreSQL `completion_metadata_preserves_exact_postgresql_catalog_names` fixture passed locally. Its six relation identities are the same matrix asserted by the widget activation test. Native SELECT metadata identifies each intended relation separately, including `Users` and `users`. This composes the exact inserted-reference assertion with the server identity check; it is not a combined installed-UI/server scenario.
+
+Keyboard popup selection, undo and screen reader checks are recorded in [manual verification](../manual-verification-0.2-features.md#exact-sql-completion). No screen reader result is claimed.
+
+GtkSourceView retains its native popup and keyboard bindings. Upstream [completion list bindings](https://github.com/GNOME/gtksourceview/blob/master/gtksourceview/gtksourcecompletionlistbox.c) route Return and Tab through proposal activation. The [completion dispatcher](https://github.com/GNOME/gtksourceview/blob/master/gtksourceview/gtksourcecompletion.c) calls the provider activation method. This source review does not replace the pending desktop keyboard and screen reader checks.
+
+Final local preflight passed: script harness, size/panic/comment/crate/bounded-operation guards, formatting, non-GTK Clippy, unit tests and sandbox integrations. Documentation links and issue ledger checks passed.
