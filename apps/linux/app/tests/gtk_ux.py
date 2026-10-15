@@ -1103,16 +1103,20 @@ GLib.MainLoop().run()
         ui.wait_for_node_containing("session was retired")
         assert psql("SELECT count(*) FROM public.session_tunnel_loss_probe") == "0"
 
+        def toggle_is_on(toggle):
+            state = toggle.getState()
+            return state.contains(pyatspi.STATE_PRESSED) or state.contains(pyatspi.STATE_CHECKED)
+
         def session_toggle(checked):
             deadline = time.monotonic() + 10
             while time.monotonic() < deadline:
                 toggle = ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
-                if toggle.getState().contains(pyatspi.STATE_CHECKED) == checked:
+                if toggle_is_on(toggle) == checked:
                     return toggle
                 time.sleep(0.2)
             raise AssertionError(f"Session toggle did not become {'on' if checked else 'off'}")
 
-        if ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON).getState().contains(pyatspi.STATE_CHECKED):
+        if toggle_is_on(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)):
             ui.invoke(session_toggle(True))
             session_toggle(False)
         ui.invoke(session_toggle(False))
