@@ -263,27 +263,10 @@ impl ExistingColumns {
         for row in &rows {
             group.add(row);
         }
-        let actions = gtk::Box::builder().spacing(6).build();
-        let remember = gtk::Button::with_label(&crate::tr!("Remember mapping"));
-        let restore = gtk::Button::with_label(&crate::tr!("Restore mapping"));
-        let forget = gtk::Button::with_label(&crate::tr!("Forget mapping"));
-        let status = gtk::Label::builder().xalign(0.0).wrap(true).build();
-        let available = store.is_some() && scope.is_some();
-        for button in [&remember, &restore, &forget] {
-            button.set_sensitive(available);
-        }
-        if !available {
-            status.set_text(&crate::tr!("Saved mappings are unavailable for this connection."));
-        }
-        for button in [&remember, &restore, &forget] {
-            actions.append(button);
-        }
-        group.add(&actions);
-        group.add(&status);
         let headers = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         let has_header = std::rc::Rc::new(std::cell::Cell::new(true));
-        MappingActions::new(
-            &status,
+        add_mapping_controls(
+            &group,
             MappingActionsParams {
                 driver_id: driver_id.to_owned(),
                 rows: rows.clone(),
@@ -293,8 +276,7 @@ impl ExistingColumns {
                 store,
                 scope,
             },
-        )
-        .connect(&remember, &restore, &forget);
+        );
         Self {
             group,
             driver_id: driver_id.to_owned(),
@@ -354,6 +336,25 @@ struct MappingActionsParams {
     columns: Vec<ColumnInfo>,
     store: Option<CsvMappingStore>,
     scope: Option<CsvMappingScope>,
+}
+
+fn add_mapping_controls(group: &adw::PreferencesGroup, params: MappingActionsParams) {
+    let actions = gtk::Box::builder().spacing(6).build();
+    let remember = gtk::Button::with_label(&crate::tr!("Remember mapping"));
+    let restore = gtk::Button::with_label(&crate::tr!("Restore mapping"));
+    let forget = gtk::Button::with_label(&crate::tr!("Forget mapping"));
+    let status = gtk::Label::builder().xalign(0.0).wrap(true).build();
+    let available = params.store.is_some() && params.scope.is_some();
+    for button in [&remember, &restore, &forget] {
+        button.set_sensitive(available);
+        actions.append(button);
+    }
+    if !available {
+        status.set_text(&crate::tr!("Saved mappings are unavailable for this connection."));
+    }
+    group.add(&actions);
+    group.add(&status);
+    MappingActions::new(&status, params).connect(&remember, &restore, &forget);
 }
 
 impl MappingActions {
