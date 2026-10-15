@@ -126,6 +126,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Fixed
 - Structure column expanders now point right when collapsed and down when open.
+- A ClickHouse, Redis or MongoDB save that failed partway now says the changes before the failing one were applied, and the audit journal no longer records it as rolled back.
 
 - PostgreSQL completion keeps quoted case, dots, spaces and embedded quotes distinct when loading table columns.
 - PostgreSQL errors no longer replay queries or writes merely because their error code resembles a stale prepared plan.
