@@ -341,11 +341,7 @@ pub enum BrowseTabInput {
     /// telling the user multi-row paste isn't supported. Cell-level
     /// paste continues to work via the normal text-editor path.
     PasteNotSupported,
-    Paste {
-        row: u32,
-        col: usize,
-        row_key: Vec<Value>,
-    },
+    Paste(paste::PasteAnchor),
     PasteText(paste::PasteTextInput),
     /// Ctrl+A: select every visible row.
     SelectAllRows,
@@ -1180,7 +1176,7 @@ impl SimpleComponent for BrowseTab {
             }
             BrowseTabInput::CopySelectedRowsAsTsv => self.handle_copy_selected_rows_as_tsv(sender),
             BrowseTabInput::PasteNotSupported => self.handle_paste_not_supported(sender),
-            BrowseTabInput::Paste { row, col, row_key } => self.handle_paste(row, col, row_key, sender),
+            BrowseTabInput::Paste(anchor) => self.handle_paste(anchor, sender),
             BrowseTabInput::PasteText(input) => self.handle_paste_text(input, sender),
             BrowseTabInput::SelectAllRows => self.handle_select_all_rows(),
             BrowseTabInput::GoToFirstRow => self.handle_go_to_first_row(),
