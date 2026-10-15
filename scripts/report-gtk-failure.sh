@@ -12,10 +12,9 @@ fi
 if [[ -r "$log_file" && -s "$log_file" ]]; then
   if matches=$(grep -aE '^passed:|^RETRY|^FAILED|scenario.s. failed|^AssertionError|^  File .*gtk_[a-z]*\.py", line [0-9]+, in ' "$log_file" | tail -30) && [[ -n "$matches" ]]; then
     printf '%s\n' "$matches"
-  else
-    printf 'GTK suite diagnostic tail (%s):\n' "$log_file"
-    tail -n 20 "$log_file" || true
   fi
+  printf 'GTK suite diagnostic tail (%s):\n' "$log_file"
+  tail -n 20 "$log_file" || true
 else
   printf 'GTK suite produced no output (log unavailable: %s)\n' "$log_file"
 fi

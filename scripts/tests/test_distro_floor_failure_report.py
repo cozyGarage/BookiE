@@ -41,6 +41,12 @@ class DistroFloorFailureReportTests(unittest.TestCase):
         self.assertEqual(result.returncode, 17)
         self.assertIn("FAILED: restart_restores_active_editor", result.stdout)
 
+    def test_passed_summary_does_not_hide_an_unexpected_failure(self):
+        failure, result = self.run_reporter("printf '%s\\n' 'passed: first_scenario' 'unexpected portal startup error'; exit 19")
+        self.assertEqual(failure.returncode, 19)
+        self.assertEqual(result.returncode, 19)
+        self.assertIn("unexpected portal startup error", result.stdout)
+
     def test_empty_log_is_reported_and_preserves_status(self):
         failure, result = self.run_reporter("exit 17")
 
