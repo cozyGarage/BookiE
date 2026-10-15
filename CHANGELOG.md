@@ -123,6 +123,8 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Fixed
 - SQL completion preserves quoted schema, table and alias identities across engines, including names with spaces, dots, mixed case and escaped delimiters.
+
+- PostgreSQL errors no longer replay queries or writes merely because their error code resembles a stale prepared plan.
 - The CSV import progress dialog now closes after the import completes or is cancelled.
 - Explain view tabs and the schema filter button now use icons available in Adwaita and Yaru themes.
 - The Explain plan window now closes when you press Escape.
