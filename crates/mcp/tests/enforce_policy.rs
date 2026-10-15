@@ -190,10 +190,11 @@ async fn execute_query_preserves_additional_result_sets_in_order() {
     .expect("read returns all result sets");
 
     assert_eq!(output["columns"], serde_json::json!(["first_set"]));
-    assert_eq!(output["rows"], serde_json::json!([[1]]));
+    assert_eq!(output["value_format"], "bookie-tagged-v1");
+    assert_eq!(output["rows"], serde_json::json!([[{"$type": "int64", "value": "1"}]]));
     assert_eq!(
         output["additional_result_sets"],
-        serde_json::json!([{"columns": ["second_set"], "rows": [["later"]], "truncated": false}])
+        serde_json::json!([{"columns": ["second_set"], "rows": [[{"$type": "text", "value": "later"}]], "truncated": false}])
     );
     assert_eq!(output["truncated"], false);
 }
@@ -237,10 +238,10 @@ async fn mcp_row_cap_is_shared_across_result_sets() {
     .await
     .expect("capped read returns its admitted rows");
 
-    assert_eq!(output["rows"], serde_json::json!([[1]]));
+    assert_eq!(output["rows"], serde_json::json!([[{"$type": "int64", "value": "1"}]]));
     assert_eq!(
         output["additional_result_sets"],
-        serde_json::json!([{"columns": ["second_set"], "rows": [[2]], "truncated": true}])
+        serde_json::json!([{"columns": ["second_set"], "rows": [[{"$type": "int64", "value": "2"}]], "truncated": true}])
     );
     assert_eq!(output["truncated"], true);
 }
@@ -313,7 +314,10 @@ async fn json_export_keeps_multiple_result_sets_and_csv_refuses_them() {
     let json = tablepro_mcp::dispatch(&bridge, &token, "export_data", args("json"))
         .await
         .expect("JSON represents every set");
-    assert_eq!(json["additional_result_sets"][0]["rows"], serde_json::json!([[2]]));
+    assert_eq!(
+        json["additional_result_sets"][0]["rows"],
+        serde_json::json!([[{"$type": "int64", "value": "2"}]])
+    );
 
     let csv_error = tablepro_mcp::dispatch(&bridge, &token, "export_data", args("csv"))
         .await
@@ -595,7 +599,8 @@ async fn count_rows_counts_a_quoted_target_with_read_scope_only() {
     .await
     .expect("a read-scoped token may count rows");
 
-    assert_eq!(out["row_count"], 1);
+    assert_eq!(out["value_format"], "bookie-tagged-v1");
+    assert_eq!(out["row_count"], serde_json::json!({"$type": "uint64", "value": "1"}));
     assert_eq!(out["exact"], true);
     assert_eq!(
         provider.executed_sql(),
@@ -633,8 +638,16 @@ async fn browse_table_pages_within_the_row_limit() {
     )
     .await
     .expect("a read-scoped token may browse a page");
-    assert_eq!(page["offset"], 10);
-    assert_eq!(page["rows"], serde_json::json!([[10], [11], [12]]));
+    assert_eq!(page["value_format"], "bookie-tagged-v1");
+    assert_eq!(page["offset"], serde_json::json!({"$type": "uint64", "value": "10"}));
+    assert_eq!(
+        page["rows"],
+        serde_json::json!([
+            [{"$type": "int64", "value": "10"}],
+            [{"$type": "int64", "value": "11"}],
+            [{"$type": "int64", "value": "12"}],
+        ])
+    );
     assert_eq!(page["truncated"], false);
 
     let capped = tablepro_mcp::dispatch(
