@@ -431,6 +431,16 @@ mod tests {
     }
 
     #[test]
+    fn tagged_json_text_preserves_source_tokens_and_duplicate_keys() {
+        let source = r#"{ "wide": 9007199254740993, "duplicate": 1, "duplicate": 2, "fraction": 1.2300e+20 }"#;
+
+        assert_eq!(
+            value_to_json(&tablepro_core::Value::JsonText(source.into())),
+            json!({"$type": "json_text", "value": source})
+        );
+    }
+
+    #[test]
     fn shared_query_history_is_not_exposed() {
         assert!(!TOOL_NAMES.contains(&"search_query_history"));
     }

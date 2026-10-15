@@ -308,7 +308,7 @@ pub(crate) fn tool_description(name: &str) -> &'static str {
         }
         "describe_table" => "Describe columns of a table",
         "execute_query" => {
-            "Run a read SQL query (writes require tools:write scope and policy approval). Results include value_format=bookie-tagged-v1; each cell is a tagged value, with integers and decimals encoded as exact strings and nested JSON recursively tagged."
+            "Run a read SQL query (writes require tools:write scope and policy approval). Results use value_format=bookie-tagged-v1; each cell is tagged, integers and decimals use exact strings, parsed JSON is recursively tagged, and raw JSON text remains exact under json_text."
         }
         "execute_write" => {
             "Run a write with optional transaction preview (preview=true by default). Results include value_format=bookie-tagged-v1; numeric counts are exact tagged strings."
@@ -317,7 +317,7 @@ pub(crate) fn tool_description(name: &str) -> &'static str {
             "Run EXPLAIN on a SQL statement; plan rows are withheld from read-scoped agents. Results include value_format=bookie-tagged-v1 and tagged cells."
         }
         "export_data" => {
-            "Run a query and return CSV or JSON; CSV responses include the null_marker used for SQL NULL cells. JSON results include value_format=bookie-tagged-v1; tagged cells preserve value kinds and exact numeric digits, including nested JSON numbers"
+            "Run a query and return CSV or JSON; CSV responses include the null_marker used for SQL NULL cells. JSON results use value_format=bookie-tagged-v1; tagged cells preserve value kinds and exact numeric digits, parsed JSON is recursively tagged, and raw JSON text remains exact under json_text"
         }
         "table_schema" => "Read the columns, primary key, indexes and foreign keys of a table",
         "count_rows" => {
@@ -578,6 +578,15 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(ORIGIN, HeaderValue::from_str(origin).unwrap());
         headers
+    }
+
+    #[test]
+    fn query_tool_descriptions_explain_raw_json_text_encoding() {
+        for name in ["execute_query", "export_data"] {
+            let description = tool_description(name);
+            assert!(description.contains("bookie-tagged-v1"));
+            assert!(description.contains("raw JSON text remains exact under json_text"));
+        }
     }
 
     struct NoProvider;

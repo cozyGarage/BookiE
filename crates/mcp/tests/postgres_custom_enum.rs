@@ -169,7 +169,13 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
         "execute_query",
         serde_json::json!({
             "connection_id": connection_id.to_string(),
-            "sql": "SELECT 9007199254740993::bigint AS wide, -9007199254740993::bigint AS negative_wide, 123456789012345678.12345678::numeric AS exact_decimal, 12345678901234567890.123456789012345::numeric AS high_precision_numeric, '{\"wide\":9007199254740993,\"fraction\":1.234567890123456789}'::jsonb AS nested",
+            "sql": concat!(
+                "SELECT 9007199254740993::bigint AS wide, -9007199254740993::bigint AS negative_wide, ",
+                "123456789012345678.12345678::numeric AS exact_decimal, ",
+                "12345678901234567890.123456789012345::numeric AS high_precision_numeric, ",
+                "'{\"wide\":9007199254740993,\"fraction\":1.234567890123456789}'::jsonb AS nested, ",
+                r#"'{ "wide": 9007199254740993, "duplicate": 1, "duplicate": 2, "fraction": 1.2300e+20 }'::json AS raw_nested"#
+            ),
         }),
     )
     .await
@@ -191,6 +197,10 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
                         "fraction":{"$type":"json_number","value":"1.234567890123456789"}
                     }
                 }
+            },
+            {
+                "$type":"json_text",
+                "value":"{ \"wide\": 9007199254740993, \"duplicate\": 1, \"duplicate\": 2, \"fraction\": 1.2300e+20 }"
             }
         ])
     );
