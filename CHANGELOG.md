@@ -223,6 +223,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Query history is left untouched and switched off, instead of being opened as if it were current, when its file was written by a newer version of the app.
 - Saving a favorite or editing saved queries while the favorites list is still loading can no longer bring back an older list.
 - Closing the Explain window now stops its query instead of letting it run until the query timeout.
+- SQL Server queries that return several result sets now show every set inside an editor session or transaction, masked and audited like the first, instead of only the first.
 
 ### Security
 
