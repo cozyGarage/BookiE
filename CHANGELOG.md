@@ -223,6 +223,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Query history is left untouched and switched off, instead of being opened as if it were current, when its file was written by a newer version of the app.
 - Saving a favorite or editing saved queries while the favorites list is still loading can no longer bring back an older list.
 - Duplicating a connection while the keyring cannot be read now offers to enter a password for the copy, instead of assuming the original had none.
+- Closing the Explain window now stops its query instead of letting it run until the query timeout.
 
 ### Security
 
