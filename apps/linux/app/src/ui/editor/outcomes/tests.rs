@@ -10,6 +10,7 @@ use relm4::gtk::prelude::*;
 use tablepro_core::{ConnectOptions, DatabaseDriver};
 
 type ReceivedRows = std::sync::Arc<std::sync::Mutex<Vec<(u64, Vec<tablepro_core::Value>)>>>;
+type ReceivedPages = std::sync::Arc<std::sync::Mutex<Vec<(u64, Vec<Vec<tablepro_core::Value>>)>>>;
 
 #[test]
 fn a_statement_is_named_by_its_verb_and_the_table_it_touches() {
@@ -457,6 +458,22 @@ fn cursor_page(values: &[i64], has_next_page: bool) -> tablepro_core::QueryCurso
     }
 }
 
+fn cursor_page_with_values(values: Vec<tablepro_core::Value>, has_next_page: bool) -> tablepro_core::QueryCursorPage {
+    let mut page = cursor_page(&[], has_next_page);
+    let template = page.result.columns[0].clone();
+    page.result.columns = values
+        .iter()
+        .enumerate()
+        .map(|(index, _)| tablepro_core::ColumnInfo {
+            name: format!("value_{index}"),
+            data_type: "test value".into(),
+            ..template.clone()
+        })
+        .collect();
+    page.result.rows.push(values);
+    page
+}
+
 fn cursor_target(
     pages: Vec<Result<tablepro_core::QueryCursorPage, tablepro_core::DriverError>>,
     counters: std::sync::Arc<CursorCounters>,
@@ -490,6 +507,23 @@ fn streamed_update(
                     }
                     let rows = page.rows.iter().filter_map(|row| row.first().cloned()).collect();
                     received.lock().unwrap().push((sequence, rows));
+                    true
+                }
+            }
+        })
+    }
+}
+
+fn record_streamed_pages(
+    received: ReceivedPages,
+) -> impl FnMut(StreamUpdate) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>> {
+    move |update| {
+        let received = received.clone();
+        Box::pin(async move {
+            match update {
+                StreamUpdate::Started { .. } => true,
+                StreamUpdate::Page { sequence, page } => {
+                    received.lock().unwrap().push((sequence, page.rows.clone()));
                     true
                 }
             }
@@ -720,6 +754,51 @@ async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
     assert_eq!(counters.fetched.load(std::sync::atomic::Ordering::SeqCst), 2);
     assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn streamed_cursor_pages_preserve_native_values_across_page_boundaries() {
+    use tablepro_core::Value;
+
+    let first = vec![
+        Value::Null,
+        Value::Bool(true),
+        Value::Bytes(vec![0, 255]),
+        Value::Decimal(rust_decimal::Decimal::new(12345, 2)),
+        Value::Json(serde_json::json!({"kind": "native"})),
+        Value::Undecodable("custom_type".into()),
+    ];
+    let second = vec![
+        Value::Int(9),
+        Value::Float(1.25),
+        Value::Text("text".into()),
+        Value::JsonText("{\"kind\":\"text\"}".into()),
+        Value::Uuid(uuid::Uuid::nil()),
+        Value::Null,
+    ];
+    let received: ReceivedPages = Default::default();
+    let result = run_statements_with_stream(
+        StatementRun {
+            target: cursor_target(
+                vec![
+                    Ok(cursor_page_with_values(first.clone(), true)),
+                    Ok(cursor_page_with_values(second.clone(), false)),
+                ],
+                std::sync::Arc::new(CursorCounters::default()),
+            ),
+            statements: vec!["SELECT typed_values".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            succeeded: |_: &str| {},
+        },
+        record_streamed_pages(received.clone()),
+    )
+    .await;
+
+    assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Complete)));
+    assert_eq!(*received.lock().unwrap(), [(0, vec![first]), (1, vec![second])]);
 }
 
 #[tokio::test]
