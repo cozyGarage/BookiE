@@ -25,3 +25,9 @@ Final local preflight passed: script harness, size/panic/comment/crate/bounded-o
 A final review reproduced alias scope loss after whitespace following a dot. The new regression offered both joined tables’ columns and keywords before the fix. The shared qualifier check now treats trailing whitespace after the dot as part of the same qualification. Completed identifiers followed by whitespace still start a new completion position.
 
 The panic guard misclassified the ordinary nested test module until its existing explicit-path convention was used. An isolated miniature Rust tree also showed the inverse: the guard accepted an ungated production panic in a different nearby module. This independent enforcement defect is tracked in [#961](https://github.com/cozyGarage/BookiE/issues/961), with the reproduction and required regression cases. No production panic in BookiE is claimed.
+
+The incomplete-quote check also has a failing-first MySQL regression: double quotes are strings in the existing default grammar, so an unfinished double-quoted string must not offer SQL identifiers. Identifier completion follows the same grammar boundary.
+
+Further boundary regressions caught keyword suggestions inside unfinished identifier quotes and an empty replacement range at the start of a quoted identifier. Both failed before their fixes. Quoted positions now offer identifiers only, and activation replaces the existing token at its start. The core lexer owns unfinished-construct classification for all dialects.
+
+At the opening of an unfinished quote, no prefix or closing delimiter identifies a safe replacement suffix. The provider refuses suggestions at that ambiguous position; typing a prefix enables quoted completion. Actual activation tests cover bare and closed-quoted prefixes at both boundaries, unfinished quotes after a typed prefix, and refusal before ambiguous unfinished quotes.

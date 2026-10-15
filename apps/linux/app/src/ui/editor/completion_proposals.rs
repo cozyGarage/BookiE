@@ -1,7 +1,9 @@
 use std::ops::Range;
 
 use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptTokenKind};
+use tablepro_core::sql_syntax::script::{
+    LexicalSettings, OpenConstruct, ScriptDiagnostic, ScriptPlan, ScriptTokenKind,
+};
 
 use super::completion::{SchemaIndex, Scope, candidate_sql, scope_at};
 use super::completion_identifiers::split_table_reference;
@@ -19,12 +21,13 @@ pub(super) fn candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Candi
             values: Vec::new(),
         };
     };
+    let quoted = sql[range.start..].starts_with(['"', '`', '[']);
     let scope = scope_at(sql, range.start, index);
     if scope == Scope::Tables {
         range.start = qualified_start(sql, range.start, grammar);
     }
     let mut values = candidate_sql(sql, range.start, index);
-    if !matches!(scope, Scope::ColumnsOf(_)) {
+    if !quoted && !matches!(scope, Scope::ColumnsOf(_)) {
         values.extend(super::SQL_KEYWORDS.split_whitespace().map(str::to_string));
     }
     let prefix = normalized(&sql[range.start..cursor]);
@@ -57,13 +60,32 @@ fn replacement_range(sql: &str, cursor: usize, grammar: SqlGrammar) -> Option<Ra
     let plan = ScriptPlan::build(sql, grammar, LexicalSettings::default_for(grammar));
     let token = plan
         .tokens(0..sql.len())
-        .find(|token| token.range.start < cursor && token.range.end >= cursor);
+        .find(|token| {
+            token.range.start == cursor
+                && matches!(
+                    token.kind,
+                    ScriptTokenKind::Word | ScriptTokenKind::QuotedIdentifier | ScriptTokenKind::Unterminated
+                )
+        })
+        .or_else(|| {
+            plan.tokens(0..sql.len())
+                .find(|token| token.range.start < cursor && token.range.end >= cursor)
+        });
     let Some(token) = token else {
         return Some(cursor..cursor);
     };
     match token.kind {
         ScriptTokenKind::Word | ScriptTokenKind::QuotedIdentifier => Some(token.range),
-        ScriptTokenKind::Unterminated if identifier_quote(&sql[token.range.start..], grammar) => {
+        ScriptTokenKind::Unterminated if token.range.start == cursor => None,
+        ScriptTokenKind::Unterminated
+            if plan.diagnostics().iter().any(|diagnostic| {
+                matches!(
+                    diagnostic,
+                    ScriptDiagnostic::Unterminated { construct: OpenConstruct::QuotedIdentifier, start }
+                        if *start == token.range.start
+                )
+            }) =>
+        {
             Some(token.range.start..cursor)
         }
         ScriptTokenKind::Whitespace
@@ -73,12 +95,6 @@ fn replacement_range(sql: &str, cursor: usize, grammar: SqlGrammar) -> Option<Ra
         | ScriptTokenKind::Semicolon => Some(cursor..cursor),
         _ => None,
     }
-}
-
-fn identifier_quote(text: &str, grammar: SqlGrammar) -> bool {
-    text.starts_with('"')
-        || (matches!(grammar, SqlGrammar::MySql | SqlGrammar::ClickHouse | SqlGrammar::Sqlite) && text.starts_with('`'))
-        || (matches!(grammar, SqlGrammar::MsSql | SqlGrammar::Sqlite) && text.starts_with('['))
 }
 
 fn qualified_start(sql: &str, start: usize, grammar: SqlGrammar) -> usize {
@@ -146,6 +162,51 @@ mod tests {
         let sql = "SELECT u.  FROM users u JOIN orders o ON true";
         let values = candidates(sql, "SELECT u. ".len(), &index).values;
         assert_eq!(values, vec![("user_column".into(), "\"user_column\"".into())]);
+    }
+
+    #[test]
+    fn unfinished_identifier_quotes_keep_the_exact_reference_for_each_dialect() {
+        for (grammar, driver) in [
+            (SqlGrammar::PostgreSql, "postgres"),
+            (SqlGrammar::MySql, "mysql"),
+            (SqlGrammar::MsSql, "mssql"),
+            (SqlGrammar::Sqlite, "sqlite"),
+            (SqlGrammar::ClickHouse, "clickhouse"),
+        ] {
+            let mut index = SchemaIndex::default();
+            index.grammar = Some(grammar);
+            let reference = tablepro_core::sql_dialect::quote_ident(driver, "Users");
+            index.tables.push(reference.clone());
+            let partial = format!("{}Us", &reference[..1]);
+            let sql = format!("SELECT * FROM {partial}");
+            let candidates = candidates(&sql, sql.len(), &index);
+            assert_eq!(candidates.values, vec![("Users".into(), reference)]);
+            assert_eq!(&sql[candidates.range], partial);
+        }
+    }
+
+    #[test]
+    fn a_cursor_at_the_start_of_an_identifier_replaces_its_whole_token() {
+        let sql = "SELECT * FROM \"Users\" WHERE true";
+        let cursor = "SELECT * FROM ".len();
+        let candidates = candidates(sql, cursor, &SchemaIndex::default());
+        assert_eq!(&sql[candidates.range], "\"Users\"");
+    }
+
+    #[test]
+    fn completion_before_an_unfinished_quote_refuses_an_ambiguous_suffix() {
+        let mut index = SchemaIndex::default();
+        index.tables.push("\"Users\"".into());
+        let sql = "SELECT * FROM \"Us WHERE true";
+        assert!(candidates(sql, "SELECT * FROM ".len(), &index).values.is_empty());
+    }
+
+    #[test]
+    fn mysql_unterminated_double_quotes_remain_a_string_literal() {
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::MySql);
+        let sql = "SELECT \"SE";
+        assert!(candidates(sql, sql.len(), &index).values.is_empty());
     }
 
     #[test]

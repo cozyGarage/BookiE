@@ -58,9 +58,26 @@ fn proposals_activate_complete_quoted_references() {
             .push(super::super::catalog_reference("postgres", Some(schema), name));
     }
     for (schema, name, partial) in cases {
-        let sql = format!("SELECT * FROM {partial} WHERE true");
-        let cursor = format!("SELECT * FROM {partial}").chars().count();
+        for fragment in [partial.to_string(), format!("\"{partial}"), format!("\"{partial}\"")] {
+            assert_table_activation(schema, name, &fragment, index.clone());
+        }
+    }
+}
+
+fn assert_table_activation(schema: &str, name: &str, fragment: &str, index: Rc<RefCell<SchemaIndex>>) {
+    let sql = format!("SELECT * FROM {fragment} WHERE true");
+    for cursor in [
+        "SELECT * FROM ".len(),
+        format!("SELECT * FROM {fragment}").chars().count(),
+    ] {
         let (_view, provider, context) = fixture(&sql, cursor, index.clone());
+        if cursor == "SELECT * FROM ".len() && fragment.starts_with('"') && !fragment.ends_with('"') {
+            let model = glib::MainContext::default()
+                .block_on(provider.populate_future(&context))
+                .unwrap();
+            assert_eq!(model.n_items(), 0);
+            continue;
+        }
         let reference = super::super::catalog_reference("postgres", Some(schema), name);
         assert_eq!(
             activate(&provider, &context, &reference),
