@@ -295,6 +295,41 @@ fn keyless_tab_rejects_inline_edits_and_insert_actions() {
     controller.detach_runtime();
 }
 
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn keyless_tab_refuses_to_stage_deletion_of_a_persisted_row() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch(tab_id);
+    load_keyless_row(&controller, &observed);
+    let selection = controller.model().current_selection.clone().unwrap();
+    selection.select_item(0, false);
+
+    controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
+    let outputs = pump(&observed);
+
+    assert!(
+        outputs
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ShowSelectionAlert { .. }))
+    );
+    assert_eq!(
+        pending(tab_id),
+        0,
+        "a persisted keyless row cannot enter the change tracker"
+    );
+    assert_eq!(
+        transactions(&outputs),
+        0,
+        "a refused keyless delete cannot dispatch a save"
+    );
+    assert!(
+        selection.is_selected(0),
+        "refusing deletion preserves the row selection"
+    );
+    controller.detach_runtime();
+}
+
 fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
     let columns = vec![column("id", true), column("title", false), column("body", false)];
     controller
