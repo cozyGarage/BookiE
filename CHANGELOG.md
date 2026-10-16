@@ -8,7 +8,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - SQL completion inserts complete dialect-quoted table and column names, preserves aliases, and offers scoped metadata instead of arbitrary editor words.
 - Large SQL query results stream in bounded pages, can be pinned, and can be fully exported by running the guarded query again.
 - CSV imports into PostgreSQL, MySQL/MariaDB and SQLite can preserve explicit auto-increment values from mapped columns; generated columns remain database-owned.
-- Editable text columns open a bounded full-value dialog; Apply stages the exact multiline text, while Set to NULL remains a separate action.
+- Editable text and JSON columns open a bounded full-value dialog; JSON input is validated, source-text JSON retains its exact text, and Format JSON makes semantic formatting changes visible before Apply.
 - At narrow window widths, the navigation sidebar collapses and the Fold block and Unfold all toolbar buttons hide so the remaining editor controls stay in view; their keyboard shortcuts still work.
 - Switching database drivers keeps custom connection values and updates fields that still use the previous driver's defaults.
 - Duplicating a password-authenticated connection with a saved password opens the copy's credential form so its password can be entered before connecting.
@@ -248,6 +248,8 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Security
 
 - Statements that set a password, an encryption key or a connection secret, and text that does not end its strings or comments, are no longer saved in the query history.
+- An agent's write preview on MySQL no longer runs DDL or other statements that MySQL commits immediately; they are refused inside a transaction instead of being applied and reported as rolled back.
+- SQL Server `BEGIN TRAN`, `COMMIT TRAN` and `ROLLBACK TRAN` are now treated as transaction control, so a shared connection refuses them and a session tracks the transaction they open instead of auditing later writes as committed.
 - Agent result masking now treats `to_json` / `to_jsonb` and JSON object builders the same as `row_to_json` when deciding which columns to redact.
 - Agent result masking now redacts columns whose projection source cannot be resolved, and masks whole-row wildcard arguments instead of leaving them clear.
 - A session or governed-write lockdown refusal is now recorded in the audit journal instead of ending without a terminal audit state.
@@ -266,6 +268,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Agent masking covers PostgreSQL XML serialization results and redacts driver errors that could contain masked values.
 - Administrative PostgreSQL function matching respects qualified names.
 - Constant numeric predicates are evaluated exactly when checking whether a write is scoped.
+- The built-in SSH client is updated to a release that fixes recent upstream security advisories.
 
 ## [0.1.5] - 2026-09-27
 - Choosing the system OpenSSH client inside the Flatpak build now stops immediately with a message to use the built-in SSH client.
