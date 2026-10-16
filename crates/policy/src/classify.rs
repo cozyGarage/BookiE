@@ -252,44 +252,20 @@ fn classify_statement_details(stmt: &Statement) -> StatementDetails {
             contains_unscoped_dml: update.selection.as_ref().is_none_or(is_constant_true),
         },
         Statement::Delete(delete) => classify_delete(delete),
-        Statement::CreateTable(c) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(&c.name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::CreateView(view) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(&view.name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::CreateIndex(c) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: match &c.name {
-                Some(n) => object_name_strings(n),
-                None => object_name_strings(&c.table_name),
-            },
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::AlterTable(alter) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(&alter.name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::Drop { names, .. } => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: names.iter().flat_map(object_name_strings).collect(),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
+        Statement::CreateTable(c) => ddl_on(object_name_strings(&c.name)),
+        Statement::CreateView(view) => ddl_on(object_name_strings(&view.name)),
+        Statement::CreateIndex(c) => ddl_on(match &c.name {
+            Some(n) => object_name_strings(n),
+            None => object_name_strings(&c.table_name),
+        }),
+        Statement::AlterTable(alter) => ddl_on(object_name_strings(&alter.name)),
+        Statement::RenameTable(renames) => ddl_on(
+            renames
+                .iter()
+                .flat_map(|rename| object_name_strings(&rename.old_name))
+                .collect(),
+        ),
+        Statement::Drop { names, .. } => ddl_on(names.iter().flat_map(object_name_strings).collect()),
         Statement::Truncate(truncate) => truncate_facts(truncate.table_names.iter().map(|table| &table.name)),
         Statement::CreateVirtualTable { .. }
         | Statement::CreateRole { .. }
@@ -650,6 +626,16 @@ pub(crate) fn expr_writes(expr: &Expr) -> bool {
                 || else_result.as_ref().is_some_and(|e| expr_writes(e))
         }
         _ => false,
+    }
+}
+
+fn ddl_on(tables: Vec<String>) -> StatementDetails {
+    StatementDetails {
+        effects: Effects::EMPTY,
+        class: StatementClass::Ddl,
+        tables,
+        has_where: true,
+        contains_unscoped_dml: false,
     }
 }
 
