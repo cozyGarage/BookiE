@@ -88,6 +88,8 @@ fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
         .send(BrowseTabInput::DuplicateRow { row_position: 0 })
         .unwrap();
     controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
+    controller.sender().send(BrowseTabInput::Undo).unwrap();
+    controller.sender().send(BrowseTabInput::Redo).unwrap();
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -122,6 +124,17 @@ fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
             displayed: None,
         }))
         .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::PasteText(super::paste::PasteTextInput {
+            row: 0,
+            col: 1,
+            row_key: vec![Value::Int(1)],
+            text: "changed".into(),
+            displayed: None,
+            snapshot: controller.model().capture_paste_snapshot(),
+        }))
+        .unwrap();
     controller.sender().send(BrowseTabInput::CommitSave).unwrap();
     let outputs = pump(&observed);
 
@@ -131,6 +144,11 @@ fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
         "read-only actions must not create draft or row changes"
     );
     assert_eq!(transactions(&outputs), 0, "read-only actions must not dispatch a save");
+    let refused = outputs
+        .iter()
+        .filter(|output| matches!(output, BrowseTabOutput::ShowToast(message) if message == "This connection is read-only."))
+        .count();
+    assert_eq!(refused, 11, "every read-only mutation message must be refused");
     controller.detach_runtime();
 }
 
