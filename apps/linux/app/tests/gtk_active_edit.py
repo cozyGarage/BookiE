@@ -97,6 +97,17 @@ def scenarios(ui):
     def active_cell_edit_survives_cancelled_disconnect(database, base):
         cancel_close_and_save(database, "win.disconnect", "Discard pending changes?")
 
+    def active_cell_edit_saves_when_close_button_targets_an_inactive_tab(database, base):
+        begin_edit(database)
+        ui.invoke_accessible_action("win.open-editor")
+        ui.wait_for_node(name="Run", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+        page = ui.wait_for_node_containing("safety_items", role=ui.pyatspi.ROLE_PAGE_TAB)
+        ui.invoke(ui.wait_within(page, name="Close Tab", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        prompt = ui.wait_for_node(name="Save changes to “safety_items”?", role=ui.pyatspi.ROLE_ALERT)
+        ui.invoke(ui.wait_within(prompt, name="Save", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("safety_items", role=ui.pyatspi.ROLE_PAGE_TAB, present=False)
+        assert notes(database) == [(1, "gamma"), (2, "beta")]
+
     result = [
         active_cell_edit_enter_control,
         active_cell_edit_survives_cancelled_tab_close,
@@ -107,6 +118,7 @@ def scenarios(ui):
         active_cell_edit_survives_cancelled_window_quit,
         active_cell_edit_keeps_its_preview_when_another_table_opens,
         active_cell_edit_survives_cancelled_disconnect,
+        active_cell_edit_saves_when_close_button_targets_an_inactive_tab,
     ]
     for scenario in result:
         scenario.environment = "local"
