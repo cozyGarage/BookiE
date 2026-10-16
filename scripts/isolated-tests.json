@@ -195,6 +195,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_toolbar_context_menu_and_keyboard_actions"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::tests::browse_page_fetch_waits_until_the_new_columns_are_applied"
     ],
     [

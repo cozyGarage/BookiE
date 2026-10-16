@@ -1,5 +1,7 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
-use relm4::gtk::prelude::SelectionModelExt;
+use relm4::gtk::prelude::{
+    ButtonExt, Cast, ListModelExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt,
+};
 use relm4::{Component, ComponentController};
 use std::sync::mpsc::Receiver;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
@@ -132,6 +134,74 @@ fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
     );
     assert_eq!(transactions(&outputs), 0, "read-only actions must not dispatch a save");
     controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn read_only_tab_rejects_toolbar_context_menu_and_keyboard_actions() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch_with_read_only(tab_id, true);
+    load_one_row(&controller, &observed);
+
+    let selection = controller.model().current_selection.clone().unwrap();
+    selection.select_item(0, false);
+    assert!(!controller.model().insert_button.is_visible());
+    controller.model().insert_button.emit_clicked();
+    controller
+        .model()
+        .current_column_view
+        .as_ref()
+        .unwrap()
+        .activate_action("cell.insert-row", None)
+        .unwrap();
+    assert!(activate_shortcut(&controller, |trigger| trigger == "Delete"));
+    assert!(activate_shortcut(&controller, |trigger| {
+        let normalized = trigger.to_ascii_lowercase();
+        normalized.ends_with('n') && !normalized.contains("shift")
+    }));
+
+    let outputs = pump(&observed);
+    assert_eq!(pending(tab_id), 0, "UI actions must not create drafts or row changes");
+    assert_eq!(transactions(&outputs), 0, "UI actions must not dispatch a save");
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+            .count(),
+        4,
+        "each installed UI route must reach the read-only guard"
+    );
+    controller.detach_runtime();
+}
+
+fn activate_shortcut(controller: &relm4::Controller<BrowseTab>, matches_trigger: impl Fn(&str) -> bool) -> bool {
+    let controllers = controller.widget().observe_controllers();
+    for controller_index in 0..controllers.n_items() {
+        let Some(item) = controllers.item(controller_index) else {
+            continue;
+        };
+        let Ok(shortcut_controller) = item.downcast::<relm4::gtk::ShortcutController>() else {
+            continue;
+        };
+        for shortcut_index in 0..shortcut_controller.n_items() {
+            let Some(item) = shortcut_controller.item(shortcut_index) else {
+                continue;
+            };
+            let Ok(shortcut) = item.downcast::<relm4::gtk::Shortcut>() else {
+                continue;
+            };
+            let Some(trigger) = shortcut.trigger() else {
+                continue;
+            };
+            if matches_trigger(&trigger.to_str()) {
+                return shortcut.action().is_some_and(|action| {
+                    action.activate(relm4::gtk::ShortcutActionFlags::EXCLUSIVE, controller.widget(), None)
+                });
+            }
+        }
+    }
+    false
 }
 
 fn load_one_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
