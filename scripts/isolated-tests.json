@@ -190,6 +190,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::tests::browse_page_fetch_waits_until_the_new_columns_are_applied"
     ],
     [

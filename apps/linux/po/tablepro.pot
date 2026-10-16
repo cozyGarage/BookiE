@@ -685,6 +685,10 @@ msgstr ""
 msgid "This connection is open read-only."
 msgstr ""
 
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:15
+msgid "This connection is read-only."
+msgstr ""
+
 #: apps/linux/app/src/ui/app/import.rs:111
 msgid "The policy rules could not be loaded, so writes are not permitted."
 msgstr ""

@@ -218,10 +218,10 @@ impl BrowseTab {
         // changed (rare in practice — would require schema migration
         // mid-session). Build the full column-view scaffolding.
         clear_box(&self.grid_holder);
-        let edit_sender = if self.read_only {
-            None
-        } else {
+        let edit_sender = if self.allows_row_mutations() {
             Some(self.grid_sender.clone())
+        } else {
+            None
         };
         let pk_col_indices: Vec<usize> = self
             .current_columns

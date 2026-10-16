@@ -3,6 +3,14 @@ use relm4::ComponentSender;
 use super::*;
 
 impl BrowseTab {
+    pub(super) fn reject_read_only_mutation(&self, input: &BrowseTabInput, sender: &ComponentSender<Self>) -> bool {
+        if self.allows_row_mutations() || !is_row_mutation_input(input) {
+            return false;
+        }
+        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!("This connection is read-only.")));
+        true
+    }
+
     pub(super) fn handle_duplicate_row(&mut self, row_position: u32, sender: ComponentSender<Self>) {
         if self.current_columns.is_empty() {
             return;
@@ -769,6 +777,23 @@ impl BrowseTab {
             UndoOp::Delete { .. } => {}
         }
     }
+}
+
+fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
+    matches!(
+        input,
+        BrowseTabInput::InsertRow
+            | BrowseTabInput::DuplicateRow { .. }
+            | BrowseTabInput::DeleteSelectedRow
+            | BrowseTabInput::GridCellEdited { .. }
+            | BrowseTabInput::GridSetCellNull { .. }
+            | BrowseTabInput::GridDeleteRowAt { .. }
+            | BrowseTabInput::Undo
+            | BrowseTabInput::Redo
+            | BrowseTabInput::CommitSave
+            | BrowseTabInput::Paste(_)
+            | BrowseTabInput::PasteText(_)
+    )
 }
 
 /// Build the draft values for a duplicated row. Columns whose value is

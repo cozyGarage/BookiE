@@ -1,4 +1,5 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
+use relm4::gtk::prelude::SelectionModelExt;
 use relm4::{Component, ComponentController};
 use std::sync::mpsc::Receiver;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
@@ -35,6 +36,10 @@ fn pump(outputs: &Receiver<BrowseTabOutput>) -> Vec<BrowseTabOutput> {
 }
 
 fn launch(tab_id: Uuid) -> (relm4::Controller<BrowseTab>, Receiver<BrowseTabOutput>) {
+    launch_with_read_only(tab_id, false)
+}
+
+fn launch_with_read_only(tab_id: Uuid, read_only: bool) -> (relm4::Controller<BrowseTab>, Receiver<BrowseTabOutput>) {
     let (output_sender, output_receiver) = relm4::channel::<BrowseTabOutput>();
     let (observed_sender, observed) = std::sync::mpsc::channel();
     relm4::spawn_local(async move {
@@ -51,7 +56,7 @@ fn launch(tab_id: Uuid) -> (relm4::Controller<BrowseTab>, Receiver<BrowseTabOutp
             table: "notes".into(),
             driver_id: "postgres".into(),
             connection_id: None,
-            read_only: false,
+            read_only,
             page_size: 100,
             initial_offset: 0,
             initial_sort: None,
@@ -65,6 +70,68 @@ fn launch(tab_id: Uuid) -> (relm4::Controller<BrowseTab>, Receiver<BrowseTabOutp
         })
         .forward(&output_sender, |output| output);
     (controller, observed)
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch_with_read_only(tab_id, true);
+    load_one_row(&controller, &observed);
+
+    let selection = controller.model().current_selection.clone().unwrap();
+    selection.select_item(0, false);
+    controller.sender().send(BrowseTabInput::InsertRow).unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::DuplicateRow { row_position: 0 })
+        .unwrap();
+    controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "changed".into(),
+            value: None,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridSetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDeleteRowAt {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::Paste(super::paste::PasteAnchor {
+            row: 0,
+            col: 1,
+            row_key: vec![Value::Int(1)],
+            displayed: None,
+        }))
+        .unwrap();
+    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    let outputs = pump(&observed);
+
+    assert_eq!(
+        pending(tab_id),
+        0,
+        "read-only actions must not create draft or row changes"
+    );
+    assert_eq!(transactions(&outputs), 0, "read-only actions must not dispatch a save");
+    controller.detach_runtime();
 }
 
 fn load_one_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
