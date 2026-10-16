@@ -536,13 +536,13 @@ async fn guarded_calls_leave_the_callers_control_usable_for_the_next_statement()
 }
 
 #[tokio::test]
-async fn a_failed_guarded_call_leaves_the_callers_control_usable() {
-    let (failing, _calls, _audit) = catalog_guard(true);
+async fn a_failed_guarded_call_never_cancels_the_callers_control() {
+    let (failing, calls, _audit) = catalog_guard(true);
     let control = control();
 
     assert!(failing.query_controlled("SELECT 1", &control).await.is_err());
+    assert!(failing.query_controlled("SELECT 2", &control).await.is_err());
 
     assert!(!control.cancellation_token().is_cancelled());
-    let (guard, _calls, _audit) = catalog_guard(false);
-    guard.query_controlled("SELECT 2", &control).await.unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 2, "the second call reached the driver");
 }

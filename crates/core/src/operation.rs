@@ -230,6 +230,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_completed_operation_never_dispatches_server_cancellation() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let token = CancellationToken::new();
+        let control = OperationControl::new(token.clone(), None);
+        let dispatched = Arc::new(AtomicBool::new(false));
+        let dispatched_by_cancel = Arc::clone(&dispatched);
+        let cancellation = async move {
+            dispatched_by_cancel.store(true, Ordering::SeqCst);
+            Ok::<_, DriverError>(())
+        };
+
+        let result = run_server_cancellable(async { Ok(5) }, cancellation, |_| false, &control).await;
+
+        assert_eq!(result.unwrap(), 5);
+        assert!(
+            !dispatched.load(Ordering::SeqCst),
+            "a finished call asked the server to stop"
+        );
+        assert!(!token.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn a_cancel_after_dispatch_is_an_unknown_outcome_not_a_clean_cancel() {
+        let token = CancellationToken::new();
+        let control = OperationControl::new(token.clone(), None);
+        let canceller = token.clone();
+        let operation = async move {
+            canceller.cancel();
+            std::future::pending::<Result<(), DriverError>>().await
+        };
+
+        let error = run_controlled(operation, &control).await.unwrap_err();
+
+        assert!(
+            matches!(&error, DriverError::OperationOutcomeUnknown { source } if matches!(**source, DriverError::Cancelled)),
+            "{error:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn returns_completed_operation_result() {
         let control = OperationControl::new(CancellationToken::new(), None);
 
