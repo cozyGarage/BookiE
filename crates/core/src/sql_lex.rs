@@ -25,6 +25,18 @@ pub fn skip_span(rest: &str, driver_id: &str) -> Option<usize> {
     }
 }
 
+pub fn skip_span_at(sql: &str, index: usize, driver_id: &str) -> Option<usize> {
+    let inside_identifier = sql[index..].starts_with('$')
+        && sql[..index]
+            .chars()
+            .next_back()
+            .is_some_and(|previous| previous.is_alphanumeric() || previous == '_' || previous == '$');
+    if inside_identifier {
+        return None;
+    }
+    skip_span(&sql[index..], driver_id)
+}
+
 fn quoted_length(rest: &str, quote: char, backslash_escapes: bool) -> usize {
     let mut characters = rest.char_indices().skip(1);
     while let Some((offset, character)) = characters.next() {
@@ -112,16 +124,7 @@ fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
     let mut index = 0usize;
     while index < bytes.len() {
         let rest = &sql[index..];
-        let inside_identifier = bytes[index] == b'$'
-            && sql[..index]
-                .chars()
-                .next_back()
-                .is_some_and(|previous| previous.is_alphanumeric() || previous == '_' || previous == '$');
-        if inside_identifier {
-            index += 1;
-            continue;
-        }
-        if let Some(length) = skip_span(rest, driver_id).filter(|length| *length > 0) {
+        if let Some(length) = skip_span_at(sql, index, driver_id).filter(|length| *length > 0) {
             index += length;
             continue;
         }
