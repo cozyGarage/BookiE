@@ -1,5 +1,7 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
-use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, WidgetExt};
+use relm4::gtk::gio::prelude::ListModelExt;
+use relm4::gtk::glib::prelude::Cast;
+use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt};
 use relm4::{Component, ComponentController};
 use std::sync::mpsc::Receiver;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
@@ -87,7 +89,8 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_grid_message
         .sender()
         .send(BrowseTabInput::DuplicateRow { row_position: 0 })
         .unwrap();
-    controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
+    assert!(activate_shortcut(&controller, "Delete"));
+    assert!(activate_shortcut(&controller, "<Primary>n"));
     controller.sender().send(BrowseTabInput::Undo).unwrap();
     controller.sender().send(BrowseTabInput::Redo).unwrap();
     controller
@@ -189,8 +192,42 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_grid_message
         .iter()
         .filter(|output| matches!(output, BrowseTabOutput::ShowToast(message) if message == "This connection is read-only."))
         .count();
-    assert_eq!(refused, 16, "every read-only mutation message must be refused");
+    assert_eq!(refused, 17, "every read-only mutation message must be refused");
     controller.detach_runtime();
+}
+
+fn activate_shortcut(controller: &relm4::Controller<BrowseTab>, trigger_text: &str) -> bool {
+    let widget = controller.widget();
+    let target_trigger = crate::ui::shortcut::parse(trigger_text).to_str();
+    let controllers = widget.observe_controllers();
+    for controller_index in 0..controllers.n_items() {
+        let Some(shortcut_controller) = controllers
+            .item(controller_index)
+            .and_then(|object| object.downcast::<relm4::gtk::ShortcutController>().ok())
+        else {
+            continue;
+        };
+        for shortcut_index in 0..shortcut_controller.n_items() {
+            let Some(shortcut) = shortcut_controller
+                .item(shortcut_index)
+                .and_then(|object| object.downcast::<relm4::gtk::Shortcut>().ok())
+            else {
+                continue;
+            };
+            if shortcut
+                .trigger()
+                .is_some_and(|trigger| trigger.to_str() == target_trigger)
+                && let Some(action) = shortcut.action()
+            {
+                return action.activate(
+                    relm4::gtk::ShortcutActionFlags::EXCLUSIVE,
+                    widget,
+                    shortcut.arguments().as_ref(),
+                );
+            }
+        }
+    }
+    false
 }
 
 #[test]
