@@ -190,12 +190,12 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs"
+      "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selection"
     ],
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_toolbar_context_menu_and_keyboard_actions"
+      "ui::browse_tab::save_in_flight_tests::read_only_tab_can_discard_a_pending_local_draft"
     ],
     [
       "tablepro-app",

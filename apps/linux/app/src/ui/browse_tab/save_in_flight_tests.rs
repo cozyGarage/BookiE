@@ -1,7 +1,7 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
-use relm4::gtk::prelude::{
-    ButtonExt, Cast, ListModelExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt,
-};
+use relm4::gtk::gio::prelude::ListModelExt;
+use relm4::gtk::glib::prelude::Cast;
+use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt};
 use relm4::{Component, ComponentController};
 use std::sync::mpsc::Receiver;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
@@ -76,20 +76,25 @@ fn launch_with_read_only(tab_id: Uuid, read_only: bool) -> (relm4::Controller<Br
 
 #[test]
 #[ignore = "requires isolated GTK display"]
-fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
+fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selection() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch_with_read_only(tab_id, true);
-    load_one_row(&controller, &observed);
+    load_two_rows(&controller, &observed);
 
     let selection = controller.model().current_selection.clone().unwrap();
     selection.select_item(0, false);
-    controller.sender().send(BrowseTabInput::InsertRow).unwrap();
+    selection.select_item(1, true);
+    assert!(!controller.model().insert_button.is_visible());
+    controller.model().insert_button.emit_clicked();
     controller
         .sender()
         .send(BrowseTabInput::DuplicateRow { row_position: 0 })
         .unwrap();
-    controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
+    assert!(activate_shortcut(&controller, "Delete"));
+    assert!(activate_shortcut(&controller, "<Primary>n"));
+    controller.sender().send(BrowseTabInput::Undo).unwrap();
+    controller.sender().send(BrowseTabInput::Redo).unwrap();
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -124,7 +129,59 @@ fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
             displayed: None,
         }))
         .unwrap();
-    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::PasteText(super::paste::PasteTextInput {
+            row: 0,
+            col: 1,
+            row_key: vec![Value::Int(1)],
+            text: "changed".into(),
+            displayed: None,
+            snapshot: controller.model().capture_paste_snapshot(),
+        }))
+        .unwrap();
+    controller.model().save_button.emit_clicked();
+    assert!(
+        controller
+            .model()
+            .current_column_view
+            .as_ref()
+            .expect("the loaded page has a grid")
+            .activate_action("cell.insert-row", None)
+            .is_ok()
+    );
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::DuplicateRow { row_position: 0 })
+        .unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::DeleteRowAt {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::SetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::CellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "grid edit".into(),
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
     let outputs = pump(&observed);
 
     assert_eq!(
@@ -133,78 +190,74 @@ fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
         "read-only actions must not create draft or row changes"
     );
     assert_eq!(transactions(&outputs), 0, "read-only actions must not dispatch a save");
+    let refused = outputs
+        .iter()
+        .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+        .count();
+    assert_eq!(refused, 17, "every read-only mutation message must be refused");
     controller.detach_runtime();
 }
 
-#[test]
-#[ignore = "requires isolated GTK display"]
-fn read_only_tab_rejects_toolbar_context_menu_and_keyboard_actions() {
-    relm4::gtk::init().unwrap();
-    let tab_id = Uuid::new_v4();
-    let (mut controller, observed) = launch_with_read_only(tab_id, true);
-    load_one_row(&controller, &observed);
-
-    let selection = controller.model().current_selection.clone().unwrap();
-    selection.select_item(0, false);
-    assert!(!controller.model().insert_button.is_visible());
-    controller.model().insert_button.emit_clicked();
-    controller
-        .model()
-        .current_column_view
-        .as_ref()
-        .unwrap()
-        .activate_action("cell.insert-row", None)
-        .unwrap();
-    assert!(activate_shortcut(&controller, |trigger| trigger == "Delete"));
-    assert!(activate_shortcut(&controller, |trigger| {
-        let normalized = trigger.to_ascii_lowercase();
-        normalized.ends_with('n') && !normalized.contains("shift")
-    }));
-
-    let outputs = pump(&observed);
-    assert_eq!(pending(tab_id), 0, "UI actions must not create drafts or row changes");
-    assert_eq!(transactions(&outputs), 0, "UI actions must not dispatch a save");
-    assert_eq!(
-        outputs
-            .iter()
-            .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
-            .count(),
-        4,
-        "each installed UI route must reach the read-only guard"
-    );
-    controller.detach_runtime();
-}
-
-fn activate_shortcut(controller: &relm4::Controller<BrowseTab>, matches_trigger: impl Fn(&str) -> bool) -> bool {
-    let controllers = controller.widget().observe_controllers();
+fn activate_shortcut(controller: &relm4::Controller<BrowseTab>, trigger_text: &str) -> bool {
+    let widget = controller.widget();
+    let target_trigger = crate::ui::shortcut::parse(trigger_text).to_str();
+    let controllers = widget.observe_controllers();
     for controller_index in 0..controllers.n_items() {
-        let Some(item) = controllers.item(controller_index) else {
-            continue;
-        };
-        let Ok(shortcut_controller) = item.downcast::<relm4::gtk::ShortcutController>() else {
+        let Some(shortcut_controller) = controllers
+            .item(controller_index)
+            .and_then(|object| object.downcast::<relm4::gtk::ShortcutController>().ok())
+        else {
             continue;
         };
         for shortcut_index in 0..shortcut_controller.n_items() {
-            let Some(item) = shortcut_controller.item(shortcut_index) else {
+            let Some(shortcut) = shortcut_controller
+                .item(shortcut_index)
+                .and_then(|object| object.downcast::<relm4::gtk::Shortcut>().ok())
+            else {
                 continue;
             };
-            let Ok(shortcut) = item.downcast::<relm4::gtk::Shortcut>() else {
-                continue;
-            };
-            let Some(trigger) = shortcut.trigger() else {
-                continue;
-            };
-            if matches_trigger(&trigger.to_str()) {
-                return shortcut.action().is_some_and(|action| {
-                    action.activate(relm4::gtk::ShortcutActionFlags::EXCLUSIVE, controller.widget(), None)
-                });
+            if shortcut
+                .trigger()
+                .is_some_and(|trigger| trigger.to_str() == target_trigger)
+                && let Some(action) = shortcut.action()
+            {
+                return action.activate(
+                    relm4::gtk::ShortcutActionFlags::EXCLUSIVE,
+                    widget,
+                    shortcut.arguments().as_ref(),
+                );
             }
         }
     }
     false
 }
 
-fn load_one_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn read_only_tab_can_discard_a_pending_local_draft() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch_with_read_only(tab_id, true);
+    crate::services::change_tracker::with_tab(tab_id, |tracker| tracker.track_insert(vec![Value::Null]))
+        .expect("tab tracker exists");
+
+    assert_eq!(pending(tab_id), 1);
+    controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
+    let outputs = pump(&observed);
+
+    assert_eq!(pending(tab_id), 0, "discarding a local draft must remain available");
+    assert_eq!(
+        transactions(&outputs),
+        0,
+        "discarding a local draft must not dispatch a database write"
+    );
+    assert!(!outputs.iter().any(
+        |output| matches!(output, BrowseTabOutput::ShowToast(message) if message == "This connection is read-only.")
+    ));
+    controller.detach_runtime();
+}
+
+fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
     let columns = vec![column("id", true), column("title", false), column("body", false)];
     controller
         .sender()
@@ -219,7 +272,10 @@ fn load_one_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<B
             .expect("a page was requested"),
         offset: 0,
     };
-    let rows = vec![vec![Value::Int(1), Value::Text("a".into()), Value::Text("b".into())]];
+    let rows = vec![
+        vec![Value::Int(1), Value::Text("a".into()), Value::Text("b".into())],
+        vec![Value::Int(2), Value::Text("c".into()), Value::Text("d".into())],
+    ];
     controller
         .sender()
         .send(BrowseTabInput::RowsLoaded {
@@ -265,7 +321,7 @@ fn edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch(tab_id);
-    load_one_row(&controller, &observed);
+    load_two_rows(&controller, &observed);
 
     edit(&controller, 1, "first");
     pump(&observed);
