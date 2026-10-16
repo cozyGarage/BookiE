@@ -127,6 +127,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Fixed
 - Structure column expanders now point right when collapsed and down when open.
 - Renaming a MySQL table in a database other than the connection's moved it into the connection's database, and renaming a ClickHouse table failed.
+- Dropping a SQL Server column that has a default, or changing its type, failed in the Structure tab; the default is now removed first and kept after a type change.
 - Saving the same connection from two windows at once, or switching its database while an edit was saving, could lose one of the changes or pair one edit's server with the other's password.
 - A SQL Server connection with TLS set to Prefer failed against a server that offers no encryption; it now continues without TLS, as Prefer does for PostgreSQL and MySQL, and a server that refuses encryption under Require reports a TLS failure.
 - A ClickHouse, Redis or MongoDB save that failed partway now says the changes before the failing one were applied, and the audit journal no longer records it as rolled back.
@@ -253,6 +254,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Security
 
+- A `FOR UPDATE` or `FOR SHARE` read inside a WHERE or HAVING subquery, a join condition or a function argument is now treated as a locking read, so read-only connections and agent read access refuse it.
 - A host key listed as `@revoked` in known_hosts with a wildcard or negated host pattern, such as `@revoked * ssh-ed25519 …`, is now refused instead of being ignored.
 - Statements that set a password, an encryption key or a connection secret, and text that does not end its strings or comments, are no longer saved in the query history.
 - An agent's write preview on MySQL no longer runs DDL or other statements that MySQL commits immediately; they are refused inside a transaction instead of being applied and reported as rolled back.
