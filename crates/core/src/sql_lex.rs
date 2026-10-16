@@ -112,6 +112,15 @@ fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
     let mut index = 0usize;
     while index < bytes.len() {
         let rest = &sql[index..];
+        let inside_identifier = bytes[index] == b'$'
+            && sql[..index]
+                .chars()
+                .next_back()
+                .is_some_and(|previous| previous.is_alphanumeric() || previous == '_' || previous == '$');
+        if inside_identifier {
+            index += 1;
+            continue;
+        }
         if let Some(length) = skip_span(rest, driver_id).filter(|length| *length > 0) {
             index += length;
             continue;
@@ -230,6 +239,18 @@ mod tests {
         assert_eq!(split.len(), 2);
         assert!(split[0].contains("SELECT 1; SELECT 2;"));
         assert_eq!(split[1], "SELECT 3");
+    }
+
+    #[test]
+    fn a_dollar_sign_inside_an_identifier_does_not_open_a_dollar_quote() {
+        assert_eq!(
+            split_statements("SELECT my$a$b FROM t; SELECT 2", "postgres"),
+            ["SELECT my$a$b FROM t", "SELECT 2"]
+        );
+        assert_eq!(
+            split_statements("SELECT $a$ x; y $a$; SELECT 2", "postgres"),
+            ["SELECT $a$ x; y $a$", "SELECT 2"]
+        );
     }
 
     #[test]
