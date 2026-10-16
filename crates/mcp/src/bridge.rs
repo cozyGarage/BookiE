@@ -128,11 +128,11 @@ impl McpBridge {
     }
 
     pub fn authenticate(&self, bearer: &str) -> Result<McpToken, String> {
-        self.auth_rate_limiter.ensure_available(AUTH_ATTEMPT_KEY)?;
+        self.auth_rate_limiter.check(AUTH_ATTEMPT_KEY)?;
         let token = bearer.strip_prefix("Bearer ").unwrap_or(bearer).trim();
         let authenticated = self.tokens.authenticate(token);
-        if authenticated.is_err() {
-            self.auth_rate_limiter.record(AUTH_ATTEMPT_KEY);
+        if authenticated.is_ok() {
+            self.auth_rate_limiter.release(AUTH_ATTEMPT_KEY);
         }
         authenticated
     }

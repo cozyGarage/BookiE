@@ -22,19 +22,14 @@ impl RateLimiter {
         self.windows.lock().map_or(0, |map| map.len())
     }
 
+    pub fn release(&self, key: &str) {
+        let mut map = self.windows.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(entries) = map.get_mut(key) {
+            entries.pop();
+        }
+    }
+
     pub fn check(&self, key: &str) -> Result<(), String> {
-        self.admit(key, true)
-    }
-
-    pub fn ensure_available(&self, key: &str) -> Result<(), String> {
-        self.admit(key, false)
-    }
-
-    pub fn record(&self, key: &str) {
-        let _ = self.admit(key, true);
-    }
-
-    fn admit(&self, key: &str, consume: bool) -> Result<(), String> {
         let mut map = self.windows.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let now = Instant::now();
         map.retain(|tracked, entries| {
@@ -51,16 +46,25 @@ impl RateLimiter {
                 self.max_per_minute
             ));
         }
-        if consume {
-            map.entry(key.to_string()).or_default().push(now);
-        }
+        map.entry(key.to_string()).or_default().push(now);
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+
+    #[test]
+    fn a_reserved_slot_counts_until_it_is_released() {
+        let lim = RateLimiter::new(2);
+        assert!(lim.check("auth").is_ok());
+        assert!(lim.check("auth").is_ok());
+        assert!(lim.check("auth").is_err(), "two reservations fill the window");
+        lim.release("auth");
+        assert!(lim.check("auth").is_ok(), "a released slot is free again");
+    }
 
     #[test]
     fn allows_under_limit() {
