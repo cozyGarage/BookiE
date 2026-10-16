@@ -13,7 +13,9 @@ use super::{App, AppMsg};
 /// close-after-save counters, the "close the window once the map
 /// drains" flag, and the in-flight transaction counter the close
 /// guard polls.
+#[derive(Default)]
 pub(super) struct WindowLifecycleHandles {
+    pub(super) grid_edits_ready: Rc<Cell<bool>>,
     pub(super) close_after_save: Rc<RefCell<HashMap<Uuid, u32>>>,
     pub(super) close_window_after_save: Rc<Cell<bool>>,
     pub(super) in_flight_saves: Rc<Cell<usize>>,
@@ -43,18 +45,13 @@ pub(super) fn install_window_lifecycle(
     let workspace_flushed_for_close = workspace_flushed.clone();
     let workspace_flush_in_progress = Rc::new(Cell::new(false));
     let workspace_flush_in_progress_for_close = workspace_flush_in_progress.clone();
-    let close_after_save_for_close: Rc<RefCell<HashMap<Uuid, u32>>> = Rc::new(RefCell::new(HashMap::new()));
-    let close_window_after_save_for_close: Rc<Cell<bool>> = Rc::new(Cell::new(false));
-    let in_flight_saves: Rc<Cell<usize>> = Rc::new(Cell::new(0));
-    let session_teardown_ready = Rc::new(Cell::new(false));
-    let session_teardown_pending = Rc::new(Cell::new(false));
-    let handles = WindowLifecycleHandles {
-        close_after_save: close_after_save_for_close.clone(),
-        close_window_after_save: close_window_after_save_for_close.clone(),
-        in_flight_saves: in_flight_saves.clone(),
-        session_teardown_ready: session_teardown_ready.clone(),
-        session_teardown_pending: session_teardown_pending.clone(),
-    };
+    let handles = WindowLifecycleHandles::default();
+    let close_after_save_for_close = handles.close_after_save.clone();
+    let close_window_after_save_for_close = handles.close_window_after_save.clone();
+    let in_flight_saves = handles.in_flight_saves.clone();
+    let session_teardown_ready = handles.session_teardown_ready.clone();
+    let session_teardown_pending = handles.session_teardown_pending.clone();
+    let grid_edits_ready = handles.grid_edits_ready.clone();
     let in_flight_saves_for_close = in_flight_saves.clone();
     let session_teardown_ready_for_close = session_teardown_ready.clone();
     let session_teardown_pending_for_close = session_teardown_pending.clone();
@@ -89,6 +86,10 @@ pub(super) fn install_window_lifecycle(
                     glib::ControlFlow::Continue
                 }
             });
+            return glib::Propagation::Stop;
+        }
+        if !grid_edits_ready.replace(false) {
+            let _ = close_request_input_sender.send(AppMsg::FlushWindowEdits);
             return glib::Propagation::Stop;
         }
         // Already-confirmed close path (set by the dialog handler

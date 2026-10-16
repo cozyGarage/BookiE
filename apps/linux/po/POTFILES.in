@@ -10,6 +10,7 @@ apps/linux/app/src/ui/app/connection.rs
 apps/linux/app/src/ui/app/database_switcher.rs
 apps/linux/app/src/ui/app/editor_files.rs
 apps/linux/app/src/ui/app/favorites.rs
+apps/linux/app/src/ui/app/grid_close.rs
 apps/linux/app/src/ui/app/import.rs
 apps/linux/app/src/ui/app/init_sidebar.rs
 apps/linux/app/src/ui/app/init_window.rs
@@ -54,9 +55,11 @@ apps/linux/app/src/ui/editor/mod.rs
 apps/linux/app/src/ui/editor/open_file.rs
 apps/linux/app/src/ui/editor/outcomes.rs
 apps/linux/app/src/ui/editor/pinned.rs
+apps/linux/app/src/ui/editor/run_lifecycle.rs
 apps/linux/app/src/ui/editor/schema.rs
 apps/linux/app/src/ui/editor/session_mode.rs
 apps/linux/app/src/ui/editor/statement_cursor.rs
+apps/linux/app/src/ui/editor/streaming.rs
 apps/linux/app/src/ui/error_text.rs
 apps/linux/app/src/ui/explain_dialog.rs
 apps/linux/app/src/ui/explain_tree.rs

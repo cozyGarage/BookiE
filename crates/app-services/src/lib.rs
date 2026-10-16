@@ -3,6 +3,7 @@ pub mod column_widths;
 pub mod config_io;
 pub mod filter_settings;
 pub mod ordered_refresh;
+pub mod preparation;
 pub mod read_scopes;
 pub mod recent_tabs;
 pub mod request_generation;
