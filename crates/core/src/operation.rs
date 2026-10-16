@@ -189,6 +189,47 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn a_finished_call_leaves_the_callers_token_usable_for_the_next_call() {
+        let token = CancellationToken::new();
+        let control = OperationControl::new(token.clone(), Some(Instant::now() + Duration::from_secs(30)));
+        let failure = || DriverError::query("statement failed");
+
+        assert_eq!(
+            run_controlled(async { Ok::<_, DriverError>(1) }, &control)
+                .await
+                .unwrap(),
+            1
+        );
+        assert!(
+            run_controlled(async { Err::<(), _>(failure()) }, &control)
+                .await
+                .is_err()
+        );
+        assert_eq!(run_controlled_setup(async { 2 }, &control).await.unwrap(), 2);
+        let never_cancel = || async { Ok::<_, DriverError>(()) };
+        assert_eq!(
+            run_server_cancellable(async { Ok(3) }, never_cancel(), |_| false, &control)
+                .await
+                .unwrap(),
+            3
+        );
+        assert!(
+            run_server_cancellable(async { Err::<(), _>(failure()) }, never_cancel(), |_| false, &control)
+                .await
+                .is_err()
+        );
+
+        assert!(!token.is_cancelled(), "a finished call cancelled its caller's token");
+        assert!(check_pre_dispatch(&control).is_ok());
+        assert_eq!(
+            run_controlled(async { Ok::<_, DriverError>(4) }, &control)
+                .await
+                .unwrap(),
+            4
+        );
+    }
+
+    #[tokio::test]
     async fn returns_completed_operation_result() {
         let control = OperationControl::new(CancellationToken::new(), None);
 
