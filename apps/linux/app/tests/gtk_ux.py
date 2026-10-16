@@ -1161,7 +1161,9 @@ GLib.MainLoop().run()
             except AssertionError:
                 continue
         else:
-            raise AssertionError("no fresh editor session could run SELECT 42 after the tunnel loss")
+            raise AssertionError(
+                f"no fresh editor session could run SELECT 42 after the tunnel loss:\n{ui.accessible_snapshot()}"
+            )
         assert psql("SELECT count(*) FROM public.session_tunnel_loss_probe") == "0"
 
     def psql(sql):
