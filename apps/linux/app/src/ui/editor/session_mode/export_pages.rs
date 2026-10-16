@@ -21,6 +21,15 @@ impl std::fmt::Debug for StreamSession {
     }
 }
 
+fn unavailable_reason(target: &StatementTarget) -> &'static str {
+    if matches!(target, StatementTarget::Session { .. }) {
+        "this result came from the tab's session, which now has a transaction open or has closed; end the \
+         transaction or run the query again, then export"
+    } else {
+        "query cursor streaming is unavailable"
+    }
+}
+
 fn export_target(connection: Arc<dyn Connection>, session: Option<&StreamSession>) -> StatementTarget {
     match session {
         Some(StreamSession(target)) => target.clone(),
@@ -123,13 +132,7 @@ fn export_page_fetcher(
                     .map_err(export_driver_error)?;
             }
             let Some(cursor) = state.as_ref() else {
-                let reason = if matches!(query_target, StatementTarget::Session { .. }) {
-                    "this result came from the tab's session, which now has a transaction open or has closed; \
-                     end the transaction or run the query again, then export"
-                } else {
-                    "query cursor streaming is unavailable"
-                };
-                return Err(ExportError::Source(reason.into()));
+                return Err(ExportError::Source(unavailable_reason(&query_target).into()));
             };
             let page = match cursor.fetch_page(&control).await {
                 Ok(page) => page,
