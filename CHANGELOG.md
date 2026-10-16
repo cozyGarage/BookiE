@@ -247,6 +247,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Security
 
+- An agent's write preview on MySQL no longer runs DDL or other statements that MySQL commits immediately; they are refused inside a transaction instead of being applied and reported as rolled back.
 - SQL Server `BEGIN TRAN`, `COMMIT TRAN` and `ROLLBACK TRAN` are now treated as transaction control, so a shared connection refuses them and a session tracks the transaction they open instead of auditing later writes as committed.
 - Agent result masking now treats `to_json` / `to_jsonb` and JSON object builders the same as `row_to_json` when deciding which columns to redact.
 - Agent result masking now redacts columns whose projection source cannot be resolved, and masks whole-row wildcard arguments instead of leaving them clear.
@@ -266,6 +267,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Agent masking covers PostgreSQL XML serialization results and redacts driver errors that could contain masked values.
 - Administrative PostgreSQL function matching respects qualified names.
 - Constant numeric predicates are evaluated exactly when checking whether a write is scoped.
+- The built-in SSH client is updated to a release that fixes recent upstream security advisories.
 
 ## [0.1.5] - 2026-09-27
 - Choosing the system OpenSSH client inside the Flatpak build now stops immediately with a message to use the built-in SSH client.
