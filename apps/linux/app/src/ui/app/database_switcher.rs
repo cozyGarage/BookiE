@@ -31,6 +31,17 @@ pub(super) fn database_choices(names: &[String], current: &str) -> Vec<DatabaseC
     choices
 }
 
+fn pending_database_switch_request(
+    transition: super::ConnectionTransition,
+    connection_id: Uuid,
+    database: String,
+) -> Option<(Uuid, String)> {
+    if transition != super::ConnectionTransition::Idle {
+        return None;
+    }
+    Some((connection_id, database))
+}
+
 pub(super) fn build_database_popover(popover: &gtk::Popover, sender: &ComponentSender<App>) -> gtk::ListBox {
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::None)
@@ -164,7 +175,11 @@ impl App {
             return;
         }
         saved.database = name.clone();
-        self.pending_database_switch = Some((id, name));
+        let Some(pending) = pending_database_switch_request(self.connection_transition, id, name) else {
+            self.on_open_saved(saved, sender);
+            return;
+        };
+        self.pending_database_switch = Some(pending);
         self.on_open_saved(saved, sender);
     }
 
@@ -235,5 +250,29 @@ mod tests {
         let choices = database_choices(&names(&["a", "a"]), "");
         assert_eq!(choices.len(), 1);
         assert!(!choices[0].current);
+    }
+
+    #[test]
+    fn a_busy_connection_transition_does_not_create_a_pending_database_switch() {
+        let connection_id = Uuid::new_v4();
+        for transition in [
+            super::super::ConnectionTransition::Connecting,
+            super::super::ConnectionTransition::AwaitingDecision,
+            super::super::ConnectionTransition::WaitingForRuns,
+            super::super::ConnectionTransition::WaitingForSaves,
+        ] {
+            assert_eq!(
+                pending_database_switch_request(transition, connection_id, "next".to_owned()),
+                None
+            );
+        }
+        assert_eq!(
+            pending_database_switch_request(
+                super::super::ConnectionTransition::Idle,
+                connection_id,
+                "next".to_owned()
+            ),
+            Some((connection_id, "next".to_owned()))
+        );
     }
 }
