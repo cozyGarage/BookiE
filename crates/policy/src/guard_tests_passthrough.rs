@@ -546,7 +546,6 @@ async fn a_failed_guarded_call_never_cancels_the_callers_control() {
     assert!(!control.cancellation_token().is_cancelled());
     assert_eq!(calls.load(Ordering::SeqCst), 2, "the second call reached the driver");
 }
-
 fn outcomes_by_operation(audit: &SequenceAuditSink) -> std::collections::HashMap<Uuid, Vec<AuditTerminalStatus>> {
     let mut outcomes: std::collections::HashMap<Uuid, Vec<AuditTerminalStatus>> = std::collections::HashMap::new();
     for event in audit.events.lock().expect("events").iter() {
