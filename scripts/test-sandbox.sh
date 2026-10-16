@@ -24,6 +24,7 @@ CRATES=(
   tablepro-transport
   tablepro-app-services
   tablepro-ssh
+  tablepro-dump
   tablepro-mcp
   tablepro-agentd
   tablepro-driver-sqlite
@@ -34,6 +35,8 @@ for c in "${CRATES[@]}"; do
   PKG_ARGS+=(-p "$c")
 done
 
-echo "==> sandbox tier: cargo test --tests"
-cargo test "${PKG_ARGS[@]}" --tests
-cargo test -p tablepro-driver-redis --test cancellation
+echo "==> sandbox tier: nextest --tests"
+NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
+PROFILE="${TABLEPRO_NEXTEST_PROFILE:-default}"
+"$NEXTEST" nextest run "${PKG_ARGS[@]}" --tests --profile "$PROFILE" --no-tests=pass
+"$NEXTEST" nextest run -p tablepro-driver-redis --test cancellation --profile "$PROFILE" --no-tests=pass
