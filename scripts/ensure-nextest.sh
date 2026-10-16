@@ -18,7 +18,7 @@ if [ ! -x "$BIN" ]; then
   trap 'rm -rf -- "$work"' EXIT
   archive="$work/nextest.tar.gz"
   url="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-$VERSION/cargo-nextest-$VERSION-$TARGET.tar.gz"
-  curl -fsSL --retry 3 --max-time 120 -o "$archive" "$url"
+  curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 --max-time 120 -o "$archive" "$url"
   echo "$SHA256  $archive" | sha256sum --check --quiet
   tar -xzf "$archive" -C "$work" cargo-nextest
   mv "$work/cargo-nextest" "$BIN"
