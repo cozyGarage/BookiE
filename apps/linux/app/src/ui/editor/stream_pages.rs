@@ -36,6 +36,7 @@ pub(super) struct StreamPageCache {
     pages: VecDeque<(u64, Arc<QueryResult>)>,
     columns: Option<Vec<ColumnInfo>>,
     next_page: u64,
+    empty_pages: u64,
     total_rows: usize,
 }
 
@@ -54,6 +55,8 @@ impl StreamPageCache {
             self.columns = Some(result.columns.clone());
         }
         if index > 0 && result.rows.is_empty() {
+            self.next_page = self.next_page.saturating_add(1);
+            self.empty_pages = self.empty_pages.saturating_add(1);
             return Ok(());
         }
         self.total_rows = self.total_rows.saturating_add(result.rows.len());
@@ -94,7 +97,7 @@ impl StreamPageCache {
         StreamedResult {
             pages: self.pages.iter().map(|(_, page)| page.clone()).collect(),
             first_page: self.first_page(),
-            total_pages: self.next_page,
+            total_pages: self.next_page.saturating_sub(self.empty_pages),
             total_rows: self.total_rows,
             terminal,
             export,
@@ -214,5 +217,18 @@ mod tests {
         cache.append(0, page(&["id"], &[])).unwrap();
         assert_eq!(cache.pages().len(), 1);
         assert_eq!(cache.snapshot(StreamTerminal::Complete, None).total_pages, 1);
+    }
+
+    #[test]
+    fn a_page_after_a_skipped_empty_page_is_still_in_order() {
+        let mut cache = StreamPageCache::default();
+        cache.append(0, page(&["id"], &[1])).unwrap();
+        cache.append(1, page(&["id"], &[])).unwrap();
+
+        cache
+            .append(2, page(&["id"], &[2]))
+            .expect("the next page is not out of order");
+
+        assert_eq!(cache.snapshot(StreamTerminal::Complete, None).total_pages, 2);
     }
 }
