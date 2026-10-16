@@ -47,10 +47,10 @@ pub async fn pg_dump(
     let partial = partial_path(request.output);
     let args = dump_args(request.format, &partial);
     if let Err(error) = run_pg_tool(tool, request.options, args, runtime_dir, cancel).await {
-        let _ = std::fs::remove_file(&partial);
+        let _ = tokio::fs::remove_file(&partial).await;
         return Err(error);
     }
-    std::fs::rename(&partial, request.output)?;
+    tokio::fs::rename(&partial, request.output).await?;
     Ok(())
 }
 

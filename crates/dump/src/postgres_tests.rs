@@ -34,7 +34,7 @@ fn env_value(env: &[(&'static str, OsString)], key: &str) -> Option<String> {
 fn fake_tool(dir: &Path, body: &str) -> ClientTool {
     let path = dir.join("pg_dump");
     std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
     ClientTool {
         name: "pg_dump".into(),
         path,
