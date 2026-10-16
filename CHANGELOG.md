@@ -250,7 +250,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Security
 
-- A Redis `SELECT n` was treated as a read, so read-only connections and agent read access let it switch the shared connection to another database; every Redis command now needs the approval an unrecognised statement needs.
+- A Redis `SELECT n` was treated as a read, so read-only connections and agent read access let it switch the shared connection to another database; it now needs the approval an unrecognised statement needs.
 - Statements that set a password, an encryption key or a connection secret, and text that does not end its strings or comments, are no longer saved in the query history.
 - An agent's write preview on MySQL no longer runs DDL or other statements that MySQL commits immediately; they are refused inside a transaction instead of being applied and reported as rolled back.
 - SQL Server `BEGIN TRAN`, `COMMIT TRAN` and `ROLLBACK TRAN` are now treated as transaction control, so a shared connection refuses them and a session tracks the transaction they open instead of auditing later writes as committed.
