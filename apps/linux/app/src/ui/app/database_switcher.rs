@@ -31,15 +31,17 @@ pub(super) fn database_choices(names: &[String], current: &str) -> Vec<DatabaseC
     choices
 }
 
-fn pending_database_switch_request(
+fn stage_database_switch(
+    pending: &mut Option<(Uuid, String)>,
     transition: super::ConnectionTransition,
     connection_id: Uuid,
     database: String,
-) -> Option<(Uuid, String)> {
+) -> bool {
     if transition != super::ConnectionTransition::Idle {
-        return None;
+        return false;
     }
-    Some((connection_id, database))
+    *pending = Some((connection_id, database));
+    true
 }
 
 pub(super) fn build_database_popover(popover: &gtk::Popover, sender: &ComponentSender<App>) -> gtk::ListBox {
@@ -175,11 +177,10 @@ impl App {
             return;
         }
         saved.database = name.clone();
-        let Some(pending) = pending_database_switch_request(self.connection_transition, id, name) else {
+        if !stage_database_switch(&mut self.pending_database_switch, self.connection_transition, id, name) {
             self.on_open_saved(saved, sender);
             return;
-        };
-        self.pending_database_switch = Some(pending);
+        }
         self.on_open_saved(saved, sender);
     }
 
@@ -254,25 +255,31 @@ mod tests {
 
     #[test]
     fn a_busy_connection_transition_does_not_create_a_pending_database_switch() {
-        let connection_id = Uuid::new_v4();
+        let active_connection_id = Uuid::new_v4();
+        let requested_connection_id = Uuid::new_v4();
         for transition in [
             super::super::ConnectionTransition::Connecting,
             super::super::ConnectionTransition::AwaitingDecision,
             super::super::ConnectionTransition::WaitingForRuns,
             super::super::ConnectionTransition::WaitingForSaves,
         ] {
-            assert_eq!(
-                pending_database_switch_request(transition, connection_id, "next".to_owned()),
-                None
-            );
-        }
-        assert_eq!(
-            pending_database_switch_request(
-                super::super::ConnectionTransition::Idle,
-                connection_id,
+            let existing = Some((active_connection_id, "active".to_owned()));
+            let mut pending = existing.clone();
+            assert!(!stage_database_switch(
+                &mut pending,
+                transition,
+                requested_connection_id,
                 "next".to_owned()
-            ),
-            Some((connection_id, "next".to_owned()))
-        );
+            ));
+            assert_eq!(pending, existing);
+        }
+        let mut pending = None;
+        assert!(stage_database_switch(
+            &mut pending,
+            super::super::ConnectionTransition::Idle,
+            requested_connection_id,
+            "next".to_owned()
+        ));
+        assert_eq!(pending, Some((requested_connection_id, "next".to_owned())));
     }
 }
