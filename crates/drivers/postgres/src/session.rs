@@ -56,6 +56,9 @@ impl tablepro_core::Session for PgSession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
+        if self.active_cursor.as_ref().is_some_and(|cursor| cursor.failed) {
+            self.active_cursor = None;
+        }
         if self.active_cursor.is_some() {
             return Err(DriverError::Unsupported(
                 "query while a forward-only cursor is active".into(),

@@ -199,6 +199,39 @@ async fn query_cursor_preserves_prior_pages_when_a_later_fetch_errors() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_rollback_after_a_failed_fetch_needs_no_explicit_cursor_close() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let mut session = connection.open_session().await.unwrap();
+    session
+        .query_params_controlled("BEGIN READ ONLY ISOLATION LEVEL REPEATABLE READ", &[], &no_timeout())
+        .await
+        .unwrap();
+    let cursor = session
+        .open_query_cursor_controlled(
+            "SELECT 1 / (value - 3) FROM generate_series(1, 5) AS g(value)",
+            &[],
+            &no_timeout(),
+        )
+        .await
+        .unwrap();
+    let failed = session.fetch_query_cursor_page_controlled(cursor, &no_timeout()).await;
+    assert!(matches!(failed, Err(DriverError::Query { .. })), "{failed:?}");
+
+    session
+        .query_params_controlled("ROLLBACK", &[], &no_timeout())
+        .await
+        .expect("the editor's rollback runs without closing the failed cursor first");
+    let after = session
+        .query_params_controlled("SELECT 1::bigint", &[], &no_timeout())
+        .await
+        .unwrap();
+    assert_eq!(after.rows, vec![vec![Value::Int(1)]]);
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_cursor_query_with_a_typo_keeps_the_session_and_its_temp_tables() {
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;

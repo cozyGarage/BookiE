@@ -123,7 +123,13 @@ fn export_page_fetcher(
                     .map_err(export_driver_error)?;
             }
             let Some(cursor) = state.as_ref() else {
-                return Err(ExportError::Source("query cursor streaming is unavailable".into()));
+                let reason = if matches!(query_target, StatementTarget::Session { .. }) {
+                    "this result came from the tab's session, which now has a transaction open or has closed; \
+                     end the transaction or run the query again, then export"
+                } else {
+                    "query cursor streaming is unavailable"
+                };
+                return Err(ExportError::Source(reason.into()));
             };
             let page = match cursor.fetch_page(&control).await {
                 Ok(page) => page,
