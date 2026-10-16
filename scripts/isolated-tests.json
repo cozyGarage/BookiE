@@ -190,7 +190,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_mutations_from_toolbar_context_actions_and_grid_messages"
+      "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selection"
     ],
     [
       "tablepro-app",

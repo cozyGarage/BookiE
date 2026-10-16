@@ -76,14 +76,15 @@ fn launch_with_read_only(tab_id: Uuid, read_only: bool) -> (relm4::Controller<Br
 
 #[test]
 #[ignore = "requires isolated GTK display"]
-fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_grid_messages() {
+fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selection() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch_with_read_only(tab_id, true);
-    load_one_row(&controller, &observed);
+    load_two_rows(&controller, &observed);
 
     let selection = controller.model().current_selection.clone().unwrap();
     selection.select_item(0, false);
+    selection.select_item(1, true);
     controller.model().insert_button.emit_clicked();
     controller
         .sender()
@@ -255,7 +256,7 @@ fn read_only_tab_can_discard_a_pending_local_draft() {
     controller.detach_runtime();
 }
 
-fn load_one_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
+fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
     let columns = vec![column("id", true), column("title", false), column("body", false)];
     controller
         .sender()
@@ -270,7 +271,10 @@ fn load_one_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<B
             .expect("a page was requested"),
         offset: 0,
     };
-    let rows = vec![vec![Value::Int(1), Value::Text("a".into()), Value::Text("b".into())]];
+    let rows = vec![
+        vec![Value::Int(1), Value::Text("a".into()), Value::Text("b".into())],
+        vec![Value::Int(2), Value::Text("c".into()), Value::Text("d".into())],
+    ];
     controller
         .sender()
         .send(BrowseTabInput::RowsLoaded {
@@ -316,7 +320,7 @@ fn edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch(tab_id);
-    load_one_row(&controller, &observed);
+    load_two_rows(&controller, &observed);
 
     edit(&controller, 1, "first");
     pump(&observed);
