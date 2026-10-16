@@ -68,6 +68,8 @@ struct DriverEntry {
     maturity: DriverMaturity,
 }
 
+static CONNECTION_SAVE_TURN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 fn auth_mode_label(mode: AuthMode) -> String {
     match mode {
         AuthMode::Password => crate::tr!("Password"),
@@ -1111,6 +1113,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         query_timeout_secs,
     };
 
+    let _save_turn = CONNECTION_SAVE_TURN.lock().await;
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;
     match saved.auth_mode {
         AuthMode::Password if stored_password.expose_secret().is_empty() => {
