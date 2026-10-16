@@ -567,8 +567,7 @@ fn build_streamed_result_widget(
 ) -> gtk::Widget {
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let page_switcher = gtk::Notebook::new();
-    for (offset, page) in result.pages.iter().enumerate() {
-        let page_index = result.first_page.saturating_add(offset as u64);
+    for (page_index, page) in result.page_indices.iter().copied().zip(&result.pages) {
         let widget = build_result_set_widget(
             page,
             grid_sender,
@@ -962,10 +961,9 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
                 .map(|(index, _)| result_view_key(outcome.identity, index))
                 .collect::<Vec<_>>(),
             StatementOutcomeKind::Streamed(result) => result
-                .pages
+                .page_indices
                 .iter()
-                .enumerate()
-                .map(|(index, _)| result_view_key(outcome.identity, result.first_page as usize + index))
+                .map(|page_index| result_view_key(outcome.identity, *page_index as usize))
                 .collect::<Vec<_>>(),
             StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => Vec::new(),
         })

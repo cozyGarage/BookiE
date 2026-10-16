@@ -24,7 +24,7 @@ pub enum StreamTerminal {
 #[derive(Debug, Clone)]
 pub struct StreamedResult {
     pub(super) pages: Vec<Arc<QueryResult>>,
-    pub(super) first_page: u64,
+    pub(super) page_indices: Vec<u64>,
     pub(super) total_pages: u64,
     pub(super) total_rows: usize,
     pub(super) terminal: StreamTerminal,
@@ -73,6 +73,7 @@ impl StreamPageCache {
         &self.pages
     }
 
+    #[cfg(test)]
     pub(super) fn first_page(&self) -> u64 {
         self.pages.front().map_or(self.next_page, |(index, _)| *index)
     }
@@ -96,7 +97,7 @@ impl StreamPageCache {
             .map(|(query, columns)| crate::ui::export_dialog::StreamExportRequest { query, columns });
         StreamedResult {
             pages: self.pages.iter().map(|(_, page)| page.clone()).collect(),
-            first_page: self.first_page(),
+            page_indices: self.pages.iter().map(|(index, _)| *index).collect(),
             total_pages: self.next_page.saturating_sub(self.empty_pages),
             total_rows: self.total_rows,
             terminal,
