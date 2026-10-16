@@ -23,6 +23,18 @@ impl RateLimiter {
     }
 
     pub fn check(&self, key: &str) -> Result<(), String> {
+        self.admit(key, true)
+    }
+
+    pub fn ensure_available(&self, key: &str) -> Result<(), String> {
+        self.admit(key, false)
+    }
+
+    pub fn record(&self, key: &str) {
+        let _ = self.admit(key, true);
+    }
+
+    fn admit(&self, key: &str, consume: bool) -> Result<(), String> {
         let mut map = self.windows.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let now = Instant::now();
         map.retain(|tracked, entries| {
@@ -32,14 +44,16 @@ impl RateLimiter {
         if !map.contains_key(key) && map.len() >= MAX_TRACKED_KEYS {
             return Err("rate limiter is tracking too many callers".into());
         }
-        let entries = map.entry(key.to_string()).or_default();
-        if entries.len() as u32 >= self.max_per_minute {
+        let used = map.get(key).map_or(0, Vec::len);
+        if used as u32 >= self.max_per_minute {
             return Err(format!(
                 "rate limit exceeded: {} requests / minute",
                 self.max_per_minute
             ));
         }
-        entries.push(now);
+        if consume {
+            map.entry(key.to_string()).or_default().push(now);
+        }
         Ok(())
     }
 }
