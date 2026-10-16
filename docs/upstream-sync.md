@@ -2,6 +2,44 @@
 
 The approved [BookiE convergence sprint](bookie-0.2-sprint.md) now includes shared Rust/Linux foundations as well as behavior review. Apple source trees remain excluded.
 
+## 2026-10-17: PR discussion and competitor follow-up
+
+Refreshed public branch heads after the October 16 scan. Bookie `linux` is at `9a665d9d0`; compared with the reviewed product tip `dab338cc3`, the intervening tree changes are limited to four documentation files. TablePro `linux` remains `7cd300f82`, TablePro `main` remains `bdbcb7de9`, dbx remains `cbdf5c9cd`, DBeaver remains `61c952984`, and Beekeeper Studio remains `f7ff968f3`. No new competitor source commits landed after the reviewed tips.
+
+Reviewed the live GitHub discussion on PRs #996, #1020, #1046, #1037, #1047, #1050, #1002, #1012, #1051 and #1055, and issues #1026, #1029, #1030, #1031, #1032, #1033, #1034, #1054 and #1056. The review comments contain resolved findings and remaining acceptance, not just status updates:
+
+- PR #1020's unconditional Redis `SELECT` refusal broke the app's guarded value refetch. The branch narrowed the refusal to bare database-switch commands, added regression coverage for the native read and quoted/bare `SELECT` forms, and merged. Preserve the read path and refusal cases in future classifier work.
+- PR #1050's review found missing direct coverage for Undo, Redo and paste, then missing toolbar, shortcut and bulk-selection paths. Follow-up tests cover those routes; the issue remains open for keyless/read-only object cases and real `PolicyGuard` composition.
+- PR #1047's focus, quit, close and disconnect scenarios are covered, and headless tests now pin late-save ownership. Bulk tab-close menu actions remain an installed manual check because the GTK fixture cannot dispatch them. The last full preflight reported six SSH askpass/fake-SSH failures even though isolated diagnostics passed; keep that run red in the evidence. PR #1047 was subsequently synced to BookiE `linux` `9a665d9d0` and pushed at `95164c536`; `git range-diff` confirmed all seven PR-owned commits unchanged. Checks for the new head need their own result before being described as green.
+- PRs #1002 and #1012 still own the streamed-tab/session prerequisites for #1032; #1016's recovery disposition remains open. The source audit and synthetic profile show that page-count limits do not bound all retained owners. Do not start overlapping retention implementation before the dependencies land.
+- Issue #1030 has native NULL/default observations and a proposed UX contract, but the B3 decision is still required before changing shared parsing or app adapters. Issues #1033/#1034 retain the B3 typed-message then GTK-consumer order. Issue #1054 waits for #1051. Issue #1056 has the documented B3-to-UX handoff and a narrowed SQLite PRAGMA-shadowing scope.
+
+At this refresh, #1026 and its active peer-review children remained open; PEER-6/#1028 is complete, and #1020, #1046 and #1037 were merged. #996 remained open, and #1055 had merged as commit `258c5c0e1`. The #1026 issue body still has #1028 unchecked even though the boundary-checker PR #1037 is merged and local tracking docs mark that slice complete; the issue checklist needs reconciliation. The TablePro/dbx/DBeaver/Beekeeper source heads match the October 17 comparison, so the competitor source scan has no newly landed commits to add. Release-note dates remain those recorded in the comparison.
+
+The refreshed dbx issue and merge feed adds cases for Bookie to test or monitor, not claims that Bookie is affected: [#12484](https://github.com/t8y2/dbx/issues/12484) reports a phantom second page when a MySQL result has exactly 100 rows; [#12504](https://github.com/t8y2/dbx/issues/12504) reports MySQL LONGTEXT writes truncated at 4096 characters; and [#12478](https://github.com/t8y2/dbx/issues/12478) reports query-tab renaming mutating an object-tab label. Proposed dbx PR [#12509](https://github.com/t8y2/dbx/pull/12509) is closed without merge, so it is not evidence that the tab-identity bug was fixed. Merged PRs [#12434](https://github.com/t8y2/dbx/pull/12434), [#12435](https://github.com/t8y2/dbx/pull/12435) and [#12468](https://github.com/t8y2/dbx/pull/12468) reinforce exact page-boundary, bounded-metadata and budget-execution tests.
+
+The October 16 DBeaver [SQLite metadata shadowing fix](https://github.com/dbeaver/dbeaver/pull/42376) exposed a related Bookie edge case. Local reproduction now covers same-named user tables in both `temp` and `main`; [#1056](https://github.com/cozyGarage/BookiE/issues/1056) tracks a fix that must retain metadata visibility across pooled SQLite connections. The earlier peer-review note that Bookie did not use the same table-valued PRAGMA pattern is superseded by this reproduction; the archived review remains unchanged as a historical record. The workspace identity follow-up [#1054](https://github.com/cozyGarage/BookiE/issues/1054) also remains open under parent #1026.
+
+## 2026-10-16: refreshed TablePro Linux and shared-product review
+
+Checked live GitHub branch tips on 2026-10-16: TablePro `linux` at `7cd300f82eaa4743d18ab049bf40a374d3ecf927`, TablePro `main` at `bdbcb7de95a267aab261e258fc6d5c745261848f`, and BookiE `linux` at `f2f9200b07d1e40aa6d1345135f589df73a9089c`. This is a bounded review of merged pull requests, not a full branch diff or runtime test. The detailed cross-client findings and BookiE dispositions are in the [October 16 peer review](archive/linux-peer-review-2026-10-16.md#2026-10-16-follow-up-source-scan).
+
+New Linux fixes reviewed:
+
+- [#3455](https://github.com/TableProApp/TablePro/pull/3455) exposed both false positives and misses in SQLite column-drop dependency detection. It lets SQLite validate the rebuilt schema after restoring dependent objects. Transfer the test matrix (same-named tokens in unrelated SQL, plus triggers that actually reference the dropped column); do not replace BookiE's driver path based on the PR description alone.
+- [#3451](https://github.com/TableProApp/TablePro/pull/3451) removes an SSH host-key replacement choice when `StrictHostKeyChecking yes` makes replacement unusable, and fixes the resulting guidance. Verify BookiE's prompt against the effective OpenSSH policy before changing its flow.
+- [#3449](https://github.com/TableProApp/TablePro/pull/3449) closes a ClickHouse mutation-outcome race by checking active queries before flushing and reading the query log. The transferable invariant is to order observations around the server's completion guarantee; this does not establish equivalent BookiE query-log semantics.
+- [#3448](https://github.com/TableProApp/TablePro/pull/3448) connects a visible deletion-confirmation preference to the operation it describes. Test preferences through the actual action path, and test late save completion after its dialog closes.
+- [#3438](https://github.com/TableProApp/TablePro/pull/3438) documents a GTK 4.22 focus/parenting hang and dropped active edits on close. BookiE tracks the analogous lifecycle matrix in [#1029](https://github.com/cozyGarage/BookiE/issues/1029); PR [#1047](https://github.com/cozyGarage/BookiE/pull/1047) is active, so do not create a competing fix.
+
+Main-branch probes reviewed:
+
+- [#3428](https://github.com/TableProApp/TablePro/pull/3428) makes blank typed cells produce NULL for selected types while retaining empty text/binary, across grid, inspector, fill and paste. BookiE's blank/default distinction is tracked in [#1030](https://github.com/cozyGarage/BookiE/issues/1030); preserve its current contract until B3 resolves it with stored-value tests.
+- [#3436](https://github.com/TableProApp/TablePro/pull/3436) scopes tabs by selected database. BookiE confirmed connection-only workspace identity and tracks same-connection database isolation in [#1054](https://github.com/cozyGarage/BookiE/issues/1054); its issue requires legacy-state and two-database tests.
+- [#3456](https://github.com/TableProApp/TablePro/pull/3456) is a useful Settings accessibility/scrolling probe, but it is SwiftUI-specific. Reproduce the behavior in GTK before adopting a UI change.
+
+No upstream implementation was copied, and no new BookiE issue was opened by this review. The unreviewed remainder of either branch and all platform runtime behavior remain outside this checkpoint.
+
 ## 2026-10-15: upstream Linux changelog review
 
 Reviewed upstream `linux` at `20ed72497` (`fix(linux): require the GLES library GTK loads at runtime in the rpm`) from `0e542e3c1` (`chore(linux): drop files main already deleted`, 2026-09-18), against BookiE `linux` at `46a4979b3`. Fourteen commits touch `linux/`. Most are the driver contract v2 switch and remediation steps 31 to 66 on a session crate we do not share. Upstream also rewrote `linux/CHANGELOG.md`, so its Fixed and Security lines were screened as hypotheses against our code. Upstream is AGPL-3.0; every fix below is reimplemented here, not copied.
