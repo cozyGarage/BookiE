@@ -52,6 +52,17 @@ def scenarios(ui):
         ui.wait_for_node(name="1 unsaved change")
         save_and_assert_notes(database)
 
+    def active_cell_edit_stages_once_when_focus_moves_to_another_cell(database, base):
+        begin_edit(database)
+        cell = ui.wait_for_node(name="beta", role=ui.pyatspi.ROLE_LABEL)
+        bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+        gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+        ui.wait_for_node(name="1 unsaved change")
+        time.sleep(0.3)
+        assert ui.find_node(name="2 unsaved changes") is None, "moving focus staged the same edit more than once"
+        assert notes(database) == [(1, "alpha"), (2, "beta")]
+        save_and_assert_notes(database)
+
     def active_cell_edit_survives_cancelled_tab_close(database, base):
         cancel_close_and_save(database, "win.close-current", "Save changes to “safety_items”?")
 
@@ -110,6 +121,7 @@ def scenarios(ui):
 
     result = [
         active_cell_edit_enter_control,
+        active_cell_edit_stages_once_when_focus_moves_to_another_cell,
         active_cell_edit_survives_cancelled_tab_close,
         active_cell_edit_survives_cancelled_keyboard_close,
         active_cell_edit_survives_cancelled_close_button,
