@@ -105,8 +105,27 @@ def scenarios(ui):
     def active_cell_edit_survives_cancelled_window_quit(database, base):
         cancel_close_and_save(database, "win.quit", "Save changes before closing?")
 
+    def active_cell_edit_saves_before_window_quit(database, base):
+        begin_edit(database)
+        ui.invoke_accessible_action("win.quit")
+        prompt = ui.wait_for_node(name="Save changes before closing?", role=ui.pyatspi.ROLE_ALERT)
+        ui.invoke(ui.wait_within(prompt, name="Save", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and notes(database) != [(1, "gamma"), (2, "beta")]:
+            time.sleep(ui.POLL_SECONDS)
+        assert notes(database) == [(1, "gamma"), (2, "beta")], "quit did not save the active cell edit"
+        ui.wait_for_node_containing("BookiE", role=ui.pyatspi.ROLE_FRAME, present=False)
+
     def active_cell_edit_survives_cancelled_disconnect(database, base):
         cancel_close_and_save(database, "win.disconnect", "Discard pending changes?")
+
+    def active_cell_edit_discards_when_disconnect_is_confirmed(database, base):
+        begin_edit(database)
+        ui.invoke_accessible_action("win.disconnect")
+        prompt = ui.wait_for_node(name="Discard pending changes?", role=ui.pyatspi.ROLE_ALERT)
+        ui.invoke(ui.wait_within(prompt, name="Discard and disconnect", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="New connection", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+        assert notes(database) == [(1, "alpha"), (2, "beta")], "disconnect committed a discarded edit"
 
     def active_cell_edit_saves_when_close_button_targets_an_inactive_tab(database, base):
         begin_edit(database)
@@ -128,8 +147,10 @@ def scenarios(ui):
         active_cell_edit_save_then_close_persists_the_value,
         active_cell_edit_discard_then_close_leaves_the_database_unchanged,
         active_cell_edit_survives_cancelled_window_quit,
+        active_cell_edit_saves_before_window_quit,
         active_cell_edit_keeps_its_preview_when_another_table_opens,
         active_cell_edit_survives_cancelled_disconnect,
+        active_cell_edit_discards_when_disconnect_is_confirmed,
         active_cell_edit_saves_when_close_button_targets_an_inactive_tab,
     ]
     for scenario in result:
