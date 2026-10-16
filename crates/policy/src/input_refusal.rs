@@ -34,6 +34,6 @@ fn is_redis_database_switch(sql: &str, dialect: &dyn Dialect) -> bool {
         .collect();
     matches!(
         words.as_slice(),
-        [Token::Word(select), Token::Number(..)] if select.value.eq_ignore_ascii_case("SELECT")
+        [Token::Word(select), _] if select.quote_style.is_none() && select.value.eq_ignore_ascii_case("SELECT")
     )
 }

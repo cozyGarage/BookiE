@@ -3,7 +3,16 @@ use tablepro_policy::{StatementClass, classify};
 
 #[test]
 fn a_redis_select_switches_databases_and_is_not_a_read() {
-    for command in ["SELECT 2", "select 0", "SELECT 15;", "FLUSHDB", "GET key"] {
+    for command in [
+        "SELECT 2",
+        "select 0",
+        "SELECT 15;",
+        "SELECT \"2\"",
+        "SELECT '2'",
+        "SELECT db",
+        "FLUSHDB",
+        "GET key",
+    ] {
         let facts = classify(command, "redis");
         assert_eq!(facts.class, StatementClass::Unparseable, "{command}");
         assert!(facts.writes(), "{command}");
