@@ -1089,8 +1089,10 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
     } = opened;
 
     let tls_mode = opts_clone.tls.mode;
+    let _save_turn = CONNECTION_SAVE_TURN.lock().await;
+    let existing = find_existing(&identity).await.or(existing);
     let saved = SavedConnection {
-        id,
+        id: existing.as_ref().map_or(id, |connection| connection.id),
         name: label.clone(),
         driver_id: driver_id.clone(),
         host: opts_clone.host.clone(),
@@ -1113,7 +1115,6 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         query_timeout_secs,
     };
 
-    let _save_turn = CONNECTION_SAVE_TURN.lock().await;
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;
     match saved.auth_mode {
         AuthMode::Password if stored_password.expose_secret().is_empty() => {
