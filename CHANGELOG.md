@@ -8,7 +8,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - SQL completion inserts complete dialect-quoted table and column names, preserves aliases, and offers scoped metadata instead of arbitrary editor words.
 - Large SQL query results stream in bounded pages, can be pinned, and can be fully exported by running the guarded query again.
 - CSV imports into PostgreSQL, MySQL/MariaDB and SQLite can preserve explicit auto-increment values from mapped columns; generated columns remain database-owned.
-- Editable text columns open a bounded full-value dialog; Apply stages the exact multiline text, while Set to NULL remains a separate action.
+- Editable text and JSON columns open a bounded full-value dialog; JSON input is validated, source-text JSON retains its exact text, and Format JSON makes semantic formatting changes visible before Apply.
 - At narrow window widths, the navigation sidebar collapses and the Fold block and Unfold all toolbar buttons hide so the remaining editor controls stay in view; their keyboard shortcuts still work.
 - Switching database drivers keeps custom connection values and updates fields that still use the previous driver's defaults.
 - Duplicating a password-authenticated connection with a saved password opens the copy's credential form so its password can be entered before connecting.
@@ -239,6 +239,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - After a transaction start is interrupted with an unknown outcome (for example an MCP write preview that times out), the connection stops accepting governed writes until it is replaced, instead of carrying on as if nothing had happened.
 - PostgreSQL column completion now tells apart a quoted mixed-case table such as "Users" from users, and keeps dots and doubled quotes inside quoted names.
 - Browsing or querying a MongoDB collection no longer holds a whole sample of documents in memory while it works out the column types, which could exhaust memory on collections with very large documents.
+- Pasting several columns into the grid now follows the order you see, skipping hidden columns, instead of the table's own column order; pasting from a hidden column is refused.
 - Browse filters Contains, Starts with and Ends with now match a literal % or _ typed in the search on SQLite, DuckDB and SQL Server, and a typed [ on SQL Server, instead of treating them as wildcards or returning wrong rows.
 - The SQLite table list now shows user tables whose names start with sqlite followed by another character, such as sqlite3_results.
 - The grid's Set to NULL action now refuses read-only cells and columns that do not accept NULL, with a message, instead of staging a change that would fail on save.
@@ -247,6 +248,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Security
 
 - An agent's write preview on MySQL no longer runs DDL or other statements that MySQL commits immediately; they are refused inside a transaction instead of being applied and reported as rolled back.
+- SQL Server `BEGIN TRAN`, `COMMIT TRAN` and `ROLLBACK TRAN` are now treated as transaction control, so a shared connection refuses them and a session tracks the transaction they open instead of auditing later writes as committed.
 - Agent result masking now treats `to_json` / `to_jsonb` and JSON object builders the same as `row_to_json` when deciding which columns to redact.
 - Agent result masking now redacts columns whose projection source cannot be resolved, and masks whole-row wildcard arguments instead of leaving them clear.
 - A session or governed-write lockdown refusal is now recorded in the audit journal instead of ending without a terminal audit state.
@@ -265,6 +267,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Agent masking covers PostgreSQL XML serialization results and redacts driver errors that could contain masked values.
 - Administrative PostgreSQL function matching respects qualified names.
 - Constant numeric predicates are evaluated exactly when checking whether a write is scoped.
+- The built-in SSH client is updated to a release that fixes recent upstream security advisories.
 
 ## [0.1.5] - 2026-09-27
 - Choosing the system OpenSSH client inside the Flatpak build now stops immediately with a message to use the built-in SSH client.
