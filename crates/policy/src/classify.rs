@@ -5,7 +5,6 @@ use sqlparser::ast::{
 };
 use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
 use sqlparser::parser::Parser;
-use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
 use crate::admin_functions::is_administrative_function_name;
 use crate::constant_predicate::is_constant_true;
@@ -118,8 +117,8 @@ fn analyze_statement_inner(
         return failed_analysis("empty SQL");
     }
 
-    if driver_id == "mysql" && sql_contains_mysql_executable_comment(trimmed, dialect.as_ref()) {
-        return failed_analysis("MySQL executable comments are not safely classified");
+    if let Some(reason) = crate::input_refusal::refusal(trimmed, driver_id, dialect.as_ref()) {
+        return failed_analysis(reason);
     }
 
     let statements = match Parser::parse_sql(dialect.as_ref(), trimmed) {
@@ -132,7 +131,11 @@ fn analyze_statement_inner(
     }
 
     let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
-    let facts = classify_statements(&statements, effects, contains_administrative_call);
+    let facts = crate::select_writes::with_locking_backstop(
+        classify_statements(&statements, effects, contains_administrative_call),
+        trimmed,
+        dialect.as_ref(),
+    );
     let (blast_radius, sensitive_positions, known_statement_rows) = if include_execution_plans {
         let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(&statements, driver_id);
         (
@@ -205,17 +208,6 @@ fn failed_analysis(message: impl Into<String>) -> StatementAnalysis {
         sensitive_positions: None,
         known_statement_rows: Vec::new(),
     }
-}
-
-fn sql_contains_mysql_executable_comment(sql: &str, dialect: &dyn Dialect) -> bool {
-    let Ok(tokens) = Tokenizer::new(dialect, sql).tokenize() else {
-        return false;
-    };
-
-    tokens.iter().any(|token| {
-        matches!(token, Token::Whitespace(Whitespace::MultiLineComment(comment))
-            if comment.starts_with('!') || comment.starts_with("M!"))
-    })
 }
 
 /// Detect administrative calls anywhere in a successfully parsed statement.
@@ -631,28 +623,6 @@ fn set_expr_tables(body: &SetExpr) -> Vec<String> {
     }
 }
 
-pub(crate) fn expr_writes(expr: &Expr) -> bool {
-    match expr {
-        Expr::Subquery(q) => classify_query(q).class.is_write(),
-        Expr::BinaryOp { left, right, .. } => expr_writes(left) || expr_writes(right),
-        Expr::UnaryOp { expr, .. } => expr_writes(expr),
-        Expr::Nested(e) => expr_writes(e),
-        Expr::Case {
-            operand,
-            conditions,
-            else_result,
-            ..
-        } => {
-            operand.as_ref().is_some_and(|e| expr_writes(e))
-                || conditions
-                    .iter()
-                    .any(|c| expr_writes(&c.condition) || expr_writes(&c.result))
-                || else_result.as_ref().is_some_and(|e| expr_writes(e))
-        }
-        _ => false,
-    }
-}
-
 fn object_name_strings(name: &ObjectName) -> Vec<String> {
     vec![name.to_string()]
 }
@@ -690,6 +660,7 @@ fn table_factor_names(factor: &TableFactor) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
