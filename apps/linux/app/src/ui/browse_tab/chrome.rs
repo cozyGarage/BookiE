@@ -340,6 +340,10 @@ impl BrowseTab {
         !self.read_only
     }
 
+    pub(super) fn allows_keyed_row_mutations(&self) -> bool {
+        self.allows_row_mutations() && self.current_columns.iter().any(|column| column.primary_key)
+    }
+
     /// Update the Filter button's count badge + tooltip based on the
     /// current FilterSet. Active filters reveal a small numeric badge
     /// next to the funnel icon and a count-aware tooltip; empty hides

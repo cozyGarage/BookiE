@@ -3,6 +3,16 @@ use relm4::ComponentSender;
 use super::*;
 
 impl BrowseTab {
+    pub(super) fn reject_keyless_mutation(&self, input: &BrowseTabInput, sender: &ComponentSender<Self>) -> bool {
+        if self.allows_keyed_row_mutations() || !requires_row_key(input) {
+            return false;
+        }
+        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+            "This table has no primary key. Inline editing is disabled."
+        )));
+        true
+    }
+
     pub(super) fn reject_read_only_mutation(&self, input: &BrowseTabInput, sender: &ComponentSender<Self>) -> bool {
         if self.allows_row_mutations() || !is_row_mutation_input(input) {
             return false;
@@ -790,6 +800,20 @@ fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
             | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::Undo
             | BrowseTabInput::Redo
+            | BrowseTabInput::CommitSave
+            | BrowseTabInput::Paste(_)
+            | BrowseTabInput::PasteText(_)
+    )
+}
+
+fn requires_row_key(input: &BrowseTabInput) -> bool {
+    matches!(
+        input,
+        BrowseTabInput::InsertRow
+            | BrowseTabInput::DuplicateRow { .. }
+            | BrowseTabInput::GridCellEdited { .. }
+            | BrowseTabInput::GridSetCellNull { .. }
+            | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::CommitSave
             | BrowseTabInput::Paste(_)
             | BrowseTabInput::PasteText(_)

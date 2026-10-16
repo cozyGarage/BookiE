@@ -257,6 +257,44 @@ fn read_only_tab_can_discard_a_pending_local_draft() {
     controller.detach_runtime();
 }
 
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn keyless_tab_rejects_inline_edits_and_insert_actions() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch(tab_id);
+    load_keyless_row(&controller, &observed);
+
+    controller
+        .sender()
+        .send(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 0,
+            new_value: "changed".into(),
+            value: None,
+            row_key: Vec::new(),
+        })
+        .unwrap();
+    controller.sender().send(BrowseTabInput::InsertRow).unwrap();
+    let outputs = pump(&observed);
+
+    assert_eq!(pending(tab_id), 0, "keyless mutation routes must not create drafts");
+    assert_eq!(
+        transactions(&outputs),
+        0,
+        "keyless mutation routes must not dispatch a save"
+    );
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+            .count(),
+        2,
+        "each refused keyless mutation must explain why it was blocked"
+    );
+    controller.detach_runtime();
+}
+
 fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
     let columns = vec![column("id", true), column("title", false), column("body", false)];
     controller
@@ -283,6 +321,36 @@ fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<
             result: QueryResult {
                 columns,
                 rows,
+                truncated: false,
+            },
+            projected_columns: None,
+        })
+        .unwrap();
+    pump(observed);
+}
+
+fn load_keyless_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
+    let columns = vec![column("title", false)];
+    controller
+        .sender()
+        .send(BrowseTabInput::ColumnsLoaded(columns.clone()))
+        .unwrap();
+    pump(observed);
+    let request = BrowsePageRequest {
+        id: controller
+            .model()
+            .page_requests
+            .current_id()
+            .expect("a page was requested"),
+        offset: 0,
+    };
+    controller
+        .sender()
+        .send(BrowseTabInput::RowsLoaded {
+            request,
+            result: QueryResult {
+                columns,
+                rows: vec![vec![Value::Text("original".into())]],
                 truncated: false,
             },
             projected_columns: None,

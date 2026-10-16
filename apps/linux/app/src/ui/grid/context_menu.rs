@@ -50,7 +50,13 @@ pub(super) fn install_grid_context_menus(
     let context: Rc<RefCell<Option<CellContext>>> = Rc::new(RefCell::new(None));
     let columns = Rc::new(result_columns.to_vec());
     let local_result = options.local_result_view.is_some();
-    let editable_menu = build_menu(true, true, true, options.filterable, local_result);
+    let editable_menu = build_menu(
+        true,
+        options.row_mutations_allowed,
+        true,
+        options.filterable,
+        local_result,
+    );
     let readonly_menu = build_menu(false, false, true, options.filterable, local_result);
     let empty_menu = empty_grid_menu(options.row_mutations_allowed);
 
@@ -949,6 +955,20 @@ mod tests {
     #[test]
     fn an_empty_writable_grid_menu_offers_insert_row() {
         assert_eq!(empty_grid_menu(true).n_items(), 2);
+    }
+
+    #[test]
+    fn editable_grid_menu_hides_row_mutations_when_the_table_has_no_key() {
+        let menu = build_menu(true, false, true, true, false);
+        let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
+        assert_eq!(actions.n_items(), 4);
+    }
+
+    #[test]
+    fn editable_grid_menu_offers_row_mutations_when_the_table_has_a_key() {
+        let menu = build_menu(true, true, true, true, false);
+        let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
+        assert_eq!(actions.n_items(), 8);
     }
 
     #[test]
