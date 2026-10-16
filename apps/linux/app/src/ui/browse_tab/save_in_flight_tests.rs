@@ -1,5 +1,5 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
-use relm4::gtk::prelude::SelectionModelExt;
+use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, WidgetExt};
 use relm4::{Component, ComponentController};
 use std::sync::mpsc::Receiver;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
@@ -74,7 +74,7 @@ fn launch_with_read_only(tab_id: Uuid, read_only: bool) -> (relm4::Controller<Br
 
 #[test]
 #[ignore = "requires isolated GTK display"]
-fn read_only_tab_rejects_mutations_from_toolbar_shortcuts_and_grid_dispatch() {
+fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_grid_messages() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch_with_read_only(tab_id, true);
@@ -82,7 +82,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_shortcuts_and_grid_dispatch() {
 
     let selection = controller.model().current_selection.clone().unwrap();
     selection.select_item(0, false);
-    controller.sender().send(BrowseTabInput::InsertRow).unwrap();
+    controller.model().insert_button.emit_clicked();
     controller
         .sender()
         .send(BrowseTabInput::DuplicateRow { row_position: 0 })
@@ -135,12 +135,16 @@ fn read_only_tab_rejects_mutations_from_toolbar_shortcuts_and_grid_dispatch() {
             snapshot: controller.model().capture_paste_snapshot(),
         }))
         .unwrap();
-    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
-    controller
-        .model()
-        .grid_sender
-        .send(crate::ui::grid::GridMsg::InsertRow)
-        .unwrap();
+    controller.model().save_button.emit_clicked();
+    assert!(
+        controller
+            .model()
+            .current_column_view
+            .as_ref()
+            .expect("the loaded page has a grid")
+            .activate_action("cell.insert-row", None)
+            .is_ok()
+    );
     controller
         .model()
         .grid_sender
