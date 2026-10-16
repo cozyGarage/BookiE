@@ -1024,11 +1024,13 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
     }
 }
 
+mod administrative;
 mod bulk;
 mod connection;
 mod panic_boundary;
 mod session;
 
+pub use administrative::AdministrativeOperation;
 pub use bulk::{BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, MAX_BULK_ROW_BUDGET};
 
 #[cfg(test)]
