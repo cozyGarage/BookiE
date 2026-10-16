@@ -74,7 +74,7 @@ fn launch_with_read_only(tab_id: Uuid, read_only: bool) -> (relm4::Controller<Br
 
 #[test]
 #[ignore = "requires isolated GTK display"]
-fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
+fn read_only_tab_rejects_mutations_from_toolbar_shortcuts_and_grid_dispatch() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch_with_read_only(tab_id, true);
@@ -136,6 +136,43 @@ fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
         }))
         .unwrap();
     controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::InsertRow)
+        .unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::DuplicateRow { row_position: 0 })
+        .unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::DeleteRowAt {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::SetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::CellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "grid edit".into(),
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
     let outputs = pump(&observed);
 
     assert_eq!(
@@ -148,7 +185,7 @@ fn read_only_tab_rejects_mutations_from_grid_keyboard_and_toolbar_inputs() {
         .iter()
         .filter(|output| matches!(output, BrowseTabOutput::ShowToast(message) if message == "This connection is read-only."))
         .count();
-    assert_eq!(refused, 11, "every read-only mutation message must be refused");
+    assert_eq!(refused, 16, "every read-only mutation message must be refused");
     controller.detach_runtime();
 }
 
