@@ -132,7 +132,11 @@ fn analyze_statement_inner(
     }
 
     let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
-    let facts = classify_statements(&statements, effects, contains_administrative_call);
+    let facts = crate::select_writes::with_locking_backstop(
+        classify_statements(&statements, effects, contains_administrative_call),
+        trimmed,
+        dialect.as_ref(),
+    );
     let (blast_radius, sensitive_positions, known_statement_rows) = if include_execution_plans {
         let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(&statements, driver_id);
         (
