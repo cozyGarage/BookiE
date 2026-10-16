@@ -1,5 +1,7 @@
 mod browse;
 mod bundle;
+#[cfg(test)]
+mod close_after_save_tests;
 mod connection;
 mod database_switcher;
 mod editor_files;
