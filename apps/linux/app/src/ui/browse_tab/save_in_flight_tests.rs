@@ -189,6 +189,31 @@ fn read_only_tab_rejects_mutations_from_toolbar_shortcuts_and_grid_dispatch() {
     controller.detach_runtime();
 }
 
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn read_only_tab_can_discard_a_pending_local_draft() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch_with_read_only(tab_id, true);
+    crate::services::change_tracker::with_tab(tab_id, |tracker| tracker.track_insert(vec![Value::Null]))
+        .expect("tab tracker exists");
+
+    assert_eq!(pending(tab_id), 1);
+    controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
+    let outputs = pump(&observed);
+
+    assert_eq!(pending(tab_id), 0, "discarding a local draft must remain available");
+    assert_eq!(
+        transactions(&outputs),
+        0,
+        "discarding a local draft must not dispatch a database write"
+    );
+    assert!(!outputs.iter().any(
+        |output| matches!(output, BrowseTabOutput::ShowToast(message) if message == "This connection is read-only.")
+    ));
+    controller.detach_runtime();
+}
+
 fn load_one_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
     let columns = vec![column("id", true), column("title", false), column("body", false)];
     controller
