@@ -64,6 +64,12 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Enter submits the form and Escape dismisses without changing saved data. **2026-10-12 Hyprland dark:** Enter failed; fixed by [#737](https://github.com/cozyGarage/BookiE/pull/737). The GTK regression covers nested entry activation; rerun the keyboard flow on installed Wayland.
 - [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels. **2026-10-12 Hyprland dark:** failed before the shortcut window was reorganized in [#725](https://github.com/cozyGarage/BookiE/pull/725); installed retest pending.
 
+## Production marker
+
+- [ ] Connect to a connection marked Production: the header bar is tinted red, a red **Production** badge shows beside Read-only, and the window title starts with `[Production]` in the taskbar or Alt-Tab. Open a table and change a cell: the title reads `• [Production] …`. The badge text and the tinted bar are readable in light and dark.
+- [ ] Disconnect, or connect to a Dev, Staging or Local connection: the badge, the tint and the title prefix are gone.
+- [ ] A Production connection that is also Read-only shows both badges.
+
 ## Connection list
 
 - [ ] Connections are grouped, with one section per group and an ungrouped section.
@@ -85,6 +91,9 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] The connect dialog shows Connect timeout and Query timeout rows; 0 means default. **2026-10-12 Hyprland dark:** passed.
 - [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after about 2 seconds, while another connection still uses the Preferences timeout. **2026-10-12 Hyprland dark:** stopped after 2.007 s, passed; the wording was fixed by [#668](https://github.com/cozyGarage/BookiE/pull/668). The second connection and installed retest remain pending.
 - [ ] A connect timeout of 3 seconds to an unreachable host fails after about 3 seconds.
+
+- [ ] With a 2-second query timeout, run `SELECT pg_sleep(5)` on PostgreSQL (streamed) and `SELECT SLEEP(5)` on MySQL (materialized): after each, the toolbar shows **Run again with an 8s timeout**. Click it: the same query runs and completes. Running any other query removes the button, and the saved timeout is still 2 seconds.
+- [ ] Edit the editor text after a timeout, then click the button: the query that timed out runs, not the new text.
 
 ## Connection bundles
 
