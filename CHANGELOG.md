@@ -115,6 +115,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Refreshing a table waits until its pending save finishes, so a failed save does not lose edits.
 - An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
 - A write refused because another write is still in flight no longer disables later writes on that connection; unresolved outcomes remain fail-closed.
+- MySQL sessions allow locking reads, user-variable assignments, savepoints and supported SHOW forms inside an open transaction; rollback does not undo session effects such as user variables or named locks.
 - The MCP token dialog reports whether the one-time token was saved in the system keyring and explains what to do if it was not.
 - The Keyboard Shortcuts window splits table browsing into shorter groups, describes mouse selection gestures separately and combines repeated context-sensitive save, undo and cancel actions.
 - About, Arch package, Flatpak, and translation metadata link to the BookiE repository.
@@ -135,7 +136,6 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
-- MySQL interactive transactions now allow locking reads, user variables, savepoints and supported SHOW forms without implicit commits; rollback does not undo session effects such as user variables or named locks.
 - After a tunnel drop during a Session transaction, a fresh editor session can run read queries again: ending its read-only snapshot with ROLLBACK is no longer refused by the earlier unresolved write, while commits and writes on that connection stay blocked.
 - Cancelling a PostgreSQL backup removes its partial file; a started restore that is cancelled or fails leaves governed writes on that connection blocked after reconnect while its outcome remains unknown.
 - Read-only connections refuse grid edits through alternate actions while still allowing local drafts to be discarded or undone and redone without changing stored data.
