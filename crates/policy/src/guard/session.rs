@@ -325,7 +325,11 @@ impl Session for PolicySession {
     }
 
     fn is_usable(&self) -> bool {
-        !self.retired && self.inner.is_usable()
+        !self.retired
+            && self
+                .guard
+                .caught_sync("SESSION STATUS", || self.inner.is_usable())
+                .unwrap_or(false)
     }
 
     fn transaction_open(&self) -> bool {
@@ -459,7 +463,7 @@ impl PolicySession {
             )
             .await;
         self.cursor = None;
-        self.retired |= result.is_err() || !self.inner.is_usable();
+        self.retired |= result.is_err() || !self.is_usable();
     }
 
     fn note_cursor_error(&mut self, error: &DriverError) {

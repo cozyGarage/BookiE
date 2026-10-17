@@ -10,7 +10,7 @@ Drivers decode whatever the server sends. A hostile, compromised, or merely bugg
 
 At the time, nothing in the application caught that. There was no `catch_unwind`, no `JoinError` inspection, and no panic hook anywhere in `app`, `mcp`, or `agentd`. A panic inside a Relm4 command killed that task silently. The component that dispatched it was waiting for a message that would now never arrive, so the interface kept showing "Loading" forever with no error, no log entry tying the hang to a cause, and no audit outcome for an operation that had already recorded its intent.
 
-The workspace lints deny `unwrap`, `expect` and `panic!` in our own code. They say nothing about a dependency's code, which is where this panic originates.
+The workspace lints deny `unwrap`, `expect` and `panic!` in our own code. They say nothing about a dependency's code, which is where this panic originates. When this decision was written, the SQL Server driver used a pinned Tiberius revision, so the panic could not be fixed in our code. The workspace now uses the crates.io Tiberius 0.13 release; containment still applies to every driver and remains necessary.
 
 ## Decision
 

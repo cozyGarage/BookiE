@@ -2,6 +2,77 @@ use super::*;
 use crate::approval::AutoApproveSink;
 use crate::guard::ConnectionFaultSink;
 
+struct PanickingStatusConn;
+
+#[async_trait]
+impl Connection for PanickingStatusConn {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        Ok(Vec::new())
+    }
+
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        Ok(Vec::new())
+    }
+
+    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        Ok(Vec::new())
+    }
+
+    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+        Ok(Box::new(PanickingStatusSession))
+    }
+
+    fn supports_server_cancellation(&self) -> bool {
+        panic!("secret capability panic")
+    }
+
+    async fn ping(&self) -> Result<(), DriverError> {
+        Ok(())
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
+
+struct PanickingStatusSession;
+
+#[async_trait]
+impl tablepro_core::Session for PanickingStatusSession {
+    async fn query_params_controlled(
+        &mut self,
+        _: &str,
+        _: &[Value],
+        _: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    fn is_usable(&self) -> bool {
+        panic!("secret session status panic")
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
+
 #[derive(Default)]
 pub(super) struct RecordingFault {
     pub(super) operations: Mutex<Vec<String>>,
@@ -26,6 +97,30 @@ fn guard_with_fault(connection: Arc<dyn Connection>, fault: Arc<RecordingFault>)
         ),
     )
     .with_fault_sink(fault)
+}
+
+#[test]
+fn a_panicking_connection_capability_is_contained_and_reports_the_connection() {
+    let fault = Arc::new(RecordingFault::default());
+    let guard = guard_with_fault(Arc::new(PanickingStatusConn), fault.clone());
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| guard.supports_server_cancellation()));
+
+    assert!(!result.expect("capability panic is contained"));
+    assert_eq!(
+        *fault.operations.lock().expect("fault lock"),
+        vec!["SERVER CANCELLATION CAPABILITY"]
+    );
+}
+
+#[tokio::test]
+async fn a_panicking_session_health_check_is_contained_and_reports_the_connection() {
+    let fault = Arc::new(RecordingFault::default());
+    let guard = guard_with_fault(Arc::new(PanickingStatusConn), fault.clone());
+    let session = guard.open_session().await.expect("open session");
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| session.is_usable()));
+
+    assert!(!result.expect("session status panic is contained"));
+    assert_eq!(*fault.operations.lock().expect("fault lock"), vec!["SESSION STATUS"]);
 }
 
 #[tokio::test]
