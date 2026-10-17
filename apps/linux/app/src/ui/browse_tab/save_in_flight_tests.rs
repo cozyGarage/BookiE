@@ -84,7 +84,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
 
     let selection = controller.model().current_selection.clone().unwrap();
     selection.select_item(0, false);
-    selection.select_item(1, true);
+    selection.select_item(1, false);
     assert!(!controller.model().insert_button.is_visible());
     controller.model().insert_button.emit_clicked();
     controller
@@ -194,7 +194,13 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .iter()
         .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
         .count();
-    assert_eq!(refused, 17, "every read-only mutation message must be refused");
+    assert_eq!(refused, 16, "every read-only mutation message must be refused");
+    assert!(
+        outputs
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ShowSelectionAlert { .. })),
+        "a stored-row delete must report why the read-only connection refused it"
+    );
     controller.detach_runtime();
 }
 
@@ -254,6 +260,90 @@ fn read_only_tab_can_discard_a_pending_local_draft() {
     assert!(!outputs.iter().any(
         |output| matches!(output, BrowseTabOutput::ShowToast(message) if message == "This connection is read-only.")
     ));
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn read_only_tab_can_delete_a_selected_draft_without_deleting_stored_rows() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch_with_read_only(tab_id, true);
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    let selection = controller.model().current_selection.clone().unwrap();
+    selection.select_item(0, false);
+
+    assert!(activate_shortcut(&controller, "Delete"));
+    let outputs = pump(&observed);
+
+    assert_eq!(
+        pending(tab_id),
+        0,
+        "deleting a selected draft must discard only local state"
+    );
+    assert_eq!(
+        selection.n_items(),
+        2,
+        "the discarded draft must leave the visible row model"
+    );
+    assert_eq!(
+        transactions(&outputs),
+        0,
+        "discarding a draft must not dispatch a database write"
+    );
+    assert!(
+        !outputs
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ShowSelectionAlert { .. }))
+    );
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn read_only_tab_refuses_a_mixed_draft_and_stored_row_delete_atomically() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch_with_read_only(tab_id, true);
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    let selection = controller.model().current_selection.clone().unwrap();
+    selection.select_item(0, false);
+    selection.select_item(1, false);
+    assert!(selection.is_selected(0) && selection.is_selected(1));
+
+    controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
+    let outputs = pump(&observed);
+
+    assert_eq!(
+        pending(tab_id),
+        1,
+        "a mixed refusal must leave the local draft available"
+    );
+    assert_eq!(selection.n_items(), 3, "the refusal must preserve all rows");
+    assert!(
+        selection.is_selected(0) && selection.is_selected(1),
+        "the refused selection stays selected"
+    );
+    assert_eq!(
+        transactions(&outputs),
+        0,
+        "a read-only delete must never dispatch a write"
+    );
+    assert!(
+        outputs
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ShowSelectionAlert { .. }))
+    );
     controller.detach_runtime();
 }
 
@@ -409,6 +499,21 @@ fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<
         })
         .unwrap();
     pump(observed);
+}
+
+fn add_draft_row(controller: &relm4::Controller<BrowseTab>, values: Vec<Value>) {
+    let key = crate::services::change_tracker::with_tab(controller.model().tab_id, |tracker| {
+        tracker.track_insert(values.clone())
+    })
+    .expect("tab tracker exists");
+    let crate::services::change_tracker::RowKey::Draft(draft_id) = key else {
+        panic!("insert creates a draft key");
+    };
+    controller
+        .model()
+        .list_store()
+        .expect("loaded tab has a row store")
+        .insert(0, &crate::ui::row_object::RowObject::new_draft(draft_id, values));
 }
 
 fn load_keyless_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {

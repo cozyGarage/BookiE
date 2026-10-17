@@ -126,7 +126,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
-- Read-only connections no longer show grid mutation actions or accept edit, paste and save messages through alternate entry points.
+- Read-only connections refuse grid edits through alternate actions while still allowing local draft rows to be discarded without changing stored data.
 - Structure column expanders now point right when collapsed and down when open.
 - MCP clients with valid tokens were refused with a rate-limit error once all agents together exceeded one token's per-minute limit; only failed sign-in attempts now count toward the shared limit.
 - Dropping a SQL Server column that has a default, or changing its type, failed in the Structure tab; the default is now removed first and kept after a type change.

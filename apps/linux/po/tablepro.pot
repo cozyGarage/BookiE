@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.6-dev\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/BookiE/issues\n"
-"POT-Creation-Date: 2026-10-16 22:34+0200\n"
+"POT-Creation-Date: 2026-10-17 04:02+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -348,7 +348,7 @@ msgstr ""
 #: apps/linux/app/src/ui/app/workspace_close.rs:28
 #: apps/linux/app/src/ui/app/workspace_close.rs:146
 #: apps/linux/app/src/ui/app/workspace_tabs.rs:665
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:216
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:235
 #: apps/linux/app/src/ui/connect_dialog/mod.rs:924
 #: apps/linux/app/src/ui/connection_bundle/export.rs:70
 #: apps/linux/app/src/ui/connection_bundle/import.rs:26
@@ -493,7 +493,7 @@ msgid ""
 msgstr ""
 
 #: apps/linux/app/src/ui/app/connection.rs:346
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:217
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:236
 #: apps/linux/app/src/ui/filter_presets.rs:50
 #: apps/linux/app/src/ui/history_dialog.rs:364
 #: apps/linux/app/src/ui/history_dialog.rs:516
@@ -529,7 +529,7 @@ msgstr ""
 #: apps/linux/app/src/ui/explain_dialog.rs:55
 #: apps/linux/app/src/ui/export_dialog.rs:273
 #: apps/linux/app/src/ui/export_dialog.rs:522
-#: apps/linux/app/src/ui/grid/context_menu.rs:208
+#: apps/linux/app/src/ui/grid/context_menu.rs:214
 #: apps/linux/app/src/ui/grid/full_value_editor.rs:406
 msgid "Close"
 msgstr ""
@@ -640,7 +640,7 @@ msgstr ""
 
 #: apps/linux/app/src/ui/app/database_switcher.rs:100
 #: apps/linux/app/src/ui/browse_tab/mod.rs:302
-#: apps/linux/app/src/ui/browse_tab/mod.rs:786
+#: apps/linux/app/src/ui/browse_tab/mod.rs:789
 #: apps/linux/app/src/ui/catalog_dialog.rs:133
 msgid "Loading…"
 msgstr ""
@@ -1039,8 +1039,8 @@ msgid "This column belongs to more than one foreign key."
 msgstr ""
 
 #: apps/linux/app/src/ui/app/row_ops.rs:142
-#: apps/linux/app/src/ui/browse_tab/mod.rs:925
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:488
+#: apps/linux/app/src/ui/browse_tab/mod.rs:928
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:507
 msgid ""
 "Some row values were not fetched. Show hidden columns and reload before "
 "copying or exporting."
@@ -1082,8 +1082,8 @@ msgid "Open Quickly"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/shortcuts.rs:18
-#: apps/linux/app/src/ui/grid/context_menu.rs:470
-#: apps/linux/app/src/ui/grid/context_menu.rs:526
+#: apps/linux/app/src/ui/grid/context_menu.rs:476
+#: apps/linux/app/src/ui/grid/context_menu.rs:532
 msgid "Jump to Column…"
 msgstr ""
 
@@ -1194,8 +1194,8 @@ msgstr ""
 
 #: apps/linux/app/src/ui/app/shortcuts.rs:198
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:24
-#: apps/linux/app/src/ui/grid/context_menu.rs:468
-#: apps/linux/app/src/ui/grid/context_menu.rs:529
+#: apps/linux/app/src/ui/grid/context_menu.rs:474
+#: apps/linux/app/src/ui/grid/context_menu.rs:535
 msgid "Insert row"
 msgstr ""
 
@@ -1603,7 +1603,7 @@ msgid "Filter"
 msgstr ""
 
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:180
-#: apps/linux/app/src/ui/browse_tab/chrome.rs:394
+#: apps/linux/app/src/ui/browse_tab/chrome.rs:398
 msgid "Filter rows (Ctrl+F)"
 msgstr ""
 
@@ -1630,34 +1630,35 @@ msgid "{n} unsaved changes"
 msgstr ""
 
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:330
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:11
 msgid "This table has no primary key. Inline editing is disabled."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/chrome.rs:382
+#: apps/linux/app/src/ui/browse_tab/chrome.rs:386
 #: apps/linux/app/src/ui/browse_tab/reference.rs:55
 msgid "Values of this type can't be used as a filter"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/chrome.rs:399
+#: apps/linux/app/src/ui/browse_tab/chrome.rs:403
 #, rust-format
 msgid "{n} filter rule(s) active — click to edit"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/chrome.rs:422
+#: apps/linux/app/src/ui/browse_tab/chrome.rs:426
 msgid "No rows on this page"
-msgstr ""
-
-#: apps/linux/app/src/ui/browse_tab/chrome.rs:434
-#, rust-format
-msgid "Rows {start} – {end} of {total}"
 msgstr ""
 
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:438
 #, rust-format
+msgid "Rows {start} – {end} of {total}"
+msgstr ""
+
+#: apps/linux/app/src/ui/browse_tab/chrome.rs:442
+#, rust-format
 msgid "Rows {start} – {end}"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/chrome.rs:474
+#: apps/linux/app/src/ui/browse_tab/chrome.rs:478
 msgid "Couldn't load rows"
 msgstr ""
 
@@ -1666,7 +1667,7 @@ msgid "The database returned rows that do not match the table columns."
 msgstr ""
 
 #: apps/linux/app/src/ui/browse_tab/mod.rs:303
-#: apps/linux/app/src/ui/browse_tab/mod.rs:787
+#: apps/linux/app/src/ui/browse_tab/mod.rs:790
 #, rust-format
 msgid "Fetching rows from {table}"
 msgstr ""
@@ -1717,7 +1718,7 @@ msgid "{column} on row {row}: {message}. Nothing was pasted."
 msgstr ""
 
 #: apps/linux/app/src/ui/browse_tab/paste.rs:274
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:405
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:424
 msgid "That row moved while you were editing. The change was not applied."
 msgstr ""
 
@@ -1733,76 +1734,78 @@ msgstr ""
 msgid "This foreign key is empty"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:10
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:20
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:186
 msgid "This connection is read-only."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:31
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:41
 #, rust-format
 msgid "Cannot duplicate this row because column {name} is undecodable."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:38
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:48
 #, rust-format
 msgid ""
 "Cannot duplicate this row because it has {actual} values for {expected} "
 "columns."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:166
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:177
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:176
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:185
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:194
 msgid "Cannot delete"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:168
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:178
 msgid ""
 "Some selected rows have a key value this driver could not read, so they "
 "cannot be identified. Reload the table, or delete those rows from a SQL "
 "editor."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:178
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:195
 msgid "This table has no primary key — editing is disabled."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:213
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:232
 #, rust-format
 msgid "Delete {n} rows?"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:214
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:233
 msgid ""
 "These rows will be marked for deletion. They aren't removed until you click "
 "Save."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:378
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:397
 msgid ""
 "This row's key could not be read from the database, so the row cannot be "
 "changed."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:428
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:447
 msgid ""
 "This cell can't be set to NULL because it is read-only or does not accept "
 "NULL."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:503
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:522
 msgid "Click a cell first, then paste to fill cells from that one"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:576
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:595
 msgid "Saving changes. Edit again when the save finishes."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:615
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:634
 #: apps/linux/app/src/ui/structure_tab/mod.rs:997
 #: apps/linux/app/src/ui/structure_tab/mod.rs:1003
 msgid "Cannot save"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:673
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:692
 #: apps/linux/app/src/ui/structure_tab/mod.rs:1076
 msgid "Save failed"
 msgstr ""
@@ -3335,111 +3338,111 @@ msgstr ""
 msgid "At least one column stays visible."
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:204
+#: apps/linux/app/src/ui/grid/context_menu.rs:210
 #, rust-format
 msgid "Skipped {n} NULL, binary or unsupported values."
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:206
+#: apps/linux/app/src/ui/grid/context_menu.rs:212
 msgid "Copy as IN clause"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:484
+#: apps/linux/app/src/ui/grid/context_menu.rs:490
 msgid "Edit cell"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:487
+#: apps/linux/app/src/ui/grid/context_menu.rs:493
 msgid "Edit Full Value…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:493
+#: apps/linux/app/src/ui/grid/context_menu.rs:499
 msgid "Rows"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:494
+#: apps/linux/app/src/ui/grid/context_menu.rs:500
 msgid "With Headers"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:495
+#: apps/linux/app/src/ui/grid/context_menu.rs:501
 msgid "JSON"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:496
+#: apps/linux/app/src/ui/grid/context_menu.rs:502
 msgid "CSV"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:497
+#: apps/linux/app/src/ui/grid/context_menu.rs:503
 msgid "CSV with Headers"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:498
+#: apps/linux/app/src/ui/grid/context_menu.rs:504
 msgid "Markdown"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:499
+#: apps/linux/app/src/ui/grid/context_menu.rs:505
 msgid "IN Clause"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:501
+#: apps/linux/app/src/ui/grid/context_menu.rs:507
 msgid "INSERT Statement"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:504
+#: apps/linux/app/src/ui/grid/context_menu.rs:510
 #: apps/linux/app/src/ui/grid/value_viewer.rs:113
 msgid "Copy value"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:505
+#: apps/linux/app/src/ui/grid/context_menu.rs:511
 msgid "Copy as"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:506
+#: apps/linux/app/src/ui/grid/context_menu.rs:512
 msgid "Copy column name"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:510
+#: apps/linux/app/src/ui/grid/context_menu.rs:516
 msgid "Filter by This Value"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:513
+#: apps/linux/app/src/ui/grid/context_menu.rs:519
 msgid "Go to Referenced Row"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:515
+#: apps/linux/app/src/ui/grid/context_menu.rs:521
 msgid "View Value…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:516
+#: apps/linux/app/src/ui/grid/context_menu.rs:522
 msgid "Show Row as JSON"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:520
+#: apps/linux/app/src/ui/grid/context_menu.rs:526
 msgid "Export Visible Rows…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:522
+#: apps/linux/app/src/ui/grid/context_menu.rs:528
 msgid "Export Results…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:525
+#: apps/linux/app/src/ui/grid/context_menu.rs:531
 msgid "Columns…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:527
+#: apps/linux/app/src/ui/grid/context_menu.rs:533
 msgid "Find in Loaded Rows…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:530
+#: apps/linux/app/src/ui/grid/context_menu.rs:536
 msgid "Duplicate row"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:531
+#: apps/linux/app/src/ui/grid/context_menu.rs:537
 #: apps/linux/app/src/ui/grid/full_value_editor.rs:234
 #: apps/linux/app/src/ui/grid/full_value_editor.rs:709
 msgid "Set to NULL"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:532
+#: apps/linux/app/src/ui/grid/context_menu.rs:538
 msgid "Delete row"
 msgstr ""
 

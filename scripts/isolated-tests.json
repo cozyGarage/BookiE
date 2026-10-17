@@ -210,6 +210,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::read_only_tab_can_delete_a_selected_draft_without_deleting_stored_rows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::read_only_tab_refuses_a_mixed_draft_and_stored_row_delete_atomically"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::read_only_tab_can_discard_a_pending_local_draft"
     ],
     [
