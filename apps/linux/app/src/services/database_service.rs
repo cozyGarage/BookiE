@@ -714,6 +714,27 @@ mod tests {
         );
     }
 
+    fn assert_three_denied_mutations_are_audited(service: &DatabaseService, connection_id: Uuid) {
+        let journal = service._audit_temp_dir.as_ref().unwrap().path().join("audit.jsonl");
+        let contents = std::fs::read_to_string(journal).expect("audit journal exists");
+        let events: Vec<serde_json::Value> = contents
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("journal record is valid JSON"))
+            .collect();
+        let denied_mutations = events
+            .iter()
+            .filter(|record| {
+                let event = &record["event"];
+                event["connection_id"] == connection_id.to_string()
+                    && event["operation_class"] == "mutation"
+                    && event["phase"] == "outcome"
+                    && event["terminal_status"] == "denied"
+            })
+            .count();
+
+        assert_eq!(denied_mutations, 3, "each refused write needs a terminal audit outcome");
+    }
+
     #[tokio::test]
     async fn gui_read_only_guarded_transactions_deny_insert_update_and_delete() {
         let service = DatabaseService::new_isolated();
@@ -787,6 +808,7 @@ mod tests {
             .unwrap()
             .rows;
         assert_eq!(rows, [[tablepro_core::Value::Text("before".into())]]);
+        assert_three_denied_mutations_are_audited(&service, id);
         service.close(id);
     }
 
