@@ -52,6 +52,18 @@ class KnownIssuesTests(unittest.TestCase):
         )
         self.assertEqual(checker.indexed_issues(PREFIX + rows), [("UI-1", 1), ("PEER-18", 1069)])
 
+    def test_indexed_issues_ignores_malformed_rows_and_missing_index(self):
+        rows = (
+            "| ID | Issue | Lane |\n"
+            "| --- | --- | --- |\n"
+            "| malformed row |\n"
+            "text outside the table\n"
+            "| UI-1 | broken link | UX |\n"
+            "| UI-2 | [#2](https://github.com/cozyGarage/BookiE/issues/2) | Other |\n"
+        )
+        self.assertEqual(checker.indexed_issues(PREFIX + rows), [])
+        self.assertEqual(checker.indexed_issues("no index"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
