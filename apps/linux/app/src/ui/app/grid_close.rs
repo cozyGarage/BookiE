@@ -77,6 +77,33 @@ async fn wait_for_edits(replies: Vec<tokio::sync::oneshot::Receiver<Result<(), S
         .map_err(|_| crate::tr!("Finishing the cell edit timed out. Try again."))?
 }
 
+fn pending_grid_close_owner_is_current(expected: &glib::WeakRef<adw::TabPage>, current: Option<&adw::TabPage>) -> bool {
+    let Some(expected) = expected.upgrade() else {
+        return false;
+    };
+    current.is_some_and(|current| current == &expected)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires isolated GTK display"]
+    fn a_pending_grid_flush_matches_only_its_original_tab_page() {
+        relm4::adw::init().unwrap();
+        let original_view = adw::TabView::new();
+        let original_page = original_view.append(&relm4::gtk::Box::new(relm4::gtk::Orientation::Vertical, 0));
+        let expected = original_page.downgrade();
+        let replacement_view = adw::TabView::new();
+        let replacement_page = replacement_view.append(&relm4::gtk::Box::new(relm4::gtk::Orientation::Vertical, 0));
+
+        assert!(pending_grid_close_owner_is_current(&expected, Some(&original_page)));
+        assert!(!pending_grid_close_owner_is_current(&expected, Some(&replacement_page)));
+        assert!(!pending_grid_close_owner_is_current(&expected, None));
+    }
+}
+
 impl App {
     fn grid_close_targets(&self, intent: &GridCloseIntent) -> (Owners, Queues) {
         let tabs = self.workspace_tabs.borrow();
@@ -177,9 +204,7 @@ impl App {
         };
         let unchanged = owners.iter().all(|(id, expected)| {
             let tabs = self.workspace_tabs.borrow();
-            expected
-                .upgrade()
-                .is_some_and(|expected| tabs.get(id).is_some_and(|tab| tab_page(tab) == &expected))
+            pending_grid_close_owner_is_current(expected, tabs.get(id).map(tab_page))
         });
         let accepted = unchanged && result.is_ok();
         if !self.grid_close.preparation.complete(intent.clone(), ticket, accepted) {
