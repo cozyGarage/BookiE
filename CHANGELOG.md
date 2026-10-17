@@ -109,10 +109,12 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 ### Changed
 - An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
+- A write refused because another write is still in flight no longer disables later writes on that connection; unresolved outcomes remain fail-closed.
 - The MCP token dialog reports whether the one-time token was saved in the system keyring and explains what to do if it was not.
 - The Keyboard Shortcuts window splits table browsing into shorter groups, describes mouse selection gestures separately and combines repeated context-sensitive save, undo and cancel actions.
 - About, Arch package, Flatpak, and translation metadata link to the BookiE repository.
 - Full-table export is refused before a destination file is chosen when a verified read snapshot is not available; current-page and loaded query-result exports remain available.
+- MCP data results use the versioned `bookie-tagged-v1` format so clients can preserve exact numeric values.
 - Redis in this development line stays a single host/port endpoint; Sentinel and Cluster topologies stay deferred.
 - A successful rollback request now warns that session state and other non-transactional side effects may remain after a failed save.
 - Startup opens the query history database while the rest of the application starts instead of waiting for it first.
@@ -133,6 +135,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - A database switch rejected during another connection change no longer alters the saved connection.
 - On MySQL and MariaDB, `--` followed by a character other than a space, such as `SELECT 5--2`, no longer hides the rest of the line as a comment, so the following statements are found and checked separately.
 - A save or import whose connection was lost during a statement could be recorded as rolled back, and agents were told the rollback was confirmed; it is now recorded as an unknown outcome, and an import batch that partly applied is no longer recorded as rolled back.
+- Closing a retired database session after a tunnel loss no longer sends ROLLBACK through that unusable session; the transaction outcome remains unknown.
 - A PostgreSQL identifier containing dollar signs, such as `my$a$b`, no longer makes the editor read the rest of the script as one quoted statement.
 - The error location for a PostgreSQL SELECT shown page by page pointed past the end of the statement; it now marks the right place.
 - Renaming a MySQL table in a database other than the connection's moved it into the connection's database, and renaming a ClickHouse table failed.
@@ -151,6 +154,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 
 - PostgreSQL completion keeps quoted case, dots, spaces and embedded quotes distinct when loading table columns.
 - PostgreSQL errors no longer replay queries or writes merely because their error code resembles a stale prepared plan.
+- Browse pagination now disables Next at the known end of a table and ignores exhausted-page navigation requests.
 - The CSV import progress dialog now closes after the import completes or is cancelled.
 - Explain view tabs and the schema filter button now use icons available in Adwaita and Yaru themes.
 - The Explain plan window now closes when you press Escape.
@@ -266,6 +270,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - The SQLite table list now shows user tables whose names start with sqlite followed by another character, such as sqlite3_results.
 - The grid's Set to NULL action now refuses read-only cells and columns that do not accept NULL, with a message, instead of staging a change that would fail on save.
 - SQLite databases whose file names contain a question mark or a percent sign now open that exact file instead of a different one.
+- Driver panics during connection capability or session health checks no longer escape PolicyGuard; the affected connection is reported unusable for replacement.
 
 ### Security
 
