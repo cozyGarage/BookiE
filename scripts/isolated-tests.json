@@ -245,7 +245,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::app::workspace_tabs::bulk_close_action_tests::bulk_close_actions_dispatch_the_selected_page_id"
+      "ui::app::workspace_tabs::bulk_close::tests::bulk_close_actions_dispatch_the_selected_page_id"
     ],
     [
       "tablepro-app",
