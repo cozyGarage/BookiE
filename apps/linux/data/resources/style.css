@@ -1,8 +1,5 @@
-headerbar.tp-production {
+.tp-production {
                 background: alpha(@error_color, 0.22);
-            }
-            headerbar.tp-production:backdrop {
-                background: alpha(@error_color, 0.12);
             }
             .tp-cell-modified {
                 background: alpha(@warning_color, 0.18);
