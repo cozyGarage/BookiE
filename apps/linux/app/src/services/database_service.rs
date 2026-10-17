@@ -813,6 +813,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn gui_local_write_records_successful_terminal_audit_outcome() {
+        let service = DatabaseService::new_isolated();
+        let id = open_memory_connection(&service, "local write fixture").await;
+        let guarded = service.get(id).expect("active GUI connection");
+
+        guarded
+            .execute("CREATE TABLE guarded_notes (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
+            .await
+            .expect("local schema setup");
+        guarded
+            .execute("INSERT INTO guarded_notes VALUES (1, 'saved')")
+            .await
+            .expect("local GUI write");
+
+        let journal = service._audit_temp_dir.as_ref().unwrap().path().join("audit.jsonl");
+        let contents = std::fs::read_to_string(journal).expect("audit journal exists");
+        let records: Vec<serde_json::Value> = contents
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("journal record is valid JSON"))
+            .collect();
+        let write_events: Vec<_> = records
+            .iter()
+            .filter(|record| {
+                let event = &record["event"];
+                event["connection_id"] == id.to_string() && event["operation_class"] == "mutation"
+            })
+            .collect();
+
+        assert_eq!(write_events.len(), 2, "the insert retains intent and outcome records");
+        assert!(write_events.iter().any(|record| record["event"]["phase"] == "intent"));
+        assert!(write_events.iter().any(|record| {
+            let event = &record["event"];
+            event["phase"] == "outcome" && event["terminal_status"] == "succeeded"
+        }));
+        let rows = guarded
+            .query("SELECT value FROM guarded_notes WHERE id = 1")
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows, [[tablepro_core::Value::Text("saved".into())]]);
+        service.close(id);
+    }
+
+    #[tokio::test]
     async fn candidate_catalog_reads_use_the_durable_policy_audit_journal() {
         let service = DatabaseService::new_isolated();
         let driver: Arc<dyn DatabaseDriver> = Arc::new(drivers_sqlite::SqliteDriver);
