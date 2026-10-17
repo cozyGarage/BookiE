@@ -5,6 +5,9 @@
 Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the user-facing map for that development line since the last tagged package, [0.1.5](#015---2026-09-27). Compare: [`linux-v0.1.5...linux`](https://github.com/cozyGarage/BookiE/compare/linux-v0.1.5...linux). Entries stay here until the next tagged release.
 
 ### Added
+
+- When a query stops at the query timeout, the editor offers Run again with a longer timeout, which runs the same query once with four times the timeout and leaves the saved timeout unchanged.- Opening a new SQL editor while disconnected now shows the editor and removes completion suggestions cached from the previous connection.
+- A connection marked Production now shows a red Production badge and a tinted header bar, and its window title starts with [Production], so it stands out from other connections.
 - Opening a new SQL editor while disconnected now shows the editor and removes completion suggestions cached from the previous connection.
 - SQL completion inserts complete dialect-quoted table and column names, preserves aliases, and offers scoped metadata instead of arbitrary editor words.
 - Large SQL query results stream in bounded pages, can be pinned, and can be fully exported by running the guarded query again.
@@ -110,6 +113,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Changed
 
 - Running a query again keeps the previous result on screen, dimmed, until the new result, error, cancel or timeout page replaces it, instead of leaving a blank area.- An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
+- Typing in a table cell is included in unsaved changes before a tab closes, a connection disconnects or a preview tab is replaced.
 - Refreshing a table waits until its pending save finishes, so a failed save does not lose edits.
 - An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
 - A write refused because another write is still in flight no longer disables later writes on that connection; unresolved outcomes remain fail-closed.
@@ -133,6 +137,8 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- After a tunnel drop during a Session transaction, a fresh editor session can run read queries again: ending its read-only snapshot with ROLLBACK is no longer refused by the earlier unresolved write, while commits and writes on that connection stay blocked.
+- Cancelling a PostgreSQL backup removes its partial file; a started restore that is cancelled or fails leaves governed writes on that connection blocked after reconnect while its outcome remains unknown.
 - Read-only connections refuse grid edits through alternate actions while still allowing local drafts to be discarded or undone and redone without changing stored data.
 - Structure column expanders now point right when collapsed and down when open.
 - A database switch rejected during another connection change no longer alters the saved connection.

@@ -1,10 +1,14 @@
 mod backup;
 mod browse;
 mod bundle;
+#[cfg(test)]
+mod close_after_save_tests;
 mod connection;
 mod database_switcher;
 mod editor_files;
+mod environment_marker;
 mod favorites;
+mod grid_close;
 pub(crate) mod import;
 mod init_css;
 mod init_sidebar;
@@ -107,6 +111,8 @@ pub struct App {
     split_view: adw::OverlaySplitView,
     sidebar_reveal: std::rc::Rc<std::cell::Cell<u32>>,
     window_title: adw::WindowTitle,
+    header_bar: adw::HeaderBar,
+    environment_badge: gtk::Label,
     sidebar_title: adw::WindowTitle,
     disconnect_action: gio::SimpleAction,
     sidebar_factory: FactoryVecDeque<SidebarRow>,
@@ -216,6 +222,7 @@ pub struct App {
     /// removes the entry entirely (abort all close intents for that
     /// tab so the user can fix the error and retry). See
     /// `dec_close_after_save` for the decrement helper.
+    grid_close: grid_close::GridCloseState,
     close_after_save: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<Uuid, u32>>>,
     /// Set when the user picked "Save" on the *window*-close dialog.
     /// While true, the last `SaveCompletedForTab` that empties
@@ -378,6 +385,16 @@ impl SimpleComponent for App {
                         #[wrap(Some)]
                         #[name = "databases_popover"]
                         set_popover = &gtk::Popover {},
+                    },
+
+                    #[name = "environment_badge"]
+                    pack_end = &gtk::Label {
+                        set_visible: false,
+                        set_label: &crate::tr!("Production"),
+                        set_tooltip_text: Some(crate::tr!("This is a production connection. Changes can affect live data.").as_str()),
+                        set_margin_end: 6,
+                        add_css_class: "error",
+                        add_css_class: "caption-heading",
                     },
 
                     #[name = "read_only_badge"]
@@ -574,6 +591,8 @@ impl SimpleComponent for App {
             split_view: widgets.split_view.clone(),
             sidebar_reveal: std::rc::Rc::default(),
             window_title: widgets.window_title.clone(),
+            header_bar: widgets.header_bar.clone(),
+            environment_badge: widgets.environment_badge.clone(),
             sidebar_title: widgets.sidebar_title.clone(),
             disconnect_action,
             sidebar_factory: sidebar.factory,
@@ -640,6 +659,7 @@ impl SimpleComponent for App {
             prepared_connection: None,
             switch_saves_pending: std::collections::HashMap::new(),
             switch_cancel_audit_was_disabled: None,
+            grid_close: grid_close::GridCloseState::new(window_handles.grid_edits_ready),
             close_after_save: window_handles.close_after_save,
             close_window_after_save: window_handles.close_window_after_save,
             in_flight_saves: window_handles.in_flight_saves,
@@ -703,7 +723,17 @@ impl SimpleComponent for App {
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+        if self.defer_for_grid_edits(&msg, &sender) {
+            return;
+        }
         match msg {
+            AppMsg::FlushWindowEdits => {
+                self.grid_close.window_ready.set(true);
+                self.window.close();
+            }
+            AppMsg::GridEditsPrepared { intent, ticket, result } => {
+                self.grid_edits_prepared(intent, ticket, result, sender)
+            }
             AppMsg::OpenConnect => self.on_open_connect(sender),
             AppMsg::ConnectionPrepared(prepared) => self.on_connection_prepared(prepared, sender),
             AppMsg::ConnectionPrepareFailed(message, saved) => {

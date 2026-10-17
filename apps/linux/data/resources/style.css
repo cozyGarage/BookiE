@@ -1,5 +1,9 @@
 .tp-stale-results {
                 opacity: 0.55;
+}
+
+.tp-production {
+                background: alpha(@error_color, 0.22);
             }
             .tp-cell-modified {
                 background: alpha(@warning_color, 0.18);

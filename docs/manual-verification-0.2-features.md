@@ -64,6 +64,12 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Enter submits the form and Escape dismisses without changing saved data. **2026-10-12 Hyprland dark:** Enter failed; fixed by [#737](https://github.com/cozyGarage/BookiE/pull/737). The GTK regression covers nested entry activation; rerun the keyboard flow on installed Wayland.
 - [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels. **2026-10-12 Hyprland dark:** failed before the shortcut window was reorganized in [#725](https://github.com/cozyGarage/BookiE/pull/725); installed retest pending.
 
+## Production marker
+
+- [ ] Connect to a connection marked Production: the header bar is tinted red, a red **Production** badge shows beside Read-only, and the window title starts with `[Production]` in the taskbar or Alt-Tab. Open a table and change a cell: the title reads `• [Production] …`. The badge text and the tinted bar are readable in light and dark.
+- [ ] Disconnect, or connect to a Dev, Staging or Local connection: the badge, the tint and the title prefix are gone.
+- [ ] A Production connection that is also Read-only shows both badges.
+
 ## Connection list
 
 - [ ] Connections are grouped, with one section per group and an ungrouped section.
@@ -85,6 +91,9 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] The connect dialog shows Connect timeout and Query timeout rows; 0 means default. **2026-10-12 Hyprland dark:** passed.
 - [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after about 2 seconds, while another connection still uses the Preferences timeout. **2026-10-12 Hyprland dark:** stopped after 2.007 s, passed; the wording was fixed by [#668](https://github.com/cozyGarage/BookiE/pull/668). The second connection and installed retest remain pending.
 - [ ] A connect timeout of 3 seconds to an unreachable host fails after about 3 seconds.
+
+- [ ] With a 2-second query timeout, run `SELECT pg_sleep(5)` on PostgreSQL (streamed) and `SELECT SLEEP(5)` on MySQL (materialized): after each, the toolbar shows **Run again with an 8s timeout**. Click it: the same query runs and completes. Running any other query removes the button, and the saved timeout is still 2 seconds.
+- [ ] Edit the editor text after a timeout, then click the button: the query that timed out runs, not the new text.
 
 ## Connection bundles
 
@@ -165,6 +174,14 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 - [ ] A retired session turns its toggle off; late state messages cannot relabel a replacement session. Automatic reconnect retires the previous tab sessions.
 - [ ] An unknown write outcome blocks only its owning connection; another connection stays usable. Restart/reconnect recovery follows the durable audit rules.
 - [ ] `SET autocommit=0`, `SET IMPLICIT_TRANSACTIONS ON`, `XA START` and an unterminated transaction batch are refused on applicable shared connections.
+
+## Active table cell close and preview paths
+
+- [ ] Type into a table cell without pressing Enter, then close it with the tab button and Ctrl+W. Cancel keeps the editor and draft, Save stores the typed value, and Discard leaves the database unchanged.
+- [ ] Repeat the pending cell edit through Close Other Tabs, Close Tabs to the Right, window close, quit and Disconnect. Each prompt or teardown decision must wait until the edit is staged; cancel preserves the connection and draft. GTK automation covers the tab button, Ctrl+W, save/discard, inactive-tab close, preview replacement, quit and Disconnect. Verify both tab context-menu actions by hand; see the [active-edit close run evidence](evidence/active-edit-close-cbccd589-2026-10-16/README.md).
+- [ ] Type into a preview table cell and open another table. The edited preview becomes a kept tab and retains the pending value. Repeat with a kept tab and with the edited tab inactive.
+- [ ] Attempt closure while a cell editor has an active IME preedit or value popover. Closure is refused without discarding or replacing the in-progress input.
+- [ ] Close a tab while its save is in flight, then deliver a late save completion after opening a replacement tab. The completion must not close or change the replacement.
 
 ## ENUM and SET pickers (PostgreSQL, MySQL and MariaDB)
 
@@ -313,4 +330,5 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 - [ ] Repeat both through an SSH tunnel (built-in and system OpenSSH) and with TLS Verify Full.
 - [ ] On a read-only connection, Back Up Database… works and Restore from Backup… is refused before a file is chosen. On a MySQL connection both explain that backups are PostgreSQL only.
 - [ ] Press Cancel during a large backup: the window closes, nothing is written next to the chosen file, and `audit.jsonl` shows a Cancelled administrative outcome after its intent.
+- [ ] On a disposable database, start a large restore and press Cancel after `pg_restore` starts. `audit.jsonl` shows an Unknown outcome, and the affected connection refuses governed writes before and after reconnect while a separate connection remains available. There is no in-app action to reconcile the outcome; inspect the database before deciding how to proceed. A restore failure after `pg_restore` starts has the same unknown outcome.
 - [ ] Remove `pg_dump` from `/usr/bin` (or test on a host without it): the error names the missing tool and how to install it.

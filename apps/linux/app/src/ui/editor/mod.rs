@@ -23,6 +23,7 @@ mod statement_band;
 mod statement_cursor;
 mod stream_pages;
 mod streaming;
+mod timeout_retry;
 
 use std::time::SystemTime;
 
@@ -77,6 +78,8 @@ pub struct SqlEditor {
     session_teardown_running: bool,
     session_teardown_waiters: Vec<tokio::sync::oneshot::Sender<Result<(), String>>>,
     cancel_button: gtk::Button,
+    longer_timeout_button: gtk::Button,
+    timeout_retry: timeout_retry::TimeoutRetry,
     pin_button: gtk::Button,
     pinned: pinned::PinnedResults,
     result_view_settings: crate::ui::grid::local_filter::LocalResultSettingsStore,
@@ -171,6 +174,7 @@ pub enum SqlEditorInput {
         generation: u64,
         terminal: StreamTerminal,
     },
+    RunWithLongerTimeout,
     ShowCancelled(u64),
     ShowTimedOut {
         generation: u64,
@@ -244,6 +248,7 @@ struct ExecutionContext {
     sql: String,
     metadata: ConnectionMetadata,
     started_at: SystemTime,
+    timeout_secs: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -346,6 +351,14 @@ impl SimpleComponent for SqlEditor {
                     gtk::Label {
                         set_halign: gtk::Align::End,
                         add_css_class: "dim-label",
+                    },
+
+                    #[name = "longer_timeout_button"]
+                    gtk::Button {
+                        set_visible: false,
+                        set_tooltip_text: Some(crate::tr!("Runs the same query again. The saved query timeout does not change.").as_str()),
+                        add_css_class: "flat",
+                        connect_clicked => SqlEditorInput::RunWithLongerTimeout,
                     },
 
                     #[name = "pin_button"]
@@ -589,6 +602,8 @@ impl SimpleComponent for SqlEditor {
             session_teardown_running: false,
             session_teardown_waiters: Vec::new(),
             cancel_button: widgets.cancel_button.clone(),
+            longer_timeout_button: widgets.longer_timeout_button.clone(),
+            timeout_retry: timeout_retry::TimeoutRetry::default(),
             pin_button: widgets.pin_button.clone(),
             pinned: pinned::PinnedResults::default(),
             result_view_settings: Default::default(),
@@ -679,6 +694,7 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
             SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
             SqlEditorInput::Run => {
+                self.timeout_retry.clear_override();
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
                 let sql = buffer.text(&start, &end, true).to_string();
@@ -758,6 +774,7 @@ impl SimpleComponent for SqlEditor {
             }
 
             SqlEditorInput::RunAtCursor => {
+                self.timeout_retry.clear_override();
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
                 let sql = buffer.text(&start, &end, true).to_string();
@@ -769,6 +786,14 @@ impl SimpleComponent for SqlEditor {
                     return;
                 };
                 self.begin_run(statement, true, sender);
+            }
+
+            SqlEditorInput::RunWithLongerTimeout => {
+                let Some(sql) = self.timeout_retry.accept() else {
+                    return;
+                };
+                self.longer_timeout_button.set_visible(false);
+                self.begin_run(sql, false, sender);
             }
 
             SqlEditorInput::Cancel => {
@@ -866,12 +891,14 @@ impl SimpleComponent for SqlEditor {
                     .unwrap_or(0);
                 let secs_str = secs.to_string();
                 let reason = crate::tr!("Query exceeded the {n}s query timeout.").replace("{n}", &secs_str);
+                let timed_out_sql = context.sql.clone();
                 self.record_history(context, elapsed, None, Outcome::Error(reason.clone()));
                 if !terminal.replace_ui {
                     return;
                 }
                 self.cancel_token = None;
                 self.status.set_label(&crate::tr!("timed out"));
+                self.offer_longer_timeout(secs, timed_out_sql);
                 let page = adw::StatusPage::builder()
                     .title(crate::tr!("Query timed out"))
                     .description(&reason)
@@ -975,17 +1002,21 @@ impl SqlEditor {
         self.streaming = None;
         self.clear_run_marks();
 
+        self.longer_timeout_button.set_visible(false);
+        let timeout_secs = self.timeout_retry.resolve(|| {
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id)
+        });
+
         self.executions.insert(
             generation,
             ExecutionContext {
                 sql: trimmed.clone(),
                 metadata,
                 started_at: SystemTime::now(),
+                timeout_secs,
             },
         );
 
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let export_origin = origin.clone();
         let export_suggested_name = export_name_for_query(&trimmed);
         let driver_id = self
