@@ -205,6 +205,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::generated_column_edit_and_null_messages_do_not_stage_mutations"
     ],
     [

@@ -464,6 +464,75 @@ fn keyless_tab_refuses_to_stage_deletion_of_a_persisted_row() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch(tab_id);
+    load_two_rows(&controller, &observed);
+    let snapshot = controller.model().capture_paste_snapshot();
+
+    controller
+        .sender()
+        .send(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "stale edit".into(),
+            value: None,
+            row_key: vec![Value::Int(2)],
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridSetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: vec![Value::Int(2)],
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDeleteRowAt {
+            row_position: 0,
+            row_key: vec![Value::Int(2)],
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::PasteText(super::paste::PasteTextInput {
+            row: 0,
+            col: 1,
+            row_key: vec![Value::Int(2)],
+            text: "stale paste".into(),
+            displayed: None,
+            snapshot,
+        }))
+        .unwrap();
+    let outputs = pump(&observed);
+    let selection = controller.model().current_selection.clone().unwrap();
+    let row = selection
+        .model()
+        .unwrap()
+        .item(0)
+        .unwrap()
+        .downcast::<crate::ui::row_object::RowObject>()
+        .unwrap();
+
+    assert_eq!(pending(tab_id), 0, "stale messages must not stage tracker changes");
+    assert_eq!(transactions(&outputs), 0, "stale messages must never dispatch a save");
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+            .count(),
+        4,
+        "each stale entry point reports that the row identity changed"
+    );
+    assert_eq!(row.cell_value(1), Value::Text("a".into()));
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
