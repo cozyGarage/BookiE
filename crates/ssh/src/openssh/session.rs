@@ -18,6 +18,7 @@ use tokio_util::sync::{CancellationToken, WaitForCancellationFutureOwned};
 
 use super::argv::{ControlOp, master_args};
 use super::askpass_bridge::AskpassBridge;
+use super::config_route::validate_route;
 use super::error::{protocol, spawn_failure, unsafe_dir};
 use super::stderr_classify::{ClassifyContext, DeclinedHostKey, classify};
 use super::supervisor::{ForwardCancel, Supervisor, run_control};
@@ -108,6 +109,7 @@ impl OpenSshSession {
         let master_dir = MasterDir::new(master_dir);
         let control = master_dir.path().join("control");
         let ssh_config = write_ssh_config(master_dir.path(), &context.timeouts)?;
+        validate_route(config, context, &ssh_config, &cancel).await?;
         let listener = bind_askpass(master_dir.path(), &control)?;
         let mut master = spawn_master(config, &ssh_config, context, master_dir, control)?;
         let mut bridge = AskpassBridge::new(context.runtime.owner_uid(), config, prompter);
@@ -248,7 +250,8 @@ fn write_ssh_config(master_dir: &Path, timeouts: &OpenSshTimeouts) -> Result<Pat
          ServerAliveCountMax={}\n\
          LogLevel=INFO\n\
          Include /etc/ssh/ssh_config\n\
-         Include ~/.ssh/config\n",
+         Include ~/.ssh/config\n\
+         ProxyCommand=none\n",
         timeouts.connect.as_secs().max(1),
         timeouts.keepalive_interval.as_secs(),
         timeouts.keepalive_max,

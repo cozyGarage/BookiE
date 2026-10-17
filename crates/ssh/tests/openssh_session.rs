@@ -82,7 +82,10 @@ async fn start() -> TestResult<Fixture> {
 
     let temp = tempfile::tempdir()?;
     let known_hosts = temp.path().join("known_hosts");
-    let config = temp.path().join("ssh_config");
+    let ssh_home = temp.path().join("home");
+    let ssh_dir = ssh_home.join(".ssh");
+    std::fs::create_dir_all(&ssh_dir)?;
+    let config = ssh_dir.join("config");
     std::fs::write(
         &config,
         format!(
@@ -93,7 +96,7 @@ async fn start() -> TestResult<Fixture> {
     let wrapper = temp.path().join("ssh");
     std::fs::write(
         &wrapper,
-        format!("#!/bin/sh\nexec ssh -F '{}' \"$@\"\n", config.display()),
+        format!("#!/bin/sh\nHOME='{}' exec ssh \"$@\"\n", ssh_home.display()),
     )?;
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755))?;
 
@@ -294,6 +297,70 @@ async fn openssh_dropping_last_arc_ends_master() {
 }
 
 #[tokio::test]
+async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResult<()> {
+    let temp = tempfile::tempdir()?;
+    let ssh_home = temp.path().join("home");
+    let ssh_dir = ssh_home.join(".ssh");
+    std::fs::create_dir_all(&ssh_dir)?;
+    let marker = temp.path().join("proxy-command-ran");
+    let jump_marker = temp.path().join("jump-proxy-command-ran");
+    std::fs::write(
+        ssh_dir.join("config"),
+        format!("Host target\n  ProxyCommand touch {}\n", marker.display()),
+    )?;
+    let wrapper = temp.path().join("ssh");
+    std::fs::write(
+        &wrapper,
+        format!("#!/bin/sh\nHOME='{}' exec ssh \"$@\"\n", ssh_home.display()),
+    )?;
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755))?;
+    let base = temp.path().join("run");
+    std::fs::create_dir(&base)?;
+    let context = OpenSshContext {
+        runtime: OpenSshRuntime::acquire(&base)?,
+        ssh_program: wrapper,
+        askpass_program: PathBuf::from(env!("CARGO_BIN_EXE_tablepro-askpass")),
+        timeouts: OpenSshTimeouts::default(),
+    };
+    let config = OpenSshConfig {
+        destination: SshDestination::new("target", None, None)?,
+        jump_hosts: Vec::new(),
+        auth: OpenSshAuth::Agent,
+    };
+
+    assert!(matches!(
+        OpenSshSession::connect(
+            &config,
+            &context,
+            ScriptedPrompter::new(vec![PromptAnswer::Decline]),
+            CancellationToken::new(),
+        )
+        .await,
+        Err(OpenSshError::UnsupportedProxyCommand)
+    ));
+    assert!(!marker.exists());
+    std::fs::write(
+        ssh_dir.join("config"),
+        format!(
+            "Host target\n  ProxyJump jump\n\nHost jump\n  ProxyCommand touch {}\n",
+            jump_marker.display()
+        ),
+    )?;
+    assert!(matches!(
+        OpenSshSession::connect(
+            &config,
+            &context,
+            ScriptedPrompter::new(vec![PromptAnswer::Decline]),
+            CancellationToken::new(),
+        )
+        .await,
+        Err(OpenSshError::UnsupportedProxyCommand)
+    ));
+    assert!(!jump_marker.exists());
+    Ok(())
+}
+
+#[tokio::test]
 #[ignore = "requires docker"]
 async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
     let network = format!("tablepro-ssh-test-{}", uuid::Uuid::new_v4());
@@ -458,7 +525,10 @@ async fn start_with_authorized_key(public_key: &str, agent_socket: Option<&Path>
     let temp = tempfile::tempdir()?;
     let known_hosts = temp.path().join("known_hosts");
     let identity_agent = agent_socket.map_or_else(|| "none".to_owned(), |socket| socket.display().to_string());
-    let config = temp.path().join("ssh_config");
+    let ssh_home = temp.path().join("home");
+    let ssh_dir = ssh_home.join(".ssh");
+    std::fs::create_dir_all(&ssh_dir)?;
+    let config = ssh_dir.join("config");
     std::fs::write(
         &config,
         format!(
@@ -471,7 +541,7 @@ async fn start_with_authorized_key(public_key: &str, agent_socket: Option<&Path>
     let wrapper = temp.path().join("ssh");
     std::fs::write(
         &wrapper,
-        format!("#!/bin/sh\nexec ssh -F '{}' \"$@\"\n", config.display()),
+        format!("#!/bin/sh\nHOME='{}' exec ssh \"$@\"\n", ssh_home.display()),
     )?;
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755))?;
 

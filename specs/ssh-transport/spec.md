@@ -121,6 +121,7 @@ OpenSSH: force `StrictHostKeyChecking=ask` for the destination and every `ProxyJ
 - System `ssh` writing `~/.ssh/known_hosts` MUST NOT be treated as trust for the built-in backend.
 - TLS through an SSH tunnel MUST verify the saved database hostname when verification is requested.
 - The OpenSSH backend MUST use `StrictHostKeyChecking=ask` for the destination and every `ProxyJump` hop, regardless of later system or user config settings.
+- The OpenSSH backend MUST refuse an effective `ProxyCommand` for the destination or any hop; it supports configured `ProxyJump` routes without executing arbitrary configured commands.
 
 ## Invariants
 
@@ -168,7 +169,7 @@ Each line names the tip proof. When the proof is code only, that is marked.
 - **Learn new.** GIVEN `UnknownHostKey::Learn` AND no matching line WHEN verify_or_learn succeeds THEN the outcome is `LearnedNew` AND a new line exists. Proof: `verify_or_learn_creates_known_hosts_on_first_use`.
 - **Prompt decline.** GIVEN verify_or_prompt AND the prompter does not accept WHEN the key is unknown THEN the outcome is `Unknown` AND no line is added. Proof: `built_in_host_key_trust_is_persisted_only_after_acceptance`.
 - **TLS identity.** GIVEN SSH plus certificate verification WHEN transport assembles options THEN the TLS hostname is the saved database host, not the local forward. Proof: `socket_forwarding_keeps_the_service_hostname_for_tls`; `verify_full_through_ssh_uses_the_original_database_hostname`; `verify_full_over_a_tcp_tunnel_never_downgrades_to_the_local_dial_address`.
-- **OpenSSH ProxyJump policy.** GIVEN the system OpenSSH backend and a `ProxyJump` route WHEN Bookie starts the master THEN it passes a private config with `StrictHostKeyChecking=ask` before the system and user config includes, and OpenSSH's child uses the same `-F` config. The Docker regression `openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target` runs with a user config that requests `StrictHostKeyChecking no`, confirms both hop keys still prompt, and confirms declining the first hop does not write `known_hosts`. `the_master_starts_with_forced_options_null_stdin_and_the_askpass_socket` also checks the config mode, ordering, and master argument. An unknown key on an installed real jump host remains in the [manual acceptance checklist](../../docs/manual-verification-0.2-features.md).
+- **OpenSSH ProxyJump policy.** GIVEN the system OpenSSH backend and a `ProxyJump` route WHEN Bookie starts the master THEN it passes a private config with `StrictHostKeyChecking=ask` before the system and user config includes, and OpenSSH's child uses the same `-F` config. The Docker regression `openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target` runs with a user config that requests `StrictHostKeyChecking no`, confirms both hop keys still prompt, and confirms declining the first hop does not write `known_hosts`. `an_effective_proxy_command_is_refused_without_running_it` confirms effective commands on the target and a hop are refused before execution. `the_master_starts_with_forced_options_null_stdin_and_the_askpass_socket` also checks the config mode, ordering, and master argument. An unknown key on an installed real jump host remains in the [manual acceptance checklist](../../docs/manual-verification-0.2-features.md).
 
 ## Open questions
 
