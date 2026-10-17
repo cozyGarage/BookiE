@@ -8,6 +8,8 @@ struct SessionScript {
     disconnect_on: Option<&'static str>,
     query_error_on: Option<&'static str>,
     panic_on_close: bool,
+    panic_on_status: bool,
+    panic_once_on_status: std::sync::atomic::AtomicBool,
     result_sets_on: Option<&'static str>,
 }
 
@@ -67,6 +69,14 @@ impl tablepro_core::Session for ScriptedSession {
     }
 
     fn is_usable(&self) -> bool {
+        if self.script.panic_on_status
+            || self
+                .script
+                .panic_once_on_status
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            panic!("secret session status panic")
+        }
         self.usable
     }
 
@@ -78,8 +88,28 @@ impl tablepro_core::Session for ScriptedSession {
     }
 }
 
-struct SessionConn {
+pub(super) struct SessionConn {
     script: Arc<SessionScript>,
+}
+
+impl SessionConn {
+    pub(super) fn panicking_status() -> Self {
+        Self {
+            script: Arc::new(SessionScript {
+                panic_on_status: true,
+                ..SessionScript::default()
+            }),
+        }
+    }
+
+    pub(super) fn panicking_status_once() -> Self {
+        Self {
+            script: Arc::new(SessionScript {
+                panic_once_on_status: std::sync::atomic::AtomicBool::new(true),
+                ..SessionScript::default()
+            }),
+        }
+    }
 }
 
 #[async_trait]
@@ -118,6 +148,13 @@ impl Connection for SessionConn {
             usable: true,
             failed_once: false,
         }))
+    }
+
+    fn supports_server_cancellation(&self) -> bool {
+        if self.script.panic_on_status {
+            panic!("secret capability panic")
+        }
+        false
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
@@ -582,9 +619,11 @@ async fn a_lost_rollback_of_a_read_only_snapshot_keeps_governed_writes_available
         .await
         .expect("begin read only");
     let _ = run(&mut session, "ROLLBACK").await;
+    let _ = session.close().await;
 
     assert!(!h.audit_state.governed_writes_disabled());
     let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 1, "the ended snapshot is recorded once: {rollbacks:?}");
     assert!(
         rollbacks
             .iter()

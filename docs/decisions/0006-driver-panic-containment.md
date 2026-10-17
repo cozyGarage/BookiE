@@ -6,7 +6,7 @@
 
 ## Context
 
-Drivers decode whatever the server sends. A hostile, compromised, or merely buggy server can drive a decoder into a state its author did not anticipate, and some of our dependencies answer that with a panic rather than an error. The SQL Server driver is the concrete case: `tiberius` panics inside its codec on input it cannot parse, and we consume it as a pinned git dependency, so we cannot fix it in our own code.
+Drivers decode whatever the server sends. A hostile, compromised, or merely buggy server can drive a decoder into a state its author did not anticipate, and some of our dependencies answer that with a panic rather than an error. The SQL Server driver is the concrete case: `tiberius` panics inside its codec on input it cannot parse. The original decision used a pinned Git revision; the workspace now uses crates.io `tiberius` 0.13. This boundary remains necessary until the panic is fixed in a reviewed release or maintained patch.
 
 At the time, nothing in the application caught that. There was no `catch_unwind`, no `JoinError` inspection, and no panic hook anywhere in `app`, `mcp`, or `agentd`. A panic inside a Relm4 command killed that task silently. The component that dispatched it was waiting for a message that would now never arrive, so the interface kept showing "Loading" forever with no error, no log entry tying the hang to a cause, and no audit outcome for an operation that had already recorded its intent.
 
@@ -40,6 +40,8 @@ The application survives a panicking driver with an honest error, a correct audi
 Containment is not a repair. A caught panic means a dependency reached a state its author did not expect, and we resume on a new connection without knowing why.
 
 The app and `agentd` install a panic hook that always withholds the payload. `TABLEPRO_DEBUG_PANICS=1` enables a backtrace without restoring Rust's payload-printing hook; `RUST_BACKTRACE=1` also requests one. Both modes retain the source location and stack frames while keeping the panic message out of logs and stderr. [#666](https://github.com/cozyGarage/BookiE/issues/666) records the installed-launch investigation steps. `PolicyGuard` separately catches driver panics and logs only the operation and payload byte count; returned errors withhold the payload. These hooks do not cover arbitrary panics in other processes or code that does not install the hook.
+
+The guard also contains panics from synchronous driver status checks. A panic while checking cancellation support reports that cancellation is unavailable; a panic while checking session health retires that guarded session permanently, even if the driver later reports it healthy. When a fault sink is installed, both checks report the connection as unusable.
 
 `catch_unwind` requires the unwinding panic strategy. Setting `panic = "abort"` in a release profile would silently disable this entire boundary, so that setting must not be introduced without replacing this mechanism.
 

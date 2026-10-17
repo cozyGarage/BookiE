@@ -311,7 +311,7 @@ impl BrowseTab {
     pub(super) fn refresh_crud_buttons(&self) {
         let has_columns = !self.current_columns.is_empty();
         let has_pk = self.has_primary_key();
-        if self.read_only {
+        if !self.allows_row_mutations() {
             // The Insert button lives in the per-table HeaderBar, not
             // in this tab's own widget tree — but the visibility flip
             // still drives the GtkWidget directly, so the header-bar
@@ -334,6 +334,14 @@ impl BrowseTab {
                 .set_tooltip_text(Some(&crate::tr!("Insert row (Ctrl+N)")));
         }
         self.refresh_banner_visibility();
+    }
+
+    pub(super) fn allows_row_mutations(&self) -> bool {
+        !self.read_only
+    }
+
+    pub(super) fn allows_keyed_row_mutations(&self) -> bool {
+        self.allows_row_mutations() && self.current_columns.iter().any(|column| column.primary_key)
     }
 
     /// Update the Filter button's count badge + tooltip based on the
@@ -401,6 +409,19 @@ impl BrowseTab {
         self.paginator_label.set_label(text);
         self.paginator_label
             .update_property(&[gtk::accessible::Property::Label(text)]);
+    }
+
+    pub(super) fn update_next_page_sensitivity(&self) {
+        let loaded_rows = self
+            .current_result
+            .as_ref()
+            .map_or(0, |result| result.rows.len() as u64);
+        self.next_button.set_sensitive(next_page_available(
+            self.current_offset,
+            self.page_size,
+            self.current_total_rows,
+            loaded_rows,
+        ));
     }
 
     pub(super) fn update_paginator_label(&self) {
@@ -471,6 +492,18 @@ impl BrowseTab {
             .description(message)
             .build();
         self.replace_status_child("error", &page);
+    }
+}
+
+pub(super) fn next_page_available(
+    current_offset: u64,
+    page_size: u64,
+    total_rows: Option<u64>,
+    loaded_rows: u64,
+) -> bool {
+    match total_rows {
+        Some(total) => current_offset.saturating_add(loaded_rows) < total,
+        None => loaded_rows == page_size,
     }
 }
 

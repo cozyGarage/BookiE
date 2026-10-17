@@ -27,6 +27,7 @@ apps/linux/app/src/ui/app/status_pages.rs
 apps/linux/app/src/ui/app/structure.rs
 apps/linux/app/src/ui/app/workspace_chrome.rs
 apps/linux/app/src/ui/app/workspace_close.rs
+apps/linux/app/src/ui/app/workspace_tabs/bulk_close.rs
 apps/linux/app/src/ui/app/workspace_tabs.rs
 apps/linux/app/src/ui/browse_tab/chrome.rs
 apps/linux/app/src/ui/browse_tab/grid_render.rs

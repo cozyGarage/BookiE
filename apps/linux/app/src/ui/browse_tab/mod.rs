@@ -201,6 +201,10 @@ pub(crate) use value_parse::mysql_enum_set_labels;
 use value_parse::*;
 
 impl BrowseTab {
+    pub(super) fn save_in_flight(&self) -> bool {
+        self.save_in_flight.get()
+    }
+
     pub fn snapshot(&self) -> Option<QueryResult> {
         let mut result = self.current_result.as_deref()?.clone();
         if self.current_projection.is_some() {
@@ -661,6 +665,12 @@ impl SimpleComponent for BrowseTab {
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+        if self.reject_read_only_mutation(&msg, &sender) {
+            return;
+        }
+        if self.reject_keyless_mutation(&msg, &sender) {
+            return;
+        }
         let Some(msg) = self.reject_while_saving(msg, &sender) else {
             return;
         };
@@ -762,6 +772,7 @@ impl SimpleComponent for BrowseTab {
                         let _ = sender.output(BrowseTabOutput::StateChanged);
                     }
                 }
+                self.update_next_page_sensitivity();
                 self.update_paginator_label();
             }
             BrowseTabInput::RowCountFailed(request) => {
@@ -770,6 +781,7 @@ impl SimpleComponent for BrowseTab {
                 }
                 self.current_total_rows = None;
                 self.last_button.set_sensitive(false);
+                self.update_next_page_sensitivity();
                 self.update_paginator_label();
             }
             BrowseTabInput::ShowError(message) => {
@@ -836,6 +848,18 @@ impl SimpleComponent for BrowseTab {
                 }
             }
             BrowseTabInput::NextPage => {
+                let loaded_rows = self
+                    .current_result
+                    .as_ref()
+                    .map_or(0, |result| result.rows.len() as u64);
+                if !next_page_available(
+                    self.current_offset,
+                    self.page_size,
+                    self.current_total_rows,
+                    loaded_rows,
+                ) {
+                    return;
+                }
                 self.current_offset += self.page_size;
                 self.emit_fetch_page(&sender);
                 let _ = sender.output(BrowseTabOutput::StateChanged);
