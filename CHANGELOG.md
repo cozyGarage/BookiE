@@ -128,6 +128,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- MySQL interactive transactions now allow locking reads, user variables, savepoints and supported SHOW forms without implicit commits; rollback does not undo session effects such as user variables or named locks.
 - Read-only connections refuse grid edits through alternate actions while still allowing local drafts to be discarded or undone and redone without changing stored data.
 - Structure column expanders now point right when collapsed and down when open.
 - A database switch rejected during another connection change no longer alters the saved connection.
