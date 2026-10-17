@@ -138,11 +138,11 @@ async fn the_master_starts_with_forced_options_null_stdin_and_the_askpass_socket
     assert!(calls[0].starts_with("-M -N -T -o ControlPath="), "{}", calls[0]);
     assert!(calls[0].contains(" -o StrictHostKeyChecking=ask "));
     assert!(calls[0].contains(" -o ForwardAgent=no "));
-    assert!(
-        calls[0].ends_with(" -J ops@jump1 -p 2222 -l deploy -- bastion"),
-        "{}",
-        calls[0]
-    );
+    assert!(!calls[0].contains(" -J "), "{}", calls[0]);
+    assert!(calls[0].contains("ProxyCommand="), "{}", calls[0]);
+    assert!(calls[0].contains("'ops'"), "{}", calls[0]);
+    assert!(calls[0].contains("jump1"), "{}", calls[0]);
+    assert!(calls[0].ends_with(" -p 2222 -l deploy -- bastion"), "{}", calls[0]);
     assert!(calls[1].starts_with("-F none ") && calls[1].contains(" -O check -- tablepro"));
 
     let env = fake.read("env");

@@ -24,6 +24,25 @@ const FORCED_OPTIONS: [&str; 17] = [
     "GatewayPorts=no",
 ];
 
+const JUMP_OPTIONS: [&str; 16] = [
+    "ControlMaster=no",
+    "ControlPath=none",
+    "ControlPersist=no",
+    "ForkAfterAuthentication=no",
+    "BatchMode=no",
+    "StrictHostKeyChecking=ask",
+    "VisualHostKey=no",
+    "Tunnel=no",
+    "ClearAllForwardings=yes",
+    "ExitOnForwardFailure=yes",
+    "ForwardAgent=no",
+    "ForwardX11=no",
+    "PermitLocalCommand=no",
+    "RequestTTY=no",
+    "SessionType=none",
+    "GatewayPorts=no",
+];
+
 const CONTROL_HOST: &str = "tablepro";
 
 #[derive(Debug, Clone, Copy)]
@@ -40,7 +59,12 @@ pub(crate) enum ControlOp<'a> {
     Exit,
 }
 
-pub(crate) fn master_args(config: &OpenSshConfig, control: &Path, timeouts: &OpenSshTimeouts) -> Vec<OsString> {
+pub(crate) fn master_args(
+    config: &OpenSshConfig,
+    control: &Path,
+    timeouts: &OpenSshTimeouts,
+    ssh_program: &Path,
+) -> Vec<OsString> {
     let mut args: Vec<OsString> = ["-M", "-N", "-T"].into_iter().map(OsString::from).collect();
     push_option(&mut args, control_path_option(control));
     for option in FORCED_OPTIONS {
@@ -59,7 +83,7 @@ pub(crate) fn master_args(config: &OpenSshConfig, control: &Path, timeouts: &Ope
         format!("ServerAliveCountMax={}", timeouts.keepalive_max).into(),
     );
     push_option(&mut args, "LogLevel=INFO".into());
-    push_jump_hosts(&mut args, config);
+    push_jump_hosts(&mut args, config, ssh_program, timeouts);
     push_auth(&mut args, &config.auth);
     if let Some(port) = config.destination.port() {
         args.push("-p".into());
@@ -74,13 +98,103 @@ pub(crate) fn master_args(config: &OpenSshConfig, control: &Path, timeouts: &Ope
     args
 }
 
-fn push_jump_hosts(args: &mut Vec<OsString>, config: &OpenSshConfig) {
+fn push_jump_hosts(args: &mut Vec<OsString>, config: &OpenSshConfig, ssh_program: &Path, timeouts: &OpenSshTimeouts) {
     if config.jump_hosts.is_empty() {
         return;
     }
-    let hops: Vec<String> = config.jump_hosts.iter().map(ToString::to_string).collect();
-    args.push("-J".into());
-    args.push(hops.join(",").into());
+    let mut option = OsString::from("ProxyCommand=");
+    option.push(proxy_command(&config.jump_hosts, ssh_program, &config.auth, timeouts));
+    push_option(args, option);
+}
+
+fn proxy_command(
+    hops: &[super::SshDestination],
+    ssh_program: &Path,
+    auth: &OpenSshAuth,
+    timeouts: &OpenSshTimeouts,
+) -> OsString {
+    let Some((hop, earlier)) = hops.split_last() else {
+        return OsString::new();
+    };
+    let mut args = vec![ssh_program.as_os_str().to_owned()];
+    push_proxy_options(&mut args, earlier, ssh_program, auth, timeouts);
+    push_auth(&mut args, auth);
+    args.extend(["-W".into(), "[%h]:%p".into()]);
+    if let Some(port) = hop.port() {
+        args.extend(["-p".into(), port.to_string().into()]);
+    }
+    if let Some(user) = hop.user() {
+        args.extend(["-l".into(), user.into()]);
+    }
+    args.extend(["--".into(), hop.host().into()]);
+    shell_join(&args)
+}
+
+fn push_proxy_options(
+    args: &mut Vec<OsString>,
+    earlier: &[super::SshDestination],
+    ssh_program: &Path,
+    auth: &OpenSshAuth,
+    timeouts: &OpenSshTimeouts,
+) {
+    for option in JUMP_OPTIONS {
+        push_option(args, option.into());
+    }
+    push_option(
+        args,
+        format!("ConnectTimeout={}", timeouts.connect.as_secs().max(1)).into(),
+    );
+    push_option(
+        args,
+        format!("ServerAliveInterval={}", timeouts.keepalive_interval.as_secs()).into(),
+    );
+    push_option(args, format!("ServerAliveCountMax={}", timeouts.keepalive_max).into());
+    push_option(args, "LogLevel=INFO".into());
+    if !earlier.is_empty() {
+        let mut option = OsString::from("ProxyCommand=");
+        option.push(proxy_command(earlier, ssh_program, auth, timeouts));
+        push_option(args, option);
+    }
+}
+
+fn shell_join(args: &[OsString]) -> OsString {
+    let mut command = Vec::new();
+    for (index, arg) in args.iter().enumerate() {
+        if index > 0 {
+            command.push(b' ');
+        }
+        let dynamic_target = arg == "[%h]:%p";
+        let bytes = if dynamic_target {
+            arg.as_os_str().as_bytes().to_vec()
+        } else {
+            escape_tokens(arg.as_os_str().as_bytes())
+        };
+        shell_quote(&bytes, &mut command);
+    }
+    OsString::from_vec(command)
+}
+
+fn escape_tokens(value: &[u8]) -> Vec<u8> {
+    let mut escaped = Vec::with_capacity(value.len());
+    for byte in value {
+        if *byte == b'%' {
+            escaped.push(b'%');
+        }
+        escaped.push(*byte);
+    }
+    escaped
+}
+
+fn shell_quote(value: &[u8], output: &mut Vec<u8>) {
+    output.push(b'\'');
+    for byte in value {
+        if *byte == b'\'' {
+            output.extend_from_slice(b"'\\''");
+        } else {
+            output.push(*byte);
+        }
+    }
+    output.push(b'\'');
 }
 
 fn push_auth(args: &mut Vec<OsString>, auth: &OpenSshAuth) {
@@ -167,7 +281,12 @@ mod tests {
     }
 
     fn master(config: &OpenSshConfig) -> Vec<OsString> {
-        master_args(config, Path::new("/tmp/control"), &OpenSshTimeouts::default())
+        master_args(
+            config,
+            Path::new("/tmp/control"),
+            &OpenSshTimeouts::default(),
+            Path::new("/usr/bin/ssh"),
+        )
     }
 
     #[test]
@@ -176,6 +295,7 @@ mod tests {
             &config(None, None, OpenSshAuth::Agent),
             Path::new("/run/user/1000/tablepro/ssh/0123456789abcdef/89abcdef/control"),
             &OpenSshTimeouts::default(),
+            Path::new("/usr/bin/ssh"),
         );
         assert_eq!(
             strings(&args),
@@ -260,14 +380,36 @@ mod tests {
     }
 
     #[test]
-    fn jump_hosts_render_one_minus_j() {
+    fn every_jump_host_uses_bookies_forced_host_key_policy() {
         let mut with_jumps = config(None, None, OpenSshAuth::Agent);
-        with_jumps.jump_hosts = SshDestination::parse_jump_list("ops@jump1:2200,[fd00::1]").unwrap();
+        with_jumps.jump_hosts = SshDestination::parse_jump_list("ops@jump1:2200,jump2").unwrap();
         let args = master(&with_jumps);
         let args = strings(&args);
-        assert_eq!(args.iter().filter(|arg| **arg == "-J").count(), 1);
-        let position = args.iter().position(|arg| *arg == "-J").unwrap();
-        assert_eq!(args[position + 1], "ops@jump1:2200,[fd00::1]");
+        assert!(!args.contains(&"-J"));
+        let proxy_command = args
+            .windows(2)
+            .find(|pair| pair[0] == "-o" && pair[1].starts_with("ProxyCommand="))
+            .map(|pair| pair[1])
+            .expect("jump routes use an explicit proxy command");
+        assert_eq!(proxy_command.matches("StrictHostKeyChecking=ask").count(), 2);
+        assert!(proxy_command.contains("jump1"));
+        assert!(proxy_command.contains("'ops'"));
+        assert!(proxy_command.contains("jump2"));
+        assert!(proxy_command.contains("[%%h]:%%p"));
+    }
+
+    #[test]
+    fn shell_metacharacters_in_a_jump_host_stay_quoted_and_percent_tokens_stay_literal() {
+        let mut with_jumps = config(None, None, OpenSshAuth::Agent);
+        with_jumps.jump_hosts = vec![SshDestination::new("jump';id;%h", None, None).unwrap()];
+        let argv = master(&with_jumps);
+        let args = strings(&argv);
+        let proxy_command = args
+            .windows(2)
+            .find(|pair| pair[0] == "-o" && pair[1].starts_with("ProxyCommand="))
+            .map(|pair| pair[1])
+            .unwrap();
+        assert!(proxy_command.contains("'jump'\\'';id;%%h'"));
     }
 
     #[test]

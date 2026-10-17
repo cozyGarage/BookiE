@@ -219,7 +219,7 @@ fn spawn_master(
 ) -> Result<Master, OpenSshError> {
     let mut command = Command::new(&context.ssh_program);
     command
-        .args(master_args(config, &control, &context.timeouts))
+        .args(master_args(config, &control, &context.timeouts, &context.ssh_program))
         .env("SSH_ASKPASS", &context.askpass_program)
         .env("SSH_ASKPASS_REQUIRE", "force")
         .env_remove("SSH_ASKPASS_PROMPT")
