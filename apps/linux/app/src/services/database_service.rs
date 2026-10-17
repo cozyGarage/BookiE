@@ -697,6 +697,72 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn gui_read_only_transaction_writes_are_denied_by_the_active_policy_guard() {
+        let service = DatabaseService::new_isolated();
+        let driver: Arc<dyn DatabaseDriver> = Arc::new(drivers_sqlite::SqliteDriver);
+        let id = Uuid::new_v4();
+        let options = ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        };
+        let connection = driver.connect(options.clone()).await.expect("sqlite connection");
+        let setup_control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+        connection
+            .execute_controlled(
+                "CREATE TABLE guarded_notes (id INTEGER PRIMARY KEY, value TEXT NOT NULL)",
+                &setup_control,
+            )
+            .await
+            .expect("create fixture table");
+        connection
+            .execute_controlled("INSERT INTO guarded_notes VALUES (1, 'before')", &setup_control)
+            .await
+            .expect("seed fixture row");
+        assert!(service.activate(
+            id,
+            ConnectionMetadata {
+                id,
+                name: "read-only fixture".into(),
+                driver_id: "sqlite".into(),
+                environment: Environment::Local,
+                read_only: true,
+                server_version: None,
+                query_timeout_secs: None,
+            },
+            connection,
+            None,
+            true,
+            ReconnectParams {
+                driver,
+                opts: options,
+                ssh: None,
+                environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+            },
+        ));
+
+        let guarded = service.get(id).expect("active GUI connection");
+        let result = guarded
+            .execute_in_transaction_checked_controlled(
+                &[(
+                    "UPDATE guarded_notes SET value = ? WHERE id = ?".into(),
+                    vec![tablepro_core::Value::Text("after".into()), tablepro_core::Value::Int(1)],
+                )],
+                &[0],
+                &tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5)),
+            )
+            .await;
+
+        assert!(matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))));
+        let rows = guarded
+            .query("SELECT value FROM guarded_notes WHERE id = 1")
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows, [[tablepro_core::Value::Text("before".into())]]);
+        service.close(id);
+    }
+
+    #[tokio::test]
     async fn candidate_catalog_reads_use_the_durable_policy_audit_journal() {
         let service = DatabaseService::new_isolated();
         let driver: Arc<dyn DatabaseDriver> = Arc::new(drivers_sqlite::SqliteDriver);
