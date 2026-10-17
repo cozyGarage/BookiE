@@ -43,6 +43,8 @@ Click a sortable result column header to order the rows already loaded in that r
 
 Right-click a result cell and choose **Filter by This Value** to filter the loaded rows in that result. This also works on pinned results, shows visible and loaded row counts, and does not run the SQL again.
 
+When a query stops at the query timeout, the editor toolbar offers **Run again with a longer timeout** (four times as long, up to 24 hours). It runs the same SQL that timed out, applies to that run only, and leaves the saved timeout unchanged. Starting any other run removes the button.
+
 Use **Split** in the editor toolbar to show the same query in a second side-by-side pane. Edits and the caret are shared; each pane keeps its own scroll position.
 
 To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+Shift+[**. Click its gutter marker to unfold it, or choose **Unfold all** in the toolbar. **Ctrl+Shift+]** also unfolds every block. Folding hides lines in the editor without changing the SQL that runs. Editing the query clears folds so hidden text cannot be mistaken for the current query.
@@ -116,6 +118,7 @@ Press Ctrl+? for the full list. The most used:
 | Ctrl+F | Filter rows |
 | Ctrl+Alt+F | Find in loaded rows |
 | Ctrl+Shift+J | Jump to a column |
+| Ctrl+Shift+L | Reveal the open table in the sidebar |
 | Ctrl+P | Open Quickly |
 | Ctrl+H | Query history |
 | Ctrl+Tab | Most recently used tab |
