@@ -442,6 +442,7 @@ fn verify_locked_with_recent(
     recover_partial: bool,
     recent_limit: Option<usize>,
 ) -> Result<(VerifiedJournal, Vec<AuditEvent>), StorageError> {
+    file.seek(SeekFrom::Start(0))?;
     let mut reader = BufReader::new(file);
     let mut tail = JournalTail {
         seq: 0,
@@ -900,6 +901,22 @@ mod tests {
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].operation_id, operation_id);
         assert_eq!(tokio::fs::read(path).await.unwrap(), bytes);
+    }
+
+    #[test]
+    fn verification_starts_at_the_beginning_of_the_file() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("audit.jsonl");
+        let event = sample_event(Principal::human_gui());
+        let operation_id = event.operation_id;
+        append_locked(&path, event, false).unwrap();
+        let mut file = open_file(&path).unwrap().file;
+        file.seek(SeekFrom::End(0)).unwrap();
+
+        let (_, recent) = verify_locked_with_recent(&mut file, false, Some(1)).unwrap();
+
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].operation_id, operation_id);
     }
 
     #[tokio::test]
