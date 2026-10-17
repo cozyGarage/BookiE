@@ -84,26 +84,6 @@ fn pending_grid_close_owner_is_current(expected: &glib::WeakRef<adw::TabPage>, c
     current.is_some_and(|current| current == &expected)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[ignore = "requires isolated GTK display"]
-    fn a_pending_grid_flush_matches_only_its_original_tab_page() {
-        relm4::adw::init().unwrap();
-        let original_view = adw::TabView::new();
-        let original_page = original_view.append(&relm4::gtk::Box::new(relm4::gtk::Orientation::Vertical, 0));
-        let expected = original_page.downgrade();
-        let replacement_view = adw::TabView::new();
-        let replacement_page = replacement_view.append(&relm4::gtk::Box::new(relm4::gtk::Orientation::Vertical, 0));
-
-        assert!(pending_grid_close_owner_is_current(&expected, Some(&original_page)));
-        assert!(!pending_grid_close_owner_is_current(&expected, Some(&replacement_page)));
-        assert!(!pending_grid_close_owner_is_current(&expected, None));
-    }
-}
-
 impl App {
     fn grid_close_targets(&self, intent: &GridCloseIntent) -> (Owners, Queues) {
         let tabs = self.workspace_tabs.borrow();
@@ -228,5 +208,25 @@ impl App {
             return;
         }
         sender.input(intent.message());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires isolated GTK display"]
+    fn a_pending_grid_flush_matches_only_its_original_tab_page() {
+        relm4::adw::init().unwrap();
+        let original_view = adw::TabView::new();
+        let original_page = original_view.append(&relm4::gtk::Box::new(relm4::gtk::Orientation::Vertical, 0));
+        let expected = original_page.downgrade();
+        let replacement_view = adw::TabView::new();
+        let replacement_page = replacement_view.append(&relm4::gtk::Box::new(relm4::gtk::Orientation::Vertical, 0));
+
+        assert!(pending_grid_close_owner_is_current(&expected, Some(&original_page)));
+        assert!(!pending_grid_close_owner_is_current(&expected, Some(&replacement_page)));
+        assert!(!pending_grid_close_owner_is_current(&expected, None));
     }
 }
