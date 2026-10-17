@@ -134,7 +134,10 @@ def scenarios(ui):
     def close_other_tabs(page):
         bounds = page.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
         gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=3)
-        ui.invoke(ui.wait_for_node(name="Close Other Tabs", role=ui.pyatspi.ROLE_MENU_ITEM))
+        time.sleep(0.2)
+        ui.press_x11_key("Down")
+        ui.press_x11_key("Down")
+        ui.press_x11_key("Return")
 
     def active_cell_edit_survives_cancelled_window_quit(database, base):
         cancel_close_and_save(database, "win.quit", "Save changes before closing?")
