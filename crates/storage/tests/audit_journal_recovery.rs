@@ -6,7 +6,7 @@ use tablepro_policy::{
     AuditAdministrativeAction, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditTerminalStatus,
     AuditTransactionOutcome, Principal,
 };
-use tablepro_storage::{AuditJournal, sample_event};
+use tablepro_storage::{AuditJournal, StorageError, sample_event};
 use uuid::Uuid;
 
 const GENESIS_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -355,7 +355,10 @@ async fn recovered_unknown_rollback_blocks_only_the_owning_connection() {
 
     let mut blocked_write = intent_event(Uuid::from_u128(0xD), AuditOperationClass::Mutation);
     blocked_write.connection_id = connection_a;
-    assert!(recovered.append_durable(blocked_write).await.is_err());
+    assert!(matches!(
+        recovered.append_durable(blocked_write).await,
+        Err(StorageError::UnresolvedWrite)
+    ));
 
     let mut unrelated_write = intent_event(Uuid::from_u128(0xE), AuditOperationClass::Mutation);
     unrelated_write.connection_id = connection_b;
