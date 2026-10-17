@@ -302,16 +302,20 @@ async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResul
     let ssh_home = temp.path().join("home");
     let ssh_dir = ssh_home.join(".ssh");
     std::fs::create_dir_all(&ssh_dir)?;
-    let marker = temp.path().join("proxy-command-ran");
-    let jump_marker = temp.path().join("jump-proxy-command-ran");
+    let proxy_marker = ssh_dir.join("proxy-command-ran");
+    let master_marker = ssh_dir.join("master-started");
     std::fs::write(
-        ssh_dir.join("config"),
-        format!("Host target\n  ProxyCommand touch {}\n", marker.display()),
+        ssh_dir.join("target-route"),
+        format!("proxycommand touch {}\n", proxy_marker.display()),
     )?;
+    std::fs::write(ssh_dir.join("jump-route"), "proxycommand none\n")?;
     let wrapper = temp.path().join("ssh");
     std::fs::write(
         &wrapper,
-        format!("#!/bin/sh\nHOME='{}' exec ssh \"$@\"\n", ssh_home.display()),
+        format!(
+            "#!/bin/sh\nHOME='{}'\nexport HOME\ncase \" $* \" in\n  *\" -G \"*)\n    case \" $* \" in\n      *\" -- target \"*) cat \"$HOME/.ssh/target-route\" ;;\n      *\" -- jump \"*) cat \"$HOME/.ssh/jump-route\" ;;\n      *) exit 2 ;;\n    esac\n    exit 0 ;;\nesac\ntouch \"$HOME/.ssh/master-started\"\nexit 1\n",
+            ssh_home.display()
+        ),
     )?;
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755))?;
     let base = temp.path().join("run");
@@ -338,13 +342,12 @@ async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResul
         .await,
         Err(OpenSshError::UnsupportedProxyCommand)
     ));
-    assert!(!marker.exists());
+    assert!(!proxy_marker.exists());
+    assert!(!master_marker.exists());
+    std::fs::write(ssh_dir.join("target-route"), "proxycommand none\nproxyjump jump\n")?;
     std::fs::write(
-        ssh_dir.join("config"),
-        format!(
-            "Host target\n  ProxyJump jump\n\nHost jump\n  ProxyCommand touch {}\n",
-            jump_marker.display()
-        ),
+        ssh_dir.join("jump-route"),
+        format!("proxycommand touch {}\n", proxy_marker.display()),
     )?;
     assert!(matches!(
         OpenSshSession::connect(
@@ -356,7 +359,8 @@ async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResul
         .await,
         Err(OpenSshError::UnsupportedProxyCommand)
     ));
-    assert!(!jump_marker.exists());
+    assert!(!proxy_marker.exists());
+    assert!(!master_marker.exists());
     Ok(())
 }
 
