@@ -124,11 +124,7 @@ impl App {
         });
         tab_view.insert_action_group("tab", Some(&action_group));
 
-        let bulk_menu = gio::Menu::new();
-        bulk_menu.append(Some(&crate::tr!("Keep Tab")), Some("tab.keep"));
-        bulk_menu.append_section(None, &gio::Menu::new());
-        bulk_menu.append(Some(&crate::tr!("Close Other Tabs")), Some("tab.close-others"));
-        bulk_menu.append(Some(&crate::tr!("Close Tabs to the Right")), Some("tab.close-right"));
+        let bulk_menu = bulk_close_menu_model();
         tab_view.set_menu_model(Some(&bulk_menu));
 
         // Both selection-change AND any pages-list change (insert /
@@ -1142,6 +1138,15 @@ fn add_bulk_close_actions(
     }
 }
 
+fn bulk_close_menu_model() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(Some(&crate::tr!("Keep Tab")), Some("tab.keep"));
+    menu.append_section(None, &gio::Menu::new());
+    menu.append(Some(&crate::tr!("Close Other Tabs")), Some("tab.close-others"));
+    menu.append(Some(&crate::tr!("Close Tabs to the Right")), Some("tab.close-right"));
+    menu
+}
+
 #[cfg(test)]
 mod structure_title_tests {
     use super::*;
@@ -1166,6 +1171,19 @@ mod bulk_close_action_tests {
     fn bulk_close_actions_dispatch_the_selected_page_id() {
         relm4::adw::init().unwrap();
         let view = adw::TabView::new();
+        let menu = bulk_close_menu_model();
+        assert_eq!(menu.n_items(), 4);
+        assert_eq!(
+            menu.item_attribute_value(2, "action", None)
+                .and_then(|value| value.get::<String>()),
+            Some("tab.close-others".into())
+        );
+        assert_eq!(
+            menu.item_attribute_value(3, "action", None)
+                .and_then(|value| value.get::<String>()),
+            Some("tab.close-right".into())
+        );
+        view.set_menu_model(Some(&menu));
         let page = view.append(&relm4::gtk::Box::new(relm4::gtk::Orientation::Vertical, 0));
         let id = Uuid::new_v4();
         write_workspace_tab_id(&page, id);
