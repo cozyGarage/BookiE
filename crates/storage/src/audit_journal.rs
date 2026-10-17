@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::{AsRawFd, RawFd};
@@ -172,21 +172,7 @@ impl AuditJournal {
             let _initialization_guard = FileLock::exclusive(&initialization_lock.file)?;
             let mut file = open_file(&path)?.file;
             let _lock = FileLock::exclusive(&file)?;
-            verify_locked(&mut file, false)?;
-            file.seek(SeekFrom::Start(0))?;
-            let mut bytes = Vec::new();
-            file.read_to_end(&mut bytes)?;
-            let mut events = Vec::new();
-            for line in bytes.split(|byte| *byte == b'\n') {
-                if line.iter().all(u8::is_ascii_whitespace) {
-                    continue;
-                }
-                let record: JournalRecord = serde_json::from_slice(line)?;
-                events.push(record.event);
-            }
-            if events.len() > limit {
-                events = events.split_off(events.len() - limit);
-            }
+            let (_, events) = verify_locked_with_recent(&mut file, false, Some(limit))?;
             Ok(events)
         })
         .await
@@ -448,6 +434,14 @@ fn append_to_file_with_sync(
 }
 
 fn verify_locked(file: &mut File, recover_partial: bool) -> Result<VerifiedJournal, StorageError> {
+    verify_locked_with_recent(file, recover_partial, None).map(|(verified, _)| verified)
+}
+
+fn verify_locked_with_recent(
+    file: &mut File,
+    recover_partial: bool,
+    recent_limit: Option<usize>,
+) -> Result<(VerifiedJournal, Vec<AuditEvent>), StorageError> {
     file.seek(SeekFrom::Start(0))?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
@@ -457,6 +451,7 @@ fn verify_locked(file: &mut File, recover_partial: bool) -> Result<VerifiedJourn
     };
     let mut pending = HashMap::new();
     let mut unresolved = HashMap::new();
+    let mut recent = VecDeque::new();
     let mut offset = 0usize;
 
     while offset < bytes.len() {
@@ -485,13 +480,7 @@ fn verify_locked(file: &mut File, recover_partial: bool) -> Result<VerifiedJourn
             }
             Err(error) => return Err(error.into()),
         };
-        validate_chain_fields(raw.seq, &raw.prev_hash, &raw.hash, &tail, raw.event.get().as_bytes())?;
-        let event: AuditEvent = serde_json::from_str(raw.event.get())?;
-        track_operation_state(&mut pending, &mut unresolved, &event);
-        tail = JournalTail {
-            seq: raw.seq,
-            hash: raw.hash,
-        };
+        tail = track_verified_record(&raw, &tail, &mut pending, &mut unresolved, &mut recent, recent_limit)?;
 
         if !terminated && recover_partial {
             file.seek(SeekFrom::End(0))?;
@@ -503,10 +492,36 @@ fn verify_locked(file: &mut File, recover_partial: bool) -> Result<VerifiedJourn
 
     let mut pending_intents: Vec<_> = pending.into_values().collect();
     pending_intents.sort_by_key(|event| event.operation_id);
-    Ok(VerifiedJournal {
-        tail,
-        pending_intents,
-        unresolved_operation_connections: unresolved,
+    Ok((
+        VerifiedJournal {
+            tail,
+            pending_intents,
+            unresolved_operation_connections: unresolved,
+        },
+        recent.into_iter().collect(),
+    ))
+}
+
+fn track_verified_record(
+    raw: &JournalRecordRaw,
+    tail: &JournalTail,
+    pending: &mut HashMap<Uuid, AuditEvent>,
+    unresolved: &mut HashMap<Uuid, Uuid>,
+    recent: &mut VecDeque<AuditEvent>,
+    recent_limit: Option<usize>,
+) -> Result<JournalTail, StorageError> {
+    validate_chain_fields(raw.seq, &raw.prev_hash, &raw.hash, tail, raw.event.get().as_bytes())?;
+    let event: AuditEvent = serde_json::from_str(raw.event.get())?;
+    track_operation_state(pending, unresolved, &event);
+    if let Some(limit) = recent_limit.filter(|limit| *limit > 0) {
+        recent.push_back(event);
+        if recent.len() > limit {
+            recent.pop_front();
+        }
+    }
+    Ok(JournalTail {
+        seq: raw.seq,
+        hash: raw.hash.clone(),
     })
 }
 
@@ -837,6 +852,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn recent_returns_the_requested_tail_in_chronological_order() {
+        let dir = TempDir::new().unwrap();
+        let journal = AuditJournal::open_validated(dir.path().join("audit.jsonl")).unwrap();
+        let operation_ids = [Uuid::from_u128(1), Uuid::from_u128(2), Uuid::from_u128(3)];
+        for operation_id in operation_ids {
+            let mut event = sample_event(Principal::human_gui());
+            event.operation_id = operation_id;
+            journal.append(event).await.unwrap();
+        }
+
+        let recent = journal.recent(2).await.unwrap();
+        assert_eq!(
+            recent.iter().map(|event| event.operation_id).collect::<Vec<_>>(),
+            operation_ids[1..].to_vec()
+        );
+        assert!(journal.recent(0).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
     async fn a_pending_write_is_distinct_from_an_unknown_outcome() {
         let dir = TempDir::new().unwrap();
         let journal = AuditJournal::open_validated(dir.path().join("audit.jsonl")).unwrap();
@@ -1003,5 +1037,20 @@ mod tests {
         tokio::fs::write(&path, text).await.unwrap();
         assert!(journal.verify_chain().await.is_err());
         assert!(AuditJournal::open_validated(path).is_err());
+    }
+
+    #[tokio::test]
+    async fn recent_with_a_short_limit_still_detects_tampering_in_older_records() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("audit.jsonl");
+        let journal = AuditJournal::open_validated(path.clone()).unwrap();
+        for _ in 0..3 {
+            journal.append(sample_event(Principal::human_gui())).await.unwrap();
+        }
+        let mut text = tokio::fs::read_to_string(&path).await.unwrap();
+        text = text.replacen("read_allow", "read_deny", 1);
+        tokio::fs::write(path, text).await.unwrap();
+
+        assert!(journal.recent(1).await.is_err());
     }
 }
