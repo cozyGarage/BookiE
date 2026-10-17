@@ -215,6 +215,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::undecodable_cell_edit_and_null_messages_do_not_stage_mutations"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selection"
     ],
     [

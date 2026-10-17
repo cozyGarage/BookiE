@@ -578,6 +578,64 @@ fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
     controller.detach_runtime();
 }
 
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn undecodable_cell_edit_and_null_messages_do_not_stage_mutations() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch(tab_id);
+    load_undecodable_cell_row(&controller, &observed);
+
+    controller
+        .sender()
+        .send(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "forged value".into(),
+            value: None,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridSetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    let outputs = pump(&observed);
+    let selection = controller.model().current_selection.clone().unwrap();
+    let row = selection
+        .model()
+        .unwrap()
+        .item(0)
+        .unwrap()
+        .downcast::<crate::ui::row_object::RowObject>()
+        .unwrap();
+
+    assert_eq!(
+        pending(tab_id),
+        0,
+        "undecodable cells must not enter the change tracker"
+    );
+    assert_eq!(
+        transactions(&outputs),
+        0,
+        "undecodable-cell messages must not dispatch a save"
+    );
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+            .count(),
+        1,
+        "Set NULL explains why the undecodable cell cannot be changed"
+    );
+    assert_eq!(row.cell_value(1), Value::Undecodable("NUMERIC".into()));
+    controller.detach_runtime();
+}
+
 fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
     let columns = vec![column("id", true), column("title", false), column("body", false)];
     controller
@@ -679,6 +737,36 @@ fn load_generated_column_row(controller: &relm4::Controller<BrowseTab>, observed
             result: QueryResult {
                 columns,
                 rows: vec![vec![Value::Int(1), Value::Text("database value".into())]],
+                truncated: false,
+            },
+            projected_columns: None,
+        })
+        .unwrap();
+    pump(observed);
+}
+
+fn load_undecodable_cell_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
+    let columns = vec![column("id", true), column("amount", false)];
+    controller
+        .sender()
+        .send(BrowseTabInput::ColumnsLoaded(columns.clone()))
+        .unwrap();
+    pump(observed);
+    let request = BrowsePageRequest {
+        id: controller
+            .model()
+            .page_requests
+            .current_id()
+            .expect("a page was requested"),
+        offset: 0,
+    };
+    controller
+        .sender()
+        .send(BrowseTabInput::RowsLoaded {
+            request,
+            result: QueryResult {
+                columns,
+                rows: vec![vec![Value::Int(1), Value::Undecodable("NUMERIC".into())]],
                 truncated: false,
             },
             projected_columns: None,
