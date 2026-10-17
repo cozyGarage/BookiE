@@ -99,6 +99,7 @@ exclusions = [
     "scripts/tests/test_change_contracts.py",
     "scripts/tests/test_check_crate_boundaries.py",
     "apps/linux/app/tests/**",
+    "**/pinned_tests.rs",
 ]
 
 [workspace.lints.clippy]
