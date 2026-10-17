@@ -330,6 +330,53 @@ fn keyless_tab_refuses_to_stage_deletion_of_a_persisted_row() {
     controller.detach_runtime();
 }
 
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch(tab_id);
+    load_generated_column_row(&controller, &observed);
+
+    controller
+        .sender()
+        .send(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "forged value".into(),
+            value: None,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridSetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: vec![Value::Int(1)],
+        })
+        .unwrap();
+    let outputs = pump(&observed);
+
+    assert_eq!(pending(tab_id), 0, "generated cells must not enter the change tracker");
+    assert_eq!(transactions(&outputs), 0, "generated cells must not dispatch a save");
+    assert!(
+        outputs
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+    );
+    let selection = controller.model().current_selection.clone().unwrap();
+    let row = selection
+        .model()
+        .unwrap()
+        .item(0)
+        .unwrap()
+        .downcast::<crate::ui::row_object::RowObject>()
+        .unwrap();
+    assert_eq!(row.cell_value(1), Value::Text("database value".into()));
+    controller.detach_runtime();
+}
+
 fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
     let columns = vec![column("id", true), column("title", false), column("body", false)];
     controller
@@ -392,6 +439,42 @@ fn load_keyless_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiv
         })
         .unwrap();
     pump(observed);
+}
+
+fn load_generated_column_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiver<BrowseTabOutput>) {
+    let columns = vec![column("id", true), generated_column("computed")];
+    controller
+        .sender()
+        .send(BrowseTabInput::ColumnsLoaded(columns.clone()))
+        .unwrap();
+    pump(observed);
+    let request = BrowsePageRequest {
+        id: controller
+            .model()
+            .page_requests
+            .current_id()
+            .expect("a page was requested"),
+        offset: 0,
+    };
+    controller
+        .sender()
+        .send(BrowseTabInput::RowsLoaded {
+            request,
+            result: QueryResult {
+                columns,
+                rows: vec![vec![Value::Int(1), Value::Text("database value".into())]],
+                truncated: false,
+            },
+            projected_columns: None,
+        })
+        .unwrap();
+    pump(observed);
+}
+
+fn generated_column(name: &str) -> ColumnInfo {
+    let mut column = column(name, false);
+    column.is_generated = true;
+    column
 }
 
 fn edit(controller: &relm4::Controller<BrowseTab>, col_index: usize, new_value: &str) {
