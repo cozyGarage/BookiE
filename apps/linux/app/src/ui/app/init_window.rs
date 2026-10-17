@@ -13,7 +13,6 @@ use super::{App, AppMsg};
 /// close-after-save counters, the "close the window once the map
 /// drains" flag, and the in-flight transaction counter the close
 /// guard polls.
-#[derive(Default)]
 pub(super) struct WindowLifecycleHandles {
     pub(super) grid_edits_ready: Rc<Cell<bool>>,
     pub(super) close_after_save: Rc<RefCell<HashMap<Uuid, u32>>>,
@@ -21,6 +20,9 @@ pub(super) struct WindowLifecycleHandles {
     pub(super) in_flight_saves: Rc<Cell<usize>>,
     pub(super) session_teardown_ready: Rc<Cell<bool>>,
     pub(super) session_teardown_pending: Rc<Cell<bool>>,
+    pub(super) window_state: Rc<RefCell<crate::services::window_state::WindowState>>,
+    pub(super) window_close_state_saved: Rc<Cell<bool>>,
+    pub(super) window_close_state_pending: Rc<Cell<bool>>,
 }
 
 pub(super) fn install_window_lifecycle(
@@ -29,9 +31,9 @@ pub(super) fn install_window_lifecycle(
     workspace: &crate::services::workspace_state::WorkspaceStore,
     sender: &ComponentSender<App>,
 ) -> WindowLifecycleHandles {
-    let restored = crate::services::window_state::load();
-    window.set_default_size(restored.width, restored.height);
-    if restored.maximized {
+    let restored = crate::services::window_state::shared();
+    window.set_default_size(restored.borrow().width, restored.borrow().height);
+    if restored.borrow().maximized {
         window.maximize();
     }
     // Window-close handler. Three responsibilities: persist window
@@ -45,18 +47,33 @@ pub(super) fn install_window_lifecycle(
     let workspace_flushed_for_close = workspace_flushed.clone();
     let workspace_flush_in_progress = Rc::new(Cell::new(false));
     let workspace_flush_in_progress_for_close = workspace_flush_in_progress.clone();
-    let handles = WindowLifecycleHandles::default();
-    let close_after_save_for_close = handles.close_after_save.clone();
-    let close_window_after_save_for_close = handles.close_window_after_save.clone();
-    let in_flight_saves = handles.in_flight_saves.clone();
-    let session_teardown_ready = handles.session_teardown_ready.clone();
-    let session_teardown_pending = handles.session_teardown_pending.clone();
-    let grid_edits_ready = handles.grid_edits_ready.clone();
+    let close_after_save_for_close: Rc<RefCell<HashMap<Uuid, u32>>> = Rc::new(RefCell::new(HashMap::new()));
+    let close_window_after_save_for_close: Rc<Cell<bool>> = Rc::new(Cell::new(false));
+    let in_flight_saves: Rc<Cell<usize>> = Rc::new(Cell::new(0));
+    let session_teardown_ready = Rc::new(Cell::new(false));
+    let session_teardown_pending = Rc::new(Cell::new(false));
+    let grid_edits_ready = Rc::new(Cell::new(false));
+    let window_close_state_saved = Rc::new(Cell::new(false));
+    let window_close_state_pending = Rc::new(Cell::new(false));
+    let handles = WindowLifecycleHandles {
+        close_after_save: close_after_save_for_close.clone(),
+        close_window_after_save: close_window_after_save_for_close.clone(),
+        in_flight_saves: in_flight_saves.clone(),
+        session_teardown_ready: session_teardown_ready.clone(),
+        session_teardown_pending: session_teardown_pending.clone(),
+        grid_edits_ready: grid_edits_ready.clone(),
+        window_state: restored.clone(),
+        window_close_state_saved: window_close_state_saved.clone(),
+        window_close_state_pending: window_close_state_pending.clone(),
+    };
     let in_flight_saves_for_close = in_flight_saves.clone();
     let session_teardown_ready_for_close = session_teardown_ready.clone();
     let session_teardown_pending_for_close = session_teardown_pending.clone();
     let close_request_input_sender = sender.input_sender().clone();
     let workspace_for_close = workspace.clone();
+    let close_state_input_sender = close_request_input_sender.clone();
+    let close_state_saved_for_close = window_close_state_saved.clone();
+    let close_state_pending_for_close = window_close_state_pending.clone();
     window.connect_close_request(move |w| {
         // If a Save is mid-flight (async transaction running), block
         // the close until it resolves. Without this, the completion
@@ -174,12 +191,24 @@ pub(super) fn install_window_lifecycle(
             dialog.present(Some(w));
             return glib::Propagation::Stop;
         }
-        let (width, height) = if w.is_maximized() {
-            (w.default_width(), w.default_height())
-        } else {
-            (w.width(), w.height())
-        };
-        crate::services::window_state::save_geometry(width, height, w.is_maximized());
+        let close_state_was_saved = close_state_saved_for_close.replace(false);
+        if !close_state_was_saved {
+            if close_state_pending_for_close.get() {
+                return glib::Propagation::Stop;
+            }
+            let (width, height) = if w.is_maximized() {
+                (w.default_width(), w.default_height())
+            } else {
+                (w.width(), w.height())
+            };
+            close_state_pending_for_close.set(true);
+            let _ = close_state_input_sender.send(AppMsg::PersistWindowStateForClose {
+                width,
+                height,
+                maximized: w.is_maximized(),
+            });
+            return glib::Propagation::Stop;
+        }
         let is_last_window = w
             .application()
             .is_none_or(|application| application.windows().len() <= 1);
