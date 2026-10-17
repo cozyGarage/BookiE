@@ -95,7 +95,7 @@ crates/core/src/import/mod.rs 5
 crates/core/src/import/plan.rs 22
 crates/core/src/numeric_input.rs 2
 crates/core/src/operation.rs 7
-crates/core/src/pagination.rs 23
+crates/core/src/pagination.rs 22
 crates/core/src/query.rs 33
 crates/core/src/sql_ddl/column.rs 36
 crates/core/src/sql_ddl/comment_tests.rs 2
@@ -127,7 +127,8 @@ crates/drivers/mongodb/src/shell.rs 7
 crates/drivers/mssql/src/codec.rs 20
 crates/drivers/mssql/src/lib.rs 64
 crates/drivers/mssql/src/tests.rs 7
-crates/drivers/mysql/src/lib.rs 84
+crates/drivers/mysql/src/decode.rs 16
+crates/drivers/mysql/src/lib.rs 68
 crates/drivers/mysql/src/session.rs 5
 crates/drivers/mysql/src/temporal.rs 1
 crates/drivers/postgres/src/array.rs 4
@@ -167,7 +168,8 @@ crates/storage/src/connection_bundle_crypto.rs 17
 crates/storage/src/connection_color.rs 12
 crates/storage/src/connection_organization.rs 32
 crates/storage/src/connection_url.rs 14
-crates/storage/src/connections.rs 44
+crates/storage/src/connections.rs 39
+crates/storage/src/connections_copy.rs 5
 crates/storage/src/query_history.rs 19
 crates/storage/src/secrets.rs 9
 crates/transport/src/lib.rs 8
