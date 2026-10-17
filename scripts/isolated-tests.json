@@ -220,6 +220,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::read_only_tab_can_undo_and_redo_pending_local_draft"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::read_only_tab_can_discard_a_pending_local_draft"
     ],
     [

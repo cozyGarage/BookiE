@@ -93,8 +93,6 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .unwrap();
     assert!(activate_shortcut(&controller, "Delete"));
     assert!(activate_shortcut(&controller, "<Primary>n"));
-    controller.sender().send(BrowseTabInput::Undo).unwrap();
-    controller.sender().send(BrowseTabInput::Redo).unwrap();
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -194,7 +192,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .iter()
         .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
         .count();
-    assert_eq!(refused, 16, "every read-only mutation message must be refused");
+    assert_eq!(refused, 14, "every read-only database mutation must be refused");
     assert!(
         outputs
             .iter()
@@ -260,6 +258,50 @@ fn read_only_tab_can_discard_a_pending_local_draft() {
     assert!(!outputs.iter().any(
         |output| matches!(output, BrowseTabOutput::ShowToast(message) if message == "This connection is read-only.")
     ));
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn read_only_tab_can_undo_and_redo_pending_local_draft() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch_with_read_only(tab_id, true);
+    crate::services::change_tracker::with_tab(tab_id, |tracker| {
+        tracker.track_insert(vec![Value::Text("draft".into())])
+    })
+    .expect("tab tracker exists");
+    assert_eq!(pending(tab_id), 1);
+
+    controller.sender().send(BrowseTabInput::Undo).unwrap();
+    let undo_outputs = pump(&observed);
+
+    assert_eq!(
+        pending(tab_id),
+        0,
+        "undo removes a local draft without a database write"
+    );
+    assert_eq!(transactions(&undo_outputs), 0);
+    assert!(
+        !undo_outputs
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+    );
+
+    controller.sender().send(BrowseTabInput::Redo).unwrap();
+    let redo_outputs = pump(&observed);
+
+    assert_eq!(
+        pending(tab_id),
+        1,
+        "redo restores a local draft without a database write"
+    );
+    assert_eq!(transactions(&redo_outputs), 0);
+    assert!(
+        !redo_outputs
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+    );
     controller.detach_runtime();
 }
 

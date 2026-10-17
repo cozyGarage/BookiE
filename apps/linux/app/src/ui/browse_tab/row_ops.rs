@@ -806,8 +806,6 @@ fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridSetCellNull { .. }
             | BrowseTabInput::GridDeleteRowAt { .. }
-            | BrowseTabInput::Undo
-            | BrowseTabInput::Redo
             | BrowseTabInput::CommitSave
             | BrowseTabInput::Paste(_)
             | BrowseTabInput::PasteText(_)
