@@ -103,6 +103,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - A Switch database button in the window header lists the databases the account can open on PostgreSQL, MySQL, SQL Server, ClickHouse and MongoDB, reconnects to the one you pick and remembers it for that saved connection.
 - The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 - The MCP tool list now carries read-only and destructive hints, so clients can tell the metadata tools from the ones that run SQL.
+- PostgreSQL databases can be backed up to a file and restored from one with the installed client tools, through SSH tunnels and TLS; restores need approval and both are audited.
 
 ### Changed
 - An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
@@ -127,6 +128,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Fixed
 - Structure column expanders now point right when collapsed and down when open.
 - SQL Server `real`, MySQL `FLOAT` and DuckDB `FLOAT` values showed extra digits, such as 0.10000000149011612 for 0.1, in the grid, copies and exports.
+- MCP clients with valid tokens were refused with a rate-limit error once all agents together exceeded one token's per-minute limit; only failed sign-in attempts now count toward the shared limit.
 - Dropping a SQL Server column that has a default, or changing its type, failed in the Structure tab; the default is now removed first and kept after a type change.
 - Saving the same connection from two windows at once, or switching its database while an edit was saving, could lose one of the changes or pair one edit's server with the other's password.
 - A SQL Server connection with TLS set to Prefer failed against a server that offers no encryption; it now continues without TLS, as Prefer does for PostgreSQL and MySQL, and a server that refuses encryption under Require reports a TLS failure.
