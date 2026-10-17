@@ -748,7 +748,17 @@ async fn mysql_non_committing_statements_run_inside_an_interactive_transaction()
         "RELEASE SAVEPOINT saved_state",
         "SHOW TABLES",
         "SHOW WARNINGS",
+        "SHOW STATUS",
+        "SHOW VARIABLES",
         "SHOW CREATE TABLE items",
+        "SHOW COLUMNS FROM items",
+        "SHOW CATALOGS",
+        "SHOW DATABASES",
+        "SHOW PROCESSLIST",
+        "SHOW SCHEMAS",
+        "SHOW CHARACTER SET",
+        "SHOW VIEWS",
+        "SHOW COLLATION",
     ] {
         let executes = Arc::new(AtomicUsize::new(0));
         let guard = transaction_guard("mysql", executes.clone(), Arc::new(SequenceAuditSink::new(vec![])));
