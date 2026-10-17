@@ -135,14 +135,11 @@ async fn the_master_starts_with_forced_options_null_stdin_and_the_askpass_socket
     let session = fake.connect(OpenSshAuth::Agent).await.unwrap();
 
     let calls = fake.calls();
-    assert!(calls[0].starts_with("-M -N -T -o ControlPath="), "{}", calls[0]);
+    assert!(calls[0].starts_with("-M -N -T -F "), "{}", calls[0]);
     assert!(calls[0].contains(" -o StrictHostKeyChecking=ask "));
     assert!(calls[0].contains(" -o ForwardAgent=no "));
-    assert!(
-        calls[0].ends_with(" -J ops@jump1 -p 2222 -l deploy -- bastion"),
-        "{}",
-        calls[0]
-    );
+    assert!(calls[0].contains(" -J ops@jump1 "), "{}", calls[0]);
+    assert!(calls[0].ends_with(" -p 2222 -l deploy -- bastion"), "{}", calls[0]);
     assert!(calls[1].starts_with("-F none ") && calls[1].contains(" -O check -- tablepro"));
 
     let env = fake.read("env");
@@ -155,6 +152,16 @@ async fn the_master_starts_with_forced_options_null_stdin_and_the_askpass_socket
         std::fs::metadata(master_dir).unwrap().permissions().mode() & 0o777,
         0o700
     );
+    let ssh_config = master_dir.join("ssh_config");
+    assert!(calls[0].contains(&format!("-F {} ", ssh_config.display())));
+    assert_eq!(
+        std::fs::metadata(&ssh_config).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    let ssh_config = std::fs::read_to_string(ssh_config).unwrap();
+    let strict_host_key = ssh_config.find("StrictHostKeyChecking=ask").unwrap();
+    assert!(strict_host_key < ssh_config.find("Include /etc/ssh/ssh_config").unwrap());
+    assert!(strict_host_key < ssh_config.find("Include ~/.ssh/config").unwrap());
     assert!(!Path::new(lines[1]).exists());
     assert!(session.master_pid().is_some_and(process_alive));
 }

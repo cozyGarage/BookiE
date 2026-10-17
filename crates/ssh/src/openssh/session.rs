@@ -1,4 +1,7 @@
 use std::ffi::OsString;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -104,8 +107,9 @@ impl OpenSshSession {
             .map_err(|error| protocol(format!("the ssh setup task failed: {error}")))??;
         let master_dir = MasterDir::new(master_dir);
         let control = master_dir.path().join("control");
+        let ssh_config = write_ssh_config(master_dir.path(), &context.timeouts)?;
         let listener = bind_askpass(master_dir.path(), &control)?;
-        let mut master = spawn_master(config, context, master_dir, control)?;
+        let mut master = spawn_master(config, &ssh_config, context, master_dir, control)?;
         let mut bridge = AskpassBridge::new(context.runtime.owner_uid(), config, prompter);
         let outcome = handshake(&mut master, &listener, &mut bridge, config, context, &cancel).await;
         drop(listener);
@@ -211,15 +215,59 @@ fn bind_askpass(master_dir: &Path, control: &Path) -> Result<UnixListener, OpenS
     UnixListener::bind(&askpass).map_err(|error| unsafe_dir(&askpass, error))
 }
 
+fn write_ssh_config(master_dir: &Path, timeouts: &OpenSshTimeouts) -> Result<PathBuf, OpenSshError> {
+    let path = master_dir.join("ssh_config");
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+        .map_err(|error| unsafe_dir(&path, error))?;
+    let config = format!(
+        "Host *\n\
+         ControlMaster=no\n\
+         ControlPath=none\n\
+         ControlPersist=no\n\
+         ForkAfterAuthentication=no\n\
+         StreamLocalBindMask=0177\n\
+         StreamLocalBindUnlink=no\n\
+         BatchMode=no\n\
+         StrictHostKeyChecking=ask\n\
+         VisualHostKey=no\n\
+         Tunnel=no\n\
+         ClearAllForwardings=yes\n\
+         ExitOnForwardFailure=yes\n\
+         ForwardAgent=no\n\
+         ForwardX11=no\n\
+         PermitLocalCommand=no\n\
+         RequestTTY=no\n\
+         SessionType=none\n\
+         GatewayPorts=no\n\
+         ConnectTimeout={}\n\
+         ServerAliveInterval={}\n\
+         ServerAliveCountMax={}\n\
+         LogLevel=INFO\n\
+         Include /etc/ssh/ssh_config\n\
+         Include ~/.ssh/config\n",
+        timeouts.connect.as_secs().max(1),
+        timeouts.keepalive_interval.as_secs(),
+        timeouts.keepalive_max,
+    );
+    file.write_all(config.as_bytes())
+        .map_err(|error| unsafe_dir(&path, error))?;
+    Ok(path)
+}
+
 fn spawn_master(
     config: &OpenSshConfig,
+    ssh_config: &Path,
     context: &OpenSshContext,
     master_dir: MasterDir,
     control: PathBuf,
 ) -> Result<Master, OpenSshError> {
     let mut command = Command::new(&context.ssh_program);
     command
-        .args(master_args(config, &control, &context.timeouts))
+        .args(master_args(config, ssh_config, &control, &context.timeouts))
         .env("SSH_ASKPASS", &context.askpass_program)
         .env("SSH_ASKPASS_REQUIRE", "force")
         .env_remove("SSH_ASKPASS_PROMPT")

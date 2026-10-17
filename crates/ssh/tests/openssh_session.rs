@@ -319,11 +319,14 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
 
     let temp = tempfile::tempdir().unwrap();
     let known_hosts = temp.path().join("known_hosts");
-    let config_path = temp.path().join("ssh_config");
+    let ssh_home = temp.path().join("home");
+    let ssh_dir = ssh_home.join(".ssh");
+    std::fs::create_dir_all(&ssh_dir).unwrap();
+    let config_path = ssh_dir.join("config");
     std::fs::write(
         &config_path,
         format!(
-            "Host *\n  UserKnownHostsFile {known_hosts}\n  GlobalKnownHostsFile /dev/null\n  IdentityAgent none\n  IdentitiesOnly yes\n  PubkeyAuthentication no\n\nHost target\n  Hostname {target_ip}\n  Port 2222\n  User deploy\n  ProxyJump ops@{jump_host}:{jump_port}\n",
+            "Host *\n  UserKnownHostsFile {known_hosts}\n  GlobalKnownHostsFile /dev/null\n  IdentityAgent none\n  IdentitiesOnly yes\n  PubkeyAuthentication no\n  StrictHostKeyChecking no\n\nHost target\n  Hostname {target_ip}\n  Port 2222\n  User deploy\n  ProxyJump ops@{jump_host}:{jump_port}\n",
             known_hosts = known_hosts.display(),
         ),
     )
@@ -331,7 +334,7 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
     let wrapper = temp.path().join("ssh");
     std::fs::write(
         &wrapper,
-        format!("#!/bin/sh\nexec ssh -F '{}' \"$@\"\n", config_path.display()),
+        format!("#!/bin/sh\nHOME='{}' exec ssh \"$@\"\n", ssh_home.display()),
     )
     .unwrap();
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -350,6 +353,22 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
         jump_hosts: Vec::new(),
         auth: password("s3cret"),
     };
+    let rejecting = ScriptedPrompter::new(vec![PromptAnswer::Decline]);
+    let rejected = OpenSshSession::connect(&cfg, &context, rejecting.clone(), CancellationToken::new()).await;
+    assert!(matches!(
+        rejected,
+        Err(OpenSshError::HostKeyUnknown { declined: true, .. })
+    ));
+    assert_eq!(
+        rejecting
+            .asked()
+            .iter()
+            .filter(|prompt| matches!(prompt, AskpassPrompt::HostKeyConfirmation { .. }))
+            .count(),
+        1,
+    );
+    assert!(!known_hosts.exists());
+
     let prompter = ScriptedPrompter::new(vec![
         PromptAnswer::Accept,
         PromptAnswer::Secret(SecretString::from("s3cret")),
@@ -374,6 +393,11 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
             .any(|prompt| matches!(prompt, AskpassPrompt::Password { user_host } if user_host.starts_with("deploy@"))),
         "the final target must also be authenticated, proving the jump reached it: {asked:?}"
     );
+    let host_key_prompts = asked
+        .iter()
+        .filter(|prompt| matches!(prompt, AskpassPrompt::HostKeyConfirmation { .. }))
+        .count();
+    assert_eq!(host_key_prompts, 2, "both SSH hops must request trust: {asked:?}");
     session.shutdown().await;
     assert!(session.is_closed());
 }
