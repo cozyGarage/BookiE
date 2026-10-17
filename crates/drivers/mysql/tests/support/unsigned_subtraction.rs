@@ -90,3 +90,56 @@ async fn mariadb_unsigned_subtraction_obeys_session_mode_and_signed_boundaries()
     let (_container, options) = crate::start_mariadb().await;
     assert_unsigned_subtraction_mode(options, "MariaDB").await;
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_float_column_keeps_the_digits_mysql_shows() {
+    let (_c, options) = crate::start_mysql().await;
+    let connection = connect(options).await;
+    let table = format!("float_digits_{}", uuid::Uuid::new_v4().simple());
+    connection
+        .execute(&format!("CREATE TABLE {table} (f FLOAT, d DOUBLE)"))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!("INSERT INTO {table} VALUES (0.1, 0.1)"))
+        .await
+        .unwrap();
+
+    let result = connection.query(&format!("SELECT f, d FROM {table}")).await.unwrap();
+
+    assert_eq!(result.rows, vec![vec![Value::Float(0.1), Value::Float(0.1)]]);
+    connection.execute(&format!("DROP TABLE {table}")).await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_tinyint_one_outside_zero_and_one_keeps_its_stored_integer() {
+    let (_c, options) = crate::start_mysql().await;
+    let connection = connect(options).await;
+    let table = format!("tinyint_one_{}", uuid::Uuid::new_v4().simple());
+    connection
+        .execute(&format!(
+            "CREATE TABLE {table} (id int PRIMARY KEY, f TINYINT(1), u TINYINT(1) UNSIGNED, b BOOL)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!("INSERT INTO {table} VALUES (1, 2, 255, 1), (2, -1, 0, 0)"))
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(&format!("SELECT f, u, b FROM {table} ORDER BY id"))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(2), Value::Int(255), Value::Bool(true)],
+            vec![Value::Int(-1), Value::Bool(false), Value::Bool(false)],
+        ]
+    );
+    connection.execute(&format!("DROP TABLE {table}")).await.unwrap();
+}

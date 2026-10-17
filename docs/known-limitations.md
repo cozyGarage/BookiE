@@ -1,6 +1,6 @@
 # Known limitations of BookiE 0.2
 
-What the application does not do, or does differently from what you might expect, and the bugs we know about. Entries link to their owning issue, decision or evidence when one exists. Reviewed 2026-10-14.
+What the application does not do, or does differently from what you might expect, and the bugs we know about. Entries link to their owning issue, decision or evidence when one exists. Reviewed 2026-10-16.
 
 ## Data and values
 
@@ -15,7 +15,10 @@ What the application does not do, or does differently from what you might expect
   Single-statement PostgreSQL `SELECT`s in the SQL editor now stream cursor
   pages through Core and PolicyGuard, retaining at most four pages of up to
   5,000 rows each. That cache is bounded by page and row count, not by cell
-  bytes. Other engines and unsupported statement shapes remain materialized.
+  bytes. A synthetic profile with four pinned results and one active stream
+  reached 1,325 MiB RSS; see the [profile evidence](evidence/stream-retention-synthetic-2026-10-16/README.md).
+  This does not measure normal queries or the complete process ceiling. Other
+  engines and unsupported statement shapes remain materialized.
   The historical grid measurement was about 2.5 times the result memory; #518
   now shares immutable values with materialized rows, and comparable profiling
   remains open (ADR 0011).
@@ -55,7 +58,7 @@ What the application does not do, or does differently from what you might expect
 
 - Multi-cursor editing is not available (UI-22 / [#552](https://github.com/cozyGarage/BookiE/issues/552)). Split panes and SQL code folding are available. Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. Preview tabs are temporary and are not restored after restart; tabs you keep are restored (UI-17b). Query history now opens in a docked panel (UI-18).
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles; a typed activity console is deferred and the activity dialog stays a plain result grid (UI-23).
-- Text and JSON values over the 8 KiB preview threshold can be edited in the full-value dialog up to 1 MiB. Invalid JSON cannot be staged; SQL NULL, empty text, JSON `null`, and text `null` remain separate values. View Value and Copy Value expose the full value. Values over 1 MiB remain read-only; final acceptance for the JSON editing slice is tracked under [#610](https://github.com/cozyGarage/BookiE/issues/610).
+- Text and JSON values over the 8 KiB preview threshold can be edited in the full-value dialog up to 1 MiB. Invalid JSON cannot be staged; SQL NULL, empty text, JSON `null`, and text `null` remain separate values. View Value and Copy Value expose the full value. Values over 1 MiB remain read-only.
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
 - No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
 - PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata remain open under B6.
@@ -71,6 +74,7 @@ What the application does not do, or does differently from what you might expect
 
 ## Known bugs
 
+- **A tunnel drop during a PostgreSQL Session transaction can leave the editor unable to recover** ([#1016](https://github.com/cozyGarage/BookiE/issues/1016)). If the connection is lost while rollback is in flight, the outcome can be recorded as unknown and later writes, including the rollback needed to end the session, can be denied. This failure was intermittent in the reported GTK run; B4 is still deciding how to recover safely. Reconnect behavior must not reuse a new backend as the old session.
 - **Several UI details remain inconsistent** ([#660](https://github.com/cozyGarage/BookiE/issues/660)): text and bytea NULL values render differently, Structure tab chevrons look inverted, and the catalog kind selector can shift the search field.
 - **PostgreSQL `VOID` results are shown as undecodable** ([#660](https://github.com/cozyGarage/BookiE/issues/660)); they should render as empty values.
 - **Two installed launches were reported to abort inside BookiE** ([#666](https://github.com/cozyGarage/BookiE/issues/666)); the cause remains under investigation.

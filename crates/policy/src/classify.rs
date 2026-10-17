@@ -5,7 +5,6 @@ use sqlparser::ast::{
 };
 use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
 use sqlparser::parser::Parser;
-use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
 use crate::admin_functions::is_administrative_function_name;
 use crate::constant_predicate::is_constant_true;
@@ -118,8 +117,8 @@ fn analyze_statement_inner(
         return failed_analysis("empty SQL");
     }
 
-    if driver_id == "mysql" && sql_contains_mysql_executable_comment(trimmed, dialect.as_ref()) {
-        return failed_analysis("MySQL executable comments are not safely classified");
+    if let Some(reason) = crate::input_refusal::refusal(trimmed, driver_id, dialect.as_ref()) {
+        return failed_analysis(reason);
     }
 
     let statements = match Parser::parse_sql(dialect.as_ref(), trimmed) {
@@ -132,7 +131,11 @@ fn analyze_statement_inner(
     }
 
     let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
-    let facts = classify_statements(&statements, effects, contains_administrative_call);
+    let facts = crate::select_writes::with_locking_backstop(
+        classify_statements(&statements, effects, contains_administrative_call),
+        trimmed,
+        dialect.as_ref(),
+    );
     let (blast_radius, sensitive_positions, known_statement_rows) = if include_execution_plans {
         let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(&statements, driver_id);
         (
@@ -207,17 +210,6 @@ fn failed_analysis(message: impl Into<String>) -> StatementAnalysis {
     }
 }
 
-fn sql_contains_mysql_executable_comment(sql: &str, dialect: &dyn Dialect) -> bool {
-    let Ok(tokens) = Tokenizer::new(dialect, sql).tokenize() else {
-        return false;
-    };
-
-    tokens.iter().any(|token| {
-        matches!(token, Token::Whitespace(Whitespace::MultiLineComment(comment))
-            if comment.starts_with('!') || comment.starts_with("M!"))
-    })
-}
-
 /// Detect administrative calls anywhere in a successfully parsed statement.
 /// Token inspection complements the AST walk so calls hidden in predicates,
 /// ordering expressions, or less-common expression wrappers still fail closed,
@@ -252,44 +244,20 @@ fn classify_statement_details(stmt: &Statement) -> StatementDetails {
             contains_unscoped_dml: update.selection.as_ref().is_none_or(is_constant_true),
         },
         Statement::Delete(delete) => classify_delete(delete),
-        Statement::CreateTable(c) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(&c.name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::CreateView(view) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(&view.name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::CreateIndex(c) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: match &c.name {
-                Some(n) => object_name_strings(n),
-                None => object_name_strings(&c.table_name),
-            },
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::AlterTable(alter) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(&alter.name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::Drop { names, .. } => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: names.iter().flat_map(object_name_strings).collect(),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
+        Statement::CreateTable(c) => ddl_on(object_name_strings(&c.name)),
+        Statement::CreateView(view) => ddl_on(object_name_strings(&view.name)),
+        Statement::CreateIndex(c) => ddl_on(match &c.name {
+            Some(n) => object_name_strings(n),
+            None => object_name_strings(&c.table_name),
+        }),
+        Statement::AlterTable(alter) => ddl_on(object_name_strings(&alter.name)),
+        Statement::RenameTable(renames) => ddl_on(
+            renames
+                .iter()
+                .flat_map(|rename| object_name_strings(&rename.old_name))
+                .collect(),
+        ),
+        Statement::Drop { names, .. } => ddl_on(names.iter().flat_map(object_name_strings).collect()),
         Statement::Truncate(truncate) => truncate_facts(truncate.table_names.iter().map(|table| &table.name)),
         Statement::CreateVirtualTable { .. }
         | Statement::CreateRole { .. }
@@ -631,25 +599,13 @@ fn set_expr_tables(body: &SetExpr) -> Vec<String> {
     }
 }
 
-pub(crate) fn expr_writes(expr: &Expr) -> bool {
-    match expr {
-        Expr::Subquery(q) => classify_query(q).class.is_write(),
-        Expr::BinaryOp { left, right, .. } => expr_writes(left) || expr_writes(right),
-        Expr::UnaryOp { expr, .. } => expr_writes(expr),
-        Expr::Nested(e) => expr_writes(e),
-        Expr::Case {
-            operand,
-            conditions,
-            else_result,
-            ..
-        } => {
-            operand.as_ref().is_some_and(|e| expr_writes(e))
-                || conditions
-                    .iter()
-                    .any(|c| expr_writes(&c.condition) || expr_writes(&c.result))
-                || else_result.as_ref().is_some_and(|e| expr_writes(e))
-        }
-        _ => false,
+fn ddl_on(tables: Vec<String>) -> StatementDetails {
+    StatementDetails {
+        effects: Effects::EMPTY,
+        class: StatementClass::Ddl,
+        tables,
+        has_where: true,
+        contains_unscoped_dml: false,
     }
 }
 
@@ -690,6 +646,7 @@ fn table_factor_names(factor: &TableFactor) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]

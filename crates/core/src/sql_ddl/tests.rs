@@ -260,6 +260,22 @@ fn rename_table_each_driver() {
 }
 
 #[test]
+fn a_renamed_table_stays_in_its_own_database() {
+    assert_eq!(
+        build_rename_table("mysql", Some("b"), "old", "new").unwrap(),
+        "ALTER TABLE `b`.`old` RENAME TO `b`.`new`"
+    );
+    assert_eq!(
+        build_rename_table("clickhouse", Some("db"), "old", "new").unwrap(),
+        "RENAME TABLE `db`.`old` TO `db`.`new`"
+    );
+    assert_eq!(
+        build_rename_table("clickhouse", None, "old", "new").unwrap(),
+        "RENAME TABLE `old` TO `new`"
+    );
+}
+
+#[test]
 fn rename_table_mssql() {
     assert_eq!(
         build_rename_table("mssql", None, "old", "new").unwrap(),
@@ -632,8 +648,8 @@ fn alter_column_mssql_applies_default_alongside_type_change() {
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 3);
-    assert_eq!(stmts[0], "ALTER TABLE [t] ALTER COLUMN [x] bigint NULL");
-    assert!(stmts[1].contains("DROP CONSTRAINT"));
+    assert!(stmts[0].contains("DROP CONSTRAINT"));
+    assert_eq!(stmts[1], "ALTER TABLE [t] ALTER COLUMN [x] bigint NULL");
     assert_eq!(stmts[2], "ALTER TABLE [t] ADD DEFAULT (0) FOR [x]");
 }
 
