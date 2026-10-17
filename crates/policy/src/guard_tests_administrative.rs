@@ -338,6 +338,39 @@ async fn a_timed_out_restore_after_dispatch_is_unknown_and_disables_governed_wri
 }
 
 #[tokio::test]
+async fn a_failed_restore_after_dispatch_is_unknown_and_disables_governed_writes() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let state = Arc::new(AuditState::new());
+    let guard = guard(
+        Principal::human_gui(),
+        false,
+        Arc::new(AutoApproveSink),
+        audit.clone(),
+        state.clone(),
+    );
+    let dispatched = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mark_dispatched = dispatched.clone();
+
+    let error = guard
+        .run_administrative_with_dispatch(AdministrativeOperation::Restore, &control(), dispatched, async move {
+            mark_dispatched.store(true, std::sync::atomic::Ordering::Release);
+            Err::<(), _>(DriverError::Internal("pg_restore exited unsuccessfully".into()))
+        })
+        .await
+        .expect_err("restore outcome is unknown");
+
+    assert!(matches!(error, DriverError::OperationOutcomeUnknown { .. }));
+    assert!(state.governed_writes_disabled());
+    assert_eq!(
+        statuses(&audit),
+        [
+            (AuditRecordPhase::Intent, AuditTerminalStatus::Pending),
+            (AuditRecordPhase::Outcome, AuditTerminalStatus::Unknown),
+        ]
+    );
+}
+
+#[tokio::test]
 async fn a_completed_restore_disarms_the_pending_write_guard() {
     let state = Arc::new(AuditState::new());
     let guard = guard(

@@ -122,7 +122,7 @@ impl PolicyGuard {
             },
             result = work => result,
         };
-        let result = self.resolve_restore_interruption(operation, dispatched.as_ref(), result);
+        let result = self.resolve_restore_outcome(operation, dispatched.as_ref(), result);
         let outcome = AuditOutcome {
             terminal_status: result
                 .as_ref()
@@ -140,7 +140,7 @@ impl PolicyGuard {
         result
     }
 
-    fn resolve_restore_interruption<T>(
+    fn resolve_restore_outcome<T>(
         &self,
         operation: AdministrativeOperation,
         dispatched: Option<&Arc<AtomicBool>>,
@@ -149,11 +149,7 @@ impl PolicyGuard {
         match result {
             Err(error)
                 if operation.replaces_data()
-                    && dispatched.as_ref().is_some_and(|state| state.load(Ordering::Acquire))
-                    && matches!(
-                        error,
-                        DriverError::Cancelled | DriverError::TimedOut | DriverError::OperationOutcomeUnknown { .. }
-                    ) =>
+                    && dispatched.as_ref().is_some_and(|state| state.load(Ordering::Acquire)) =>
             {
                 self.ctx.audit_state.disable_governed_writes();
                 Err(match error {

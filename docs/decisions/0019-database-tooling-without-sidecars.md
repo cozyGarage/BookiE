@@ -16,7 +16,7 @@ BookiE ships no sidecar binaries. Each tool uses the narrowest mechanism that al
 3. **Logical backup and restore call the vendor client tools.** PostgreSQL uses `pg_dump` and `pg_restore` first; MySQL and MariaDB use `mysqldump` or `mariadb-dump` and the matching client next. Other engines wait for a tested design. The tools are user-installed optional dependencies, never bundled in the Arch or Debian packages. Each run follows the rules of the system OpenSSH transport in `crates/ssh`:
    - The binary is resolved once to an absolute path and its version is checked; `pg_dump` must be at least the server's major version.
    - The child starts with a cleared environment and is killed when its operation is cancelled or dropped.
-   - A cancelled or dropped dump removes its partial output. Restore dispatch begins when `pg_restore` starts; cancellation or timeout after that point has an unknown outcome, is audited as unknown and disables governed writes. Cancellation before dispatch remains cancelled.
+   - A cancelled or dropped dump removes its partial output. Restore dispatch begins when `pg_restore` starts; any failure after that point has an unknown outcome, is audited as unknown and disables governed writes. Cancellation before dispatch remains cancelled.
    - Passwords never appear in arguments. PostgreSQL reads a 0600 `PGPASSFILE` and MySQL a 0600 `--defaults-extra-file`, both created in `$XDG_RUNTIME_DIR` and removed when the run ends.
    - Host and port come from the transport endpoint, so SSH tunnels and TLS settings apply as they do for the driver.
    - Where the kernel supports Landlock, the child can write only the chosen output path.
