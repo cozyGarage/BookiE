@@ -14,7 +14,7 @@ Passwords are kept in your desktop keyring, never in BookiE's own files.
 
 - **SSH**: the form configures one SSH host. The built-in transport can use saved multi-hop routes, but the form cannot edit them yet. System OpenSSH uses jump hosts from your SSH configuration. BookiE asks before trusting a built-in host key it has not seen.
 - **TLS**: choose how strictly the server certificate is checked. "Verify full" checks both the certificate authority and the host name.
-- **Environment and read-only**: mark a connection as production, staging or local, and tick **Read-only** to refuse every change on it.
+- **Environment and read-only**: mark a connection as production, staging or local, and tick **Read-only** to refuse every change on it. A production connection shows a red **Production** badge, a tinted header bar and `[Production]` at the start of its window title, so it stands out in the taskbar and Alt-Tab.
 - **Import from URL** fills the form from a network connection URL such as `postgres://user@host:5432/db`. Local Unix socket paths must be set in the form or restored from a connection bundle.
 - **Share connections**: export or import connections from the menu in the saved list. Encrypt the export with a passphrase to include stored database and SSH credentials. Plaintext exports contain no credentials.
 
@@ -42,6 +42,8 @@ SQL completion offers keywords and scoped table and column names. Choosing an id
 Click a sortable result column header to order the rows already loaded in that result. This is a local view change and does not run the SQL again, including for write statements that return rows. SQL NULL values stay last; columns with mixed or undecodable values cannot be sorted. Text uses local value ordering, which can differ from the database collation.
 
 Right-click a result cell and choose **Filter by This Value** to filter the loaded rows in that result. This also works on pinned results, shows visible and loaded row counts, and does not run the SQL again.
+
+When a query stops at the query timeout, the editor toolbar offers **Run again with a longer timeout** (four times as long, up to 24 hours). It runs the same SQL that timed out, applies to that run only, and leaves the saved timeout unchanged. Starting any other run removes the button.
 
 Use **Split** in the editor toolbar to show the same query in a second side-by-side pane. Edits and the caret are shared; each pane keeps its own scroll position.
 
