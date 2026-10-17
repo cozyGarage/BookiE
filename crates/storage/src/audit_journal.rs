@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
@@ -442,9 +442,7 @@ fn verify_locked_with_recent(
     recover_partial: bool,
     recent_limit: Option<usize>,
 ) -> Result<(VerifiedJournal, Vec<AuditEvent>), StorageError> {
-    file.seek(SeekFrom::Start(0))?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
+    let mut reader = BufReader::new(file);
     let mut tail = JournalTail {
         seq: 0,
         hash: GENESIS_HASH.to_string(),
@@ -453,17 +451,22 @@ fn verify_locked_with_recent(
     let mut unresolved = HashMap::new();
     let mut recent = VecDeque::new();
     let mut offset = 0usize;
+    let mut line = Vec::new();
 
-    while offset < bytes.len() {
-        let remaining = &bytes[offset..];
-        let newline = remaining.iter().position(|byte| *byte == b'\n');
-        let (line, terminated) = match newline {
-            Some(index) => (&remaining[..index], true),
-            None => (remaining, false),
-        };
-        let next_offset = offset + line.len() + usize::from(terminated);
+    loop {
+        line.clear();
+        let bytes_read = reader.read_until(b'\n', &mut line)?;
+        if bytes_read == 0 {
+            break;
+        }
+        let terminated = line.last() == Some(&b'\n');
+        if terminated {
+            line.pop();
+        }
+        let next_offset = offset + bytes_read;
         if line.iter().all(u8::is_ascii_whitespace) {
             if !terminated && recover_partial {
+                let file = reader.get_mut();
                 file.set_len(offset as u64)?;
                 file.sync_data()?;
             }
@@ -471,9 +474,10 @@ fn verify_locked_with_recent(
             continue;
         }
 
-        let raw = match serde_json::from_slice::<JournalRecordRaw>(line) {
+        let raw = match serde_json::from_slice::<JournalRecordRaw>(&line) {
             Ok(raw) => raw,
             Err(_) if !terminated && recover_partial => {
+                let file = reader.get_mut();
                 file.set_len(offset as u64)?;
                 file.sync_data()?;
                 break;
@@ -483,6 +487,7 @@ fn verify_locked_with_recent(
         tail = track_verified_record(&raw, &tail, &mut pending, &mut unresolved, &mut recent, recent_limit)?;
 
         if !terminated && recover_partial {
+            let file = reader.get_mut();
             file.seek(SeekFrom::End(0))?;
             file.write_all(b"\n")?;
             file.sync_data()?;
@@ -490,16 +495,24 @@ fn verify_locked_with_recent(
         offset = next_offset;
     }
 
-    let mut pending_intents: Vec<_> = pending.into_values().collect();
-    pending_intents.sort_by_key(|event| event.operation_id);
     Ok((
-        VerifiedJournal {
-            tail,
-            pending_intents,
-            unresolved_operation_connections: unresolved,
-        },
+        verified_journal(tail, pending, unresolved),
         recent.into_iter().collect(),
     ))
+}
+
+fn verified_journal(
+    tail: JournalTail,
+    pending: HashMap<Uuid, AuditEvent>,
+    unresolved: HashMap<Uuid, Uuid>,
+) -> VerifiedJournal {
+    let mut pending_intents: Vec<_> = pending.into_values().collect();
+    pending_intents.sort_by_key(|event| event.operation_id);
+    VerifiedJournal {
+        tail,
+        pending_intents,
+        unresolved_operation_connections: unresolved,
+    }
 }
 
 fn track_verified_record(
@@ -868,6 +881,25 @@ mod tests {
             operation_ids[1..].to_vec()
         );
         assert!(journal.recent(0).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn recent_preserves_a_complete_record_without_a_line_terminator() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("audit.jsonl");
+        let journal = AuditJournal::open_validated(path.clone()).unwrap();
+        let event = sample_event(Principal::human_gui());
+        let operation_id = event.operation_id;
+        journal.append(event).await.unwrap();
+        let mut bytes = tokio::fs::read(&path).await.unwrap();
+        assert_eq!(bytes.pop(), Some(b'\n'));
+        tokio::fs::write(&path, &bytes).await.unwrap();
+
+        let recent = journal.recent(1).await.unwrap();
+
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].operation_id, operation_id);
+        assert_eq!(tokio::fs::read(path).await.unwrap(), bytes);
     }
 
     #[tokio::test]
