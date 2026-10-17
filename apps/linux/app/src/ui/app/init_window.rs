@@ -56,7 +56,6 @@ pub(super) fn install_window_lifecycle(
     let window_close_state_saved = Rc::new(Cell::new(false));
     let window_close_state_pending = Rc::new(Cell::new(false));
     let handles = WindowLifecycleHandles {
-        grid_edits_ready: grid_edits_ready.clone(),
         close_after_save: close_after_save_for_close.clone(),
         close_window_after_save: close_window_after_save_for_close.clone(),
         in_flight_saves: in_flight_saves.clone(),

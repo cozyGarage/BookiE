@@ -343,7 +343,7 @@ msgstr ""
 #: apps/linux/app/src/ui/app/connection.rs:348
 #: apps/linux/app/src/ui/app/editor_files.rs:105
 #: apps/linux/app/src/ui/app/favorites.rs:53
-#: apps/linux/app/src/ui/app/init_window.rs:132
+#: apps/linux/app/src/ui/app/init_window.rs:131
 #: apps/linux/app/src/ui/app/organization.rs:98
 #: apps/linux/app/src/ui/app/organization.rs:149
 #: apps/linux/app/src/ui/app/referenced_row.rs:18
@@ -527,7 +527,7 @@ msgid "Connection failed"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/connection.rs:482
-#: apps/linux/app/src/ui/app/init_window.rs:247
+#: apps/linux/app/src/ui/app/init_window.rs:246
 #: apps/linux/app/src/ui/app/status_pages.rs:78
 #: apps/linux/app/src/ui/explain_dialog.rs:27
 #: apps/linux/app/src/ui/explain_dialog.rs:55
@@ -712,7 +712,7 @@ msgid "Name"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/favorites.rs:54
-#: apps/linux/app/src/ui/app/init_window.rs:134
+#: apps/linux/app/src/ui/app/init_window.rs:133
 #: apps/linux/app/src/ui/app/organization.rs:99
 #: apps/linux/app/src/ui/app/workspace_tabs.rs:646
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:250
@@ -840,36 +840,36 @@ msgid ""
 "Nothing matches the current search, or this connection has no tables yet."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/init_window.rs:86
+#: apps/linux/app/src/ui/app/init_window.rs:85
 msgid "Saving in progress"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/init_window.rs:88
+#: apps/linux/app/src/ui/app/init_window.rs:87
 msgid "Waiting for pending saves to finish before closing the window."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/init_window.rs:128
+#: apps/linux/app/src/ui/app/init_window.rs:127
 msgid "Save changes before closing?"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/init_window.rs:130
+#: apps/linux/app/src/ui/app/init_window.rs:129
 msgid ""
 "One or more tabs have unsaved changes. They will be permanently lost if you "
 "discard them."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/init_window.rs:133
+#: apps/linux/app/src/ui/app/init_window.rs:132
 #: apps/linux/app/src/ui/app/workspace_tabs.rs:645
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:243
 #: apps/linux/app/src/ui/structure_tab/mod.rs:714
 msgid "Discard"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/init_window.rs:242
+#: apps/linux/app/src/ui/app/init_window.rs:241
 msgid "Could not save workspace"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/init_window.rs:244
+#: apps/linux/app/src/ui/app/init_window.rs:243
 msgid ""
 "The window will remain open so you can retry without losing your workspace."
 msgstr ""
