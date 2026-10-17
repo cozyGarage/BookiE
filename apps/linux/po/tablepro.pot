@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.6-dev\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/BookiE/issues\n"
-"POT-Creation-Date: 2026-10-16 21:28+0200\n"
+"POT-Creation-Date: 2026-10-17 03:50+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -60,12 +60,12 @@ msgstr ""
 
 #: apps/linux/app/src/services/quick_switcher.rs:57
 #: apps/linux/app/src/ui/activity_dialog.rs:43
-#: apps/linux/app/src/ui/app/shortcuts.rs:21
+#: apps/linux/app/src/ui/app/shortcuts.rs:23
 msgid "Server activity"
 msgstr ""
 
 #: apps/linux/app/src/services/quick_switcher.rs:58
-#: apps/linux/app/src/ui/app/shortcuts.rs:23
+#: apps/linux/app/src/ui/app/shortcuts.rs:25
 #: apps/linux/app/src/ui/explain_dialog.rs:24
 #: apps/linux/app/src/ui/explain_dialog.rs:52
 msgid "Explain query"
@@ -76,7 +76,7 @@ msgid "Jump to column"
 msgstr ""
 
 #: apps/linux/app/src/services/quick_switcher.rs:60
-#: apps/linux/app/src/ui/app/shortcuts.rs:197
+#: apps/linux/app/src/ui/app/shortcuts.rs:201
 msgid "Filter rows"
 msgstr ""
 
@@ -117,7 +117,7 @@ msgid "Export all rows as JSON"
 msgstr ""
 
 #: apps/linux/app/src/services/quick_switcher.rs:70
-#: apps/linux/app/src/ui/app/shortcuts.rs:26
+#: apps/linux/app/src/ui/app/shortcuts.rs:28
 #: apps/linux/app/src/ui/preferences.rs:36
 msgid "Preferences"
 msgstr ""
@@ -131,7 +131,7 @@ msgid "Command"
 msgstr ""
 
 #: apps/linux/app/src/services/sidebar_tree.rs:102
-#: apps/linux/app/src/ui/app/mod.rs:388
+#: apps/linux/app/src/ui/app/mod.rs:390
 #: apps/linux/app/src/ui/app/workspace_chrome.rs:92
 msgid "Tables"
 msgstr ""
@@ -213,6 +213,23 @@ msgstr ""
 msgid "This engine does not report this kind of activity."
 msgstr ""
 
+#: apps/linux/app/src/ui/app/backup.rs:25
+msgid "Can't back up"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:30
+msgid "Back Up Database"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:45
+msgid "Can't restore"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:52
+msgid "Restore from Backup"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:67
 #: apps/linux/app/src/ui/app/browse.rs:60
 #: apps/linux/app/src/ui/app/import.rs:104
 #: apps/linux/app/src/ui/app/import.rs:244
@@ -223,6 +240,62 @@ msgstr ""
 #: apps/linux/app/src/ui/app/structure.rs:520
 #: apps/linux/app/src/ui/app/structure.rs:644
 msgid "No active connection."
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:70
+msgid "Backups are available for PostgreSQL connections."
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:73
+#: apps/linux/app/src/ui/app/import.rs:107
+msgid "This connection is open read-only."
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:76
+msgid "A backup or restore is already running."
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:90
+#: apps/linux/app/src/ui/app/backup.rs:101
+msgid "Can't start"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:102
+msgid "The connection or the private runtime directory is not available."
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:111
+#, rust-format
+msgid "Restoring {database}"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:113
+#, rust-format
+msgid "Backing up {database}"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:145
+msgid "The database was restored from the backup."
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:148
+msgid "The backup was saved."
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:149
+msgid "Cancelled. Nothing was changed."
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:152
+msgid "Restore failed"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:154
+msgid "Backup failed"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/backup.rs:171
+msgid "PostgreSQL backups"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/browse.rs:472
@@ -293,9 +366,9 @@ msgstr ""
 #: apps/linux/app/src/ui/grid/full_value_editor.rs:732
 #: apps/linux/app/src/ui/history_dialog.rs:515
 #: apps/linux/app/src/ui/history_dialog.rs:553
-#: apps/linux/app/src/ui/import_dialog.rs:751
 #: apps/linux/app/src/ui/parameters_dialog.rs:30
 #: apps/linux/app/src/ui/preferences.rs:158
+#: apps/linux/app/src/ui/progress_dialog.rs:13
 #: apps/linux/app/src/ui/saved_queries_dialog.rs:100
 #: apps/linux/app/src/ui/saved_queries_dialog.rs:121
 #: apps/linux/app/src/ui/ssh_prompt.rs:105
@@ -594,7 +667,7 @@ msgid "A reopened tab is no longer linked to its file: {reason}"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/editor_files.rs:76
-#: apps/linux/app/src/ui/app/mod.rs:751
+#: apps/linux/app/src/ui/app/mod.rs:754
 msgid "Saved"
 msgstr ""
 
@@ -681,12 +754,8 @@ msgid "CSV files"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/import.rs:83
-#: apps/linux/app/src/ui/import_dialog.rs:700
+#: apps/linux/app/src/ui/import_dialog.rs:701
 msgid "Import CSV"
-msgstr ""
-
-#: apps/linux/app/src/ui/app/import.rs:107
-msgid "This connection is open read-only."
 msgstr ""
 
 #: apps/linux/app/src/ui/app/import.rs:111
@@ -789,7 +858,7 @@ msgid ""
 msgstr ""
 
 #: apps/linux/app/src/ui/app/init_workspace.rs:75
-#: apps/linux/app/src/ui/app/shortcuts.rs:170
+#: apps/linux/app/src/ui/app/shortcuts.rs:174
 msgid "Open SQL editor"
 msgstr ""
 
@@ -801,55 +870,55 @@ msgstr ""
 msgid "Pick a table from the sidebar, or use the button below (Ctrl+T)."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:316
+#: apps/linux/app/src/ui/app/mod.rs:318
 msgid "New connection"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:323
+#: apps/linux/app/src/ui/app/mod.rs:325
 msgid "Open saved connection"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:333
+#: apps/linux/app/src/ui/app/mod.rs:335
 msgid "Switch database"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:344
+#: apps/linux/app/src/ui/app/mod.rs:346
 msgid "Read-only"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:354
+#: apps/linux/app/src/ui/app/mod.rs:356
 msgid "Saving…"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:360
+#: apps/linux/app/src/ui/app/mod.rs:362
 msgid "Main menu"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:394 apps/linux/app/src/ui/app/mod.rs:474
+#: apps/linux/app/src/ui/app/mod.rs:396 apps/linux/app/src/ui/app/mod.rs:476
 msgid "Search tables"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:400
+#: apps/linux/app/src/ui/app/mod.rs:402
 msgid "Filter schemas"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:421
+#: apps/linux/app/src/ui/app/mod.rs:423
 msgid "Filter tables…"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:444
+#: apps/linux/app/src/ui/app/mod.rs:446
 msgid "Retry"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:911
+#: apps/linux/app/src/ui/app/mod.rs:914
 msgid "Saved as favorite"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:927 apps/linux/app/src/ui/app/mod.rs:934
+#: apps/linux/app/src/ui/app/mod.rs:930 apps/linux/app/src/ui/app/mod.rs:937
 msgid "Connect to a database first to run SQL."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/mod.rs:1006
+#: apps/linux/app/src/ui/app/mod.rs:1009
 msgid "Open a result grid to jump to a column."
 msgstr ""
 
@@ -893,7 +962,7 @@ msgstr ""
 
 #: apps/linux/app/src/ui/app/organization.rs:150
 #: apps/linux/app/src/ui/connection_bundle/import.rs:106
-#: apps/linux/app/src/ui/import_dialog.rs:71
+#: apps/linux/app/src/ui/import_dialog.rs:72
 msgid "Import"
 msgstr ""
 
@@ -1004,279 +1073,287 @@ msgstr ""
 msgid "Disconnect"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:15
+#: apps/linux/app/src/ui/app/shortcuts.rs:13
+msgid "Back Up Database…"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/shortcuts.rs:14
+msgid "Restore from Backup…"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/shortcuts.rs:17
 msgid "Open Quickly"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:16
+#: apps/linux/app/src/ui/app/shortcuts.rs:18
 #: apps/linux/app/src/ui/grid/context_menu.rs:56
 #: apps/linux/app/src/ui/grid/context_menu.rs:518
 msgid "Jump to Column…"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:17
+#: apps/linux/app/src/ui/app/shortcuts.rs:19
 msgid "Save Query as Favorite"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:20
+#: apps/linux/app/src/ui/app/shortcuts.rs:22
 #: apps/linux/app/src/ui/history_dialog.rs:107
 msgid "Query History"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:22
+#: apps/linux/app/src/ui/app/shortcuts.rs:24
 #: apps/linux/app/src/ui/catalog_dialog.rs:42
 msgid "Catalog"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:27
+#: apps/linux/app/src/ui/app/shortcuts.rs:29
 msgid "New Window"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:30
-#: apps/linux/app/src/ui/app/shortcuts.rs:159
+#: apps/linux/app/src/ui/app/shortcuts.rs:32
+#: apps/linux/app/src/ui/app/shortcuts.rs:163
 msgid "Keyboard Shortcuts"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:31
+#: apps/linux/app/src/ui/app/shortcuts.rs:33
 msgid "About BookiE"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:32
-#: apps/linux/app/src/ui/app/shortcuts.rs:179
+#: apps/linux/app/src/ui/app/shortcuts.rs:34
+#: apps/linux/app/src/ui/app/shortcuts.rs:183
 msgid "Quit"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:168
+#: apps/linux/app/src/ui/app/shortcuts.rs:172
 #: apps/linux/app/src/ui/preferences.rs:40
 msgid "General"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:171
+#: apps/linux/app/src/ui/app/shortcuts.rs:175
 msgid "Open a SQL file in a new editor tab"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:172
+#: apps/linux/app/src/ui/app/shortcuts.rs:176
 msgid "Refresh table"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:173
+#: apps/linux/app/src/ui/app/shortcuts.rs:177
 msgid "Open Preferences"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:174
+#: apps/linux/app/src/ui/app/shortcuts.rs:178
 msgid "Open Query History"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:175
+#: apps/linux/app/src/ui/app/shortcuts.rs:179
 msgid "Open Quickly: favorites and open tabs"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:176
+#: apps/linux/app/src/ui/app/shortcuts.rs:180
 msgid "Save the editor query as a favorite"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:177
+#: apps/linux/app/src/ui/app/shortcuts.rs:181
 msgid "Manage saved queries"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:178
+#: apps/linux/app/src/ui/app/shortcuts.rs:182
 msgid "Show keyboard shortcuts"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:184
+#: apps/linux/app/src/ui/app/shortcuts.rs:188
 msgid "Browse table"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:186
+#: apps/linux/app/src/ui/app/shortcuts.rs:190
 msgid "Edit focused cell (or press Return)"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:187
+#: apps/linux/app/src/ui/app/shortcuts.rs:191
 msgid "Move to next cell (commits if editing)"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:188
+#: apps/linux/app/src/ui/app/shortcuts.rs:192
 msgid "Move to previous cell (commits if editing)"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:189
+#: apps/linux/app/src/ui/app/shortcuts.rs:193
 msgid "Move to previous cell"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:190
+#: apps/linux/app/src/ui/app/shortcuts.rs:194
 msgid "Move to next cell"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:191
+#: apps/linux/app/src/ui/app/shortcuts.rs:195
 msgid "Move to cell above"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:192
+#: apps/linux/app/src/ui/app/shortcuts.rs:196
 msgid "Move to cell below"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:193
+#: apps/linux/app/src/ui/app/shortcuts.rs:197
 msgid "Toggle boolean cell"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:194
+#: apps/linux/app/src/ui/app/shortcuts.rs:198
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:24
 #: apps/linux/app/src/ui/grid/context_menu.rs:55
 #: apps/linux/app/src/ui/grid/context_menu.rs:521
 msgid "Insert row"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:195
+#: apps/linux/app/src/ui/app/shortcuts.rs:199
 msgid "Delete selected row"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:196
+#: apps/linux/app/src/ui/app/shortcuts.rs:200
 msgid "Set focused cell to NULL"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:198
+#: apps/linux/app/src/ui/app/shortcuts.rs:202
 msgid "Jump to Column (focused grid)"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:199
+#: apps/linux/app/src/ui/app/shortcuts.rs:203
 msgid "Find in loaded rows (focused grid)"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:200
+#: apps/linux/app/src/ui/app/shortcuts.rs:204
 msgid "Select all rows"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:201
+#: apps/linux/app/src/ui/app/shortcuts.rs:205
 msgid "Copy selected rows as TSV"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:202
+#: apps/linux/app/src/ui/app/shortcuts.rs:206
 msgid "Previous page"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:203
+#: apps/linux/app/src/ui/app/shortcuts.rs:207
 msgid "Next page"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:204
+#: apps/linux/app/src/ui/app/shortcuts.rs:208
 msgid "Jump to first row of page"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:205
+#: apps/linux/app/src/ui/app/shortcuts.rs:209
 msgid "Jump to last row of page"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:210
+#: apps/linux/app/src/ui/app/shortcuts.rs:214
 msgid "Row selection"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:212
+#: apps/linux/app/src/ui/app/shortcuts.rs:216
 msgid "Extend selection to the clicked row"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:213
+#: apps/linux/app/src/ui/app/shortcuts.rs:217
 msgid "Toggle the clicked row in selection"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:218
+#: apps/linux/app/src/ui/app/shortcuts.rs:222
 #: apps/linux/app/src/ui/history_dialog.rs:166
 #: apps/linux/app/src/ui/preferences.rs:222
 msgid "SQL editor"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:220
+#: apps/linux/app/src/ui/app/shortcuts.rs:224
 msgid "Run query"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:221
+#: apps/linux/app/src/ui/app/shortcuts.rs:225
 msgid "Run statement at cursor"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:222
+#: apps/linux/app/src/ui/app/shortcuts.rs:226
 msgid "Save the SQL file as"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:223
+#: apps/linux/app/src/ui/app/shortcuts.rs:227
 msgid "Toggle line comment"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:224
+#: apps/linux/app/src/ui/app/shortcuts.rs:228
 msgid "Fold SQL block at cursor"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:225
+#: apps/linux/app/src/ui/app/shortcuts.rs:229
 msgid "Unfold all SQL blocks"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:226
+#: apps/linux/app/src/ui/app/shortcuts.rs:230
 msgid "New editor tab"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:227
+#: apps/linux/app/src/ui/app/shortcuts.rs:231
 msgid "Close current tab or window"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:228
+#: apps/linux/app/src/ui/app/shortcuts.rs:232
 msgid "Switch to the most recently used tab"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:229
+#: apps/linux/app/src/ui/app/shortcuts.rs:233
 msgid "Previous editor tab"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:230
+#: apps/linux/app/src/ui/app/shortcuts.rs:234
 msgid "Reopen last closed tab"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:231
+#: apps/linux/app/src/ui/app/shortcuts.rs:235
 msgid "Format SQL"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:232
+#: apps/linux/app/src/ui/app/shortcuts.rs:236
 msgid "Jump to the next statement"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:233
+#: apps/linux/app/src/ui/app/shortcuts.rs:237
 msgid "Jump to the previous statement"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:238
+#: apps/linux/app/src/ui/app/shortcuts.rs:242
 msgid "Context-sensitive actions"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:242
+#: apps/linux/app/src/ui/app/shortcuts.rs:246
 msgid "Save grid edits, the SQL file, or table structure changes"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:246
+#: apps/linux/app/src/ui/app/shortcuts.rs:250
 msgid "Undo a grid, SQL editor, or table structure change"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:250
+#: apps/linux/app/src/ui/app/shortcuts.rs:254
 msgid "Redo the current change (or press Ctrl+Shift+Z)"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:254
+#: apps/linux/app/src/ui/app/shortcuts.rs:258
 msgid "Cancel editing or a query, clear selection, or close a dialog"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:278
+#: apps/linux/app/src/ui/app/shortcuts.rs:282
 msgid "Left"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:279
+#: apps/linux/app/src/ui/app/shortcuts.rs:283
 msgid "Right"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:280
+#: apps/linux/app/src/ui/app/shortcuts.rs:284
 msgid "space"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:281
+#: apps/linux/app/src/ui/app/shortcuts.rs:285
 msgid "Shift-click"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/shortcuts.rs:282
+#: apps/linux/app/src/ui/app/shortcuts.rs:286
 msgid "Ctrl-click"
 msgstr ""
 
@@ -3049,7 +3126,7 @@ msgid "SQL options"
 msgstr ""
 
 #: apps/linux/app/src/ui/export_dialog.rs:210
-#: apps/linux/app/src/ui/import_dialog.rs:540
+#: apps/linux/app/src/ui/import_dialog.rs:541
 msgid "Table name"
 msgstr ""
 
@@ -3084,7 +3161,7 @@ msgid ""
 msgstr ""
 
 #: apps/linux/app/src/ui/export_dialog.rs:332
-#: apps/linux/app/src/ui/import_dialog.rs:151
+#: apps/linux/app/src/ui/import_dialog.rs:152
 msgid "Text that means NULL"
 msgstr ""
 
@@ -3247,7 +3324,7 @@ msgid "No matching columns"
 msgstr ""
 
 #: apps/linux/app/src/ui/grid/column_visibility.rs:52
-#: apps/linux/app/src/ui/import_dialog.rs:247
+#: apps/linux/app/src/ui/import_dialog.rs:248
 #: apps/linux/app/src/ui/structure_tab/mod.rs:487
 #: apps/linux/app/src/ui/structure_tab_dialogs.rs:144
 #: apps/linux/app/src/ui/structure_tab_dialogs.rs:208
@@ -3685,86 +3762,85 @@ msgstr ""
 msgid "{n} d ago"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:142
+#: apps/linux/app/src/ui/import_dialog.rs:143
 msgid "File"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:147
+#: apps/linux/app/src/ui/import_dialog.rs:148
 msgid "First row names the columns"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:249
+#: apps/linux/app/src/ui/import_dialog.rs:250
 msgid ""
 "Generated columns stay on Skip and are filled by the database. Other columns "
 "left on Skip are not written, so their database defaults apply."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:343
+#: apps/linux/app/src/ui/import_dialog.rs:344
 msgid "Remember mapping"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:344
+#: apps/linux/app/src/ui/import_dialog.rs:345
 msgid "Restore mapping"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:345
+#: apps/linux/app/src/ui/import_dialog.rs:346
 msgid "Forget mapping"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:353
+#: apps/linux/app/src/ui/import_dialog.rs:354
 msgid "Saved mappings are unavailable for this connection."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:401
+#: apps/linux/app/src/ui/import_dialog.rs:402
 msgid "Mapping saved for this table."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:425
+#: apps/linux/app/src/ui/import_dialog.rs:426
 msgid "Saved mapping restored. Review it before importing."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:427
-#: apps/linux/app/src/ui/import_dialog.rs:441
+#: apps/linux/app/src/ui/import_dialog.rs:428
+#: apps/linux/app/src/ui/import_dialog.rs:442
 msgid "No saved mapping for this table."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:440
+#: apps/linux/app/src/ui/import_dialog.rs:441
 msgid "Saved mapping removed."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:486
+#: apps/linux/app/src/ui/import_dialog.rs:487
 msgid "Auto-increment values are inserted when mapped."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:492
+#: apps/linux/app/src/ui/import_dialog.rs:493
 msgid "Generated by database; CSV values are ignored."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:535
+#: apps/linux/app/src/ui/import_dialog.rs:536
 msgid "New table"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:537
+#: apps/linux/app/src/ui/import_dialog.rs:538
 msgid ""
 "The type of each column is a guess from the first rows of the file. Change "
 "any that is wrong before the table is created."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:558
+#: apps/linux/app/src/ui/import_dialog.rs:559
 msgid "Column"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:657
+#: apps/linux/app/src/ui/import_dialog.rs:658
 msgid "Field separator"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:732
-#: apps/linux/app/src/ui/import_dialog.rs:746
+#: apps/linux/app/src/ui/import_dialog.rs:738
 #, rust-format
 msgid "{done} of {total} rows"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:764
+#: apps/linux/app/src/ui/import_dialog.rs:746
 #, rust-format
 msgid "Importing into {table}"
 msgstr ""

@@ -4,6 +4,7 @@ apps/linux/app/src/services/query_parameters.rs
 apps/linux/app/src/services/quick_switcher.rs
 apps/linux/app/src/services/sidebar_tree.rs
 apps/linux/app/src/ui/activity_dialog.rs
+apps/linux/app/src/ui/app/backup.rs
 apps/linux/app/src/ui/app/browse.rs
 apps/linux/app/src/ui/app/bundle.rs
 apps/linux/app/src/ui/app/connection.rs
@@ -81,6 +82,7 @@ apps/linux/app/src/ui/import_dialog.rs
 apps/linux/app/src/ui/mcp_preferences.rs
 apps/linux/app/src/ui/parameters_dialog.rs
 apps/linux/app/src/ui/preferences.rs
+apps/linux/app/src/ui/progress_dialog.rs
 apps/linux/app/src/ui/quick_switcher_dialog.rs
 apps/linux/app/src/ui/row_inspector.rs
 apps/linux/app/src/ui/saved_queries_dialog.rs
