@@ -1090,10 +1090,27 @@ GLib.MainLoop().run()
             ui.wait_for_node_containing("Connection lost — reconnecting")
         finally:
             set_bastion_enabled(True)
-        # The monitor uses a five-second initial backoff. Allow that bounded
-        # attempt to finish; then the stale-session and replacement-session
-        # assertions below provide the observable recovery proof.
-        time.sleep(6)
+        def reconnect_banner_visible():
+            node = ui.find_node_containing("Connection lost — reconnecting")
+            if node is None:
+                return False
+            showing = node.getState().contains(pyatspi.STATE_SHOWING)
+            return showing and node.queryComponent().getExtents(pyatspi.DESKTOP_COORDS).height > 0
+
+        def wait_for_stable_connection():
+            deadline = time.monotonic() + 90
+            quiet_since = None
+            while time.monotonic() < deadline:
+                if reconnect_banner_visible():
+                    quiet_since = None
+                elif quiet_since is None:
+                    quiet_since = time.monotonic()
+                elif time.monotonic() - quiet_since >= 5:
+                    return
+                time.sleep(0.5)
+            raise AssertionError("the connection did not stay reconnected for 5 seconds")
+
+        wait_for_stable_connection()
 
         # The old dedicated session must be retired even though the saved
         # connection has already reconnected. A write through that stale
@@ -1107,21 +1124,36 @@ GLib.MainLoop().run()
             state = toggle.getState()
             return state.contains(pyatspi.STATE_PRESSED) or state.contains(pyatspi.STATE_CHECKED)
 
+        def session_node():
+            return ui.wait_for_node_containing("Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
         def session_toggle(on, sensitive=False):
             deadline = time.monotonic() + 30
             while time.monotonic() < deadline:
-                toggle = ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+                toggle = session_node()
                 ready = toggle.getState().contains(pyatspi.STATE_SENSITIVE) or not sensitive
                 if toggle_is_on(toggle) == on and ready:
                     return toggle
                 time.sleep(0.2)
             raise AssertionError(f"Session toggle did not become {'on' if on else 'off'}")
 
-        if toggle_is_on(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)):
-            ui.invoke(session_toggle(True, sensitive=True))
-        ui.invoke(session_toggle(False, sensitive=True))
-        session_toggle(True)
-        for _ in range(4):
+        def end_session():
+            toggle = session_toggle(True, sensitive=True)
+            had_transaction = "transaction open" in toggle.name
+            ui.invoke(toggle)
+            if had_transaction:
+                ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
+            session_toggle(False, sensitive=True)
+
+        def reopen_session():
+            if toggle_is_on(session_node()):
+                end_session()
+            wait_for_stable_connection()
+            ui.invoke(session_toggle(False, sensitive=True))
+            session_toggle(True)
+
+        for _ in range(3):
+            reopen_session()
             ui.run_sql("SELECT 42")
             try:
                 ui.wait_for_node(name="42", role=pyatspi.ROLE_LABEL, timeout=10)
@@ -1129,8 +1161,9 @@ GLib.MainLoop().run()
             except AssertionError:
                 continue
         else:
-            ui.run_sql("SELECT 42")
-            ui.wait_for_node(name="42", role=pyatspi.ROLE_LABEL)
+            raise AssertionError(
+                f"no fresh editor session could run SELECT 42 after the tunnel loss:\n{ui.accessible_snapshot()}"
+            )
         assert psql("SELECT count(*) FROM public.session_tunnel_loss_probe") == "0"
 
     def psql(sql):
@@ -1518,6 +1551,21 @@ GLib.MainLoop().run()
 
     restart_with_an_untouched_editor_restores_without_layout_criticals.needs_restart = True
 
+    def disconnected_editor_remains_usable_without_cached_table_names(_database, _base):
+        ui.invoke_accessible_action("win.disconnect")
+        ui.wait_for_node(name="Open connection")
+        ui.invoke_accessible_action("win.open-editor")
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        editor = ui.set_editor_text("SELECT * FROM ")
+        extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + 120, extents.y + 12, button=1)
+        ui.press_x11_key("End", ("Control_L",))
+        ui.press_x11_key("space", ("Control_L",))
+        time.sleep(0.3)
+        assert ui.find_node(name="safety_items", role=pyatspi.ROLE_LABEL) is None, (
+            "a disconnected editor offered a cached table"
+        )
+
     result = [
         sqlite_grid_context_menu_columns_action_is_reachable_via_atspi,
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
@@ -1549,6 +1597,7 @@ GLib.MainLoop().run()
         paste_past_the_loaded_rows_changes_nothing,
         window_controls_follow_the_desktop_button_layout,
         restart_with_an_untouched_editor_restores_without_layout_criticals,
+        disconnected_editor_remains_usable_without_cached_table_names,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)
