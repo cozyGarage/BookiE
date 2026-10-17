@@ -252,12 +252,6 @@ impl MssqlConnection {
         }
     }
 
-    /// Runs `operation` under the caller's cancellation and deadline.
-    /// tiberius 0.12 exposes no way to send the TDS attention packet, so
-    /// an interruption cannot stop the statement on the server: the
-    /// outcome stays unknown and the connection is retired rather than
-    /// reused. `supports_server_cancellation` reports false for exactly
-    /// this reason.
     async fn run_abandonable<T, F>(&self, operation: F, control: &OperationControl) -> Result<T, DriverError>
     where
         F: std::future::Future<Output = Result<T, DriverError>>,
