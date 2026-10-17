@@ -110,6 +110,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 ### Changed
 
 - Running a query again keeps the previous result on screen, dimmed, until the new result, error, cancel or timeout page replaces it, instead of leaving a blank area.- An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
+- Typing in a table cell is included in unsaved changes before a tab closes, a connection disconnects or a preview tab is replaced.
 - Refreshing a table waits until its pending save finishes, so a failed save does not lose edits.
 - An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
 - A write refused because another write is still in flight no longer disables later writes on that connection; unresolved outcomes remain fail-closed.
@@ -133,6 +134,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- Cancelling a PostgreSQL backup removes its partial file; a started restore that is cancelled or fails leaves governed writes on that connection blocked after reconnect while its outcome remains unknown.
 - Read-only connections refuse grid edits through alternate actions while still allowing local drafts to be discarded or undone and redone without changing stored data.
 - Structure column expanders now point right when collapsed and down when open.
 - A database switch rejected during another connection change no longer alters the saved connection.
