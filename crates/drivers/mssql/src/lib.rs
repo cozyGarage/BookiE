@@ -236,11 +236,6 @@ impl MssqlConnection {
         }
     }
 
-    /// Every statement goes through here so an abandoned one cannot
-    /// strand the next caller. tiberius has no way to resynchronise a
-    /// client whose token stream was left half-read, and the client sits
-    /// behind a mutex, so a single abandoned statement would otherwise
-    /// block every later operation on this connection forever.
     async fn client(&self) -> Result<MappedMutexGuard<'_, MssqlClient>, DriverError> {
         if !self.usable.load(Ordering::Acquire) {
             return Err(DriverError::Disconnected);
