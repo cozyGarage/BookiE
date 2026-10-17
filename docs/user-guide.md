@@ -12,7 +12,7 @@ For MySQL and MariaDB, choose a local socket file instead of a host to connect t
 
 Passwords are kept in your desktop keyring, never in BookiE's own files.
 
-- **SSH**: the form configures one SSH host. The built-in transport can use saved multi-hop routes, but the form cannot edit them yet. System OpenSSH uses jump hosts from your SSH configuration. BookiE asks before trusting a built-in host key it has not seen.
+- **SSH**: the form configures one SSH host. The built-in transport can use saved multi-hop routes, but the form cannot edit them yet. System OpenSSH uses jump hosts from your SSH configuration. BookiE asks before trusting an unknown host key, including keys presented by a jump host.
 - **TLS**: choose how strictly the server certificate is checked. "Verify full" checks both the certificate authority and the host name.
 - **Environment and read-only**: mark a connection as production, staging or local, and tick **Read-only** to refuse every change on it. A production connection shows a red **Production** badge, a tinted header bar and `[Production]` at the start of its window title, so it stands out in the taskbar and Alt-Tab.
 - **Import from URL** fills the form from a network connection URL such as `postgres://user@host:5432/db`. Local Unix socket paths must be set in the form or restored from a connection bundle.
@@ -55,7 +55,7 @@ To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+S
 - A failed statement shows the error, with **Copy error**, and on PostgreSQL the line and column of the error inside that statement.
 - `:name` placeholders ask for values before the statement runs and send them as bound parameters, never pasted into the SQL.
 - Completion offers tables after `FROM` and `JOIN` and columns elsewhere.
-- **Session** keeps one connection for the tab, so settings, temporary tables and transactions carry over between runs.
+- **Session** keeps one connection for the tab, so settings, temporary tables and transactions carry over between runs. MySQL sessions allow locking reads, user variables, savepoints and supported `SHOW` forms inside an open transaction; raw transaction-control SQL, DDL, account statements, `LOCK TABLES` and `SET autocommit` remain refused. `ROLLBACK` does not undo user-variable assignments or release named locks acquired by functions in assignment expressions; close the session to release those locks.
 - **Explain** shows the plan of the selected text, or of the whole editor when nothing is selected. For PostgreSQL and SQLite the plan opens as a **Tree** (indented by nesting, with a bar for each step's share of the estimated cost; hover a bar for the numbers) and the **Text** tab keeps the raw plan. Other engines show the text plan only. The costs are the planner's estimates; nothing is executed.
 - Ctrl+H opens query history in a panel beneath the workspace. Statements that set a password, an encryption key or a connection secret are not saved there. Search, filter, pin, export or reopen queries there; **Close history** returns the full space to your current workspace. Ctrl+D saves the query as a favorite, and Ctrl+P opens Open Quickly for favorites, tabs and connections.
 
