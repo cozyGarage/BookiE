@@ -139,7 +139,17 @@ mod tests {
 
     fn streamed(sql: &str, values: &[i64], terminal: super::super::stream_pages::StreamTerminal) -> StatementOutcome {
         let mut cache = super::super::stream_pages::StreamPageCache::default();
-        let page = Arc::new(QueryResult {
+        let page = page(values);
+        assert!(cache.append(0, page).is_ok());
+        let result = cache.snapshot(terminal, None);
+        StatementOutcome {
+            kind: StatementOutcomeKind::Streamed(Box::new(result)),
+            ..rows(sql)
+        }
+    }
+
+    fn page(values: &[i64]) -> Arc<QueryResult> {
+        Arc::new(QueryResult {
             columns: vec![ColumnInfo {
                 name: "id".into(),
                 data_type: "INTEGER".into(),
@@ -155,13 +165,7 @@ mod tests {
             }],
             rows: values.iter().map(|value| vec![Value::Int(*value)]).collect(),
             truncated: false,
-        });
-        assert!(cache.append(0, page).is_ok());
-        let result = cache.snapshot(terminal, None);
-        StatementOutcome {
-            kind: StatementOutcomeKind::Streamed(Box::new(result)),
-            ..rows(sql)
-        }
+        })
     }
 
     #[test]
@@ -185,6 +189,44 @@ mod tests {
         assert!(shown[0].pinned);
         assert_eq!(shown[0].sql_preview, "SELECT 1");
         assert!(!shown[1].pinned);
+    }
+
+    #[test]
+    #[ignore = "app-server isolated regression"]
+    fn an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin() {
+        let mut cache = super::super::stream_pages::StreamPageCache::default();
+        let first_page = page(&[1]);
+        let first_page_weak = Arc::downgrade(&first_page);
+        assert!(cache.append(0, first_page.clone()).is_ok());
+        drop(first_page);
+
+        let first_result = cache.snapshot(super::super::stream_pages::StreamTerminal::Complete, None);
+        for index in 1..=super::super::stream_pages::MAX_RETAINED_STREAM_PAGES as u64 {
+            assert!(cache.append(index, page(&[index as i64])).is_ok());
+        }
+        assert_eq!(cache.first_page(), 1);
+        assert!(first_page_weak.upgrade().is_some());
+
+        let first_outcome = StatementOutcome {
+            kind: StatementOutcomeKind::Streamed(Box::new(first_result)),
+            ..rows("SELECT 1")
+        };
+        let mut pins = PinnedResults::default();
+        let first_render = pins.show(vec![first_outcome]);
+        assert_eq!(pins.pin_last(), 1);
+        drop(first_render);
+
+        let next_render = pins.show(vec![streamed(
+            "SELECT 2",
+            &[2],
+            super::super::stream_pages::StreamTerminal::Complete,
+        )]);
+        assert!(first_page_weak.upgrade().is_some());
+        drop(next_render);
+
+        drop(pins.unpin_all());
+
+        assert!(first_page_weak.upgrade().is_none());
     }
 
     #[test]
