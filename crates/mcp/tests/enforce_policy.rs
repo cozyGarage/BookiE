@@ -200,6 +200,58 @@ async fn execute_query_preserves_additional_result_sets_in_order() {
 }
 
 #[tokio::test]
+async fn serialized_mcp_numeric_values_survive_javascript_json_parse() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let store = Arc::new(TokenStore::open(dir.path().join("tokens.json")).unwrap());
+    let connection_id = Uuid::nil();
+    let (_metadata, plaintext) = store
+        .issue("reader".into(), TokenPermissions::ReadOnly, vec![connection_id], None)
+        .unwrap();
+    let raw_json = r#"{ "wide": 9007199254740993, "duplicate": 1, "duplicate": 2 }"#;
+    let provider = Arc::new(RecordingProvider::with_result(QueryResult {
+        columns: vec![column("wide"), column("decimal"), column("nested"), column("raw")],
+        rows: vec![vec![
+            Value::Int(9_007_199_254_740_993),
+            Value::Decimal("123456789012345678.12345678".parse().unwrap()),
+            Value::Json(serde_json::from_str(r#"{"wide":9007199254740993,"fraction":1.234567890123456789}"#).unwrap()),
+            Value::JsonText(raw_json.into()),
+        ]],
+        truncated: false,
+    }));
+    let bridge = McpBridge::new(provider, store);
+    let token = bridge.authenticate(&plaintext).unwrap();
+    let output = tablepro_mcp::dispatch(
+        &bridge,
+        &token,
+        "execute_query",
+        serde_json::json!({"connection_id": connection_id.to_string(), "sql": "SELECT 1"}),
+    )
+    .await
+    .expect("dispatch returns the tagged result");
+    let javascript = concat!(
+        "const p=JSON.parse(process.argv[1]),r=p.rows[0];",
+        "if(p.value_format!==\"bookie-tagged-v1\"||",
+        "r[0].$type!==\"int64\"||r[0].value!==\"9007199254740993\"||",
+        "r[1].$type!==\"decimal\"||r[1].value!==\"123456789012345678.12345678\"||",
+        "r[2].$type!==\"json\"||r[2].value.value.wide.$type!==\"json_number\"||",
+        "r[2].value.value.wide.value!==\"9007199254740993\"||",
+        "r[2].value.value.fraction.value!==\"1.234567890123456789\"||",
+        "r[3].$type!==\"json_text\"||",
+        "r[3].value!==\"{ \\\"wide\\\": 9007199254740993, \\\"duplicate\\\": 1, \\\"duplicate\\\": 2 }\")process.exit(1);"
+    );
+    let result = std::process::Command::new("node")
+        .args(["-e", javascript, &output.to_string()])
+        .output()
+        .expect("Node.js is required for the JavaScript JSON.parse contract check");
+
+    assert!(
+        result.status.success(),
+        "JavaScript did not preserve the tagged MCP values: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+}
+
+#[tokio::test]
 async fn mcp_row_cap_is_shared_across_result_sets() {
     let dir = tempfile::TempDir::new().unwrap();
     let store = Arc::new(TokenStore::open(dir.path().join("tokens.json")).unwrap());
