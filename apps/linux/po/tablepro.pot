@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.6-dev\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/BookiE/issues\n"
-"POT-Creation-Date: 2026-10-17 20:05+0200\n"
+"POT-Creation-Date: 2026-10-17 20:34+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -50,7 +50,7 @@ msgid "New window"
 msgstr ""
 
 #: apps/linux/app/src/services/quick_switcher.rs:55
-#: apps/linux/app/src/ui/preferences.rs:120
+#: apps/linux/app/src/ui/preferences.rs:129
 msgid "Query history"
 msgstr ""
 
@@ -257,44 +257,46 @@ msgstr ""
 
 #: apps/linux/app/src/ui/app/backup.rs:90
 #: apps/linux/app/src/ui/app/backup.rs:101
+#: apps/linux/app/src/ui/app/backup.rs:108
 msgid "Can't start"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/backup.rs:102
+#: apps/linux/app/src/ui/app/backup.rs:109
 msgid "The connection or the private runtime directory is not available."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/backup.rs:111
+#: apps/linux/app/src/ui/app/backup.rs:118
 #, rust-format
 msgid "Restoring {database}"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/backup.rs:113
+#: apps/linux/app/src/ui/app/backup.rs:120
 #, rust-format
 msgid "Backing up {database}"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/backup.rs:145
+#: apps/linux/app/src/ui/app/backup.rs:153
 msgid "The database was restored from the backup."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/backup.rs:148
+#: apps/linux/app/src/ui/app/backup.rs:156
 msgid "The backup was saved."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/backup.rs:149
+#: apps/linux/app/src/ui/app/backup.rs:157
 msgid "Cancelled. Nothing was changed."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/backup.rs:152
+#: apps/linux/app/src/ui/app/backup.rs:160
 msgid "Restore failed"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/backup.rs:154
+#: apps/linux/app/src/ui/app/backup.rs:162
 msgid "Backup failed"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/backup.rs:171
+#: apps/linux/app/src/ui/app/backup.rs:179
 msgid "PostgreSQL backups"
 msgstr ""
 
@@ -367,7 +369,7 @@ msgstr ""
 #: apps/linux/app/src/ui/history_dialog.rs:515
 #: apps/linux/app/src/ui/history_dialog.rs:553
 #: apps/linux/app/src/ui/parameters_dialog.rs:30
-#: apps/linux/app/src/ui/preferences.rs:158
+#: apps/linux/app/src/ui/preferences.rs:167
 #: apps/linux/app/src/ui/progress_dialog.rs:13
 #: apps/linux/app/src/ui/saved_queries_dialog.rs:100
 #: apps/linux/app/src/ui/saved_queries_dialog.rs:121
@@ -1274,7 +1276,7 @@ msgstr ""
 
 #: apps/linux/app/src/ui/app/shortcuts.rs:222
 #: apps/linux/app/src/ui/history_dialog.rs:166
-#: apps/linux/app/src/ui/preferences.rs:222
+#: apps/linux/app/src/ui/preferences.rs:231
 msgid "SQL editor"
 msgstr ""
 
@@ -2080,7 +2082,7 @@ msgid "0 uses the default of 30 seconds"
 msgstr ""
 
 #: apps/linux/app/src/ui/connect_dialog/controls.rs:108
-#: apps/linux/app/src/ui/preferences.rs:246
+#: apps/linux/app/src/ui/preferences.rs:255
 msgid "Query timeout (seconds)"
 msgstr ""
 
@@ -3473,12 +3475,12 @@ msgstr ""
 
 #: apps/linux/app/src/ui/grid/display.rs:28
 #: apps/linux/app/src/ui/grid/display.rs:36
-#: apps/linux/app/src/ui/preferences.rs:99
+#: apps/linux/app/src/ui/preferences.rs:107
 msgid "(null)"
 msgstr ""
 
 #: apps/linux/app/src/ui/grid/display.rs:34
-#: apps/linux/app/src/ui/preferences.rs:97
+#: apps/linux/app/src/ui/preferences.rs:105
 msgid "NULL"
 msgstr ""
 
@@ -3706,17 +3708,17 @@ msgid ""
 msgstr ""
 
 #: apps/linux/app/src/ui/history_dialog.rs:548
-#: apps/linux/app/src/ui/preferences.rs:153
+#: apps/linux/app/src/ui/preferences.rs:162
 msgid "Clear all query history?"
 msgstr ""
 
 #: apps/linux/app/src/ui/history_dialog.rs:550
-#: apps/linux/app/src/ui/preferences.rs:155
+#: apps/linux/app/src/ui/preferences.rs:164
 msgid "This permanently deletes every saved query, including pinned ones."
 msgstr ""
 
 #: apps/linux/app/src/ui/history_dialog.rs:554
-#: apps/linux/app/src/ui/preferences.rs:159
+#: apps/linux/app/src/ui/preferences.rs:168
 msgid "Clear"
 msgstr ""
 
@@ -4007,90 +4009,100 @@ msgid "Show a confirmation dialog before each destructive action"
 msgstr ""
 
 #: apps/linux/app/src/ui/preferences.rs:72
+msgid "Reuse one tab when opening tables"
+msgstr ""
+
+#: apps/linux/app/src/ui/preferences.rs:74
+msgid ""
+"Opening a table replaces the temporary preview tab. Turn off to give every "
+"table its own tab."
+msgstr ""
+
+#: apps/linux/app/src/ui/preferences.rs:80
 msgid "Appearance"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:73
+#: apps/linux/app/src/ui/preferences.rs:81
 msgid "Follow the system, or always use the light or dark style"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:75
+#: apps/linux/app/src/ui/preferences.rs:83
 msgid "System"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:76
+#: apps/linux/app/src/ui/preferences.rs:84
 msgid "Light"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:77
+#: apps/linux/app/src/ui/preferences.rs:85
 msgid "Dark"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:92
+#: apps/linux/app/src/ui/preferences.rs:100
 msgid "NULL display"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:94
+#: apps/linux/app/src/ui/preferences.rs:102
 msgid "How a NULL cell is shown. Applies to cells drawn after the change."
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:98
+#: apps/linux/app/src/ui/preferences.rs:106
 msgid "∅ (empty set)"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:121
+#: apps/linux/app/src/ui/preferences.rs:130
 msgid "Persistent record of every SQL query you run."
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:125
+#: apps/linux/app/src/ui/preferences.rs:134
 msgid "Retention (days)"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:126
+#: apps/linux/app/src/ui/preferences.rs:135
 msgid "0 keeps history forever; pinned entries are never pruned."
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:140
+#: apps/linux/app/src/ui/preferences.rs:149
 msgid "Clear…"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:145
+#: apps/linux/app/src/ui/preferences.rs:154
 msgid "Clear query history"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:146
+#: apps/linux/app/src/ui/preferences.rs:155
 msgid "Removes every saved query, including pinned ones."
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:182
+#: apps/linux/app/src/ui/preferences.rs:191
 msgid "Show in Files"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:191
+#: apps/linux/app/src/ui/preferences.rs:200
 msgid "Storage location"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:218
+#: apps/linux/app/src/ui/preferences.rs:227
 msgid "Editor"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:225
+#: apps/linux/app/src/ui/preferences.rs:234
 msgid "Editor font size"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:230
+#: apps/linux/app/src/ui/preferences.rs:239
 msgid "Editor font family"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:236
+#: apps/linux/app/src/ui/preferences.rs:245
 msgid "Vim keys in the SQL editor"
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:237
+#: apps/linux/app/src/ui/preferences.rs:246
 msgid "Applies to editors opened after the change."
 msgstr ""
 
-#: apps/linux/app/src/ui/preferences.rs:248
+#: apps/linux/app/src/ui/preferences.rs:257
 msgid "Cancel long-running queries automatically. Set to 0 to disable."
 msgstr ""
 
