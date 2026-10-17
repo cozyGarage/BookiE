@@ -506,6 +506,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::completion_provider::tests::retired_proposals_do_not_edit_the_buffer"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::app::environment_marker::tests::the_badge_and_header_tint_follow_the_connection_environment"
     ]
   ],
   "keyring": [
