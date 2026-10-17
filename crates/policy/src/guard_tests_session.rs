@@ -9,6 +9,7 @@ struct SessionScript {
     query_error_on: Option<&'static str>,
     panic_on_close: bool,
     panic_on_status: bool,
+    panic_once_on_status: std::sync::atomic::AtomicBool,
     result_sets_on: Option<&'static str>,
 }
 
@@ -68,7 +69,12 @@ impl tablepro_core::Session for ScriptedSession {
     }
 
     fn is_usable(&self) -> bool {
-        if self.script.panic_on_status {
+        if self.script.panic_on_status
+            || self
+                .script
+                .panic_once_on_status
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
             panic!("secret session status panic")
         }
         self.usable
@@ -91,6 +97,15 @@ impl SessionConn {
         Self {
             script: Arc::new(SessionScript {
                 panic_on_status: true,
+                ..SessionScript::default()
+            }),
+        }
+    }
+
+    pub(super) fn panicking_status_once() -> Self {
+        Self {
+            script: Arc::new(SessionScript {
+                panic_once_on_status: std::sync::atomic::AtomicBool::new(true),
                 ..SessionScript::default()
             }),
         }

@@ -53,6 +53,26 @@ async fn a_panicking_session_health_check_is_contained_and_reports_the_connectio
 }
 
 #[tokio::test]
+async fn a_recovered_session_status_does_not_revive_after_a_panic() {
+    let fault = Arc::new(RecordingFault::default());
+    let guard = guard_with_fault(
+        Arc::new(super::session::SessionConn::panicking_status_once()),
+        fault.clone(),
+    );
+    let mut session = guard.open_session().await.expect("open session");
+
+    assert!(!session.is_usable());
+    assert!(!session.is_usable());
+    let error = session
+        .query_params_controlled("SELECT 1", &[], &OperationControl::with_timeout(Duration::from_secs(5)))
+        .await
+        .expect_err("a status panic retires the session permanently");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert_eq!(*fault.operations.lock().expect("fault lock"), vec!["SESSION STATUS"]);
+}
+
+#[tokio::test]
 async fn a_panicking_read_reports_the_connection_unusable() {
     let fault = Arc::new(RecordingFault::default());
     let guard = guard_with_fault(Arc::new(PanickingConn), fault.clone());
