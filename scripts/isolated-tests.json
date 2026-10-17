@@ -245,6 +245,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::app::workspace_tabs::bulk_close_action_tests::bulk_close_actions_dispatch_the_selected_page_id"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::context_menu::tests::view_value_resolves_pending_text_null_and_draft_values_from_the_cell"
     ],
     [

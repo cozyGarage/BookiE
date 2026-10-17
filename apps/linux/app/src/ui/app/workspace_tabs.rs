@@ -118,30 +118,10 @@ impl App {
         });
         let action_group = gio::SimpleActionGroup::new();
         action_group.add_action(&keep_tab_action);
-        let close_others_action = gio::SimpleAction::new("close-others", None);
-        let menu_target_others = menu_target.clone();
-        let sender_close_others = sender.clone();
-        close_others_action.connect_activate(move |_, _| {
-            let target = menu_target_others.borrow().clone();
-            if let Some(page) = target
-                && let Some(id) = read_workspace_tab_id(&page)
-            {
-                sender_close_others.input(AppMsg::CloseOtherWorkspaceTabs(id));
-            }
+        let sender_for_bulk_close = sender.clone();
+        add_bulk_close_actions(&action_group, menu_target, move |message| {
+            sender_for_bulk_close.input(message);
         });
-        action_group.add_action(&close_others_action);
-        let close_right_action = gio::SimpleAction::new("close-right", None);
-        let menu_target_right = menu_target;
-        let sender_close_right = sender.clone();
-        close_right_action.connect_activate(move |_, _| {
-            let target = menu_target_right.borrow().clone();
-            if let Some(page) = target
-                && let Some(id) = read_workspace_tab_id(&page)
-            {
-                sender_close_right.input(AppMsg::CloseWorkspaceTabsToRight(id));
-            }
-        });
-        action_group.add_action(&close_right_action);
         tab_view.insert_action_group("tab", Some(&action_group));
 
         let bulk_menu = gio::Menu::new();
@@ -1139,6 +1119,29 @@ fn editor_tab_tooltip(query: &str, label: &str) -> Option<String> {
     if preview == label { None } else { Some(preview) }
 }
 
+fn add_bulk_close_actions(
+    group: &gio::SimpleActionGroup,
+    menu_target: Rc<RefCell<Option<adw::TabPage>>>,
+    dispatch: impl Fn(AppMsg) + 'static,
+) {
+    let dispatch = Rc::new(dispatch);
+    for (name, message) in [
+        ("close-others", AppMsg::CloseOtherWorkspaceTabs as fn(Uuid) -> AppMsg),
+        ("close-right", AppMsg::CloseWorkspaceTabsToRight as fn(Uuid) -> AppMsg),
+    ] {
+        let target = menu_target.clone();
+        let dispatch = dispatch.clone();
+        let action = gio::SimpleAction::new(name, None);
+        action.connect_activate(move |_, _| {
+            let page = target.borrow().clone();
+            if let Some(id) = page.as_ref().and_then(read_workspace_tab_id) {
+                dispatch(message(id));
+            }
+        });
+        group.add_action(&action);
+    }
+}
+
 #[cfg(test)]
 mod structure_title_tests {
     use super::*;
@@ -1150,5 +1153,39 @@ mod structure_title_tests {
             structure_tab_title(2, Some("sales"), "orders"),
             "sales.orders · Structure"
         );
+    }
+}
+
+#[cfg(test)]
+mod bulk_close_action_tests {
+    use super::*;
+    use relm4::gtk::prelude::WidgetExt;
+
+    #[test]
+    #[ignore = "requires isolated GTK display"]
+    fn bulk_close_actions_dispatch_the_selected_page_id() {
+        relm4::adw::init().unwrap();
+        let view = adw::TabView::new();
+        let page = view.append(&relm4::gtk::Box::new(relm4::gtk::Orientation::Vertical, 0));
+        let id = Uuid::new_v4();
+        write_workspace_tab_id(&page, id);
+        let target = Rc::new(RefCell::new(Some(page)));
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let group = gio::SimpleActionGroup::new();
+        add_bulk_close_actions(&group, target, move |message| {
+            sender.send(message).unwrap();
+        });
+        view.insert_action_group("tab", Some(&group));
+
+        assert!(view.activate_action("tab.close-others", None).is_ok());
+        assert!(matches!(
+            receiver.recv().unwrap(),
+            AppMsg::CloseOtherWorkspaceTabs(target_id) if target_id == id
+        ));
+        assert!(view.activate_action("tab.close-right", None).is_ok());
+        assert!(matches!(
+            receiver.recv().unwrap(),
+            AppMsg::CloseWorkspaceTabsToRight(target_id) if target_id == id
+        ));
     }
 }
