@@ -424,6 +424,30 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
         jump_hosts: Vec::new(),
         auth: password("s3cret"),
     };
+    let proxy_marker = temp.path().join("proxy-command-ran");
+    std::fs::write(
+        &config_path,
+        format!(
+            "Host *\n  UserKnownHostsFile {known_hosts}\n  GlobalKnownHostsFile /dev/null\n  IdentityAgent none\n  IdentitiesOnly yes\n  PubkeyAuthentication no\n  StrictHostKeyChecking no\n\nHost target\n  Hostname {target_ip}\n  Port 2222\n  User deploy\n  ProxyCommand touch {proxy_marker}\n",
+            known_hosts = known_hosts.display(),
+            proxy_marker = proxy_marker.display(),
+        ),
+    )
+    .unwrap();
+    assert!(matches!(
+        OpenSshSession::connect(&cfg, &context, ScriptedPrompter::new(vec![]), CancellationToken::new()).await,
+        Err(OpenSshError::UnsupportedProxyCommand)
+    ));
+    assert!(!proxy_marker.exists());
+
+    std::fs::write(
+        &config_path,
+        format!(
+            "Host *\n  UserKnownHostsFile {known_hosts}\n  GlobalKnownHostsFile /dev/null\n  IdentityAgent none\n  IdentitiesOnly yes\n  PubkeyAuthentication no\n  StrictHostKeyChecking no\n\nHost target\n  Hostname {target_ip}\n  Port 2222\n  User deploy\n  ProxyJump ops@{jump_host}:{jump_port}\n",
+            known_hosts = known_hosts.display(),
+        ),
+    )
+    .unwrap();
     let rejecting = ScriptedPrompter::new(vec![PromptAnswer::Decline]);
     let rejected = OpenSshSession::connect(&cfg, &context, rejecting.clone(), CancellationToken::new()).await;
     assert!(matches!(
