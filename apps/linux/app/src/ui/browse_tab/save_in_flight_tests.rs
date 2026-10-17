@@ -759,7 +759,7 @@ fn edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
-fn draft_history_discard_and_paste_are_ignored_during_a_save() {
+fn draft_mutation_routes_are_ignored_during_a_save() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch(tab_id);
@@ -772,32 +772,64 @@ fn draft_history_discard_and_paste_are_ignored_during_a_save() {
     let started = pump(&observed);
     assert_eq!(transactions(&started), 1);
 
-    controller.sender().send(BrowseTabInput::Undo).unwrap();
-    pump(&observed);
-    let undo_preserved = pending(tab_id) == 1;
-
-    controller.sender().send(BrowseTabInput::Redo).unwrap();
-    pump(&observed);
-    let redo_preserved = pending(tab_id) == 1;
-
-    controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
-    pump(&observed);
-    let discard_preserved = pending(tab_id) == 1;
-
     controller
-        .sender()
-        .send(BrowseTabInput::PasteText(super::paste::PasteTextInput {
+        .model()
+        .current_selection
+        .as_ref()
+        .unwrap()
+        .select_item(0, false);
+    let actions = [
+        BrowseTabInput::Undo,
+        BrowseTabInput::Redo,
+        BrowseTabInput::DiscardAll,
+        BrowseTabInput::InsertRow,
+        BrowseTabInput::DuplicateRow { row_position: 0 },
+        BrowseTabInput::DeleteSelectedRow,
+        BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "during save".into(),
+            value: None,
+            row_key: vec![Value::Int(1)],
+        },
+        BrowseTabInput::GridSetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: vec![Value::Int(1)],
+        },
+        BrowseTabInput::GridDeleteRowAt {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+        },
+        BrowseTabInput::Paste(super::paste::PasteAnchor {
+            row: 0,
+            col: 1,
+            row_key: vec![Value::Int(1)],
+            displayed: None,
+        }),
+        BrowseTabInput::PasteText(super::paste::PasteTextInput {
             row: 0,
             col: 1,
             row_key: vec![Value::Int(1)],
             text: "pasted".into(),
             displayed: None,
             snapshot,
-        }))
-        .unwrap();
-    let paste_outputs = pump(&observed);
-    let paste_preserved = pending(tab_id) == 1;
-    let no_second_save = transactions(&paste_outputs) == 0;
+        }),
+    ];
+    let action_count = actions.len();
+    let mut preserved = Vec::with_capacity(action_count);
+    let mut refusal_count = 0;
+    let mut transaction_count = 0;
+    for action in actions {
+        controller.sender().send(action).unwrap();
+        let outputs = pump(&observed);
+        preserved.push(pending(tab_id) == 1);
+        refusal_count += outputs
+            .iter()
+            .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+            .count();
+        transaction_count += transactions(&outputs);
+    }
 
     controller
         .sender()
@@ -808,12 +840,16 @@ fn draft_history_discard_and_paste_are_ignored_during_a_save() {
     pump(&observed);
     controller.detach_runtime();
 
-    assert!(undo_preserved, "undo cannot mutate a submitted save snapshot");
-    assert!(redo_preserved, "redo cannot mutate a submitted save snapshot");
-    assert!(discard_preserved, "discard cannot erase a submitted save snapshot");
-    assert!(paste_preserved, "paste cannot add edits while a save is in flight");
     assert!(
-        no_second_save,
+        preserved.iter().all(|unchanged| *unchanged),
+        "every action preserves the submitted tracker state"
+    );
+    assert_eq!(
+        refusal_count, action_count,
+        "every draft mutation route reports that a save is in flight"
+    );
+    assert_eq!(
+        transaction_count, 0,
         "post-submit actions cannot dispatch another transaction"
     );
 }
