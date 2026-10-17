@@ -1,5 +1,5 @@
 pub fn skip_span(rest: &str, driver_id: &str) -> Option<usize> {
-    if rest.starts_with("--") {
+    if rest.starts_with("--") && (driver_id != "mysql" || rest[2..].chars().next().is_none_or(char::is_whitespace)) {
         return Some(rest.find('\n').map_or(rest.len(), |offset| offset + 1));
     }
     if rest.starts_with("/*") {
@@ -23,6 +23,18 @@ pub fn skip_span(rest: &str, driver_id: &str) -> Option<usize> {
         (_, Some(b'"')) => Some(quoted_length(rest, '"', matches!(driver_id, "mysql" | "clickhouse"))),
         _ => None,
     }
+}
+
+pub fn skip_span_at(sql: &str, index: usize, driver_id: &str) -> Option<usize> {
+    let inside_identifier = sql[index..].starts_with('$')
+        && sql[..index]
+            .chars()
+            .next_back()
+            .is_some_and(|previous| previous.is_alphanumeric() || previous == '_' || previous == '$');
+    if inside_identifier {
+        return None;
+    }
+    skip_span(&sql[index..], driver_id)
 }
 
 fn quoted_length(rest: &str, quote: char, backslash_escapes: bool) -> usize {
@@ -112,7 +124,7 @@ fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
     let mut index = 0usize;
     while index < bytes.len() {
         let rest = &sql[index..];
-        if let Some(length) = skip_span(rest, driver_id).filter(|length| *length > 0) {
+        if let Some(length) = skip_span_at(sql, index, driver_id).filter(|length| *length > 0) {
             index += length;
             continue;
         }
@@ -233,6 +245,18 @@ mod tests {
     }
 
     #[test]
+    fn a_dollar_sign_inside_an_identifier_does_not_open_a_dollar_quote() {
+        assert_eq!(
+            split_statements("SELECT my$a$b FROM t; SELECT 2", "postgres"),
+            ["SELECT my$a$b FROM t", "SELECT 2"]
+        );
+        assert_eq!(
+            split_statements("SELECT $a$ x; y $a$; SELECT 2", "postgres"),
+            ["SELECT $a$ x; y $a$", "SELECT 2"]
+        );
+    }
+
+    #[test]
     fn a_mysql_dollar_delimiter_is_not_a_quoted_span() {
         assert_eq!(
             split_statements("SELECT $tag$; SELECT 2", "mysql"),
@@ -304,6 +328,22 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(10));
         }
+    }
+
+    #[test]
+    fn a_mysql_double_dash_needs_whitespace_to_start_a_comment() {
+        assert_eq!(
+            split_statements("SELECT 5--2; SELECT 1", "mysql"),
+            ["SELECT 5--2", "SELECT 1"]
+        );
+        assert_eq!(skip_span("--2; SELECT 1", "mysql"), None);
+        assert_eq!(skip_span("-- note\nSELECT 1", "mysql"), Some(8));
+        assert_eq!(skip_span("--\tnote", "mysql"), Some(7));
+        assert_eq!(skip_span("--", "mysql"), Some(2));
+        assert_eq!(
+            split_statements("SELECT 5--2; SELECT 1", "postgres"),
+            ["SELECT 5--2; SELECT 1"]
+        );
     }
 
     #[test]

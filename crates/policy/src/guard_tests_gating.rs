@@ -621,10 +621,24 @@ async fn list_objects_audit_target_leaves_out_the_schema_for_unscoped_kinds() {
     assert!(events.iter().any(|event| event.targets == vec!["role".to_string()]));
 }
 
+fn tsql_spellings(driver_id: &str) -> &'static [&'static str] {
+    if driver_id != "mssql" {
+        return &[];
+    }
+    &[
+        "BEGIN TRAN",
+        "COMMIT TRAN",
+        "ROLLBACK TRAN",
+        "BEGIN TRAN UPDATE t SET a = 1 WHERE id = 1",
+        "UPDATE t SET a = 1 WHERE id = 1 COMMIT TRAN",
+    ]
+}
+
 #[tokio::test]
 async fn transaction_control_on_the_shared_connection_is_denied_before_dispatch() {
     for driver_id in ["postgres", "mysql", "sqlite", "mssql"] {
-        for statement in ["BEGIN", "START TRANSACTION", "COMMIT", "ROLLBACK", "SELECT 1; BEGIN"] {
+        let common = ["BEGIN", "START TRANSACTION", "COMMIT", "ROLLBACK", "SELECT 1; BEGIN"];
+        for statement in common.iter().chain(tsql_spellings(driver_id)).copied() {
             let executes = Arc::new(AtomicUsize::new(0));
             let queries = Arc::new(AtomicUsize::new(0));
             let audit = Arc::new(SequenceAuditSink::new(vec![]));
@@ -671,4 +685,99 @@ async fn transaction_control_on_the_shared_connection_is_denied_before_dispatch(
             );
         }
     }
+}
+
+fn transaction_guard(driver_id: &str, executes: Arc<AtomicUsize>, audit: Arc<SequenceAuditSink>) -> PolicyGuard {
+    let mut guard_context = context(
+        Principal::human_gui(),
+        Environment::Local,
+        PolicyConfig::default(),
+        Arc::new(AutoApproveSink),
+        audit,
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = driver_id.into();
+    PolicyGuard::new(
+        Arc::new(CountingConn {
+            executes,
+            commits: Arc::new(AtomicUsize::new(0)),
+        }),
+        guard_context,
+    )
+}
+
+#[tokio::test]
+async fn mysql_ddl_inside_a_rollback_able_transaction_is_denied_before_dispatch() {
+    for statement in [
+        "DROP TABLE t",
+        "ALTER TABLE t ADD COLUMN c int",
+        "CREATE TABLE u (id int)",
+        "TRUNCATE TABLE t",
+    ] {
+        let executes = Arc::new(AtomicUsize::new(0));
+        let audit = Arc::new(SequenceAuditSink::new(vec![]));
+        let guard = transaction_guard("mysql", executes.clone(), audit.clone());
+
+        let mut transaction = guard.begin().await.expect("begin");
+        let executed = transaction.execute(statement).await;
+
+        assert!(
+            matches!(executed, Err(DriverError::PolicyDenied(_))),
+            "{statement}: {executed:?}"
+        );
+        assert_eq!(executes.load(Ordering::SeqCst), 0, "{statement} reached the driver");
+        let events = audit.events.lock().expect("audit events");
+        assert!(
+            events
+                .iter()
+                .any(|event| event.decision_rule == "ddl_commits_transaction"),
+            "{statement}: the denial is audited"
+        );
+    }
+}
+
+#[tokio::test]
+async fn transactional_ddl_and_mysql_dml_still_run_inside_a_transaction() {
+    for (driver_id, statement) in [
+        ("postgres", "DROP TABLE t"),
+        ("sqlite", "CREATE TABLE u (id int)"),
+        ("mysql", "UPDATE t SET a = 1 WHERE id = 1"),
+    ] {
+        let executes = Arc::new(AtomicUsize::new(0));
+        let guard = transaction_guard(driver_id, executes.clone(), Arc::new(SequenceAuditSink::new(vec![])));
+
+        let mut transaction = guard.begin().await.expect("begin");
+        transaction.execute(statement).await.expect(statement);
+
+        assert_eq!(executes.load(Ordering::SeqCst), 1, "{driver_id}: {statement}");
+    }
+}
+
+#[tokio::test]
+async fn an_approved_controlled_write_never_cancels_the_callers_token() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            Arc::new(SequenceAuditSink::new(vec![])),
+            Arc::new(AuditState::new()),
+        ),
+    );
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+
+    guard
+        .execute_controlled("UPDATE jobs SET status = 'done' WHERE id = 1", &control)
+        .await
+        .expect("the approved write runs");
+    guard
+        .execute_controlled("UPDATE jobs SET status = 'new' WHERE id = 2", &control)
+        .await
+        .expect("the next statement on the same control runs");
+
+    assert_eq!(executes.load(Ordering::SeqCst), 2);
+    assert!(!control.cancellation_token().is_cancelled());
 }

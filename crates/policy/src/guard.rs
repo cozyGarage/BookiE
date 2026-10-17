@@ -23,7 +23,8 @@ use crate::effects::Effects;
 use crate::mask::apply_masking;
 use crate::principal::Principal;
 use crate::rules::{
-    Decision, evaluate_categorical, evaluate_eligible_write, evaluate_with_effects, shared_connection_decision,
+    Decision, evaluate_categorical, evaluate_eligible_write, evaluate_with_effects, interactive_transaction_decision,
+    shared_connection_decision,
 };
 
 const BLAST_RADIUS_TIMEOUT: Duration = Duration::from_secs(30);
@@ -139,6 +140,18 @@ impl PolicyGuard {
             return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
         self.authorize_with_bound(sql, analysis, enforced_rows, control).await
+    }
+
+    async fn authorize_in_transaction(
+        &self,
+        sql: &str,
+        control: Option<&OperationControl>,
+    ) -> Result<Authorization, DriverError> {
+        let analysis = self.analyze_statement(sql);
+        if let Some(decision) = interactive_transaction_decision(&self.ctx.driver_id, &analysis.facts) {
+            return self.resolve_authorization(sql, analysis, decision, None, control).await;
+        }
+        self.authorize_analysis(sql, analysis, None, control).await
     }
 
     async fn authorize_classified(
@@ -483,23 +496,44 @@ impl PolicyGuard {
     }
 
     async fn record_intent(&self, operation: &AuditOperation<'_>) -> Result<(), AuditError> {
-        self.record(
-            operation,
-            AuditRecordPhase::Intent,
-            AuditTerminalStatus::Pending,
-            if matches!(
-                operation.class,
-                AuditOperationClass::TransactionCommit | AuditOperationClass::TransactionRollback
-            ) {
-                AuditTransactionOutcome::Pending
-            } else {
-                AuditTransactionOutcome::NotApplicable
-            },
-            None,
-            None,
-            None,
-        )
-        .await
+        let result = self
+            .record(
+                operation,
+                AuditRecordPhase::Intent,
+                AuditTerminalStatus::Pending,
+                if matches!(
+                    operation.class,
+                    AuditOperationClass::TransactionCommit | AuditOperationClass::TransactionRollback
+                ) {
+                    AuditTransactionOutcome::Pending
+                } else {
+                    AuditTransactionOutcome::NotApplicable
+                },
+                None,
+                None,
+                None,
+            )
+            .await;
+        if matches!(result, Err(AuditError::UnresolvedWrite)) {
+            self.ctx.audit_state.disable_governed_writes();
+            if self
+                .record_outcome(
+                    operation,
+                    AuditOutcome {
+                        terminal_status: AuditTerminalStatus::Denied,
+                        transaction_outcome: AuditTransactionOutcome::NotApplicable,
+                        rows_affected: None,
+                        error_category: Some(AuditErrorCategory::Policy),
+                        duration_ms: 0,
+                    },
+                )
+                .await
+                .is_err()
+            {
+                self.ctx.audit_state.disable_after_audit_failure();
+            }
+        }
+        result
     }
 
     async fn record_outcome(&self, operation: &AuditOperation<'_>, outcome: AuditOutcome) -> Result<(), AuditError> {
@@ -610,6 +644,11 @@ impl PolicyGuard {
         let Err(error) = result else {
             return Ok(());
         };
+        if matches!(error, AuditError::UnresolvedWrite) {
+            return Err(DriverError::PolicyDenied(format!(
+                "operation denied because an unresolved write outcome blocks this connection: {error}"
+            )));
+        }
         if self.intent_is_required() {
             return Err(DriverError::PolicyDenied(format!(
                 "operation denied because audit intent could not be persisted: {error}"
@@ -926,7 +965,12 @@ fn transaction_error_outcome(error: &DriverError) -> (AuditTerminalStatus, Audit
     match error {
         DriverError::Cancelled => (AuditTerminalStatus::Cancelled, AuditTransactionOutcome::Pending, false),
         DriverError::TimedOut => (AuditTerminalStatus::TimedOut, AuditTransactionOutcome::Pending, false),
-        DriverError::Transaction { .. } => (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false),
+        DriverError::Transaction { source, .. } if !is_ambiguous_post_dispatch(source) => {
+            (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false)
+        }
+        DriverError::PartiallyApplied { source, .. } if !is_ambiguous_post_dispatch(source) => {
+            (AuditTerminalStatus::Failed, AuditTransactionOutcome::Failed, false)
+        }
         _ => (AuditTerminalStatus::Unknown, AuditTransactionOutcome::Unknown, true),
     }
 }
@@ -940,7 +984,7 @@ fn interactive_transaction_error_outcome(error: &DriverError) -> (AuditTerminalS
     }
 }
 
-fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
+pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
     match error {
         DriverError::ConnectionRefused
         | DriverError::Disconnected
@@ -949,7 +993,9 @@ fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
         | DriverError::Tls(_)
         | DriverError::Internal(_)
         | DriverError::OperationOutcomeUnknown { .. } => true,
-        DriverError::Transaction { source, .. } => is_ambiguous_post_dispatch(source),
+        DriverError::Transaction { source, .. } | DriverError::PartiallyApplied { source, .. } => {
+            is_ambiguous_post_dispatch(source)
+        }
         DriverError::TransactionRollbackFailed { .. } => true,
         DriverError::Query { .. }
         | DriverError::ConcurrentModification
@@ -975,16 +1021,18 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
         DriverError::Cancelled => AuditErrorCategory::Cancelled,
         DriverError::TimedOut => AuditErrorCategory::Timeout,
         DriverError::OperationOutcomeUnknown { .. } => AuditErrorCategory::Unknown,
-        DriverError::Transaction { .. } => AuditErrorCategory::Transaction,
+        DriverError::Transaction { .. } | DriverError::PartiallyApplied { .. } => AuditErrorCategory::Transaction,
         DriverError::TransactionRollbackFailed { .. } => AuditErrorCategory::Unknown,
     }
 }
 
+mod administrative;
 mod bulk;
 mod connection;
 mod panic_boundary;
 mod session;
 
+pub use administrative::AdministrativeOperation;
 pub use bulk::{BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, MAX_BULK_ROW_BUDGET};
 
 #[cfg(test)]

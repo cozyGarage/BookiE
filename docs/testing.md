@@ -10,6 +10,10 @@ The [active sprint](bookie-0.2-sprint.md) owns current acceptance. Start with th
 
 Database fixtures, the GTK scenarios and the distro-floor jobs run in containers or virtual displays. A pass there shows the code behaves as designed against a disposable database; it is not acceptance of a connection path. Unix sockets, IPv6 loopback, desktop portals and the Secret Service behave differently across containers and desktop sessions; a container run has already hidden one such difference (Docker does not publish `::1`). Acceptance for those paths is the installed package connecting to a real database in the target native desktop session, on the host or a supported VM, as recorded under PKG-1 and in the [manual checklist](manual-verification-0.2-features.md).
 
+## Test runner
+
+The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release, checks its SHA-256 and caches it under `~/.cache/bookie-tools` (Forgejo uses `/var/cache/ci/tools`); `.config/nextest.toml` requires that version. Both profiles keep `retries = 0`, so a flaky test fails instead of passing on a hidden retry, and stop a test that runs for five minutes. The `ci` profile also writes `target/nextest/ci/junit.xml`. Nextest runs the same tests as `cargo test` for these tiers (1690 unit and 1706 sandbox names on 2026-10-16); its pass total is lower only because libtest also counts subprocess helpers that a parent test launches. Driver, release, GTK and keyring tiers stay on `cargo test` until the PostgreSQL shared fixture has ownership across processes ([#892](https://github.com/cozyGarage/BookiE/issues/892)). Doc tests are not part of these tiers.
+
 ## Local checks and fixtures
 
 Select Cargo test targets deliberately: `tablepro-app` puts UI and service tests in the `tablepro_app` library, while `agentd` has library, binary and integration tests. DuckDB stays out of the default gate because its optional native build is large. Contributor lint and test-target rules live in [AGENTS.md](../AGENTS.md).
@@ -25,6 +29,27 @@ Place focused tests beside the Rust module under `#[cfg(test)]`. Pure parsing, S
 Driver value fixtures can live in `tests/support/value_contracts.rs` as modules of `tests/integration.rs`. Keep the module declaration in that target: support files are not independent Cargo test targets. PostgreSQL and MySQL use this layout; SQL Server unit tests live in `src/tests.rs` under `#[cfg(test)]`. Run the ignored-test inventory generator after moving tests so its links stay correct.
 
 The full `--lib --bins` command builds and runs tests from library crates and binary crates. Application service and UI logic tests are included through the `tablepro_app` library target.
+
+## Contract guardrails
+
+A guardrail test pins a contract that other code relies on but that no feature test exercises on its own, so a refactor cannot break it silently. Each one names the invariant it protects, and each was checked by injecting the regression it guards against and watching it fail. When a guardrail fails, the change broke the contract: fix the change, not the test. Weakening or removing a guardrail needs the owner of the contract (the ADR or the lane that owns the code) to agree in the pull request.
+
+| Contract | Test | Where |
+| --- | --- | --- |
+| A finished call, successful or failed, never cancels its caller's operation control, so the next statement can reuse it | `a_finished_call_leaves_the_callers_token_usable_for_the_next_call` | `crates/core/src/operation.rs` |
+| A completed call never asks the server to stop it | `a_completed_operation_never_dispatches_server_cancellation` | `crates/core/src/operation.rs` |
+| A cancel after dispatch is an unknown outcome, never a clean cancel | `a_cancel_after_dispatch_is_an_unknown_outcome_not_a_clean_cancel` | `crates/core/src/operation.rs` |
+| Guarded queries, writes and transactions leave the caller's control usable, after success or failure | `guarded_calls_leave_the_callers_control_usable_for_the_next_statement`, `a_failed_guarded_call_never_cancels_the_callers_control` | `crates/policy/src/guard_tests_passthrough.rs` |
+| The guard cancels the caller's token only when the approval deadline passes | `an_approved_controlled_write_never_cancels_the_callers_token` | `crates/policy/src/guard_tests_gating.rs` |
+| A completed MCP HTTP request delivers its response and never cancels | `a_completed_http_request_delivers_its_response_and_never_cancels` | `crates/mcp/src/server.rs` |
+| An expired MCP token never authenticates | `an_expired_token_is_refused` | `crates/mcp/src/tokens.rs` |
+| Only the token hash is stored; the plaintext never reaches the token file or Debug output | `the_token_file_and_debug_never_hold_the_plaintext` | `crates/mcp/src/tokens.rs` |
+| Every MCP tool refuses a connection outside a non-empty allowlist before opening one | `every_tool_refuses_a_connection_outside_a_nonempty_allowlist` | `crates/mcp/tests/enforce_policy.rs` |
+| The MCP HTTP body is bounded by the same limit as stdio | `an_http_body_over_the_request_limit_is_refused` | `crates/mcp/src/server.rs` |
+| Every audited read ends in exactly one terminal outcome, on success and failure, controlled or not | `every_audited_read_ends_in_exactly_one_terminal_outcome`, `no_read_under_a_cancelled_control_writes_two_outcomes` | `crates/policy/src/guard_tests_passthrough.rs` |
+| An undecodable value stays visible and distinct from NULL in every export format and in copy; SQL export refuses it | `value_contract_every_export_keeps_undecodable_distinct_from_null` | `crates/core/src/export/stream_tests.rs` |
+
+Add a row here when you add a guardrail.
 
 ## Storage tests
 
@@ -95,6 +120,14 @@ For the deterministic direct Unix-socket fixture:
 ```
 
 It exposes a PostgreSQL 16 socket directory from a disposable container and verifies query, write, pre-dispatch cancellation, close, and reconnect without opening a TCP database port.
+
+For the backup and restore runner:
+
+```bash
+./scripts/test-pg-dump.sh
+```
+
+It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through wrappers, so the host needs Docker but no PostgreSQL client. Set `TABLEPRO_PG_DUMP_IMAGE` to test another client version. Forgejo runs it as the `pg-dump` job.
 
 ## Manual verification after the 0.2 feature sprint
 

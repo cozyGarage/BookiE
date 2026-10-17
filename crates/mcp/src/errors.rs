@@ -79,18 +79,19 @@ impl McpToolError {
                 TransactionOutcome::NotApplicable,
                 "The write may have been applied; check database state before retrying.",
             ),
-            DriverError::TransactionRollbackFailed { .. } => (
-                "transaction_rollback_failed",
-                OperationOutcome::Unknown,
-                TransactionOutcome::Unknown,
-                "The transaction failed and rollback could not be confirmed.",
-            ),
-            DriverError::Transaction { .. } => (
-                "transaction_failed",
-                OperationOutcome::ConfirmedFailure,
-                TransactionOutcome::RolledBack,
-                "The transaction failed and rollback was confirmed.",
-            ),
+            DriverError::PartiallyApplied { source, .. } | DriverError::Transaction { source, .. }
+                if tablepro_policy::is_ambiguous_post_dispatch(source) =>
+            {
+                (
+                    "operation_outcome_unknown",
+                    OperationOutcome::Unknown,
+                    TransactionOutcome::Unknown,
+                    "The write may have been applied; check database state before retrying.",
+                )
+            }
+            DriverError::TransactionRollbackFailed { .. }
+            | DriverError::PartiallyApplied { .. }
+            | DriverError::Transaction { .. } => batch_failure_envelope(error),
             DriverError::Cancelled => (
                 "operation_cancelled",
                 OperationOutcome::ConfirmedFailure,
@@ -163,6 +164,35 @@ impl From<&str> for McpToolError {
     }
 }
 
+fn batch_failure_envelope(error: &DriverError) -> (&'static str, OperationOutcome, TransactionOutcome, &'static str) {
+    match error {
+        DriverError::TransactionRollbackFailed { .. } => (
+            "transaction_rollback_failed",
+            OperationOutcome::Unknown,
+            TransactionOutcome::Unknown,
+            "The transaction failed and rollback could not be confirmed.",
+        ),
+        DriverError::PartiallyApplied { .. } => (
+            "batch_partially_applied",
+            OperationOutcome::ConfirmedFailure,
+            TransactionOutcome::NotApplicable,
+            "The batch stopped at a failing statement; the statements before it were applied and not rolled back.",
+        ),
+        DriverError::Transaction { .. } => (
+            "transaction_failed",
+            OperationOutcome::ConfirmedFailure,
+            TransactionOutcome::RolledBack,
+            "The transaction failed and rollback was confirmed.",
+        ),
+        _ => (
+            "operation_outcome_unknown",
+            OperationOutcome::Unknown,
+            TransactionOutcome::Unknown,
+            "The write may have been applied; check database state before retrying.",
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -199,6 +229,29 @@ mod tests {
         assert_eq!(error.code, "transaction_rollback_failed");
         assert_eq!(error.operation_outcome, OperationOutcome::Unknown);
         assert_eq!(error.transaction_outcome, TransactionOutcome::Unknown);
+    }
+
+    #[test]
+    fn a_partially_applied_batch_is_not_reported_as_rolled_back() {
+        let error = McpToolError::from_write_error(&DriverError::non_atomic_batch_failure(
+            2,
+            DriverError::query("statement detail"),
+        ));
+
+        assert_eq!(error.code, "batch_partially_applied");
+        assert_ne!(error.transaction_outcome, TransactionOutcome::RolledBack);
+    }
+
+    #[test]
+    fn a_batch_lost_mid_statement_is_never_reported_as_a_confirmed_rollback() {
+        for error in [
+            DriverError::non_atomic_batch_failure(0, DriverError::Disconnected),
+            DriverError::non_atomic_batch_failure(2, DriverError::Disconnected),
+        ] {
+            let envelope = McpToolError::from_write_error(&error);
+            assert_eq!(envelope.code, "operation_outcome_unknown", "{error:?}");
+            assert_eq!(envelope.operation_outcome, OperationOutcome::Unknown);
+        }
     }
 
     #[test]

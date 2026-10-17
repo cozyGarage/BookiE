@@ -123,6 +123,8 @@ These apply to the GUI, the MCP server and `tablepro-agentd`.
 
 Unit tests sit next to pure logic; integration tests live in each crate's `tests/`. Driver behaviour is tested against a real database (testcontainers or an isolated local database); filesystem tests use `tempfile`. Policy and MCP changes test denied and allowed cases, scopes, allowlists, approval, masking, timeouts and audit terminal states. GTK-only behaviour that automation cannot reach gets manual steps in [manual verification](docs/manual-verification-0.2-features.md). Never change a test to accept incorrect behaviour; confirm a new regression test fails on the unfixed code.
 
+[Contract guardrail tests](docs/testing.md#contract-guardrails) pin invariants other code relies on. When one fails, fix the change, not the guardrail; weakening one needs the contract owner's agreement.
+
 Rules for pull requests that add tests (any agent, including Cursor):
 
 - Assert observable behaviour, such as an outcome, a stored value or an error kind, and not rule names, message text or internal identifiers that the code owner may rename.
@@ -137,8 +139,8 @@ Every test belongs to one tier with one script and one gate. Use the [validation
 
 | Tier | Contents | Script |
 |---|---|---|
-| unit | `--lib` on the non-GTK crate list in `preflight.sh` (skips `tablepro-app`) | `scripts/preflight.sh` |
-| sandbox | integration targets needing no Docker, database or display | `scripts/test-sandbox.sh` |
+| unit | `--lib` on the non-GTK crate list in `preflight.sh` (skips `tablepro-app`), run by nextest | `scripts/preflight.sh` |
+| sandbox | integration targets needing no Docker, database or display, run by nextest | `scripts/test-sandbox.sh` |
 | driver | `crates/drivers/*/tests/integration.rs`, SSH and socket fixtures | `scripts/ci-local.sh integration` |
 | driver-tls | `tests/driver-tls` | `scripts/test-driver-tls.sh` |
 | release | `tests/release` against PostgreSQL | `scripts/test-postgres-release.sh` |

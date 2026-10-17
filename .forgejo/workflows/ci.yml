@@ -73,8 +73,12 @@ jobs:
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Unit tests
+        env:
+          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
         run: |
-          cd src && cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
+          cd src
+          NEXTEST="$(bash scripts/ensure-nextest.sh)"
+          "$NEXTEST" nextest run --workspace --exclude tablepro-driver-duckdb --lib --bins --profile ci --no-tests=pass
 
   sandbox:
     runs-on: any-host
@@ -88,6 +92,9 @@ jobs:
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Sandbox tier
+        env:
+          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+          TABLEPRO_NEXTEST_PROFILE: ci
         run: |
           cd src && bash scripts/test-sandbox.sh
 
@@ -339,6 +346,30 @@ jobs:
       - name: PostgreSQL release fixture
         run: |
           cd src && ./scripts/test-postgres-release.sh
+
+  pg-dump:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name != 'pull_request'
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/pg-dump
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: pg_dump against PostgreSQL
+        run: cd src && ./scripts/test-pg-dump.sh
 
   socket-ssh:
     runs-on: debian-host

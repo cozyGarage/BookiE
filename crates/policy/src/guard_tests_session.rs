@@ -541,6 +541,61 @@ async fn a_session_lost_mid_transaction_after_a_write_records_an_unknown_outcome
 }
 
 #[tokio::test]
+async fn losing_a_read_only_snapshot_keeps_governed_writes_available() {
+    let h = harness(
+        SessionScript {
+            lose_on: Some("SELECT pg_sleep(60)"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .await
+        .expect("begin read only");
+    let _ = run(&mut session, "SELECT pg_sleep(60)").await;
+    assert!(!session.is_usable());
+
+    session
+        .close()
+        .await
+        .expect("nothing was written, so the close has no unknown outcome");
+
+    assert!(!h.audit_state.governed_writes_disabled());
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 1);
+    assert_ne!(rollbacks[0].terminal_status, AuditTerminalStatus::Unknown);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
+}
+
+#[tokio::test]
+async fn a_lost_rollback_of_a_read_only_snapshot_keeps_governed_writes_available() {
+    let h = harness(
+        SessionScript {
+            disconnect_on: Some("ROLLBACK"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .await
+        .expect("begin read only");
+    let _ = run(&mut session, "ROLLBACK").await;
+    let _ = session.close().await;
+
+    assert!(!h.audit_state.governed_writes_disabled());
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 1, "the ended snapshot is recorded once: {rollbacks:?}");
+    assert!(
+        rollbacks
+            .iter()
+            .all(|event| event.terminal_status != AuditTerminalStatus::Unknown),
+        "{rollbacks:?}"
+    );
+}
+
+#[tokio::test]
 async fn a_statement_on_a_retired_session_is_refused_before_dispatch() {
     let h = harness(
         SessionScript {
@@ -618,6 +673,48 @@ async fn transaction_control_hidden_in_a_script_is_refused_and_never_reaches_the
         assert!(matches!(error, DriverError::PolicyDenied(_)), "{script}: {error:?}");
         assert!(session.transaction_open(), "{script}");
         assert_eq!(*h.script.sent.lock().expect("sent lock"), vec!["BEGIN"], "{script}");
+    }
+}
+
+#[tokio::test]
+async fn sql_server_tran_statements_drive_the_session_transaction() {
+    let h = harness_with_driver(SessionScript::default(), false, "mssql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN TRAN").await.expect("begin tran");
+    assert!(session.transaction_open());
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("write");
+    run(&mut session, "ROLLBACK TRAN").await.expect("rollback tran");
+    assert!(!session.transaction_open());
+
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 1);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
+}
+
+#[tokio::test]
+async fn sql_server_tran_hidden_in_a_batch_is_refused_and_never_reaches_the_database() {
+    for script in [
+        "BEGIN TRAN UPDATE items SET v = 1 WHERE id = 1",
+        "UPDATE items SET v = 1 WHERE id = 1 COMMIT TRAN",
+        "ROLLBACK TRAN outer_name",
+        "SAVE TRAN savepoint_name",
+    ] {
+        let h = harness_with_driver(SessionScript::default(), false, "mssql");
+        let mut session = h.guard.open_session().await.expect("open session");
+
+        run(&mut session, "BEGIN TRAN").await.expect("begin tran");
+        let error = run(&mut session, script).await.expect_err("hidden transaction control");
+
+        assert!(matches!(error, DriverError::PolicyDenied(_)), "{script}: {error:?}");
+        assert!(session.transaction_open(), "{script}");
+        assert_eq!(
+            *h.script.sent.lock().expect("sent lock"),
+            vec!["BEGIN TRAN"],
+            "{script}"
+        );
     }
 }
 

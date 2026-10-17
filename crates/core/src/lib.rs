@@ -20,6 +20,7 @@ mod query;
 mod registry;
 mod session;
 mod shortcut_label;
+pub mod sql_credentials;
 pub mod sql_ddl;
 pub mod sql_diagnostics;
 pub mod sql_dialect;
@@ -44,7 +45,7 @@ pub use filter::{
     equality_rule, filter_value_kind,
 };
 pub use numeric_input::{
-    FloatInputError, is_numeric_input, parse_float_input, sqlite_affinity_decimal,
+    FloatInputError, is_numeric_input, parse_float_input, single_precision_as_f64, sqlite_affinity_decimal,
     sqlite_declared_type_has_numeric_affinity,
 };
 pub use operation::{

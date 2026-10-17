@@ -14,12 +14,14 @@ mod effects;
 mod effects_classification;
 mod explain_options;
 mod guard;
+mod input_refusal;
 mod mask;
 mod principal;
 mod rules;
 mod select_writes;
 mod sensitive_projection;
 mod transaction_control;
+mod tsql_transaction;
 mod verdict;
 
 pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
@@ -32,8 +34,8 @@ pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite, count_sql_for_muta
 pub use classify::{StatementClass, StatementFacts, classify, statement_requires_write_capability};
 pub use config::{EnvPolicy, MaskRule, PolicyConfig, WritePolicy, load_from_path};
 pub use guard::{
-    BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, ConnectionFaultSink, GuardContext,
-    MAX_BULK_ROW_BUDGET, PolicyGuard,
+    AdministrativeOperation, BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, ConnectionFaultSink,
+    GuardContext, MAX_BULK_ROW_BUDGET, PolicyGuard, is_ambiguous_post_dispatch,
 };
 pub use mask::{DEFAULT_SENSITIVE_PATTERNS, apply_masking, column_is_sensitive};
 pub use principal::Principal;

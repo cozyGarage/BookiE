@@ -1,5 +1,20 @@
 use super::*;
 
+struct UnresolvedWriteAuditSink {
+    events: Arc<Mutex<Vec<AuditEvent>>>,
+}
+
+#[async_trait]
+impl AuditSink for UnresolvedWriteAuditSink {
+    async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
+        self.events.lock().unwrap().push(event.clone());
+        if event.phase == AuditRecordPhase::Intent && event.operation_class.is_write() {
+            return Err(AuditError::UnresolvedWrite);
+        }
+        Ok(())
+    }
+}
+
 struct WaitingApproval {
     started: Arc<Notify>,
 }
@@ -61,47 +76,6 @@ async fn human_query_errors_preserve_driver_message_details() {
     let error = guard.query("SELECT pan::int FROM cards").await.unwrap_err();
 
     assert!(error.to_string().contains("4111111111111111"));
-}
-
-#[test]
-fn rollback_failure_is_audited_as_an_unknown_transaction_outcome() {
-    let error = DriverError::TransactionRollbackFailed {
-        statement_index: 1,
-        source: Box::new(DriverError::Query {
-            message: "statement failed".into(),
-            sqlstate: None,
-            position: None,
-        }),
-        rollback_error: Box::new(DriverError::Disconnected),
-    };
-
-    assert_eq!(
-        super::super::transaction_error_outcome(&error),
-        (AuditTerminalStatus::Unknown, AuditTransactionOutcome::Unknown, true)
-    );
-    assert_eq!(super::super::error_category(&error), AuditErrorCategory::Unknown);
-}
-
-#[test]
-fn confirmed_transaction_rollback_is_not_audited_as_an_unknown_outcome() {
-    let error = DriverError::Transaction {
-        statement_index: 1,
-        source: Box::new(DriverError::ConcurrentModification),
-    };
-
-    assert_eq!(
-        super::super::transaction_error_outcome(&error),
-        (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false)
-    );
-    assert_eq!(super::super::error_category(&error), AuditErrorCategory::Transaction);
-}
-
-#[test]
-fn read_only_transaction_error_is_a_known_failure_without_disabling_writes() {
-    assert_eq!(
-        super::super::interactive_transaction_error_outcome(&DriverError::ReadOnly),
-        (AuditTerminalStatus::Failed, AuditTransactionOutcome::Failed, false)
-    );
 }
 
 #[tokio::test]
@@ -774,6 +748,52 @@ async fn local_unaudited_write_requires_explicit_opt_in() {
         .expect_err("failed outcome must report uncertain execution");
     assert!(error.to_string().contains("operation may have succeeded"));
     assert_eq!(allowed_executes.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn unresolved_write_refusal_cannot_use_the_local_unaudited_write_exception() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let state = Arc::new(AuditState::new());
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let mut policy = PolicyConfig::default();
+    policy
+        .environments
+        .entry("local".into())
+        .or_default()
+        .human_allow_unaudited_writes = Some(true);
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            policy,
+            Arc::new(AutoApproveSink),
+            Arc::new(UnresolvedWriteAuditSink { events: events.clone() }),
+            state.clone(),
+        ),
+    );
+
+    guard
+        .execute("INSERT INTO jobs(id) VALUES (1)")
+        .await
+        .expect_err("an unresolved outcome must deny the write even when audit is optional");
+
+    assert!(state.governed_writes_disabled());
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+    guard
+        .execute("INSERT INTO jobs(id) VALUES (2)")
+        .await
+        .expect_err("the same connection remains blocked");
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+    let denied = events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|event| {
+            event.phase == AuditRecordPhase::Outcome && event.terminal_status == AuditTerminalStatus::Denied
+        })
+        .count();
+    assert_eq!(denied, 2);
 }
 
 #[tokio::test]

@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 import tempfile
+import tomllib
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -371,6 +372,11 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("coverage xml -o target/sonar/python-coverage.xml", workflow)
         self.assertIn("-Dsonar.python.coverage.reportPaths=target/sonar/python-coverage.xml", workflow)
 
+    def test_sonar_excludes_python_test_sources_from_coverage(self):
+        workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())
+        exclusions = workspace["workspace"]["metadata"]["sonar"]["sonar.coverage.exclusions"]
+        self.assertIn("scripts/tests/test_check_crate_boundaries.py", exclusions)
+
 
     def test_arch_package_container_mounts_the_repository_root(self):
         script = (ROOT / "scripts/test-arch-package-container.sh").read_text()
@@ -397,11 +403,16 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("BASE=ubuntu:24.04", builder)
         self.assertIn("scripts/build-deb.sh", builder)
         self.assertIn("flock", builder)
+        self.assertIn('test -e "/probe/', builder)
+        self.assertIn('.floor-package', builder)
+        self.assertLess(builder.index('test -e "/probe/'), builder.index("flock 9"))
         self.assertIn("chown", builder)
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('apt-get install -y -qq "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
         self.assertLess(floor_script.index('if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]'), floor_script.index("pkg-config --modversion"))
         self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
+        gtk_safety_script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
+        self.assertIn('timeout 600s python3 -u "$ROOT/apps/linux/app/tests/gtk_safety.py"', gtk_safety_script)
         runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
         self.assertIn("python3-pyatspi", runtime_image)
         self.assertIn("gir1.2-gtk-4.0", runtime_image)

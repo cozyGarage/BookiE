@@ -5,7 +5,6 @@ use sqlparser::ast::{
 };
 use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
 use sqlparser::parser::Parser;
-use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
 use crate::admin_functions::is_administrative_function_name;
 use crate::constant_predicate::is_constant_true;
@@ -118,8 +117,8 @@ fn analyze_statement_inner(
         return failed_analysis("empty SQL");
     }
 
-    if driver_id == "mysql" && sql_contains_mysql_executable_comment(trimmed, dialect.as_ref()) {
-        return failed_analysis("MySQL executable comments are not safely classified");
+    if let Some(reason) = crate::input_refusal::refusal(trimmed, driver_id, dialect.as_ref()) {
+        return failed_analysis(reason);
     }
 
     let statements = match Parser::parse_sql(dialect.as_ref(), trimmed) {
@@ -132,7 +131,11 @@ fn analyze_statement_inner(
     }
 
     let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
-    let facts = classify_statements(&statements, effects, contains_administrative_call);
+    let facts = crate::select_writes::with_locking_backstop(
+        classify_statements(&statements, effects, contains_administrative_call),
+        trimmed,
+        dialect.as_ref(),
+    );
     let (blast_radius, sensitive_positions, known_statement_rows) = if include_execution_plans {
         let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(&statements, driver_id);
         (
@@ -207,17 +210,6 @@ fn failed_analysis(message: impl Into<String>) -> StatementAnalysis {
     }
 }
 
-fn sql_contains_mysql_executable_comment(sql: &str, dialect: &dyn Dialect) -> bool {
-    let Ok(tokens) = Tokenizer::new(dialect, sql).tokenize() else {
-        return false;
-    };
-
-    tokens.iter().any(|token| {
-        matches!(token, Token::Whitespace(Whitespace::MultiLineComment(comment))
-            if comment.starts_with('!') || comment.starts_with("M!"))
-    })
-}
-
 /// Detect administrative calls anywhere in a successfully parsed statement.
 /// Token inspection complements the AST walk so calls hidden in predicates,
 /// ordering expressions, or less-common expression wrappers still fail closed,
@@ -244,53 +236,29 @@ fn classify_statement_details(stmt: &Statement) -> StatementDetails {
     match stmt {
         Statement::Query(q) => classify_query(q),
         Statement::Insert(insert) => classify_insert(insert),
-        Statement::Update { table, selection, .. } => StatementDetails {
+        Statement::Update(update) => StatementDetails {
             effects: Effects::EMPTY,
             class: StatementClass::Update,
-            tables: table_factor_names(&table.relation),
-            has_where: selection.is_some(),
-            contains_unscoped_dml: selection.as_ref().is_none_or(is_constant_true),
+            tables: table_factor_names(&update.table.relation),
+            has_where: update.selection.is_some(),
+            contains_unscoped_dml: update.selection.as_ref().is_none_or(is_constant_true),
         },
         Statement::Delete(delete) => classify_delete(delete),
-        Statement::CreateTable(c) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(&c.name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::CreateView { name, .. } => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::CreateIndex(c) => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: match &c.name {
-                Some(n) => object_name_strings(n),
-                None => object_name_strings(&c.table_name),
-            },
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::AlterTable { name, .. } => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: object_name_strings(name),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::Drop { names, .. } => StatementDetails {
-            effects: Effects::EMPTY,
-            class: StatementClass::Ddl,
-            tables: names.iter().flat_map(object_name_strings).collect(),
-            has_where: true,
-            contains_unscoped_dml: false,
-        },
-        Statement::Truncate { table_names, .. } => truncate_facts(table_names.iter().map(|table| &table.name)),
+        Statement::CreateTable(c) => ddl_on(object_name_strings(&c.name)),
+        Statement::CreateView(view) => ddl_on(object_name_strings(&view.name)),
+        Statement::CreateIndex(c) => ddl_on(match &c.name {
+            Some(n) => object_name_strings(n),
+            None => object_name_strings(&c.table_name),
+        }),
+        Statement::AlterTable(alter) => ddl_on(object_name_strings(&alter.name)),
+        Statement::RenameTable(renames) => ddl_on(
+            renames
+                .iter()
+                .flat_map(|rename| object_name_strings(&rename.old_name))
+                .collect(),
+        ),
+        Statement::Drop { names, .. } => ddl_on(names.iter().flat_map(object_name_strings).collect()),
+        Statement::Truncate(truncate) => truncate_facts(truncate.table_names.iter().map(|table| &table.name)),
         Statement::CreateVirtualTable { .. }
         | Statement::CreateRole { .. }
         | Statement::CreateSecret { .. }
@@ -324,13 +292,12 @@ fn classify_statement_details(stmt: &Statement) -> StatementDetails {
         | Statement::CreateDomain(_)
         | Statement::CreateType { .. } => ddl_facts(Vec::new()),
         Statement::CreateFunction(f) => ddl_facts(object_name_strings(&f.name)),
-        Statement::Grant { objects, .. } | Statement::Revoke { objects, .. } => {
-            ddl_facts(objects.as_ref().map(grant_object_names).unwrap_or_default())
-        }
-        Statement::Merge { table, .. } => StatementDetails {
+        Statement::Grant(grant) => ddl_facts(grant.objects.as_ref().map(grant_object_names).unwrap_or_default()),
+        Statement::Revoke(revoke) => ddl_facts(revoke.objects.as_ref().map(grant_object_names).unwrap_or_default()),
+        Statement::Merge(merge) => StatementDetails {
             effects: Effects::EMPTY,
             class: StatementClass::Other,
-            tables: table_factor_names(table),
+            tables: table_factor_names(&merge.table),
             has_where: true,
             contains_unscoped_dml: false,
         },
@@ -419,6 +386,7 @@ fn classify_insert(insert: &Insert) -> StatementDetails {
     let tables = match &insert.table {
         TableObject::TableName(name) => object_name_strings(name),
         TableObject::TableFunction(f) => vec![f.name.to_string()],
+        TableObject::TableQuery(query) => classify_query(query).tables,
     };
     StatementDetails {
         effects: Effects::EMPTY,
@@ -597,9 +565,7 @@ fn function_arguments_are_administrative(arguments: &FunctionArguments) -> bool 
 
 fn set_expr_writes(body: &SetExpr) -> bool {
     match body {
-        SetExpr::Insert(_) | SetExpr::Update(_) | SetExpr::Delete(_) => true,
-        // VALUES is a read-only row constructor. INSERT ... VALUES is already
-        // represented by Statement::Insert and classified as a write above.
+        SetExpr::Insert(_) | SetExpr::Update(_) | SetExpr::Delete(_) | SetExpr::Merge(_) => true,
         SetExpr::Values(_) => false,
         SetExpr::Query(q) => classify_query(q).class.is_write(),
         SetExpr::SetOperation { left, right, .. } => set_expr_writes(left) || set_expr_writes(right),
@@ -626,30 +592,20 @@ fn set_expr_tables(body: &SetExpr) -> Vec<String> {
             t.extend(set_expr_tables(right));
             t
         }
-        SetExpr::Insert(stmt) | SetExpr::Update(stmt) | SetExpr::Delete(stmt) => classify_statement(stmt).tables,
+        SetExpr::Insert(s) | SetExpr::Update(s) | SetExpr::Delete(s) | SetExpr::Merge(s) => {
+            classify_statement(s).tables
+        }
         _ => Vec::new(),
     }
 }
 
-pub(crate) fn expr_writes(expr: &Expr) -> bool {
-    match expr {
-        Expr::Subquery(q) => classify_query(q).class.is_write(),
-        Expr::BinaryOp { left, right, .. } => expr_writes(left) || expr_writes(right),
-        Expr::UnaryOp { expr, .. } => expr_writes(expr),
-        Expr::Nested(e) => expr_writes(e),
-        Expr::Case {
-            operand,
-            conditions,
-            else_result,
-            ..
-        } => {
-            operand.as_ref().is_some_and(|e| expr_writes(e))
-                || conditions
-                    .iter()
-                    .any(|c| expr_writes(&c.condition) || expr_writes(&c.result))
-                || else_result.as_ref().is_some_and(|e| expr_writes(e))
-        }
-        _ => false,
+fn ddl_on(tables: Vec<String>) -> StatementDetails {
+    StatementDetails {
+        effects: Effects::EMPTY,
+        class: StatementClass::Ddl,
+        tables,
+        has_where: true,
+        contains_unscoped_dml: false,
     }
 }
 
@@ -690,6 +646,7 @@ fn table_factor_names(factor: &TableFactor) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]

@@ -166,7 +166,7 @@ fn create_table_with_foreign_key() {
 }
 
 #[test]
-fn create_table_sqlite_emits_pragma_for_fk() {
+fn create_table_sqlite_declares_foreign_keys_inline() {
     let cols = vec![nn(pk(dc("id", "INTEGER"))), nn(dc("user_id", "INTEGER"))];
     let fk = ForeignKeyInfo {
         name: "fk_user".into(),
@@ -178,8 +178,14 @@ fn create_table_sqlite_emits_pragma_for_fk() {
         on_update: None,
     };
     let stmts = build_create_table("sqlite", None, "orders", &cols, &[], &[fk]).unwrap();
-    assert_eq!(stmts.len(), 3);
+    assert_eq!(stmts.len(), 2);
+    assert!(
+        stmts[0].contains("CONSTRAINT \"fk_user\" FOREIGN KEY (\"user_id\") REFERENCES \"users\" (\"id\")"),
+        "{}",
+        stmts[0]
+    );
     assert_eq!(stmts[1], "PRAGMA foreign_keys = ON");
+    assert!(stmts.iter().all(|statement| !statement.contains("ADD CONSTRAINT")));
 }
 
 #[test]
@@ -250,6 +256,22 @@ fn rename_table_each_driver() {
     assert_eq!(
         build_rename_table("sqlite", None, "old", "new").unwrap(),
         "ALTER TABLE \"old\" RENAME TO \"new\""
+    );
+}
+
+#[test]
+fn a_renamed_table_stays_in_its_own_database() {
+    assert_eq!(
+        build_rename_table("mysql", Some("b"), "old", "new").unwrap(),
+        "ALTER TABLE `b`.`old` RENAME TO `b`.`new`"
+    );
+    assert_eq!(
+        build_rename_table("clickhouse", Some("db"), "old", "new").unwrap(),
+        "RENAME TABLE `db`.`old` TO `db`.`new`"
+    );
+    assert_eq!(
+        build_rename_table("clickhouse", None, "old", "new").unwrap(),
+        "RENAME TABLE `old` TO `new`"
     );
 }
 
@@ -626,8 +648,8 @@ fn alter_column_mssql_applies_default_alongside_type_change() {
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 3);
-    assert_eq!(stmts[0], "ALTER TABLE [t] ALTER COLUMN [x] bigint NULL");
-    assert!(stmts[1].contains("DROP CONSTRAINT"));
+    assert!(stmts[0].contains("DROP CONSTRAINT"));
+    assert_eq!(stmts[1], "ALTER TABLE [t] ALTER COLUMN [x] bigint NULL");
     assert_eq!(stmts[2], "ALTER TABLE [t] ADD DEFAULT (0) FOR [x]");
 }
 

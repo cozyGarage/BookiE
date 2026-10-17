@@ -6,7 +6,7 @@ use gtk4::{self as gtk, gio, glib};
 use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use super::GridMsg;
-use super::display::{FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
+use super::display::{FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
 use super::editing::enter_edit_mode;
 use super::export;
 use super::local_filter::LocalResultView;
@@ -34,6 +34,7 @@ pub(super) struct GridMenus {
 
 pub(super) struct GridMenuOptions {
     pub(super) filterable: bool,
+    pub(super) row_mutations_allowed: bool,
     pub(super) foreign_key_columns: std::collections::HashSet<String>,
     pub(super) local_result_view: Option<LocalResultView>,
 }
@@ -49,11 +50,15 @@ pub(super) fn install_grid_context_menus(
     let context: Rc<RefCell<Option<CellContext>>> = Rc::new(RefCell::new(None));
     let columns = Rc::new(result_columns.to_vec());
     let local_result = options.local_result_view.is_some();
-    let editable_menu = build_menu(true, true, true, options.filterable, local_result);
+    let editable_menu = build_menu(
+        true,
+        options.row_mutations_allowed,
+        true,
+        options.filterable,
+        local_result,
+    );
     let readonly_menu = build_menu(false, false, true, options.filterable, local_result);
-    let empty_menu = gio::Menu::new();
-    empty_menu.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
-    empty_menu.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
+    let empty_menu = empty_grid_menu(options.row_mutations_allowed);
 
     let group = gio::SimpleActionGroup::new();
     let edit_action = gio::SimpleAction::new("edit", None);
@@ -80,7 +85,7 @@ pub(super) fn install_grid_context_menus(
             let Some(column) = columns.get(slot.col_index) else {
                 return;
             };
-            if !super::full_value_editor::is_text_column(&column.data_type) {
+            if !super::full_value_editor::is_full_value_column(&column.data_type) {
                 return;
             }
             let Some(row) = row_object_at(&view, position(slot)) else {
@@ -90,8 +95,8 @@ pub(super) fn install_grid_context_menus(
             if row.draft_id().is_none() && !has_persisted_row_key(&row_key) {
                 return;
             }
-            let initial_text = match full_text_seed(&slot.widget, &row, slot.col_index) {
-                TextSeed::Value(text) => text,
+            let (initial_text, kind) = match full_value_seed(&slot.widget, &row, slot.col_index, &column.data_type) {
+                TextSeed::Value(text, kind) => (text, kind),
                 TextSeed::TooLarge => {
                     super::full_value_editor::present_too_large(&view);
                     return;
@@ -107,6 +112,7 @@ pub(super) fn install_grid_context_menus(
                     col_index: slot.col_index,
                     row_key,
                     nullable: column.nullable,
+                    kind,
                     sender: sender.clone(),
                 },
             );
@@ -462,6 +468,15 @@ pub(super) fn install_grid_context_menus(
     }
 }
 
+fn empty_grid_menu(row_mutations_allowed: bool) -> gio::Menu {
+    let menu = gio::Menu::new();
+    if row_mutations_allowed {
+        menu.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
+    }
+    menu.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
+    menu
+}
+
 fn build_menu(
     editable: bool,
     row_operations: bool,
@@ -758,29 +773,51 @@ fn position(slot: &CellContext) -> u32 {
 }
 
 enum TextSeed {
-    Value(String),
+    Value(String, super::full_value_editor::FullValueKind),
     TooLarge,
     Unsupported,
 }
 
-fn full_text_seed(widget: &gtk::Widget, row: &crate::ui::row_object::RowObject, column: usize) -> TextSeed {
+fn full_value_seed(
+    widget: &gtk::Widget,
+    row: &crate::ui::row_object::RowObject,
+    column: usize,
+    data_type: &str,
+) -> TextSeed {
     if IS_NULL_SLOT.get(widget).unwrap_or(false) {
-        return TextSeed::Value(String::new());
+        return super::full_value_editor::edit_kind(data_type, &Value::Null)
+            .map(|kind| TextSeed::Value(String::new(), kind))
+            .unwrap_or(TextSeed::Unsupported);
     }
     if let Some(size) = FULL_EDIT_TEXT_SLOT.with(widget, String::len) {
         if !super::full_value_editor::within_edit_budget(size) {
             return TextSeed::TooLarge;
         }
-        return FULL_EDIT_TEXT_SLOT
-            .cloned(widget)
-            .map(TextSeed::Value)
-            .unwrap_or(TextSeed::Unsupported);
+        let Some(text) = FULL_EDIT_TEXT_SLOT.cloned(widget) else {
+            return TextSeed::Unsupported;
+        };
+        let Some(kind) = FULL_EDIT_KIND_SLOT.get(widget) else {
+            return TextSeed::Unsupported;
+        };
+        return TextSeed::Value(text, kind);
     }
     row.with_cell_value(column, |value| match value {
-        Value::Text(text) if super::full_value_editor::within_edit_budget(text.len()) => TextSeed::Value(text.clone()),
+        Value::Text(text) if super::full_value_editor::within_edit_budget(text.len()) => {
+            super::full_value_editor::edit_kind(data_type, value)
+                .map(|kind| TextSeed::Value(text.clone(), kind))
+                .unwrap_or(TextSeed::Unsupported)
+        }
         Value::Text(_) => TextSeed::TooLarge,
-        Value::Null => TextSeed::Value(String::new()),
-        _ => TextSeed::Unsupported,
+        value => super::full_value_editor::edit_kind(data_type, value)
+            .map(|kind| {
+                let text = super::display::value_to_full_edit_text(value);
+                if super::full_value_editor::within_edit_budget(text.len()) {
+                    TextSeed::Value(text, kind)
+                } else {
+                    TextSeed::TooLarge
+                }
+            })
+            .unwrap_or(TextSeed::Unsupported),
     })
     .unwrap_or(TextSeed::Unsupported)
 }
@@ -792,7 +829,12 @@ fn row_has_full_text_value(view: &gtk::ColumnView, widget: &gtk::Widget, positio
     let (_, row_key) = cell_row_identity(widget);
     (row.draft_id().is_some() || has_persisted_row_key(&row_key))
         && row
-            .with_cell_value(column, |value| matches!(value, Value::Text(_) | Value::Null))
+            .with_cell_value(column, |value| {
+                matches!(
+                    value,
+                    Value::Text(_) | Value::Json(_) | Value::JsonText(_) | Value::Null
+                )
+            })
             .unwrap_or(false)
 }
 
@@ -904,6 +946,30 @@ fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_empty_read_only_grid_menu_does_not_offer_insert_row() {
+        assert_eq!(empty_grid_menu(false).n_items(), 1);
+    }
+
+    #[test]
+    fn an_empty_writable_grid_menu_offers_insert_row() {
+        assert_eq!(empty_grid_menu(true).n_items(), 2);
+    }
+
+    #[test]
+    fn editable_grid_menu_hides_row_mutations_when_the_table_has_no_key() {
+        let menu = build_menu(true, false, true, true, false);
+        let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
+        assert_eq!(actions.n_items(), 4);
+    }
+
+    #[test]
+    fn editable_grid_menu_offers_row_mutations_when_the_table_has_a_key() {
+        let menu = build_menu(true, true, true, true, false);
+        let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
+        assert_eq!(actions.n_items(), 8);
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]

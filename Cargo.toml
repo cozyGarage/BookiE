@@ -9,6 +9,7 @@ members = [
     "crates/mcp",
     "crates/agentd",
     "crates/ssh",
+    "crates/dump",
     "crates/storage",
     "crates/transport",
     "tests/driver-tls",
@@ -36,7 +37,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order", "raw_value"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
 tokio-util = { version = "0.7", default-features = false }
-russh = "0.63"
+russh = "0.64"
 rust_xlsxwriter = { version = "0.99", default-features = false, features = ["chrono"] }
 secrecy = { version = "0.10", features = ["serde"] }
 tracing = "0.1"
@@ -63,7 +64,7 @@ testcontainers = { version = "0.27", default-features = false, features = ["aws-
 testcontainers-modules = { version = "0.15", default-features = false, features = ["aws-lc-rs"] }
 oo7 = { version = "0.6", default-features = false, features = ["tokio", "native_crypto"] }
 relm4 = { version = "0.11", default-features = false, features = ["macros", "libadwaita"] }
-sqlparser = "0.58"
+sqlparser = "0.63"
 toml = "1"
 sha2 = "0.11"
 argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
@@ -96,6 +97,7 @@ exclusions = [
     "scripts/check-ci-jobs.py",
     "scripts/tests/test_ci_workflow.py",
     "scripts/tests/test_change_contracts.py",
+    "scripts/tests/test_check_crate_boundaries.py",
     "apps/linux/app/tests/**",
 ]
 

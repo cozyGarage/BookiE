@@ -81,12 +81,13 @@ Reviewed against the current ADR index, code and living docs on 2026-10-14. The 
 | Secret Service credentials | [ADR 0004](0004-libsecret-secret-storage.md), [secret-storage spec](../../specs/secret-storage/spec.md) (draft) |
 | Governed consumer seam (`PolicyGuard`) | [ADR 0016](0016-governed-consumer-seam.md), [governed SQL spec](../../specs/governed-sql/spec.md) (draft) |
 | Server-side cancellation | [ADR 0005](0005-server-side-cancellation.md) |
-| Cursor-paged editor results | [ADR 0011](0011-paged-query-results.md) (accepted; core/PostgreSQL/PolicyGuard support exists, editor integration remains) |
+| Cursor-paged editor results | [ADR 0011](0011-paged-query-results.md) (accepted; PostgreSQL editor support has landed; broader memory acceptance remains open under #554) |
 | Sidebar object tree | [ADR 0012](0012-sidebar-object-tree.md) |
 | Multiple result sets | [ADR 0013](0013-multiple-query-result-sets.md) |
 | Full-table export read snapshot | [ADR 0014](0014-full-table-export-snapshot.md) (not the same as ADR 0015) |
 | Database clone / restore snapshots | [ADR 0015](0015-database-snapshots.md) (accepted for 0.2.x after 0.2.0) |
 | Bundle admin audit | [ADR 0010](0010-administrative-action-audit.md) |
+| File conversion, schema migrations, logical backup | [ADR 0019](0019-database-tooling-without-sidecars.md) (accepted for 0.2.x after 0.2.0) |
 
 ## Open forks (do not invent answers here)
 

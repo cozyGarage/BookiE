@@ -27,13 +27,15 @@ Click a table in the sidebar. It opens as a preview tab, marked with an icon, an
 - **Filter and sort**: Ctrl+F opens the filter bar. Save structured filters by name for the current connection, schema and table, then select and apply them later; you can rename or delete saved filters there too. Click a column header to sort. Right-click a cell and choose **Filter by This Value** for a quick filter. On a foreign key cell, **Go to Referenced Row** opens the referenced table filtered to that row (composite keys use every column of the key). If the column belongs to multiple foreign keys, choose the target table. Click a cell and press Ctrl+V to paste tab-separated text (for example copied from a spreadsheet) into the cells from that one: each value is checked like a typed edit, nothing is applied if any cell is refused, and the result is a set of pending changes you review and save. An empty pasted value on a nullable column becomes NULL. On PostgreSQL (a column whose type is an enum, or a domain over one; not arrays of enums) and on MySQL and MariaDB, double-clicking an ENUM cell opens a list of its members (choose one with the mouse or the arrow keys and Enter), and a SET cell opens a list with a check for each member and an Apply button; the empty member shows as (empty) and is stored as the empty value, not NULL.
 - **Columns**: the **Columns…** entry in the cell menu hides or shows columns. Drag a header to reorder columns. Both are remembered per table.
 - **Find**: Ctrl+Alt+F lists loaded rows that contain a text.
-- **Long values**: cells longer than 8 KiB show a preview and the full value's size. **View Value** opens the whole value, and **Copy Value** copies it in full. Right-click an editable text cell and choose **Edit Full Value…** to edit the entire value up to 1 MiB. **Apply** stages the text for review; **Set to NULL** is separate, so empty text remains empty. **Cancel** stages nothing. JSON previews and values over 1 MiB are not supported in this dialog yet ([#610](https://github.com/cozyGarage/BookiE/issues/610)). SQL result grids remain read-only. Exports use full values when fetched; full-row copy and current-page export are refused if hidden columns leave values unavailable.
+- **Long values**: cells longer than 8 KiB show a preview and the full value's size. **View Value** opens the whole value, and **Copy Value** copies it in full. Right-click an editable text or JSON cell and choose **Edit Full Value…** to edit the entire value up to 1 MiB. **Apply** stages the value for review; invalid JSON stays in the dialog without staging. **Format JSON** visibly formats semantic JSON values. Source-text JSON keeps its exact text, including key order and number spelling. **Set to NULL** is separate from empty text, JSON `null`, and the text `null`. **Cancel** stages nothing. Values over 1 MiB are not supported in this dialog. SQL result grids remain read-only. Exports use full values when fetched; full-row copy and current-page export are refused if hidden columns leave values unavailable.
 - **Row inspector**: shows every column of the selected row with its type.
 - **Selection statistics**: select several rows and open the selection badge to see count, sum, average, min and max per numeric column; **Copy summary** copies them.
 
 ## Run SQL
 
 Ctrl+E opens a SQL editor tab for the current connection.
+
+Supported single-statement PostgreSQL `SELECT`s load progressively. The grid keeps up to four pages of 5,000 rows; older pages leave the forward-only window and cannot be revisited there. Other engines and unsupported query shapes load a capped result. A truncated, failed or cancelled result is incomplete; see [result limits](known-limitations.md#data-and-values).
 
 SQL completion offers keywords and scoped table and column names. Choosing an identifier inserts its complete quoted SQL name. Table names keep their schema; column suggestions after an alias keep that alias. Arbitrary words elsewhere in the editor are not suggestions.
 
@@ -53,7 +55,7 @@ To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+S
 - Completion offers tables after `FROM` and `JOIN` and columns elsewhere.
 - **Session** keeps one connection for the tab, so settings, temporary tables and transactions carry over between runs.
 - **Explain** shows the plan of the selected text, or of the whole editor when nothing is selected. For PostgreSQL and SQLite the plan opens as a **Tree** (indented by nesting, with a bar for each step's share of the estimated cost; hover a bar for the numbers) and the **Text** tab keeps the raw plan. Other engines show the text plan only. The costs are the planner's estimates; nothing is executed.
-- Ctrl+H opens query history in a panel beneath the workspace. Search, filter, pin, export or reopen queries there; **Close history** returns the full space to your current workspace. Ctrl+D saves the query as a favorite, and Ctrl+P opens Open Quickly for favorites, tabs and connections.
+- Ctrl+H opens query history in a panel beneath the workspace. Statements that set a password, an encryption key or a connection secret are not saved there. Search, filter, pin, export or reopen queries there; **Close history** returns the full space to your current workspace. Ctrl+D saves the query as a favorite, and Ctrl+P opens Open Quickly for favorites, tabs and connections.
 
 ## Import and export
 
@@ -77,6 +79,10 @@ BookiE checks every statement before it runs:
 - Writes on a read-only connection are refused.
 - Depending on the connection's environment and your policy, risky statements (for example a `DELETE` without `WHERE`, or schema changes in production) ask for your approval first. The time spent waiting for approval is not counted in the statement's elapsed time.
 - Every executed, refused or cancelled operation is written to an audit journal on your machine.
+
+## Back up and restore PostgreSQL
+
+From the app menu, choose **Back Up Database…** to save a custom-format `.dump` file, or **Restore from Backup…** to restore one. These actions are available for PostgreSQL connections and use the installed `pg_dump` and `pg_restore` tools. They work over the connection's configured SSH and TLS route. Restore requires a writable connection and approval; both operations are audited. Cancel stops the running tool.
 
 ## Snapshots
 

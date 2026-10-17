@@ -55,7 +55,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Connection dialog and browse shortcuts
 
-- [ ] Screen readers can activate Driver, Endpoint and TLS, and announce Port, Connect timeout and Query timeout. GTK AT-SPI scenario passed in Xvfb on 2026-10-13; native Hyprland verification is pending. The sidebar search, saved-filter name and colour picker are outside this connection-form check, [#658](https://github.com/cozyGarage/BookiE/issues/658).
+- [ ] Screen readers can activate Driver, Endpoint and TLS, and announce Port, Connect timeout and Query timeout. GTK AT-SPI scenario passed in Xvfb on 2026-10-13; native Hyprland verification is pending. The sidebar search, saved-filter name and list colour chooser are outside this connection-form check; the specific missing-name/action report in [#658](https://github.com/cozyGarage/BookiE/issues/658) was rechecked and closed.
 - [ ] New connection defaults match the selected driver; no PostgreSQL defaults leak into another engine. Switching drivers and editing a saved connection preserves intended custom values. **2026-10-12 historical run:** defaults passed for all seven drivers; switching drivers reset custom port, database and username values. Fixed by [#740](https://github.com/cozyGarage/BookiE/pull/740); transition tests cover all three fields, and installed Hyprland retest remains pending.
 - [ ] For MySQL/MariaDB, select a local Unix socket and confirm the form shows a socket-file path while hiding host and port. Switch back to Network and confirm the socket path is hidden and host/port return.
 - [ ] Connect through a real local MySQL/MariaDB socket, save the connection, reopen it, and confirm the socket path and endpoint mode remain selected. Export and re-import a bundle and confirm the same endpoint is retained.
@@ -97,6 +97,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 ## Structure tab, column comments
 
 - [ ] Open an existing Structure tab and make an unsaved change: its title keeps the `· Structure` suffix alongside the dirty marker. The regression test in [#796](https://github.com/cozyGarage/BookiE/pull/796) covers title state; installed Wayland retest pending.
+- [ ] SQLite: create a new table with a foreign key in the Structure tab and save; the table is created with the key. On an existing SQLite table, Add Foreign Key… is greyed out and says SQLite cannot add one to an existing table.
 - [ ] A Comment row appears per column on PostgreSQL, MySQL, SQL Server and ClickHouse. **2026-10-12 Hyprland dark:** PostgreSQL passed; others not run.
 - [ ] On ClickHouse the field is populated but not editable for an existing column, with a tooltip saying why.
 - [ ] No Comment row appears on SQLite or DuckDB.
@@ -231,7 +232,7 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 
 ## Grid previews for long values
 
-In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a typed preview with the original byte count. SQL result grids are read-only. In an editable browse table, confirm that a long text cell opens for inline editing with the full value, not the preview. **View Value** and **Copy Value** expose the complete value. Text cells over 8 KiB can be edited in the bounded full-value dialog. JSON full-value editing remains open under [#610](https://github.com/cozyGarage/BookiE/issues/610). Use text and JSON values just below and just above the 8 KiB threshold.
+In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a typed preview with the original byte count. SQL result grids are read-only. In an editable browse table, confirm that a long text cell opens for inline editing with the full value, not the preview. **View Value** and **Copy Value** expose the complete value. Text and JSON cells over 8 KiB can be edited in the bounded full-value dialog. Use text and JSON values just below and just above the 8 KiB threshold.
 
 - [ ] A value below the threshold displays in full and remains editable where that type supports grid edits.
 - [ ] Values over the threshold show a prefix and `… (N bytes total)`; SQL result cells and binary/unsupported browse values do not offer inline editing. Editable browse text opens with the full value.
@@ -249,7 +250,8 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 - [ ] Apply empty text and confirm it remains empty. Use **Set to NULL** separately and confirm the stored value is SQL NULL.
 - [ ] Edit a draft text row, save it, and discard a separate pending edit.
 - [ ] A value over 1 MiB is refused. Non-text, generated, key and read-only cells do not offer the action.
-- [ ] JSON previews remain read-only in this dialog. Small JSON cells keep using the existing JSON popover editor; full-value JSON editing remains open under [#610](https://github.com/cozyGarage/BookiE/issues/610).
+- [ ] Edit JSON and JSONB values with reordered keys, duplicate source-text keys, large integer lexemes, JSON `null`, and SQL NULL. Apply valid input and reload to confirm the correct stored carrier; invalid input leaves the dialog open and stages no change.
+- [ ] **Format JSON** visibly formats semantic JSON values. Source-text JSON has no lossy formatter; its exact text stays intact until edited. Confirm empty text, JSON `null`, text `null`, and SQL NULL remain distinct.
 
 ## Server activity view: binary values
 
@@ -279,6 +281,7 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 - [ ] On SQL Server, run `EXEC sys.sp_executesql N'SELECT 1 AS first_result; SELECT 2 AS second_result;'` as one query. Confirm the result-set selector shows both sets in source order and each displays its own column and value.
 - [ ] Run `SELECT 1 AS one; SELECT 2 AS two;`, pin both results, then run `SELECT 3 AS three;` and `SELECT 4 AS four; SELECT * FROM missing_table;`: pinned results stay first and the failed second statement is labelled **Statement 2**, not Statement 4. Unpin removes the pinned results. **2026-10-12 historical run:** pin ordering passed, but failure numbering after pinning was not checked; fixed by [#785](https://github.com/cozyGarage/BookiE/pull/785). The installed GTK scenario `pinned_results_stay_ahead_of_the_next_run` covers the failure; installed Wayland retest pending ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
 - [ ] After running a script, each statement's first line shows a tick or, for a failed statement, a cross in the gutter, in light and dark. Edit the script and run it again: the marks follow the new run. **2026-10-12 Hyprland dark:** dark theme passed.
+- [ ] PostgreSQL: pin a result, then run a long streamed SELECT and press Stop (or let it time out): the pinned result stays above the Cancelled or Timed out page, and Pin is unavailable while the stream is still loading.
 
 ## Closing a window during a save
 
@@ -300,3 +303,12 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 - [ ] On PostgreSQL, create distinct `users` and `"Users"` relations, plus a relation with a space or escaped quote in its name. Use Ctrl+Space to open completion, select each relation with the arrow keys, and accept with Enter or Tab. Run the resulting SELECT and confirm the intended relation. Repeat in the split editor view.
 - [ ] Complete an alias-qualified column in the middle of a query. The alias and following SQL stay intact. Undo restores the original identifier in one step.
 - [ ] With a screen reader, confirm completion names can be read and selected. This remains a manual accessibility check; provider activation tests do not establish screen reader behavior.
+
+## PostgreSQL backup and restore
+
+- [ ] With `pg_dump` and `pg_restore` installed, connect to a PostgreSQL database, choose Back Up Database… from the main menu and save the file. A progress window with Cancel appears and closes, a toast says the backup was saved, and the `.dump` file exists.
+- [ ] Change some rows, choose Restore from Backup…, pick the file and approve the prompt. The rows return to their backed-up state and the open browse tab refreshes. Deny the prompt on a second try: nothing changes.
+- [ ] Repeat both through an SSH tunnel (built-in and system OpenSSH) and with TLS Verify Full.
+- [ ] On a read-only connection, Back Up Database… works and Restore from Backup… is refused before a file is chosen. On a MySQL connection both explain that backups are PostgreSQL only.
+- [ ] Press Cancel during a large backup: the window closes, nothing is written next to the chosen file, and `audit.jsonl` shows a Cancelled administrative outcome after its intent.
+- [ ] Remove `pg_dump` from `/usr/bin` (or test on a host without it): the error names the missing tool and how to install it.

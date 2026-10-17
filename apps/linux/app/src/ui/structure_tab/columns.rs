@@ -134,6 +134,37 @@ fn format_column_subtitle(col: &DraftColumn) -> String {
     parts.join(" · ")
 }
 
+fn expander_arrow(widget: &gtk::Widget) -> Option<gtk::Image> {
+    let mut child = widget.first_child();
+    while let Some(current) = child {
+        if current.has_css_class("expander-row-arrow") || current.has_css_class("tp-structure-expander-arrow") {
+            return current.downcast::<gtk::Image>().ok();
+        }
+        if let Some(image) = expander_arrow(&current) {
+            return Some(image);
+        }
+        child = current.next_sibling();
+    }
+    None
+}
+
+fn bind_expander_arrow(row: &adw::ExpanderRow) {
+    let Some(arrow) = expander_arrow(row.upcast_ref()) else {
+        return;
+    };
+    arrow.remove_css_class("expander-row-arrow");
+    arrow.add_css_class("tp-structure-expander-arrow");
+    let update = move |row: &adw::ExpanderRow| {
+        arrow.set_icon_name(Some(if row.is_expanded() {
+            "pan-down-symbolic"
+        } else {
+            "pan-end-symbolic"
+        }));
+    };
+    update(row);
+    row.connect_expanded_notify(update);
+}
+
 /// Build one collapsible column row as `adw::ExpanderRow`. Collapsed
 /// state shows the column name (title) + summary subtitle; expanded
 /// reveals one `AdwEntryRow` / `AdwSwitchRow` per editable attribute.
@@ -162,6 +193,7 @@ pub(super) fn build_column_expander_row(
         .title(glib::markup_escape_text(&col.name))
         .subtitle(glib::markup_escape_text(&format_column_subtitle(col)))
         .build();
+    bind_expander_arrow(&row);
     row.set_widget_name(&format!("col-row-{index}"));
 
     // Trash button as a header-suffix on the expander row itself —
@@ -451,6 +483,32 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
 #[cfg(test)]
 mod tests {
     use super::{CommentEditability, comment_editability};
+    use super::{bind_expander_arrow, expander_arrow};
+    use relm4::adw::prelude::*;
+    use relm4::{adw, gtk};
+
+    fn pump() {
+        let context = gtk::glib::MainContext::default();
+        while context.iteration(false) {}
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_structure_expander_arrow_matches_its_expansion_state() {
+        adw::init().unwrap();
+        let row = adw::ExpanderRow::new();
+        let weak_row = row.downgrade();
+        bind_expander_arrow(&row);
+        let arrow = expander_arrow(row.upcast_ref()).unwrap();
+
+        assert_eq!(arrow.icon_name().as_deref(), Some("pan-end-symbolic"));
+        row.set_expanded(true);
+        pump();
+        assert_eq!(arrow.icon_name().as_deref(), Some("pan-down-symbolic"));
+        drop(arrow);
+        drop(row);
+        assert!(weak_row.upgrade().is_none());
+    }
 
     #[test]
     fn a_comment_is_editable_where_the_engine_can_alter_one() {

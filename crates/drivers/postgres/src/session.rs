@@ -12,6 +12,7 @@ use crate::{CONTROL_SETUP_TIMEOUT, backend_pid, controlled_execute, controlled_q
 struct ActiveCursor {
     id: QueryCursorId,
     columns: Vec<tablepro_core::ColumnInfo>,
+    failed: bool,
 }
 
 pub(crate) struct PgSession {
@@ -55,6 +56,9 @@ impl tablepro_core::Session for PgSession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
+        if self.active_cursor.as_ref().is_some_and(|cursor| cursor.failed) {
+            self.active_cursor = None;
+        }
         if self.active_cursor.is_some() {
             return Err(DriverError::Unsupported(
                 "query while a forward-only cursor is active".into(),
@@ -75,7 +79,7 @@ impl tablepro_core::Session for PgSession {
             ));
         }
         check_pre_dispatch(control)?;
-        let statement = format!("DECLARE bookie_cursor NO SCROLL CURSOR FOR {sql}");
+        let statement = format!("{CURSOR_PREFIX}{sql}");
         let connection = self
             .connection
             .take()
@@ -92,15 +96,16 @@ impl tablepro_core::Session for PgSession {
         .await;
         self.connection = connection;
         if let Err(error) = result {
-            if !matches!(&error, DriverError::Query { sqlstate: Some(code), .. } if code == "25P01") {
+            if !matches!(error, DriverError::Query { .. }) {
                 self.retire_cursor_session();
             }
-            return Err(error);
+            return Err(position_in_cursor_query(error));
         }
         let id = QueryCursorId::new();
         self.active_cursor = Some(ActiveCursor {
             id,
             columns: Vec::new(),
+            failed: false,
         });
         Ok(id)
     }
@@ -119,6 +124,12 @@ impl tablepro_core::Session for PgSession {
         let result = self.run_cursor_query_controlled(&statement, control).await;
         let mut page = match result {
             Ok(page) => page,
+            Err(error @ DriverError::Query { .. }) if self.connection.is_some() => {
+                if let Some(cursor) = self.active_cursor.as_mut() {
+                    cursor.failed = true;
+                }
+                return Err(error);
+            }
             Err(error) => {
                 self.retire_cursor_session();
                 return Err(error);
@@ -156,10 +167,14 @@ impl tablepro_core::Session for PgSession {
         cursor_id: QueryCursorId,
         control: &OperationControl,
     ) -> Result<(), DriverError> {
-        if !self.active_cursor.as_ref().is_some_and(|cursor| cursor.id == cursor_id) {
+        let Some(cursor) = self.active_cursor.as_ref().filter(|cursor| cursor.id == cursor_id) else {
             return Err(DriverError::Unsupported(
                 "forward-only cursor is not active in this session".into(),
             ));
+        };
+        if cursor.failed {
+            self.active_cursor = None;
+            return Ok(());
         }
         check_pre_dispatch(control)?;
         let connection = self
@@ -256,5 +271,62 @@ impl PgSession {
     fn retire_cursor_session(&mut self) {
         self.connection = None;
         self.active_cursor = None;
+    }
+}
+
+const CURSOR_PREFIX: &str = "DECLARE bookie_cursor NO SCROLL CURSOR FOR ";
+
+fn position_in_cursor_query(error: DriverError) -> DriverError {
+    let DriverError::Query {
+        message,
+        sqlstate,
+        position,
+    } = error
+    else {
+        return error;
+    };
+    let prefix = CURSOR_PREFIX.chars().count();
+    DriverError::Query {
+        message,
+        sqlstate,
+        position: position
+            .and_then(|position| position.checked_sub(prefix))
+            .filter(|position| *position > 0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tablepro_core::DriverError;
+
+    use super::{CURSOR_PREFIX, position_in_cursor_query};
+
+    fn query_error(position: Option<usize>) -> DriverError {
+        DriverError::Query {
+            message: "column \"nope\" does not exist".into(),
+            sqlstate: Some("42703".into()),
+            position,
+        }
+    }
+
+    #[test]
+    fn an_error_position_points_into_the_users_statement() {
+        let prefix = CURSOR_PREFIX.chars().count();
+        let shifted = position_in_cursor_query(query_error(Some(prefix + 8)));
+        assert!(
+            matches!(shifted, DriverError::Query { position: Some(8), .. }),
+            "{shifted:?}"
+        );
+    }
+
+    #[test]
+    fn a_position_inside_the_cursor_prefix_is_dropped() {
+        let dropped = position_in_cursor_query(query_error(Some(3)));
+        assert!(
+            matches!(dropped, DriverError::Query { position: None, .. }),
+            "{dropped:?}"
+        );
+        let other = position_in_cursor_query(DriverError::Disconnected);
+        assert!(matches!(other, DriverError::Disconnected));
     }
 }
