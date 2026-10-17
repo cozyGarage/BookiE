@@ -134,7 +134,7 @@ def scenarios(ui):
     def close_other_tabs(page):
         bounds = page.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
         gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=3)
-        time.sleep(0.4)
+        ui.wait_for_node(role=ui.pyatspi.ROLE_MENU)
         ui.press_x11_key("Down")
         ui.press_x11_key("Return")
 
