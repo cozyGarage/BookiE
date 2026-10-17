@@ -687,3 +687,64 @@ fn edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes() {
     assert_eq!(pending(tab_id), 2, "edits are accepted again once the save has ended");
     controller.detach_runtime();
 }
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn draft_history_discard_and_paste_are_ignored_during_a_save() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch(tab_id);
+    load_two_rows(&controller, &observed);
+    let snapshot = controller.model().capture_paste_snapshot();
+
+    edit(&controller, 1, "submitted");
+    pump(&observed);
+    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    let started = pump(&observed);
+    assert_eq!(transactions(&started), 1);
+
+    controller.sender().send(BrowseTabInput::Undo).unwrap();
+    pump(&observed);
+    let undo_preserved = pending(tab_id) == 1;
+
+    controller.sender().send(BrowseTabInput::Redo).unwrap();
+    pump(&observed);
+    let redo_preserved = pending(tab_id) == 1;
+
+    controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
+    pump(&observed);
+    let discard_preserved = pending(tab_id) == 1;
+
+    controller
+        .sender()
+        .send(BrowseTabInput::PasteText(super::paste::PasteTextInput {
+            row: 0,
+            col: 1,
+            row_key: vec![Value::Int(1)],
+            text: "pasted".into(),
+            displayed: None,
+            snapshot,
+        }))
+        .unwrap();
+    let paste_outputs = pump(&observed);
+    let paste_preserved = pending(tab_id) == 1;
+    let no_second_save = transactions(&paste_outputs) == 0;
+
+    controller
+        .sender()
+        .send(BrowseTabInput::SaveFailed("fixture cleanup".into()))
+        .unwrap();
+    pump(&observed);
+    controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
+    pump(&observed);
+    controller.detach_runtime();
+
+    assert!(undo_preserved, "undo cannot mutate a submitted save snapshot");
+    assert!(redo_preserved, "redo cannot mutate a submitted save snapshot");
+    assert!(discard_preserved, "discard cannot erase a submitted save snapshot");
+    assert!(paste_preserved, "paste cannot add edits while a save is in flight");
+    assert!(
+        no_second_save,
+        "post-submit actions cannot dispatch another transaction"
+    );
+}

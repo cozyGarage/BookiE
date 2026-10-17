@@ -579,7 +579,7 @@ impl BrowseTab {
         msg: BrowseTabInput,
         sender: &ComponentSender<Self>,
     ) -> Option<BrowseTabInput> {
-        let edits_tracker = matches!(
+        let changes_tracker = matches!(
             msg,
             BrowseTabInput::DuplicateRow { .. }
                 | BrowseTabInput::InsertRow
@@ -587,8 +587,13 @@ impl BrowseTab {
                 | BrowseTabInput::GridCellEdited { .. }
                 | BrowseTabInput::GridSetCellNull { .. }
                 | BrowseTabInput::GridDeleteRowAt { .. }
+                | BrowseTabInput::Undo
+                | BrowseTabInput::Redo
+                | BrowseTabInput::DiscardAll
+                | BrowseTabInput::Paste(_)
+                | BrowseTabInput::PasteText(_)
         );
-        if !(self.save_in_flight.get() && edits_tracker) {
+        if !(self.save_in_flight.get() && changes_tracker) {
             return Some(msg);
         }
         let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(

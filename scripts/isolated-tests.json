@@ -190,6 +190,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::draft_history_discard_and_paste_are_ignored_during_a_save"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::keyless_tab_rejects_inline_edits_and_insert_actions"
     ],
     [
