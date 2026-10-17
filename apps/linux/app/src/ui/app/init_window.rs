@@ -13,7 +13,6 @@ use super::{App, AppMsg};
 /// close-after-save counters, the "close the window once the map
 /// drains" flag, and the in-flight transaction counter the close
 /// guard polls.
-#[derive(Default)]
 pub(super) struct WindowLifecycleHandles {
     pub(super) grid_edits_ready: Rc<Cell<bool>>,
     pub(super) close_after_save: Rc<RefCell<HashMap<Uuid, u32>>>,
@@ -53,7 +52,7 @@ pub(super) fn install_window_lifecycle(
     let in_flight_saves: Rc<Cell<usize>> = Rc::new(Cell::new(0));
     let session_teardown_ready = Rc::new(Cell::new(false));
     let session_teardown_pending = Rc::new(Cell::new(false));
-    let grid_edits_ready: Rc<Cell<bool>> = Rc::new(Cell::new(false));
+    let grid_edits_ready = Rc::new(Cell::new(false));
     let window_close_state_saved = Rc::new(Cell::new(false));
     let window_close_state_pending = Rc::new(Cell::new(false));
     let handles = WindowLifecycleHandles {
@@ -63,6 +62,7 @@ pub(super) fn install_window_lifecycle(
         in_flight_saves: in_flight_saves.clone(),
         session_teardown_ready: session_teardown_ready.clone(),
         session_teardown_pending: session_teardown_pending.clone(),
+        grid_edits_ready: grid_edits_ready.clone(),
         window_state: restored.clone(),
         window_close_state_saved: window_close_state_saved.clone(),
         window_close_state_pending: window_close_state_pending.clone(),
