@@ -353,6 +353,22 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
         jump_hosts: Vec::new(),
         auth: password("s3cret"),
     };
+    let rejecting = ScriptedPrompter::new(vec![PromptAnswer::Decline]);
+    let rejected = OpenSshSession::connect(&cfg, &context, rejecting.clone(), CancellationToken::new()).await;
+    assert!(matches!(
+        rejected,
+        Err(OpenSshError::HostKeyUnknown { declined: true, .. })
+    ));
+    assert_eq!(
+        rejecting
+            .asked()
+            .iter()
+            .filter(|prompt| matches!(prompt, AskpassPrompt::HostKeyConfirmation { .. }))
+            .count(),
+        1,
+    );
+    assert!(!known_hosts.exists());
+
     let prompter = ScriptedPrompter::new(vec![
         PromptAnswer::Accept,
         PromptAnswer::Secret(SecretString::from("s3cret")),
