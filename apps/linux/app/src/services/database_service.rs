@@ -696,8 +696,26 @@ mod tests {
         id
     }
 
+    async fn assert_read_only_write_is_refused(
+        connection: &dyn tablepro_core::Connection,
+        sql: &str,
+        params: Vec<tablepro_core::Value>,
+        expect_one: &[usize],
+        control: &tablepro_core::OperationControl,
+    ) {
+        let statements = [(sql.to_string(), params)];
+        let result = connection
+            .execute_in_transaction_checked_controlled(&statements, expect_one, control)
+            .await;
+
+        assert!(
+            matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))),
+            "{sql}"
+        );
+    }
+
     #[tokio::test]
-    async fn gui_read_only_transaction_writes_are_denied_by_the_active_policy_guard() {
+    async fn gui_read_only_guarded_transactions_deny_insert_update_and_delete() {
         let service = DatabaseService::new_isolated();
         let driver: Arc<dyn DatabaseDriver> = Arc::new(drivers_sqlite::SqliteDriver);
         let id = Uuid::new_v4();
@@ -741,18 +759,28 @@ mod tests {
         ));
 
         let guarded = service.get(id).expect("active GUI connection");
-        let result = guarded
-            .execute_in_transaction_checked_controlled(
-                &[(
-                    "UPDATE guarded_notes SET value = ? WHERE id = ?".into(),
-                    vec![tablepro_core::Value::Text("after".into()), tablepro_core::Value::Int(1)],
-                )],
-                &[0],
-                &tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5)),
-            )
-            .await;
-
-        assert!(matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))));
+        let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+        for (sql, params, expect_one) in [
+            (
+                "INSERT INTO guarded_notes VALUES (?, ?)",
+                vec![
+                    tablepro_core::Value::Int(2),
+                    tablepro_core::Value::Text("inserted".into()),
+                ],
+                vec![],
+            ),
+            (
+                "UPDATE guarded_notes SET value = ? WHERE id = ?",
+                vec![
+                    tablepro_core::Value::Text("updated".into()),
+                    tablepro_core::Value::Int(1),
+                ],
+                vec![0],
+            ),
+            ("DELETE FROM guarded_notes WHERE id = 1", vec![], vec![0]),
+        ] {
+            assert_read_only_write_is_refused(guarded.as_ref(), sql, params, &expect_one, &control).await;
+        }
         let rows = guarded
             .query("SELECT value FROM guarded_notes WHERE id = 1")
             .await
