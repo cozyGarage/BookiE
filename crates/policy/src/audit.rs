@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
@@ -368,6 +369,15 @@ impl AuditState {
         PendingWrite {
             state: self,
             armed: true,
+            dispatched: None,
+        }
+    }
+
+    pub(crate) fn pending_write_after_dispatch(&self, dispatched: Arc<AtomicBool>) -> PendingWrite<'_> {
+        PendingWrite {
+            state: self,
+            armed: true,
+            dispatched: Some(dispatched),
         }
     }
 }
@@ -375,6 +385,7 @@ impl AuditState {
 pub(crate) struct PendingWrite<'a> {
     state: &'a AuditState,
     armed: bool,
+    dispatched: Option<Arc<AtomicBool>>,
 }
 
 impl PendingWrite<'_> {
@@ -385,7 +396,12 @@ impl PendingWrite<'_> {
 
 impl Drop for PendingWrite<'_> {
     fn drop(&mut self) {
-        if self.armed {
+        if self.armed
+            && self
+                .dispatched
+                .as_ref()
+                .is_none_or(|state| state.load(Ordering::Acquire))
+        {
             self.state.disable_governed_writes();
         }
     }

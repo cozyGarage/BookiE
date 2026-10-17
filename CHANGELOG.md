@@ -126,6 +126,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
+- Cancelling a PostgreSQL backup removes its partial file; cancelling a started restore records an unknown outcome and blocks governed writes on that connection until reconnect.
 - Read-only connections refuse grid edits through alternate actions while still allowing local drafts to be discarded or undone and redone without changing stored data.
 - Structure column expanders now point right when collapsed and down when open.
 - On MySQL and MariaDB, `--` followed by a character other than a space, such as `SELECT 5--2`, no longer hides the rest of the line as a comment, so the following statements are found and checked separately.
