@@ -695,6 +695,13 @@ mod tests {
         assert!(index.columns.is_empty());
         assert_eq!(index.grammar, None);
         assert!(!index.accepts(&request));
+        let keyword_candidates = super::super::completion_proposals::candidates("SEL", 3, &index);
+        assert!(
+            keyword_candidates
+                .values
+                .iter()
+                .any(|(label, value)| label == "SELECT" && value == "SELECT")
+        );
         assert!(
             !super::candidates("SELECT * FROM ", 14, &index, false, str::to_string)
                 .iter()
