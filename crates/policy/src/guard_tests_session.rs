@@ -8,6 +8,7 @@ struct SessionScript {
     disconnect_on: Option<&'static str>,
     query_error_on: Option<&'static str>,
     panic_on_close: bool,
+    panic_on_status: bool,
     result_sets_on: Option<&'static str>,
 }
 
@@ -67,6 +68,9 @@ impl tablepro_core::Session for ScriptedSession {
     }
 
     fn is_usable(&self) -> bool {
+        if self.script.panic_on_status {
+            panic!("secret session status panic")
+        }
         self.usable
     }
 
@@ -78,8 +82,19 @@ impl tablepro_core::Session for ScriptedSession {
     }
 }
 
-struct SessionConn {
+pub(super) struct SessionConn {
     script: Arc<SessionScript>,
+}
+
+impl SessionConn {
+    pub(super) fn panicking_status() -> Self {
+        Self {
+            script: Arc::new(SessionScript {
+                panic_on_status: true,
+                ..SessionScript::default()
+            }),
+        }
+    }
 }
 
 #[async_trait]
@@ -118,6 +133,13 @@ impl Connection for SessionConn {
             usable: true,
             failed_once: false,
         }))
+    }
+
+    fn supports_server_cancellation(&self) -> bool {
+        if self.script.panic_on_status {
+            panic!("secret capability panic")
+        }
+        false
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
