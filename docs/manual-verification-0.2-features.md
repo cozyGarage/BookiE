@@ -10,6 +10,21 @@ Take light and dark screenshots for each section, per `AGENTS.md`. Record a resu
 
 Real values: before 0.2.0, also run the by-hand value check in [oracle review](oracle-review.md) (Part B), which compares each engine's own client with the grid, export and edit path.
 
+## Visual audit matrix
+
+Proposed follow-up for DOC-3/[#561](https://github.com/cozyGarage/BookiE/issues/561), based on the [October 18 source audit](archive/code-and-ui-audit-2026-10-18.md). These checks are **not run** at that report's source pin. They do not add 0.2.0 blockers. Use synthetic data and a separate test profile; retain the package and environment record described above with each result.
+
+Run the core grid/editor/connection screens in light, dark, high-contrast light and high-contrast dark. Start at scale 1 and the normal window size; repeat at the minimum supported width and with enlarged desktop text. Then inspect at 1.25 and 2 scale where supported, including a move between differently scaled monitors. Record logical window dimensions, monitor scale and text scale separately. Unavailable combinations remain blocked or not run.
+
+- [ ] Show ordinary, selected, focused, edited, inserted, deleted and failed cells, including Boolean, NULL, empty text and long values. Pending state remains distinguishable without hue and is announced by Orca; recycling a row clears its previous state. Keep the existing production badge and window-title marker readable.
+- [ ] Toggle light/dark and high contrast while both SQL panes are open. Check syntax text, selection, caret, gutter marks, statement band, completion and error highlights; compare with the native controls beside them.
+- [ ] Measure custom text against its actual composited background, including selected rows and translucent state tints. Record foreground/background colors, ratio and screenshot. Use the [audit's contrast targets](archive/code-and-ui-audit-2026-10-18.md#visual-acceptance-reference); class names and uncomposited palette values alone do not prove a pass.
+- [ ] Resize connection forms/popovers, editor toolbars, the browse pager, import mapping controls and result panes. Use long translated labels and large fonts. Run, Stop, transaction state, primary dialog actions and secondary menu actions remain reachable without overlap or clipped labels. Refresh row counts and change page size while narrow, then widen again.
+- [ ] Navigate with keyboard only through text, Boolean and editable cells, menus and dialogs. Focus stays visible on selected rows and returns to its origin after dismissal. With animations disabled, a failed edit retains an understandable error indication.
+- [ ] Scroll to the final grid row and rightmost column with wrapped/multiline values. Inspect text baselines, descenders, focus borders, bottom bars and popover edges at each tested scale. Copy and full-value editing preserve the underlying value; a display preview never becomes the saved value.
+
+For an observed failure, record the action, expected and actual behavior, theme/scale/size, screenshot, binary SHA and owning issue. Add an automated behavior regression where possible; keep rendered acceptance here. Coordinate checklist edits with open UX PRs before landing.
+
 ## Installed run on 2026-10-12
 
 Package `bookie 0.2.0-1`, built 2026-10-12 from the UX worktree at `d3202c17c` (BookiE `linux` `6cc8bd732` plus the [#618](https://github.com/cozyGarage/BookiE/pull/618) branch). `/usr/bin/bookie` SHA-256 `b2a8431bba1f4eddf4cc28a83110f789d38af75b16681152e2a5e837a35c3e87`. Arch Linux, Hyprland 0.56.2, native Wayland, GTK 4.22.4, libadwaita 1.9.3, GtkSourceView 5.20.0, scale 1, dark theme only. Databases: PostgreSQL 17 and MariaDB 11 in local containers. The UI was driven through AT-SPI, a virtual pointer and keyboard input; screenshots were kept locally and not committed.
@@ -151,6 +166,7 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 - [ ] Turn on "Use system OpenSSH" in the SSH section and connect to a host already in `~/.ssh/known_hosts`: no prompt, the connection works.
 - [ ] Connect to a new host: a "Trust this SSH host?" dialog shows the fingerprint; Cancel fails the connection and writes nothing.
 - [ ] A host reached through a `ProxyJump` line in `~/.ssh/config` connects.
+- [ ] A new key at a `ProxyJump` hop requires the same explicit approval as a new destination key; declining does not add the jump key to `known_hosts`.
 - [ ] A saved password is used for the target host; a jump host asking for a password gets a dialog instead of the saved one.
 - [ ] A PostgreSQL connection with Verify Full through the OpenSSH tunnel verifies the database hostname.
 - [ ] After closing the app, no `ssh -M` process is left running.
@@ -159,6 +175,7 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 
 - [ ] Turn on Session in an editor tab: `SET search_path` and a `CREATE TEMP TABLE` from one run are still in effect on the next run.
 - [ ] `BEGIN`, then an `UPDATE` in a later run: the button reads "Session · transaction open"; another tab cannot see the change. **2026-10-12 Hyprland dark:** passed (label read "Session · transaction open"; a separate psql session did not see the change).
+- [ ] In a MySQL Session transaction, locking reads, `SET @user_variable`, savepoints and supported `SHOW` forms run; raw `BEGIN`, `COMMIT` and `ROLLBACK`, DDL, account statements, `LOCK TABLES` and `SET autocommit` remain refused. Confirm `ROLLBACK` leaves user-variable values unchanged and does not release named locks acquired by functions in assignment expressions; release the lock explicitly.
 - [ ] Turning Session off with a transaction open asks Commit / Roll Back / Cancel, and each does what it says; Cancel leaves the session on. **2026-10-12 Hyprland dark:** Cancel and Commit passed; Roll Back not run.
 - [ ] Closing the tab with a transaction open asks first; Roll Back and Close leaves the table unchanged.
 - [ ] Without Session, a lone `BEGIN` is refused and the message mentions Session. **2026-10-12 Hyprland dark:** passed.
@@ -296,6 +313,8 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 - [ ] Edit the query while a block is folded. The editor reveals the full query and clears stale fold markers.
 
 ## Pinned results and gutter marks
+
+- [ ] Run `SELECT 1 AS first;`, then run `SELECT pg_sleep(3), 2 AS second;`: while it runs, the first result stays on screen, dimmed, with Running… and the spinner in the toolbar; when it finishes the dimming is gone and the second result is shown. Repeat with a query that fails, with Cancel, and with a statement that times out: each replaces the dimmed result. A streamed PostgreSQL SELECT keeps the previous result until its first page arrives.
 
 - [ ] On SQL Server, run `EXEC sys.sp_executesql N'SELECT 1 AS first_result; SELECT 2 AS second_result;'` as one query. Confirm the result-set selector shows both sets in source order and each displays its own column and value.
 - [ ] Run `SELECT 1 AS one; SELECT 2 AS two;`, pin both results, then run `SELECT 3 AS three;` and `SELECT 4 AS four; SELECT * FROM missing_table;`: pinned results stay first and the failed second statement is labelled **Statement 2**, not Statement 4. Unpin removes the pinned results. **2026-10-12 historical run:** pin ordering passed, but failure numbering after pinning was not checked; fixed by [#785](https://github.com/cozyGarage/BookiE/pull/785). The installed GTK scenario `pinned_results_stay_ahead_of_the_next_run` covers the failure; installed Wayland retest pending ([#660](https://github.com/cozyGarage/BookiE/issues/660)).

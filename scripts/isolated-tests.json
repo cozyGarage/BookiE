@@ -370,6 +370,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::column::tests::recycled_cell_clears_pending_visual_state_and_resets_accessible_description"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::column::tests::mysql_spatial_grid_bytes_bind_as_read_only_labels_without_edits"
     ],
     [
@@ -546,6 +551,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::close_edits::tests::an_active_preedit_is_refused_without_hiding_or_replacing_the_edit"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::run_lifecycle::tests::previous_results_are_dimmed_while_a_run_is_in_flight_and_cleared_with_their_replacement"
     ],
     [
       "tablepro-app",

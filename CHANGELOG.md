@@ -113,10 +113,13 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - PostgreSQL databases can be backed up to a file and restored from one with the installed client tools, through SSH tunnels and TLS; restores need approval and both are audited.
 
 ### Changed
+
+- Running a query again keeps the previous result on screen, dimmed, until the new result, error, cancel or timeout page replaces it, instead of leaving a blank area.- An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
 - Typing in a table cell is included in unsaved changes before a tab closes, a connection disconnects or a preview tab is replaced.
 - Refreshing a table waits until its pending save finishes, so a failed save does not lose edits.
 - An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
 - A write refused because another write is still in flight no longer disables later writes on that connection; unresolved outcomes remain fail-closed.
+- MySQL sessions allow locking reads, user-variable assignments, savepoints and supported SHOW forms inside an open transaction; rollback does not undo session effects such as user variables or named locks.
 - The MCP token dialog reports whether the one-time token was saved in the system keyring and explains what to do if it was not.
 - The Keyboard Shortcuts window splits table browsing into shorter groups, describes mouse selection gestures separately and combines repeated context-sensitive save, undo and cancel actions.
 - About, Arch package, Flatpak, and translation metadata link to the BookiE repository.
@@ -154,6 +157,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Streamed query results: a result of exactly a whole number of pages no longer ends on an empty page, a failed or timed-out stream is shown first, a stream still loading can no longer be pinned as if complete, and pinned results stay visible while a query runs or after it is stopped.
 - MCP clients with valid tokens were refused with a rate-limit error once all agents together exceeded one token's per-minute limit; only failed sign-in attempts now count toward the shared limit.
 - Dropping a SQL Server column that has a default, or changing its type, failed in the Structure tab; the default is now removed first and kept after a type change.
+- Importing a connections bundle or deleting a connection while the same connection was being saved could leave its record and its saved passwords from different edits; these now take turns.
 - Saving the same connection from two windows at once, or switching its database while an edit was saving, could lose one of the changes or pair one edit's server with the other's password.
 - A SQL Server connection with TLS set to Prefer failed against a server that offers no encryption; it now continues without TLS, as Prefer does for PostgreSQL and MySQL, and a server that refuses encryption under Require reports a TLS failure.
 - A ClickHouse, Redis or MongoDB save that failed partway now says the changes before the failing one were applied, and the audit journal no longer records it as rolled back.
@@ -287,6 +291,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - A Redis `SELECT n` was treated as a read, so read-only connections and agent read access let it switch the shared connection to another database; it now needs the approval an unrecognised statement needs.
 - A `FOR UPDATE` or `FOR SHARE` read inside a WHERE or HAVING subquery, a join condition or a function argument is now treated as a locking read, so read-only connections and agent read access refuse it.
 - A host key listed as `@revoked` in known_hosts with a wildcard or negated host pattern, such as `@revoked * ssh-ed25519 …`, is now refused instead of being ignored.
+- Unknown host keys on configured SSH jump hosts now require explicit confirmation before connecting.
 - Statements that set a password, an encryption key or a connection secret, and text that does not end its strings or comments, are no longer saved in the query history.
 - An agent's write preview on MySQL no longer runs DDL or other statements that MySQL commits immediately; they are refused inside a transaction instead of being applied and reported as rolled back.
 - SQL Server `BEGIN TRAN`, `COMMIT TRAN` and `ROLLBACK TRAN` are now treated as transaction control, so a shared connection refuses them and a session tracks the transaction they open instead of auditing later writes as committed.

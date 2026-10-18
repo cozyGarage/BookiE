@@ -15,6 +15,7 @@ candidate inventory as a release commitment.
 | UI-1b | Edit SSH jump chains in the form | Storage, transport, bundle v2 and per-hop passphrase coverage merged in #490, #492, #494 and #528; GTK editing stays refused until its complete path passes |
 | UI-19 | Foreign key value picker, estimated counts | FK navigation, paste TSV and the ENUM and SET pickers (PostgreSQL, MySQL, MariaDB) landed |
 | UI-38 | Local filters and sorting for materialized SQL results | Exact-value filtering and local sort are implemented; settings are retained per statement/result set across reruns and pin/unpin. Selection follows the same materialized result, and app-restart persistence is not included |
+| UI-39 | Pending grid edit cues that work without color and are announced to assistive technology | Modified, inserted and deleted rows need persistent visible state cues, accessible descriptions, and coverage for revert and widget recycling ([#1126](https://github.com/cozyGarage/BookiE/issues/1126)) |
 | UI-20 | Server output (NOTICE, PRINT) and a timing breakdown | with PERF-4 |
 | UI-22, UI-23, UI-26 | Multi-cursor editing, typed PostgreSQL activity console, reusable SSH profiles | accepted for later; preview tabs, split panes, SQL code folding and the docked query history panel have landed (#618, #630, #754, #619); PostgreSQL catalog objects are already built (UI-23) |
 | PKG-2 | Debian and GNOME desktop pass (UI-D1 to D4) | the packages keep building and passing the distro floor in CI; this is the desktop acceptance |
@@ -42,7 +43,7 @@ candidate inventory as a release commitment.
 | TEST-34 | Import Python coverage for repository tooling into SonarCloud without lowering the coverage gate; #830 added tests but SonarCloud reported 0.0% new-code coverage |
 | TEST-36 | Record duration for each installed GTK scenario and retry so distro-floor suite growth can be measured before changing its timeout or shard layout ([#1075](https://github.com/cozyGarage/BookiE/issues/1075)); keep the existing 600-second bound until measured |
 | AUD-5 | About 4,700 comment lines in `src/` to move into docs, file by file |
-| DOC-3, DOC-5 | Orca and high contrast pass; value comparison with DBeaver and dbx |
+| DOC-3, DOC-5 | Orca and high contrast pass; value comparison with DBeaver and dbx. The [October 18 source audit](archive/code-and-ui-audit-2026-10-18.md) identifies custom styling and pending-state checks; the [visual matrix](manual-verification-0.2-features.md#visual-audit-matrix) records the proposed acceptance recipe. |
 | PEER-2 | One per-dialect lexer profile (backslash escapes, `E''` strings, `--` rule, quote characters) shared by the statement splitter, the classifier and export quoting; dbx's `SqlDialectProfile` closed a class of splitter and export disagreements |
 | PEER-3 | A Redis command table with arity and safety class that fails closed on unknown commands, instead of relying on the SQL classifier |
 | B4-9, B4-11, B4-17, B4-21 | Route and TLS acceptance evidence, failed-batch rollback on optional MySQL engines and package acceptance, native multi-hop trust flow, SQL Server Kerberos Windows AD interoperability and package acceptance |
