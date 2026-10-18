@@ -31,6 +31,26 @@ class DocSymbolTests(unittest.TestCase):
                 CHECKER.check_references(root, (("guide.md", "widget.rs", "Widget", "struct"),)),
             )
 
+    def test_ignores_a_symbol_mentioned_only_in_a_comment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "guide.md").write_text("Uses `Widget`.\n", encoding="utf-8")
+            (root / "widget.rs").write_text("// pub struct Widget {}\npub struct Gadget {}\n", encoding="utf-8")
+            self.assertIn(
+                "guide.md: struct Widget is missing from widget.rs",
+                CHECKER.check_references(root, (("guide.md", "widget.rs", "Widget", "struct"),)),
+            )
+
+    def test_requires_a_complete_documented_identifier(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "guide.md").write_text("Uses `Widgetish`.\n", encoding="utf-8")
+            (root / "widget.rs").write_text("pub struct Widget {}\n", encoding="utf-8")
+            self.assertIn(
+                "guide.md: named symbol is missing: Widget",
+                CHECKER.check_references(root, (("guide.md", "widget.rs", "Widget", "struct"),)),
+            )
+
     def test_rejects_a_missing_named_source_path(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
