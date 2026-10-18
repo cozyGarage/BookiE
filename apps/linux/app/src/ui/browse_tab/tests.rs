@@ -208,9 +208,9 @@ fn assert_deep_last_page_selection<T: ComponentController<BrowseTab>>(
             count: 30_000,
         })
         .unwrap();
-    spin_until(&context, || controller.model().current_total_rows == Some(30_000));
+    spin_until(context, || controller.model().current_total_rows == Some(30_000));
     controller.sender().send(BrowseTabInput::LastPage).unwrap();
-    spin_until(&context, || controller.model().last_page());
+    spin_until(context, || controller.model().last_page());
     assert_eq!(controller.model().current_offset, 29_900);
 }
 
