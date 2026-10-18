@@ -6,6 +6,7 @@ python3 scripts/inventory-ignored-tests.py --check
 python3 scripts/check-doc-links.py
 python3 scripts/check-moved-paths.py
 python3 scripts/check-known-issues.py
+python3 scripts/update-third-party-notices.py --check
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/tests/test_arch_candidate.py
 python3 scripts/tests/test_deb_package.py

@@ -14,6 +14,8 @@ Implement a pinned generator against the exact Arch package feature graph, with 
 
 Keep the generated bundle out of runtime resources. Install it under the package's documentation/license directory and expose it through package documentation or About. Add regeneration drift checks to the cheap supply-chain harness and package-content assertions to existing package tiers.
 
-## Remaining implementation
+## Implementation
 
-This record establishes the current gap and the required design. It does not generate or ship third-party notices. The linked issue remains open until the generator, provenance checks, package integration and drift tests land.
+`scripts/update-third-party-notices.py` runs the pinned cargo-about configuration against the locked GUI and agentd `kerberos` feature graphs and the askpass binary's crate graph. It writes `apps/linux/packaging/THIRD_PARTY_NOTICES.md` and fails if a license expression, license text or package attribution is missing. The bundle includes resolved license text and sorted package/version attribution. Regenerate it after changing a dependency graph or accepted-license clarification.
+
+The Arch package installs the generated bundle under `/usr/share/licenses/bookie/`. `scripts/test-harness.sh` checks that the committed bundle matches the locked graphs. Optional DuckDB is not built or included by the Arch recipe; native system-library notices remain governed by the distro package metadata and their own license packages.
