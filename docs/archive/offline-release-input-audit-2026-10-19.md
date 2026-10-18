@@ -8,14 +8,10 @@ The Arch recipe still runs `cargo fetch --locked` in `prepare()` and invokes Car
 
 The app manifest reports `0.1.6-dev`, while candidate package version is an explicit environment input to the RC helper. The helper validates version syntax but does not compare it with the app manifest or a release date. This is useful for unpublished candidates, but it leaves consistency checks to the maintainer.
 
-## Adoption decision
+## Implementation
 
-Extend the candidate pipeline in a later implementation PR to emit a provenance manifest alongside the source archive: commit, app version, candidate package version, date, Rust toolchain, target, selected workspace packages/features, vendor archive checksum, and declared native build inputs. Compare candidate metadata before packaging and fail on unexplained mismatches.
+`scripts/build-arch-rc.sh` now requires an ISO release date, checks that `TABLEPRO_RC_VERSION` equals both the app and agentd package versions, and writes three retained inputs under `target/arch-release-inputs/`: the immutable Git source archive, a Cargo vendor archive, and a JSON build-input manifest. The manifest records the commit and optional verified tag, source/package version, date, target, Cargo and Rust versions, both archive checksums, the Arch recipe checksum, selected package roots/features, and the exact native runtime, build and check dependency constraints parsed from the Arch recipe.
 
-Capture Cargo registry and git dependencies into a verified vendor input, then run build and test commands with Cargo offline mode after preparation. Keep native system packages as declared external inputs; do not claim the whole build is offline unless those are also captured. Stable inputs and checksums prove provenance, not byte-for-byte reproducible binaries.
+The helper fetches the selected Cargo graphs and vendors them with checksums. The Arch recipe verifies the manifest checksum, builds and tests with `--offline`, and installs the manifest under `/usr/share/doc/bookie/BUILD_INPUTS.json`. The package validator checks that its recorded source/package version matches the package filename and validates the commit, date, target and checksums. Native GTK, database and packaging packages remain external Arch inputs with declared version constraints; the manifest and its recipe checksum do not claim to capture the installed native package versions or prove a fully offline operating-system build. They also do not claim byte-for-byte reproducible binaries.
 
-Extend the existing candidate fixture for wrong tags, version/date mismatch, checksum mismatch, absent runtime helpers and unsupported inputs. Keep installed Arch acceptance and the publication decision as separate evidence. This audit does not create a tag or publish the completed 0.2.0 release.
-
-## Remaining implementation
-
-The current immutable source archive and package validator remain useful. This record does not add vendor archives, offline Cargo builds, metadata checks or new package fixtures. Issue #1146 remains open until those changes land and pass the selected package gates.
+The app and agentd source versions are now `0.2.0`, matching the completed delivery milestone. This changes package metadata only; it creates no tag and publishes no artifact or release. `scripts/tests/test_arch_candidate.py` covers source and vendor archive checksums, provenance fields, bad version/date inputs, immutable commit checks and dirty-tree rejection.
