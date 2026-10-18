@@ -112,6 +112,8 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - PostgreSQL databases can be backed up to a file and restored from one with the installed client tools, through SSH tunnels and TLS; restores need approval and both are audited.
 
 ### Changed
+
+- Running a query again keeps the previous result on screen, dimmed, until the new result, error, cancel or timeout page replaces it, instead of leaving a blank area.- An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
 - Typing in a table cell is included in unsaved changes before a tab closes, a connection disconnects or a preview tab is replaced.
 - Refreshing a table waits until its pending save finishes, so a failed save does not lose edits.
 - An unresolved write outcome blocks governed writes only on its saved connection; a journal failure or unresolved process-wide operation still blocks writes everywhere.
@@ -154,6 +156,7 @@ Source version **0.1.6-dev** (`apps/linux/app/Cargo.toml`). This section is the 
 - Streamed query results: a result of exactly a whole number of pages no longer ends on an empty page, a failed or timed-out stream is shown first, a stream still loading can no longer be pinned as if complete, and pinned results stay visible while a query runs or after it is stopped.
 - MCP clients with valid tokens were refused with a rate-limit error once all agents together exceeded one token's per-minute limit; only failed sign-in attempts now count toward the shared limit.
 - Dropping a SQL Server column that has a default, or changing its type, failed in the Structure tab; the default is now removed first and kept after a type change.
+- Importing a connections bundle or deleting a connection while the same connection was being saved could leave its record and its saved passwords from different edits; these now take turns.
 - Saving the same connection from two windows at once, or switching its database while an edit was saving, could lose one of the changes or pair one edit's server with the other's password.
 - A SQL Server connection with TLS set to Prefer failed against a server that offers no encryption; it now continues without TLS, as Prefer does for PostgreSQL and MySQL, and a server that refuses encryption under Require reports a TLS failure.
 - A ClickHouse, Redis or MongoDB save that failed partway now says the changes before the failing one were applied, and the audit journal no longer records it as rolled back.
