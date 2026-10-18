@@ -50,6 +50,21 @@ fn keyset_where_comparison(
             values: boundary_values.len(),
         });
     }
+    if driver_id == "postgres"
+        && pk_columns.len() > 1
+        && boundary_values.iter().all(|value| !matches!(value, Value::Null))
+    {
+        let columns = pk_columns
+            .iter()
+            .map(|column| quote_ident(driver_id, column))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let values = (placeholder_start..placeholder_start + boundary_values.len())
+            .map(|index| placeholder_for(driver_id, index))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Ok((format!("({columns}) {comparison} ({values})"), boundary_values.to_vec()));
+    }
 
     // (a, b, c) > (x, y, z) expands to:
     //   a > x
@@ -169,8 +184,8 @@ mod tests {
         let (sql, params) =
             keyset_before_where_clause("postgres", &["tenant_id", "id"], &[Value::Int(7), Value::Int(42)], 2).unwrap();
 
-        assert_eq!(sql, r#"("tenant_id" < $3 OR ("tenant_id" = $4 AND "id" < $5))"#);
-        assert_eq!(params, vec![Value::Int(7), Value::Int(7), Value::Int(42)]);
+        assert_eq!(sql, r#"("tenant_id", "id") < ($3, $4)"#);
+        assert_eq!(params, vec![Value::Int(7), Value::Int(42)]);
     }
 
     #[test]
