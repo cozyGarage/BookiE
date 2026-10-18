@@ -36,7 +36,7 @@ def scenarios(ui):
         start_import(table, path)
         ui.wait_for_node_containing("Imported", role=ui.pyatspi.ROLE_LABEL)
 
-    def import_refreshes_only_the_imported_table(database, base):
+    def open_tabs_with_unrelated_dirty_edit(database):
         ui.run_sql("CREATE TABLE other_items(id INTEGER PRIMARY KEY, note TEXT)")
         ui.wait_for_node(name="other_items", role=ui.pyatspi.ROLE_LIST_ITEM)
         with sqlite3.connect(database) as connection:
@@ -58,6 +58,9 @@ def scenarios(ui):
             ui.press_x11_key(key)
         ui.press_x11_key("Return")
         ui.wait_for_node(name="1 unsaved change")
+
+    def import_refreshes_only_the_imported_table(database, base):
+        open_tabs_with_unrelated_dirty_edit(database)
 
         csv_path = base / "home" / "more.csv"
         csv_path.parent.mkdir(parents=True, exist_ok=True)
@@ -73,27 +76,7 @@ def scenarios(ui):
         assert ui.find_node(name="Discard pending changes?") is None, "the import prompted to discard an unrelated edit"
 
     def failed_import_keeps_unrelated_edits(database, base):
-        ui.run_sql("CREATE TABLE other_items(id INTEGER PRIMARY KEY, note TEXT)")
-        ui.wait_for_node(name="other_items", role=ui.pyatspi.ROLE_LIST_ITEM)
-        with sqlite3.connect(database) as connection:
-            connection.executemany(
-                "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
-            )
-            connection.executemany(
-                "INSERT INTO other_items(id, note) VALUES (?, ?)", [(1, "x"), (2, "y")]
-            )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
-        ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
-        ui.invoke_named_action_within("other_items", "Open other_items")
-        ui.wait_for_node_containing("other_items", role=ui.pyatspi.ROLE_PAGE_TAB)
-        other_cell = ui.wait_for_node(name="x", role=ui.pyatspi.ROLE_LABEL)
-        bounds = other_cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
-        gtk_ux.x11_click(bounds.x + min(bounds.width, 40) // 2, bounds.y + bounds.height // 2, button=1, clicks=2)
-        time.sleep(0.3)
-        for key in "zz":
-            ui.press_x11_key(key)
-        ui.press_x11_key("Return")
-        ui.wait_for_node(name="1 unsaved change")
+        open_tabs_with_unrelated_dirty_edit(database)
 
         # Row 3 would commit, row 1 duplicates an existing key and stops the import.
         csv_path = base / "home" / "clash.csv"
