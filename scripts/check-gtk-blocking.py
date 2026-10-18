@@ -78,9 +78,10 @@ def skip_quoted(source, index, line, quote):
     index += 1
     while index < len(source):
         if source[index] == "\\":
+            line += source[index : index + 2].count("\n")
             index += 2
         elif source[index] == quote:
-            return index + 1, line + source[index - 1 : index + 1].count("\n")
+            return index + 1, line
         else:
             line += source[index] == "\n"
             index += 1
@@ -155,7 +156,9 @@ def imported_names(lexed):
 
 def collect_thread_imports(statement, sleep_names, thread_names):
     tail = statement[3:]
-    if tail[:2] == ["::", "sleep"]:
+    if not tail:
+        thread_names.add("thread")
+    elif tail[:2] == ["::", "sleep"]:
         sleep_names.add(alias_after(tail, 2, "sleep"))
     elif tail and tail[0] == "as":
         thread_names.add(tail[1])
