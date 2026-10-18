@@ -20,7 +20,7 @@ Passwords are kept in your desktop keyring, never in BookiE's own files.
 
 ## Browse a table
 
-Click a table in the sidebar. It opens as a preview tab, marked with an icon, and the next table click reuses that preview. Edit the table or choose **Keep Tab** from the tab menu to keep it open. Tabs with pending edits are kept automatically. Ctrl+click or the sidebar's **Open in new tab** action always creates a durable tab. The sidebar groups tables and views under each schema; click a group to collapse it, and type in the search to find a table.
+Click a table in the sidebar. It opens as a preview tab, marked with an icon, and the next table click reuses that preview. Edit the table or choose **Keep Tab** from the tab menu to keep it open. Tabs with pending edits are kept automatically. Ctrl+click or the sidebar's **Open in new tab** action always creates a durable tab. Turn off **Reuse one tab when opening tables** in Preferences to give every table its own tab; a table that is already open is still selected instead of duplicated. The sidebar groups tables and views under each schema; click a group to collapse it, and type in the search to find a table.
 
 - **Edit**: double-click a cell, or press F2 or Enter. Changes stay pending (shown with a dot on the tab) until you press Ctrl+S. Ctrl+Z and Ctrl+Y undo and redo pending changes.
 - **Insert and delete**: Ctrl+N inserts a row, Delete removes the selected rows. Ctrl+Shift+N sets the focused cell to NULL.
@@ -38,6 +38,8 @@ Ctrl+E opens a SQL editor tab for the current connection.
 Supported single-statement PostgreSQL `SELECT`s load progressively. The grid keeps up to four pages of 5,000 rows; older pages leave the forward-only window and cannot be revisited there. Other engines and unsupported query shapes load a capped result. A truncated, failed or cancelled result is incomplete; see [result limits](known-limitations.md#data-and-values).
 
 SQL completion offers keywords and scoped table and column names. Choosing an identifier inserts its complete quoted SQL name. Table names keep their schema; column suggestions after an alias keep that alias. Arbitrary words elsewhere in the editor are not suggestions.
+
+While a query runs again, the previous result stays on screen, dimmed, until the new result, an error, or a cancel or timeout message replaces it.
 
 Click a sortable result column header to order the rows already loaded in that result. This is a local view change and does not run the SQL again, including for write statements that return rows. SQL NULL values stay last; columns with mixed or undecodable values cannot be sorted. Text uses local value ordering, which can differ from the database collation.
 
