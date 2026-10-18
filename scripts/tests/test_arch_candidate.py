@@ -93,7 +93,10 @@ fi
         subprocess.run(runner, env=environment, check=True)
         (root / "tag-anchor").write_text("tag fixture\n")
         subprocess.run(["git", "-C", str(root), "add", "tag-anchor"], check=True)
-        subprocess.run(["git", "-C", str(root), "commit", "-qm", "tag anchor"], check=True)
+        subprocess.run([
+            "git", "-C", str(root), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+            "commit", "-qm", "tag anchor",
+        ], check=True)
         sha = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
         environment["TABLEPRO_RC_COMMIT"] = sha
         remote = root / "remote.git"
