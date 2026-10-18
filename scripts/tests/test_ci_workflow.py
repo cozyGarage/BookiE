@@ -133,6 +133,16 @@ class CiWorkflowTests(unittest.TestCase):
         full = script.split("run_full() {", 1)[1].split("run_integration()", 1)[0]
         self.assertIn("python3 scripts/check-function-size.py", full)
 
+    def test_full_gate_runs_the_unit_tier_under_nextest_like_forgejo(self):
+        script = (ROOT / "scripts/ci-local.sh").read_text()
+        full = script.split("run_full() {", 1)[1].split("run_integration()", 1)[0]
+        ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        selection = "--workspace --exclude tablepro-driver-duckdb --lib --bins"
+        self.assertIn(f"nextest run {selection}", ci)
+        self.assertIn('"$ROOT/scripts/ensure-nextest.sh"', full)
+        self.assertIn(f'nextest run {selection} --profile "${{TABLEPRO_NEXTEST_PROFILE:-default}}" --no-tests=pass', full)
+        self.assertNotIn("cargo test --workspace", full)
+
     def test_jobs_share_an_immutable_checkout(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         self.assertNotIn("continue-on-error:", workflow)
@@ -412,7 +422,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("flock", builder)
         self.assertIn('test -e "/probe/', builder)
         self.assertIn('.floor-package', builder)
-        self.assertLess(builder.index('test -e "/probe/'), builder.index("flock 9"))
+        self.assertLess(builder.index("flock 9"), builder.index("docker build -q"))
         self.assertIn("chown", builder)
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('apt-get install -y -qq "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
@@ -424,6 +434,12 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3-pyatspi", runtime_image)
         self.assertIn("gir1.2-gtk-4.0", runtime_image)
         self.assertNotIn("rustup", runtime_image)
+
+    def test_distro_package_builder_uses_a_distinct_image_tag(self):
+        builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
+        self.assertIn("image=bookie-floor-package-ubuntu-24.04", builder)
+        self.assertIn('docker build -q -t "$image"', builder)
+        self.assertIn('"$image" bash -ceu', builder)
 
 
 if __name__ == "__main__":
