@@ -28,6 +28,13 @@ class TranslationGenerationTests(unittest.TestCase):
         source = 'crate::tr!("one"); app::i18n::tr!("two"); tr!("three");'
         self.assertEqual(TRANSLATIONS.rewrite_qualified_macros(source), 'tr!("one"); tr!("two"); tr!("three");')
 
+    def test_extracts_rust_strings_without_parsing_the_rust_file(self):
+        source = r'''crate::tr!("Hello \
+            world\u{2026}");
+let value = 3;
+'''
+        self.assertEqual(TRANSLATIONS.extraction_source(source), 'tr("Hello world\\u2026")\n\n\n')
+
     def test_normalizes_only_catalog_creation_timestamp(self):
         pot = '"POT-Creation-Date: 2026-10-19 10:20+0200\\n"\nmsgid "A"\n'
         normalized = TRANSLATIONS.normalize_catalog(pot)

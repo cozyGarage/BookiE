@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import argparse
+import ast
+import json
 import os
 from pathlib import Path
 import re
@@ -15,6 +17,8 @@ POTFILES = ROOT / "apps/linux/po/POTFILES.in"
 TRANSLATION_MACRO = re.compile(
     r"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*::)*tr!(?=\s*(?:\(|\{|\[))"
 )
+TRANSLATION_CALL = re.compile(r"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*::)*tr!\s*\(\s*")
+RUST_STRING = re.compile(r'"(?:\\.|[^"\\])*"', re.DOTALL)
 QUALIFIED_MACRO = re.compile(
     r"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*::)+tr!(?=\s*(?:\(|\{|\[))"
 )
@@ -32,6 +36,20 @@ def translation_sources(root=ROOT):
 
 def rewrite_qualified_macros(source):
     return QUALIFIED_MACRO.sub("tr!", source)
+
+
+def extraction_source(source):
+    lines = [[] for _ in source.splitlines()]
+    for match in TRANSLATION_CALL.finditer(source):
+        literal = RUST_STRING.match(source, match.end())
+        if literal is None:
+            raise RuntimeError("translation calls must start with a string literal")
+        rust_string = re.sub(r"\\\n[ \t]*", "", literal.group())
+        rust_string = re.sub(r"\\u\{([0-9a-fA-F]{1,6})\}", lambda item: f"\\U{int(item.group(1), 16):08x}", rust_string)
+        message = ast.literal_eval(rust_string)
+        line = source.count("\n", 0, match.start())
+        lines[line].append(f"tr({json.dumps(message, ensure_ascii=True)})")
+    return "\n".join("; ".join(items) for items in lines) + "\n"
 
 
 def normalize_catalog(catalog):
@@ -53,14 +71,13 @@ def generate_catalog(root=ROOT):
         for source in files:
             target = stage / source.relative_to(root)
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(rewrite_qualified_macros(source.read_text(encoding="utf-8")), encoding="utf-8")
+            target.write_text(extraction_source(source.read_text(encoding="utf-8")), encoding="utf-8")
         generated = stage / "tablepro.pot"
         environment = dict(os.environ, LC_ALL="C", LANG="C", TZ="UTC", SOURCE_DATE_EPOCH="0")
         subprocess.run(
             [
                 "xgettext",
-                "--language=Rust",
-                "--keyword=tr!",
+                "--language=Python",
                 "--keyword=tr",
                 "--from-code=UTF-8",
                 "--no-wrap",
@@ -75,7 +92,9 @@ def generate_catalog(root=ROOT):
             env=environment,
             check=True,
         )
-        catalog = normalize_catalog(generated.read_text(encoding="utf-8"))
+        catalog = normalize_catalog(generated.read_text(encoding="utf-8")).replace(
+            "#, python-brace-format", "#, rust-format"
+        )
     potfiles = "\n".join(relative_paths) + "\n"
     return catalog, potfiles
 
