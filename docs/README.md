@@ -84,6 +84,8 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 
 ## Client research (October 2026)
 
+- [Upstream main analysis, October 20](archive/upstream-main-analysis-2026-10-20.md): pinned Linux and Apple changes, current adoption status, transferable regression cases and integration costs.
+
 - [Upstream Linux adoption and development workflow](archive/upstream-linux-adoption-2026-10-18.md), with the [movement/source audit](archive/upstream-linux-movement-2026-10-18.md): code, CI, infrastructure, conventions and post-0.2.0 tracker [#1149](https://github.com/cozyGarage/BookiE/issues/1149).
 - [0.2.0 completion handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md): maintainer completion statement, publication boundary and previous scope/sprint snapshots.
 
@@ -94,3 +96,5 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 - [Linux peer review, October 17](archive/linux-peer-review-2026-10-17.md): refreshed source pins, recent dbx fixes, and their BookiE applicability.
 - [dbx architecture, boundaries and reuse review](archive/2026-10-15-dbx-review.md).
 - [PostgreSQL client review](archive/2026-10-15-postgresql-client-research/review.md), with [46 regression candidates](archive/2026-10-15-postgresql-client-research/cases.csv), [machine-readable cases](archive/2026-10-15-postgresql-client-research/cases.json) and [source pins and probe evidence](archive/2026-10-15-postgresql-client-research/manifest.json). These dated observations do not override current ADRs or sprint priorities.
+
+- [Workstation test reuse proposal](proposals/workstation-test-reuse.md): bounded local execution, build metadata reuse, cache ownership and post-nightly adoption order.
