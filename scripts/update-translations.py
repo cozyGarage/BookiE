@@ -48,12 +48,13 @@ def extraction_source(source):
         rust_string = re.sub(r"\\u\{([0-9a-fA-F]{1,6})\}", lambda item: f"\\U{int(item.group(1), 16):08x}", rust_string)
         message = ast.literal_eval(rust_string)
         line = source.count("\n", 0, literal.start())
-        lines[line].append(f"tr({json.dumps(message, ensure_ascii=True)})")
+        lines[line].append(f"tr({json.dumps(message, ensure_ascii=False)})")
     return "\n".join("; ".join(items) for items in lines) + "\n"
 
 
 def normalize_catalog(catalog):
-    return CATALOG_DATE.sub('"POT-Creation-Date: 1970-01-01 00:00+0000\\n"', catalog)
+    catalog = CATALOG_DATE.sub('"POT-Creation-Date: 1970-01-01 00:00+0000\\n"', catalog)
+    return catalog.replace('"Content-Type: text/plain; charset=CHARSET\\n"', '"Content-Type: text/plain; charset=UTF-8\\n"')
 
 
 def package_version(root):
