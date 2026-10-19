@@ -21,11 +21,14 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
-    def test_linux_contracts_installs_cargo_about_with_cli(self):
-        workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
-        self.assertIn("cargo install cargo-about --locked --version 0.9.2 --features=cli", workflow)
-        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        self.assertIn("cargo install cargo-about --locked --version 0.9.2 --features=cli", forgejo)
+    def test_workflows_install_cargo_about_with_cli(self):
+        for path in (
+            ".github/workflows/build-linux.yml",
+            ".github/workflows/linux-ci-contracts.yml",
+            ".forgejo/workflows/ci.yml",
+        ):
+            workflow = (ROOT / path).read_text()
+            self.assertIn("cargo install cargo-about --locked --version 0.9.2 --features=cli", workflow)
 
     def test_forgejo_gtk_jobs_select_distinct_run_scoped_mcp_ports(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
