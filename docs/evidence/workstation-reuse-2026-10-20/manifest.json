@@ -25,6 +25,17 @@
   "nextest": "0.9.148",
   "cargo_build_jobs": 6,
   "nextest_test_threads": 4,
+  "gtk_widget_tier": {
+    "date": "2026-10-20",
+    "script": "bash scripts/test-gtk-widgets.sh",
+    "tests": 76,
+    "passed": 76,
+    "failed": 0,
+    "app_test_binary_build_seconds": 47.18,
+    "later_cargo_freshness_seconds": 0.22,
+    "xvfb": true,
+    "mesa_dri3_warning": "Xvfb had no accelerated DRI3 device; all tests passed"
+  },
   "build_seconds": 7.48,
   "first_run": {
     "tests": 640,
@@ -39,7 +50,7 @@
     "summary_seconds": 2.36
   },
   "limits": [
-    "Core unit tests only; no driver, GTK or Forgejo acceptance",
+    "Core and GTK widget tiers only; no driver or Forgejo acceptance",
     "Compiler/linker blockers apply to PATH commands; existing binaries were used through nextest metadata",
     "NVMe physical write delta and sccache hit rate were not measured"
   ]
