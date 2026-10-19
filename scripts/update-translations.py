@@ -19,9 +19,6 @@ TRANSLATION_MACRO = re.compile(
 )
 TRANSLATION_CALL = re.compile(r"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*::)*tr!\s*\(\s*")
 RUST_STRING = re.compile(r'"(?:\\.|[^"\\])*"', re.DOTALL)
-QUALIFIED_MACRO = re.compile(
-    r"(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*::)+tr!(?=\s*(?:\(|\{|\[))"
-)
 CATALOG_DATE = re.compile(r'(?m)^"POT-Creation-Date: [^"\n]*\\n"$')
 
 
@@ -32,10 +29,6 @@ def translation_sources(root=ROOT):
         for path in sorted(source_root.rglob("*.rs"))
         if TRANSLATION_MACRO.search(path.read_text(encoding="utf-8"))
     )
-
-
-def rewrite_qualified_macros(source):
-    return QUALIFIED_MACRO.sub("tr!", source)
 
 
 def extraction_source(source):
@@ -53,7 +46,7 @@ def extraction_source(source):
 
 
 def normalize_catalog(catalog):
-    catalog = CATALOG_DATE.sub('"POT-Creation-Date: 1970-01-01 00:00+0000\\n"', catalog)
+    catalog = CATALOG_DATE.sub(lambda _: '"POT-Creation-Date: 1970-01-01 00:00+0000\\n"', catalog)
     return catalog.replace('"Content-Type: text/plain; charset=CHARSET\\n"', '"Content-Type: text/plain; charset=UTF-8\\n"')
 
 
