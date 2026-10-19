@@ -59,6 +59,35 @@ class ThirdPartyNoticeTests(unittest.TestCase):
                     NOTICES.generate()
             run.assert_not_called()
 
+    def test_normalizes_license_line_endings_before_grouping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, config, manifests = self.setup_root(Path(directory))
+            inventory = {
+                "licenses": [
+                    {
+                        "id": "MIT",
+                        "text": "MIT terms\r\ncontinued\r\n",
+                        "used_by": [{"crate": {"name": "windows", "version": "1.0"}}],
+                    },
+                    {
+                        "id": "MIT",
+                        "text": "MIT terms\ncontinued\n",
+                        "used_by": [{"crate": {"name": "unix", "version": "1.0"}}],
+                    },
+                ]
+            }
+            result = NOTICES.subprocess.CompletedProcess(["cargo-about"], 0, json.dumps(inventory), "")
+            with (
+                self.patched_inputs(root, config, manifests),
+                patch.object(NOTICES.subprocess, "run", return_value=result),
+            ):
+                generated = NOTICES.generate()
+
+            self.assertEqual(generated.count("## MIT"), 1)
+            self.assertIn("- `unix 1.0`", generated)
+            self.assertIn("- `windows 1.0`", generated)
+            self.assertIn("MIT terms\ncontinued", generated)
+
     def test_reports_cargo_about_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root, config, manifests = self.setup_root(Path(directory))

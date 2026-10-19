@@ -60,7 +60,8 @@ def generate() -> str:
             if not isinstance(license_id, str) or not isinstance(text, str) or not text.strip():
                 raise RuntimeError(f"cargo-about returned incomplete license data: {license_item!r}")
             users = license_item.get("used_by", [])
-            key = (license_id, text.strip())
+            normalized_text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+            key = (license_id, normalized_text)
             packages = licenses_by_text.setdefault(key, set())
             for entry in users:
                 package = entry.get("crate", {}) if isinstance(entry, dict) else {}
