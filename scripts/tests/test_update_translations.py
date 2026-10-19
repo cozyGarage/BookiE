@@ -124,6 +124,7 @@ let value = 3;
             with self.patched_main(root, catalog, potfiles, ("new catalog\n", "source.rs\n"), ["--check"]), contextlib.redirect_stderr(error):
                 self.assertEqual(TRANSLATIONS.main(), 1)
             self.assertIn("tablepro.pot", error.getvalue())
+            self.assertIn("@@", error.getvalue())
 
     def test_update_mode_writes_both_catalog_files(self):
         with tempfile.TemporaryDirectory() as directory:

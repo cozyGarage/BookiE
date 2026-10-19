@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
 import ast
+import difflib
 import json
+from itertools import islice
 import os
 from pathlib import Path
 import re
@@ -119,6 +121,18 @@ def main():
         if stale:
             names = ", ".join(str(path.relative_to(ROOT)) for path in stale)
             print(f"stale translation catalogue files: {names}; run python3 scripts/update-translations.py", file=sys.stderr)
+            expected = {CATALOG: catalog, POTFILES: potfiles}
+            for path in stale:
+                current = read_exact(path)
+                if current is None:
+                    continue
+                diff = difflib.unified_diff(
+                    current.splitlines(keepends=True),
+                    expected[path].splitlines(keepends=True),
+                    fromfile=str(path.relative_to(ROOT)),
+                    tofile="generated",
+                )
+                print("".join(islice(diff, 80)), file=sys.stderr, end="")
             return 1
         print("translation catalogues: ok")
         return 0
