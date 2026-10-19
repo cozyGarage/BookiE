@@ -389,6 +389,7 @@ class CiWorkflowTests(unittest.TestCase):
         exclusions = workspace["workspace"]["metadata"]["sonar"]["sonar.coverage.exclusions"]
         self.assertIn("scripts/tests/test_check_crate_boundaries.py", exclusions)
         self.assertIn("scripts/tests/test_gtk_runner.py", exclusions)
+        self.assertIn("scripts/tests/test_arch_candidate.py", exclusions)
 
     def test_sonar_excludes_app_pinning_test_support_from_coverage(self):
         workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())

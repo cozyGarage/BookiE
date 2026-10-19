@@ -103,6 +103,7 @@ exclusions = [
     "scripts/tests/test_gtk_runner.py",
     "scripts/tests/test_deb_package.py",
     "scripts/tests/test_panic_sites.py",
+    "scripts/tests/test_arch_candidate.py",
     "apps/linux/app/tests/**",
     "**/pinned_tests.rs",
 ]
