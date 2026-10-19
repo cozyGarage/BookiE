@@ -24,6 +24,7 @@ for required in \
   usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \
   usr/share/licenses/bookie/LICENSE.md \
   usr/share/doc/bookie/BUILD_INPUTS.json \
+  usr/share/licenses/bookie/THIRD_PARTY_NOTICES.md \
   usr/share/doc/bookie/policy.example.toml; do
   if ! grep -Fxq "$required" <<<"$contents"; then
     echo "package is missing $required" >&2

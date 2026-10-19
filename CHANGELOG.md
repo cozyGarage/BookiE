@@ -6,6 +6,7 @@ Source version **0.2.0** (`apps/linux/app/Cargo.toml`). This section is the user
 
 ### Added
 - Arch packages include a build-input manifest with source and dependency archive checksums, package versions, and toolchain details.
+- The Arch package includes generated license texts and versioned attributions for the Rust dependencies used by its application binaries.
 - Preferences has **Reuse one tab when opening tables**. Turn it off to give every table opened from the sidebar its own tab; an already-open table is still selected instead of duplicated.
 
 - Reveal Table in Sidebar (Ctrl+Shift+L, or the main menu) opens the collapsed groups around the open table, clears a search that hides it, and scrolls to and selects it in the sidebar.- Opening a new SQL editor while disconnected now shows the editor and removes completion suggestions cached from the previous connection.
