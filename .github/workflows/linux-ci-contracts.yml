@@ -55,7 +55,7 @@ jobs:
         with:
           toolchain: 1.98
       - name: Install pinned cargo-about
-        run: cargo install cargo-about --locked --version 0.9.2
+        run: cargo install cargo-about --locked --version 0.9.2 --features cli
       - name: Fetch locked application dependencies
         run: cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
       - name: Test runner failures and workflow contracts
