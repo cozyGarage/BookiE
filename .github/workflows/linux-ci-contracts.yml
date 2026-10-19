@@ -58,6 +58,10 @@ jobs:
         run: cargo install cargo-about --locked --version 0.9.2 --features cli
       - name: Fetch locked application dependencies
         run: cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
+      - name: Install gettext tools for generated catalog checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y gettext
       - name: Test runner failures and workflow contracts
         run: python3 scripts/run-test-layer.py harness packaging-contracts
       - name: Retain evidence even after failure
