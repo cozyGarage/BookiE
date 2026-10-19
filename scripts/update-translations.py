@@ -47,7 +47,7 @@ def extraction_source(source):
         rust_string = re.sub(r"\\\n[ \t]*", "", literal.group())
         rust_string = re.sub(r"\\u\{([0-9a-fA-F]{1,6})\}", lambda item: f"\\U{int(item.group(1), 16):08x}", rust_string)
         message = ast.literal_eval(rust_string)
-        line = source.count("\n", 0, match.start())
+        line = source.count("\n", 0, literal.start())
         lines[line].append(f"tr({json.dumps(message, ensure_ascii=True)})")
     return "\n".join("; ".join(items) for items in lines) + "\n"
 

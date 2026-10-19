@@ -34,6 +34,7 @@ class TranslationGenerationTests(unittest.TestCase):
 let value = 3;
 '''
         self.assertEqual(TRANSLATIONS.extraction_source(source), 'tr("Hello world\\u2026")\n\n\n')
+        self.assertEqual(TRANSLATIONS.extraction_source('crate::tr!(\n    "Next line");\n'), '\ntr("Next line")\n')
 
     def test_normalizes_only_catalog_creation_timestamp(self):
         pot = '"POT-Creation-Date: 2026-10-19 10:20+0200\\n"\nmsgid "A"\n'
