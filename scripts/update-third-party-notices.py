@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import os
+from itertools import islice
 from pathlib import Path
 import subprocess
 import sys
@@ -102,6 +104,14 @@ def main() -> int:
     if args.check:
         if current != generated:
             print(f"{OUTPUT.relative_to(ROOT)} is stale; run python3 scripts/update-third-party-notices.py", file=sys.stderr)
+            if current is not None:
+                diff = difflib.unified_diff(
+                    current.splitlines(keepends=True),
+                    generated.splitlines(keepends=True),
+                    fromfile=str(OUTPUT.relative_to(ROOT)),
+                    tofile="generated",
+                )
+                print("".join(islice(diff, 80)), file=sys.stderr, end="")
             return 1
         return 0
     OUTPUT.write_text(generated)

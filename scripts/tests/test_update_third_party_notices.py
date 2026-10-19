@@ -113,6 +113,7 @@ class ThirdPartyNoticeTests(unittest.TestCase):
             ):
                 self.assertEqual(NOTICES.main(), 1)
             self.assertIn("notices.md is stale", error.getvalue())
+            self.assertIn("@@", error.getvalue())
 
     def test_update_mode_writes_notice_file(self):
         with tempfile.TemporaryDirectory() as directory:
