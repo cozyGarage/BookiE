@@ -127,6 +127,9 @@ def main():
     aggregate = pull_request(args.pr)
     head = aggregate['headRefOid']
     fetch_head(args.remote, aggregate)
+    if args.phase != 'merged':
+        require(command('git', 'rev-parse', 'HEAD') == head, 'checkout is not at the aggregate PR head')
+        require(not command('git', 'status', '--porcelain'), 'checkout has uncommitted changes')
     manifest = json.loads(command('git', 'show', f'{head}:{MANIFEST}'))
     members = manifest_members(manifest)
     require(args.pr not in {m['number'] for m in members}, 'aggregate PR cannot contain itself')

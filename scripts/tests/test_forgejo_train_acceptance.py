@@ -133,6 +133,15 @@ class TrainIntegrationTests(unittest.TestCase):
                 patch.object(TRAIN, 'forgejo_run', return_value=gate), \
                 patch.object(TRAIN, 'linux_head', return_value=self.base):
             TRAIN.main()
+            dirty = self.repo / 'untracked'
+            dirty.write_text('pending work')
+            with self.assertRaises(ValueError):
+                TRAIN.main()
+            dirty.unlink()
+            self.git('checkout', '--quiet', 'a')
+            with self.assertRaises(ValueError):
+                TRAIN.main()
+            self.git('checkout', '--quiet', 'train')
             states[7]['headRefOid'] = self.b
             with self.assertRaises(ValueError):
                 TRAIN.main()
