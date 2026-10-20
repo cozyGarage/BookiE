@@ -79,12 +79,13 @@ class CsvImportChooserTests(unittest.TestCase):
                     with closing(connect(path)) as connection, connection:
                         yield connection
 
+                scenario = module.scenarios(ui)[0]
                 with (
                     patch.object(module.sqlite3, "connect", connection_context),
                     patch.object(module.time, "sleep"),
                     self.assertRaises(FileChosen),
                 ):
-                    module.scenarios(ui)[0](database, root)
+                    scenario(database, root)
 
 
 if __name__ == "__main__":
