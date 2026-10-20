@@ -107,7 +107,7 @@ def cleanup(root, reserve):
 def main():
     parser = argparse.ArgumentParser(description='Coordinate Forgejo cache use and generated-artifact cleanup')
     parser.add_argument('--root', type=Path, default=Path('/var/cache/ci/target'))
-    parser.add_argument('--lock', type=Path, default=Path('/run/lock/bookie-ci-cache.lock'))
+    parser.add_argument('--lock', type=Path, default=Path('/run/bookie-ci/cache.lock'))
     commands = parser.add_subparsers(dest='command', required=True)
     run = commands.add_parser('run')
     run.add_argument('script')
