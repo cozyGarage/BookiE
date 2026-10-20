@@ -28,7 +28,9 @@ def scenarios(ui):
         invoke_row_action(table, "sidebar-row.import-csv")
         chooser = ui.wait_for_node(name="Import CSV", role=ui.FILE_CHOOSER_ROLES)
         ui.show_file_chooser_location(chooser)
-        location = ui.set_visible_editable_within("Import CSV", ui.FILE_CHOOSER_ROLES, str(path), action_name="Open")
+        location = ui.set_visible_editable_within(
+            "Import CSV", ui.FILE_CHOOSER_ROLES, str(path), action_name="Open",
+        )
         ui.invoke(location)
         open_button = ui.wait_within(chooser, name="Open", role=ui.pyatspi.ROLE_PUSH_BUTTON)
         deadline = time.monotonic() + ui.WAIT_SECONDS
