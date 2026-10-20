@@ -26,7 +26,7 @@ The new typed commit regression failed with `Unsupported` before the policy impl
 | `cargo test -p tablepro-policy --test session_postgres -- --ignored --test-threads=1` | 11 passed |
 | `cargo test -p tablepro-app --lib` | 686 passed, 113 display or fixture tests ignored |
 | `bash scripts/test-gtk-widgets.sh` | 76 passed |
-| Focused PostgreSQL GTK transaction scenario | Passed |
+| Full PostgreSQL GTK fixture, including transaction outcome scenario | 6 passed |
 | Translation catalog, documentation links, ledger, ignored-test inventory, Python syntax and diff checks | Passed |
 
 The focused GTK command was:
