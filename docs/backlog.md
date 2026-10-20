@@ -25,6 +25,26 @@ Start with the two native driver investigations and common conformance. Tooling 
 | UP-9 / [#1147](https://github.com/cozyGarage/BookiE/issues/1147) | Changelog fragment evaluation | UX | Measured conflict benefit and unpublished draft before a convention change |
 | UP-10 / [#1148](https://github.com/cozyGarage/BookiE/issues/1148) | Stale documentation symbols and generated catalogues | UX | Bounded active-doc checks and deterministic gettext drift checks |
 
+## TablePro and dbx review defects
+
+The [October 20 TablePro and dbx review](archive/tablepro-dbx-review-2026-10-20/README.md) found these through upstream fixes. Each is source reading only: start with the failing regression test, and close the issue with that test as evidence if current code already passes. Two further findings went to existing issues: the ClickHouse `readonly=1` connect path to [#983](https://github.com/cozyGarage/BookiE/issues/983) and the version mismatch to [#1146](https://github.com/cozyGarage/BookiE/issues/1146). The review's feature waves stay candidates in the [feature comparison](0.2-feature-comparison.md).
+
+| ID / issue | Defect | Lane | Acceptance focus |
+|---|---|---|---|
+| RV-1 / [#1171](https://github.com/cozyGarage/BookiE/issues/1171) | Ctrl+Enter during a running query starts a second run | UX | Keyboard run follows the Run button guard |
+| RV-2 / [#1172](https://github.com/cozyGarage/BookiE/issues/1172) | URL import drops `sslmode` and saves TLS Disabled | B4 | Storage unit cases per `sslmode`; pinned default changed with maintainer agreement |
+| RV-3 / [#1173](https://github.com/cozyGarage/BookiE/issues/1173) | Missing SQLite or DuckDB file becomes a new empty database | B3 | Driver refusal on a missing path; explicit create through UX |
+| RV-4 / [#1174](https://github.com/cozyGarage/BookiE/issues/1174) | Every TLS error advises disabling TLS | B4 | Typed failure kinds; only "server has no TLS" suggests Disabled |
+| RV-5 / [#1175](https://github.com/cozyGarage/BookiE/issues/1175) | ClickHouse edit keys on a non-unique sorting key | B3 | One edit changes one row or is refused |
+| RV-6 / [#1176](https://github.com/cozyGarage/BookiE/issues/1176) | SQLite Drop Table runs child ON DELETE actions | B3 | Child rows unchanged or drop refused |
+| RV-7 / [#1177](https://github.com/cozyGarage/BookiE/issues/1177) | MySQL binary-collation text and MariaDB JSON decode as bytes | B3 | Charset-based decode under ADR 0007 |
+| RV-8 / [#1178](https://github.com/cozyGarage/BookiE/issues/1178) | MySQL `CALL` loses result sets; text retry returns no rows | B3 | Real-engine multi-result and `EXECUTE` cases |
+| RV-9 / [#1179](https://github.com/cozyGarage/BookiE/issues/1179) | Policy reads a body's trailing `END` as COMMIT and refuses DDL | B4 | Allowed compound DDL; unclosed transactions still refused |
+| RV-10 / [#1180](https://github.com/cozyGarage/BookiE/issues/1180) | Redis browse loads whole values | B3 | Bounded previews and memory on large keys |
+| RV-11 / [#1181](https://github.com/cozyGarage/BookiE/issues/1181) | TLS material files, `CLONE` history, MCP lockout, system trust store | B4 | One failing test per finding |
+| RV-12 / [#1182](https://github.com/cozyGarage/BookiE/issues/1182) | Restore drops tabs after 32 per connection | UX | Unsaved editor text always restored |
+| RV-13 / [#1184](https://github.com/cozyGarage/BookiE/issues/1184) | Copy then paste between BookiE grids changes values | UX | Round trip keeps text and NULL |
+
 ## 0.2.x features
 
 | Row | What | Notes |
@@ -55,7 +75,7 @@ Start with the two native driver investigations and common conformance. Tooling 
 | TEST-2 | Broad mutation audit: policy, core, transport, SSH and storage are measured; survivor triage stays open under [#559](https://github.com/cozyGarage/BookiE/issues/559). Expected-value provenance is tracked separately by [TEST-32](oracle-review.md); see the [transport mutation report](evidence/test-quality-2026-10-11/transport-mutants.md) for one measured package. |
 | AUD-11 consolidation | Finish the single AST walk for classification, masking and blast-radius planning. Behavioural fixes are closed on the current policy suite; shared analysis landed in #506. Structural consolidation follows 0.2.0. |
 | TEST-12 | Verify sample and page-observed type union, plus acceptance evidence, against the bounded 128-document non-snapshot contract in [ADR 0007](decisions/0007-type-and-value-preservation.md) |
-| APP-MOD | Keep the app layer thin: finish the staged moves of [ADR 0018](decisions/0018-headless-app-services-crate.md) (completion, schema state, browse query planning, tab membership, preview plans, save-before-close state and workspace persistence are now headless; translated errors and the TabView handshake stay in app adapters; continue the remaining service moves), and replace hard-coded driver-name branches in the app layer with driver capabilities, starting with `browse_tab/value_parse.rs` |
+| APP-MOD | Keep the app layer thin: finish the staged moves of [ADR 0018](decisions/0018-headless-app-services-crate.md) (completion, schema state, browse query planning, edit tracking, tab membership, preview plans, save-before-close state and workspace persistence are now headless; translated errors and the TabView handshake stay in app adapters; continue the remaining service moves), and replace hard-coded driver-name branches in the app layer with driver capabilities, starting with `browse_tab/value_parse.rs` |
 | UI-21, TEST-28 | Fake connection for the GTK tier, native Ubuntu AT-SPI menu reachability |
 | TEST-30 | Remaining SonarCloud and CodeQL findings | #562 has no Lane set on Project #3 yet, so it is not listed in the lane index. |
 | TEST-34 | Import Python coverage for repository tooling into SonarCloud without lowering the coverage gate; #830 added tests but SonarCloud reported 0.0% new-code coverage |
