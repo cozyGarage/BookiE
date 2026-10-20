@@ -71,10 +71,12 @@ def prune_job(job, cutoff):
             print(f'removed generated {profile} artifacts', flush=True)
 
 
-def prune(root, cutoff):
+def prune(root, cutoff, reserve=None):
     directory = open_directory(root)
     try:
         for name in sorted(os.listdir(directory)):
+            if reserve is not None and shutil.disk_usage(root).free >= reserve:
+                return
             entry = metadata(name, directory)
             if entry is None or not stat.S_ISDIR(entry.st_mode):
                 continue
@@ -93,7 +95,7 @@ def cleanup(root, reserve):
     now = time.time()
     prune(root, now - 5 * 86400)
     if shutil.disk_usage(root).free < reserve:
-        prune(root, now - 86400)
+        prune(root, now - 86400, reserve)
     after = shutil.disk_usage(root).free
     print(f'free after cleanup: {after} bytes; required reserve: {reserve} bytes', flush=True)
     if after < reserve:

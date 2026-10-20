@@ -1,11 +1,14 @@
 from pathlib import Path
 import fcntl
+import importlib.util
 import os
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / 'scripts/ci-cache.py'
@@ -67,6 +70,19 @@ class CiCacheTests(unittest.TestCase):
         self.assertFalse((idle / 'debug').exists())
         self.assertTrue((recent / 'debug/deps/artifact').exists())
         self.assertIn('reserve', result.stderr)
+
+    def test_pressure_cleanup_stops_after_recovering_the_reserve(self):
+        first = self.target('a-idle', 2)
+        second = self.target('b-idle', 2)
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        readings = [SimpleNamespace(free=value) for value in (0, 0, 0, 100, 100)]
+        with patch.object(helper.shutil, 'disk_usage', side_effect=readings):
+            result = helper.cleanup(self.cache, 50)
+        self.assertTrue((second / 'debug/deps/artifact').exists())
+        self.assertFalse((first / 'debug').exists())
+        self.assertEqual(result, 0)
 
     def test_shared_build_lock_prevents_cleanup(self):
         target = self.target('unit', 10)
