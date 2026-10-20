@@ -100,6 +100,56 @@ async fn run(
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_postgres_commit_after_savepoint_recovery_matches_the_audit_and_stored_rows() {
+    let (_container, opts) = start_pg().await;
+    let raw = connect(opts.clone()).await;
+    raw.execute("CREATE TABLE savepoint_probe (id INT PRIMARY KEY)")
+        .await
+        .expect("create table");
+    let audit = Arc::new(CapturingAudit::new());
+    let guard = PolicyGuard::new(
+        Arc::from(raw),
+        guard_context(audit.clone(), Arc::new(AuditState::new())),
+    );
+    let mut session = guard.open_session().await.expect("open session");
+    for sql in [
+        "BEGIN",
+        "SAVEPOINT outer_recovery",
+        "INSERT INTO savepoint_probe VALUES (2)",
+        "SAVEPOINT recovery",
+    ] {
+        run(&mut session, sql).await.expect("prepare transaction");
+    }
+    let error = run(&mut session, "SELECT 1 / 0").await.expect_err("abort transaction");
+    assert!(matches!(error, DriverError::Query { sqlstate: Some(code), .. } if code == "22012"));
+    for sql in [
+        "ROLLBACK TO SAVEPOINT recovery",
+        "INSERT INTO savepoint_probe VALUES (3)",
+        "RELEASE SAVEPOINT recovery",
+        "COMMIT",
+    ] {
+        run(&mut session, sql).await.expect("recover and commit");
+    }
+    session.close().await.expect("close");
+
+    let fresh = connect(opts).await;
+    let stored = fresh
+        .query("SELECT id FROM savepoint_probe ORDER BY id")
+        .await
+        .expect("read committed rows");
+    assert_eq!(stored.rows, vec![vec![Value::Int(2)], vec![Value::Int(3)]]);
+    let commits = outcomes_of(&audit, AuditOperationClass::TransactionCommit);
+    assert_eq!(commits.len(), 1);
+    assert_eq!(commits[0].terminal_status, AuditTerminalStatus::Succeeded);
+    assert_eq!(commits[0].transaction_outcome, AuditTransactionOutcome::Committed);
+    let writes = outcomes_of(&audit, AuditOperationClass::Mutation);
+    assert_eq!(writes.len(), 2);
+    assert!(commits[0].batch_id.is_some());
+    assert!(writes.iter().all(|write| write.batch_id == commits[0].batch_id));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_commit_on_a_server_aborted_postgres_transaction_is_audited_as_rolled_back() {
     let (_container, opts) = start_pg().await;
     let raw = connect(opts).await;

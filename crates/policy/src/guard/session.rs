@@ -589,6 +589,7 @@ impl PolicySession {
         }
         let authorization = self.guard.authorize_classified(sql, analysis, Some(control)).await?;
         let writes = authorization.analysis.facts.writes();
+        let rolls_back_to_savepoint = authorization.analysis.rolls_back_to_savepoint;
         let result = match self.batch {
             Some(batch) => {
                 self.batch_statement(sql, params, control, authorization, batch.id)
@@ -597,7 +598,7 @@ impl PolicySession {
             None if writes => self.lone_write(sql, params, control, authorization).await,
             None => self.lone_read(sql, params, control, authorization).await,
         };
-        self.note_statement(writes, &result);
+        self.note_statement(writes, rolls_back_to_savepoint, &result);
         result
     }
 
@@ -607,7 +608,12 @@ impl PolicySession {
         }
     }
 
-    fn note_statement(&mut self, writes: bool, result: &Result<QueryResult, DriverError>) {
+    fn note_statement(
+        &mut self,
+        writes: bool,
+        rolls_back_to_savepoint: bool,
+        result: &Result<QueryResult, DriverError>,
+    ) {
         self.note_disconnect(result);
         let Some(batch) = self.batch.as_mut() else {
             return;
@@ -622,8 +628,8 @@ impl PolicySession {
         ) {
             batch.uncertain = true;
         }
-        if result.is_err() && self.guard.ctx.driver_id == "postgres" {
-            batch.aborted = true;
+        if self.guard.ctx.driver_id == "postgres" && (result.is_err() || rolls_back_to_savepoint) {
+            batch.aborted = result.is_err();
         }
     }
 
