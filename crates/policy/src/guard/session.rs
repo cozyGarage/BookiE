@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use tablepro_core::{QueryCursorId, QueryCursorPage, QueryResultBatch, Session};
+use tablepro_core::{QueryCursorId, QueryCursorPage, QueryResultBatch, Session, SessionCommitOutcome};
 
 use super::*;
 use crate::transaction_control::{TransactionControl, hides_transaction_control, transaction_control};
@@ -136,24 +136,7 @@ impl Session for PolicySession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        if self.cursor.is_some() {
-            return self
-                .refuse_policy(
-                    sql,
-                    "query_cursor_active",
-                    "close the active query cursor before using the session",
-                )
-                .await;
-        }
-        if !self.is_usable() {
-            return self
-                .refuse_policy(
-                    sql,
-                    "retired_session",
-                    "the session was retired after a connection fault and cannot run another statement",
-                )
-                .await;
-        }
+        self.require_query_ready(sql).await?;
         match transaction_control(sql, &self.guard.ctx.driver_id) {
             Some(TransactionControl::BeginReadWrite) if self.guard.ctx.read_only => {
                 self.refuse_policy(
@@ -173,8 +156,14 @@ impl Session for PolicySession {
                 .await
             }
             Some(TransactionControl::BeginReadOnlySnapshot) => self.begin_read_only(sql, control).await,
-            Some(TransactionControl::Commit { chain }) => self.finish(sql, control, Finish::Commit, chain).await,
-            Some(TransactionControl::Rollback { chain }) => self.finish(sql, control, Finish::Rollback, chain).await,
+            Some(TransactionControl::Commit { chain }) => self
+                .finish(sql, control, Finish::Commit, chain)
+                .await
+                .map(|(result, _)| result),
+            Some(TransactionControl::Rollback { chain }) => self
+                .finish(sql, control, Finish::Rollback, chain)
+                .await
+                .map(|(result, _)| result),
             None if hides_transaction_control(sql, &self.guard.ctx.driver_id) => {
                 self.refuse_policy(
                     sql,
@@ -184,6 +173,18 @@ impl Session for PolicySession {
                 .await
             }
             None => self.statement(sql, params, control).await,
+        }
+    }
+
+    async fn commit_controlled(&mut self, control: &OperationControl) -> Result<SessionCommitOutcome, DriverError> {
+        self.require_query_ready("COMMIT").await?;
+        let (_, outcome) = self.finish("COMMIT", control, Finish::Commit, false).await?;
+        match outcome {
+            AuditTransactionOutcome::Committed => Ok(SessionCommitOutcome::Committed),
+            AuditTransactionOutcome::RolledBack => Ok(SessionCommitOutcome::RolledBack),
+            _ => Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(DriverError::Unsupported("unconfirmed session commit outcome".into())),
+            }),
         }
     }
 
@@ -217,8 +218,7 @@ impl Session for PolicySession {
                     "retired_session",
                     "the session was retired and cannot open a query cursor",
                 )
-                .await
-                .map(|_| QueryCursorId::new());
+                .await;
         }
         let Some(batch) = self.batch.filter(|batch| batch.read_only) else {
             return self
@@ -227,8 +227,7 @@ impl Session for PolicySession {
                     "query_cursor_requires_read_snapshot",
                     "query cursors require a read-only snapshot",
                 )
-                .await
-                .map(|_| QueryCursorId::new());
+                .await;
         };
         if self.cursor.is_some() {
             return self
@@ -237,8 +236,7 @@ impl Session for PolicySession {
                     "query_cursor_already_open",
                     "only one query cursor may be open per session",
                 )
-                .await
-                .map(|_| QueryCursorId::new());
+                .await;
         }
         let analysis = self.guard.analyze_statement(sql);
         if !cursor_query_is_read(&analysis) {
@@ -248,8 +246,7 @@ impl Session for PolicySession {
                     "query_cursor_requires_single_read",
                     "query cursors require one read-only statement",
                 )
-                .await
-                .map(|_| QueryCursorId::new());
+                .await;
         }
         let authorization = self.guard.authorize_classified(sql, analysis, Some(control)).await?;
         let audit = CursorAudit {
@@ -785,7 +782,7 @@ impl PolicySession {
         control: &OperationControl,
         kind: Finish,
         chain: bool,
-    ) -> Result<QueryResult, DriverError> {
+    ) -> Result<(QueryResult, AuditTransactionOutcome), DriverError> {
         let Some(batch) = self.batch else {
             return self
                 .refuse_policy(sql, "missing_transaction", "no transaction is open on this session")
@@ -845,7 +842,7 @@ impl PolicySession {
         };
         self.guard.handle_write_outcome_failure(audit_result)?;
         pending_write.disarm();
-        result
+        result.map(|result| (result, transaction_outcome))
     }
 }
 

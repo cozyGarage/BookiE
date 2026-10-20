@@ -560,3 +560,55 @@ async fn an_agent_cannot_expose_sensitive_columns_through_table_to_xml() {
 
     assert_eq!(result.rows, vec![vec![Value::Text("***REDACTED***".into())]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn typed_postgres_commit_reports_rollback_and_recovered_commit_with_matching_rows() {
+    use tablepro_core::SessionCommitOutcome;
+
+    let (_container, opts) = start_pg().await;
+    let raw = connect(opts.clone()).await;
+    raw.execute("CREATE TABLE typed_commit_probe (id INT PRIMARY KEY)")
+        .await
+        .expect("create table");
+    let audit = Arc::new(CapturingAudit::new());
+    let guard = PolicyGuard::new(
+        Arc::from(raw),
+        guard_context(audit.clone(), Arc::new(AuditState::new())),
+    );
+    let mut session = guard.open_session().await.expect("open session");
+    for (id, recover, expected, rows) in [
+        (1, false, SessionCommitOutcome::RolledBack, 0),
+        (2, true, SessionCommitOutcome::Committed, 1),
+    ] {
+        run(&mut session, "BEGIN").await.expect("begin");
+        run(&mut session, &format!("INSERT INTO typed_commit_probe VALUES ({id})"))
+            .await
+            .expect("insert");
+        run(&mut session, "SAVEPOINT recovery").await.expect("savepoint");
+        run(&mut session, "SELECT 1 / 0").await.expect_err("abort transaction");
+        if recover {
+            run(&mut session, "ROLLBACK TO recovery").await.expect("recover");
+        }
+        assert_eq!(
+            session.commit_controlled(&no_timeout()).await.expect("finish"),
+            expected
+        );
+        let fresh = connect(opts.clone()).await;
+        let stored = fresh
+            .query("SELECT id FROM typed_commit_probe")
+            .await
+            .expect("read rows");
+        assert_eq!(stored.rows.len(), rows);
+        let outcomes = outcomes_of(&audit, AuditOperationClass::TransactionCommit);
+        let expected_audit = match expected {
+            SessionCommitOutcome::Committed => AuditTransactionOutcome::Committed,
+            SessionCommitOutcome::RolledBack => AuditTransactionOutcome::RolledBack,
+        };
+        assert_eq!(
+            outcomes.last().expect("commit audit").transaction_outcome,
+            expected_audit
+        );
+    }
+    session.close().await.expect("close");
+}
