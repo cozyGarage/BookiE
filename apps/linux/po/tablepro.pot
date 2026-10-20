@@ -298,7 +298,7 @@ msgid "Connection closed."
 msgstr ""
 
 #: apps/linux/app/src/ui/activity_dialog.rs:111
-#: apps/linux/app/src/ui/editor/mod.rs:1000
+#: apps/linux/app/src/ui/editor/mod.rs:1017
 msgid "Running…"
 msgstr ""
 
@@ -485,8 +485,8 @@ msgstr ""
 #: apps/linux/app/src/ui/connection_bundle/import.rs:26
 #: apps/linux/app/src/ui/connection_bundle/import.rs:105
 #: apps/linux/app/src/ui/connection_row.rs:204
-#: apps/linux/app/src/ui/editor/mod.rs:373
-#: apps/linux/app/src/ui/editor/session_mode.rs:261
+#: apps/linux/app/src/ui/editor/mod.rs:387
+#: apps/linux/app/src/ui/editor/session_mode.rs:276
 #: apps/linux/app/src/ui/export_dialog/file.rs:121
 #: apps/linux/app/src/ui/grid/editing.rs:448
 #: apps/linux/app/src/ui/grid/full_value_editor.rs:227
@@ -1676,7 +1676,7 @@ msgid "Unsaved changes will be permanently lost if you discard them."
 msgstr ""
 
 #: apps/linux/app/src/ui/app/workspace_tabs.rs:924
-#: apps/linux/app/src/ui/editor/outcomes.rs:913
+#: apps/linux/app/src/ui/editor/outcomes.rs:983
 #: apps/linux/app/src/ui/editor/schema.rs:17
 #: apps/linux/app/src/ui/history_dialog.rs:1041
 msgid "Empty query"
@@ -2584,137 +2584,133 @@ msgstr ""
 msgid "The query ran for {seconds} seconds."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:312
+#: apps/linux/app/src/ui/editor/mod.rs:326
 msgid "Fold block"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:313
+#: apps/linux/app/src/ui/editor/mod.rs:327
 msgid "Fold the SQL block at the cursor"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:320
+#: apps/linux/app/src/ui/editor/mod.rs:334
 msgid "Unfold all"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:321
+#: apps/linux/app/src/ui/editor/mod.rs:335
 msgid "Show all folded SQL blocks"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:336
+#: apps/linux/app/src/ui/editor/mod.rs:350
 msgid "SQL warnings"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:337
+#: apps/linux/app/src/ui/editor/mod.rs:351
 msgid "Character suggestions; SQL is not changed"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:357
+#: apps/linux/app/src/ui/editor/mod.rs:371
 msgid "Runs the same query again. The saved query timeout does not change."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:364
+#: apps/linux/app/src/ui/editor/mod.rs:378
 #: apps/linux/app/src/ui/editor/pinned.rs:69
 msgid "Pin results"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:365
+#: apps/linux/app/src/ui/editor/mod.rs:379
 msgid "Keep these results above the results of the next run"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:374
+#: apps/linux/app/src/ui/editor/mod.rs:388
 msgid "Cancel running query (Esc)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:382
-#: apps/linux/app/src/ui/editor/session_mode.rs:280
+#: apps/linux/app/src/ui/editor/mod.rs:396
+#: apps/linux/app/src/ui/editor/session_mode.rs:295
 msgid "Session"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:383
+#: apps/linux/app/src/ui/editor/mod.rs:397
 msgid "Run this tab on its own connection, so settings, temporary tables and transactions carry over between runs"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:392
+#: apps/linux/app/src/ui/editor/mod.rs:406
 msgid "Explain"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:393
+#: apps/linux/app/src/ui/editor/mod.rs:407
 msgid "Explain query plan"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:400
+#: apps/linux/app/src/ui/editor/mod.rs:414
 msgid "Run"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:401
+#: apps/linux/app/src/ui/editor/mod.rs:415
 msgid "Run query (Ctrl+Return)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:408
+#: apps/linux/app/src/ui/editor/mod.rs:422
 msgid "Split"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:409
+#: apps/linux/app/src/ui/editor/mod.rs:423
 msgid "Show or hide a second SQL editor pane"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:701
+#: apps/linux/app/src/ui/editor/mod.rs:722
 msgid "empty query"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:783
+#: apps/linux/app/src/ui/editor/mod.rs:803
 msgid "No statement at cursor"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:872
+#: apps/linux/app/src/ui/editor/mod.rs:892
 #: apps/linux/app/src/ui/editor/streaming.rs:154
 #: apps/linux/app/src/ui/history_dialog.rs:1054
 msgid "cancelled"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:874
-#: apps/linux/app/src/ui/editor/outcomes.rs:630
+#: apps/linux/app/src/ui/editor/mod.rs:894
+#: apps/linux/app/src/ui/editor/outcomes.rs:700
 msgid "Query cancelled"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:875
+#: apps/linux/app/src/ui/editor/mod.rs:895
 msgid "The running query was stopped."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:891
+#: apps/linux/app/src/ui/editor/mod.rs:911
 #, rust-format
 msgid "Query exceeded the {n}s query timeout."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:898
+#: apps/linux/app/src/ui/editor/mod.rs:918
 #: apps/linux/app/src/ui/editor/streaming.rs:156
 msgid "timed out"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:901
+#: apps/linux/app/src/ui/editor/mod.rs:921
 #: apps/linux/app/src/ui/editor/outcomes.rs:70
-#: apps/linux/app/src/ui/editor/outcomes.rs:639
+#: apps/linux/app/src/ui/editor/outcomes.rs:709
 #: apps/linux/app/src/ui/editor/streaming.rs:139
 msgid "Query timed out"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:950
+#: apps/linux/app/src/ui/editor/mod.rs:968
 msgid "Formatting is unavailable for this connection"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:974
+#: apps/linux/app/src/ui/editor/mod.rs:991
 msgid "Waiting for session to finish"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/mod.rs:981
-#: apps/linux/app/src/ui/editor/mod.rs:986
-#: apps/linux/app/src/ui/editor/session_mode.rs:339
+#: apps/linux/app/src/ui/editor/mod.rs:998
+#: apps/linux/app/src/ui/editor/mod.rs:1003
+#: apps/linux/app/src/ui/editor/session_lexing.rs:65
+#: apps/linux/app/src/ui/editor/session_mode.rs:354
 msgid "no active connection"
-msgstr ""
-
-#: apps/linux/app/src/ui/editor/mod.rs:1151
-#: apps/linux/app/src/ui/editor/mod.rs:1164
-msgid "query-results"
 msgstr ""
 
 #: apps/linux/app/src/ui/editor/open_file.rs:25
@@ -2751,150 +2747,159 @@ msgstr ""
 msgid "Save SQL file"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:441
+#: apps/linux/app/src/ui/editor/outcomes.rs:270
+msgid "Not run: the previous statement changed how this session reads strings, so the rest of the script would split differently. Run the remaining statements again."
+msgstr ""
+
+#: apps/linux/app/src/ui/editor/outcomes.rs:276
+#, rust-format
+msgid "Not run: could not confirm how this session reads strings: {error}"
+msgstr ""
+
+#: apps/linux/app/src/ui/editor/outcomes.rs:511
 msgid "A result page exceeded the query result limit. The result is incomplete."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:496
+#: apps/linux/app/src/ui/editor/outcomes.rs:566
 #, rust-format
 msgid "error in {ms} ms"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:498
+#: apps/linux/app/src/ui/editor/outcomes.rs:568
 #: apps/linux/app/src/ui/editor/streaming.rs:153
 #, rust-format
 msgid "done in {ms} ms"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:504
+#: apps/linux/app/src/ui/editor/outcomes.rs:574
 #, rust-format
 msgid "{ok}/{total} statements · {ms} ms"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:509
+#: apps/linux/app/src/ui/editor/outcomes.rs:579
 #: apps/linux/app/src/ui/editor/streaming.rs:160
 msgid "error"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:539
+#: apps/linux/app/src/ui/editor/outcomes.rs:609
 #, rust-format
 msgid "Statement {n} executed"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:540
+#: apps/linux/app/src/ui/editor/outcomes.rs:610
 #, rust-format
 msgid "No rows returned · {ms} ms"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:551
+#: apps/linux/app/src/ui/editor/outcomes.rs:621
 #, rust-format
 msgid "Statement {n} not run"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:552
+#: apps/linux/app/src/ui/editor/outcomes.rs:622
 msgid "Skipped because an earlier statement failed."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:583
+#: apps/linux/app/src/ui/editor/outcomes.rs:653
 #: apps/linux/app/src/ui/history_dialog.rs:147
 msgid "Status"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:589
+#: apps/linux/app/src/ui/editor/outcomes.rs:659
 #, rust-format
 msgid "Received {rows} rows · {pages} pages"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:594
+#: apps/linux/app/src/ui/editor/outcomes.rs:664
 msgid "Export all rows…"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:604
+#: apps/linux/app/src/ui/editor/outcomes.rs:674
 msgid "The query will run again through a guarded cursor."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:613
+#: apps/linux/app/src/ui/editor/outcomes.rs:683
 msgid "Rows 0"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:619
+#: apps/linux/app/src/ui/editor/outcomes.rs:689
 #, rust-format
 msgid "Rows {start}-{end}"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:631
-#: apps/linux/app/src/ui/editor/outcomes.rs:640
+#: apps/linux/app/src/ui/editor/outcomes.rs:701
+#: apps/linux/app/src/ui/editor/outcomes.rs:710
 msgid "Rows already received remain available."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:662
+#: apps/linux/app/src/ui/editor/outcomes.rs:732
 #, rust-format
 msgid "Result set {n} ({rows})"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:679
+#: apps/linux/app/src/ui/editor/outcomes.rs:749
 msgid "Result set"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:696
+#: apps/linux/app/src/ui/editor/outcomes.rs:766
 msgid "Copy error"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:703
+#: apps/linux/app/src/ui/editor/outcomes.rs:773
 #, rust-format
 msgid "Statement {n} failed"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:721
+#: apps/linux/app/src/ui/editor/outcomes.rs:791
 msgid "No rows returned"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:805
-#: apps/linux/app/src/ui/editor/outcomes.rs:808
+#: apps/linux/app/src/ui/editor/outcomes.rs:875
+#: apps/linux/app/src/ui/editor/outcomes.rs:878
 #, rust-format
 msgid "Result {n} ({rows})"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:811
+#: apps/linux/app/src/ui/editor/outcomes.rs:881
 #, rust-format
 msgid "Result {n} (error)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:812
+#: apps/linux/app/src/ui/editor/outcomes.rs:882
 #, rust-format
 msgid "Result {n} (skipped)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:816
-#: apps/linux/app/src/ui/editor/outcomes.rs:820
+#: apps/linux/app/src/ui/editor/outcomes.rs:886
+#: apps/linux/app/src/ui/editor/outcomes.rs:890
 #, rust-format
 msgid "{n} · {statement} ({rows})"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:824
+#: apps/linux/app/src/ui/editor/outcomes.rs:894
 #, rust-format
 msgid "{n} · {statement} (error)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:827
+#: apps/linux/app/src/ui/editor/outcomes.rs:897
 #, rust-format
 msgid "{n} · {statement} (skipped)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:839
+#: apps/linux/app/src/ui/editor/outcomes.rs:909
 msgid "Result"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:840
+#: apps/linux/app/src/ui/editor/outcomes.rs:910
 #, rust-format
 msgid "📌 {statement} ({rows})"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:888
+#: apps/linux/app/src/ui/editor/outcomes.rs:958
 msgid "Statement result"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:914
+#: apps/linux/app/src/ui/editor/outcomes.rs:984
 msgid "Type a SQL statement and press Run."
 msgstr ""
 
@@ -2908,70 +2913,84 @@ msgstr ""
 msgid "{n} pinned; they stay above the next run"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/run_lifecycle.rs:58
+#: apps/linux/app/src/ui/editor/run_lifecycle.rs:68
 msgid "Cannot ask for parameter values without a window"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/run_lifecycle.rs:76
+#: apps/linux/app/src/ui/editor/run_lifecycle.rs:85
 #, rust-format
 msgid "Run again with a {n}s timeout"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:256
+#: apps/linux/app/src/ui/editor/session_lexing.rs:98
+msgid "The connection changed before the script ran. Run it again."
+msgstr ""
+
+#: apps/linux/app/src/ui/editor/session_lexing.rs:108
+#, rust-format
+msgid "Could not read the session's string settings: {message}"
+msgstr ""
+
+#: apps/linux/app/src/ui/editor/session_mode.rs:271
 msgid "End the session with an open transaction?"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:258
+#: apps/linux/app/src/ui/editor/session_mode.rs:273
 msgid "Changes made since BEGIN are kept only if you commit them."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:262
+#: apps/linux/app/src/ui/editor/session_mode.rs:277
 msgid "Roll Back"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:263
+#: apps/linux/app/src/ui/editor/session_mode.rs:278
 msgid "Commit"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:278
+#: apps/linux/app/src/ui/editor/session_mode.rs:293
 msgid "Session · transaction open"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:413
-#: apps/linux/app/src/ui/editor/session_mode.rs:552
+#: apps/linux/app/src/ui/editor/session_mode.rs:428
+#: apps/linux/app/src/ui/editor/session_mode.rs:567
 msgid "Rolling back and closing session…"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:442
+#: apps/linux/app/src/ui/editor/session_mode.rs:457
 msgid "Closing session…"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:510
+#: apps/linux/app/src/ui/editor/session_mode.rs:525
 msgid "This editor session was retired after a connection failure. Reopen Session before running more SQL."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:583
-#: apps/linux/app/src/ui/editor/session_mode.rs:638
+#: apps/linux/app/src/ui/editor/session_mode.rs:598
+#: apps/linux/app/src/ui/editor/session_mode.rs:653
 msgid "Session rolled back"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:607
+#: apps/linux/app/src/ui/editor/session_mode.rs:622
 msgid "Committing session…"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:637
+#: apps/linux/app/src/ui/editor/session_mode.rs:652
 msgid "Session committed"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/session_mode.rs:701
+#: apps/linux/app/src/ui/editor/session_mode.rs:716
 msgid "This engine does not offer dedicated sessions yet"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/statement_cursor.rs:39
+#: apps/linux/app/src/ui/editor/sql_text.rs:72
+#: apps/linux/app/src/ui/editor/sql_text.rs:85
+msgid "query-results"
+msgstr ""
+
+#: apps/linux/app/src/ui/editor/statement_cursor.rs:66
 msgid "The script contains an unterminated quote or comment."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/statement_cursor.rs:43
+#: apps/linux/app/src/ui/editor/statement_cursor.rs:70
 msgid "GO repetition is not supported. Expand repeated batches explicitly before running."
 msgstr ""
 

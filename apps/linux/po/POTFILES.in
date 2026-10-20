@@ -60,7 +60,9 @@ apps/linux/app/src/ui/editor/outcomes.rs
 apps/linux/app/src/ui/editor/pinned.rs
 apps/linux/app/src/ui/editor/run_lifecycle.rs
 apps/linux/app/src/ui/editor/schema.rs
+apps/linux/app/src/ui/editor/session_lexing.rs
 apps/linux/app/src/ui/editor/session_mode.rs
+apps/linux/app/src/ui/editor/sql_text.rs
 apps/linux/app/src/ui/editor/statement_cursor.rs
 apps/linux/app/src/ui/editor/streaming.rs
 apps/linux/app/src/ui/explain_dialog.rs
