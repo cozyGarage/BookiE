@@ -4,6 +4,10 @@ on:
     - cron: "0 23 * * *"
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: /usr/local/libexec/bookie-ci-cache run {0}
+
 env:
   CARGO_TERM_COLOR: never
   CARGO_INCREMENTAL: "0"
