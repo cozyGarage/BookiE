@@ -223,6 +223,15 @@ pub enum AppMsg {
     ShowCreateTableLoaded {
         sql: String,
     },
+    TruncateTablePrompt {
+        schema: Option<String>,
+        table: String,
+    },
+    TruncateTableConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        schema: Option<String>,
+        table: String,
+    },
     DropTablePrompt {
         schema: Option<String>,
         table: String,

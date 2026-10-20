@@ -74,6 +74,7 @@ pub enum SidebarRowMsg {
     EditStructure,
     ShowCreateTable,
     ImportCsv,
+    TruncateTable,
     DropTable,
     SetCollapsed(bool),
     NewTable,
@@ -122,6 +123,10 @@ pub enum SidebarRowOutput {
     /// Right-click "Import CSV…" → App reads the file, asks the user how
     /// to map its fields, and loads it into this table.
     ImportCsv {
+        schema: Option<String>,
+        name: String,
+    },
+    TruncateTable {
         schema: Option<String>,
         name: String,
     },
@@ -337,6 +342,10 @@ impl FactoryComponent for SidebarRow {
             menu.append_section(None, &structure_section);
             let mutate_section = gtk::gio::Menu::new();
             mutate_section.append(Some(&crate::tr!("Import CSV\u{2026}")), Some("sidebar-row.import-csv"));
+            mutate_section.append(
+                Some(&crate::tr!("Truncate Table\u{2026}")),
+                Some("sidebar-row.truncate-table"),
+            );
             mutate_section.append(Some(&crate::tr!("Drop Table\u{2026}")), Some("sidebar-row.drop-table"));
             menu.append_section(None, &mutate_section);
         }
@@ -370,10 +379,21 @@ impl FactoryComponent for SidebarRow {
         let import_action = gtk::gio::ActionEntry::builder("import-csv")
             .activate(move |_, _, _| sender_import.input(SidebarRowMsg::ImportCsv))
             .build();
+        let sender_truncate = sender.clone();
+        let truncate_action = gtk::gio::ActionEntry::builder("truncate-table")
+            .activate(move |_, _, _| sender_truncate.input(SidebarRowMsg::TruncateTable))
+            .build();
         let drop_action = gtk::gio::ActionEntry::builder("drop-table")
             .activate(move |_, _, _| sender_drop.input(SidebarRowMsg::DropTable))
             .build();
-        group.add_action_entries([open_action, edit_action, show_create_action, import_action, drop_action]);
+        group.add_action_entries([
+            open_action,
+            edit_action,
+            show_create_action,
+            import_action,
+            truncate_action,
+            drop_action,
+        ]);
         root.insert_action_group("sidebar-row", Some(&group));
 
         // Defence against the factory-clears-row-while-menu-is-open
@@ -426,6 +446,7 @@ impl FactoryComponent for SidebarRow {
             SidebarRowMsg::EditStructure => SidebarRowOutput::EditStructure { schema, name },
             SidebarRowMsg::ShowCreateTable => SidebarRowOutput::ShowCreateTable { schema, name },
             SidebarRowMsg::ImportCsv => SidebarRowOutput::ImportCsv { schema, name },
+            SidebarRowMsg::TruncateTable => SidebarRowOutput::TruncateTable { schema, name },
             SidebarRowMsg::DropTable => SidebarRowOutput::DropTable { schema, name },
             SidebarRowMsg::NewTable => SidebarRowOutput::NewTable { schema },
             SidebarRowMsg::TableFromCsv => SidebarRowOutput::TableFromCsv { schema },
