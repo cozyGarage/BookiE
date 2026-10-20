@@ -70,7 +70,7 @@ To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+S
   Full-table export is refused until a consistent snapshot path is supported.
 - **Import**: right-click a table and choose **Import CSV…** to load a CSV file
   into it, or use the button on a schema header to create a new table from a CSV
-  file. Separator, header row and column mapping are detected and can be changed.
+  file. Separator, header row and column mapping are detected and can be changed, as can the quote character, backslash escaping of quotes and the text encoding (UTF-8, Windows-1252 or UTF-16; a file that is not UTF-8 opens with a matching choice).
   For an existing table, use **Remember mapping** and **Restore mapping** to reuse
   the destination choices for that connection and table. Auto-increment and generated
   columns stay on Skip; the database supplies their values. Explicit values for
