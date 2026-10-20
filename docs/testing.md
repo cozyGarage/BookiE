@@ -240,7 +240,32 @@ Where each check runs is owned by [CI tiers in the validation playbook](validati
 
 ### Gating several pull requests at once
 
-`scripts/forgejo-train.sh BRANCH BRANCH...` merges the named remote branches onto `origin/linux` in a throwaway worktree, skips any that conflict, and gates the combined result once. A pass proves that combination only; each pull request still needs its required gate on the head to be merged, as described in the [validation playbook](validation-playbook.md#hosted-checks). A failed train can help isolate conflicts or interactions; gate its branches individually to locate the cause. `FORGEJO_TRAIN_DRY=1` only builds the train. `CHANGELOG.md` and the PostgreSQL `connection_paths.rs` registry merge by union (`.gitattributes`), because every pull request appends to them and they were the usual cause of conflicts.
+`scripts/forgejo-train.sh BRANCH BRANCH...` merges the named remote branches onto `origin/linux` in a throwaway worktree, skips any that conflict, and gates the combined result once. A pass proves that combination only. It does not implement the accepted aggregate PR checks below; individual PRs outside an accepted aggregate still need their own required gate. A failed train can help isolate conflicts or interactions; gate its branches individually to locate the cause. `FORGEJO_TRAIN_DRY=1` only builds the train. `CHANGELOG.md` and the PostgreSQL `connection_paths.rs` registry merge by union (`.gitattributes`), because every pull request appends to them and they were the usual cause of conflicts.
+
+### Aggregate train acceptance
+
+[ADR 0020](decisions/0020-aggregate-forgejo-trains.md) defines the accepted merge unit. The queue owner prepares a small batch in the current clean checkout, starting a new train branch at the freshly fetched GitHub `linux` SHA. Merge each exact constituent head with a separate `--no-ff` merge in the recorded order. Stop on conflicts; do not silently skip an input. Retain necessary reviews and each PR's GitHub checks. Resolve no behavior changes merely to make a train pass.
+
+Commit `ci/forgejo-train.json` on that branch with this shape, replacing the SHA placeholders with full commit IDs:
+
+```json
+{"version": 1, "base": "BASE_SHA", "members": [{"number": 1197, "sha": "FIRST_HEAD_SHA"}, {"number": 1201, "sha": "SECOND_HEAD_SHA"}]}
+```
+
+Open one aggregate PR against `linux`, listing the constituents and any train-owned changes. Its GitHub checks must pass too. Use the following checks with the actual train PR number and Forgejo run ID:
+
+```bash
+python3 scripts/check-forgejo-train.py TRAIN_PR --phase gate
+train_head="$(git rev-parse HEAD)"
+bash scripts/forgejo-gate.sh "$train_head" "train/$train_head"
+python3 scripts/check-forgejo-train.py TRAIN_PR --phase merge --run RUN_ID
+gh pr merge TRAIN_PR --squash --match-head-commit "$train_head"
+python3 scripts/check-forgejo-train.py TRAIN_PR --phase merged --run RUN_ID
+```
+
+The verifier reads the committed manifest from the aggregate head, checks the exact integration order, rejects moved constituents or base, requires the ordinary GitHub checks and verifies successful `ci.yml` evidence at that head. `--remote` selects the GitHub remote when it is not named `origin`. Reference CodeQL and Sonar scans retain their existing non-gating status. Required skipped checks never count as passes.
+
+Run the merge check immediately before merging and coordinate base pushes with the queue owner. A changed base/head requires a new train. After the merged-tree comparison passes, close each constituent PR as included with a link to the aggregate PR. Close only satisfied issues, sync Forgejo's `linux` through the serialized gate script and remove only clean, completed worktrees. A tree mismatch stops further acceptance for investigation. A failed train approves no subset; split it and gate the new heads for diagnosis.
 
 ### Reading a red run
 
