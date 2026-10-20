@@ -30,6 +30,20 @@ class CiWorkflowTests(unittest.TestCase):
             workflow = (ROOT / path).read_text()
             self.assertIn("cargo install cargo-about --locked --version 0.9.2 --features=cli", workflow)
 
+    def test_forgejo_workflows_queue_without_cancelling_across_refs(self):
+        groups = []
+        for name in ("ci", "nightly"):
+            workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
+            match = re.search(r"^concurrency:\n((?:[ \t]+[^\n]*\n)+)", workflow, re.MULTILINE)
+            self.assertIsNotNone(match, name)
+            settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
+            group = settings["group"].strip()
+            self.assertTrue(group, name)
+            self.assertNotIn("${{", group, name)
+            self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
+            groups.append(group)
+        self.assertEqual(groups[0], groups[1])
+
     def test_forgejo_gtk_jobs_select_distinct_run_scoped_mcp_ports(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         nightly = (ROOT / ".forgejo/workflows/nightly.yml").read_text()
@@ -356,6 +370,13 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             with self.subTest(scenario=scenario):
                 self.assertIn(scenario, default_scenarios)
+
+    def test_codeql_scans_linux_after_merge_and_weekly_but_not_each_pull_request(self):
+        workflow = (ROOT / ".github/workflows/codeql.yml").read_text()
+        triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+        events = set(re.findall(r"^  ([a-z_]+):", triggers, re.M))
+        self.assertEqual(events, {"push", "schedule", "workflow_dispatch"})
+        self.assertIn("branches: [linux]", triggers.split("  push:", 1)[1])
 
     def test_analysis_and_flatpak_skip_docs_and_reuse_cache(self):
         cancel_push_or_pr = (
