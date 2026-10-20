@@ -348,7 +348,10 @@ mod tests {
             ("mysql", "CHANGE REPLICATION SOURCE TO SOURCE_PASSWORD = 'p'"),
             ("mysql", "START GROUP_REPLICATION USER = 'u', PASSWORD = 'p'"),
             ("mysql", "CLONE INSTANCE FROM 'u'@'donor':3306 IDENTIFIED BY 'p'"),
-            ("mysql", "CLONE INSTANCE FROM root@donor:3306 IDENTIFIED BY 'p' REQUIRE NO SSL"),
+            (
+                "mysql",
+                "CLONE INSTANCE FROM root@donor:3306 IDENTIFIED BY 'p' REQUIRE NO SSL",
+            ),
             ("mysql", "SELECT AES_ENCRYPT('text', 'key')"),
             (
                 "mysql",
