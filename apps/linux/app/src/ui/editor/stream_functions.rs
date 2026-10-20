@@ -1,7 +1,5 @@
 use tablepro_core::sql_syntax::SqlGrammar;
 use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptTokenKind};
-
-/// Words that may precede `(` without calling a function.
 const KEYWORDS: &[&str] = &[
     "all",
     "and",
@@ -48,10 +46,6 @@ const KEYWORDS: &[&str] = &[
     "with",
     "within",
 ];
-
-/// PostgreSQL built-in functions that never write. A streamed SELECT runs inside a
-/// read-only transaction, so a call to anything else could fail where the ordinary run
-/// would succeed.
 const READ_ONLY_FUNCTIONS: &[&str] = &[
     "abs",
     "age",
@@ -183,10 +177,6 @@ const READ_ONLY_FUNCTIONS: &[&str] = &[
     "var_samp",
     "variance",
 ];
-
-/// Whether every `name(` in `sql` is SQL syntax, an `AS alias(columns)` list or a known
-/// read-only built-in. Calls to user functions, schema-qualified names or quoted names
-/// return false.
 pub(crate) fn calls_only_read_only_functions(sql: &str) -> bool {
     let plan = ScriptPlan::build(
         sql,
