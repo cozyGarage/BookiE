@@ -16,6 +16,10 @@ fi
 exit 0
 """
 
+GATE_STUB = """#!/usr/bin/env bash
+printf '%s\\n' "$*" > "$GATE_LOG"
+"""
+
 IDENTITY = {
     "GIT_AUTHOR_NAME": "Train Test",
     "GIT_AUTHOR_EMAIL": "train@example.invalid",
@@ -44,6 +48,10 @@ class Fixture:
         (self.repo / "src").mkdir()
         (self.repo / "src/registry.rs").write_text("mod base;\n")
         (self.repo / "src/other.rs").write_text("fn other() {}\n")
+        (self.repo / "scripts").mkdir()
+        gate = self.repo / "scripts/forgejo-gate.sh"
+        gate.write_text(GATE_STUB)
+        gate.chmod(0o755)
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "base")
         git(self.repo, "push", "--quiet", "fork", "linux")
@@ -72,6 +80,7 @@ class Fixture:
             "STUB_LOG": str(log),
             "STUB_FMT_CHANGES": fmt_changes,
             "STUB_FMT_EXIT": str(fmt_exit),
+            "GATE_LOG": str(self.tmp / "gate.log"),
             "FORGEJO_TRAIN_DRY": "1",
             **(env or {}),
         }
@@ -79,8 +88,11 @@ class Fixture:
             ["bash", str(SCRIPT), *branches], cwd=self.repo, env=environment, capture_output=True, text=True
         )
 
-    def train_messages(self):
-        return git(self.repo, "log", "--format=%s", "refs/heads/train/gate").splitlines()
+    def train_sha(self, result):
+        return result.stdout.rsplit("(", 1)[1].split(")", 1)[0]
+
+    def train_messages(self, result):
+        return git(self.repo, "log", "--format=%s", self.train_sha(result)).splitlines()
 
     def cargo_calls(self):
         return (self.tmp / "cargo.log").read_text().splitlines()
@@ -99,7 +111,7 @@ class ForgejoTrainTests(unittest.TestCase):
     def test_a_formatting_change_confined_to_union_merged_files_is_committed_to_the_train(self):
         result = self.fixture.run("feature-a", "feature-b", fmt_changes="src/registry.rs")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.fixture.train_messages()[0], "train: format union-merged files")
+        self.assertEqual(self.fixture.train_messages(result)[0], "train: format union-merged files")
 
     def test_a_formatting_change_outside_union_merged_files_fails_and_names_the_file(self):
         result = self.fixture.run("feature-a", "feature-b", fmt_changes="src/registry.rs src/other.rs")
@@ -110,7 +122,7 @@ class ForgejoTrainTests(unittest.TestCase):
     def test_a_train_that_needs_no_formatting_gains_no_format_commit(self):
         result = self.fixture.run("feature-a", "feature-b")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("train: format union-merged files", self.fixture.train_messages())
+        self.assertNotIn("train: format union-merged files", self.fixture.train_messages(result))
 
     def test_a_failing_formatter_stops_the_train(self):
         result = self.fixture.run("feature-a", "feature-b", fmt_exit=1)
@@ -124,7 +136,14 @@ class ForgejoTrainTests(unittest.TestCase):
         git(self.fixture.repo, "remote", "add", "origin", str(decoy))
         result = self.fixture.run("feature-a", "feature-b")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(git(self.fixture.repo, "rev-parse", "refs/heads/train/gate^1^1"), self.fixture.base)
+        sha = self.fixture.train_sha(result)
+        self.assertEqual(git(self.fixture.repo, "rev-parse", f"{sha}^1^1"), self.fixture.base)
+
+    def test_gate_receives_the_exact_train_sha_and_a_sha_scoped_remote_ref(self):
+        result = self.fixture.run("feature-a", "feature-b", env={"FORGEJO_TRAIN_DRY": ""})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        sha = self.fixture.train_sha(result)
+        self.assertEqual((self.fixture.tmp / "gate.log").read_text().split(), [sha, f"train/{sha}"])
 
     def test_branches_come_from_github_even_when_the_forgejo_mirror_shares_the_repository_path(self):
         mirror = Path(self.tmp.name) / "hosts/10.61.0.11/cozyGarage/BookiE.git"

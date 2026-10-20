@@ -54,9 +54,9 @@ format_union_merges() {
 format_union_merges
 
 sha="$(git -C "$work" rev-parse HEAD)"
-git -C "$root" update-ref "refs/heads/train/gate" "$sha"
+target="train/$sha"
 [ -z "${FORGEJO_TRAIN_DRY:-}" ] || { echo "train: dry run, would gate ${merged[*]} ($sha)"; exit 0; }
 echo "train: gating ${merged[*]} as one run ($sha)"
 cd "$root"
-scripts/forgejo-gate.sh train/gate "train/$(date +%m%d-%H%M)"
+scripts/forgejo-gate.sh "$sha" "$target"
 echo "train passed for: ${merged[*]}"
