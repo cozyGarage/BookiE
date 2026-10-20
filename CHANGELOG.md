@@ -6,6 +6,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Added
 
+- Import accepts Excel .xlsx files: the first worksheet with data is read with size, row and column limits and then mapped like a CSV file.
 - PostgreSQL query cancellation through PgBouncer without interrupting another client's work.
 - Unsorted keyed table browsing can move backward through deep pages and jump to the last page using primary-key seeks while keeping rows in ascending key order.
 - Arch packages include a build-input manifest with source and dependency archive checksums, package versions, and toolchain details.
