@@ -1184,6 +1184,9 @@ async fn a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor(
         outcomes[0].kind
     );
     assert!(!streamed.load(std::sync::atomic::Ordering::SeqCst));
-    let stored = connection.query("SELECT count(*) FROM archived").await.unwrap();
+    let stored = connection
+        .query_controlled("SELECT count(*) FROM archived", &control)
+        .await
+        .unwrap();
     assert_eq!(stored.rows, [[tablepro_core::Value::Int(1)]]);
 }
