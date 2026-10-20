@@ -27,6 +27,7 @@ GROUP_SOURCES = {
     "mongodb": "crates/drivers/mongodb/tests",
     "app-server": "apps/linux/app",
 }
+DRIVER_TLS_FIXTURES = ROOT / "tests/fixtures/driver-tls"
 
 MODULE_START = re.compile(r"\b(" + "|".join(TESTCONTAINERS_MODULES_0_15_IMAGES) + r")::default\(\)")
 GENERIC_START = re.compile(r'GenericImage::new\(\s*"([^"]+)"\s*,\s*"([^"]+)"')
@@ -70,6 +71,14 @@ def started_images(directory):
     for text in sources.values():
         images.update(module_image(text, match, constants) for match in MODULE_START.finditer(text))
         images.update(f"{name}:{tag}" for name, tag in GENERIC_START.findall(text))
+    return images
+
+
+def fixture_images():
+    compose = (DRIVER_TLS_FIXTURES / "docker-compose.yml").read_text()
+    images = set(re.findall(r"^\s+image:\s*([^\s#]+)", compose, re.MULTILINE))
+    for dockerfile in DRIVER_TLS_FIXTURES.rglob("Dockerfile"):
+        images.update(re.findall(r"^FROM\s+(?:--platform=\S+\s+)?([^\s]+)", dockerfile.read_text(), re.MULTILINE))
     return images
 
 STUB = """#!/usr/bin/env bash
@@ -150,6 +159,9 @@ class PrepullTestImagesTests(unittest.TestCase):
         for group, directory in GROUP_SOURCES.items():
             with self.subTest(group=group):
                 self.assertEqual(groups.get(group, set()), started_images(directory))
+
+    def test_the_tls_group_pulls_all_fixture_and_compose_images(self):
+        self.assertEqual(listed_groups().get("driver-tls", set()), fixture_images())
 
     def test_a_tag_given_by_constant_resolves_to_that_tag(self):
         text = 'const DB_TAG: &str = "7";\nlet c = Mongo::default().with_tag(DB_TAG).start();'

@@ -23,3 +23,6 @@ driver-tls clickhouse/clickhouse-server:24.8-alpine
 driver-tls mongo:7
 driver-tls mysql:8.4
 driver-tls redis:7-alpine
+driver-tls postgres:16-alpine
+driver-tls mcr.microsoft.com/mssql/server:2022-latest
+driver-tls alpine:3.22
