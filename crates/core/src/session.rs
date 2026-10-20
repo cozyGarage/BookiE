@@ -60,8 +60,6 @@ pub trait Session: Send {
         Err(DriverError::Unsupported("forward-only query cursors".into()))
     }
 
-    /// The string-literal rules this session lexes SQL with now, or `None` when they never
-    /// differ from the grammar's defaults.
     async fn lexical_settings_controlled(
         &mut self,
         _control: &OperationControl,

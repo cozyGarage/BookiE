@@ -13,8 +13,6 @@ pub fn grammar_for(driver: &str) -> Option<SqlGrammar> {
     }
 }
 
-/// The driver plus the string rules its session last reported; `None` settings mean the
-/// grammar's defaults.
 #[derive(Debug, Clone, Copy)]
 pub struct Lexing<'a> {
     pub driver: &'a str,
@@ -46,8 +44,6 @@ pub fn cursor_byte_offset(text: &str, character_offset: usize) -> usize {
 pub struct PlannedStatements {
     pub statements: Vec<String>,
     pub error_policy: BatchErrorPolicy,
-    /// Settings the session must still have before each later statement runs, set when
-    /// another session setting would split this script differently.
     pub settings_check: Option<LexicalSettings>,
 }
 

@@ -8,14 +8,12 @@ use uuid::Uuid;
 use super::statement_cursor::Lexing;
 use super::{SqlEditor, SqlEditorInput};
 
-/// Which connection and editor session reported a set of string rules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct LexingSource {
     connection_id: Option<Uuid>,
     session_id: Option<Uuid>,
 }
 
-/// The string rules the editor's session last reported, shared with the statement band.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct KnownLexing(Rc<Cell<Option<(LexingSource, LexicalSettings)>>>);
 
@@ -55,7 +53,6 @@ impl SqlEditor {
         }
     }
 
-    /// Asks the session for its current string rules, then plans and runs `sql` with them.
     pub(super) fn read_lexing_then_run(&mut self, sql: String, sender: ComponentSender<Self>) {
         if self.reading_lexing {
             return;

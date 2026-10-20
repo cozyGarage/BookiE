@@ -152,8 +152,6 @@ pub trait Connection: Send + Sync {
     async fn open_session(&self) -> Result<Box<dyn crate::Session>, DriverError> {
         Err(DriverError::Unsupported("dedicated sessions".into()))
     }
-    /// The string-literal rules a pooled connection lexes SQL with, or `None` when they never
-    /// differ from the grammar's defaults.
     async fn lexical_settings_controlled(
         &self,
         _control: &OperationControl,

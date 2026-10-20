@@ -211,8 +211,6 @@ where
     ScriptRunResult::Completed(out)
 }
 
-/// A statement the script did not reach, either after an earlier failure or, with a reason,
-/// because the session's string settings changed.
 fn skipped_outcome(identity: StatementIdentity, preview: String, reason: Option<String>) -> StatementOutcome {
     match reason {
         Some(reason) => StatementOutcome {
@@ -254,8 +252,6 @@ where
         .map_err(Halt::Finished)
 }
 
-/// Why the rest of a script must not run because the session no longer lexes SQL with the
-/// settings the script was split under, or `None` when they still hold.
 async fn lexical_settings_change(
     target: &super::session_mode::StatementTarget,
     expected: Option<LexicalSettings>,

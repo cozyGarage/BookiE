@@ -29,14 +29,11 @@ impl LexicalSettings {
         Self::new(backslash_escapes, false)
     }
 
-    /// Settings of a MySQL or MariaDB session, read from its `@@SESSION.sql_mode`.
     pub fn from_mysql_sql_mode(sql_mode: &str) -> Self {
         let has = |name: &str| sql_mode.split(',').any(|mode| mode.trim().eq_ignore_ascii_case(name));
         Self::new(!has("NO_BACKSLASH_ESCAPES"), has("ANSI_QUOTES") || has("ANSI"))
     }
 
-    /// Settings of a PostgreSQL session, read from its `standard_conforming_strings`;
-    /// `None` for a value BookiE does not understand.
     pub fn from_postgres_standard_conforming_strings(value: &str) -> Option<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
             "on" => Some(Self::new(false, false)),
