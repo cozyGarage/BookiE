@@ -12,7 +12,7 @@ Supported explicit PostgreSQL `sslmode`, MySQL `ssl-mode` and MongoDB `tls` valu
 
 Unsupported options, duplicate options and fragments refuse import. This includes MongoDB `authSource`, which has no saved field, and custom TLS certificate URL options, which are not mapped by this fix. Errors do not echo the URL or its credentials. Users can configure supported certificate fields through the connection form.
 
-The no-option default decision is pending with the maintainer. This worktree currently keeps the existing Disabled default and its regression. This is not approval to merge a default change.
+On 2026-10-20, the maintainer explicitly chose to keep Disabled when TLS options are omitted and preserve explicit options. The existing no-option regression pins that decision. The continuation uses the main checkout at the maintainer's request; no new worktree was created.
 
 ## References
 
