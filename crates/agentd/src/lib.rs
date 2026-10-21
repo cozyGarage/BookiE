@@ -288,6 +288,13 @@ impl Connection for SessionConnection {
         self.inner.ping().await
     }
 
+    async fn lexical_settings_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+        self.inner.lexical_settings_controlled(control).await
+    }
+
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         Ok(())
     }
@@ -595,6 +602,7 @@ mod tests {
 
     fn saved_connection() -> SavedConnection {
         SavedConnection {
+            auth_source: None,
             id: Uuid::new_v4(),
             name: "Warehouse".into(),
             driver_id: "postgres".into(),

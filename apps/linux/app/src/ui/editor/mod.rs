@@ -7,6 +7,7 @@ mod finish_notice;
 mod folding;
 pub(crate) mod open_file;
 mod run_lifecycle;
+mod session_lexing;
 use run_lifecycle::{clear_results_box, dim_previous_results};
 use tablepro_core::sql_format as format_plan;
 mod outcomes;
@@ -19,7 +20,9 @@ mod split_view;
 mod sql_text;
 mod statement_band;
 mod statement_cursor;
+mod stream_functions;
 mod stream_pages;
+mod stream_view;
 mod streaming;
 mod timeout_retry;
 
@@ -50,8 +53,10 @@ pub use statement_cursor::grammar_for;
 use outcomes::{ScriptRunResult, StatementRun, StreamUpdate, clear_box, render_outcomes, run_statements_with_stream};
 use run_generation::{RunGeneration, RunTerminal};
 use schema::{apply_editor_preferences, apply_editor_scheme};
-use sql_text::toggle_line_comment;
-use statement_cursor::{adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor};
+use sql_text::{export_name_for_query, read_sql_text, toggle_line_comment};
+use statement_cursor::{
+    PlannedStatements, adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor,
+};
 
 fn show_cancel_button(running: bool, supports_server_cancellation: bool) -> bool {
     running && supports_server_cancellation
@@ -94,6 +99,8 @@ pub struct SqlEditor {
     preferences: crate::services::preferences::PreferencesStore,
     run_generation: RunGeneration,
     drop_generation: std::rc::Rc<DropGeneration>,
+    known_lexing: session_lexing::KnownLexing,
+    reading_lexing: bool,
     /// Disconnected in `shutdown`. Without this, every tab's
     /// `connect_dark_notify` closure -- which strongly captures this
     /// tab's `source_view` -- stayed registered on the process-global
@@ -144,9 +151,17 @@ pub enum SqlEditorInput {
     Run,
     RunWithParameters {
         sql: String,
-        statements: Vec<String>,
-        error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy,
+        planned: PlannedStatements,
         values: std::collections::HashMap<String, tablepro_core::Value>,
+    },
+    LexingRead {
+        source: session_lexing::LexingSource,
+        sql: String,
+        result: Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, String>,
+    },
+    LexingRefreshed {
+        source: session_lexing::LexingSource,
+        settings: Option<tablepro_core::sql_syntax::script::LexicalSettings>,
     },
     Cancel,
     TogglePin,
@@ -244,6 +259,7 @@ pub(super) const MAX_SQL_FILE_BYTES: u64 = 8 * 1024 * 1024;
 #[derive(Debug)]
 struct ExecutionContext {
     sql: String,
+    lexical: Option<tablepro_core::sql_syntax::script::LexicalSettings>,
     metadata: ConnectionMetadata,
     started_at: SystemTime,
     timeout_secs: u32,
@@ -474,10 +490,12 @@ impl SimpleComponent for SqlEditor {
         }
         let split_view =
             split_view::SplitEditorView::install(&widgets.editor_holder, &widgets.source_scroll, &widgets.source_view);
+        let known_lexing = session_lexing::KnownLexing::default();
         statement_band::install(
             widgets.source_view.buffer().upcast_ref(),
             init.database.clone(),
             init.connection_id,
+            known_lexing.clone(),
         );
         run_marks::install(&widgets.source_view);
         let folding = std::rc::Rc::new(std::cell::RefCell::new(folding::FoldController::new(
@@ -503,6 +521,7 @@ impl SimpleComponent for SqlEditor {
         narrow.add_setter(&widgets.fold_button, "visible", Some(&false.into()));
         narrow.add_setter(&widgets.unfold_button, "visible", Some(&false.into()));
         root.add_breakpoint(narrow);
+        finish_notice::fit_status(&widgets.status);
         let find = find_bar::FindBar::new(&widgets.source_view);
         if let Some(find) = &find {
             widgets.toolbar_view.add_top_bar(find.widget());
@@ -539,7 +558,7 @@ impl SimpleComponent for SqlEditor {
             .connect_cursor_position_notify(move |_| update_cursor());
 
         let refresh_completion =
-            build_completion_refresh(widgets.source_view.clone(), init.schema_index.clone(), sender.clone());
+            completion_provider::build_refresh(widgets.source_view.clone(), init.schema_index.clone(), sender.clone());
         refresh_completion();
         let refresh_on_cursor = refresh_completion.clone();
         widgets
@@ -616,6 +635,8 @@ impl SimpleComponent for SqlEditor {
             history: init.history,
             run_generation: RunGeneration::default(),
             drop_generation,
+            known_lexing,
+            reading_lexing: false,
             dark_notify_handler: Some(dark_notify_handler),
         };
         ComponentParts { model, widgets }
@@ -669,7 +690,10 @@ impl SimpleComponent for SqlEditor {
                 session_id,
                 result,
             } => self.on_session_opened(connection_id, connection_identity, session_id, result, &sender),
-            SqlEditorInput::ConnectionIdentityChanged => self.on_connection_identity_changed(&sender),
+            SqlEditorInput::ConnectionIdentityChanged => {
+                self.known_lexing.forget();
+                self.on_connection_identity_changed(&sender);
+            }
             SqlEditorInput::SessionState {
                 session_id,
                 transaction_open,
@@ -704,26 +728,24 @@ impl SimpleComponent for SqlEditor {
                 self.begin_run(trimmed, false, sender);
             }
 
-            SqlEditorInput::RunWithParameters {
-                sql,
-                statements,
-                error_policy,
-                values,
-            } => {
-                self.execute_sql(sql, statements, error_policy, values, sender);
+            SqlEditorInput::RunWithParameters { sql, planned, values } => {
+                self.execute_sql(sql, planned, values, sender);
             }
+
+            SqlEditorInput::LexingRead { source, sql, result } => self.on_lexing_read(source, sql, result, sender),
+            SqlEditorInput::LexingRefreshed { source, settings } => self.on_lexing_refreshed(source, settings),
 
             SqlEditorInput::ToggleLineComment => {
                 toggle_line_comment(&self.source_view.buffer());
             }
 
             SqlEditorInput::ToggleFold => {
-                let grammar = self
-                    .metadata()
-                    .and_then(|metadata| statement_cursor::grammar_for(&metadata.driver_id))
+                let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
+                let grammar = statement_cursor::grammar_for(&driver_id)
                     .unwrap_or(tablepro_core::sql_syntax::SqlGrammar::PostgreSql);
+                let settings = self.lexing(&driver_id).settings_for(grammar);
                 if let Ok(buffer) = self.source_view.buffer().downcast::<sourceview5::Buffer>() {
-                    self.folding.borrow_mut().toggle_at_cursor(&buffer, grammar);
+                    self.folding.borrow_mut().toggle_at_cursor(&buffer, grammar, settings);
                 }
             }
 
@@ -743,7 +765,7 @@ impl SimpleComponent for SqlEditor {
                     let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
                     let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
                     let cursor = cursor_byte_offset(&all, cursor_chars);
-                    statement_at_cursor(&all, &driver_id, cursor).unwrap_or(all)
+                    statement_at_cursor(&all, self.lexing(&driver_id), cursor).unwrap_or(all)
                 };
                 if let Some(window) = self.source_view.root().and_then(|r| r.downcast::<gtk::Window>().ok()) {
                     crate::ui::explain_dialog::present(
@@ -763,7 +785,7 @@ impl SimpleComponent for SqlEditor {
                 let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
                 let cursor_byte = cursor_byte_offset(&sql, cursor_chars);
                 let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
-                let Some(target) = adjacent_statement_start(&sql, &driver_id, cursor_byte, forward) else {
+                let Some(target) = adjacent_statement_start(&sql, self.lexing(&driver_id), cursor_byte, forward) else {
                     return;
                 };
                 let target_chars = sql[..target].chars().count() as i32;
@@ -779,7 +801,7 @@ impl SimpleComponent for SqlEditor {
                 let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
                 let cursor_byte = cursor_byte_offset(&sql, cursor_chars);
                 let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
-                let Some(statement) = statement_at_cursor(&sql, &driver_id, cursor_byte) else {
+                let Some(statement) = statement_at_cursor(&sql, self.lexing(&driver_id), cursor_byte) else {
                     self.status.set_label(&crate::tr!("No statement at cursor"));
                     return;
                 };
@@ -942,15 +964,13 @@ impl SimpleComponent for SqlEditor {
                 if text.trim().is_empty() {
                     return;
                 }
-                let Some(grammar) = self
-                    .metadata()
-                    .and_then(|metadata| statement_cursor::grammar_for(&metadata.driver_id))
-                else {
+                let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
+                let Some(grammar) = statement_cursor::grammar_for(&driver_id) else {
                     self.status
                         .set_label(&crate::tr!("Formatting is unavailable for this connection"));
                     return;
                 };
-                let settings = tablepro_core::sql_syntax::script::LexicalSettings::default_for(grammar);
+                let settings = self.lexing(&driver_id).settings_for(grammar);
                 let formatted = format_plan::format_script(&text, grammar, settings);
                 if formatted == text {
                     return;
@@ -965,8 +985,7 @@ impl SqlEditor {
     pub(super) fn execute_sql(
         &mut self,
         trimmed: String,
-        statements: Vec<String>,
-        error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy,
+        planned: PlannedStatements,
         parameter_values: std::collections::HashMap<String, tablepro_core::Value>,
         sender: ComponentSender<Self>,
     ) {
@@ -1011,6 +1030,7 @@ impl SqlEditor {
             generation,
             ExecutionContext {
                 sql: trimmed.clone(),
+                lexical: self.lexing(&metadata.driver_id).settings,
                 metadata,
                 started_at: SystemTime::now(),
                 timeout_secs,
@@ -1026,6 +1046,7 @@ impl SqlEditor {
             .unwrap_or_default();
         let export_driver_id = driver_id.clone();
         let target = self.statement_target(conn);
+        let lexing_source = self.lexing_source();
         let export_session = StreamSession::of(&target);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -1092,11 +1113,12 @@ impl SqlEditor {
                     let msg = match run_statements_with_stream(
                         StatementRun {
                             target: target.clone(),
-                            statements,
+                            statements: planned.statements,
                             driver_id: &driver_id,
                             parameter_values: &parameter_values,
                             control: &control,
-                            error_policy,
+                            error_policy: planned.error_policy,
+                            settings_check: planned.settings_check,
                             succeeded,
                         },
                         stream_update,
@@ -1134,62 +1156,17 @@ impl SqlEditor {
                             usable,
                         });
                     }
+                    let refresh_control = crate::services::operation_control::bounded(timeout_secs);
+                    if let Ok(settings) = target.lexical_settings(&refresh_control).await {
+                        sender_clone.input(SqlEditorInput::LexingRefreshed {
+                            source: lexing_source,
+                            settings,
+                        });
+                    }
                 })
                 .drop_on_shutdown()
         });
     }
-}
-
-pub(super) fn read_sql_text(path: &std::path::Path, max_bytes: u64) -> Result<String, String> {
-    tablepro_core::text_file::read_text_file(path, max_bytes)
-        .map(|file| file.text)
-        .map_err(|error| open_file::file_error_message(&error))
-}
-
-fn export_name_for_query(query: &str) -> String {
-    if query.trim().is_empty() {
-        return crate::tr!("query-results");
-    }
-    let label = derive_tab_label(query);
-    let mut slug = String::new();
-    for character in label.chars() {
-        if character.is_alphanumeric() {
-            slug.push(character.to_ascii_lowercase());
-        } else if !slug.ends_with('-') {
-            slug.push('-');
-        }
-    }
-    let slug = slug.trim_matches('-');
-    if slug.is_empty() {
-        crate::tr!("query-results")
-    } else {
-        slug.to_string()
-    }
-}
-
-fn build_completion_refresh(
-    view: sourceview5::View,
-    schema_index: std::rc::Rc<std::cell::RefCell<SchemaIndex>>,
-    sender: ComponentSender<SqlEditor>,
-) -> std::rc::Rc<dyn Fn()> {
-    std::rc::Rc::new(move || {
-        let buffer = view.buffer();
-        let (start, end) = buffer.bounds();
-        let sql = buffer.text(&start, &end, true).to_string();
-        let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
-        let cursor_byte = cursor_byte_offset(&sql, cursor_chars);
-        let Ok(index) = schema_index.try_borrow() else {
-            return;
-        };
-        let missing: Vec<String> = referenced_tables(&sql, cursor_byte, index.grammar)
-            .into_iter()
-            .filter(|table| !index.knows_columns(table))
-            .collect();
-        drop(index);
-        if !missing.is_empty() {
-            let _ = sender.output(SqlEditorOutput::NeedColumns(missing));
-        }
-    })
 }
 
 #[cfg(test)]

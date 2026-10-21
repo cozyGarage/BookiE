@@ -163,6 +163,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::outcomes::tests::a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "services::browse_query::tests::mysql_value_query_refetches_the_exact_blob_for_a_composite_key"
     ],
     [
@@ -235,7 +240,12 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::save_in_flight_tests::a_foreign_key_that_arrives_after_the_rows_marks_its_header"
+      "ui::browse_tab::save_in_flight_tests::the_cell_menu_sets_a_draft_cell_to_null_in_the_draft"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::the_row_menu_deletes_a_draft_row_by_discarding_it"
     ],
     [
       "tablepro-app",
@@ -276,6 +286,11 @@
       "tablepro-app",
       "--lib",
       "ui::explain_dialog::tests::explain_pages_have_available_icons_for_the_view_switcher"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::explain_dialog::tests::closing_the_explain_window_cancels_its_query"
     ],
     [
       "tablepro-app",
@@ -465,6 +480,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::local_filter::tests::filtering_a_fully_selected_result_restores_the_selection_in_one_signal"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::schema::vim_tests::vim_keys_are_attached_only_when_enabled"
     ],
     [
@@ -486,6 +506,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::streaming::tests::a_stream_waits_with_a_loading_status_page"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::tests::a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown"
     ],
     [
       "tablepro-app",
@@ -581,6 +606,91 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_dispatch_resumes_after_success_cancel_and_timeout"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::column_width_tests::saved_grid_width_stays_fixed_when_the_window_grows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::column_width_tests::resized_grid_width_stays_fixed_when_the_window_grows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::column_width_tests::unsaved_result_grid_width_stays_fixed_when_the_window_grows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::split_view::tests::opening_an_editor_moves_focus_out_of_sidebar_search"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::lifetime_tests::a_dropped_result_grid_releases_its_page"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::lifetime_tests::a_rendered_result_grid_with_menus_releases_its_page"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::lifetime_tests::a_rendered_editable_grid_releases_its_page"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::lifetime_tests::repeated_result_grid_replacement_releases_every_retired_page"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::lifetime_tests::a_menu_context_does_not_keep_a_removed_cell_alive"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::outcomes::lifetime_tests::streamed_widgets_release_evicted_pages_and_cancelled_results_on_close"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::pager::tests::pager_navigates_retained_pages_and_status_without_retaining_its_notebook"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::sql_text::tests::advisory_text_is_bounded_by_utf8_bytes_without_truncating_the_buffer"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::completion_resumes_after_a_large_buffer_is_replaced_with_a_small_query"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::app::session_teardown::tests::a_window_close_whose_sessions_cannot_close_offers_to_close_anyway"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::tests::hidden_stream_pages_build_their_grid_only_when_selected"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::tests::a_terminal_status_keeps_retained_grids_unbuilt_until_selected"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::a_foreign_key_that_arrives_after_the_rows_marks_its_header"
     ]
   ],
   "keyring": [
