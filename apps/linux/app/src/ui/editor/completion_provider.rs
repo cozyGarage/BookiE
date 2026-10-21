@@ -126,8 +126,10 @@ impl Provider {
         let Some(buffer) = context.buffer() else {
             return model;
         };
-        let (start, end) = buffer.bounds();
-        let source: Rc<str> = buffer.text(&start, &end, true).as_str().into();
+        let Some(text) = super::sql_text::analysis_text(buffer.upcast_ref()) else {
+            return model;
+        };
+        let source: Rc<str> = text.as_str().into();
         let cursor = super::statement_cursor::cursor_byte_offset(
             &source,
             buffer.iter_at_mark(&buffer.get_insert()).offset() as usize,
@@ -194,8 +196,9 @@ pub(super) fn build_completion_refresh(
 ) -> std::rc::Rc<dyn Fn()> {
     std::rc::Rc::new(move || {
         let buffer = view.buffer();
-        let (start, end) = buffer.bounds();
-        let sql = buffer.text(&start, &end, true).to_string();
+        let Some(sql) = super::sql_text::analysis_text(&buffer) else {
+            return;
+        };
         let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
         let cursor_byte = super::statement_cursor::cursor_byte_offset(&sql, cursor_chars);
         let Ok(index) = schema_index.try_borrow() else {
