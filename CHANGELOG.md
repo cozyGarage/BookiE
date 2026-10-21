@@ -7,6 +7,9 @@
 - Streamed result pages wait until their first display frame before building a grid, avoiding work for discarded pages.
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
+### Changed
+
+- Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
 
 ## [0.2.0] - 2026-10-21
 
