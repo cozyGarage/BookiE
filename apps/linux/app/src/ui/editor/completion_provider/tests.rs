@@ -112,7 +112,7 @@ fn proposals_preserve_aliases_and_replace_only_the_identifier() {
 #[ignore = "requires an isolated GTK display"]
 fn retired_proposals_do_not_edit_the_buffer() {
     gtk::init().unwrap();
-    for retired_by in ["generation", "text", "cursor"] {
+    for retired_by in ["generation", "text", "cursor", "large_buffer"] {
         let index = Rc::new(RefCell::new(SchemaIndex::default()));
         index.borrow_mut().tables.push("\"Users\"".into());
         let (_view, provider, context) = fixture("SELECT * FROM Us", 16, index.clone());
@@ -128,6 +128,7 @@ fn retired_proposals_do_not_edit_the_buffer() {
         match retired_by {
             "generation" => index.borrow_mut().invalidate_columns(),
             "text" => buffer.set_text("SELECT * FROM other"),
+            "large_buffer" => buffer.set_text(&" ".repeat(super::super::sql_text::MAX_ANALYSIS_BYTES + 1)),
             _ => buffer.place_cursor(&buffer.start_iter()),
         }
         let (start, end) = buffer.bounds();

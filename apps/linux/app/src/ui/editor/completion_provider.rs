@@ -163,9 +163,11 @@ impl Provider {
         let Ok(index) = index.try_borrow() else {
             return;
         };
-        let (start, end) = buffer.bounds();
+        let Some(text) = super::sql_text::analysis_text(buffer.upcast_ref()) else {
+            return;
+        };
         if !index.accepts(&insertion.request)
-            || buffer.text(&start, &end, true).as_str() != insertion.source.as_ref()
+            || text.as_str() != insertion.source.as_ref()
             || buffer.iter_at_mark(&buffer.get_insert()).offset() != insertion.cursor
         {
             return;
