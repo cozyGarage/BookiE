@@ -7,6 +7,8 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 ### Added
 
 - Copy as in the grid menu also offers UPDATE Statement and DELETE Statement for a row, found by its primary key. Tables without a key refuse with a message.
+- The sidebar table menu has Truncate Table, which asks for confirmation and runs through the same guard as other statements. SQLite is refused because it has no TRUNCATE.
+- The sidebar table menu has Truncate Table, which asks for confirmation and runs through the same guard as other statements. SQLite is refused because it has no TRUNCATE.
 - The sidebar table menu has Rename Table. It asks for the new name and is refused while the table has open tabs, so no pending changes are lost.
 - MongoDB connections have an optional Authentication database field, for a user defined in `admin` while the Database field names the database to browse; saved connections and bundles carry it.
 - PostgreSQL query cancellation through PgBouncer without interrupting another client's work.
@@ -158,6 +160,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Fixed
 
+- PostgreSQL pooled connections are reset (`DISCARD ALL`) when returned, so a `SET`, temporary table or prepared statement from one editor statement no longer leaks into later reads on the same connection. Session mode keeps its own state.
 - Stopping or timing out a DuckDB query now interrupts it on the engine, so the connection is free again at once instead of waiting for the query to finish.
 - ClickHouse grid edits and deletes check that the key matches exactly one row and refuse, changing nothing, when the non-unique sorting key matches several.
 - SQLite refuses to drop a table that other tables reference and names them, instead of silently running their ON DELETE actions on the child rows.
