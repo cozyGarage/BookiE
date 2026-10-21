@@ -37,7 +37,7 @@ Use First, Previous, Next and Last to move through table pages. Unsorted tables 
 
 Ctrl+E opens a SQL editor tab for the current connection.
 
-Supported single-statement PostgreSQL `SELECT`s load progressively. The grid keeps up to four pages of 5,000 rows; older pages leave the forward-only window and cannot be revisited there. Other engines and unsupported query shapes load a capped result. A truncated, failed or cancelled result is incomplete; see [result limits](known-limitations.md#data-and-values).
+Supported single-statement PostgreSQL `SELECT`s load progressively. The grid keeps up to four pages of 5,000 rows; use **Previous page** and **Next page** to navigate retained pages. The row summary states which rows remain when older pages leave the forward-only window. Discarded rows cannot be revisited there. Other engines and unsupported query shapes load a capped result. A truncated, failed or cancelled result is incomplete; see [result limits](known-limitations.md#data-and-values).
 
 SQL completion offers keywords and scoped table and column names. Choosing an identifier inserts its complete quoted SQL name. Table names keep their schema; column suggestions after an alias keep that alias. Arbitrary words elsewhere in the editor are not suggestions.
 
@@ -72,7 +72,7 @@ To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+S
   [identity and generated-column limitations](known-limitations.md#data-and-values).
 - **Import**: right-click a table and choose **Import CSV…** to load a CSV file
   into it, or use the button on a schema header to create a new table from a CSV
-  file. A `.xlsx` workbook is read from its first worksheet that has data, using the values the file stores (formulas show their last saved result, dates as ISO text); there is no sheet picker yet. Separator, header row and column mapping are detected and can be changed.
+  file. A `.xlsx` workbook is read from its first worksheet that has data, using the values the file stores (formulas show their last saved result, dates as ISO text); there is no sheet picker yet. Separator, header row and column mapping are detected and can be changed, as can the quote character, backslash escaping of quotes and the text encoding (UTF-8, Windows-1252 or UTF-16; a file that is not UTF-8 opens with a matching choice).
   For an existing table, use **Remember mapping** and **Restore mapping** to reuse
   the destination choices for that connection and table. Generated columns stay on
   Skip. PostgreSQL, MySQL/MariaDB and SQLite accept mapped auto-increment values;
