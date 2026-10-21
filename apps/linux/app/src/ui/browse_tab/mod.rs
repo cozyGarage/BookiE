@@ -36,6 +36,16 @@ pub(super) fn columns_for_browse_page(
     loaded_columns.to_vec()
 }
 
+pub(super) fn with_table_ownership(columns: &mut [ColumnInfo], table: &[ColumnInfo]) {
+    for column in columns {
+        if let Some(known) = table.iter().find(|known| known.name == column.name) {
+            column.is_generated |= known.is_generated;
+            column.is_auto_increment |= known.is_auto_increment;
+            column.primary_key |= known.primary_key;
+        }
+    }
+}
+
 fn projection_for_loaded_page(result: &QueryResult, projection: Option<Vec<usize>>) -> Option<Vec<usize>> {
     if result.rows.is_empty() && result.columns.is_empty() {
         None
@@ -225,6 +235,7 @@ impl BrowseTab {
             }
             result.columns = self.current_columns.clone();
         }
+        with_table_ownership(&mut result.columns, &self.current_columns);
         Some(result)
     }
 
@@ -973,8 +984,8 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::GridDeleteRowAt { row_position, row_key } => {
                 self.handle_grid_delete_row(row_position, row_key, sender)
             }
-            BrowseTabInput::GridCopyRowAsInsert { row_position } => {
-                self.handle_grid_copy_row_as_insert(row_position, sender)
+            BrowseTabInput::GridCopyRowAsStatement(row_position, statement) => {
+                self.handle_grid_copy_row_as_statement(row_position, statement, sender)
             }
             BrowseTabInput::GridCopyToClipboard(text) => self.handle_grid_copy_to_clipboard(text, sender),
             BrowseTabInput::GridFetchCellValue {

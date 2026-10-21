@@ -450,6 +450,15 @@ impl BrowseTab {
             )));
             return;
         }
+        if let Some(row) = self.row_object_at(row_position)
+            && let Some(draft_id) = row.draft_id()
+        {
+            crate::services::change_tracker::with_tab(self.tab_id, |tracker| {
+                tracker.track_draft_cell_edit(draft_id, col_index, Value::Null);
+            });
+            row.set_cell(col_index, Value::Null);
+            return;
+        }
         let Some((key, row)) = self.row_key_at(row_position) else {
             self.report_unreadable_row_key(row_position, &sender);
             return;
@@ -469,6 +478,13 @@ impl BrowseTab {
         if self.reject_stale_row_edit(row_position, &row_key, &sender) {
             return;
         }
+        if let Some(draft_id) = self.row_object_at(row_position).and_then(|row| row.draft_id()) {
+            crate::services::change_tracker::with_tab(self.tab_id, |tracker| {
+                tracker.discard_draft(draft_id);
+            });
+            remove_draft_rows(self.list_store().as_ref(), &[draft_id]);
+            return;
+        }
         let Some((key, row)) = self.row_key_at(row_position) else {
             self.report_unreadable_row_key(row_position, &sender);
             return;
@@ -478,8 +494,16 @@ impl BrowseTab {
         });
     }
 
-    pub(super) fn handle_grid_copy_row_as_insert(&mut self, row_position: u32, sender: ComponentSender<Self>) {
-        let _ = sender.output(BrowseTabOutput::CopyRowAsInsert { row_position });
+    pub(super) fn handle_grid_copy_row_as_statement(
+        &mut self,
+        row_position: u32,
+        statement: tablepro_core::sql_literal::RowStatement,
+        sender: ComponentSender<Self>,
+    ) {
+        let _ = sender.output(BrowseTabOutput::CopyRowAsStatement {
+            row_position,
+            statement,
+        });
     }
 
     pub(super) fn handle_grid_copy_to_clipboard(&mut self, text: String, sender: ComponentSender<Self>) {

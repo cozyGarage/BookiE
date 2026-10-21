@@ -1,3 +1,4 @@
+mod cell_context;
 mod choice_editor;
 mod close_edits;
 pub(crate) use close_edits::finish_active_edits;
@@ -5,11 +6,15 @@ mod column;
 mod column_jump;
 mod column_order;
 mod column_visibility;
+#[cfg(test)]
+mod column_width_tests;
 mod context_menu;
 mod display;
 mod editing;
 mod export;
 pub(crate) mod full_value_editor;
+#[cfg(test)]
+mod lifetime_tests;
 pub(crate) mod local_filter;
 mod local_sort;
 mod presentation;
@@ -68,9 +73,7 @@ pub enum GridMsg {
     },
     IncompleteRowData,
     ProjectionFailure,
-    CopyRowAsInsert {
-        row_position: u32,
-    },
+    CopyRowAsStatement(u32, tablepro_core::sql_literal::RowStatement),
     ShowRowAsJson(String),
     ExportResults(QueryResult),
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
