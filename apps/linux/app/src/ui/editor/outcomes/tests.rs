@@ -1171,6 +1171,7 @@ async fn a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor(
             parameter_values: &Default::default(),
             control: &control,
             error_policy: BatchErrorPolicy::StopScript,
+            settings_check: None,
             succeeded: |_: &str| {},
         },
         move |_| {
