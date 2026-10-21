@@ -1,0 +1,7 @@
+# Bounded visible cell previews, October 22
+
+The maintainer approved limiting oversized, non-inline-editable text and JSON cell previews to 512 Unicode characters before GTK layout. The 8 KiB backing sample and full source value are unchanged. The existing byte-count suffix identifies the full source size; View Value, Copy Value and export continue to use their existing exact-value paths.
+
+Two regressions failed before the correction: an 8 KiB Text/JsonText sample still produced an 8 KiB label, and a multibyte sample included characters beyond the chosen limit. The correction chooses a UTF-8 boundary after 512 Unicode scalar values, then applies the existing visible NUL substitution to that prefix. Binary previews and ordinary inline-editable cells are unchanged. This branch includes the preceding NUL-preview fix #1314 and should be reviewed after that dependency.
+
+The motivation is the [stream-cache comparison in PR #1322](https://github.com/cozyGarage/BookiE/pull/1322) recorded on a separate branch under [#1032](https://github.com/cozyGarage/BookiE/issues/1032): a smaller retained window reduced memory but increased CPU; perf attributed most work to GTK text layout. Attribution to a specific UI transition is not established. All 31 non-ignored display tests, all 103 isolated GTK cases, full preflight and app all-target Clippy passed. A matched optimized profile remains pending. No measured CPU reduction is claimed yet.
