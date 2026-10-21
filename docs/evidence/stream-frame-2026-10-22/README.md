@@ -66,3 +66,11 @@ The [summary](wide-heap-summary.json) records source identity, tool totals and a
 ## Arena-count experiment
 
 A child-process-only `MALLOC_ARENA_MAX=2` experiment repeated the same six wide-value cycles and completed successfully. Peak sampled RSS was 480.18 MiB, compared with 481.99 MiB in the earlier default run. After-close samples remained near 480 MiB. This single run did not show a useful reduction, so no application or desktop setting was changed. The [record](arena-experiment.json) preserves configuration and outcomes. The setting is described in the [GNU libc allocation manual](https://sourceware.org/glibc/manual/latest/html_node/Memory-Allocation-Tunables.html); this is experiment provenance, not a recommendation to change defaults.
+
+## Reclaimability diagnostic
+
+A child-only preload probe called `malloc_trim(0)` every five seconds for at most 120 seconds, without changing the profiled application binary. Six 50,000-row queries with 8,193-byte payloads completed, each followed by replacement and tab close. The scenario exited 0 after 109.334 seconds without a safety abort; perf exited -2, so CPU figures come from process accounting. The [summary](trim-experiment.json) records all phase samples.
+
+After-close RSS was 178.12, 181.08, 175.15, 191.30, 192.62 and 194.02 MiB, compared with roughly 468–482 MiB in the earlier default six-cycle capture. Final idle RSS was 193.75 MiB; CPU remained 53.31 seconds across the 15-second idle interval. Peak RSS was 495.63 MiB, so this diagnostic did not reduce peak working data. The existing heap capture independently shows payload allocations released after close. Together these support allocator page retention as a substantial contributor to residual RSS in this workload. They do not prove the absence of other leaks.
+
+The probe is not a production recommendation. Periodic process-wide trimming can affect latency and unrelated allocations. Any product change needs disposal-triggered, bounded scheduling outside the GTK thread, measurements of pause time, and a repeated comparison. No allocator environment or desktop configuration was changed. The owned PostgreSQL container was stopped when the probe ended.
