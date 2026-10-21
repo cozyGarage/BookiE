@@ -6,6 +6,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Added
 
+- MongoDB connections have an optional Authentication database field, for a user defined in `admin` while the Database field names the database to browse; saved connections and bundles carry it.
 - PostgreSQL query cancellation through PgBouncer without interrupting another client's work.
 - Unsorted keyed table browsing can move backward through deep pages and jump to the last page using primary-key seeks while keeping rows in ascending key order.
 - Arch packages include a build-input manifest with source and dependency archive checksums, package versions, and toolchain details.
@@ -119,6 +120,8 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - PostgreSQL databases can be backed up to a file and restored from one with the installed client tools, through SSH tunnels and TLS; restores need approval and both are audited.
 
 ### Changed
+
+- Manually resized and restored grid columns keep their width when the window grows; unsized columns continue to fill the available space.
 - Imported connection URLs preserve supported TLS settings and reject options they cannot preserve.
 - Ending an aborted PostgreSQL editor transaction reports that it rolled back instead of saying its changes were committed.
 - PostgreSQL session audit records distinguish committed transactions recovered through savepoints from aborted transactions that roll back.
@@ -150,6 +153,10 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Fixed
 
+- Clearing a cell in a required text column saves an empty string instead of refusing the edit with "Field is required".
+- The connection dialog puts Test on the left and Connect on the right with a centered title; its dropdown choices, port and timeout boxes have an arrow or room around them.
+- A long message in the SQL editor toolbar, such as the notice after cancelling a large query, is cut with an ellipsis instead of pushing Pin results, Session, Explain, Run and Split off screen; the full text is in the tooltip and on the Status page.
+- A `USE` run on a pooled MySQL connection no longer changes which database later catalog reads and queries see: each pooled connection returns to the configured database before it is reused.
 - Keyboard run shortcuts no longer start another execution while a query is active.
 - After a tunnel drop during a Session transaction, a fresh editor session can run read queries again: ending its read-only snapshot with ROLLBACK is no longer refused by the earlier unresolved write, while commits and writes on that connection stay blocked.
 - Cancelling a PostgreSQL backup removes its partial file; a started restore that is cancelled or fails leaves governed writes on that connection blocked after reconnect while its outcome remains unknown.
