@@ -9,7 +9,7 @@ use sourceview5::prelude::*;
 use sourceview5::subclass::prelude::*;
 
 use super::completion::{SchemaIndex, SchemaRequest};
-use super::completion_proposals::candidates;
+use super::completion_proposals::candidates_with;
 
 struct Insertion {
     label: String,
@@ -49,6 +49,7 @@ mod provider {
     #[derive(Default)]
     pub struct Provider {
         pub index: RefCell<Rc<RefCell<SchemaIndex>>>,
+        pub(crate) lexing: RefCell<super::super::session_lexing::KnownLexing>,
     }
 
     #[glib::object_subclass]
@@ -114,9 +115,10 @@ glib::wrapper! {
     pub struct Provider(ObjectSubclass<provider::Provider>) @implements sourceview5::CompletionProvider;
 }
 
-pub(super) fn install(index: Rc<RefCell<SchemaIndex>>) -> Provider {
+pub(super) fn install(index: Rc<RefCell<SchemaIndex>>, lexing: super::session_lexing::KnownLexing) -> Provider {
     let provider: Provider = glib::Object::new();
     provider.imp().index.replace(index);
+    provider.imp().lexing.replace(lexing);
     provider
 }
 
@@ -137,7 +139,8 @@ impl Provider {
         let Ok(index) = index.try_borrow() else {
             return glib::Object::new();
         };
-        let candidates = candidates(&source, cursor, &index);
+        let settings = self.imp().lexing.borrow().settings();
+        let candidates = candidates_with(&source, cursor, &index, settings);
         model::ProposalModel::new(
             candidates,
             source,
@@ -179,13 +182,10 @@ impl Provider {
     }
 }
 
-#[cfg(test)]
-#[path = "completion_provider/tests.rs"]
-mod tests;
-
-pub(super) fn build_refresh(
+pub(super) fn build_completion_refresh(
     view: sourceview5::View,
     schema_index: std::rc::Rc<std::cell::RefCell<SchemaIndex>>,
+    known_lexing: super::session_lexing::KnownLexing,
     sender: relm4::ComponentSender<super::SqlEditor>,
 ) -> std::rc::Rc<dyn Fn()> {
     std::rc::Rc::new(move || {
@@ -198,13 +198,18 @@ pub(super) fn build_refresh(
         let Ok(index) = schema_index.try_borrow() else {
             return;
         };
-        let missing: Vec<String> = super::referenced_tables(&sql, cursor_byte, index.grammar)
-            .into_iter()
-            .filter(|table| !index.knows_columns(table))
-            .collect();
+        let missing: Vec<String> =
+            super::completion::referenced_tables_with(&sql, cursor_byte, index.grammar, known_lexing.settings())
+                .into_iter()
+                .filter(|table| !index.knows_columns(table))
+                .collect();
         drop(index);
         if !missing.is_empty() {
             let _ = sender.output(super::SqlEditorOutput::NeedColumns(missing));
         }
     })
 }
+
+#[cfg(test)]
+#[path = "completion_provider/tests.rs"]
+mod tests;
