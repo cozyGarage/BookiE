@@ -153,6 +153,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Fixed
 
+- The connection dialog puts Test on the left and Connect on the right with a centered title; its dropdown choices, port and timeout boxes have an arrow or room around them.
 - A `USE` run on a pooled MySQL connection no longer changes which database later catalog reads and queries see: each pooled connection returns to the configured database before it is reused.
 - Keyboard run shortcuts no longer start another execution while a query is active.
 - After a tunnel drop during a Session transaction, a fresh editor session can run read queries again: ending its read-only snapshot with ROLLBACK is no longer refused by the earlier unresolved write, while commits and writes on that connection stay blocked.
