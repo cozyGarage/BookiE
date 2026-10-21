@@ -74,3 +74,7 @@ A child-only preload probe called `malloc_trim(0)` every five seconds for at mos
 After-close RSS was 178.12, 181.08, 175.15, 191.30, 192.62 and 194.02 MiB, compared with roughly 468–482 MiB in the earlier default six-cycle capture. Final idle RSS was 193.75 MiB; CPU remained 53.31 seconds across the 15-second idle interval. Peak RSS was 495.63 MiB, so this diagnostic did not reduce peak working data. The existing heap capture independently shows payload allocations released after close. Together these support allocator page retention as a substantial contributor to residual RSS in this workload. They do not prove the absence of other leaks.
 
 The probe is not a production recommendation. Periodic process-wide trimming can affect latency and unrelated allocations. Any product change needs disposal-triggered, bounded scheduling outside the GTK thread, measurements of pause time, and a repeated comparison. No allocator environment or desktop configuration was changed. The owned PostgreSQL container was stopped when the probe ended.
+
+## Corrected dependency refresh
+
+The frame branch now includes #1304's cursor-local PostgreSQL correction rather than the failed shared-casing attempt. Runtime source matches profiling baseline `aebdadea6`; intervening source merges changed only documentation. Full preflight and all 105 isolated GTK tests passed on the refreshed branch. The old failed aggregate #1307 was closed as obsolete. These local checks do not qualify a Forgejo merge gate for the refreshed frame PR.
