@@ -6,6 +6,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Added
 
+- The sidebar table menu has Rename Table. It asks for the new name and is refused while the table has open tabs, so no pending changes are lost.
 - MongoDB connections have an optional Authentication database field, for a user defined in `admin` while the Database field names the database to browse; saved connections and bundles carry it.
 - PostgreSQL query cancellation through PgBouncer without interrupting another client's work.
 - Unsorted keyed table browsing can move backward through deep pages and jump to the last page using primary-key seeks while keeping rows in ascending key order.
@@ -121,6 +122,9 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Changed
 
+- Opening a SQL editor tab moves keyboard focus into the query instead of leaving typing in the sidebar search.
+- Closing or replacing table and query results releases associated data instead of accumulating memory.
+
 - Manually resized and restored grid columns keep their width when the window grows; unsized columns continue to fill the available space.
 - Imported connection URLs preserve supported TLS settings and reject options they cannot preserve.
 - Ending an aborted PostgreSQL editor transaction reports that it rolled back instead of saying its changes were committed.
@@ -154,6 +158,12 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 ### Fixed
 
 - Failed MCP token guesses can no longer lock out a valid token: the shared failed-attempt limit applies only after a token fails verification.
+- Stopping or timing out a DuckDB query now interrupts it on the engine, so the connection is free again at once instead of waiting for the query to finish.
+- ClickHouse grid edits and deletes check that the key matches exactly one row and refuse, changing nothing, when the non-unique sorting key matches several.
+- SQLite refuses to drop a table that other tables reference and names them, instead of silently running their ON DELETE actions on the child rows.
+- Pasting rows copied from a BookiE grid restores values that start with `-`, `+`, `=` or `@` and turns the copied NULL marker back into an empty (NULL) cell.
+- Restoring a workspace with more than 32 tabs on one connection keeps every SQL editor and drops table tabs first.
+- Clearing a cell in a required text column saves an empty string instead of refusing the edit with "Field is required".
 - The connection dialog puts Test on the left and Connect on the right with a centered title; its dropdown choices, port and timeout boxes have an arrow or room around them.
 - A long message in the SQL editor toolbar, such as the notice after cancelling a large query, is cut with an ellipsis instead of pushing Pin results, Session, Explain, Run and Split off screen; the full text is in the tooltip and on the Status page.
 - A `USE` run on a pooled MySQL connection no longer changes which database later catalog reads and queries see: each pooled connection returns to the configured database before it is reused.
