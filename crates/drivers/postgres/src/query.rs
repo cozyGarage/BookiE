@@ -261,7 +261,7 @@ pub(super) fn statement_columns(columns: &[sqlx::postgres::PgColumn]) -> Vec<Col
         .iter()
         .map(|column| ColumnInfo {
             name: column.name().to_string(),
-            data_type: column.type_info().name().to_ascii_lowercase(),
+            data_type: column.type_info().name().to_string(),
             nullable: true,
             primary_key: false,
             is_auto_increment: false,
