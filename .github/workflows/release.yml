@@ -98,7 +98,7 @@ jobs:
           apt-get install -y --no-install-recommends build-essential ca-certificates curl git nodejs pkg-config \
             libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libssl-dev libsecret-1-dev libkrb5-dev \
             libsqlite3-dev clang python3 dpkg-dev file patchelf desktop-file-utils squashfs-tools xz-utils \
-            gettext binutils libgdk-pixbuf-2.0-dev librsvg2-common shared-mime-info
+            gettext binutils libgdk-pixbuf-2.0-dev librsvg2-common shared-mime-info ibus-gtk4
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ github.sha }}

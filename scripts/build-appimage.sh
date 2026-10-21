@@ -34,12 +34,14 @@ cd "$OUT"
 export APPIMAGE_EXTRACT_AND_RUN=1 DEPLOY_GTK_VERSION=4 ARCH=x86_64 VERSION
 export OUTPUT="BookiE-${VERSION}-x86_64.AppImage"
 export PATH="$TOOLS:$PATH"
+IBUS_LIBRARY="$(ldconfig -p | awk '/libibus-1.0.so.5 .*x86-64/ {print $NF; exit}')"
 "$TOOLS/linuxdeploy-x86_64.AppImage" \
   --appdir "$APPDIR" \
   --desktop-file "$APPDIR/usr/share/applications/com.tablepro.linux.desktop" \
   --icon-file "$APPDIR/usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg" \
   --executable "$APPDIR/usr/bin/bookie" \
   --executable "$APPDIR/usr/bin/bookie-agentd" \
+  ${IBUS_LIBRARY:+--library "$IBUS_LIBRARY"} \
   --plugin gtk \
   --output appimage
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
