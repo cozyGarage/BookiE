@@ -154,6 +154,11 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 ### Fixed
 
 - SQLite refuses to drop a table that other tables reference and names them, instead of silently running their ON DELETE actions on the child rows.
+- Pasting rows copied from a BookiE grid restores values that start with `-`, `+`, `=` or `@` and turns the copied NULL marker back into an empty (NULL) cell.
+- Restoring a workspace with more than 32 tabs on one connection keeps every SQL editor and drops table tabs first.
+- Clearing a cell in a required text column saves an empty string instead of refusing the edit with "Field is required".
+- The connection dialog puts Test on the left and Connect on the right with a centered title; its dropdown choices, port and timeout boxes have an arrow or room around them.
+- A long message in the SQL editor toolbar, such as the notice after cancelling a large query, is cut with an ellipsis instead of pushing Pin results, Session, Explain, Run and Split off screen; the full text is in the tooltip and on the Status page.
 - A `USE` run on a pooled MySQL connection no longer changes which database later catalog reads and queries see: each pooled connection returns to the configured database before it is reused.
 - Keyboard run shortcuts no longer start another execution while a query is active.
 - After a tunnel drop during a Session transaction, a fresh editor session can run read queries again: ending its read-only snapshot with ROLLBACK is no longer refused by the earlier unresolved write, while commits and writes on that connection stay blocked.
