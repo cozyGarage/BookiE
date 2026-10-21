@@ -157,9 +157,10 @@ pub enum AppMsg {
     },
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
     CopyToClipboard(String),
-    CopyRowAsInsert {
+    CopyRowAsStatement {
         tab_id: Uuid,
         row_position: u32,
+        statement: tablepro_core::sql_literal::RowStatement,
     },
     FetchBrowsePage(Uuid),
     FetchBrowseCellValue(
@@ -222,6 +223,25 @@ pub enum AppMsg {
     },
     ShowCreateTableLoaded {
         sql: String,
+    },
+    RenameTablePrompt {
+        schema: Option<String>,
+        table: String,
+    },
+    RenameTableConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        schema: Option<String>,
+        table: String,
+        new_name: String,
+    },
+    TruncateTablePrompt {
+        schema: Option<String>,
+        table: String,
+    },
+    TruncateTableConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        schema: Option<String>,
+        table: String,
     },
     DropTablePrompt {
         schema: Option<String>,

@@ -35,6 +35,24 @@ fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
     }
 }
 
+#[test]
+fn empty_input_is_an_empty_string_only_for_required_text_columns() {
+    let mut required = column("name", "character varying(20)", false);
+    required.nullable = false;
+    assert_eq!(
+        parse_grid_cell_input("", Some(&required), "postgres", None),
+        Ok(Value::Text(String::new()))
+    );
+    let nullable = column("name", "character varying(20)", false);
+    assert_eq!(
+        parse_grid_cell_input("", Some(&nullable), "postgres", None),
+        Ok(Value::Null)
+    );
+    let mut required_int = column("n", "integer", false);
+    required_int.nullable = false;
+    assert!(parse_grid_cell_input("", Some(&required_int), "postgres", None).is_err());
+}
+
 fn assert_cell_read_only(column: &ColumnInfo, value: &Value) {
     assert!(!crate::ui::grid::cell_allows_inline_edit(column, value));
 }
@@ -861,4 +879,36 @@ fn same_count_type_change_invalidates_cached_grid_factories() {
     let current = vec![column("value", "mixed", false)];
     assert!(!column_layout_matches(&rendered, &current));
     assert!(column_layout_matches(&current, &current));
+}
+
+#[test]
+fn a_page_sql_export_leaves_out_columns_the_server_fills() {
+    let plain = |name: &str| ColumnInfo {
+        name: name.into(),
+        data_type: "int".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    let mut table = vec![plain("id"), plain("qty"), plain("total"), plain("version")];
+    table[0].primary_key = true;
+    table[0].is_auto_increment = true;
+    table[2].is_generated = true;
+    table[3].is_generated = true;
+    let mut page = vec![plain("id"), plain("qty"), plain("total"), plain("version")];
+
+    super::with_table_ownership(&mut page, &table);
+
+    let row = [Value::Int(1), Value::Int(2), Value::Int(4), Value::Int(9)];
+    assert_eq!(
+        tablepro_core::sql_literal::build_insert_literal("mssql", Some("dbo"), "orders", &page, &row).unwrap(),
+        "INSERT INTO [dbo].[orders] ([qty]) VALUES (2);"
+    );
+    assert!(page[0].primary_key);
 }

@@ -30,6 +30,7 @@ pub struct ConnectDialog {
     resolved_socket: adw::ActionRow,
     database: adw::EntryRow,
     database_file_picker: gtk::Box,
+    auth_source: adw::EntryRow,
     username: adw::EntryRow,
     password: adw::PasswordEntryRow,
     auth_row: adw::ActionRow,
@@ -50,7 +51,6 @@ pub struct ConnectDialog {
     toast_overlay: adw::ToastOverlay,
     test_banner: adw::Banner,
     header_title: gtk::Label,
-    header_actions: gtk::Box,
     form: AuthFormState,
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
@@ -81,6 +81,7 @@ fn selected_path(row: &adw::EntryRow) -> Option<std::path::PathBuf> {
     (!path.is_empty()).then(|| std::path::PathBuf::from(path))
 }
 
+mod auth_source;
 mod browse;
 mod controls;
 mod entry_activation;
@@ -165,7 +166,8 @@ impl Component for ConnectDialog {
                 add_top_bar = &adw::HeaderBar {
                     set_centering_policy: adw::CenteringPolicy::Loose,
                     set_title_widget: Some(&model.header_title),
-                    pack_end: &model.header_actions,
+                    pack_start: &model.test_button,
+                    pack_end: &model.submit,
                 },
 
                 #[wrap(Some)]
@@ -211,6 +213,7 @@ impl Component for ConnectDialog {
             .build();
         let port_row = adw::ActionRow::builder().title(crate::tr!("Port")).build();
         let port = gtk::SpinButton::with_range(1.0, 65535.0, 1.0);
+        controls::center_in_row(&port);
         port.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Port"))]);
         port_row.add_suffix(&port);
         port_row.set_activatable_widget(Some(&port));
@@ -224,6 +227,7 @@ impl Component for ConnectDialog {
         let database = adw::EntryRow::builder().title(crate::tr!("Database")).build();
         let database_file_picker = browse::attach_database_file_picker(&database);
         database_file_picker.set_visible(false);
+        let auth_source = auth_source::row();
         let username = adw::EntryRow::builder().title(crate::tr!("Username")).build();
         let password = adw::PasswordEntryRow::builder().title(crate::tr!("Password")).build();
         let tls_choices = TlsMode::ALL.iter().map(|mode| mode.label().to_string()).collect();
@@ -289,6 +293,7 @@ impl Component for ConnectDialog {
         connection_group.add(&socket_dir);
         connection_group.add(&resolved_socket);
         connection_group.add(&database);
+        connection_group.add(&auth_source);
 
         let auth_labels: Vec<String> = AUTH_MODE_ROWS.iter().map(|mode| auth_mode_label(*mode)).collect();
         let (auth_row, auth_combo) = choice_row(crate::tr!("Method"), None, auth_labels);
@@ -333,15 +338,9 @@ impl Component for ConnectDialog {
             .map(|driver| crate::tr!("Connect to {name}").replace("{name}", &driver.display_name))
             .unwrap_or_else(|| crate::tr!("Connect"));
         let header_title = gtk::Label::new(Some(&initial_title));
-        header_title.set_halign(gtk::Align::Fill);
         header_title.set_valign(gtk::Align::Center);
-        header_title.set_hexpand(true);
-        header_title.set_xalign(0.0);
         header_title.set_ellipsize(gtk::pango::EllipsizeMode::End);
         header_title.add_css_class("title");
-        let header_actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        header_actions.append(&test_button);
-        header_actions.append(&submit);
 
         let page = adw::PreferencesPage::new();
         page.add(&connection_group);
@@ -375,6 +374,7 @@ impl Component for ConnectDialog {
             resolved_socket,
             database,
             database_file_picker,
+            auth_source,
             username,
             password,
             auth_row,
@@ -395,7 +395,6 @@ impl Component for ConnectDialog {
             toast_overlay,
             test_banner,
             header_title,
-            header_actions,
             form: AuthFormState::default(),
             preferences: init.preferences,
             bound_connection_id: init.bound_connection_id,
@@ -803,24 +802,6 @@ impl ConnectDialog {
         self.tls_client_key.set_visible(visible);
     }
 
-    fn apply_driver_form_visibility(&mut self, driver: &dyn tablepro_core::DatabaseDriver) {
-        self.form.file_based = driver.is_file_based();
-        self.form.supports_integrated = driver.supports_integrated_auth();
-        self.form.supports_local_socket = driver.supports_local_socket();
-        if !self.form.supports_local_socket {
-            self.endpoint_combo.set_selected(0);
-        }
-        self.apply_form_state();
-        self.configure_socket_field(driver.id());
-        self.apply_tls_visibility();
-        self.database_file_picker.set_visible(self.form.file_based);
-        self.database.set_title(&if self.form.file_based {
-            crate::tr!("File path")
-        } else {
-            crate::tr!("Database")
-        });
-    }
-
     fn apply_form_state(&self) {
         let endpoint = self.endpoint_state();
         let socket = endpoint.uses_local_socket();
@@ -862,6 +843,7 @@ impl ConnectDialog {
             host: self.host.text().to_string(),
             port: self.port.value() as u16,
             database: self.database.text().to_string(),
+            auth_source: auth_source::value(&self.auth_source),
             username,
             password: SecretString::new(password.into()),
             tls: self.tls_config_for(driver),
@@ -1111,6 +1093,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         last_opened_at: None,
         connect_timeout_secs: opts_clone.connect_timeout_secs,
         query_timeout_secs,
+        auth_source: opts_clone.auth_source.clone(),
     };
 
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;
