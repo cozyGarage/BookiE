@@ -19,3 +19,7 @@ The [source/binary manifest](preview-manifest.json) identifies the integration c
 All six follow-up queries reported success and the expected retained range 45001–50000, with all 50,000 rows received. Query times were 1.35–2.83 seconds. The scenario exited 0 in 84.307 seconds without a safety abort. Perf exited -2, so CPU totals use process accounting rather than perf's exit status. CPU accounting did not advance during the final 15-second idle period. After-close RSS ranged from 274.44 to 276.75 MiB. The owned PostgreSQL fixture was stopped afterward.
 
 Relative to the earlier original baseline, sampled peak RSS was 44.59% lower and app CPU was 56.80% lower in this workload. This supports bounding visible preview layout alongside retained bytes. It does not establish statistical significance, native Wayland behavior, long-duration leak freedom or a process-memory ceiling. A repeated order-reversed comparison remains useful before making broader claims.
+
+## Remaining routing scope
+
+Browse grids enable long-value previews only when primary-key indices are present; RowObject::preview_long_values returns early without them. Streamed SQL results use a separate result-preview path. The 512-character limit therefore applies to preview-enabled cells, not every unkeyed table cell. Unkeyed browse layout needs a separate reproduction and safe full-value-access check before changing its path. This source distinction is recorded on #1032; it is not a measured keyless-table regression.
