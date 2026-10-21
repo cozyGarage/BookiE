@@ -42,7 +42,10 @@ IBUS_LIBRARY="$(ldconfig -p | awk '/libibus-1.0.so.5 .*x86-64/ {print $NF; exit}
   --executable "$APPDIR/usr/bin/bookie" \
   --executable "$APPDIR/usr/bin/bookie-agentd" \
   ${IBUS_LIBRARY:+--library "$IBUS_LIBRARY"} \
-  --plugin gtk \
-  --output appimage
+  --plugin gtk
+for module in "$APPDIR"/usr/lib/gtk-4.0/*/immodules/*.so; do
+  patchelf --set-rpath '$ORIGIN/../../..' "$module"
+done
+"$TOOLS/linuxdeploy-x86_64.AppImage" --appdir "$APPDIR" --output appimage
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
 echo "Wrote $OUT/$OUTPUT"
