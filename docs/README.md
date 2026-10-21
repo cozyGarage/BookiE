@@ -19,6 +19,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | People using BookiE | [User guide](user-guide.md), [platforms](platforms.md), [root README](../README.md) |
 | Maintainers reviewing capability scope | [Capability review](capability-review.md) |
 | Contributors writing code | [AGENTS.md](../AGENTS.md), [architecture](../ARCHITECTURE.md) (including [where new code goes](../ARCHITECTURE.md#where-new-code-goes) and the boundary checklist), [code conventions](code-conventions.md), [adding drivers](adding-drivers.md), [state management](state-management.md), [connections](connections.md), [disconnection contracts](disconnection-contracts.md), [storage](storage.md), [error handling](error-handling.md) |
+| Releases | [Release process](release-process.md): tags, packages, release notes |
 | Contributors testing | [Validation playbook](validation-playbook.md) (including [CI tiers](validation-playbook.md#ci-tiers): GitHub cheap vs Forgejo merge), [testing](testing.md), ignored-test inventory (`scripts/inventory-ignored-tests.py`, generated, not committed), [manual verification](manual-verification-0.2-features.md) |
 | Planning and status | [Sprint](bookie-0.2-sprint.md), [0.2.0 scope](0.2.0-scope.md), [backlog](backlog.md), [known limitations](known-limitations.md), [Project #3](https://github.com/users/cozyGarage/projects/3), [ledger index](known-issues.md), [B3 board pointer](type-contract-strategy.md), [B4 board pointer](b4-task-board.md), [value evidence index](value-contracts.md), [ROADMAP](../ROADMAP.md), [changelog](../CHANGELOG.md) |
 | Product context and specs | [PRODUCT.md](../PRODUCT.md), [user contexts](personas.md), [PRINCIPLES.md](../PRINCIPLES.md), [SECURITY.md](../SECURITY.md), [capability specs](../specs/README.md) (descriptive drafts until architect review; AGENTS and ADRs rank above them) |
@@ -89,6 +90,11 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 Record a rule once in an ADR and a task once on Project #3. Do not copy old test counts into a current claim. Keep ignored `target/quality` paths as plain text, and when output is unavailable, say so instead of leaving a dead link.
 
 ## Engineering review records (October 2026)
+
+- [Bounded SQL result pager, October 21](evidence/stream-result-pager-2026-10-21/README.md): retained-page navigation, row-range regression and remaining visual acceptance.
+
+- [Initial SQL editor focus, October 21](evidence/editor-focus-2026-10-21/README.md): failing-then-passing GTK focus regression and remapping behavior.
+- [Grid lifetime and memory investigation, October 21](evidence/grid-lifetime-2026-10-21/README.md): reproduced GTK ownership cycles, original/fixed heap profiles, PostgreSQL RSS probe and remaining manual acceptance.
 
 - [Public documentation language review, October 21](evidence/public-documentation-language-2026-10-21/README.md): repository-wide Markdown screening, neutral wording corrections and independent adoption criteria.
 
