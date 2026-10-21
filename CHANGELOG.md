@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
+
 ## [0.2.0] - 2026-10-21
 
 Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). This section is the user-facing map for the 0.2.0 release since the last tagged package, [0.1.5](#015---2026-09-27). Compare: [`linux-v0.1.5...linux-v0.2.0`](https://github.com/cozyGarage/BookiE/compare/linux-v0.1.5...linux-v0.2.0).

@@ -1,0 +1,9 @@
+# Stream-cache byte budget, October 22
+
+[#1032](https://github.com/cozyGarage/BookiE/issues/1032) owns the broader resource investigation. The maintainer approved a byte budget alongside the four-page cap. The recorded handoff allows UX to expose core's existing row-size estimate instead of duplicating value and JSON accounting in the UI.
+
+Two cache regressions failed on the original implementation: three 24 MiB text pages remained retained, and a 65 MiB page remained after replacement by a small newer page. The corrected cache records each page estimate once and evicts oldest pages until both limits are met, while always keeping the newest page. Eviction must release the cache's strong reference; full values and received-row/page counts remain unchanged. A single oversized newest page is deliberately retained and remains a documented exception.
+
+Core's read-only estimated_row_bytes method sums the existing row_size accounting. A separate unit test derives the expected size from owned string capacity, Value storage and row-vector containers. The estimate excludes column metadata and allocator overhead; no claim of total process memory follows from it. Pinned results and overlapping snapshots can continue owning evicted pages.
+
+All nine focused cache cases passed after the fix; the core owned-capacity/container estimate test passed independently. Full preflight, all 103 isolated GTK cases and app all-target Clippy passed. All 715 non-ignored app unit tests passed; 141 tests were ignored in that general selector, with the registered GTK subset exercised separately. Real-query CPU/RSS profiling and Forgejo acceptance remain pending. This cache slice does not complete the broader pin/export/teardown acceptance in #1032 and does not establish that GTK or allocator-retained memory is released.
