@@ -47,3 +47,18 @@ An earlier comparison attempt connected before PostgreSQL finished initializatio
 A follow-up on the same repaired binary completed six query/replacement/close cycles with 50,000 rows and 8,193-byte synthetic text values per row. Every query reported success, ten pages received and retained rows 30,001–50,000. The [measurement record](wide-cycles.json) includes terminal labels and phase samples. Peak sampled RSS was 481.99 MiB. After-close RSS was 468.22, 481.03, 481.21, 481.39, 481.99 and 475.87 MiB. During the final 15.004-second idle interval, measured process CPU increased by 0.0 seconds.
 
 This short series did not show sustained growth, but the retained process footprint remains substantial. RSS alone cannot distinguish live allocations from allocator retention; this does not establish leak freedom or explain the retained memory. The earlier failed wide-value capture remains excluded. The follow-up used a profiling-only lookup that returns on the first existing application identity match instead of collecting names from the entire accessibility tree. That is a harness difference, not a demonstrated fix for the earlier accessibility failure. The fixture was stopped after collection.
+
+## Live heap versus resident memory
+
+A separate heaptrack capture completed three wide-value query/replacement/close cycles and exited normally through `win.quit` (wrapper exit 0). No safety abort or forced termination occurred. Heaptrack reported 368.26 MB peak allocated heap, 571.96 MB peak RSS including instrumentation overhead, and 43.57 MB outstanding at process exit. The outstanding total includes runtime/library allocations and is not a demonstrated leak.
+
+Approximate phase alignment of the heaptrack Massif output with process samples gives:
+
+| Phase | Tracked live heap, MiB | RSS including instrumentation, MiB |
+| --- | ---: | ---: |
+| connected-idle | 42.77 | 232.92 |
+| cycle-1-50000rows-8193bytes-after-close | 41.92 | 498.31 |
+| cycle-2-50000rows-8193bytes-after-close | 42.57 | 539.30 |
+| cycle-3-50000rows-8193bytes-after-close | 43.14 | 540.33 |
+
+The [summary](wide-heap-summary.json) records source identity, tool totals and alignment limits. The live heap returns near its connected-idle level after each close while RSS stays high. This capture therefore does not support a claim that wide query payloads remain live after close. Allocator retention and other non-heap storage need separate attribution. Instrumented CPU/RSS must not be compared directly with the uninstrumented series. This is not whole-application leak-free acceptance. Raw heaptrack, Massif and process traces remain in the dated local artifact directory.
