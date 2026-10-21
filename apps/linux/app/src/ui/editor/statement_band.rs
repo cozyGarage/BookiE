@@ -25,7 +25,9 @@ fn band_char_range(text: &str, driver: &str, cursor_chars: usize) -> Option<(i32
 fn refresh(buffer: &gtk::TextBuffer, driver: &str) {
     let (start, end) = buffer.bounds();
     buffer.remove_tag_by_name(TAG_NAME, &start, &end);
-    let text = buffer.text(&start, &end, true).to_string();
+    let Some(text) = super::sql_text::analysis_text(buffer) else {
+        return;
+    };
     let cursor = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
     let Some((from, to)) = band_char_range(&text, driver, cursor) else {
         return;
@@ -107,5 +109,9 @@ mod tests {
         refresh(&buffer, "postgres");
         assert!(buffer.iter_at_offset(12).has_tag(&tag));
         assert!(!buffer.iter_at_offset(3).has_tag(&tag));
+        buffer.set_text(&"x".repeat(MAX_BANDED_BYTES + 1));
+        refresh(&buffer, "postgres");
+        assert!(!buffer.iter_at_offset(3).has_tag(&tag));
+        assert_eq!(buffer.char_count() as usize, MAX_BANDED_BYTES + 1);
     }
 }

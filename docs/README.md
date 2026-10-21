@@ -91,6 +91,8 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 
 ## Engineering review records (October 2026)
 
+- [Large SQL editor analysis, October 21](evidence/large-sql-editor-analysis-2026-10-21/README.md): bounded advisory snapshots, deferred diagnostics and remaining full-document costs.
+
 - [Bounded SQL result pager, October 21](evidence/stream-result-pager-2026-10-21/README.md): retained-page navigation, row-range regression and remaining visual acceptance.
 
 - [Initial SQL editor focus, October 21](evidence/editor-focus-2026-10-21/README.md): failing-then-passing GTK focus regression and remapping behavior.

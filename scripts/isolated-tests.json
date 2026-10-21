@@ -651,6 +651,16 @@
       "tablepro-app",
       "--lib",
       "ui::editor::stream_view::pager::tests::pager_navigates_retained_pages_and_status_without_retaining_its_notebook"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::sql_text::tests::advisory_text_is_bounded_by_utf8_bytes_without_truncating_the_buffer"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::completion_resumes_after_a_large_buffer_is_replaced_with_a_small_query"
     ]
   ],
   "keyring": [
