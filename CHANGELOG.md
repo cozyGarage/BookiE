@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Oversized text and JSON cells use shorter visible previews to reduce text-layout work; full values remain available through View Value and Copy Value.
+
 ### Fixed
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
