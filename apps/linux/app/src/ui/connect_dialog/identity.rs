@@ -127,6 +127,7 @@ mod tests {
 
     fn saved(driver_id: &str, username: &str, auth_mode: AuthMode) -> SavedConnection {
         SavedConnection {
+            auth_source: None,
             id: Uuid::new_v4(),
             name: "saved".into(),
             driver_id: driver_id.into(),
