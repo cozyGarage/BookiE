@@ -6,6 +6,14 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Added
 
+- Import accepts Excel .xlsx files: the first worksheet with data is read with size, row and column limits and then mapped like a CSV file.
+- CSV export has Keep plain numbers as they are: text such as -5 or +1.5 is written without the spreadsheet apostrophe so it re-imports into numeric columns, while other formula-like text is still prefixed.
+- Copy as in the grid menu also offers UPDATE Statement and DELETE Statement for a row, found by its primary key. Tables without a key refuse with a message.
+- CSV import can set the quote character, backslash escaping of quotes and the file encoding (UTF-8, Windows-1252, UTF-16); a file that is not UTF-8 opens with a matching encoding selected.
+- The sidebar table menu has Truncate Table, which asks for confirmation and runs through the same guard as other statements. SQLite is refused because it has no TRUNCATE.
+- The sidebar table menu has Truncate Table, which asks for confirmation and runs through the same guard as other statements. SQLite is refused because it has no TRUNCATE.
+- The sidebar table menu has Rename Table. It asks for the new name and is refused while the table has open tabs, so no pending changes are lost.
+- MongoDB connections have an optional Authentication database field, for a user defined in `admin` while the Database field names the database to browse; saved connections and bundles carry it.
 - PostgreSQL query cancellation through PgBouncer without interrupting another client's work.
 - Unsorted keyed table browsing can move backward through deep pages and jump to the last page using primary-key seeks while keeping rows in ascending key order.
 - Arch packages include a build-input manifest with source and dependency archive checksums, package versions, and toolchain details.
@@ -119,6 +127,12 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - PostgreSQL databases can be backed up to a file and restored from one with the installed client tools, through SSH tunnels and TLS; restores need approval and both are audited.
 
 ### Changed
+
+- The translation template is now named `bookie.pot` and is generated rather than committed, so it no longer conflicts between changes; each release attaches it.
+- Opening a SQL editor tab moves keyboard focus into the query instead of leaving typing in the sidebar search.
+- Closing or replacing table and query results releases associated data instead of accumulating memory.
+
+- Manually resized and restored grid columns keep their width when the window grows; unsized columns continue to fill the available space.
 - Imported connection URLs preserve supported TLS settings and reject options they cannot preserve.
 - Ending an aborted PostgreSQL editor transaction reports that it rolled back instead of saying its changes were committed.
 - PostgreSQL session audit records distinguish committed transactions recovered through savepoints from aborted transactions that roll back.
@@ -150,6 +164,26 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Fixed
 
+- Large SQL files skip automatic editor analysis above 200,000 UTF-8 bytes while preserving their full text for editing, saving and execution.
+- Streamed queries build a retained page’s grid only when it is first displayed, avoiding work for hidden pages.
+
+- Large SQL results use Previous/Next controls with row ranges and state when earlier rows are no longer retained.
+
+- Failed MCP token guesses can no longer lock out a valid token: the shared failed-attempt limit applies only after a token fails verification.
+- ClickHouse connections that name no certificate authority now trust the system certificate store, so corporate authorities installed on the machine verify; the bundled roots remain the fallback.
+- A MySQL CLONE INSTANCE statement with IDENTIFIED BY is no longer saved in query history.
+- A named pipe or device chosen as a TLS CA, certificate or key file is refused instead of hanging the connection.
+- A TLS certificate failure no longer tells you to set TLS to Disabled; only a server that does not support TLS gets that suggestion.
+- PostgreSQL pooled connections are reset (`DISCARD ALL`) when returned, so a `SET`, temporary table or prepared statement from one editor statement no longer leaks into later reads on the same connection. Session mode keeps its own state.
+- Stopping or timing out a DuckDB query now interrupts it on the engine, so the connection is free again at once instead of waiting for the query to finish.
+- ClickHouse grid edits and deletes check that the key matches exactly one row and refuse, changing nothing, when the non-unique sorting key matches several.
+- SQLite refuses to drop a table that other tables reference and names them, instead of silently running their ON DELETE actions on the child rows.
+- Pasting rows copied from a BookiE grid restores values that start with `-`, `+`, `=` or `@` and turns the copied NULL marker back into an empty (NULL) cell.
+- Restoring a workspace with more than 32 tabs on one connection keeps every SQL editor and drops table tabs first.
+- Clearing a cell in a required text column saves an empty string instead of refusing the edit with "Field is required".
+- The connection dialog puts Test on the left and Connect on the right with a centered title; its dropdown choices, port and timeout boxes have an arrow or room around them.
+- A long message in the SQL editor toolbar, such as the notice after cancelling a large query, is cut with an ellipsis instead of pushing Pin results, Session, Explain, Run and Split off screen; the full text is in the tooltip and on the Status page.
+- A `USE` run on a pooled MySQL connection no longer changes which database later catalog reads and queries see: each pooled connection returns to the configured database before it is reused.
 - Keyboard run shortcuts no longer start another execution while a query is active.
 - After a tunnel drop during a Session transaction, a fresh editor session can run read queries again: ending its read-only snapshot with ROLLBACK is no longer refused by the earlier unresolved write, while commits and writes on that connection stay blocked.
 - Cancelling a PostgreSQL backup removes its partial file; a started restore that is cancelled or fails leaves governed writes on that connection blocked after reconnect while its outcome remains unknown.

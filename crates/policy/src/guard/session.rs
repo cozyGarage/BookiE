@@ -239,7 +239,7 @@ impl Session for PolicySession {
                 .await;
         }
         let analysis = self.guard.analyze_statement(sql);
-        if !cursor_query_is_read(&analysis) {
+        if !analysis.facts.is_single_read() {
             return self
                 .refuse_policy(
                     sql,
@@ -320,6 +320,21 @@ impl Session for PolicySession {
         _control: &OperationControl,
     ) -> Result<(), DriverError> {
         self.close_active_cursor(cursor_id, Some(AuditTerminalStatus::Cancelled))
+            .await
+    }
+
+    async fn lexical_settings_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+        if self.retired.get() {
+            return Err(DriverError::Unsupported("the session was retired".into()));
+        }
+        self.guard
+            .caught_read(
+                "SESSION LEXICAL SETTINGS",
+                self.inner.lexical_settings_controlled(control),
+            )
             .await
     }
 
@@ -918,16 +933,6 @@ async fn audit_cursor_error(
         )
         .await;
     guard.handle_read_audit_failure(audit_result)
-}
-
-fn cursor_query_is_read(analysis: &crate::classify::StatementAnalysis) -> bool {
-    let external_effects = Effects::SESSION_STATE
-        .union(Effects::HOST_OR_FILE_ACCESS)
-        .union(Effects::ADMIN);
-    !analysis.facts.is_multi_statement
-        && analysis.facts.class == StatementClass::Select
-        && !analysis.facts.effects.writes()
-        && !analysis.facts.effects.contains(external_effects)
 }
 
 fn finish_operation(kind: Finish, batch_id: Uuid) -> AuditOperation<'static> {

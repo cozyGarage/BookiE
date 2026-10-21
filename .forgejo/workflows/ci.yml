@@ -11,6 +11,10 @@ concurrency:
   group: bookie-lab
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: /usr/local/libexec/bookie-ci-cache run {0}
+
 env:
   CARGO_TERM_COLOR: never
   CARGO_INCREMENTAL: "0"
@@ -38,7 +42,6 @@ jobs:
       - name: Script harness and guards
         run: |
           cd src
-          cargo install cargo-about --locked --version 0.9.2 --features=cli
           cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
           bash scripts/test-harness.sh
           bash scripts/check-file-size.sh
@@ -260,6 +263,7 @@ jobs:
         run: |
           cd src
           cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
+          cargo test --locked -p tablepro-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
           cargo test --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
           cargo test --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
       - name: App server tests

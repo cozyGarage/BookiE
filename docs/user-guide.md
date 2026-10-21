@@ -15,7 +15,7 @@ Passwords are kept in your desktop keyring, never in BookiE's own files.
 - **SSH**: the form configures one SSH host. The built-in transport can use saved multi-hop routes, but the form cannot edit them yet. System OpenSSH uses jump hosts from your SSH configuration. BookiE asks before trusting an unknown host key, including keys presented by a jump host.
 - **TLS**: choose how strictly the server certificate is checked. "Verify full" checks both the certificate authority and the host name.
 - **Environment and read-only**: mark a connection as production, staging or local, and tick **Read-only** to refuse every change on it. A production connection shows a red **Production** badge, a tinted header bar and `[Production]` at the start of its window title, so it stands out in the taskbar and Alt-Tab.
-- **Import from URL** fills the form from a network connection URL such as `postgres://user@host:5432/db`. Local Unix socket paths must be set in the form or restored from a connection bundle.
+- **Import from URL** fills the form from a connection URL such as `postgres://user@host:5432/db`. A local Unix socket is written `mysql://user@/db?socket=/run/mysqld/mysqld.sock` or `postgres://user@/db?host=/run/postgresql`.
 - **Share connections**: export or import connections from the menu in the saved list. Encrypt the export with a passphrase to include stored database and SSH credentials. Plaintext exports contain no credentials.
 
 ## Browse a table
@@ -37,7 +37,9 @@ Use First, Previous, Next and Last to move through table pages. Unsorted tables 
 
 Ctrl+E opens a SQL editor tab for the current connection.
 
-Supported single-statement PostgreSQL `SELECT`s load progressively. The grid keeps up to four pages of 5,000 rows; older pages leave the forward-only window and cannot be revisited there. Other engines and unsupported query shapes load a capped result. A truncated, failed or cancelled result is incomplete; see [result limits](known-limitations.md#data-and-values).
+Supported single-statement PostgreSQL `SELECT`s load progressively. The grid keeps up to four pages of 5,000 rows; use **Previous page** and **Next page** to navigate retained pages. The row summary states which rows remain when older pages leave the forward-only window. Discarded rows cannot be revisited there. Other engines and unsupported query shapes load a capped result. A truncated, failed or cancelled result is incomplete; see [result limits](known-limitations.md#data-and-values).
+
+Automatic completion, statement shading and character diagnostics are available for SQL buffers up to 200,000 UTF-8 bytes. Larger files remain editable, saveable and executable; automatic assistance is disabled to bound background analysis.
 
 SQL completion offers keywords and scoped table and column names. Choosing an identifier inserts its complete quoted SQL name. Table names keep their schema; column suggestions after an alias keep that alias. Arbitrary words elsewhere in the editor are not suggestions.
 
@@ -68,13 +70,16 @@ To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+S
 - **Export**: from a table or a result, choose CSV, JSON, Markdown, HTML, XML, SQL
   or an Excel workbook. Export the current table page or loaded query results.
   Full-table export is refused until a consistent snapshot path is supported.
+  SQL row export and Copy as INSERT are not database backups; see the
+  [identity and generated-column limitations](known-limitations.md#data-and-values).
 - **Import**: right-click a table and choose **Import CSV…** to load a CSV file
   into it, or use the button on a schema header to create a new table from a CSV
-  file. Separator, header row and column mapping are detected and can be changed.
+  file. A `.xlsx` workbook is read from its first worksheet that has data, using the values the file stores (formulas show their last saved result, dates as ISO text); there is no sheet picker yet. Separator, header row and column mapping are detected and can be changed, as can the quote character, backslash escaping of quotes and the text encoding (UTF-8, Windows-1252 or UTF-16; a file that is not UTF-8 opens with a matching choice).
   For an existing table, use **Remember mapping** and **Restore mapping** to reuse
-  the destination choices for that connection and table. Auto-increment and generated
-  columns stay on Skip; the database supplies their values. Explicit values for
-  auto-increment columns cannot currently be imported ([known limitations](known-limitations.md#data-and-values)).
+  the destination choices for that connection and table. Generated columns stay on
+  Skip. PostgreSQL, MySQL/MariaDB and SQLite accept mapped auto-increment values;
+  SQL Server identity columns stay on Skip. See
+  [known limitations](known-limitations.md#data-and-values).
   PostgreSQL `timestamptz` values should include an explicit zone; unzoned values are
   currently treated as UTC. See [known limitations](known-limitations.md#data-and-values).
 
