@@ -49,102 +49,107 @@ msgstr ""
 msgid "This table's columns changed after you started editing (for example, in a Structure tab). Reload the page and reapply your changes."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:29
+#: apps/linux/app/src/services/error_text.rs:42
 msgid "Could not reach the database. Is it running?"
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:30
+#: apps/linux/app/src/services/error_text.rs:43
 msgid "Username or password is wrong."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:32
+#: apps/linux/app/src/services/error_text.rs:45
 #, rust-format
-msgid "TLS handshake failed: {detail}. If this server does not use TLS, such as a local container, set TLS to Disabled."
+msgid "TLS handshake failed: {detail}. The server does not appear to use TLS. For a local container, set TLS to Disabled."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:39
+#: apps/linux/app/src/services/error_text.rs:49
+#, rust-format
+msgid "TLS handshake failed: {detail}. Check the server certificate, the certificate authority file and the TLS mode. Do not turn TLS off to get past a certificate error."
+msgstr ""
+
+#: apps/linux/app/src/services/error_text.rs:56
 #, rust-format
 msgid "Query failed (SQLSTATE {sqlstate}): {message}"
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:42
+#: apps/linux/app/src/services/error_text.rs:59
 #, rust-format
 msgid "Query failed: {message}"
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:43
+#: apps/linux/app/src/services/error_text.rs:60
 msgid "The connection was closed, or all connections are busy with other queries. Try reconnecting."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:45
+#: apps/linux/app/src/services/error_text.rs:62
 msgid "This row changed in the database after you loaded it. Your edits are still available; reload the row and reapply them."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:48
+#: apps/linux/app/src/services/error_text.rs:65
 msgid "This connection is read-only. Reopen it without read-only mode to make changes."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:50
+#: apps/linux/app/src/services/error_text.rs:67
 #, rust-format
 msgid "Blocked by policy: {detail}"
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:52
+#: apps/linux/app/src/services/error_text.rs:69
 #, rust-format
 msgid "This driver does not support: {detail}"
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:54
+#: apps/linux/app/src/services/error_text.rs:71
 #, rust-format
 msgid "Internal driver error: {detail}"
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:55
+#: apps/linux/app/src/services/error_text.rs:72
 msgid "The operation was cancelled."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:56
+#: apps/linux/app/src/services/error_text.rs:73
 msgid "The operation timed out."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:58
+#: apps/linux/app/src/services/error_text.rs:75
 #, rust-format
 msgid "The operation was interrupted, but the database outcome could not be confirmed: {detail}"
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:62
+#: apps/linux/app/src/services/error_text.rs:79
 #, rust-format
 msgid "Kerberos login failed: {detail}. Check that klist shows a valid ticket, run kinit if it does not, and make sure the server's SPN matches the host you typed."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:77
+#: apps/linux/app/src/services/error_text.rs:94
 #, rust-format
 msgid "Save failed at statement {n}: {error}. The rollback request succeeded; session state and other non-transactional side effects may remain."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:85
+#: apps/linux/app/src/services/error_text.rs:102
 #, rust-format
 msgid "Save failed at statement {n}: {error}. This database cannot roll a save back, so the statements before it were applied. Refresh the table before saving again."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:94
+#: apps/linux/app/src/services/error_text.rs:111
 #, rust-format
 msgid "Save failed at statement {n}: {error}. Rollback also failed: {rollback_error}. Database changes may have been applied."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:107
+#: apps/linux/app/src/services/error_text.rs:124
 msgid "No keyring is running, so saved passwords can't be read. Start GNOME Keyring, KeePassXC with Secret Service, or another Secret Service provider, then try again."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:110
+#: apps/linux/app/src/services/error_text.rs:127
 msgid "The keyring is locked. Unlock it, for example by signing in again or opening Passwords and Keys, then try again."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:114
+#: apps/linux/app/src/services/error_text.rs:131
 msgid "Unlocking the keyring was cancelled, so the saved password was not read. Try again and unlock it when asked."
 msgstr ""
 
-#: apps/linux/app/src/services/error_text.rs:118
+#: apps/linux/app/src/services/error_text.rs:135
 #, rust-format
 msgid "The keyring could not be used: {detail}"
 msgstr ""
@@ -890,7 +895,7 @@ msgid "CSV files"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/import.rs:87
-#: apps/linux/app/src/ui/import_dialog.rs:701
+#: apps/linux/app/src/ui/import_dialog.rs:767
 msgid "Import CSV"
 msgstr ""
 
@@ -1095,7 +1100,7 @@ msgstr ""
 
 #: apps/linux/app/src/ui/app/organization.rs:150
 #: apps/linux/app/src/ui/connection_bundle/import.rs:106
-#: apps/linux/app/src/ui/import_dialog.rs:72
+#: apps/linux/app/src/ui/import_dialog.rs:73
 msgid "Import"
 msgstr ""
 
@@ -3177,7 +3182,7 @@ msgid "SQL options"
 msgstr ""
 
 #: apps/linux/app/src/ui/export_dialog.rs:211
-#: apps/linux/app/src/ui/import_dialog.rs:541
+#: apps/linux/app/src/ui/import_dialog.rs:584
 msgid "Table name"
 msgstr ""
 
@@ -3210,7 +3215,7 @@ msgid "Prefix formula-like text with an apostrophe for spreadsheet safety. Turn 
 msgstr ""
 
 #: apps/linux/app/src/ui/export_dialog.rs:333
-#: apps/linux/app/src/ui/import_dialog.rs:152
+#: apps/linux/app/src/ui/import_dialog.rs:168
 msgid "Text that means NULL"
 msgstr ""
 
@@ -3380,7 +3385,7 @@ msgid "No matching columns"
 msgstr ""
 
 #: apps/linux/app/src/ui/grid/column_visibility.rs:52
-#: apps/linux/app/src/ui/import_dialog.rs:248
+#: apps/linux/app/src/ui/import_dialog.rs:291
 #: apps/linux/app/src/ui/structure_tab/mod.rs:487
 #: apps/linux/app/src/ui/structure_tab_dialogs.rs:144
 #: apps/linux/app/src/ui/structure_tab_dialogs.rs:208
@@ -3820,81 +3825,93 @@ msgstr ""
 msgid "{n} d ago"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:143
+#: apps/linux/app/src/ui/import_dialog.rs:159
 msgid "File"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:148
+#: apps/linux/app/src/ui/import_dialog.rs:164
 msgid "First row names the columns"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:250
+#: apps/linux/app/src/ui/import_dialog.rs:171
+msgid "Quote character"
+msgstr ""
+
+#: apps/linux/app/src/ui/import_dialog.rs:175
+msgid "Backslash escapes a quote"
+msgstr ""
+
+#: apps/linux/app/src/ui/import_dialog.rs:178
+msgid "Encoding"
+msgstr ""
+
+#: apps/linux/app/src/ui/import_dialog.rs:293
 msgid "Generated columns stay on Skip and are filled by the database. Other columns left on Skip are not written, so their database defaults apply."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:344
+#: apps/linux/app/src/ui/import_dialog.rs:387
 msgid "Remember mapping"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:345
+#: apps/linux/app/src/ui/import_dialog.rs:388
 msgid "Restore mapping"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:346
+#: apps/linux/app/src/ui/import_dialog.rs:389
 msgid "Forget mapping"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:354
+#: apps/linux/app/src/ui/import_dialog.rs:397
 msgid "Saved mappings are unavailable for this connection."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:402
+#: apps/linux/app/src/ui/import_dialog.rs:445
 msgid "Mapping saved for this table."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:426
+#: apps/linux/app/src/ui/import_dialog.rs:469
 msgid "Saved mapping restored. Review it before importing."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:428
-#: apps/linux/app/src/ui/import_dialog.rs:442
+#: apps/linux/app/src/ui/import_dialog.rs:471
+#: apps/linux/app/src/ui/import_dialog.rs:485
 msgid "No saved mapping for this table."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:441
+#: apps/linux/app/src/ui/import_dialog.rs:484
 msgid "Saved mapping removed."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:487
+#: apps/linux/app/src/ui/import_dialog.rs:530
 msgid "Auto-increment values are inserted when mapped."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:493
+#: apps/linux/app/src/ui/import_dialog.rs:536
 msgid "Generated by database; CSV values are ignored."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:536
+#: apps/linux/app/src/ui/import_dialog.rs:579
 msgid "New table"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:538
+#: apps/linux/app/src/ui/import_dialog.rs:581
 msgid "The type of each column is a guess from the first rows of the file. Change any that is wrong before the table is created."
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:559
+#: apps/linux/app/src/ui/import_dialog.rs:602
 msgid "Column"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:658
+#: apps/linux/app/src/ui/import_dialog.rs:724
 msgid "Field separator"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:738
+#: apps/linux/app/src/ui/import_dialog.rs:804
 #, rust-format
 msgid "{done} of {total} rows"
 msgstr ""
 
-#: apps/linux/app/src/ui/import_dialog.rs:746
+#: apps/linux/app/src/ui/import_dialog.rs:812
 #, rust-format
 msgid "Importing into {table}"
 msgstr ""
