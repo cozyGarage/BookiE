@@ -758,8 +758,8 @@ msgid "The connection was deleted, but some stored credentials could not be remo
 msgstr ""
 
 #: apps/linux/app/src/ui/app/database_switcher.rs:113
-#: apps/linux/app/src/ui/browse_tab/mod.rs:319
-#: apps/linux/app/src/ui/browse_tab/mod.rs:826
+#: apps/linux/app/src/ui/browse_tab/mod.rs:330
+#: apps/linux/app/src/ui/browse_tab/mod.rs:837
 #: apps/linux/app/src/ui/catalog_dialog.rs:133
 msgid "Loading…"
 msgstr ""
@@ -855,7 +855,7 @@ msgid "Finishing the cell edit timed out. Try again."
 msgstr ""
 
 #: apps/linux/app/src/ui/app/grid_close.rs:141
-#: apps/linux/app/src/ui/browse_tab/mod.rs:698
+#: apps/linux/app/src/ui/browse_tab/mod.rs:709
 msgid "Finish or cancel the current cell edit and try again."
 msgstr ""
 
@@ -1170,7 +1170,7 @@ msgid "This column belongs to more than one foreign key."
 msgstr ""
 
 #: apps/linux/app/src/ui/app/row_ops.rs:142
-#: apps/linux/app/src/ui/browse_tab/mod.rs:998
+#: apps/linux/app/src/ui/browse_tab/mod.rs:1009
 #: apps/linux/app/src/ui/browse_tab/row_ops.rs:509
 msgid "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
 msgstr ""
@@ -1813,17 +1813,17 @@ msgstr ""
 msgid "The database returned rows that do not match the table columns."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/mod.rs:320
-#: apps/linux/app/src/ui/browse_tab/mod.rs:827
+#: apps/linux/app/src/ui/browse_tab/mod.rs:331
+#: apps/linux/app/src/ui/browse_tab/mod.rs:838
 #, rust-format
 msgid "Fetching rows from {table}"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/mod.rs:352
+#: apps/linux/app/src/ui/browse_tab/mod.rs:363
 msgid "Read-only connection. Editing disabled."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/mod.rs:357
+#: apps/linux/app/src/ui/browse_tab/mod.rs:368
 msgid "This table has no primary key. Row order is not stable; use the SQL editor to modify rows."
 msgstr ""
 
