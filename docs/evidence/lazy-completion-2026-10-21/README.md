@@ -16,7 +16,7 @@ The cache cannot contain more entries than the candidate list. It retains reques
 
 ## Validation and review
 
-The two narrow GTK cases passed. Full preflight passed: 290 Python harness tests, 2,022 unit tests, 2,023 sandbox tests and one Redis cancellation regression. All 83 isolated GTK cases passed, and app all-target Clippy passed with warnings denied. Documentation links, issue-index and ignored-test registration checks passed. A separate self-review found no additional defect; this was not an independent review. The serialized Forgejo gate is pending. This document does not qualify native Wayland interaction or the final popover's timing.
+The two narrow GTK cases passed. Full preflight passed: 290 Python harness tests, 2,022 unit tests, 2,023 sandbox tests and one Redis cancellation regression. All 83 isolated GTK cases passed, and app all-target Clippy passed with warnings denied. Documentation links, issue-index and ignored-test registration checks passed. A separate self-review found no additional defect; this was not an independent review. Forgejo run #838 passed all 29 jobs at implementation commit `76d58f5bb2d1f29364bf60a2c3ddb0de2cf90e21`. [PR #1275](https://github.com/cozyGarage/BookiE/pull/1275) contains the implementation. Current linux was merged as `453653a7a`; the branch's own diff under apps, crates and scripts was compared byte-for-byte before and after that merge and is unchanged. Preflight on the updated base also passed, including the expanded 321-test Python harness and the same Rust tiers. Documentation-only follow-up does not change the gated code or tests. GitHub PR checks remain required before merge. This document does not qualify native Wayland interaction or the final popover's timing.
 
 ## Landing order
 
