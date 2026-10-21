@@ -3016,11 +3016,11 @@ msgstr ""
 msgid "Running EXPLAIN…"
 msgstr ""
 
-#: apps/linux/app/src/ui/explain_dialog.rs:143
+#: apps/linux/app/src/ui/explain_dialog.rs:148
 msgid "Tree"
 msgstr ""
 
-#: apps/linux/app/src/ui/explain_dialog.rs:144
+#: apps/linux/app/src/ui/explain_dialog.rs:149
 msgid "Text"
 msgstr ""
 
