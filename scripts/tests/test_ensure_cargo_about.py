@@ -70,16 +70,16 @@ class EnsureCargoAboutTests(unittest.TestCase):
     def downloads(self):
         return [line for line in self.log.read_text().splitlines() if line.startswith("curl ")]
 
-    def test_a_cached_binary_is_returned_without_downloading(self):
+    def test_a_cached_binary_that_does_not_match_the_pin_is_not_used(self):
         version = re.search(r'VERSION="([^"]+)"', SCRIPT.read_text()).group(1)
         cached = self.tools / f"cargo-about-{version}" / "cargo-about"
         cached.parent.mkdir(parents=True)
         cached.write_text("#!/bin/sh\n")
         cached.chmod(0o755)
         result = self.run_script()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), str(cached))
-        self.assertEqual(self.downloads(), [])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(self.downloads()), 1)
+        self.assertFalse(cached.exists())
 
     def test_a_download_that_fails_the_checksum_is_refused_and_not_cached(self):
         result = self.run_script()
@@ -101,6 +101,7 @@ class EnsureCargoAboutTests(unittest.TestCase):
 
     def test_the_pin_is_a_full_sha256(self):
         self.assertRegex(SCRIPT.read_text(), r'SHA256="[0-9a-f]{64}"')
+        self.assertRegex(SCRIPT.read_text(), r'BINARY_SHA256="[0-9a-f]{64}"')
 
 
 if __name__ == "__main__":
