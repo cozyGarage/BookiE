@@ -109,7 +109,13 @@ jobs:
         with:
           prefix-key: release-appimage
       - name: Build
-        run: scripts/build-appimage.sh
+        env:
+          APPIMAGE_OUT: ${{ runner.temp }}/bookie-appimage-output-sentinel
+        run: |
+          mkdir -p "$APPIMAGE_OUT"
+          touch "$APPIMAGE_OUT/preserve"
+          scripts/build-appimage.sh
+          test -f "$APPIMAGE_OUT/preserve"
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: package-appimage

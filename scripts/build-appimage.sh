@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="${APPIMAGE_OUT:-$ROOT/target/appimage}"
+OUT="$ROOT/target/appimage"
 VERSION="$(python3 "$ROOT/scripts/check-release-version.py" --print)"
 TOOLS="$OUT/tools"
 LINUXDEPLOY_URL=https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage
