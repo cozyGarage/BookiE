@@ -62,3 +62,7 @@ Approximate phase alignment of the heaptrack Massif output with process samples 
 | cycle-3-50000rows-8193bytes-after-close | 43.14 | 540.33 |
 
 The [summary](wide-heap-summary.json) records source identity, tool totals and alignment limits. The live heap returns near its connected-idle level after each close while RSS stays high. This capture therefore does not support a claim that wide query payloads remain live after close. Allocator retention and other non-heap storage need separate attribution. Instrumented CPU/RSS must not be compared directly with the uninstrumented series. This is not whole-application leak-free acceptance. Raw heaptrack, Massif and process traces remain in the dated local artifact directory.
+
+## Arena-count experiment
+
+A child-process-only `MALLOC_ARENA_MAX=2` experiment repeated the same six wide-value cycles and completed successfully. Peak sampled RSS was 480.18 MiB, compared with 481.99 MiB in the earlier default run. After-close samples remained near 480 MiB. This single run did not show a useful reduction, so no application or desktop setting was changed. The [record](arena-experiment.json) preserves configuration and outcomes. The setting is described in the [GNU libc allocation manual](https://sourceware.org/glibc/manual/latest/html_node/Memory-Allocation-Tunables.html); this is experiment provenance, not a recommendation to change defaults.
