@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -18,6 +19,12 @@ exit 0
 
 GATE_STUB = """#!/usr/bin/env bash
 printf '%s\\n' "$*" > "$GATE_LOG"
+"""
+
+GIT_STUB = """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$GIT_LOG"
+if [[ " $* " == *" worktree "* ]]; then exit 90; fi
+exec "$REAL_GIT" "$@"
 """
 
 IDENTITY = {
@@ -65,6 +72,14 @@ class Fixture:
         git(self.repo, "push", "--quiet", "fork", name)
         git(self.repo, "checkout", "--quiet", "linux")
 
+    def branch_file(self, name, path, content):
+        git(self.repo, "checkout", "--quiet", "-b", name, self.base)
+        (self.repo / path).write_text(content)
+        git(self.repo, "add", path)
+        git(self.repo, "commit", "--quiet", "-m", name)
+        git(self.repo, "push", "--quiet", "fork", name)
+        git(self.repo, "checkout", "--quiet", "linux")
+
     def run(self, *branches, fmt_changes="", fmt_exit=0, env=None):
         stub_dir = self.tmp / "bin"
         stub_dir.mkdir(exist_ok=True)
@@ -81,9 +96,14 @@ class Fixture:
             "STUB_FMT_CHANGES": fmt_changes,
             "STUB_FMT_EXIT": str(fmt_exit),
             "GATE_LOG": str(self.tmp / "gate.log"),
+            "GIT_LOG": str(self.tmp / "git.log"),
+            "REAL_GIT": shutil.which("git"),
             "FORGEJO_TRAIN_DRY": "1",
             **(env or {}),
         }
+        git_stub = stub_dir / "git"
+        git_stub.write_text(GIT_STUB)
+        git_stub.chmod(0o755)
         return subprocess.run(
             ["bash", str(SCRIPT), *branches], cwd=self.repo, env=environment, capture_output=True, text=True
         )
@@ -140,10 +160,12 @@ class ForgejoTrainTests(unittest.TestCase):
         self.assertEqual(git(self.fixture.repo, "rev-parse", f"{sha}^1^1"), self.fixture.base)
 
     def test_gate_receives_the_exact_train_sha_and_a_sha_scoped_remote_ref(self):
+        original_head = git(self.fixture.repo, "rev-parse", "HEAD")
         result = self.fixture.run("feature-a", "feature-b", env={"FORGEJO_TRAIN_DRY": ""})
         self.assertEqual(result.returncode, 0, result.stderr)
         sha = self.fixture.train_sha(result)
         self.assertEqual((self.fixture.tmp / "gate.log").read_text().split(), [sha, f"train/{sha}"])
+        self.assertEqual(git(self.fixture.repo, "rev-parse", "HEAD"), original_head)
 
     def test_branches_come_from_github_even_when_the_forgejo_mirror_shares_the_repository_path(self):
         mirror = Path(self.tmp.name) / "hosts/10.61.0.11/cozyGarage/BookiE.git"
@@ -153,12 +175,32 @@ class ForgejoTrainTests(unittest.TestCase):
         result = self.fixture.run("feature-a", "feature-b")
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_a_failed_fetch_leaves_no_temporary_directory(self):
-        scratch = Path(self.tmp.name) / "scratch"
-        scratch.mkdir()
-        result = self.fixture.run("feature-a", "no-such-branch", env={"TMPDIR": str(scratch)})
+    def test_train_uses_the_current_checkout_without_creating_a_worktree(self):
+        original_head = git(self.fixture.repo, "rev-parse", "HEAD")
+        result = self.fixture.run("feature-a", "feature-b")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("worktree", (self.fixture.tmp / "git.log").read_text())
+        self.assertEqual(git(self.fixture.repo, "rev-parse", "HEAD"), original_head)
+
+    def test_a_conflicting_input_stops_the_train_and_restores_the_checkout(self):
+        self.fixture.branch_file("conflict-a", "src/other.rs", "fn first() {}\\n")
+        self.fixture.branch_file("conflict-b", "src/other.rs", "fn second() {}\\n")
+        original_head = git(self.fixture.repo, "rev-parse", "HEAD")
+        result = self.fixture.run("conflict-a", "conflict-b")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(list(scratch.iterdir()), [])
+        self.assertIn("conflicts", result.stderr)
+        self.assertEqual(git(self.fixture.repo, "rev-parse", "HEAD"), original_head)
+        self.assertEqual(git(self.fixture.repo, "status", "--porcelain"), "")
+
+    def test_a_dirty_checkout_is_refused_without_changing_the_working_file(self):
+        path = self.fixture.repo / "src/other.rs"
+        path.write_text("uncommitted change\\n")
+        original_head = git(self.fixture.repo, "rev-parse", "HEAD")
+        result = self.fixture.run("feature-a", "feature-b")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("current checkout must be clean", result.stderr)
+        self.assertEqual(git(self.fixture.repo, "rev-parse", "HEAD"), original_head)
+        self.assertEqual(path.read_text(), "uncommitted change\\n")
 
 
 class ForgejoTrainRemoteTests(unittest.TestCase):
