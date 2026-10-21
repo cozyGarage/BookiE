@@ -733,7 +733,6 @@ impl SimpleComponent for SqlEditor {
             }
 
             SqlEditorInput::LexingRead { source, sql, result } => self.on_lexing_read(source, sql, result, sender),
-
             SqlEditorInput::LexingRefreshed { source, settings } => self.on_lexing_refreshed(source, settings),
 
             SqlEditorInput::ToggleLineComment => {
