@@ -671,6 +671,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::completion_provider::tests::completion_resumes_after_a_large_buffer_is_replaced_with_a_small_query"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::app::session_teardown::tests::a_window_close_whose_sessions_cannot_close_offers_to_close_anyway"
     ]
   ],
   "keyring": [
