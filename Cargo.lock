@@ -6304,6 +6304,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "csv",
+ "encoding_rs",
  "rust_decimal",
  "rust_xlsxwriter",
  "secrecy",
@@ -6331,6 +6332,7 @@ dependencies = [
  "jiff",
  "rust_decimal",
  "rustls",
+ "rustls-native-certs",
  "rustls-pki-types",
  "secrecy",
  "serde",
@@ -6645,6 +6647,7 @@ name = "tablepro-transport"
 version = "0.2.0"
 dependencies = [
  "async-trait",
+ "libc",
  "rustls",
  "secrecy",
  "sha2 0.11.0",
