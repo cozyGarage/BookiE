@@ -137,3 +137,49 @@ fn retired_proposals_do_not_edit_the_buffer() {
         assert_eq!(buffer.text(&start, &end, true), before);
     }
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn large_catalog_materializes_only_requested_completion_proposals() {
+    gtk::init().unwrap();
+    let index = Rc::new(RefCell::new(SchemaIndex::default()));
+    index.borrow_mut().tables = (0..50_000).map(|position| format!("table_{position:05}")).collect();
+    let sql = "SELECT * FROM table_";
+    let (_view, provider, context) = fixture(sql, sql.len(), index);
+    let model = glib::MainContext::default()
+        .block_on(provider.populate_future(&context))
+        .unwrap();
+    assert_eq!(model.n_items(), 50_000);
+    let first = model.item(0).unwrap().downcast::<Proposal>().unwrap();
+    let insertion = first.imp().insertion.get().unwrap();
+    assert_eq!(insertion.sql, "table_00000");
+    assert!(Rc::strong_count(&insertion.source) <= 3);
+    assert_eq!(model.item(0).unwrap(), first);
+    let last = model.item(49_999).unwrap().downcast::<Proposal>().unwrap();
+    assert_eq!(last.imp().insertion.get().unwrap().sql, "table_49999");
+    assert!(Rc::strong_count(&insertion.source) <= 3);
+    assert!(model.item(50_000).is_none());
+    provider.activate(&context, &last);
+    let buffer = context.buffer().unwrap();
+    let (start, end) = buffer.bounds();
+    assert_eq!(buffer.text(&start, &end, true).as_str(), "SELECT * FROM table_49999");
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn proposals_first_requested_after_catalog_retirement_do_not_edit_the_buffer() {
+    gtk::init().unwrap();
+    let index = Rc::new(RefCell::new(SchemaIndex::default()));
+    index.borrow_mut().tables.push("orders".into());
+    let sql = "SELECT * FROM ord";
+    let (_view, provider, context) = fixture(sql, sql.len(), index.clone());
+    let model = glib::MainContext::default()
+        .block_on(provider.populate_future(&context))
+        .unwrap();
+    index.borrow_mut().invalidate_columns();
+    let proposal = model.item(0).unwrap().downcast::<Proposal>().unwrap();
+    provider.activate(&context, &proposal);
+    let buffer = context.buffer().unwrap();
+    let (start, end) = buffer.bounds();
+    assert_eq!(buffer.text(&start, &end, true).as_str(), sql);
+}

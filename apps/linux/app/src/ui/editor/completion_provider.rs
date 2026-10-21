@@ -1,3 +1,5 @@
+mod model;
+
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 
@@ -119,10 +121,9 @@ pub(super) fn install(index: Rc<RefCell<SchemaIndex>>) -> Provider {
 }
 
 impl Provider {
-    fn model(&self, context: &sourceview5::CompletionContext) -> gio::ListStore {
-        let model = gio::ListStore::new::<Proposal>();
+    fn model(&self, context: &sourceview5::CompletionContext) -> model::ProposalModel {
         let Some(buffer) = context.buffer() else {
-            return model;
+            return glib::Object::new();
         };
         let (start, end) = buffer.bounds();
         let source: Rc<str> = buffer.text(&start, &end, true).as_str().into();
@@ -132,22 +133,15 @@ impl Provider {
         );
         let index = self.imp().index.borrow();
         let Ok(index) = index.try_borrow() else {
-            return model;
+            return glib::Object::new();
         };
         let candidates = candidates(&source, cursor, &index);
-        for (label, sql) in candidates.values {
-            let proposal: Proposal = glib::Object::new();
-            let _ = proposal.imp().insertion.set(Insertion {
-                label,
-                sql,
-                source: source.clone(),
-                cursor: buffer.iter_at_mark(&buffer.get_insert()).offset(),
-                range: candidates.range.clone(),
-                request: index.request(String::new()),
-            });
-            model.append(&proposal);
-        }
-        model
+        model::ProposalModel::new(
+            candidates,
+            source,
+            buffer.iter_at_mark(&buffer.get_insert()).offset(),
+            index.request(String::new()),
+        )
     }
 
     fn insert(&self, context: &sourceview5::CompletionContext, proposal: &sourceview5::CompletionProposal) {
