@@ -42,7 +42,7 @@ use tablepro_storage::query_history::{HistoryStore, NewEntry, Outcome};
 use crate::services::database_service::ConnectionMetadata;
 use crate::ui::grid::GridMsg;
 
-pub use completion::{SchemaIndex, SchemaRequest, referenced_tables};
+pub use completion::{SchemaIndex, SchemaRequest};
 pub(crate) use completion_identifiers::{catalog_reference, split_table_reference, table_key};
 pub use schema::derive_tab_label;
 pub(crate) use session_mode::{StreamSession, query_cursor_export_factory};
@@ -533,7 +533,7 @@ impl SimpleComponent for SqlEditor {
         apply_editor_preferences(&widgets.source_view, &preferences);
         apply_editor_preferences(split_view.secondary_view(), &preferences);
 
-        let provider = completion_provider::install(init.schema_index.clone());
+        let provider = completion_provider::install(init.schema_index.clone(), known_lexing.clone());
         let completion = widgets.source_view.completion();
         completion.add_provider(&provider);
         split_view.secondary_view().completion().add_provider(&provider);
@@ -554,8 +554,12 @@ impl SimpleComponent for SqlEditor {
             .buffer()
             .connect_cursor_position_notify(move |_| update_cursor());
 
-        let refresh_completion =
-            build_completion_refresh(widgets.source_view.clone(), init.schema_index.clone(), sender.clone());
+        let refresh_completion = completion_provider::build_completion_refresh(
+            widgets.source_view.clone(),
+            init.schema_index.clone(),
+            known_lexing.clone(),
+            sender.clone(),
+        );
         refresh_completion();
         let refresh_on_cursor = refresh_completion.clone();
         widgets
@@ -1165,31 +1169,6 @@ impl SqlEditor {
                 .drop_on_shutdown()
         });
     }
-}
-
-fn build_completion_refresh(
-    view: sourceview5::View,
-    schema_index: std::rc::Rc<std::cell::RefCell<SchemaIndex>>,
-    sender: ComponentSender<SqlEditor>,
-) -> std::rc::Rc<dyn Fn()> {
-    std::rc::Rc::new(move || {
-        let buffer = view.buffer();
-        let (start, end) = buffer.bounds();
-        let sql = buffer.text(&start, &end, true).to_string();
-        let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
-        let cursor_byte = cursor_byte_offset(&sql, cursor_chars);
-        let Ok(index) = schema_index.try_borrow() else {
-            return;
-        };
-        let missing: Vec<String> = referenced_tables(&sql, cursor_byte, index.grammar)
-            .into_iter()
-            .filter(|table| !index.knows_columns(table))
-            .collect();
-        drop(index);
-        if !missing.is_empty() {
-            let _ = sender.output(SqlEditorOutput::NeedColumns(missing));
-        }
-    })
 }
 
 #[cfg(test)]
