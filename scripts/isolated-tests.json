@@ -596,6 +596,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::column_width_tests::unsaved_result_grid_width_stays_fixed_when_the_window_grows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::split_view::tests::opening_an_editor_moves_focus_out_of_sidebar_search"
     ]
   ],
   "keyring": [
