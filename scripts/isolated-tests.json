@@ -591,6 +591,16 @@
       "tablepro-app",
       "--lib",
       "ui::grid::column_width_tests::unsaved_result_grid_width_stays_fixed_when_the_window_grows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::large_catalog_materializes_only_requested_completion_proposals"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::proposals_first_requested_after_catalog_retirement_do_not_edit_the_buffer"
     ]
   ],
   "keyring": [
