@@ -1676,7 +1676,7 @@ msgid "Unsaved changes will be permanently lost if you discard them."
 msgstr ""
 
 #: apps/linux/app/src/ui/app/workspace_tabs.rs:924
-#: apps/linux/app/src/ui/editor/outcomes.rs:913
+#: apps/linux/app/src/ui/editor/outcomes.rs:914
 #: apps/linux/app/src/ui/editor/schema.rs:17
 #: apps/linux/app/src/ui/history_dialog.rs:1041
 msgid "Empty query"
@@ -2673,7 +2673,7 @@ msgid "cancelled"
 msgstr ""
 
 #: apps/linux/app/src/ui/editor/mod.rs:874
-#: apps/linux/app/src/ui/editor/outcomes.rs:630
+#: apps/linux/app/src/ui/editor/outcomes.rs:631
 msgid "Query cancelled"
 msgstr ""
 
@@ -2693,7 +2693,7 @@ msgstr ""
 
 #: apps/linux/app/src/ui/editor/mod.rs:901
 #: apps/linux/app/src/ui/editor/outcomes.rs:70
-#: apps/linux/app/src/ui/editor/outcomes.rs:639
+#: apps/linux/app/src/ui/editor/outcomes.rs:640
 #: apps/linux/app/src/ui/editor/streaming.rs:139
 msgid "Query timed out"
 msgstr ""
@@ -2751,150 +2751,150 @@ msgstr ""
 msgid "Save SQL file"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:441
+#: apps/linux/app/src/ui/editor/outcomes.rs:442
 msgid "A result page exceeded the query result limit. The result is incomplete."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:496
+#: apps/linux/app/src/ui/editor/outcomes.rs:497
 #, rust-format
 msgid "error in {ms} ms"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:498
+#: apps/linux/app/src/ui/editor/outcomes.rs:499
 #: apps/linux/app/src/ui/editor/streaming.rs:153
 #, rust-format
 msgid "done in {ms} ms"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:504
+#: apps/linux/app/src/ui/editor/outcomes.rs:505
 #, rust-format
 msgid "{ok}/{total} statements · {ms} ms"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:509
+#: apps/linux/app/src/ui/editor/outcomes.rs:510
 #: apps/linux/app/src/ui/editor/streaming.rs:160
 msgid "error"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:539
+#: apps/linux/app/src/ui/editor/outcomes.rs:540
 #, rust-format
 msgid "Statement {n} executed"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:540
+#: apps/linux/app/src/ui/editor/outcomes.rs:541
 #, rust-format
 msgid "No rows returned · {ms} ms"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:551
+#: apps/linux/app/src/ui/editor/outcomes.rs:552
 #, rust-format
 msgid "Statement {n} not run"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:552
+#: apps/linux/app/src/ui/editor/outcomes.rs:553
 msgid "Skipped because an earlier statement failed."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:583
+#: apps/linux/app/src/ui/editor/outcomes.rs:584
 #: apps/linux/app/src/ui/history_dialog.rs:147
 msgid "Status"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:589
+#: apps/linux/app/src/ui/editor/outcomes.rs:590
 #, rust-format
 msgid "Received {rows} rows · {pages} pages"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:594
+#: apps/linux/app/src/ui/editor/outcomes.rs:595
 msgid "Export all rows…"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:604
+#: apps/linux/app/src/ui/editor/outcomes.rs:605
 msgid "The query will run again through a guarded cursor."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:613
+#: apps/linux/app/src/ui/editor/outcomes.rs:614
 msgid "Rows 0"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:619
+#: apps/linux/app/src/ui/editor/outcomes.rs:620
 #, rust-format
 msgid "Rows {start}-{end}"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:631
-#: apps/linux/app/src/ui/editor/outcomes.rs:640
+#: apps/linux/app/src/ui/editor/outcomes.rs:632
+#: apps/linux/app/src/ui/editor/outcomes.rs:641
 msgid "Rows already received remain available."
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:662
+#: apps/linux/app/src/ui/editor/outcomes.rs:663
 #, rust-format
 msgid "Result set {n} ({rows})"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:679
+#: apps/linux/app/src/ui/editor/outcomes.rs:680
 msgid "Result set"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:696
+#: apps/linux/app/src/ui/editor/outcomes.rs:697
 msgid "Copy error"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:703
+#: apps/linux/app/src/ui/editor/outcomes.rs:704
 #, rust-format
 msgid "Statement {n} failed"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:721
+#: apps/linux/app/src/ui/editor/outcomes.rs:722
 msgid "No rows returned"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:805
-#: apps/linux/app/src/ui/editor/outcomes.rs:808
+#: apps/linux/app/src/ui/editor/outcomes.rs:806
+#: apps/linux/app/src/ui/editor/outcomes.rs:809
 #, rust-format
 msgid "Result {n} ({rows})"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:811
+#: apps/linux/app/src/ui/editor/outcomes.rs:812
 #, rust-format
 msgid "Result {n} (error)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:812
+#: apps/linux/app/src/ui/editor/outcomes.rs:813
 #, rust-format
 msgid "Result {n} (skipped)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:816
-#: apps/linux/app/src/ui/editor/outcomes.rs:820
+#: apps/linux/app/src/ui/editor/outcomes.rs:817
+#: apps/linux/app/src/ui/editor/outcomes.rs:821
 #, rust-format
 msgid "{n} · {statement} ({rows})"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:824
+#: apps/linux/app/src/ui/editor/outcomes.rs:825
 #, rust-format
 msgid "{n} · {statement} (error)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:827
+#: apps/linux/app/src/ui/editor/outcomes.rs:828
 #, rust-format
 msgid "{n} · {statement} (skipped)"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:839
+#: apps/linux/app/src/ui/editor/outcomes.rs:840
 msgid "Result"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:840
+#: apps/linux/app/src/ui/editor/outcomes.rs:841
 #, rust-format
 msgid "📌 {statement} ({rows})"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:888
+#: apps/linux/app/src/ui/editor/outcomes.rs:889
 msgid "Statement result"
 msgstr ""
 
-#: apps/linux/app/src/ui/editor/outcomes.rs:914
+#: apps/linux/app/src/ui/editor/outcomes.rs:915
 msgid "Type a SQL statement and press Run."
 msgstr ""
 
