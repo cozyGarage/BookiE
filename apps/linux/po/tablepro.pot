@@ -358,8 +358,8 @@ msgstr ""
 
 #: apps/linux/app/src/ui/app/backup.rs:67
 #: apps/linux/app/src/ui/app/browse.rs:60
-#: apps/linux/app/src/ui/app/import.rs:108
-#: apps/linux/app/src/ui/app/import.rs:248
+#: apps/linux/app/src/ui/app/import.rs:109
+#: apps/linux/app/src/ui/app/import.rs:249
 #: apps/linux/app/src/ui/app/structure.rs:150
 #: apps/linux/app/src/ui/app/structure.rs:243
 #: apps/linux/app/src/ui/app/structure.rs:372
@@ -375,7 +375,7 @@ msgid "Backups are available for PostgreSQL connections."
 msgstr ""
 
 #: apps/linux/app/src/ui/app/backup.rs:73
-#: apps/linux/app/src/ui/app/import.rs:111
+#: apps/linux/app/src/ui/app/import.rs:112
 msgid "This connection is open read-only."
 msgstr ""
 
@@ -874,72 +874,71 @@ msgid "This connection type cannot create a table from a file. Import into an ex
 msgstr ""
 
 #: apps/linux/app/src/ui/app/import.rs:76
-#: apps/linux/app/src/ui/app/import.rs:170
-#: apps/linux/app/src/ui/app/import.rs:224
-#: apps/linux/app/src/ui/app/import.rs:233
-#: apps/linux/app/src/ui/app/import.rs:240
-#: apps/linux/app/src/ui/app/import.rs:248
+#: apps/linux/app/src/ui/app/import.rs:171
+#: apps/linux/app/src/ui/app/import.rs:225
+#: apps/linux/app/src/ui/app/import.rs:234
+#: apps/linux/app/src/ui/app/import.rs:241
+#: apps/linux/app/src/ui/app/import.rs:249
 msgid "Can't import"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/import.rs:80
-#: apps/linux/app/src/ui/history_dialog.rs:982
-msgid "CSV files"
+msgid "CSV and Excel files"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:87
+#: apps/linux/app/src/ui/app/import.rs:88
 #: apps/linux/app/src/ui/import_dialog.rs:701
 msgid "Import CSV"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:115
+#: apps/linux/app/src/ui/app/import.rs:116
 msgid "The policy rules could not be loaded, so writes are not permitted."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:123
+#: apps/linux/app/src/ui/app/import.rs:124
 msgid "A previous operation's audit record could not be written, so writes are not permitted."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:301
+#: apps/linux/app/src/ui/app/import.rs:302
 #, rust-format
 msgid "Imported {done} rows into {table}"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:308
+#: apps/linux/app/src/ui/app/import.rs:309
 msgid "Import stopped"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:309
+#: apps/linux/app/src/ui/app/import.rs:310
 #, rust-format
 msgid "{done} of {total} rows were written to {table} before the import stopped. {error}"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:507
+#: apps/linux/app/src/ui/app/import.rs:508
 msgid "The import was cancelled."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:556
+#: apps/linux/app/src/ui/app/import.rs:557
 msgid "The table has no columns to import into."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:573
+#: apps/linux/app/src/ui/app/import.rs:574
 msgid "The table could not be built from the file."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:592
+#: apps/linux/app/src/ui/app/import.rs:593
 msgid "The file could not be opened."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:595
+#: apps/linux/app/src/ui/app/import.rs:596
 #, rust-format
 msgid "The file is larger than the {limit} MB import limit."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:598
+#: apps/linux/app/src/ui/app/import.rs:599
 msgid "The file could not be read."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/import.rs:621
+#: apps/linux/app/src/ui/app/import.rs:626
 #, rust-format
 msgid "Line {line}, column {column}: {reason}"
 msgstr ""
@@ -3749,6 +3748,10 @@ msgstr ""
 #: apps/linux/app/src/ui/history_dialog.rs:943
 #, rust-format
 msgid "{n} selected"
+msgstr ""
+
+#: apps/linux/app/src/ui/history_dialog.rs:982
+msgid "CSV files"
 msgstr ""
 
 #: apps/linux/app/src/ui/history_dialog.rs:989
