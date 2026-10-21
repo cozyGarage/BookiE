@@ -269,7 +269,7 @@ msgstr ""
 
 #: apps/linux/app/src/ui/activity_dialog.rs:26
 #: apps/linux/app/src/ui/activity_dialog.rs:35
-#: apps/linux/app/src/ui/app/row_ops.rs:31
+#: apps/linux/app/src/ui/app/row_ops.rs:32
 #: apps/linux/app/src/ui/catalog_dialog.rs:29
 msgid "No active connection"
 msgstr ""
@@ -480,7 +480,7 @@ msgstr ""
 #: apps/linux/app/src/ui/app/structure.rs:185
 #: apps/linux/app/src/ui/app/workspace_close.rs:29
 #: apps/linux/app/src/ui/app/workspace_close.rs:142
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:639
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:646
 #: apps/linux/app/src/ui/browse_tab/row_ops.rs:235
 #: apps/linux/app/src/ui/connect_dialog/mod.rs:904
 #: apps/linux/app/src/ui/connection_bundle/export.rs:70
@@ -656,7 +656,7 @@ msgstr ""
 #: apps/linux/app/src/ui/explain_dialog.rs:55
 #: apps/linux/app/src/ui/export_dialog.rs:274
 #: apps/linux/app/src/ui/export_dialog.rs:523
-#: apps/linux/app/src/ui/grid/context_menu.rs:214
+#: apps/linux/app/src/ui/grid/context_menu.rs:215
 #: apps/linux/app/src/ui/grid/full_value_editor.rs:406
 msgid "Close"
 msgstr ""
@@ -833,7 +833,7 @@ msgstr ""
 #: apps/linux/app/src/ui/app/favorites.rs:54
 #: apps/linux/app/src/ui/app/init_window.rs:133
 #: apps/linux/app/src/ui/app/organization.rs:99
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:641
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:648
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:250
 #: apps/linux/app/src/ui/grid/editing.rs:445
 #: apps/linux/app/src/ui/structure_tab/mod.rs:718
@@ -969,7 +969,7 @@ msgid "One or more tabs have unsaved changes. They will be permanently lost if y
 msgstr ""
 
 #: apps/linux/app/src/ui/app/init_window.rs:132
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:640
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:647
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:243
 #: apps/linux/app/src/ui/structure_tab/mod.rs:714
 msgid "Discard"
@@ -1171,21 +1171,29 @@ msgstr ""
 msgid "This column belongs to more than one foreign key."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/row_ops.rs:142
+#: apps/linux/app/src/ui/app/row_ops.rs:148
 #: apps/linux/app/src/ui/browse_tab/mod.rs:998
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:525
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:533
 msgid "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/row_ops.rs:160
+#: apps/linux/app/src/ui/app/row_ops.rs:161
 msgid "INSERT statement copied"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/row_ops.rs:165
+#: apps/linux/app/src/ui/app/row_ops.rs:162
+msgid "UPDATE statement copied"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/row_ops.rs:163
+msgid "DELETE statement copied"
+msgstr ""
+
+#: apps/linux/app/src/ui/app/row_ops.rs:169
 msgid "Copied to clipboard"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/row_ops.rs:200
+#: apps/linux/app/src/ui/app/row_ops.rs:204
 #, rust-format
 msgid "{n} rows could not be located. They may have been changed by another session. Refresh and review."
 msgstr ""
@@ -1228,8 +1236,8 @@ msgid "Open Quickly"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/shortcuts.rs:18
-#: apps/linux/app/src/ui/grid/context_menu.rs:476
-#: apps/linux/app/src/ui/grid/context_menu.rs:532
+#: apps/linux/app/src/ui/grid/context_menu.rs:478
+#: apps/linux/app/src/ui/grid/context_menu.rs:536
 msgid "Jump to Column…"
 msgstr ""
 
@@ -1348,8 +1356,8 @@ msgstr ""
 
 #: apps/linux/app/src/ui/app/shortcuts.rs:205
 #: apps/linux/app/src/ui/browse_tab/chrome.rs:24
-#: apps/linux/app/src/ui/grid/context_menu.rs:474
-#: apps/linux/app/src/ui/grid/context_menu.rs:535
+#: apps/linux/app/src/ui/grid/context_menu.rs:476
+#: apps/linux/app/src/ui/grid/context_menu.rs:539
 msgid "Insert row"
 msgstr ""
 
@@ -1703,41 +1711,41 @@ msgid "New query (Ctrl+E)"
 msgstr ""
 
 #: apps/linux/app/src/ui/app/workspace_tabs.rs:191
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:403
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:554
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:410
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:561
 msgid "Row as JSON"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:427
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:434
 msgid "Preview tab. Use the tab menu to keep it open."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:634
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:641
 #, rust-format
 msgid "Save changes to “{name}”?"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:637
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:644
 msgid "Unsaved changes will be permanently lost if you discard them."
 msgstr ""
 
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:924
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:931
 #: apps/linux/app/src/ui/editor/outcomes.rs:922
 #: apps/linux/app/src/ui/editor/schema.rs:17
 #: apps/linux/app/src/ui/history_dialog.rs:1041
 msgid "Empty query"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:996
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:1003
 msgid "Structure"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:1000
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:1007
 #, rust-format
 msgid "Query {n}"
 msgstr ""
 
-#: apps/linux/app/src/ui/app/workspace_tabs.rs:1062
+#: apps/linux/app/src/ui/app/workspace_tabs.rs:1069
 msgid "No recently closed tab"
 msgstr ""
 
@@ -1971,21 +1979,21 @@ msgstr ""
 msgid "This cell can't be set to NULL because it is read-only or does not accept NULL."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:540
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:548
 msgid "Click a cell first, then paste to fill cells from that one"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:620
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:628
 msgid "Saving changes. Edit again when the save finishes."
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:659
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:667
 #: apps/linux/app/src/ui/structure_tab/mod.rs:997
 #: apps/linux/app/src/ui/structure_tab/mod.rs:1003
 msgid "Cannot save"
 msgstr ""
 
-#: apps/linux/app/src/ui/browse_tab/row_ops.rs:717
+#: apps/linux/app/src/ui/browse_tab/row_ops.rs:725
 #: apps/linux/app/src/ui/structure_tab/mod.rs:1076
 msgid "Save failed"
 msgstr ""
@@ -3358,111 +3366,119 @@ msgstr ""
 msgid "At least one column stays visible."
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:210
+#: apps/linux/app/src/ui/grid/context_menu.rs:211
 #, rust-format
 msgid "Skipped {n} NULL, binary or unsupported values."
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:212
+#: apps/linux/app/src/ui/grid/context_menu.rs:213
 msgid "Copy as IN clause"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:490
+#: apps/linux/app/src/ui/grid/context_menu.rs:492
 msgid "Edit cell"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:493
+#: apps/linux/app/src/ui/grid/context_menu.rs:495
 msgid "Edit Full Value…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:499
+#: apps/linux/app/src/ui/grid/context_menu.rs:501
 msgid "Rows"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:500
+#: apps/linux/app/src/ui/grid/context_menu.rs:502
 msgid "With Headers"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:501
+#: apps/linux/app/src/ui/grid/context_menu.rs:503
 msgid "JSON"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:502
+#: apps/linux/app/src/ui/grid/context_menu.rs:504
 msgid "CSV"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:503
+#: apps/linux/app/src/ui/grid/context_menu.rs:505
 msgid "CSV with Headers"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:504
+#: apps/linux/app/src/ui/grid/context_menu.rs:506
 msgid "Markdown"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:505
+#: apps/linux/app/src/ui/grid/context_menu.rs:507
 msgid "IN Clause"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:507
+#: apps/linux/app/src/ui/grid/context_menu.rs:509
 msgid "INSERT Statement"
 msgstr ""
 
 #: apps/linux/app/src/ui/grid/context_menu.rs:510
+msgid "UPDATE Statement"
+msgstr ""
+
+#: apps/linux/app/src/ui/grid/context_menu.rs:511
+msgid "DELETE Statement"
+msgstr ""
+
+#: apps/linux/app/src/ui/grid/context_menu.rs:514
 #: apps/linux/app/src/ui/grid/value_viewer.rs:113
 msgid "Copy value"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:511
+#: apps/linux/app/src/ui/grid/context_menu.rs:515
 msgid "Copy as"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:512
+#: apps/linux/app/src/ui/grid/context_menu.rs:516
 msgid "Copy column name"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:516
+#: apps/linux/app/src/ui/grid/context_menu.rs:520
 msgid "Filter by This Value"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:519
+#: apps/linux/app/src/ui/grid/context_menu.rs:523
 msgid "Go to Referenced Row"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:521
+#: apps/linux/app/src/ui/grid/context_menu.rs:525
 msgid "View Value…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:522
+#: apps/linux/app/src/ui/grid/context_menu.rs:526
 msgid "Show Row as JSON"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:526
+#: apps/linux/app/src/ui/grid/context_menu.rs:530
 msgid "Export Visible Rows…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:528
+#: apps/linux/app/src/ui/grid/context_menu.rs:532
 msgid "Export Results…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:531
+#: apps/linux/app/src/ui/grid/context_menu.rs:535
 msgid "Columns…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:533
+#: apps/linux/app/src/ui/grid/context_menu.rs:537
 msgid "Find in Loaded Rows…"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:536
+#: apps/linux/app/src/ui/grid/context_menu.rs:540
 msgid "Duplicate row"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:537
+#: apps/linux/app/src/ui/grid/context_menu.rs:541
 #: apps/linux/app/src/ui/grid/full_value_editor.rs:234
 #: apps/linux/app/src/ui/grid/full_value_editor.rs:709
 msgid "Set to NULL"
 msgstr ""
 
-#: apps/linux/app/src/ui/grid/context_menu.rs:538
+#: apps/linux/app/src/ui/grid/context_menu.rs:542
 msgid "Delete row"
 msgstr ""
 
