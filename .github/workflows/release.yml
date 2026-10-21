@@ -80,7 +80,7 @@ jobs:
           scripts/build-deb.sh
           package="$(ls apps/linux/packaging/out/*.deb)"
           scripts/validate-deb-package.sh "$package"
-          sha256sum "$package" > "$package.sha256"
+          (cd "$(dirname "$package")" && sha256sum "$(basename "$package")" > "$(basename "$package").sha256")
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: package-deb
