@@ -128,15 +128,7 @@ impl DatabaseDriver for PgDriver {
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
             .after_release(|connection, _| {
-                Box::pin(async move {
-                    match sqlx::query("DISCARD ALL").execute(connection).await {
-                        Ok(_) => Ok(true),
-                        Err(error) => {
-                            eprintln!("PostgreSQL pooled session reset failed: {error}");
-                            Ok(false)
-                        }
-                    }
-                })
+                Box::pin(async move { Ok(sqlx::query("DISCARD ALL").execute(connection).await.is_ok()) })
             })
             .connect_with(pg_opts)
             .await
