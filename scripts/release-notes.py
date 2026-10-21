@@ -21,17 +21,18 @@ def section(text, version):
     return body + "\n"
 
 
-def cut(text, version, date, previous):
+def cut(text, version, date):
     if re.search(rf"(?m)^## \[{re.escape(version)}\]", text):
         raise SystemExit(f"CHANGELOG.md already has a section for {version}")
     if UNRELEASED not in text:
         raise SystemExit("CHANGELOG.md has no Unreleased section")
     text = text.replace(UNRELEASED, f"{UNRELEASED}\n\n## [{version}] - {date}", 1)
     text = re.sub(r"(?m)^\[Unreleased\]: .*$", f"[Unreleased]: {REPO}/compare/linux-v{version}...linux", text)
-    text = re.sub(
-        rf"(?m)^\[{re.escape(version)}\]: .*$", f"[{version}]: {REPO}/releases/tag/linux-v{version}", text
-    )
-    return text
+    version_link = f"[{version}]: {REPO}/releases/tag/linux-v{version}"
+    version_link_pattern = rf"(?m)^\[{re.escape(version)}\]: .*$"
+    if re.search(version_link_pattern, text):
+        return re.sub(version_link_pattern, version_link, text)
+    return text.rstrip() + f"\n{version_link}\n"
 
 
 def main():
@@ -42,7 +43,6 @@ def main():
     cutting = commands.add_parser("cut", help="move Unreleased entries under a new version heading")
     cutting.add_argument("version")
     cutting.add_argument("date")
-    cutting.add_argument("--previous", default="")
     args = parser.parse_args()
     text = CHANGELOG.read_text()
     if args.command == "notes":
@@ -50,7 +50,7 @@ def main():
         return
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.date):
         raise SystemExit("date must be YYYY-MM-DD")
-    CHANGELOG.write_text(cut(text, args.version, args.date, args.previous))
+    CHANGELOG.write_text(cut(text, args.version, args.date))
 
 
 if __name__ == "__main__":
