@@ -1,4 +1,6 @@
 from pathlib import Path
+import configparser
+import fnmatch
 import importlib.util
 import json
 import os
@@ -21,14 +23,19 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
-    def test_workflows_install_cargo_about_with_cli(self):
+    def test_cargo_about_comes_from_the_pinned_installer_and_is_never_built_in_ci(self):
         for path in (
             ".github/workflows/build-linux.yml",
             ".github/workflows/linux-ci-contracts.yml",
             ".forgejo/workflows/ci.yml",
         ):
-            workflow = (ROOT / path).read_text()
-            self.assertIn("cargo install cargo-about --locked --version 0.9.2 --features=cli", workflow)
+            with self.subTest(workflow=path):
+                self.assertNotIn("cargo install cargo-about", (ROOT / path).read_text())
+        harness = (ROOT / "scripts/test-harness.sh").read_text()
+        self.assertLess(
+            harness.index("scripts/ensure-cargo-about.sh"),
+            harness.index("scripts/update-third-party-notices.py --check"),
+        )
 
     def test_forgejo_workflows_queue_without_cancelling_across_refs(self):
         groups = []
@@ -79,6 +86,7 @@ class CiWorkflowTests(unittest.TestCase):
         local = (ROOT / "scripts/ci-local.sh").read_text()
         for package, target in [
             ("tablepro-mcp", "mongodb_extended_json"),
+            ("tablepro-mcp", "postgres_custom_enum"),
             ("tablepro-policy", "session_postgres"),
             ("tablepro-policy", "session_mssql"),
         ]:
@@ -144,6 +152,7 @@ class CiWorkflowTests(unittest.TestCase):
         ledger = subprocess.check_output(["python3", str(ROOT / "scripts/inventory-ignored-tests.py")], text=True)
         for package, target in [
             ("tablepro-mcp", "mongodb_extended_json"),
+            ("tablepro-mcp", "postgres_custom_enum"),
             ("tablepro-policy", "session_postgres"),
             ("tablepro-policy", "session_mssql"),
         ]:
@@ -409,7 +418,17 @@ class CiWorkflowTests(unittest.TestCase):
     def test_sonar_imports_python_tool_coverage_report(self):
         workflow = (ROOT / ".github/workflows/sonar-rust.yml").read_text()
         self.assertIn("coverage==7.10.6", workflow)
-        self.assertIn("coverage run --branch --source=scripts", workflow)
+        self.assertIn("coverage run -m unittest discover -s scripts/tests", workflow)
+        config = configparser.ConfigParser()
+        config.read(ROOT / '.coveragerc')
+        self.assertEqual(set(config['run']['patch'].split()), {'subprocess', 'execv'})
+        self.assertTrue(config['run'].getboolean('branch'))
+        self.assertTrue(config['run'].getboolean('parallel'))
+        self.assertEqual(config['run']['source'], 'scripts')
+        self.assertEqual(config['run']['omit'], 'scripts/tests/*')
+        commands = ['coverage erase', 'coverage run -m unittest', 'coverage combine', 'coverage xml']
+        positions = [workflow.index(command) for command in commands]
+        self.assertEqual(positions, sorted(positions))
         self.assertIn("unittest discover -s scripts/tests", workflow)
         self.assertIn("coverage xml -o target/sonar/python-coverage.xml", workflow)
         self.assertIn("-Dsonar.python.coverage.reportPaths=target/sonar/python-coverage.xml", workflow)
@@ -417,11 +436,10 @@ class CiWorkflowTests(unittest.TestCase):
     def test_sonar_excludes_python_test_sources_from_coverage(self):
         workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())
         exclusions = workspace["workspace"]["metadata"]["sonar"]["sonar.coverage.exclusions"]
-        self.assertIn("scripts/tests/test_check_crate_boundaries.py", exclusions)
-        self.assertIn("scripts/tests/test_gtk_runner.py", exclusions)
-        self.assertIn("scripts/tests/test_arch_candidate.py", exclusions)
-        self.assertIn("scripts/tests/test_csv_import_chooser.py", exclusions)
-        self.assertIn("scripts/tests/test_update_third_party_notices.py", exclusions)
+        for path in (ROOT / 'scripts/tests').rglob('test_*.py'):
+            relative = path.relative_to(ROOT).as_posix()
+            self.assertTrue(any(fnmatch.fnmatchcase(relative, pattern) for pattern in exclusions), relative)
+        self.assertFalse(any(fnmatch.fnmatchcase('scripts/ci-cache.py', pattern) for pattern in exclusions))
 
     def test_sonar_excludes_app_pinning_test_support_from_coverage(self):
         workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())

@@ -11,7 +11,7 @@ Related: [value contracts](value-contracts.md) (the shared corpus and the rules 
 | Class | Meaning | Example |
 |---|---|---|
 | N, native | The database or a standard computes the expected value | `value = 'FFFFFFFF/FFFFFFFF'::pg_lsn AS server_match`, `pg_typeof(value)`, `value::text` in the same query |
-| R, round trip | A value goes in and the same value comes out through our code and the engine | the shared corpus in `tests/data/value-contract.json` run by `assert_scalar_contract` on every engine |
+| R, round trip | A value goes in and the same value comes out through BookiE's code and the engine | the shared corpus in `tests/data/value-contract.json` run by `assert_scalar_contract` on every engine |
 | H, hand typed | The author typed the expected literal | `assert_eq!(decode(...), "{\"NULL\",...}")` |
 | C, computed | The expectation is computed by the code under test, or by a copy of its algorithm | an expected string built with the same formatter the driver uses |
 | P, policy | The expected decision comes from an ADR, `AGENTS.md` or a written rule | "TRUNCATE needs approval in Local" |
@@ -39,7 +39,7 @@ These rows demonstrate how to identify an oracle and review an assertion. They a
 | 11 | Export | `crates/core/src/export/file.rs:182` `value_contract_xml_illegal_text_preserves_destination_and_reports_coordinates` | Text XML cannot hold is refused with its row and column and the destination file is untouched | N | OK | `file.rs:185-208`: characters are those XML 1.0 forbids; error must name `row 2, column 2` and the codepoint; destination bytes stay `existing XML`. |
 | 12 | Policy | `crates/policy/tests/aud11_s6_s7.rs` `truncate_needs_human_approval_even_when_local_ddl_is_permissive` | `TRUNCATE` needs approval in Local even when ordinary DDL does not | P | OK | `aud11_s6_s7.rs:69-74`: Local defaults have `human_approve_ddl == false`, yet `TRUNCATE TABLE users` must be `RequireApproval` (AUD-11 / [effects proposal](proposals/policy-effects-and-verdict.md)). |
 | 13 | Policy | `crates/policy/src/select_writes.rs:23` `select_into_creates_a_table_and_is_a_write` | `SELECT ... INTO` is classified as a write | P | OK | `select_writes.rs:23-34`: postgres/mssql `SELECT ... INTO` must report `writes()` and not `StatementClass::Select` (table-creating select is a write). |
-| 14 | Policy / drivers | `crates/drivers/postgres/tests/support/read_only_session.rs:16` `a_read_only_connection_is_refused_writes_by_the_server` | A read-only connection is refused writes by the server itself, not by our check | N | OK | `read_only_session.rs:32-42`: writes fail with PostgreSQL SQLSTATE `25006`; a plain `SELECT` still returns the row, so the refusal is the server's read-only transaction. |
+| 14 | Policy / drivers | `crates/drivers/postgres/tests/support/read_only_session.rs:16` `a_read_only_connection_is_refused_writes_by_the_server` | A read-only connection is refused writes by the server itself, not by BookiE's check | N | OK | `read_only_session.rs:32-42`: writes fail with PostgreSQL SQLSTATE `25006`; a plain `SELECT` still returns the row, so the refusal is the server's read-only transaction. |
 
 ### PostgreSQL cases from issue #590
 | 15 | PostgreSQL | `crates/drivers/postgres/tests/support/native_oracle_contract.rs` `value_contract_integer_text_and_bytea_match_native_oracles` | Integer and text boundaries, plus NULL/empty/binary `bytea`, match PostgreSQL's native type, text, wire and byte outputs | N | OK | `pg_typeof`, `::text`, `int8send`, `octet_length`, `convert_to` and `encode` are computed by PostgreSQL. Includes signed bounds, integers beyond 2^53, empty text, literal `NULL`, apostrophe, Unicode, SQL NULL, empty bytea and binary bytes. |
@@ -68,7 +68,7 @@ Use a database's native client when a round trip cannot rule out matching encode
 Use disposable scratch data and the engine's native client. Select only values and operations that the current driver and app support.
 
 1. Create scratch data with native integer, float, decimal and text values where the engine supports those types. For Redis, seed string keys with text and binary values, and use a counter command for an integer reply.
-2. Seed the applicable values below with the native client, so our code is not involved.
+2. Seed the applicable values below with the native client, so BookiE's code is not involved.
 3. Read them back with the native client and note the exact text it prints.
 4. Open the data in the app and compare its value display and CSV export to the native result. Use the grid for tables and the query editor for command-oriented engines.
 5. Change a value through the app path that the engine supports, then read it back with the native client. The stored value must be the one you entered.

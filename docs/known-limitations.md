@@ -1,6 +1,6 @@
 # Known limitations of BookiE 0.2
 
-What the application does not do, or does differently from what you might expect, and the bugs we know about. Entries link to their owning issue, decision or evidence when one exists. Issues own current work and acceptance status; this page records user-visible behavior.
+Documented application limits, behavior differences and known defects. Entries link to their owning issue, decision or evidence when one exists. Issues own current work and acceptance status; this page records user-visible behavior.
 
 ## Data and values
 
@@ -14,7 +14,11 @@ What the application does not do, or does differently from what you might expect
   results stop at 1 million rows, 10 million cells or 64 MiB estimated size.
   Single-statement PostgreSQL `SELECT`s in the SQL editor now stream cursor
   pages through Core and PolicyGuard, retaining at most four pages of up to
-  5,000 rows each. That cache is bounded by page and row count, not by cell
+  5,000 rows each. Previous/Next controls navigate only retained pages. The
+  received-row summary identifies the retained range when earlier rows have
+  been discarded; those rows cannot be revisited without running the query
+  again. Row ranges are positions in the result, not database row identifiers.
+  That cache is bounded by page and row count, not by cell
   bytes. A synthetic profile with four pinned results and one active stream
   reached 1,325 MiB RSS; see the [profile evidence](evidence/stream-retention-synthetic-2026-10-16/README.md).
   This does not measure normal queries or the complete process ceiling. Other
@@ -40,6 +44,7 @@ What the application does not do, or does differently from what you might expect
   literal, because the instant cannot be known.
 - **SQLite real numbers:** negative zero and NaN cannot be bound as parameters.
 - **SQLite JSON aggregate output** can differ across system SQLite versions (TEST-25).
+- **SQL row export does not preserve every server-assigned value.** When column metadata marks a value as generated, SQL export and Copy as INSERT omit it. They also omit auto-increment columns for PostgreSQL and SQL Server, so replay assigns fresh values. They do not emit sequence-state restoration or remap foreign keys to those fresh values. Do not use these row statements as a relational backup. For PostgreSQL backup and restore, use the [dedicated backup tools](user-guide.md#back-up-and-restore-postgresql).
 - **CSV import does not map SQL Server IDENTITY columns.** PostgreSQL, MySQL/MariaDB and SQLite can import explicit auto-increment values when mapped. SQL Server identity columns and generated columns remain database-owned ([type and value contract](decisions/0007-type-and-value-preservation.md)).
 - **Unzoned PostgreSQL `timestamptz` CSV values** are currently interpreted as UTC. [PostgreSQL](https://www.postgresql.org/docs/current/datatype-datetime.html) normally interprets unzoned timestamp input in the session time zone; the import rule is tracked in [#857](https://github.com/cozyGarage/BookiE/issues/857). Include an explicit zone in the CSV to avoid ambiguity.
 - **MongoDB:** browse pages are separate observations, not one point-in-time view (TEST-12); a column with mixed types is read-only. Compatible `_id` pages can use keyset seeking ([#493](https://github.com/cozyGarage/BookiE/pull/493)), and supported sort requests run server-side ([#837](https://github.com/cozyGarage/BookiE/pull/837)). Sorted pages outside the compatible `_id` keyset path and keyless deep pages still use offset pagination. Installed and representative-network acceptance is tracked under PERF-3 / [#555](https://github.com/cozyGarage/BookiE/issues/555).

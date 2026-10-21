@@ -40,6 +40,7 @@ apps/linux/app/src/ui/browse_tab/selection/stats.rs
 apps/linux/app/src/ui/browse_tab/selection.rs
 apps/linux/app/src/ui/browse_tab/value_parse.rs
 apps/linux/app/src/ui/catalog_dialog.rs
+apps/linux/app/src/ui/connect_dialog/auth_source.rs
 apps/linux/app/src/ui/connect_dialog/browse.rs
 apps/linux/app/src/ui/connect_dialog/controls.rs
 apps/linux/app/src/ui/connect_dialog/form.rs
@@ -62,6 +63,7 @@ apps/linux/app/src/ui/editor/run_lifecycle.rs
 apps/linux/app/src/ui/editor/schema.rs
 apps/linux/app/src/ui/editor/session_mode.rs
 apps/linux/app/src/ui/editor/statement_cursor.rs
+apps/linux/app/src/ui/editor/stream_view/pager.rs
 apps/linux/app/src/ui/editor/streaming.rs
 apps/linux/app/src/ui/explain_dialog.rs
 apps/linux/app/src/ui/explain_tree.rs
