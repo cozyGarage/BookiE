@@ -74,6 +74,7 @@ pub enum SidebarRowMsg {
     EditStructure,
     ShowCreateTable,
     ImportCsv,
+    RenameTable,
     TruncateTable,
     DropTable,
     SetCollapsed(bool),
@@ -123,6 +124,10 @@ pub enum SidebarRowOutput {
     /// Right-click "Import CSV…" → App reads the file, asks the user how
     /// to map its fields, and loads it into this table.
     ImportCsv {
+        schema: Option<String>,
+        name: String,
+    },
+    RenameTable {
         schema: Option<String>,
         name: String,
     },
@@ -343,6 +348,10 @@ impl FactoryComponent for SidebarRow {
             let mutate_section = gtk::gio::Menu::new();
             mutate_section.append(Some(&crate::tr!("Import CSV\u{2026}")), Some("sidebar-row.import-csv"));
             mutate_section.append(
+                Some(&crate::tr!("Rename Table\u{2026}")),
+                Some("sidebar-row.rename-table"),
+            );
+            mutate_section.append(
                 Some(&crate::tr!("Truncate Table\u{2026}")),
                 Some("sidebar-row.truncate-table"),
             );
@@ -379,6 +388,10 @@ impl FactoryComponent for SidebarRow {
         let import_action = gtk::gio::ActionEntry::builder("import-csv")
             .activate(move |_, _, _| sender_import.input(SidebarRowMsg::ImportCsv))
             .build();
+        let sender_rename = sender.clone();
+        let rename_action = gtk::gio::ActionEntry::builder("rename-table")
+            .activate(move |_, _, _| sender_rename.input(SidebarRowMsg::RenameTable))
+            .build();
         let sender_truncate = sender.clone();
         let truncate_action = gtk::gio::ActionEntry::builder("truncate-table")
             .activate(move |_, _, _| sender_truncate.input(SidebarRowMsg::TruncateTable))
@@ -391,6 +404,7 @@ impl FactoryComponent for SidebarRow {
             edit_action,
             show_create_action,
             import_action,
+            rename_action,
             truncate_action,
             drop_action,
         ]);
@@ -446,6 +460,7 @@ impl FactoryComponent for SidebarRow {
             SidebarRowMsg::EditStructure => SidebarRowOutput::EditStructure { schema, name },
             SidebarRowMsg::ShowCreateTable => SidebarRowOutput::ShowCreateTable { schema, name },
             SidebarRowMsg::ImportCsv => SidebarRowOutput::ImportCsv { schema, name },
+            SidebarRowMsg::RenameTable => SidebarRowOutput::RenameTable { schema, name },
             SidebarRowMsg::TruncateTable => SidebarRowOutput::TruncateTable { schema, name },
             SidebarRowMsg::DropTable => SidebarRowOutput::DropTable { schema, name },
             SidebarRowMsg::NewTable => SidebarRowOutput::NewTable { schema },
