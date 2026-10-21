@@ -43,6 +43,8 @@ IBUS_LIBRARY="$(ldconfig -p | awk '/libibus-1.0.so.5 .*x86-64/ {print $NF; exit}
   --executable "$APPDIR/usr/bin/bookie-agentd" \
   ${IBUS_LIBRARY:+--library "$IBUS_LIBRARY"} \
   --plugin gtk
+sed -i 's|^export GDK_BACKEND=x11.*$|export GDK_BACKEND="${GDK_BACKEND:-wayland,x11}"|' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
+grep -q 'wayland,x11' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
 for module in "$APPDIR"/usr/lib/gtk-4.0/*/immodules/*.so; do
   patchelf --set-rpath '$ORIGIN/../../..' "$module"
 done
