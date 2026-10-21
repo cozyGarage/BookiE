@@ -35,7 +35,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | Current capability behaviour extracted from code | [specs/](../specs/README.md) | Descriptive only; when a spec and the code disagree, fix the spec |
 | An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR; keep the [checklist](decisions/checklist.md) row in sync |
 | Which forks already have an answer | The [decision checklist](decisions/checklist.md) | Link, N/A, or open item; do not invent a decision to fill a cell |
-| A design not yet decided | [proposals/](proposals/) | Becomes an ADR or is deleted; current proposals include the [Forgejo train gate](proposals/forgejo-train-gate.md) |
+| A design not yet decided | [proposals/](proposals/) | Becomes an ADR or is deleted; aggregate Forgejo trains are accepted in [ADR 0020](decisions/0020-aggregate-forgejo-trains.md) |
 | An open issue, its status and lane | [Project #3](https://github.com/users/cozyGarage/projects/3); ID map in the [ledger index](known-issues.md) | Status and Lane on the project; keep the index ID→issue→Lane table in sync; `scripts/check-known-issues.py` checks format offline, while `scripts/check-github-issue-status.py` reports live issue state |
 | Milestone completion and subsequent order | [Completion](bookie-0.2-sprint.md), [scope](0.2.0-scope.md), [backlog](backlog.md) | Record maintainer completion separately from publication; keep issue acceptance on Project #3 and dated proof in the archive |
 | B3 remaining work | Project #3 Lane B3; [B3 board pointer](type-contract-strategy.md) | Issues on the project; pointer keeps accepted refusals and the case record |
@@ -47,7 +47,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | A user-visible change | The [changelog](../CHANGELOG.md) | One line of user impact; no test or evidence notes |
 | What a user can do and how | The [user guide](user-guide.md) | Update with the feature that changes it |
 | Run-specific proof (manifests, focused logs) | `evidence/<topic>[-<sha>]-<YYYY-MM-DD>/` | A `manifest.json` or concise `README.md`, with only the artifacts needed to check the claim; link it from the owning row or board |
-| A finished review, audit or long history | [archive/](archive/) | Dated file name; never edited after archiving except for broken links |
+| A finished review, audit or long history | [archive/](archive/) | Dated file name; corrections to links or neutral wording must preserve the recorded evidence, dates and decisions |
 
 The [runner maintenance and isolation proposal](proposals/runner-maintenance-and-isolation.md) records the observed cleanup risks and the staged mini PC runner migration. It is not deployed acceptance.
 
@@ -90,6 +90,12 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 Record a rule once in an ADR and a task once on Project #3. Do not copy old test counts into a current claim. Keep ignored `target/quality` paths as plain text, and when output is unavailable, say so instead of leaving a dead link.
 
 ## Engineering review records (October 2026)
+
+- [Public documentation language review, October 21](evidence/public-documentation-language-2026-10-21/README.md): repository-wide Markdown screening, neutral wording corrections and independent adoption criteria.
+
+- [TablePro adoption and collaboration, October 21](archive/tablepro-collaboration-2026-10-21.md): current Linux performance, SSH, export and translation changes, PostgreSQL behavior candidates and concrete upstream contribution routes.
+
+- [dbx architecture and regression follow-up, October 21](archive/dbx-follow-up-2026-10-21.md): changes since the prior pin, PostgreSQL session/restore lessons, current architecture guards and qualified regression candidates.
 
 - [Newest-code and upstream follow-up, October 20](archive/upstream-next-slices-2026-10-20.md): PostgreSQL transaction outcome gaps, native/savepoint and CI diagnostic probes, current upstream changes and proposed next slices.
 - [TablePro and dbx deep review, October 20](archive/tablepro-dbx-review-2026-10-20/README.md): full feature, architecture and fix-commit mapping of TablePro `3222542a4` and dbx `d1e88ab4b` against BookiE `7c4cb3929`, with Wave 0 defects to confirm and a ranked roadmap of candidates.

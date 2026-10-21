@@ -120,6 +120,8 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - PostgreSQL databases can be backed up to a file and restored from one with the installed client tools, through SSH tunnels and TLS; restores need approval and both are audited.
 
 ### Changed
+
+- Manually resized and restored grid columns keep their width when the window grows; unsized columns continue to fill the available space.
 - Imported connection URLs preserve supported TLS settings and reject options they cannot preserve.
 - Ending an aborted PostgreSQL editor transaction reports that it rolled back instead of saying its changes were committed.
 - PostgreSQL session audit records distinguish committed transactions recovered through savepoints from aborted transactions that roll back.
@@ -151,6 +153,9 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 
 ### Fixed
 
+- Clearing a cell in a required text column saves an empty string instead of refusing the edit with "Field is required".
+- The connection dialog puts Test on the left and Connect on the right with a centered title; its dropdown choices, port and timeout boxes have an arrow or room around them.
+- A long message in the SQL editor toolbar, such as the notice after cancelling a large query, is cut with an ellipsis instead of pushing Pin results, Session, Explain, Run and Split off screen; the full text is in the tooltip and on the Status page.
 - A `USE` run on a pooled MySQL connection no longer changes which database later catalog reads and queries see: each pooled connection returns to the configured database before it is reused.
 - Keyboard run shortcuts no longer start another execution while a query is active.
 - After a tunnel drop during a Session transaction, a fresh editor session can run read queries again: ending its read-only snapshot with ROLLBACK is no longer refused by the earlier unresolved write, while commits and writes on that connection stay blocked.
