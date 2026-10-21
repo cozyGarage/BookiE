@@ -41,6 +41,26 @@
       "repository": "fluxdb-alt/fluxDB",
       "commit": "017c2524b90f502890803942d85d65ca11de326a",
       "license_observed": "GPL-3.0"
+    },
+    {
+      "repository": "longbridge/gpui-component",
+      "commit": "8b3631f020a85675dca2a7ba251fdeff1c867fc7",
+      "license_observed": "Apache-2.0 code; separate documentation and asset licenses"
+    },
+    {
+      "repository": "dctanner/seesvee",
+      "commit": "8df3c06f887c129febbfd278fab3079e02bf54ec",
+      "license_observed": "MIT"
+    },
+    {
+      "repository": "smolcars/hunk",
+      "commit": "0e2d1619e3e84548c1c58d6a54d86717eb75f409",
+      "license_observed": "GPL-3.0"
+    },
+    {
+      "repository": "duanebester/pgui",
+      "commit": "d01aed7838f1bdbe3aa07c656e9ac7b88f57675e",
+      "license_observed": "No repository license identified; no reuse proposed"
     }
   ]
 }

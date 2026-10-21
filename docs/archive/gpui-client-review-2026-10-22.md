@@ -57,3 +57,27 @@ The existing performance issues #1272, #1299 and #1306 remain the appropriate wo
 No source was copied and no dependency added. MIT and Apache labels are starting points for file-level provenance, notices and dependency review. GPL-labeled sources require checking the actual license version and compatibility before incorporation. Navop's custom restrictions prevent treating its repository as generally reusable open-source code. The curated list's license does not license the linked projects.
 
 The preferred first step is an independently implemented regression case or a small correction to an existing GTK path. A GPUI prototype would require a separate product decision and evidence covering accessibility, input methods, clipboard, large text, display scaling and packaging. None of those capabilities was verified here.
+
+## Follow-up candidates from the curated list
+
+These four additional sources were inspected after the initial eight. Their pins are in the same manifest. No application execution or comparative benchmark was performed.
+
+### Two-dimensional visibility and keyboard scrolling
+
+The table state tracks visible row and column ranges. Its horizontal offset calculation can keep an already visible column in place while bringing an offscreen column into view. This suggests testing BookiE with hundreds of columns, keyboard navigation at viewport edges, and stable header/body alignment. Source inspection is not evidence that its accessibility or input behavior matches GTK. [Pinned source](https://github.com/longbridge/gpui-component/blob/8b3631f020a85675dca2a7ba251fdeff1c867fc7/crates/component/src/table/state.rs).
+
+### Bound preview shaping before rendering
+
+The CSV grid uses visible-column geometry and caps display text at 300 characters before shaping it. The early byte check avoids scanning an entire huge cell just to decide it needs a preview. Its separate store.rs uses a contiguous string arena with offset indexes and a sparse edit overlay. That storage design is interesting for imported text, but it cannot replace exact heterogeneous database values without a separate design and boundary analysis. The useful immediate probe is whether BookiE formats or shapes full offscreen cell values. [Pinned source](https://github.com/dctanner/seesvee/blob/8df3c06f887c129febbfd278fab3079e02bf54ec/src/grid.rs).
+
+### Degrade expensive decoration without changing content
+
+Intraline diffing limits characters, token count and LCS matrix cells, then uses a coarse change map. This is a useful pattern for optional SQL diagnostics and highlighting: preserve the document while reducing expensive analysis. It is not a demonstrated remedy for GTK shaping an extremely long line; the inspected helper still allocates character arrays and maps. [Pinned source](https://github.com/smolcars/hunk/blob/0e2d1619e3e84548c1c58d6a54d86717eb75f409/crates/hunk-app/src/diff/highlight.rs).
+
+### Check ownership transfers even with a virtualized table
+
+The inspected update method takes a QueryResult by value, clones its rows, and clones each row’s cells into retained table state. This is a concrete reminder to inspect adapter copies separately from drawing. No BookiE duplicate-copy defect is established by this source, and no repository license was identified for copying it. [Pinned source](https://github.com/duanebester/pgui/blob/d01aed7838f1bdbe3aa07c656e9ac7b88f57675e/src/workspace/results/table_delegate.rs).
+
+### Follow-up acceptance in BookiE
+
+UX should first trace grid preview conversion, width measurement and binding for large cells and many columns. A useful regression must distinguish stored exact values from bounded display text, and verify copy/export still retrieves the exact value. Keyboard scenarios should include entering a new editor from sidebar search, navigating beyond both viewport edges, closing a focused dialog, and resizing with large text. Existing focus and toolbar fixes remain their own evidence; these research candidates do not mark untested scenarios complete.
