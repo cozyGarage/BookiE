@@ -17,6 +17,7 @@ mod packed;
 mod session;
 mod temporal;
 
+use tablepro_core::sql_syntax::script::LexicalSettings;
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
     MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Transport, Value, check_pre_dispatch,
@@ -90,13 +91,16 @@ impl DatabaseDriver for MysqlDriver {
         let cancellation_options = mysql_opts.clone();
         let session_options = mysql_opts.clone();
         let read_only = opts.read_only;
+        let database: std::sync::Arc<str> = opts.database.as_str().into();
         let pool = MySqlPoolOptions::new()
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
             .after_connect(move |connection, _| Box::pin(prepare_session(connection, read_only)))
             .before_acquire(move |connection, _| {
+                let database = std::sync::Arc::clone(&database);
                 Box::pin(async move {
                     prepare_session(connection, read_only).await?;
+                    restore_database(connection, &database).await?;
                     Ok(true)
                 })
             })
@@ -420,6 +424,15 @@ impl Connection for MysqlConnection {
         session::open(&self.session_options, self.cancellation_pool.clone(), self.read_only).await
     }
 
+    async fn lexical_settings_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Option<LexicalSettings>, DriverError> {
+        run_controlled_setup(session_lexical_settings(&self.pool), control)
+            .await?
+            .map(Some)
+    }
+
     async fn begin(&self) -> Result<Box<dyn tablepro_core::Transaction>, DriverError> {
         let tx = self.pool.begin().await.map_err(map_sqlx_error)?;
         Ok(Box::new(MysqlTransaction { tx: Some(tx) }))
@@ -537,6 +550,17 @@ async fn set_utc_timezone(connection: &mut sqlx::MySqlConnection) -> Result<(), 
     Ok(())
 }
 
+async fn restore_database(connection: &mut sqlx::MySqlConnection, database: &str) -> Result<(), sqlx::Error> {
+    if database.is_empty() {
+        return Ok(());
+    }
+    let statement = format!("USE `{}`", database.replace('`', "``"));
+    sqlx::raw_sql(sqlx::AssertSqlSafe(statement))
+        .execute(connection)
+        .await?;
+    Ok(())
+}
+
 async fn prepare_session(connection: &mut sqlx::MySqlConnection, read_only: bool) -> Result<(), sqlx::Error> {
     set_utc_timezone(connection).await?;
     if read_only {
@@ -545,6 +569,17 @@ async fn prepare_session(connection: &mut sqlx::MySqlConnection, read_only: bool
             .await?;
     }
     Ok(())
+}
+
+async fn session_lexical_settings<'e, E>(executor: E) -> Result<LexicalSettings, DriverError>
+where
+    E: sqlx::Executor<'e, Database = MySql>,
+{
+    let sql_mode: String = sqlx::query_scalar("SELECT @@SESSION.sql_mode")
+        .fetch_one(executor)
+        .await
+        .map_err(map_sqlx_error)?;
+    Ok(LexicalSettings::from_mysql_sql_mode(&sql_mode))
 }
 
 async fn timezone_is_utc<'e, E>(executor: E) -> Result<bool, DriverError>

@@ -13,7 +13,7 @@ The nine selected packets under [#1149](https://github.com/cozyGarage/BookiE/iss
 
 ## Current development order
 
-Finish existing pull requests first, then address destructive operations [#1176](https://github.com/cozyGarage/BookiE/issues/1176) and [#1175](https://github.com/cozyGarage/BookiE/issues/1175), value preservation [#1184](https://github.com/cozyGarage/BookiE/issues/1184) and [#1177](https://github.com/cozyGarage/BookiE/issues/1177), and the security findings below. Reproduce each report before changing behavior. Keep one lane-owned fix and one serialized Forgejo gate at a time.
+Finish existing pull requests first, then address destructive operations [#1176](https://github.com/cozyGarage/BookiE/issues/1176) and [#1175](https://github.com/cozyGarage/BookiE/issues/1175), value preservation [#1177](https://github.com/cozyGarage/BookiE/issues/1177), and the security findings below. Reproduce each report before changing behavior. Keep one lane-owned fix and one serialized Forgejo gate at a time.
 
 Continue existing dependency chains after those fixes: object write capabilities #1065 before shared grid guards #1031, and bounded server messages #1033 before the GTK consumer #1034. Edit ownership #1029, workspace identity #1054 and stream budgets #1032 retain their acceptance. New features remain selected separately; issue status and lane belong to Project #3.
 
@@ -32,8 +32,6 @@ The [October 20 TablePro and dbx review](archive/tablepro-dbx-review-2026-10-20/
 | RV-9 / [#1179](https://github.com/cozyGarage/BookiE/issues/1179) | Policy reads a body's trailing `END` as COMMIT and refuses DDL | B4 | Allowed compound DDL; unclosed transactions still refused |
 | RV-10 / [#1180](https://github.com/cozyGarage/BookiE/issues/1180) | Redis browse loads whole values | B3 | Bounded previews and memory on large keys |
 | RV-11 / [#1181](https://github.com/cozyGarage/BookiE/issues/1181) | TLS material files, `CLONE` history, MCP lockout, system trust store | B4 | One failing test per finding |
-| RV-12 / [#1182](https://github.com/cozyGarage/BookiE/issues/1182) | Restore drops tabs after 32 per connection | UX | Unsaved editor text always restored |
-| RV-13 / [#1184](https://github.com/cozyGarage/BookiE/issues/1184) | Copy then paste between BookiE grids changes values | UX | Round trip keeps text and NULL |
 
 The [newest-code follow-up](archive/upstream-next-slices-2026-10-20.md) records the native PostgreSQL and failure-report probes behind RV-14 to RV-16, the latest Apple-side upstream lessons, and a proposed sequence before server notices and PostgreSQL extension work. Its candidate order does not add a release commitment.
 
@@ -70,7 +68,6 @@ The [newest-code follow-up](archive/upstream-next-slices-2026-10-20.md) records 
 | APP-MOD | Keep the app layer thin: finish the staged moves of [ADR 0018](decisions/0018-headless-app-services-crate.md) (completion, workspace and browse/edit models, scoped filter and mapping stores, preference data, quick-switcher ranking and retry decisions are now headless; translated errors and the TabView handshake stay in app adapters; continue the remaining service moves), and replace hard-coded driver-name branches in the app layer with driver capabilities, starting with `browse_tab/value_parse.rs` |
 | UI-21, TEST-28 | Fake connection for the GTK tier, native Ubuntu AT-SPI menu reachability |
 | TEST-30 | Triage remaining SonarCloud and CodeQL findings; close confirmed false positives with a reason |
-| TEST-34 | Import repository-tool Python coverage into SonarCloud without lowering the coverage gate ([#830](https://github.com/cozyGarage/BookiE/issues/830)) |
 | TEST-36 | Record duration for each installed GTK scenario and retry so suite growth can be measured before changing timeouts or shard layout ([#1075](https://github.com/cozyGarage/BookiE/issues/1075)); retain current limits until there is measurement evidence |
 | AUD-5 | Move nonessential Rust comments into documentation under the repository comment-line rule ([#563](https://github.com/cozyGarage/BookiE/issues/563)) |
 | DOC-3, DOC-5 | Orca, keyboard-only and high-contrast acceptance; verify typed values and pending edits remain understandable across display and interaction paths. The [visual matrix](manual-verification-0.2-features.md#visual-audit-matrix) records the proposed acceptance recipe. |

@@ -60,6 +60,7 @@ fn mcp_context(
 ) -> (Uuid, McpBridge, tablepro_mcp::McpToken, tempfile::TempDir) {
     let connection_id = Uuid::new_v4();
     let saved = SavedConnection {
+        auth_source: None,
         id: connection_id,
         name: "PostgreSQL enum fixture".into(),
         driver_id: "postgres".into(),
@@ -355,10 +356,10 @@ async fn postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_impor
     assert_eq!(
         response["rows"],
         serde_json::json!([
-            [1, "NULL", "mcp_domain_enum.state_domain"],
-            [2, "", "mcp_domain_enum.state_domain"],
-            [3, "東京", "mcp_domain_enum.state_domain"],
-            [4, null, "mcp_domain_enum.state_domain"],
+            [{"$type":"int64","value":"1"}, {"$type":"text","value":"NULL"}, {"$type":"text","value":"mcp_domain_enum.state_domain"}],
+            [{"$type":"int64","value":"2"}, {"$type":"text","value":""}, {"$type":"text","value":"mcp_domain_enum.state_domain"}],
+            [{"$type":"int64","value":"3"}, {"$type":"text","value":"東京"}, {"$type":"text","value":"mcp_domain_enum.state_domain"}],
+            [{"$type":"int64","value":"4"}, {"$type":"null"}, {"$type":"text","value":"mcp_domain_enum.state_domain"}],
         ])
     );
     assert_eq!(response["truncated"], false);
@@ -595,6 +596,7 @@ async fn postgres_lost_write_ack_is_structured_and_never_retried() {
     let audit = Arc::new(OutcomeAudit(Mutex::new(Vec::new())));
     let audit_state = Arc::new(AuditState::new());
     let saved = SavedConnection {
+        auth_source: None,
         id: connection_id,
         name: "PostgreSQL lost acknowledgement fixture".into(),
         driver_id: "postgres".into(),
