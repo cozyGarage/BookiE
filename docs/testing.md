@@ -59,7 +59,7 @@ Add a row here when you add a guardrail.
 
 ## Storage tests
 
-Storage tests use temporary directories and explicit file paths for JSON and audit behavior. Query-history tests use SQLite. The Secret Service round-trip test is ignored by default because it needs a keyring. `scripts/test-secret-service.sh` always creates an isolated D-Bus/keyring session, even when invoked from a desktop session.
+Storage tests use temporary directories and explicit file paths for JSON and audit behavior. Query-history tests use SQLite. The Secret Service round-trip test is ignored by default because it needs a keyring. `scripts/test-secret-service.sh` always creates an isolated D-Bus/keyring session, even when invoked from a desktop session. It first runs the `keyring-fresh` tests against a keyring daemon that has no default collection yet (reading or deleting a missing password must not create one), then unlocks a test keyring for the `keyring` tests.
 
 Tests that change XDG environment variables must avoid racing with other tests. Prefer internal functions that accept a path when the module already provides them.
 
@@ -86,6 +86,8 @@ python3 scripts/run-test-layer.py app-server
 The GTK fast CI job runs the app-server registry with the host Docker socket. Testcontainers resolves the Docker bridge gateway from inside the job container. The local release gate uses the same registration.
 
 The exact driver list and supplementary targets are owned by [`ci-local.sh::run_integration`](../scripts/ci-local.sh). It includes six network drivers, MCP BSON, policy PostgreSQL sessions, Unix sockets and SSH. Reuse that script rather than a copied list that can omit newly registered targets.
+
+To find UI-thread stalls while profiling or testing by hand, set `TABLEPRO_UI_STALL_MS=50` (any positive number of milliseconds). The app then logs a `UI thread stalled` warning with the stall length whenever the GTK main loop is late by at least that long. It is off by default and logs no content. It reports that a stall happened, not its cause; pair it with a profiler.
 
 The Forgejo driver matrix sets `TABLEPRO_TEST_RUN_ID` and runs each complete integration binary serially. PostgreSQL, MySQL and MariaDB fixtures reuse one primary server per engine and recreate the `test` database before each test; filtered and exact selectors start their own server. Deliberate restart tests also start a separate server. So a full-suite runtime estimate should count those cases rather than multiply every test by a database startup.
 
