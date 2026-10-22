@@ -31,7 +31,8 @@ Documented application limits, behavior differences and known defects. Entries l
 - **SQL result filters apply only to loaded rows** ([#609](https://github.com/cozyGarage/BookiE/issues/609)). Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **File exports use text markers for undecodable cells** ([#883](https://github.com/cozyGarage/BookiE/issues/883)). CSV, JSON, Markdown, HTML, XML, Excel, copied text and MCP CSV content use a visible `<undecodable TYPE>` string; these text representations do not retain a separate typed marker, so a real text value with the same spelling is ambiguous. SQL export refuses the value. MCP JSON retains an explicit tagged `undecodable` value.
 - **Long cells are shown as a preview** (PERF-10). Values over 8 KiB show a typed
-  preview and byte count. View Value and Copy Value use the full value, including
+  preview and byte count. Oversized text and JSON previews show at most 512
+  Unicode characters before their size suffix. View Value and Copy Value use the full value, including
   pending edits and drafts. Browse-table values are refetched by primary key; a
   table without one cannot refetch.
 - **Hidden-column projection still needs desktop acceptance** (PERF-9). Merged
@@ -84,7 +85,6 @@ Documented application limits, behavior differences and known defects. Entries l
 
 - **Unresolved transaction after PostgreSQL session loss** ([#1016](https://github.com/cozyGarage/BookiE/issues/1016)). Reporting the outcome as unknown and refusing further governed writes on that connection is intentional: a disconnected session cannot confirm whether its transaction committed. The editor closes the unusable session without sending ROLLBACK through it. The PostgreSQL release regression in [#998](https://github.com/cozyGarage/BookiE/pull/998) checks that reconnecting never reuses a new backend as the old session. A fresh session may run reads and end its read-only snapshot with ROLLBACK; commits and other governed writes remain blocked until the unresolved outcome is reconciled. The app has no in-app reconciliation action yet ([#947](https://github.com/cozyGarage/BookiE/issues/947)).
 - **Catalog kind selection may shift the schema search field** ([#660](https://github.com/cozyGarage/BookiE/issues/660)). Check the issue for current reproduction and fix status.
-- **PostgreSQL `VOID` results are shown as undecodable.** The expected presentation is an empty result value.
 - **Two installed launches were reported to abort inside BookiE** ([#666](https://github.com/cozyGarage/BookiE/issues/666)); consult the issue for diagnosis and current status.
 - **Installed GTK suite has had intermittent Forgejo failures** (TEST-31 / [#556](https://github.com/cozyGarage/BookiE/issues/556)): the startup restore layout abort was fixed in [#821](https://github.com/cozyGarage/BookiE/pull/821). Historical failures also include application shutdown with a bad exit status after scenarios passed. Check TEST-31 and #556 for current run evidence.
 
