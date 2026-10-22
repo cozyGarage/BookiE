@@ -105,6 +105,10 @@ impl LocalResultView {
         view
     }
 
+    pub(crate) fn has_filter(&self) -> bool {
+        self.0.borrow().filter.is_some()
+    }
+
     pub(crate) fn loaded_result(&self) -> Arc<QueryResult> {
         self.0.borrow().result.clone()
     }
