@@ -720,6 +720,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::lifetime_tests::a_retired_grid_does_not_retain_its_inspector_through_selection_callback"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::grid_render::selection_stats_tests::wide_selection_statistics_preserve_rows_and_selection"
     ]
   ],
@@ -793,6 +798,13 @@
       "tablepro-storage",
       "--lib",
       "connection_bundle::tests::importing_a_bundle_keeps_existing_hop_credentials_until_replacement_is_asked_for"
+    ]
+  ],
+  "keyring-fresh": [
+    [
+      "tablepro-storage",
+      "--lib",
+      "secrets::tests::reading_a_missing_password_does_not_create_a_keyring"
     ]
   ]
 }
