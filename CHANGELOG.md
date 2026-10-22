@@ -14,6 +14,8 @@
 ### Fixed
 
 - In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
+- Closing a result grid releases its selection and row inspector.
+
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
 - Streamed result pages wait until their first display frame before building a grid, avoiding work for discarded pages.
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
