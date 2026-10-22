@@ -20,5 +20,49 @@
       "trace_sha256": "2e57aa7cf6a218ad9582945a0279ef2cb639cf50914b4fb27e67e60a3c4acf06",
       "status": "passed"
     }
-  }
+  },
+  "candidate": {
+    "source_head": "89774528ade0d46629a30aea9a5e72cc9f81b221",
+    "binary_sha256": "34dbd70f06f88cf842ffa47db44a58c0b10f24e60abd329ebee089117d3fefdb",
+    "integration_tests_passed": 8,
+    "workspace_unit_tests_passed": 40
+  },
+  "repeated_four_connection_profiles": [
+    {
+      "variant": "before",
+      "repeat": 1,
+      "peak_heap": "25.00M",
+      "trace_sha256": "fa5107ab9259eccf3e0d3ebcd6f2ad0bbefd173adbcf7eb6b48f61c1f3c342d4"
+    },
+    {
+      "variant": "before",
+      "repeat": 2,
+      "peak_heap": "25.00M",
+      "trace_sha256": "3787dd69bcfc1b2426abde9bc2533ff81dd4402365a43b6a7982910a9e7c99e6"
+    },
+    {
+      "variant": "before",
+      "repeat": 3,
+      "peak_heap": "25.00M",
+      "trace_sha256": "0dccbb5a73ec819ffd32311300cdd97b77bd56648233a57d76688a88fb883e01"
+    },
+    {
+      "variant": "after",
+      "repeat": 1,
+      "peak_heap": "18.77M",
+      "trace_sha256": "447bee64ce25e072c043488d0157c5c6c03102efc9d85207170a58926ee48849"
+    },
+    {
+      "variant": "after",
+      "repeat": 2,
+      "peak_heap": "18.77M",
+      "trace_sha256": "75583edc073ff20daa4f544b8213bdd2d075f0ba94c059315600524736fca3fb"
+    },
+    {
+      "variant": "after",
+      "repeat": 3,
+      "peak_heap": "18.77M",
+      "trace_sha256": "69f0be76897c7f735f741ea731312f1fed9945ac65b530398f25f049f4f63047"
+    }
+  ]
 }
