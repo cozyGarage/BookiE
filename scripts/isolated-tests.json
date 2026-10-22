@@ -711,6 +711,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_actions_fit_narrow_rows_with_running_and_retry_controls"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::grid_render::selection_stats_tests::wide_selection_statistics_preserve_rows_and_selection"
     ]
   ],
   "keyring": [

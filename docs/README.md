@@ -134,3 +134,5 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 - [Agent tooling review, October 20](archive/agent-tooling-review-2026-10-20.md): TablePro and dbx agent skills, rules and reviewer agents, and what BookiE adopted (the `fix-issue` skill) or left for gated follow-ups.
 
 - [Workstation test reuse proposal](proposals/workstation-test-reuse.md): bounded local execution, build metadata reuse, cache ownership and post-nightly adoption order.
+
+- [Selection statistics resource investigation, October 22](evidence/selection-statistics-2026-10-22/README.md): borrowed-cell computation, numeric behavior tests and matched headless heap profiles.
