@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
+
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
 
 ## [0.2.0] - 2026-10-21

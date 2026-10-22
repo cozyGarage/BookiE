@@ -706,6 +706,16 @@
       "tablepro-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::copy_as_insert_reads_the_live_row_under_a_prepended_draft_with_its_unsaved_edit"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::commenting_selected_lines_publishes_one_complete_query_change"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::query_publication_waits_for_nested_actions_and_keeps_ordinary_edits_immediate"
     ]
   ],
   "keyring": [
