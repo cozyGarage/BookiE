@@ -135,4 +135,7 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 
 - [Workstation test reuse proposal](proposals/workstation-test-reuse.md): bounded local execution, build metadata reuse, cache ownership and post-nightly adoption order.
 
+- [Zed editor and panel review, October 22](archive/zed-editor-panel-review-2026-10-22.md): completed research, existing PR dependencies and issue-owned results/error/message panel follow-ups.
+- [GPUI client review, October 22](archive/gpui-client-review-2026-10-22.md): completed source research including dbdelve; open adoption proposals remain on their issues.
+
 - [Selection statistics resource investigation, October 22](evidence/selection-statistics-2026-10-22/README.md): borrowed-cell computation, numeric behavior tests and matched headless heap profiles.
