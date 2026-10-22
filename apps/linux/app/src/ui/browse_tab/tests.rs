@@ -332,7 +332,12 @@ fn pasted_null_and_empty_text_stay_distinct() {
         Ok(Value::Text(String::new()))
     );
     assert!(parse_pasted_cell(None, Some(&required_text), "postgres", None).is_err());
-    assert!(parse_pasted_cell(Some(""), Some(&count), "postgres", None).is_err());
+    assert_eq!(
+        parse_pasted_cell(Some(""), Some(&count), "postgres", None),
+        Ok(Value::Null)
+    );
+    let required_count = column("count", "integer", true);
+    assert!(parse_pasted_cell(Some(""), Some(&required_count), "postgres", None).is_err());
     assert_eq!(
         parse_pasted_cell(Some("7"), Some(&count), "postgres", None),
         Ok(Value::Int(7))

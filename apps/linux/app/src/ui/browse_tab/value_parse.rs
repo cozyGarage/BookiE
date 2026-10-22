@@ -323,7 +323,11 @@ pub(super) fn parse_pasted_cell(
     match text {
         None if col.is_none_or(|column| column.nullable) => Ok(Value::Null),
         None => Err(crate::tr!("Field is required")),
-        Some("") => {
+        Some("")
+            if col.is_none_or(|column| {
+                column.enum_type.is_none() && is_character_type(&column.data_type.to_ascii_lowercase())
+            }) =>
+        {
             let required = col.map(|column| ColumnInfo {
                 nullable: false,
                 default_value: None,
