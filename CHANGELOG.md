@@ -15,6 +15,7 @@
 
 - Export reviews the table-page, loaded-result or query-rerun scope before file format; all matching table rows remain unavailable until consistent snapshot export is qualified.
 - Grid headers preserve exact engine type case and keep comments, key and nullability metadata in a native column-details menu.
+- Oversized text and JSON cells use shorter visible previews to reduce text-layout work; full values remain available through View Value and Copy Value.
 - Editing rows with large values uses less temporary memory when verifying the row identity.
 
 - Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
@@ -24,6 +25,12 @@
 ### Fixed
 
 - In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
+- Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
+
+- Closing SQL editors releases their retained query text and search state.
+- Large JSON previews use less temporary memory.
+- Saving workspaces with large SQL drafts uses less temporary memory.
+
 - Closing SQL editors releases their retained query text and search state.
 - SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
 
