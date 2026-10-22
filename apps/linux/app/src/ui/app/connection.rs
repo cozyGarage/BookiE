@@ -94,17 +94,19 @@ impl App {
             tables,
             views,
             driver_id,
+            database: connected_database,
         } = activated;
         self.dismiss_loading_page();
         self.dialog = None;
         self.connected = true;
         self.connection_id = Some(id);
+        self.connected_database = Some(connected_database);
         crate::services::window_registry::register(id, self.window.clone().upcast());
         self.current_driver_id = Some(driver_id.clone());
         self.read_only = self.window_metadata().map(|m| m.read_only).unwrap_or(false);
         self.read_only_badge.set_visible(self.read_only);
         self.show_database_switcher(&driver_id, id, &sender);
-        super::sidebar_state::reveal_sidebar(&self.split_view, &self.sidebar_reveal);
+        self.show_sidebar_for_new_connection();
         self.disconnect_action.set_enabled(true);
         self.table_search.set_text("");
         // Build the unified workspace tab tree (Browse + Editor share one
@@ -130,22 +132,7 @@ impl App {
         if let Some(connection_id) = self.connection_id {
             self.set_last_connection_id(Some(connection_id), sender.clone());
             self.restore_workspace_tabs(connection_id, sender.clone());
-            // Stamp `last_opened_at = now()` then reload connections so
-            // the popover + welcome view re-sort with the fresh
-            // timestamp. Sequencing matters: ReloadConnections reads
-            // the JSON; firing it before the touch lands would render
-            // the previous ordering until the next reload.
-            let sender_for_touch = sender.clone();
-            relm4::spawn(async move {
-                let result = tablepro_storage::touch_last_opened(connection_id).await;
-                if let Err(error) = result {
-                    tracing::warn!(error = %error, "touch_last_opened failed");
-                    sender_for_touch.input(AppMsg::ShowToast(crate::tr!(
-                        "The connection opened, but its recent-use time could not be saved."
-                    )));
-                }
-                sender_for_touch.input(AppMsg::ReloadConnections);
-            });
+            touch_last_opened(connection_id, sender);
             return;
         }
         sender.input(AppMsg::ReloadConnections);
@@ -227,6 +214,7 @@ impl App {
         // connection we're about to release. Reopening one against a
         // different connection would target a non-existent table.
         self.clear_closed_tabs_stack();
+        self.connected_database = None;
         if let Some(id) = self.connection_id.take() {
             if self.window_state.borrow().last_connection_id == Some(id) {
                 self.set_last_connection_id(None, sender.clone());
@@ -240,6 +228,7 @@ impl App {
         self.databases_button.set_visible(false);
         self.connected = false;
         super::sidebar_state::hide_sidebar(&self.split_view, &self.sidebar_reveal);
+        self.set_sidebar_connected(false);
         self.disconnect_action.set_enabled(false);
         self.refresh_window_title();
         self.table_search.set_text("");
@@ -682,6 +671,7 @@ impl App {
         // Activation is additive, so this window releases the connection it is
         // replacing. Closing before activation keeps reconnecting to the same
         // saved connection correct: the identifier is reused, not cancelled.
+        self.connected_database = None;
         if let Some(previous) = self.connection_id.take() {
             self.database.close(previous);
         }
@@ -695,6 +685,7 @@ impl App {
             self.switch_cancel_audit_was_disabled = None;
             self.connected = false;
             super::sidebar_state::hide_sidebar(&self.split_view, &self.sidebar_reveal);
+            self.set_sidebar_connected(false);
             self.disconnect_action.set_enabled(false);
             self.refresh_window_title();
             self.show_toast(&crate::tr!("This connection is already open in another window."));
@@ -894,6 +885,19 @@ fn execute_delete_connection(
                 sender_clone.input(AppMsg::ReloadConnections);
             })
             .drop_on_shutdown()
+    });
+}
+
+fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
+    relm4::spawn(async move {
+        let result = tablepro_storage::touch_last_opened(connection_id).await;
+        if let Err(error) = result {
+            tracing::warn!(error = %error, "touch_last_opened failed");
+            sender.input(AppMsg::ShowToast(crate::tr!(
+                "The connection opened, but its recent-use time could not be saved."
+            )));
+        }
+        sender.input(AppMsg::ReloadConnections);
     });
 }
 
