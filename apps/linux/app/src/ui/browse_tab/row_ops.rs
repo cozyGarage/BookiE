@@ -672,6 +672,25 @@ impl BrowseTab {
         }
     }
 
+    pub(super) fn handle_preview_sql(&self) {
+        let result = crate::services::change_tracker::with_tab_ref(self.tab_id, |t| {
+            t.materialize(
+                &self.driver_id,
+                self.schema.as_deref(),
+                &self.table,
+                &self.current_columns,
+            )
+        });
+        if let Some(Ok((statements, _))) = result
+            && !statements.is_empty()
+        {
+            super::preview::present(
+                &self.pending_revealer,
+                &super::preview::preview_text(&self.driver_id, &statements),
+            );
+        }
+    }
+
     pub(super) fn handle_discard_all(&mut self, sender: ComponentSender<Self>) {
         crate::services::change_tracker::with_tab(self.tab_id, |t| t.clear());
         self.emit_fetch_page(&sender);
