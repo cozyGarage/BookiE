@@ -40,7 +40,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL.
 - The header shows each column's type. Primary key columns have a key mark, foreign key columns a link mark, and a column comment appears under the name.
 - Filter with the filter bar, and save filters by name per table. Sort by clicking a header.
-- Hide and reorder columns. The choice is remembered per table.
+- Hide and reorder columns, and reset dragged column widths. The choice is remembered per table.
 - Long values show a preview and their size. View Value, Copy Value and Edit Full Value work on the whole value.
 - The row inspector shows every column of the selected row. Selection statistics show count, sum, average, minimum and maximum.
 
@@ -54,7 +54,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Write `:name` where a value belongs. BookiE asks for each value and sends it as a bound parameter. Each value has a type choice: `Auto`, `Text`, `Integer`, `Decimal`, `Boolean` or `Null`. Placeholders inside string literals, quoted identifiers, comments, dollar-quoted bodies, PostgreSQL `::` casts and existing `$1` or `?` placeholders are left alone.
 - Results load in pages. PostgreSQL single-statement `SELECT` queries stream through a window of four pages. Each statement in a script has its own result view. Pin results to keep them above the next run.
 - Sorting and filtering a result are local and do not run the SQL again.
-- Session keeps one connection for the tab, so settings, temporary tables and transactions carry over.
+- Session keeps one connection for the tab, so settings, temporary tables and transactions carry over. While a transaction is open the button says so and, after a minute, how long it has been open.
 - Explain shows the plan. PostgreSQL and SQLite plans open as a tree with the share of estimated cost per step.
 - A query that hits the timeout offers Run again with a longer timeout, once, without changing the saved timeout.
 - Query history opens in a panel under the workspace. Statements that set a password or key are not saved.
