@@ -730,6 +730,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::tests::a_closed_browse_tab_releases_its_root_widget"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::dispatch_tests::editor_waits_for_its_session_before_accepting_any_run_input"
     ],
     [

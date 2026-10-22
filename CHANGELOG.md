@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- Closing a table browse tab releases its widgets and loaded rows.
 - Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
 
 - Closing SQL editors releases their retained query text and search state.
