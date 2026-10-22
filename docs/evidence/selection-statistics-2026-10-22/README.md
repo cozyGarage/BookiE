@@ -54,7 +54,10 @@ Six baseline behavior tests passed before and after changing access. Eight
 candidate unit tests now pass, including unfetched cells and decimal overflow.
 The matching wide-selection GTK fixture passes on both binaries and pins
 existing observable behavior. It is a profiling fixture, not an allocation
-limit assertion. Full preflight, 721 application unit tests, all-target application Clippy and
-105 isolated GTK widget tests pass. Documentation links, issue ledger and
-ignored-test inventory pass. Forgejo acceptance remains pending. Native
-desktop responsiveness has not been checked.
+limit assertion. The initial branch passed full preflight, 721 application
+unit tests, application Clippy and 105 isolated GTK widget tests. After
+merging Linux `ad9bb1447163c848919616773ab0971c5a2d2135`, refreshed preflight
+passed all 2,054 tests (64 skipped), and all 106 isolated GTK widget tests
+passed. Documentation links, issue ledger and ignored-test inventory pass.
+Forgejo acceptance for the refreshed head remains pending. Native desktop
+responsiveness has not been checked.

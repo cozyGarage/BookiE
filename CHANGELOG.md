@@ -8,12 +8,16 @@
 
 ### Changed
 
+- Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
 - The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
 
 ### Fixed
 
 - Selecting rows with large text or binary cells no longer copies their contents to calculate numeric summaries.
 
+- Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
+- Streamed result pages wait until their first display frame before building a grid, avoiding work for discarded pages.
+- SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - Discarding changes to a SQL file closes its tab without reopening the same save prompt.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
