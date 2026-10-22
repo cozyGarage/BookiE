@@ -107,6 +107,7 @@ impl RowInspector {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn show_row(&self, fields: Option<Vec<InspectorField>>) {
         show_row(&self.list, &self.stack, fields);
     }
