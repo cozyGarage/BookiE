@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use tablepro_policy::{AuditApprovalOutcome, AuditEvent, AuditRecordPhase, AuditTerminalStatus};
+use tablepro_policy::{
+    AuditApprovalOutcome, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditTerminalStatus, Principal,
+};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,15 +22,16 @@ pub struct OperationRow {
 }
 
 pub fn operations(events: Vec<AuditEvent>) -> Vec<OperationRow> {
-    let mut rows: Vec<OperationRow> = Vec::new();
+    let mut rows: Vec<(OperationRow, usize)> = Vec::new();
     let mut by_operation: HashMap<Uuid, usize> = HashMap::new();
-    for event in events {
+    for (position, event) in events.into_iter().enumerate() {
         let index = *by_operation.entry(event.operation_id).or_insert_with(|| {
-            rows.push(row_from(&event));
+            rows.push((row_from(&event), position));
             rows.len() - 1
         });
+        rows[index].1 = position;
         if event.phase == AuditRecordPhase::Outcome {
-            let row = &mut rows[index];
+            let row = &mut rows[index].0;
             row.status = event.terminal_status;
             row.approval = event.approval_outcome;
             row.error = event.error;
@@ -36,8 +39,8 @@ pub fn operations(events: Vec<AuditEvent>) -> Vec<OperationRow> {
             row.duration_ms = event.duration_ms;
         }
     }
-    rows.reverse();
-    rows
+    rows.sort_by_key(|(_, last_event)| std::cmp::Reverse(*last_event));
+    rows.into_iter().map(|(row, _)| row).collect()
 }
 
 fn row_from(event: &AuditEvent) -> OperationRow {
@@ -49,8 +52,8 @@ fn row_from(event: &AuditEvent) -> OperationRow {
             .format("%Y-%m-%d %H:%M:%S")
             .to_string(),
         connection: event.connection_name.clone(),
-        principal: event.principal.label(),
-        class: format!("{:?}", event.operation_class),
+        principal: principal_text(&event.principal),
+        class: class_label(event.operation_class),
         status: event.terminal_status,
         approval: event.approval_outcome,
         rule: event.decision_rule.clone(),
@@ -59,6 +62,44 @@ fn row_from(event: &AuditEvent) -> OperationRow {
         rows: event.rows_affected,
         duration_ms: event.duration_ms,
     }
+}
+
+fn principal_text(principal: &Principal) -> String {
+    match principal {
+        Principal::Agent {
+            token,
+            client: Some(client),
+            ..
+        } => format!("agent:{client}:{token}"),
+        Principal::Agent { token, .. } => format!("agent:{token}"),
+        human => human.label(),
+    }
+}
+
+fn class_label(class: AuditOperationClass) -> String {
+    match class {
+        AuditOperationClass::Read => crate::tr!("Read"),
+        AuditOperationClass::Mutation => crate::tr!("Data change"),
+        AuditOperationClass::Ddl => crate::tr!("Schema change"),
+        AuditOperationClass::Administrative => crate::tr!("Administrative"),
+        AuditOperationClass::TransactionCommit => crate::tr!("Commit"),
+        AuditOperationClass::TransactionRollback => crate::tr!("Rollback"),
+        AuditOperationClass::UnknownWrite => crate::tr!("Unclassified write"),
+    }
+}
+
+pub fn approval_label(approval: AuditApprovalOutcome) -> String {
+    match approval {
+        AuditApprovalOutcome::NotRequired => crate::tr!("no approval needed"),
+        AuditApprovalOutcome::Approved => crate::tr!("approved"),
+        AuditApprovalOutcome::Denied => crate::tr!("denied"),
+        AuditApprovalOutcome::Cancelled => crate::tr!("approval cancelled"),
+        AuditApprovalOutcome::TimedOut => crate::tr!("approval timed out"),
+    }
+}
+
+pub fn needs_attention(status: AuditTerminalStatus) -> bool {
+    !matches!(status, AuditTerminalStatus::Succeeded | AuditTerminalStatus::Pending)
 }
 
 pub fn status_label(status: AuditTerminalStatus) -> String {
@@ -125,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn intent_and_outcome_of_one_operation_become_one_row_newest_first() {
+    fn intent_and_outcome_of_one_operation_become_one_row_ordered_by_latest_record() {
         let (first, second) = (Uuid::new_v4(), Uuid::new_v4());
         let rows = operations(vec![
             event(first, AuditRecordPhase::Intent, AuditTerminalStatus::Pending),
@@ -133,15 +174,34 @@ mod tests {
             event(first, AuditRecordPhase::Outcome, AuditTerminalStatus::Succeeded),
         ]);
         assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].operation_id, second);
+        assert_eq!(rows[0].operation_id, first, "its outcome is the newest record");
+        assert_eq!(rows[0].status, AuditTerminalStatus::Succeeded);
+        assert_eq!((rows[0].rows, rows[0].duration_ms), (Some(3), Some(12)));
+        assert_eq!(rows[1].operation_id, second);
         assert_eq!(
-            rows[0].status,
+            rows[1].status,
             AuditTerminalStatus::Pending,
             "no outcome yet stays visible"
         );
-        assert_eq!(rows[1].operation_id, first);
-        assert_eq!(rows[1].status, AuditTerminalStatus::Succeeded);
-        assert_eq!((rows[1].rows, rows[1].duration_ms), (Some(3), Some(12)));
+    }
+
+    #[test]
+    fn the_operation_that_finished_last_comes_first_and_agents_keep_their_token() {
+        let (long, short) = (Uuid::new_v4(), Uuid::new_v4());
+        let mut agent = event(short, AuditRecordPhase::Outcome, AuditTerminalStatus::Succeeded);
+        agent.principal = Principal::Agent {
+            token: "sha256:0123456789abcdef".into(),
+            client: Some("claude".into()),
+            model: None,
+        };
+        let rows = operations(vec![
+            event(long, AuditRecordPhase::Intent, AuditTerminalStatus::Pending),
+            agent,
+            event(long, AuditRecordPhase::Outcome, AuditTerminalStatus::Failed),
+        ]);
+        assert_eq!(rows[0].operation_id, long, "the failure that ended last is first");
+        assert_eq!(rows[1].principal, "agent:claude:sha256:0123456789abcdef");
+        assert!(needs_attention(AuditTerminalStatus::Failed) && !needs_attention(AuditTerminalStatus::Pending));
     }
 
     #[test]

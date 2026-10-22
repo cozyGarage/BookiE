@@ -5,7 +5,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::glib;
 use relm4::{adw, gtk};
 
-use crate::services::audit_view::{OperationRow, matches, operations, status_label};
+use crate::services::audit_view::{OperationRow, approval_label, matches, needs_attention, operations, status_label};
 use crate::services::database_service::DatabaseService;
 use crate::tr;
 
@@ -60,9 +60,7 @@ pub fn present(parent: &gtk::Window, database: &Arc<DatabaseService>) {
                     status.set_title(&tr!("No audited operations yet"));
                     return;
                 }
-                fill(&list, &rows, "");
-                stack.set_visible_child_name("list");
-                search.connect_search_changed(move |entry| fill(&list, &rows, &entry.text()));
+                show_operations(&list, &stack, &search, rows);
             }
             Err(error) => {
                 status.set_icon_name(Some("dialog-warning-symbolic"));
@@ -73,11 +71,18 @@ pub fn present(parent: &gtk::Window, database: &Arc<DatabaseService>) {
     });
 }
 
-fn fill(list: &gtk::ListBox, rows: &[OperationRow], query: &str) {
-    list.remove_all();
-    for row in rows.iter().filter(|row| matches(row, query)) {
+fn show_operations(list: &gtk::ListBox, stack: &gtk::Stack, search: &gtk::SearchEntry, rows: Rc<Vec<OperationRow>>) {
+    for row in rows.iter() {
         list.append(&operation_row(row));
     }
+    let query = search.clone();
+    list.set_filter_func(move |item| {
+        let index = usize::try_from(item.index()).unwrap_or(usize::MAX);
+        rows.get(index).is_some_and(|row| matches(row, &query.text()))
+    });
+    stack.set_visible_child_name("list");
+    let list = list.clone();
+    search.connect_search_changed(move |_| list.invalidate_filter());
 }
 
 fn operation_row(row: &OperationRow) -> adw::ExpanderRow {
@@ -95,13 +100,13 @@ fn operation_row(row: &OperationRow) -> adw::ExpanderRow {
         )))
         .subtitle(glib::markup_escape_text(&subtitle.join(" · ")))
         .build();
-    if row.status != tablepro_policy::AuditTerminalStatus::Succeeded {
+    if needs_attention(row.status) {
         expander.add_css_class("warning");
     }
     expander.add_row(&detail(&tr!("Operation"), &row.operation_id.to_string(), false));
     expander.add_row(&detail(
         &tr!("Rule"),
-        &format!("{} ({:?})", row.rule, row.approval),
+        &format!("{} ({})", row.rule, approval_label(row.approval)),
         false,
     ));
     expander.add_row(&detail(&tr!("Statement"), &row.sql, true));
