@@ -182,6 +182,7 @@ pub enum AppMsg {
     WorkspaceSchemaWordsChanged,
     WorkspaceTabClosed(Uuid),
     FinishCloseWorkspaceTab(Uuid),
+    CloseDiscardedWorkspaceTab(Uuid),
     CloseOtherWorkspaceTabs(Uuid),
     CloseWorkspaceTabsToRight(Uuid),
     WorkspaceTabsChanged,
