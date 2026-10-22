@@ -199,3 +199,26 @@ fn error_navigation_does_not_mistake_a_comment_for_the_executed_statement() {
     );
     window.destroy();
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_selected_query_error_keeps_its_original_unicode_offset() {
+    let fixture = EditorFixture::new();
+    let window = window(&fixture);
+    let buffer = fixture.controller.model().source_view.buffer();
+    let prefix = "SELECT 'é';\n";
+    let selected = "  SELECT broken;";
+    buffer.set_text(&format!("{prefix}{selected}\nSELECT 3;"));
+    let start = buffer.iter_at_offset(prefix.chars().count() as i32);
+    let end = buffer.iter_at_offset((prefix.chars().count() + selected.chars().count()) as i32);
+    buffer.select_range(&start, &end);
+    fixture.controller.model().run_button.emit_clicked();
+    let pending = fixture.next_query();
+    assert_eq!(pending.sql.trim(), "SELECT broken");
+    fixture.finish(pending, error());
+    navigation(&fixture).emit_clicked();
+    let expected = (prefix.chars().count() + 2 + 7) as i32;
+    spin_until(|| buffer.cursor_position() == expected);
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
+    window.destroy();
+}

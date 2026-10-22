@@ -728,7 +728,16 @@ impl SimpleComponent for SqlEditor {
                     self.status.set_label(&crate::tr!("empty query"));
                     return;
                 }
-                self.begin_run(trimmed, false, sender);
+                let buffer = self.source_view.buffer();
+                let start = buffer
+                    .selection_bounds()
+                    .filter(|(start, end)| !buffer.text(start, end, true).trim().is_empty())
+                    .map_or(0, |(start, _)| start.offset() as usize);
+                let anchor = SourceAnchor {
+                    revision: self.drop_generation.revision(),
+                    start: start + sql.chars().take_while(|character| character.is_whitespace()).count(),
+                };
+                self.begin_run(trimmed, Some(anchor), false, sender);
             }
             SqlEditorInput::SessionAction { session_id, commit } => {
                 self.on_session_toolbar_action(session_id, commit, &sender);

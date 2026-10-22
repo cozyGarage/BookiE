@@ -891,6 +891,11 @@
       "tablepro-app",
       "--lib",
       "ui::browse_tab::grid_render::selection_stats_tests::wide_selection_statistics_preserve_rows_and_selection"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::error_navigation_tests::a_selected_query_error_keeps_its_original_unicode_offset"
     ]
   ],
   "keyring": [
