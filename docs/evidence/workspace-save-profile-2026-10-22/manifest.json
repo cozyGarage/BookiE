@@ -1,0 +1,24 @@
+{
+  "source_head": "9015604f49c550725d60084b0c546708cf233c0a",
+  "uncommitted_test_diff": "diff --git i/crates/app-services/tests/workspace_persistence.rs w/crates/app-services/tests/workspace_persistence.rs\nindex b48450383..f63b37b36 100644\n--- i/crates/app-services/tests/workspace_persistence.rs\n+++ w/crates/app-services/tests/workspace_persistence.rs\n@@ -174,13 +174,12 @@ fn startup_preview_cleanup_preserves_the_selected_kept_tab_on_disk() {\n     assert!(matches!(&state.tabs[0], WorkspaceTabRecord::Table { table, preview: false, .. } if table == \"kept\"));\n }\n \n-#[test]\n-fn repeated_large_draft_saves_preserve_other_connections_and_unicode_text() {\n+fn repeated_large_draft_saves(connection_count: usize) {\n     let dir = tempfile::tempdir().unwrap();\n     let path = dir.path().join(\"workspace_state.json\");\n     let drafts = dir.path().join(\"drafts\");\n     let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());\n-    let ids: Vec<_> = (0..4).map(|_| Uuid::new_v4()).collect();\n+    let ids: Vec<_> = (0..connection_count).map(|_| Uuid::new_v4()).collect();\n     let original = \"SELECT '\u6771\u4eac\u00e9';\\n\".repeat(65_536);\n     let record = |query: String| ConnectionWorkspaceState {\n         tabs: vec![WorkspaceTabRecord::Editor {\n@@ -209,3 +208,13 @@ fn repeated_large_draft_saves_preserve_other_connections_and_unicode_text() {\n         assert!(matches!(&state.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == expected));\n     }\n }\n+\n+#[test]\n+fn repeated_large_draft_saves_preserve_other_connections_and_unicode_text() {\n+    repeated_large_draft_saves(4);\n+}\n+\n+#[test]\n+fn repeated_large_draft_saves_preserve_one_connections_unicode_text() {\n+    repeated_large_draft_saves(1);\n+}\n",
+  "binary_sha256": "2b3b18be47a5dadd86917ee514d15a9232476e9a24b7820dd71ad7edaa4c94cc",
+  "functional_exit": 0,
+  "cases": {
+    "one": {
+      "connections": 1,
+      "draft_bytes_each": 1245184,
+      "peak_heap": "10.05M",
+      "instrumented_peak_rss": "21.42M",
+      "trace_sha256": "a50c8ee2fe7a95e29aeb96c557d950203be7bf875092e730ebae2e3d9959621b",
+      "status": "passed"
+    },
+    "four": {
+      "connections": 4,
+      "draft_bytes_each": 1245184,
+      "peak_heap": "25.00M",
+      "instrumented_peak_rss": "37.91M",
+      "trace_sha256": "2e57aa7cf6a218ad9582945a0279ef2cb639cf50914b4fb27e67e60a3c4acf06",
+      "status": "passed"
+    }
+  }
+}

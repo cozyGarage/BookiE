@@ -12,10 +12,23 @@ These are verified source operations, not measured peak memory or a demonstrated
 
 `repeated_large_draft_saves_preserve_other_connections_and_unicode_text` uses temporary storage, four connections and 65,536 repetitions of a Unicode SQL line per connection. It flushes the initial state, then updates and flushes the first connection three times. A fresh store must restore the latest first draft and the exact original text of the other three connections.
 
-This test pins existing behavior. It is not a failing performance regression or a timing assertion. Execution and allocation measurements are pending while the separate resource train uses the shared build target.
+This test pins existing behavior. It is not a failing performance regression or a timing assertion. Both cases passed on the unmodified implementation. The exact test binary was saved before profiling; its checksum and source diff are in the [manifest](manifest.json).
 
 ## Next measurement
 
 Build the workload once, then run the exact test binary under Heaptrack without concurrent local compilation. Record source and binary hashes, peak heap and stacks attributable to workspace load/save. Compare a single connection with four connections through the same save/flush path. Confirm all observable restoration assertions before accepting measurements. Keep filesystem/cache effects separate from heap allocation evidence.
 
 Any optimization must preserve migration backup, exact Unicode drafts, write ordering, failed-write recovery, flush acknowledgements and external changes. No product code has been changed for this profiling preparation.
+
+## Baseline allocation measurements
+
+| Case | Draft bytes per connection | Peak heap | Instrumented peak RSS |
+| --- | --- | --- | --- |
+| One connection | 1,245,184 | 10.05 MB | 21.42 MB |
+| Four connections | 1,245,184 | 25.00 MB | 37.91 MB |
+
+These values cover the complete test, including fixture construction, initial saves, three updates and restoration into a fresh store. They do not isolate update-only cost or prove a leak. More connections necessarily retain more valid data. The four-connection allocation report contains clone stacks through `save_locked`, consistent with the source trace; merged stack peak totals are not additive. No optimized comparison or CPU improvement is claimed.
+
+The recorder reports approximately 1.65 KB outstanding at process exit in both cases. This has not been diagnosed as a product leak. Runs are short debug-test workloads, not native application RSS measurements. Other machine activity was not controlled, so elapsed times are not used for performance claims.
+
+The first Heaptrack invocation automatically opened its viewer. That owned viewer was immediately stopped. Subsequent recording used `--record-only`; no desktop capture or interaction occurred. Raw traces and reports remain under `~/bookie-test/workspace-save-profile/`.
