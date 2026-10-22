@@ -9,6 +9,7 @@
 ### Changed
 
 - Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
+- Oversized streamed result rows are rejected before value decoding, reducing memory spikes.
 - The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
 
 ### Fixed
