@@ -6,8 +6,6 @@ path. A clickable that is not listed fails the scenario, so a new
 mouse-only control cannot appear unnoticed.
 """
 
-import fnmatch
-
 PATH_KINDS = ("shortcut:", "menu:", "tab-stop", "gap:")
 
 SQL_EDITOR = {
@@ -26,24 +24,16 @@ SQL_EDITOR = {
     "Search tables": "tab-stop",
     "New Table\u2026": "tab-stop",
     "Table from CSV\u2026": "tab-stop",
-    "Open *": "tab-stop (Enter on the sidebar row)",
+    "Open safety_items": "tab-stop (Enter on the sidebar row)",
     "Close": "shortcut: Ctrl+Q",
     "Minimize": "tab-stop",
     "Maximize": "tab-stop",
 }
 
 
-def registered(name, registry):
-    return any(fnmatch.fnmatchcase(name, pattern) for pattern in registry)
-
-
 def unregistered(names, registry):
-    return sorted({name for name in names if not registered(name, registry)})
+    return sorted({name for name in names if name not in registry})
 
 
 def malformed(registry):
     return sorted(name for name, path in registry.items() if not path.startswith(PATH_KINDS))
-
-
-def gaps(registry):
-    return sorted(f"{name}: {path}" for name, path in registry.items() if path.startswith("gap:"))

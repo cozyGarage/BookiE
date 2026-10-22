@@ -730,7 +730,13 @@ GLib.MainLoop().run()
     def sql_editor_clickables_all_have_a_keyboard_path(database, base):
         ui.run_sql("SELECT 1 AS alpha")
         wait_for_result_column("alpha")
-        clickable = (pyatspi.ROLE_PUSH_BUTTON, pyatspi.ROLE_TOGGLE_BUTTON)
+        clickable = (
+            pyatspi.ROLE_PUSH_BUTTON,
+            pyatspi.ROLE_TOGGLE_BUTTON,
+            pyatspi.ROLE_CHECK_BOX,
+            pyatspi.ROLE_COMBO_BOX,
+            pyatspi.ROLE_LINK,
+        )
         names = [
             ui.node_name(node).strip()
             for node in ui.descendants(ui.application_node())
