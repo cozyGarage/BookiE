@@ -2,14 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- SQLite files open from the file manager (Open With BookiE), and `bookie books.db` or `bookie postgres://user@host/db` opens a database file or a connection URL from a terminal. A URL asks you to confirm before it is imported and connected; a missing or non-database file is refused instead of creating an empty database. A second launch hands its argument to the running window. DuckDB files open from the terminal only.
+
 ### Changed
 
+- Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
 - The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
 
 ### Fixed
 
 - Saving workspaces with large SQL drafts uses less temporary memory.
 
+- Streamed result pages wait until their first display frame before building a grid, avoiding work for discarded pages.
+- SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
+- SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
+- Discarding changes to a SQL file closes its tab without reopening the same save prompt.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
 
 ## [0.2.0] - 2026-10-21
