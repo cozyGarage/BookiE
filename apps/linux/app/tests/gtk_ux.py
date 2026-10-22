@@ -1534,6 +1534,27 @@ GLib.MainLoop().run()
         ui.invoke(unpin)
         wait_until(lambda: not pinned(), "unpinning did not drop the pinned results")
 
+    def local_filter_narrows_a_pinned_result_and_a_second_result_set(_database, _base):
+        ui.run_sql(
+            "SELECT 'apple' AS fruit UNION ALL SELECT 'pear' UNION ALL SELECT 'apple';\n"
+            "SELECT 'red' AS colour UNION ALL SELECT 'blue';"
+        )
+        wait_until(lambda: len(page_tab_names()) >= 2, "two result sets did not appear")
+        ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+        filter_by_this_value = 3
+        open_cell_menu("pear")
+        invoke_menu_item(filter_by_this_value)
+        ui.wait_for_node_containing("Showing 1 of 3 loaded rows", role=pyatspi.ROLE_LABEL)
+        ui.wait_for_node(name="apple", role=pyatspi.ROLE_LABEL, present=False)
+        second = next(
+            node for node in ui.descendants(ui.application_node())
+            if ui.node_role(node) == pyatspi.ROLE_PAGE_TAB and ui.node_name(node).startswith("2 · ")
+        )
+        ui.invoke(second)
+        open_cell_menu("blue")
+        invoke_menu_item(filter_by_this_value)
+        ui.wait_for_node_containing("Showing 1 of 2 loaded rows", role=pyatspi.ROLE_LABEL)
+
     def filter_by_this_value_narrows_the_browse_rows(database, _base):
         import sqlite3
         with sqlite3.connect(database) as connection:
@@ -1641,6 +1662,7 @@ GLib.MainLoop().run()
         query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace,
         find_in_loaded_rows_lists_matches_and_selects_one,
         pinned_results_stay_ahead_of_the_next_run,
+        local_filter_narrows_a_pinned_result_and_a_second_result_set,
         filter_by_this_value_narrows_the_browse_rows,
         selection_statistics_summarise_the_selected_rows,
         paste_past_the_loaded_rows_changes_nothing,
