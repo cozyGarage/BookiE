@@ -2,7 +2,13 @@ use relm4::gtk;
 use relm4::gtk::prelude::*;
 
 pub(crate) fn text_to_run(buffer: &gtk::TextBuffer) -> String {
-    let (start, end) = buffer.selection_bounds().unwrap_or_else(|| buffer.bounds());
+    if let Some((start, end)) = buffer.selection_bounds() {
+        let selected = buffer.text(&start, &end, true).to_string();
+        if !selected.trim().is_empty() {
+            return selected;
+        }
+    }
+    let (start, end) = buffer.bounds();
     buffer.text(&start, &end, true).to_string()
 }
 
@@ -117,6 +123,16 @@ mod tests {
         assert_eq!(text_to_run(&buffer), "SELECT 1;\nSELECT 2;");
         buffer.select_range(&buffer.iter_at_line(1).unwrap(), &buffer.end_iter());
         assert_eq!(text_to_run(&buffer), "SELECT 2;");
+        buffer.set_text("SELECT 1;\n   \nSELECT 2;");
+        let blank = buffer.iter_at_line(1).unwrap();
+        let mut blank_end = blank;
+        blank_end.forward_to_line_end();
+        buffer.select_range(&blank, &blank_end);
+        assert_eq!(
+            text_to_run(&buffer),
+            "SELECT 1;\n   \nSELECT 2;",
+            "a blank selection falls back to the whole script"
+        );
     }
 
     #[test]
