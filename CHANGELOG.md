@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- A new empty editor tab takes the first free "Query N" title instead of counting open editors, so closing Query 1 and opening a new tab no longer produces a second "Query 2".
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - Discarding changes to a SQL file closes its tab without reopening the same save prompt.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
