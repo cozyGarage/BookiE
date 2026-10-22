@@ -490,6 +490,12 @@ fn empty_grid_menu(row_mutations_allowed: bool) -> gio::Menu {
     menu
 }
 
+fn export_loaded_item() -> gio::MenuItem {
+    let item = gio::MenuItem::new(Some(&crate::tr!("Export All Loaded Rows…")), Some("cell.export-loaded"));
+    item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+    item
+}
+
 fn build_menu(
     editable: bool,
     row_operations: bool,
@@ -544,10 +550,7 @@ fn build_menu(
     };
     actions.append(Some(&export_label), Some("cell.export"));
     if local_result {
-        let export_loaded =
-            gio::MenuItem::new(Some(&crate::tr!("Export All Loaded Rows…")), Some("cell.export-loaded"));
-        export_loaded.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
-        actions.append_item(&export_loaded);
+        actions.append_item(&export_loaded_item());
     }
     actions.append(Some(&crate::tr!("Columns…")), Some("grid.columns"));
     actions.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
