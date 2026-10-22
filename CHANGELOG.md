@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- The AppImage ships GtkSourceView's language specs and colour schemes, so SQL highlighting works on hosts without the GtkSourceView data package. The build fails if the SQL language spec is missing from the image.
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
 - Streamed result pages wait until their first display frame before building a grid, avoiding work for discarded pages.
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.

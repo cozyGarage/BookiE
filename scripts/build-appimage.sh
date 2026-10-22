@@ -48,6 +48,14 @@ grep -q 'wayland,x11' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
 for module in "$APPDIR"/usr/lib/gtk-4.0/*/immodules/*.so; do
   patchelf --set-rpath '$ORIGIN/../../..' "$module"
 done
+# The editor's SQL highlighting and colour schemes come from GtkSourceView's
+# data, not its library; ship it so the image does not depend on the host.
+SOURCEVIEW_DATA="${SOURCEVIEW_DATA:-/usr/share/gtksourceview-5}"
+cp -a "$SOURCEVIEW_DATA" "$APPDIR/usr/share/"
+if [[ ! -f "$APPDIR/usr/share/gtksourceview-5/language-specs/sql.lang" ]]; then
+  echo "the AppDir has no GtkSourceView SQL language spec" >&2
+  exit 1
+fi
 "$TOOLS/linuxdeploy-x86_64.AppImage" --appdir "$APPDIR" --output appimage
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
 echo "Wrote $OUT/$OUTPUT"
