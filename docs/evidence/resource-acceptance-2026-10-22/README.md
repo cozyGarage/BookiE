@@ -13,3 +13,5 @@ Remaining resource work includes longer pin/export/cancel lifetimes, keyless bro
 ## Inspector correction and rebuild
 
 The first local candidate passed preflight and all 105 GTK widget tests, but app unit tests reported 717 passes and one failure: the row inspector’s stored sample was shortened through a shared formatter. It was not published or gated. The unchanged inspector regression now passes on the corrected preview constituent, along with all 716 app unit tests and app all-target Clippy. The original candidate remains on a local evidence branch. This train was rebuilt from the same Linux base with all five exact constituent heads and a corrected manifest. Combined checks must pass again before publication and gating.
+
+The corrected preview constituent `c35f72bf3` subsequently passed refreshed preflight and all 103 isolated GTK widget tests, in addition to its 716 app unit tests and app all-target Clippy. Combined checks on the rebuilt train remain pending.
