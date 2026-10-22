@@ -23,6 +23,7 @@ mod row_ops;
 mod schema_index;
 mod session_teardown;
 mod shortcuts;
+mod sidebar_layout;
 mod sidebar_state;
 mod status_pages;
 mod structure;
@@ -295,6 +296,13 @@ impl SimpleComponent for App {
                         set_popover = &gtk::Popover {},
                     },
 
+                    #[name = "sidebar_toggle"]
+                    pack_start = &gtk::ToggleButton {
+                        set_icon_name: "sidebar-show-symbolic",
+                        set_tooltip_text: Some(crate::tr!("Show tables").as_str()),
+                        set_visible: true,
+                    },
+
                     #[name = "databases_button"]
                     pack_start = &gtk::MenuButton {
                         set_icon_name: "network-server-symbolic",
@@ -447,6 +455,7 @@ impl SimpleComponent for App {
             mcp_bridge,
         } = init;
         let widgets = view_output!();
+        sidebar_layout::install(&widgets.split_view);
         widgets
             .table_search
             .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Search tables"))]);
@@ -463,8 +472,13 @@ impl SimpleComponent for App {
 
         init_css::install_pending_change_css();
 
-        let window_handles =
-            init_window::install_window_lifecycle(&widgets.window, &widgets.split_view, &workspace, &sender);
+        let window_handles = init_window::install_window_lifecycle(
+            &widgets.window,
+            &widgets.split_view,
+            &widgets.sidebar_toggle,
+            &workspace,
+            &sender,
+        );
 
         let sidebar = init_sidebar::build_sidebar(&widgets, &sender);
 
@@ -846,10 +860,11 @@ impl SimpleComponent for App {
             AppMsg::CloseWorkspaceTabsToRight(id) => self.close_workspace_tabs_to_right(id, sender),
             AppMsg::CloseActiveWorkspaceTab => self.close_active_workspace_tab(sender),
             AppMsg::ShowAlert { title, body } => self.show_error_alert(&title, &body),
-            AppMsg::ExportResults { result, name } => super::export_dialog::present(
+            AppMsg::ExportResults { result, name, scope } => super::export_dialog::present(
                 &self.window,
                 &self.toast_overlay,
                 super::export_dialog::ExportRequest {
+                    scope,
                     paged: None,
                     result,
                     suggested_name: name,
@@ -860,6 +875,7 @@ impl SimpleComponent for App {
             AppMsg::ExportStreamedResults(request) => self.on_export_streamed_results(request),
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
+            AppMsg::WindowWidened => self.on_window_widened(),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
             AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),

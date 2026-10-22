@@ -74,6 +74,7 @@ pub enum AppMsg {
     ImportConnectionUrl,
     ImportConnectionUrlText(String, bool),
     OpenLaunchArguments(Vec<crate::services::open_request::LaunchArgument>),
+    WindowWidened,
     ImportConnectionUrlSucceeded(String),
     ImportConnectionUrlFailed,
     NewEditorTab,
@@ -153,6 +154,7 @@ pub enum AppMsg {
     ExportAllCsv,
     ExportAllJson,
     ExportResults {
+        scope: crate::ui::export_dialog::ExportScope,
         result: QueryResult,
         name: String,
     },

@@ -498,7 +498,7 @@ impl App {
             return;
         };
 
-        let (result, has_unfetched_columns) = {
+        let (result, has_unfetched_columns, filtered) = {
             let tabs = self.workspace_tabs.borrow();
             let Some(model) = tabs
                 .get(&active_id)
@@ -508,7 +508,11 @@ impl App {
                 self.show_toast(&crate::tr!("Nothing to export"));
                 return;
             };
-            (model.snapshot(), model.has_unfetched_columns())
+            (
+                model.snapshot(),
+                model.has_unfetched_columns(),
+                !model.current_filter().is_empty(),
+            )
         };
         let Some(result) = result else {
             let message = if has_unfetched_columns {
@@ -527,6 +531,7 @@ impl App {
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
+                scope: crate::ui::export_dialog::ExportScope::TablePage { filtered },
                 paged: None,
                 result,
                 suggested_name: table_label,
@@ -552,6 +557,7 @@ impl App {
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
+                scope: crate::ui::export_dialog::ExportScope::QueryRerun,
                 paged: Some(crate::ui::export_dialog::PagedExport {
                     mode: crate::ui::export_dialog::PagedExportMode::GuardedQuery,
                     total_rows: None,
@@ -617,6 +623,9 @@ impl App {
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
+                scope: crate::ui::export_dialog::ExportScope::TablePage {
+                    filtered: !plan.filter.is_empty(),
+                },
                 paged: Some(crate::ui::export_dialog::PagedExport {
                     mode: crate::ui::export_dialog::PagedExportMode::FullTable,
                     total_rows,

@@ -4,15 +4,22 @@
 
 ### Added
 
+- The query editor has visible run scopes and result-file export choices, plus commit-and-close and rollback-and-close controls for an owned session with an open transaction.
+- Tables and views expand to show bounded field/type previews, with a Structure shortcut; the docked sidebar has a native resize handle and its toggle stays available at every window width.
+
 - SQLite files open from the file manager (Open With BookiE), and `bookie books.db` or `bookie postgres://user@host/db` opens a database file or a connection URL from a terminal. A URL asks you to confirm before it is imported and connected; a missing or non-database file is refused instead of creating an empty database. A second launch hands its argument to the running window. DuckDB files open from the terminal only.
 
 ### Changed
+
+- Export reviews the table-page, loaded-result or query-rerun scope before file format; all matching table rows remain unavailable until consistent snapshot export is qualified.
+- Grid headers preserve exact engine type case and keep comments, key and nullability metadata in a native column-details menu.
 
 - The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
 
 ### Fixed
 
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
+- In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens or closes it at any window width, and the sidebar returns by itself when the window is widened.
 - Discarding changes to a SQL file closes its tab without reopening the same save prompt.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
 
