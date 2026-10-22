@@ -92,6 +92,7 @@ pub struct App {
     mcp_bridge: Option<Arc<tablepro_mcp::McpBridge>>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
+    sidebar_toggle: gtk::ToggleButton,
     sidebar_reveal: std::rc::Rc<std::cell::Cell<u32>>,
     window_title: adw::WindowTitle,
     header_bar: adw::HeaderBar,
@@ -110,6 +111,7 @@ pub struct App {
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     schema_fetch_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
+    database_list_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     content_holder: adw::ToolbarView,
     history_paned: gtk::Paned,
     toast_overlay: adw::ToastOverlay,
@@ -295,6 +297,13 @@ impl SimpleComponent for App {
                         set_popover = &gtk::Popover {},
                     },
 
+                    #[name = "sidebar_toggle"]
+                    pack_start = &gtk::ToggleButton {
+                        set_icon_name: "sidebar-show-symbolic",
+                        set_tooltip_text: Some(crate::tr!("Tables sidebar").as_str()),
+                        set_visible: false,
+                    },
+
                     #[name = "databases_button"]
                     pack_start = &gtk::MenuButton {
                         set_icon_name: "network-server-symbolic",
@@ -463,8 +472,13 @@ impl SimpleComponent for App {
 
         init_css::install_pending_change_css();
 
-        let window_handles =
-            init_window::install_window_lifecycle(&widgets.window, &widgets.split_view, &workspace, &sender);
+        let window_handles = init_window::install_window_lifecycle(
+            &widgets.window,
+            &widgets.split_view,
+            &widgets.sidebar_toggle,
+            &workspace,
+            &sender,
+        );
 
         let sidebar = init_sidebar::build_sidebar(&widgets, &sender);
 
@@ -495,6 +509,7 @@ impl SimpleComponent for App {
         adw::StyleManager::default().set_color_scheme(crate::services::preferences::color_scheme_style(
             preferences.load().color_scheme,
         ));
+        crate::ui::theme::apply(preferences.load().theme);
         crate::ui::grid::set_null_display(preferences.load().null_display);
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
@@ -510,6 +525,7 @@ impl SimpleComponent for App {
             mcp_bridge,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
+            sidebar_toggle: widgets.sidebar_toggle.clone(),
             sidebar_reveal: std::rc::Rc::default(),
             window_title: widgets.window_title.clone(),
             header_bar: widgets.header_bar.clone(),
@@ -528,6 +544,7 @@ impl SimpleComponent for App {
             catalog_generation: std::cell::Cell::new(0),
             catalog_cancel: Default::default(),
             schema_fetch_cancel: Default::default(),
+            database_list_cancel: Default::default(),
             content_holder: widgets.content_holder.clone(),
             history_paned: gtk::Paned::builder()
                 .orientation(gtk::Orientation::Vertical)
@@ -600,6 +617,7 @@ impl SimpleComponent for App {
         open_request::forward_open_signal(sender.input_sender());
         sender.input(AppMsg::ReloadConnections);
         model.content_holder.set_content(Some(&model.history_paned));
+        model.set_sidebar_connected(false);
         model.show_welcome_page(sender.clone());
 
         widgets
@@ -1093,9 +1111,7 @@ impl SimpleComponent for App {
             AppMsg::ImportConnectionUrlFailed => self.on_import_connection_url_failed(),
             AppMsg::OpenSaved(saved) => self.on_open_saved(saved, sender),
             AppMsg::LoadDatabases => self.on_load_databases(sender),
-            AppMsg::DatabasesLoaded { connection_id, result } => {
-                self.on_databases_loaded(connection_id, result, sender)
-            }
+            AppMsg::DatabasesLoaded { origin, result } => self.on_databases_loaded(origin, result, sender),
             AppMsg::SwitchDatabase(name) => self.on_switch_database(name, sender),
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
