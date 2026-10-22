@@ -56,10 +56,10 @@ Use **Split** in the editor toolbar to show the same query in a second side-by-s
 
 To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+Shift+[**. Click its gutter marker to unfold it, or choose **Unfold all** in the toolbar. **Ctrl+Shift+]** also unfolds every block. Folding hides lines in the editor without changing the SQL that runs. Editing the query clears folds so hidden text cannot be mistaken for the current query.
 
-- Ctrl+Enter runs the whole script; Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it.
+- Ctrl+Enter (and the Run button) runs the selected text when something other than blank space is selected, otherwise the whole script (a find match left selected counts as a selection); Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it. The arrow beside **Run** offers whole-script and current-statement actions with their shortcuts. After execution, its **File output** section lists loaded result sets separately; a streamed result offers an explicitly labeled rerun export.
 - Each statement has a result view. SQL Server statements that return multiple result sets show those sets in order within that view. More than five statement results collapse into a drop-down. **Pin results** keeps the current results above the next run.
-- After a run, the gutter marks each statement with a tick or a cross.
-- A failed statement shows the error, with **Copy error**, and on PostgreSQL the line and column of the error inside that statement.
+- After a run, the gutter marks each statement with a tick or a cross. For supported SQL dialects, SQL text inside comments does not receive a statement mark.
+- A failed statement shows the error with **Copy error**. When the server supplies a position for the original SQL, **Go to error** in the result and **Errors** views restores the editor and places the caret there. Positions count Unicode characters and refer to the statement that failed, including when the same statement occurs twice. Editing the query, running it again, or changing its connection requires a fresh error before an old action can navigate. Errors without a usable position remain readable and copyable.
 - `:name` placeholders ask for values before the statement runs and send them as bound parameters, never pasted into the SQL.
 - Completion offers tables after `FROM` and `JOIN` and columns elsewhere.
 - **Session** keeps one connection for the tab, so settings, temporary tables and transactions carry over between runs. MySQL sessions allow locking reads, user variables, savepoints and supported `SHOW` forms inside an open transaction; raw transaction-control SQL, DDL, account statements, `LOCK TABLES` and `SET autocommit` remain refused. `ROLLBACK` does not undo user-variable assignments or release named locks acquired by functions in assignment expressions; close the session to release those locks.
@@ -67,11 +67,15 @@ To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+S
 - **Explain** shows the plan of the selected text, or of the whole editor when nothing is selected. For PostgreSQL and SQLite the plan opens as a **Tree** (indented by nesting, with a bar for each step's share of the estimated cost; hover a bar for the numbers) and the **Text** tab keeps the raw plan. Other engines show the text plan only. The costs are the planner's estimates; nothing is executed.
 - Ctrl+H opens query history in a panel beneath the workspace. Statements that set a password, an encryption key or a connection secret are not saved there. Search, filter, pin, export or reopen queries there; **Close history** returns the full space to your current workspace. Ctrl+D saves the query as a favorite, and Ctrl+P opens Open Quickly for favorites, tabs and connections.
 
+A session with an open transaction also shows **Transaction active**, **Commit & close session**, and **Roll back & close session**. Both actions end that editor session. They are unavailable while a statement or session operation is running. A failed commit keeps the existing recovery behavior; an aborted PostgreSQL transaction can report a rollback instead of a commit.
+
+The header's **Show tables** toggle opens or closes database navigation at any window width. In a wide window, drag the divider or focus its native handle and use the keyboard to resize the sidebar. In a narrow window the sidebar is an overlay and stays closed after connecting. The arrow beside a table or view expands its fields without opening another tab. Names lead, engine types are secondary, and primary-key fields show a key icon. **Structure…** opens the full metadata view. Expansion previews up to 256 fields per object, with at most 2,048 fields retained across expanded objects and four metadata requests at once. Collapse and expand to retry a failed load; collapsing releases its field budget.
+
+Grid headers show the column name and exact engine type spelling on separate lines. The native header menu shows **Column details**, including keys, nullability and the column comment. Comments are kept out of the header so they do not increase every header's height.
+
 ## Import and export
 
-- **Export**: from a table or a result, choose CSV, JSON, Markdown, HTML, XML, SQL
-  or an Excel workbook. Export the current table page or loaded query results.
-  Full-table export is refused until a consistent snapshot path is supported.
+- **Export** opens one dialog with **Scope** before **Format**. A table uses its current page and active server-side filter; **All matching table rows** explains the snapshot requirement and cannot start an export. A query exports its loaded result columns, including joins and aliases, without running SQL again. A streamed result's all-row export explicitly runs the guarded query again and can observe changed data. Choose CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook after reviewing the scope. Full-table export remains refused until a consistent snapshot path is supported.
   SQL row export and Copy as INSERT are not database backups; see the
   [identity and generated-column limitations](known-limitations.md#data-and-values).
 - **Import**: right-click a table and choose **Import CSV…** to load a CSV file
@@ -124,7 +128,7 @@ Press Ctrl+? for the full list. The most used:
 | Keys | Action |
 |---|---|
 | Ctrl+E / Ctrl+T | New SQL editor tab |
-| Ctrl+Enter | Run the script |
+| Ctrl+Enter | Run the selection, or the script when nothing is selected |
 | Ctrl+Shift+Enter | Run the statement at the cursor |
 | Ctrl+S | Save pending changes (or the SQL file) |
 | Ctrl+Z / Ctrl+Y | Undo / redo a pending change |
@@ -140,3 +144,9 @@ Press Ctrl+? for the full list. The most used:
 | Ctrl+Shift+] | Unfold all SQL blocks |
 | F5 | Refresh the table |
 | Ctrl+W | Close the tab |
+
+### Results panel
+
+Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Show result sets** returns from the Errors view to the existing result selector. **Errors** lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
+
+Drag the divider to resize the panel. **Maximize results** hides the SQL area; **Restore editor** returns to the previous divider position and SQL focus. Hiding a maximized panel also restores the editor. Panel size is retained within the open editor, not across an application restart. Closing the query releases its panel with the rest of that editor.
