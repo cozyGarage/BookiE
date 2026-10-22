@@ -9,8 +9,18 @@
 ### Fixed
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
+### Added
+
+- SQLite files open from the file manager (Open With BookiE), and `bookie books.db` or `bookie postgres://user@host/db` opens a database file or a connection URL from a terminal. A URL asks you to confirm before it is imported and connected; a missing or non-database file is refused instead of creating an empty database. A second launch hands its argument to the running window. DuckDB files open from the terminal only.
+
+### Changed
+
+- The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
+
 ### Fixed
 
+- SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
+- Discarding changes to a SQL file closes its tab without reopening the same save prompt.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
 
 ## [0.2.0] - 2026-10-21
