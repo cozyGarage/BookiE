@@ -25,6 +25,7 @@ mod stream_pages;
 mod stream_view;
 mod streaming;
 mod timeout_retry;
+mod toolbar_actions;
 
 use std::time::SystemTime;
 
@@ -70,6 +71,8 @@ pub struct SqlEditor {
     split_view: split_view::SplitEditorView,
     find: Option<find_bar::FindBar>,
     run_button: gtk::Button,
+    run_options: gtk::MenuButton,
+    transaction_actions: toolbar_actions::TransactionActions,
     folding: std::rc::Rc<std::cell::RefCell<folding::FoldController>>,
     session_button: gtk::ToggleButton,
     session: Option<session_mode::EditorSession>,
@@ -149,6 +152,10 @@ pub enum SqlEditorInput {
         sql: String,
     },
     Run,
+    SessionAction {
+        session_id: Uuid,
+        commit: bool,
+    },
     RunWithParameters {
         sql: String,
         planned: PlannedStatements,
@@ -365,6 +372,11 @@ impl SimpleComponent for SqlEditor {
                         add_css_class: "suggested-action",
                         connect_clicked => SqlEditorInput::Run,
                     },
+                    #[name = "run_options"]
+                    gtk::MenuButton {
+                        set_icon_name: "pan-down-symbolic",
+                        set_tooltip_text: Some(crate::tr!("Run options").as_str()),
+                    },
                 },
 
                 add_top_bar = &gtk::Box {
@@ -530,6 +542,7 @@ impl SimpleComponent for SqlEditor {
         narrow.add_setter(&widgets.fold_button, "visible", Some(&false.into()));
         narrow.add_setter(&widgets.unfold_button, "visible", Some(&false.into()));
         root.add_breakpoint(narrow);
+        let transaction_actions = toolbar_actions::TransactionActions::install(&widgets.toolbar_view, &sender);
         finish_notice::fit_status(&widgets.status);
         let find = find_bar::FindBar::new(&widgets.source_view);
         if let Some(find) = &find {
@@ -623,6 +636,8 @@ impl SimpleComponent for SqlEditor {
             folding,
             find,
             run_button: widgets.run_button.clone(),
+            run_options: widgets.run_options.clone(),
+            transaction_actions,
             session_button: widgets.session_button.clone(),
             session: None,
             retired_session_connection_id: None,
@@ -653,6 +668,7 @@ impl SimpleComponent for SqlEditor {
             reading_lexing: false,
             dark_notify_handler: Some(dark_notify_handler),
         };
+        model.refresh_run_options(&sender);
         ComponentParts { model, widgets }
     }
 
@@ -729,19 +745,10 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
             SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
-            SqlEditorInput::Run => {
-                self.timeout_retry.clear_override();
-                let buffer = self.source_view.buffer();
-                let (start, end) = buffer.bounds();
-                let sql = buffer.text(&start, &end, true).to_string();
-                let trimmed = sql.trim().to_string();
-                if trimmed.is_empty() {
-                    self.status.set_label(&crate::tr!("empty query"));
-                    return;
-                }
-                self.begin_run(trimmed, false, sender);
+            SqlEditorInput::Run => self.run_scope(false, sender.clone()),
+            SqlEditorInput::SessionAction { session_id, commit } => {
+                self.on_session_toolbar_action(session_id, commit, &sender);
             }
-
             SqlEditorInput::RunWithParameters { sql, planned, values } => {
                 self.execute_sql(sql, planned, values, sender);
             }
@@ -807,20 +814,7 @@ impl SimpleComponent for SqlEditor {
                 self.source_view.scroll_mark_onscreen(&buffer.get_insert());
             }
 
-            SqlEditorInput::RunAtCursor => {
-                self.timeout_retry.clear_override();
-                let buffer = self.source_view.buffer();
-                let (start, end) = buffer.bounds();
-                let sql = buffer.text(&start, &end, true).to_string();
-                let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
-                let cursor_byte = cursor_byte_offset(&sql, cursor_chars);
-                let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
-                let Some(statement) = statement_at_cursor(&sql, self.lexing(&driver_id), cursor_byte) else {
-                    self.status.set_label(&crate::tr!("No statement at cursor"));
-                    return;
-                };
-                self.begin_run(statement, true, sender);
-            }
+            SqlEditorInput::RunAtCursor => self.run_scope(true, sender.clone()),
 
             SqlEditorInput::RunWithLongerTimeout => {
                 let Some(sql) = self.timeout_retry.accept() else {
@@ -992,6 +986,7 @@ impl SimpleComponent for SqlEditor {
                 buffer.set_text(&formatted);
             }
         }
+        self.sync_session_controls();
     }
 }
 

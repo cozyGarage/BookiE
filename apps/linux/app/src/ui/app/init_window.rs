@@ -272,7 +272,6 @@ pub(super) fn install_window_lifecycle(
     ));
     breakpoint.add_setter(split_view, "collapsed", Some(&true.into()));
     breakpoint.add_setter(split_view, "show-sidebar", Some(&false.into()));
-    breakpoint.add_setter(sidebar_toggle, "visible", Some(&true.into()));
     sidebar_toggle
         .bind_property("active", split_view, "show-sidebar")
         .bidirectional()

@@ -177,23 +177,7 @@ impl App {
                     database: database_for_create.clone(),
                     preferences: preferences_for_create.clone(),
                 })
-                .forward(sender_for_create.input_sender(), move |out| match out {
-                    SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {
-                        origin,
-                        schema: None,
-                        table: None,
-                    },
-                    SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
-                    SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
-                    SqlEditorOutput::NeedColumns(tables) => AppMsg::EditorNeedsColumns(tables),
-                    SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
-                    SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
-                        title: crate::tr!("Row as JSON"),
-                        body,
-                    },
-                    SqlEditorOutput::ExportResults { result, name } => AppMsg::ExportResults { result, name },
-                    SqlEditorOutput::ExportStreamedResults(request) => AppMsg::ExportStreamedResults(request),
-                });
+                .forward(sender_for_create.input_sender(), move |out| editor_output(tab_id, out));
             let page = tab_view_for_create.append(editor.widget());
             let editor_count = workspace_tabs_for_create
                 .borrow()
@@ -410,7 +394,11 @@ impl App {
                     title: crate::tr!("Row as JSON"),
                     body,
                 },
-                BrowseTabOutput::ExportResults { result, name } => AppMsg::ExportResults { result, name },
+                BrowseTabOutput::ExportResults { result, name, filtered } => AppMsg::ExportResults {
+                    result,
+                    name,
+                    scope: crate::ui::export_dialog::ExportScope::TablePage { filtered },
+                },
                 BrowseTabOutput::ExportStreamedResults(request) => AppMsg::ExportStreamedResults(request),
                 BrowseTabOutput::SchemaWordsChanged(_words) => AppMsg::WorkspaceSchemaWordsChanged,
                 BrowseTabOutput::ShowSelectionAlert { title, body } => AppMsg::ShowAlert { title, body },
@@ -547,23 +535,7 @@ impl App {
                 database: self.database.clone(),
                 preferences: self.preferences.clone(),
             })
-            .forward(sender.input_sender(), move |out| match out {
-                SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {
-                    origin,
-                    schema: None,
-                    table: None,
-                },
-                SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
-                SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
-                SqlEditorOutput::NeedColumns(tables) => AppMsg::EditorNeedsColumns(tables),
-                SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
-                SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
-                    title: crate::tr!("Row as JSON"),
-                    body,
-                },
-                SqlEditorOutput::ExportResults { result, name } => AppMsg::ExportResults { result, name },
-                SqlEditorOutput::ExportStreamedResults(request) => AppMsg::ExportStreamedResults(request),
-            });
+            .forward(sender.input_sender(), move |out| editor_output(tab_id, out));
         let page = tab_view.append(editor.widget());
         let label = match query.trim().is_empty() {
             true => default_editor_tab_label(self.editor_tab_count() + 1),
@@ -1128,6 +1100,30 @@ fn editor_tab_tooltip(query: &str, label: &str) -> Option<String> {
     }
     let preview = format!("{}…", &q[..last_idx]);
     if preview == label { None } else { Some(preview) }
+}
+
+fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
+    match output {
+        SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {
+            origin,
+            schema: None,
+            table: None,
+        },
+        SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
+        SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
+        SqlEditorOutput::NeedColumns(tables) => AppMsg::EditorNeedsColumns(tables),
+        SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
+        SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
+            title: crate::tr!("Row as JSON"),
+            body,
+        },
+        SqlEditorOutput::ExportResults { result, name } => AppMsg::ExportResults {
+            result,
+            name,
+            scope: crate::ui::export_dialog::ExportScope::QueryResult,
+        },
+        SqlEditorOutput::ExportStreamedResults(request) => AppMsg::ExportStreamedResults(request),
+    }
 }
 
 #[cfg(test)]
