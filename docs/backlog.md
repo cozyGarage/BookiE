@@ -35,6 +35,23 @@ The [October 20 TablePro and dbx review](archive/tablepro-dbx-review-2026-10-20/
 
 The [newest-code follow-up](archive/upstream-next-slices-2026-10-20.md) records the native PostgreSQL and failure-report probes behind RV-14 to RV-16, the latest Apple-side upstream lessons, and a proposed sequence before server notices and PostgreSQL extension work. Its candidate order does not add a release commitment.
 
+## Audit and dbflux follow-ups
+
+From the 2026-10-22 dbflux review and the audit of closed issues. Each is an issue with its own acceptance; none is a release commitment. Start with the failing regression test where a defect is suspected.
+
+| ID / issue | Item | Lane |
+|---|---|---|
+| RV-12 / [#1354](https://github.com/cozyGarage/BookiE/issues/1354) | MySQL index listing probably fails on a functional index | B3 |
+| RV-13 / [#1364](https://github.com/cozyGarage/BookiE/issues/1364) | SQLite DROP TABLE on an attached schema may bypass the child-row guard | B3 |
+| PERF-11 / [#580](https://github.com/cozyGarage/BookiE/issues/580) | Reopened: catalog scoping, many-schema performance, restricted-role metadata | UX |
+| DBF-1 / [#1355](https://github.com/cozyGarage/BookiE/issues/1355) | In-app audit viewer, then error toasts carrying the operation id | UX |
+| DBF-2 to DBF-4 / [#1356](https://github.com/cozyGarage/BookiE/issues/1356), [#1357](https://github.com/cozyGarage/BookiE/issues/1357), [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | Measure PostgreSQL row-cap drain, SQLite early cancel, verify-ca hostname per engine | B3 / B4 |
+| DBF-6 / [#1360](https://github.com/cozyGarage/BookiE/issues/1360) | Keyboard-path coverage registry | UX |
+| B4-24 / [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Decide the TLS fingerprint pin | B4 |
+| UI-43 / [#1366](https://github.com/cozyGarage/BookiE/issues/1366) | Completion through the session search_path | UX |
+
+The [#1327](https://github.com/cozyGarage/BookiE/issues/1327) keyring prompt, [#1333](https://github.com/cozyGarage/BookiE/issues/1333) close handling, [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) carry the dbflux design notes as comments. Vendored dependency patches: see [upstream patches](proposals/upstream-patches.md); `mongodb` SCRAM hunk can be dropped after the release containing [mongo-rust-driver#1833](https://github.com/mongodb/mongo-rust-driver/pull/1833).
+
 ## 0.2.x features
 
 | Row | What | Notes |
@@ -68,7 +85,7 @@ The [newest-code follow-up](archive/upstream-next-slices-2026-10-20.md) records 
 | APP-MOD | Keep the app layer thin: finish the staged moves of [ADR 0018](decisions/0018-headless-app-services-crate.md) (completion, workspace and browse/edit models, scoped filter and mapping stores, preference data, quick-switcher ranking and retry decisions are now headless; translated errors and the TabView handshake stay in app adapters; continue the remaining service moves), and replace hard-coded driver-name branches in the app layer with driver capabilities, starting with `browse_tab/value_parse.rs` |
 | UI-21, TEST-28 | Fake connection for the GTK tier, native Ubuntu AT-SPI menu reachability |
 | TEST-30 | Triage remaining SonarCloud and CodeQL findings; close confirmed false positives with a reason |
-| TEST-36 | Record duration for each installed GTK scenario and retry so suite growth can be measured before changing timeouts or shard layout ([#1075](https://github.com/cozyGarage/BookiE/issues/1075)); retain current limits until there is measurement evidence |
+| TEST-36 | Record duration for each installed GTK scenario and retry so suite growth can be measured before changing timeouts or shard layout (origin [#1075](https://github.com/cozyGarage/BookiE/issues/1075) is closed and no open issue owns this row; open one before selecting it); retain current limits until there is measurement evidence |
 | AUD-5 | Move nonessential Rust comments into documentation under the repository comment-line rule ([#563](https://github.com/cozyGarage/BookiE/issues/563)) |
 | DOC-3, DOC-5 | Orca, keyboard-only and high-contrast acceptance; verify typed values and pending edits remain understandable across display and interaction paths. The [visual matrix](manual-verification-0.2-features.md#visual-audit-matrix) records the proposed acceptance recipe. |
 | PEER-2 | One per-dialect lexer profile (backslash escapes, `E''` strings, `--` rule, quote characters) shared by statement splitting, classification and export quoting, so those paths cannot interpret the same SQL differently |
