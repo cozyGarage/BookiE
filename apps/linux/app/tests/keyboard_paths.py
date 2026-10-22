@@ -22,6 +22,7 @@ SQL_EDITOR = {
     "Open saved connection": "shortcut: Ctrl+P (Open Quickly lists connections)",
     "Main menu": "shortcut: F10",
     "Search tables": "tab-stop",
+    "Tables sidebar": "tab-stop",
     "New Table\u2026": "tab-stop",
     "Table from CSV\u2026": "tab-stop",
     "Open safety_items": "tab-stop (Enter on the sidebar row)",
