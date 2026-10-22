@@ -59,7 +59,7 @@ Add a row here when you add a guardrail.
 
 ## Storage tests
 
-Storage tests use temporary directories and explicit file paths for JSON and audit behavior. Query-history tests use SQLite. The Secret Service round-trip test is ignored by default because it needs a keyring. `scripts/test-secret-service.sh` always creates an isolated D-Bus/keyring session, even when invoked from a desktop session.
+Storage tests use temporary directories and explicit file paths for JSON and audit behavior. Query-history tests use SQLite. The Secret Service round-trip test is ignored by default because it needs a keyring. `scripts/test-secret-service.sh` always creates an isolated D-Bus/keyring session, even when invoked from a desktop session. It first runs the `keyring-fresh` tests against a keyring daemon that has no default collection yet (reading or deleting a missing password must not create one), then unlocks a test keyring for the `keyring` tests.
 
 Tests that change XDG environment variables must avoid racing with other tests. Prefer internal functions that accept a path when the module already provides them.
 
@@ -202,6 +202,8 @@ bash scripts/test-gtk-safety.sh
 Use `cancelled_workbook_export_preserves_existing_file` for the cancellation case. Record the binary's commit/checksum; a prebuilt binary is not evidence for later Rust edits. Omit `TABLEPRO_GTK_BINARY` to build the current release profile.
 
 Each scenario creates a temporary profile and fixture connection/database. Its `environment` attribute selects the policy environment to exercise, and `audit_available` controls whether the fixture audit journal is present. These tests do not use existing saved connections or a user's production database.
+
+Memory profiles and second-launch checks retain the exact subprocess launched by the fixture. They verify its PID lifetime and executable file identity rather than scanning process names. Second launch reuses the supplied fixture environment; it never reads another process's environment. Profile rows record the owned PID and Linux process start ticks. An exited or replaced target fails the check instead of selecting another application.
 
 The Open Quickly scenario waits for the filtered result set before invoking its single action; the already-visible favorite is not proof that the debounced row rebuild has completed. It still requires the window to close and usage to be persisted.
 

@@ -6,7 +6,7 @@ cd "$ROOT"
 
 # Never unlock or write a probe into the user's desktop keyring.
 if [[ "${TABLEPRO_SECRET_DBUS_ACTIVE:-0}" != "1" ]]; then
-  secret_root="$(mktemp -d)"
+  secret_root="$(mktemp -d /tmp/tablepro.XXXXXX)"
   mkdir -p \
     "$secret_root/home" \
     "$secret_root/config" \
@@ -31,7 +31,14 @@ if [[ "${TABLEPRO_SECRET_DBUS_ACTIVE:-0}" != "1" ]]; then
   exit
 fi
 
-eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
-printf 'probe' | secret-tool store --label='TablePro CI probe' application tablepro-ci
+gnome-keyring-daemon --daemonize --components=secrets >/dev/null
+python3 "$ROOT/scripts/run-isolated-tests.py" keyring-fresh
+eval "$(printf 'tablepro-test' | gnome-keyring-daemon --replace --daemonize --unlock --components=secrets)"
+# --replace returns before the old daemon releases the bus name; retry until the unlocked one answers.
+for attempt in $(seq 1 20); do
+  printf 'probe' | secret-tool store --label='TablePro CI probe' application tablepro-ci && break
+  [[ "$attempt" == 20 ]] && { echo "unlocked keyring daemon did not take over" >&2; exit 1; }
+  sleep 0.5
+done
 secret-tool clear application tablepro-ci
 python3 "$ROOT/scripts/run-isolated-tests.py" keyring
