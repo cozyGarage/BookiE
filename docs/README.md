@@ -142,3 +142,8 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 
 - [Editor bottom panel desktop acceptance, October 22](evidence/editor-bottom-panel-2026-10-22/README.md): source-built native Wayland, keyboard/pointer, error/timeout and layout evidence; package and Forgejo gates stay separate.
 - [Browse inspector callback lifetime, October 22](evidence/inspector-cycle-2026-10-22/README.md): failing then passing GTK weak-reference regression for a selection-to-inspector ownership cycle.
+
+- [Query row decoding budget, October 22](evidence/query-row-budget-2026-10-22/README.md): pre-decode row checks, measured PostgreSQL client RSS reduction and remaining allocation limits.
+- [Borrowed row identity checks, October 22](evidence/row-key-borrowing-2026-10-22/README.md): reduced copying during stale-edit validation, with key contract tests and allocation measurements.
+
+- [Linux follow-up review, October 22](archive/linux-follow-up-review-2026-10-22.md): merged result-memory fixes, corrected evidence status and nonduplicating UI acceptance order.
