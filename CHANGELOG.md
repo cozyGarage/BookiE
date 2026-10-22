@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
 ### Fixed
 
 - Streamed result pages wait until their first display frame before building a grid, avoiding work for discarded pages.
