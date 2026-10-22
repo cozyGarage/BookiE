@@ -605,6 +605,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::app::sidebar_state::tests::the_sidebar_stays_closed_in_a_narrow_window_and_never_opens_empty"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::dispatch_tests::editor_inputs_cannot_dispatch_or_cancel_an_active_query"
     ],
     [
@@ -675,6 +680,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::mcp_preferences::copy_tests::the_copy_button_puts_the_token_on_the_clipboard_and_keeps_the_dialog_open"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::completion_provider::tests::completion_resumes_after_a_large_buffer_is_replaced_with_a_small_query"
     ],
     [
@@ -736,6 +746,31 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_waits_for_its_session_before_accepting_any_run_input"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::grid_render::selection_stats_tests::wide_selection_statistics_preserve_rows_and_selection"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connection_row::tests::connection_actions_leave_room_for_text_in_a_narrow_row"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connection_row::tests::connection_menu_dispatches_actions_for_its_own_record"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::commenting_selected_lines_publishes_one_complete_query_change"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::query_publication_waits_for_nested_actions_and_keeps_ordinary_edits_immediate"
     ]
   ],
   "keyring": [
