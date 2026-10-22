@@ -4,6 +4,7 @@
 
 ### Added
 
+- F10 opens the main menu, as in other GNOME applications.
 - **Audit Log** in the main menu lists the operations recorded in the local audit journal, newest first: connection, who ran it, kind, outcome, rows and duration, with the operation id, policy rule, stored statement text and error on expand. A filter matches operation id, connection, outcome or statement. It verifies the journal chain before showing anything and reports a broken or unavailable journal instead of a partial list. It shows only what the journal stored; statement text is the redacted form. A failed statement's panel has **View in Audit Log**, which opens it with the newest operation, usually the failure, at the top.
 - A Preview SQL button in the unsaved-changes bar of a table tab shows the statements and values Save would run, without running them.
 - While a query result is locally filtered, its menu also offers **Export All Loaded Rows…** next to **Export Visible Rows…**, so the full loaded result can still be exported. Neither runs the query again.
@@ -23,6 +24,7 @@
 ### Fixed
 
 - Table browsing identifies when the result byte limit cuts a page short.
+- SQL completion popups remain usable when suggestions disappear and return, instead of triggering a GTK critical or showing a blank popup.
 - Spaces pasted around a connection's host or database name are removed before connecting; file paths are kept as typed.
 - Inspecting a row with oversized cell previews avoids copying the full row contents.
 - A PostgreSQL `VOID` result, such as `SELECT pg_sleep(0)`, shows as an empty value instead of undecodable.
