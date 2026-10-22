@@ -5,6 +5,7 @@
 ### Fixed
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
+- PostgreSQL queries ending on a full result page complete without a false column-change error.
 
 ## [0.2.0] - 2026-10-21
 
