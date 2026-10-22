@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Oversized text and JSON cells use shorter visible previews to reduce text-layout work; full values remain available through View Value and Copy Value.
+
+### Fixed
+
+- Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
 ### Added
 
 - SQLite files open from the file manager (Open With BookiE), and `bookie books.db` or `bookie postgres://user@host/db` opens a database file or a connection URL from a terminal. A URL asks you to confirm before it is imported and connected; a missing or non-database file is refused instead of creating an empty database. A second launch hands its argument to the running window. DuckDB files open from the terminal only.
