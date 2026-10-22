@@ -31,7 +31,9 @@ if [[ "${TABLEPRO_SECRET_DBUS_ACTIVE:-0}" != "1" ]]; then
   exit
 fi
 
-eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+gnome-keyring-daemon --daemonize --components=secrets >/dev/null
+python3 "$ROOT/scripts/run-isolated-tests.py" keyring-fresh
+eval "$(printf 'tablepro-test' | gnome-keyring-daemon --replace --daemonize --unlock --components=secrets)"
 printf 'probe' | secret-tool store --label='TablePro CI probe' application tablepro-ci
 secret-tool clear application tablepro-ci
 python3 "$ROOT/scripts/run-isolated-tests.py" keyring

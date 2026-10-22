@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.
 - Closing a result grid releases its selection and row inspector.
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
