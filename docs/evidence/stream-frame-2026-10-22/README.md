@@ -78,3 +78,5 @@ The probe is not a production recommendation. Periodic process-wide trimming can
 ## Corrected dependency refresh
 
 The frame branch now includes #1304's cursor-local PostgreSQL correction rather than the failed shared-casing attempt. Runtime source matches profiling baseline `aebdadea6`; intervening source merges changed only documentation. Full preflight and all 105 isolated GTK tests passed on the refreshed branch. The old failed aggregate #1307 was closed as obsolete. These local checks do not qualify a Forgejo merge gate for the refreshed frame PR.
+
+The branch was refreshed again after #1304 and #1312 merged. Accepted dependency evidence was preserved, the closed #1302 ledger row was removed, and full preflight passed after that integration. The remaining code diff against linux consists of the still-pending toolbar and frame work; no PostgreSQL driver change remains.
