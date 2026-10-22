@@ -8,10 +8,12 @@ fn a_failed_statement_offers_a_copy_button() {
     let page = super::super::error_page(0, &"syntax error at position 8".into());
     let mut widgets = vec![page.upcast::<relm4::gtk::Widget>()];
     let mut copy = false;
+    let mut audit = false;
     let mut description = false;
     while let Some(widget) = widgets.pop() {
         if let Some(button) = widget.downcast_ref::<relm4::gtk::Button>() {
             copy |= button.label().as_deref() == Some("Copy error");
+            audit |= button.action_name().as_deref() == Some("win.show-audit");
         }
         if let Some(label) = widget.downcast_ref::<relm4::gtk::Label>() {
             description |= label.text() == "syntax error at position 8";
@@ -23,6 +25,7 @@ fn a_failed_statement_offers_a_copy_button() {
         }
     }
     assert!(copy);
+    assert!(audit);
     assert!(description);
 }
 

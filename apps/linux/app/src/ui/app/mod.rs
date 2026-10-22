@@ -128,6 +128,7 @@ pub struct App {
     databases_button: gtk::MenuButton,
     databases_list: gtk::ListBox,
     pending_database_switch: Option<(Uuid, String)>,
+    connected_database: Option<String>,
     health_state: Option<ConnectionHealth>,
     row_op_spinner: gtk::Spinner,
     read_only_badge: gtk::Label,
@@ -265,6 +266,8 @@ impl SimpleComponent for App {
             set_title: Some("BookiE"),
             set_default_width: 1200,
             set_default_height: 760,
+            set_width_request: 600,
+            set_height_request: 400,
 
             adw::ToolbarView {
                 #[name = "header_bar"]
@@ -302,7 +305,7 @@ impl SimpleComponent for App {
                     pack_start = &gtk::ToggleButton {
                         set_icon_name: "sidebar-show-symbolic",
                         set_tooltip_text: Some(crate::tr!("Tables sidebar").as_str()),
-                        set_visible: true,
+                        set_visible: false,
                     },
 
                     #[name = "databases_button"]
@@ -346,6 +349,7 @@ impl SimpleComponent for App {
                     pack_end = &gtk::MenuButton {
                         set_icon_name: "open-menu-symbolic",
                         set_tooltip_text: Some(crate::tr!("Main menu").as_str()),
+                        set_primary: true,
                     },
                 },
 
@@ -511,6 +515,7 @@ impl SimpleComponent for App {
         adw::StyleManager::default().set_color_scheme(crate::services::preferences::color_scheme_style(
             preferences.load().color_scheme,
         ));
+        crate::ui::theme::apply(preferences.load().theme);
         crate::ui::grid::set_null_display(preferences.load().null_display);
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
@@ -561,6 +566,7 @@ impl SimpleComponent for App {
             databases_button: widgets.databases_button.clone(),
             databases_list: database_switcher::build_database_popover(&widgets.databases_popover, &sender),
             pending_database_switch: None,
+            connected_database: None,
             health_state: None,
             row_op_spinner: widgets.row_op_spinner.clone(),
             read_only_badge: widgets.read_only_badge.clone(),
@@ -999,6 +1005,9 @@ impl SimpleComponent for App {
             AppMsg::RefreshPage => self.on_refresh_active_tab(),
             AppMsg::ShowShortcuts => self.on_show_shortcuts(),
             AppMsg::ShowAbout => self.on_show_about(),
+            AppMsg::ShowAuditLog => {
+                crate::ui::audit_dialog::present(self.window.upcast_ref::<gtk::Window>(), &self.database)
+            }
             AppMsg::ShowActivity => {
                 crate::ui::activity_dialog::present(
                     self.window.upcast_ref::<gtk::Window>(),

@@ -25,6 +25,9 @@ import gtk_csv_refresh
 import gtk_input
 import gtk_runner
 import gtk_shard
+import gtk_process
+
+_owned_application = None
 
 APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
@@ -929,7 +932,13 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
     return database, environment
 
 
+def owned_application():
+    assert _owned_application is not None, "no owned application is running"
+    return _owned_application
+
+
 def start_application(binary, environment, restored=False):
+    global _owned_application
     environment.setdefault("G_DEBUG", "fatal-criticals")
     stderr_capture = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
     try:
@@ -945,6 +954,7 @@ def start_application(binary, environment, restored=False):
         raise
     process.stderr = stderr_capture
     try:
+        _owned_application = gtk_process.OwnedApplication(process, binary, environment)
         if restored == "empty":
             wait_for_node(name="BookiE", role=pyatspi.ROLE_FRAME)
         elif restored == "welcome":
@@ -961,6 +971,7 @@ def start_application(binary, environment, restored=False):
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
+        _owned_application = None
         stderr = read_application_stderr(process)
         raise AssertionError(f"application did not expose its expected window: {stderr}")
 
@@ -974,6 +985,9 @@ def read_application_stderr(process):
 
 
 def stop_application(process):
+    global _owned_application
+    if _owned_application is not None and _owned_application.process is process:
+        _owned_application = None
     if process.poll() is None:
         process.send_signal(signal.SIGTERM)
         try:
@@ -1057,6 +1071,8 @@ def run_scenario(binary, scenario):
         shutil.rmtree(base, ignore_errors=True)
     if failure is not None:
         raise AssertionError(f"{failure}\napplication stderr:\n{stderr}") from failure
+    if "does not have a minimum size" in stderr:
+        raise AssertionError(f"a window with breakpoints has no minimum size:\n{stderr}")
 
 
 def dismissed_approval_denies(database, _base):
@@ -1990,6 +2006,35 @@ def pending_edits_gate_a_connection_switch(database, base):
 pending_edits_gate_a_connection_switch.environment = "local"
 
 
+def preview_sql_shows_the_pending_statement_without_saving(database, _base):
+    invoke_named_action_within("safety_items", "Open safety_items")
+    wait_for_node(name="No rows on this page")
+    invoke(wait_for_node(name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="1 unsaved change")
+    invoke(wait_for_node(name="Preview SQL", role=pyatspi.ROLE_PUSH_BUTTON))
+    def shown_statement():
+        return any(
+            "INSERT INTO" in node.queryText().getText(0, -1)
+            for node in descendants(application_node())
+            if "Text" in node.get_interfaces()
+        )
+
+    deadline = time.monotonic() + WAIT_SECONDS
+    while not shown_statement():
+        assert time.monotonic() < deadline, accessible_snapshot()
+        time.sleep(POLL_SECONDS)
+    press_x11_key("Escape")
+    deadline = time.monotonic() + WAIT_SECONDS
+    while shown_statement():
+        assert time.monotonic() < deadline, "the preview did not close"
+        time.sleep(POLL_SECONDS)
+    wait_for_node(name="1 unsaved change")
+    assert_database_count_stable(database, 0)
+
+
+preview_sql_shows_the_pending_statement_without_saving.environment = "local"
+
+
 def a_browse_tab_reads_the_new_connection_after_a_switch(database, base):
     database_b = base / "safety-b.sqlite"
     with sqlite3.connect(database) as connection:
@@ -2430,6 +2475,7 @@ def main():
         current_page_json_export_preserves_values,
         restart_restores_active_editor_and_connection,
         pending_edits_gate_a_connection_switch,
+        preview_sql_shows_the_pending_statement_without_saving,
         a_browse_tab_reads_the_new_connection_after_a_switch,
         two_windows_hold_two_connections,
         switched_connection_keeps_workspace_tabs_after_debounce,

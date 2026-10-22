@@ -803,6 +803,12 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
     let text = message.to_string();
     copy.connect_clicked(move |button| button.clipboard().set_text(&text));
     actions.insert(&copy, -1);
+    let audit = gtk::Button::builder()
+        .label(crate::tr!("View in Audit Log"))
+        .action_name("win.show-audit")
+        .css_classes(["pill", "flat"])
+        .build();
+    actions.insert(&audit, -1);
     if let Some(button) = message.navigation_button() {
         actions.insert(&button, -1);
     }

@@ -1,5 +1,6 @@
 mod activity_dialog;
 mod app;
+mod audit_dialog;
 mod browse_tab;
 mod catalog_dialog;
 mod cell_editor;
@@ -32,6 +33,7 @@ mod ssh_prompt;
 mod ssh_section;
 mod structure_tab;
 mod structure_tab_dialogs;
+mod theme;
 mod welcome_view;
 
 pub use app::{App, AppInit};

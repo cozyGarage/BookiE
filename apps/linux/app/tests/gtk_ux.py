@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import gtk_input
+import keyboard_paths
 
 
 class XWindowAttributes(ctypes.Structure):
@@ -113,10 +114,19 @@ def scenarios(ui):
     pyatspi = ui.pyatspi
     ssh_trust_prompt_roles = (pyatspi.ROLE_ALERT, pyatspi.ROLE_FRAME)
 
+    def saved_connection_action(name, action):
+        row = ui.wait_for_node(name=name, role=pyatspi.ROLE_LIST_ITEM)
+        ui.invoke(ui.wait_within(row, name="Connection actions", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.invoke(ui.wait_for_node(name=action))
+
     def wait_for_adw_dialog(name, present=True):
         if gtk_input.uses_old_adw():
             return None
-        return ui.wait_for_node(name=name, role=pyatspi.ROLE_DIALOG, present=present)
+        roles = (pyatspi.ROLE_DIALOG, pyatspi.ROLE_LABEL)
+        wait_until(
+            lambda: any(ui.find_node(name=name, role=role) is not None for role in roles) == present,
+            f"dialog {name!r} did not become {'visible' if present else 'hidden'}",
+        )
 
     def text_of(node):
         text = node.queryText()
@@ -349,7 +359,7 @@ GLib.MainLoop().run()
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        ui.invoke_named_action_within(ui.CONNECTION_B_NAME, "Edit connection")
+        saved_connection_action(ui.CONNECTION_B_NAME, "Edit connection")
         ui.wait_for_node(name=f"Edit {ui.CONNECTION_B_NAME}")
         name = ui.wait_for_node(name="Name (optional)", role=pyatspi.ROLE_TEXT)
         assert text_of(name) == ui.CONNECTION_B_NAME, text_of(name)
@@ -363,7 +373,7 @@ GLib.MainLoop().run()
 
     def open_edit_dialog_for(name):
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        ui.invoke_named_action_within(name, "Edit connection")
+        saved_connection_action(name, "Edit connection")
         ui.wait_for_node(name=f"Edit {name}")
 
     def test_connection_reports_success_in_the_dialog(database, base):
@@ -421,34 +431,10 @@ GLib.MainLoop().run()
         assert ui.database_ids(database_b) == [55], "switch after cancellation used the wrong database"
 
     def app_memory_kb():
-        import glob
-        for status in glob.glob("/proc/[0-9]*/status"):
-            try:
-                executable = os.readlink(status.replace("status", "exe"))
-                text = open(status).read()
-            except OSError:
-                continue
-            if not executable.endswith(("/usr/bin/tablepro", "/usr/bin/bookie")):
-                continue
-            fields = dict(line.split(":", 1) for line in text.splitlines() if ":" in line)
-            return int(fields["VmRSS"].split()[0]), int(fields["VmHWM"].split()[0])
-        raise AssertionError("application process not found")
+        return ui.owned_application().memory_kb()
 
     def a_second_launch_raises_the_window_and_exits_cleanly(database, base):
-        import glob
-        import subprocess
-        for status in glob.glob("/proc/[0-9]*/status"):
-            try:
-                executable = os.readlink(status.replace("status", "exe"))
-                raw_environment = open(status.replace("status", "environ"), "rb").read()
-            except OSError:
-                continue
-            if executable.endswith(("/usr/bin/tablepro", "/usr/bin/bookie")):
-                break
-        else:
-            raise AssertionError("application process not found")
-        environment = dict(item.split("=", 1) for item in raw_environment.decode().split("\0") if "=" in item)
-        result = subprocess.run([executable], env=environment, capture_output=True, text=True, timeout=30)
+        result = ui.owned_application().launch_again()
         assert result.returncode == 0, (result.returncode, result.stderr)
         assert "did not unregister" not in result.stderr, result.stderr
         assert "asked it to show its window" in result.stderr, result.stderr
@@ -478,6 +464,7 @@ GLib.MainLoop().run()
         )
         with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
             out.write(json.dumps({
+                **ui.owned_application().identity(),
                 "profile_mode": "table-browse",
                 "rows_requested": rows,
                 "cell_payload_bytes": payload_bytes,
@@ -576,6 +563,7 @@ GLib.MainLoop().run()
             if any(word in ui.node_name(node).lower() for word in ("done in", "truncat"))
         })
         line = json.dumps({
+            **ui.owned_application().identity(),
             "rows_requested": rows,
             "cell_payload_bytes": payload_bytes,
             "repetition": int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1")),
@@ -670,6 +658,25 @@ GLib.MainLoop().run()
         ui.invoke(session_toggle("Session \u00b7 transaction open"))
         ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
         session_toggle("Session")
+
+    def switching_connection_asks_before_rolling_back_an_open_session_transaction(database, base):
+        ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        time.sleep(0.5)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.open_saved_connection(ui.CONNECTION_B_NAME)
+        ui.wait_for_node(name="Switch with an open session transaction?")
+        time.sleep(0.5)
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Switch with an open session transaction?", present=False)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} \u2014 BookiE")
+        ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.open_saved_connection(ui.CONNECTION_B_NAME)
+        ui.wait_for_node(name="Switch with an open session transaction?")
+        ui.invoke(ui.wait_for_node(name="Roll Back and Switch", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} \u2014 BookiE")
 
     def wait_for_editor_text(expected):
         deadline = time.monotonic() + ui.WAIT_SECONDS
@@ -785,8 +792,7 @@ GLib.MainLoop().run()
         ui.invoke_accessible_action("win.disconnect")
         ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        row = ui.wait_for_node(name=ui.CONNECTION_NAME, role=pyatspi.ROLE_LIST_ITEM)
-        ui.invoke(ui.wait_within(row, name="Group and tags", role=pyatspi.ROLE_PUSH_BUTTON))
+        saved_connection_action(ui.CONNECTION_NAME, "Group and tags")
         chooser = ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON)
         actions = chooser.queryAction()
         assert any(actions.getName(index) == "click" for index in range(actions.nActions)), (
@@ -797,6 +803,38 @@ GLib.MainLoop().run()
         ui.invoke(option)
         ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
         ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
+
+    def sql_editor_clickables_all_have_a_keyboard_path(database, base):
+        ui.run_sql("SELECT 1 AS alpha")
+        wait_for_result_column("alpha")
+        clickable = (
+            pyatspi.ROLE_PUSH_BUTTON,
+            pyatspi.ROLE_TOGGLE_BUTTON,
+            pyatspi.ROLE_CHECK_BOX,
+            pyatspi.ROLE_COMBO_BOX,
+            pyatspi.ROLE_LINK,
+        )
+        names = [
+            ui.node_name(node).strip()
+            for node in ui.descendants(ui.application_node())
+            if ui.node_role(node) in clickable and node.getState().contains(pyatspi.STATE_SHOWING)
+        ]
+        missing = keyboard_paths.unregistered(names, keyboard_paths.SQL_EDITOR)
+        assert not missing, "clickable without a registered keyboard path:\n" + "\n".join(missing)
+        line = ui.wait_for_node(name="SELECT 1 AS alpha", role=pyatspi.ROLE_LABEL)
+        extents = line.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
+        def main_menu_showing():
+            menu = ui.find_node(name="Main menu", role=pyatspi.ROLE_MENU)
+            return menu is not None and menu.getState().contains(pyatspi.STATE_SHOWING)
+
+        assert not main_menu_showing(), "the main menu was already open"
+        ui.press_x11_key("F10")
+        deadline = time.monotonic() + 5
+        while not main_menu_showing():
+            assert time.monotonic() < deadline, f"F10 did not open the main menu:\n{ui.accessible_snapshot()}"
+            time.sleep(0.1)
+        ui.press_x11_key("Escape")
 
     def alt_arrows_jump_between_statements(database, base):
         sql = "select 1;\nselect 2;\nselect 3"
@@ -1544,6 +1582,14 @@ GLib.MainLoop().run()
         assert owner.poll() is None, owner.stderr.read().decode()
         return owner
 
+    def reopen_cell_menu(cell_text):
+        # A click that lands while the previous popover is still closing is swallowed on slower stacks.
+        for _ in range(3):
+            open_cell_menu(cell_text)
+            if ui.find_node(role=pyatspi.ROLE_MENU) is not None:
+                return
+            time.sleep(0.5)
+
     def invoke_menu_item(position):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
@@ -1564,6 +1610,34 @@ GLib.MainLoop().run()
         unpin = ui.wait_for_node_containing("Unpin results", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(unpin)
         wait_until(lambda: not pinned(), "unpinning did not drop the pinned results")
+
+    def local_filter_narrows_a_pinned_result_and_a_second_result_set(_database, _base):
+        ui.run_sql(
+            "SELECT 'apple' AS fruit UNION ALL SELECT 'pear' UNION ALL SELECT 'apple';\n"
+            "SELECT 'red' AS colour UNION ALL SELECT 'blue';"
+        )
+        wait_until(lambda: len(page_tab_names()) >= 2, "two result sets did not appear")
+        ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+        filter_by_this_value = 3
+        open_cell_menu("pear")
+        invoke_menu_item(filter_by_this_value)
+        ui.wait_for_node_containing("Showing 1 of 3 loaded rows", role=pyatspi.ROLE_LABEL)
+        ui.wait_for_node(name="apple", role=pyatspi.ROLE_LABEL, present=False)
+        export_visible, export_all_loaded = 6, 7
+        for item, rows in ((export_visible, "1 loaded rows / current page"), (export_all_loaded, "3 loaded rows / current page")):
+            reopen_cell_menu("pear")
+            invoke_menu_item(item)
+            ui.wait_for_node_containing(rows, role=pyatspi.ROLE_LABEL)
+            ui.press_x11_key("Escape")
+            ui.wait_for_node_containing(rows, role=pyatspi.ROLE_LABEL, present=False)
+        second = next(
+            node for node in ui.descendants(ui.application_node())
+            if ui.node_role(node) == pyatspi.ROLE_PAGE_TAB and ui.node_name(node).startswith("2 · ")
+        )
+        ui.invoke(second)
+        reopen_cell_menu("blue")
+        invoke_menu_item(filter_by_this_value)
+        ui.wait_for_node_containing("Showing 1 of 2 loaded rows", role=pyatspi.ROLE_LABEL)
 
     def filter_by_this_value_narrows_the_browse_rows(database, _base):
         import sqlite3
@@ -1662,17 +1736,20 @@ GLib.MainLoop().run()
         connect_dialog_cancel_stops_a_hanging_connection,
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
+        switching_connection_asks_before_rolling_back_an_open_session_transaction,
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
         wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells,
         narrow_window_keeps_main_and_editor_toolbar_actions_reachable,
         connection_colour_chooser_has_an_accessible_button,
+        sql_editor_clickables_all_have_a_keyboard_path,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
         query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace,
         find_in_loaded_rows_lists_matches_and_selects_one,
         pinned_results_stay_ahead_of_the_next_run,
+        local_filter_narrows_a_pinned_result_and_a_second_result_set,
         filter_by_this_value_narrows_the_browse_rows,
         selection_statistics_summarise_the_selected_rows,
         paste_past_the_loaded_rows_changes_nothing,
