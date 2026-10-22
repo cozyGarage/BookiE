@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- Choosing a kind in the Catalog dialog no longer resizes its dropdown and shifts the schema search field.
 - Closing SQL editors releases their retained query text and search state.
 - SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
 
