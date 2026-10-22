@@ -12,6 +12,8 @@
 
 ### Fixed
 
+- Inspecting a row with oversized cell previews avoids copying the full row contents.
+
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - Discarding changes to a SQL file closes its tab without reopening the same save prompt.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
