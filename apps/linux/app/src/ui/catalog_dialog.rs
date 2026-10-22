@@ -88,28 +88,16 @@ pub fn present(
 fn steady_width_dropdown(labels: &[String]) -> gtk::DropDown {
     let label_refs: Vec<&str> = labels.iter().map(String::as_str).collect();
     let dropdown = gtk::DropDown::from_strings(&label_refs);
-    let widest = labels.iter().map(|label| label.chars().count()).max().unwrap_or(0);
-    let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(move |_, item| {
-        if let Some(item) = item.downcast_ref::<gtk::ListItem>() {
-            item.set_child(Some(
-                &gtk::Label::builder().xalign(0.0).width_chars(widest as i32).build(),
-            ));
-        }
+    let labels = labels.to_vec();
+    dropdown.connect_realize(move |dropdown| {
+        let text_width = |text: &str| dropdown.create_pango_layout(Some(text)).pixel_size().0;
+        let selected = labels
+            .get(dropdown.selected() as usize)
+            .map_or(0, |label| text_width(label));
+        let widest = labels.iter().map(|label| text_width(label)).max().unwrap_or(0);
+        let natural = dropdown.measure(gtk::Orientation::Horizontal, -1).1;
+        dropdown.set_width_request(natural - selected + widest);
     });
-    factory.connect_bind(|_, item| {
-        let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        let text = item
-            .item()
-            .and_downcast::<gtk::StringObject>()
-            .map(|object| object.string());
-        if let (Some(label), Some(text)) = (item.child().and_downcast::<gtk::Label>(), text) {
-            label.set_label(&text);
-        }
-    });
-    dropdown.set_factory(Some(&factory));
     dropdown
 }
 
@@ -257,12 +245,6 @@ mod tests {
     fn choosing_a_longer_kind_does_not_change_the_dropdown_width() {
         gtk::init().unwrap();
         let labels: Vec<String> = CatalogObjectKind::ALL.iter().map(|kind| kind_label(*kind)).collect();
-        let longest = (0..labels.len())
-            .max_by_key(|&index| labels[index].chars().count())
-            .unwrap();
-        let shortest = (0..labels.len())
-            .min_by_key(|&index| labels[index].chars().count())
-            .unwrap();
         let dropdown = steady_width_dropdown(&labels);
         let window = gtk::Window::builder().child(&dropdown).build();
         window.present();
@@ -271,7 +253,8 @@ mod tests {
             while gtk::glib::MainContext::default().iteration(false) {}
             dropdown.measure(gtk::Orientation::Horizontal, -1).1
         };
-        assert_eq!(natural_width(shortest), natural_width(longest), "{labels:?}");
+        let widths: Vec<i32> = (0..labels.len()).map(natural_width).collect();
+        assert!(widths.iter().all(|width| *width == widths[0]), "{labels:?} {widths:?}");
         window.close();
     }
 
