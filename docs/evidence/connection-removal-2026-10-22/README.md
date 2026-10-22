@@ -16,7 +16,7 @@ The shared row now emits the deletion request directly. Both welcome and workspa
 
 - Connected-workspace installed regression passed: cancel preserves records, confirmation removes only the selected record, and the database file is unchanged.
 - Welcome-list installed regression passed with the same record and database preservation assertions.
-- Full local validation is pending.
+- Full local preflight and application all-target Clippy passed.
 - Secret Service credential deletion is not independently verified by the SQLite fixture. The existing storage and application deletion paths remain unchanged.
 - Native Wayland and Forgejo acceptance are pending.
 
