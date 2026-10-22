@@ -1,6 +1,11 @@
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 
+pub(crate) fn text_to_run(buffer: &gtk::TextBuffer) -> String {
+    let (start, end) = buffer.selection_bounds().unwrap_or_else(|| buffer.bounds());
+    buffer.text(&start, &end, true).to_string()
+}
+
 pub(crate) fn toggle_line_comment(buffer: &gtk::TextBuffer) {
     let (sel_start, sel_end) = buffer.selection_bounds().unwrap_or_else(|| {
         let i = buffer.iter_at_mark(&buffer.get_insert());
@@ -102,6 +107,17 @@ pub(super) fn export_name_for_query(query: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn run_uses_the_selection_when_there_is_one_and_the_whole_buffer_otherwise() {
+        gtk::init().unwrap();
+        let buffer = gtk::TextBuffer::new(None);
+        buffer.set_text("SELECT 1;\nSELECT 2;");
+        assert_eq!(text_to_run(&buffer), "SELECT 1;\nSELECT 2;");
+        buffer.select_range(&buffer.iter_at_line(1).unwrap(), &buffer.end_iter());
+        assert_eq!(text_to_run(&buffer), "SELECT 2;");
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]

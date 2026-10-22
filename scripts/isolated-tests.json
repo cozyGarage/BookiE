@@ -670,6 +670,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::sql_text::tests::run_uses_the_selection_when_there_is_one_and_the_whole_buffer_otherwise"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::completion_provider::tests::completion_resumes_after_a_large_buffer_is_replaced_with_a_small_query"
     ],
     [
