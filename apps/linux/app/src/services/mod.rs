@@ -22,6 +22,7 @@ pub mod query_parameters;
 pub mod quick_switcher;
 pub mod sidebar_tree;
 pub mod single_instance;
+pub mod ui_stall;
 
 pub mod window_registry;
 pub mod window_state;
