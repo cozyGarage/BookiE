@@ -4,6 +4,8 @@
 
 ### Added
 
+- The Columns dialog has a Reset button that forgets the column widths you set by dragging for that table.
+- The Session button shows how long its transaction has been open ("Session · transaction open · 12 min") once it passes a minute, so a forgotten transaction holding locks stands out.
 - F10 opens the main menu, as in other GNOME applications.
 - **Audit Log** in the main menu lists the operations recorded in the local audit journal, newest first: connection, who ran it, kind, outcome, rows and duration, with the operation id, policy rule, stored statement text and error on expand. A filter matches operation id, connection, outcome or statement. It verifies the journal chain before showing anything and reports a broken or unavailable journal instead of a partial list. It shows only what the journal stored; statement text is the redacted form. A failed statement's panel has **View in Audit Log**, which opens it with the newest operation, usually the failure, at the top.
 - A Preview SQL button in the unsaved-changes bar of a table tab shows the statements and values Save would run, without running them.
@@ -24,6 +26,8 @@
 ### Fixed
 
 - Copying rows and pasting them back into the grid keeps NULL, empty text and text such as `\N` unchanged. Previously empty text pasted as `""`, and a cell holding `\N` could swap with a NULL.
+- Table browsing identifies when the result byte limit cuts a page short.
+- The main window has a minimum size, which stops repeated libadwaita warnings on older libadwaita releases.
 - Choosing a kind in the Catalog dialog no longer resizes its dropdown and shifts the schema search field.
 - SQL completion popups remain usable when suggestions disappear and return, instead of triggering a GTK critical or showing a blank popup.
 - Spaces pasted around a connection's host or database name are removed before connecting; file paths are kept as typed.
