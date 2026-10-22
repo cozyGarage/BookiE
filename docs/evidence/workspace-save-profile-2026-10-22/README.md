@@ -1,0 +1,21 @@
+# Workspace draft save profiling, 2026-10-22
+
+Tracks [#1341](https://github.com/cozyGarage/BookiE/issues/1341).
+
+## Source trace
+
+On Linux `6caa27f18`, each writer attempt calls `load_locked`, which loads the workspace metadata and every referenced editor draft before applying pending connection updates. The save wrapper clones the combined workspace, and the disk writer clones it again before clearing query bodies from the metadata snapshot. The GTK snapshot builder also clones each open editor query before handing it to the store. The writer itself runs on a background thread.
+
+These are verified source operations, not measured peak memory or a demonstrated cause of the native editor freeze. A comparison must separate retained workspace cache, caller-held text, transient copies and allocator retention.
+
+## Prepared workload
+
+`repeated_large_draft_saves_preserve_other_connections_and_unicode_text` uses temporary storage, four connections and 65,536 repetitions of a Unicode SQL line per connection. It flushes the initial state, then updates and flushes the first connection three times. A fresh store must restore the latest first draft and the exact original text of the other three connections.
+
+This test pins existing behavior. It is not a failing performance regression or a timing assertion. Execution and allocation measurements are pending while the separate resource train uses the shared build target.
+
+## Next measurement
+
+Build the workload once, then run the exact test binary under Heaptrack without concurrent local compilation. Record source and binary hashes, peak heap and stacks attributable to workspace load/save. Compare a single connection with four connections through the same save/flush path. Confirm all observable restoration assertions before accepting measurements. Keep filesystem/cache effects separate from heap allocation evidence.
+
+Any optimization must preserve migration backup, exact Unicode drafts, write ordering, failed-write recovery, flush acknowledgements and external changes. No product code has been changed for this profiling preparation.
