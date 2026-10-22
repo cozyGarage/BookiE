@@ -11,10 +11,7 @@ pub(super) fn reveal_sidebar(split_view: &adw::OverlaySplitView, generation: &st
     reveal_with(split_view, generation, |split_view| split_view.set_show_sidebar(true));
 }
 
-pub(super) fn reveal_sidebar_unless_overlay(
-    split_view: &adw::OverlaySplitView,
-    generation: &std::rc::Rc<std::cell::Cell<u32>>,
-) {
+fn reveal_sidebar_unless_overlay(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
     reveal_with(split_view, generation, show_unless_overlay);
 }
 
@@ -57,6 +54,11 @@ pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std:
 }
 
 impl App {
+    pub(super) fn show_sidebar_for_new_connection(&self) {
+        self.set_sidebar_connected(true);
+        reveal_sidebar_unless_overlay(&self.split_view, &self.sidebar_reveal);
+    }
+
     pub(super) fn set_sidebar_connected(&self, connected: bool) {
         sidebar_follows_connection(&self.split_view, &self.sidebar_toggle, connected);
     }

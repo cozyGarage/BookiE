@@ -104,8 +104,7 @@ impl App {
         self.read_only = self.window_metadata().map(|m| m.read_only).unwrap_or(false);
         self.read_only_badge.set_visible(self.read_only);
         self.show_database_switcher(&driver_id, id, &sender);
-        self.set_sidebar_connected(true);
-        super::sidebar_state::reveal_sidebar_unless_overlay(&self.split_view, &self.sidebar_reveal);
+        self.show_sidebar_for_new_connection();
         self.disconnect_action.set_enabled(true);
         self.table_search.set_text("");
         // Build the unified workspace tab tree (Browse + Editor share one
