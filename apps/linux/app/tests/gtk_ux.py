@@ -1546,6 +1546,13 @@ GLib.MainLoop().run()
         invoke_menu_item(filter_by_this_value)
         ui.wait_for_node_containing("Showing 1 of 3 loaded rows", role=pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="apple", role=pyatspi.ROLE_LABEL, present=False)
+        export_visible, export_all_loaded = 6, 7
+        for item, rows in ((export_visible, "1 loaded rows / current page"), (export_all_loaded, "3 loaded rows / current page")):
+            open_cell_menu("pear")
+            invoke_menu_item(item)
+            ui.wait_for_node_containing(rows, role=pyatspi.ROLE_LABEL)
+            ui.press_x11_key("Escape")
+            ui.wait_for_node_containing(rows, role=pyatspi.ROLE_LABEL, present=False)
         second = next(
             node for node in ui.descendants(ui.application_node())
             if ui.node_role(node) == pyatspi.ROLE_PAGE_TAB and ui.node_name(node).startswith("2 · ")

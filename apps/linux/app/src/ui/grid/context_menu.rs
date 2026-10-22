@@ -360,6 +360,19 @@ pub(super) fn install_grid_context_menus(
             })
             .build()
     };
+    let export_loaded_action = {
+        let sender = sender.clone();
+        let local_result_view = options.local_result_view.clone();
+        gio::ActionEntry::builder("export-loaded")
+            .activate(move |_, _, _| {
+                if let Some(view) = &local_result_view {
+                    sender
+                        .send(GridMsg::ExportResults(view.loaded_result().as_ref().clone()))
+                        .ok();
+                }
+            })
+            .build()
+    };
     let filter_action = filter_by_value_action(
         context.clone(),
         sender.clone(),
@@ -404,6 +417,7 @@ pub(super) fn install_grid_context_menus(
         view_value_action,
         show_row_json_action,
         export_action,
+        export_loaded_action,
         copy_row_action,
         copy_row_update_action,
         copy_row_delete_action,
@@ -527,6 +541,9 @@ fn build_menu(
         crate::tr!("Export Results…")
     };
     actions.append(Some(&export_label), Some("cell.export"));
+    if local_result {
+        actions.append(Some(&crate::tr!("Export All Loaded Rows…")), Some("cell.export-loaded"));
+    }
     actions.append(Some(&crate::tr!("Columns…")), Some("grid.columns"));
     actions.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
     actions.append(Some(&crate::tr!("Find in Loaded Rows…")), Some("grid.find-row"));
@@ -959,6 +976,23 @@ mod tests {
         let menu = build_menu(true, false, true, true, false);
         let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
         assert_eq!(actions.n_items(), 4);
+    }
+
+    #[test]
+    fn a_local_result_menu_offers_visible_and_all_loaded_row_exports() {
+        let export_targets = |local_result| {
+            let menu = build_menu(false, false, true, false, local_result);
+            let actions = menu
+                .item_link(menu.n_items() - 1, gio::MENU_LINK_SECTION)
+                .expect("actions section");
+            (0..actions.n_items())
+                .filter_map(|index| actions.item_attribute_value(index, "action", None))
+                .filter_map(|value| value.get::<String>())
+                .filter(|action| action.starts_with("cell.export"))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(export_targets(true), ["cell.export", "cell.export-loaded"]);
+        assert_eq!(export_targets(false), ["cell.export"]);
     }
 
     #[test]
