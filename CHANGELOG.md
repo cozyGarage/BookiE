@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- The main window has a minimum size, which stops repeated libadwaita warnings on older libadwaita releases.
 - Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.
 - Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout.
 - A schema change stops the SQL-completion column lookups still running from before it.
