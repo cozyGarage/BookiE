@@ -6,6 +6,8 @@ The 0.2.0 desktop target is **Arch Linux / Omarchy / Hyprland, native Wayland**.
 
 The source-matched installed GTK safety run passed 93 scenarios under Xvfb/AT-SPI on 2026-10-21; see its [package identity, result and limitations](evidence/installed-gtk-0.2.0-2026-10-21/README.md). It does not close the native Wayland visual checklist below.
 
+The ongoing native Wayland run on 2026-10-22 records package identity, synthetic PostgreSQL value checks, responsive widths, About and Preferences observations, isolated installed-binary GTK scenarios for restart, MySQL, MongoDB, ClickHouse and PostgreSQL, resource samples, and one GTK/GLib abort in [its evidence note](evidence/installed-wayland-0.2.0-2026-10-22/README.md). System appearance restoration and test-profile cleanup were verified; the remaining checklist items are still open unless a dated result is recorded beside them.
+
 Record the full binary/package SHA, package checksum when installed, GTK backend, OS/Hyprland/GTK/libadwaita versions, display scale, light/dark mode, result and screenshot paths. Test both normal size and a narrow/resized window, keyboard focus, clipboard and popover/dialog placement. Mark blocked and not-run items explicitly.
 
 Take light and dark screenshots for each section, per `AGENTS.md`. Record a result beside each item rather than leaving it blank, because a blank line here reads as "passed" to the next person.
@@ -47,7 +49,7 @@ The published AppImage ran under **XWayland**, not native Wayland: the GTK plugi
 
 - [ ] Welcome screen and connection list render. **2026-10-21 Hyprland native Wayland, light and dark:** passed. The two text lines of a connection row sit very close together.
 - [ ] Tab order on the welcome screen reaches every control and shows focus. **2026-10-21 Hyprland dark and light:** passed. Order: header buttons, filter, export, add, the connection row, then the row's buttons.
-- [ ] A saved connection opens and the header shows the server version. **2026-10-21 Hyprland dark:** passed (`UX test shop · Local · PostgreSQL 16.15`). The first connect showed a system keyring prompt to create a keyring; that came from the isolated message bus, not from the app.
+- [ ] A saved connection opens and the header shows the server version. **2026-10-21 Hyprland dark:** passed (`UX test shop · Local · PostgreSQL 16.15`). The first connect showed a system keyring prompt to create a keyring; that came from the isolated message bus, not from the app. **2026-10-22 installed 0.2.0 native Wayland, SQL Server:** the saved read-only profile connected to the disposable fixture and opened `dbo.people` with both expected rows. The header showed `tablepro_ro@127.0.0.1 · Local · SQL Server` without a server version, so the version part remains unverified for SQL Server. The original fixture was stopped; see [the installed Wayland evidence](evidence/installed-wayland-0.2.0-2026-10-22/README.md).
 - [ ] Grid distinguishes NULL, empty text and Boolean states; multiline and long values. **2026-10-21 Hyprland dark:** passed. NULL shows `<NULL>`, empty text is blank, Boolean shows checked, unchecked and a dash for NULL, multiline text wraps and grows the row, long text is cut with an ellipsis, the primary key column carries a key icon. Light theme, edited, inserted, deleted and failed cell states were not run.
 - [ ] Filter bar opens with Ctrl+F. **2026-10-21 Hyprland dark:** inconclusive. Nothing appeared, but keyboard focus may not have been in the grid.
 - [ ] SQL editor opens, highlights SQL and runs a statement. **2026-10-21 Hyprland dark:** editor opened and highlighted correctly; a run that the policy could not parse asked for approval, and Deny produced "Statement 1 failed" with a Copy error button. A successful run and its result pane were not seen: part of the typed text was lost to a focus problem in the test input (see below), so the statement was truncated.
@@ -67,7 +69,7 @@ Defects found. Screenshots are kept by the tester, not in the repository.
 
 Open a result, then Export Results.
 
-- [ ] The Format list offers CSV, JSON, Markdown, HTML, XML, SQL and Excel. **2026-10-12 Hyprland dark:** passed.
+- [ ] The Format list offers CSV, JSON, Markdown, HTML, XML, SQL and Excel. **2026-10-12 Hyprland dark:** passed. **2026-10-22 native Wayland, editor query result:** CSV, JSON, Markdown, HTML, XML and SQL were present; Excel was absent. This export was "All rows from a fresh guarded run of this query" with no known total. The current export implementation filters Excel for an unknown total, so this observation does not establish a defect or verify Excel availability for a browse table with a known total.
 - [ ] SQL is absent for a MongoDB or Redis connection, present for the others.
 - [ ] The CSV options group shows for CSV and hides for every other format. **2026-10-12 Hyprland dark:** passed for CSV and SQL only.
 - [ ] A SQL options group with an editable Table name shows only for SQL. **2026-10-12 Hyprland dark:** passed.
@@ -157,7 +159,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Editor and history
 
-- [ ] At 847 px and 802 px window widths, the navigation sidebar collapses and the main menu, editor Split action and window close control remain visible and usable. At an editor-pane width of 900 px or less, Fold block and Unfold all hide from the toolbar; Ctrl+Shift+[ and Ctrl+Shift+] still fold and unfold SQL blocks. The automated Xvfb scenario checks the main menu, Split and close-control bounds, not the folding controls. Ubuntu floor coverage passed in [#824](https://github.com/cozyGarage/BookiE/pull/824); no native Hyprland result is recorded here. The original report is [#657](https://github.com/cozyGarage/BookiE/issues/657).
+- [ ] At 847 px and 802 px window widths, the navigation sidebar collapses and the main menu, editor Split action and window close control remain visible and usable. At an editor-pane width of 900 px or less, Fold block and Unfold all hide from the toolbar; Ctrl+Shift+[ and Ctrl+Shift+] still fold and unfold SQL blocks. The automated Xvfb scenario checks the main menu, Split and close-control bounds, not the folding controls. Ubuntu floor coverage passed in [#824](https://github.com/cozyGarage/BookiE/pull/824); the original report is [#657](https://github.com/cozyGarage/BookiE/issues/657). **2026-10-22 native Wayland:** screenshots at 922 px (sidebar open) and 802 px (sidebar collapsed) show Run and Split visible without literal overlap; controls were not activated. The repeated Xvfb warning about a 964 px editor toolbar minimum in 910 px has no confirmed visual clipping; see [installed evidence](evidence/installed-wayland-0.2.0-2026-10-22/README.md). Native activation and the 900–964 px range remain untested.
 
 - [ ] Toggle **Split** on and off with the mouse and keyboard; edit the query from either pane, confirm both views update, and check that each pane keeps its scroll position at a narrow window width. **2026-10-12 Hyprland dark:** mouse toggle and shared buffer passed; keyboard and narrow width not run. The orphaned-tab abort was fixed by [#667](https://github.com/cozyGarage/BookiE/pull/667); repeat the installed flow.
 - [ ] Ctrl+O opens a `.sql` file into a new tab titled with the file name. **2026-10-12 Hyprland dark:** passed.
@@ -168,6 +170,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Closing a tab with unsaved file changes asks Save/Discard/Cancel, and Save closes it only after the file is written. **2026-10-12 Hyprland dark:** the prompt passed; Save wrote the file but the tab stayed open. Fixed by [#667](https://github.com/cozyGarage/BookiE/pull/667); no installed retest is recorded here.
 - [ ] Saving a file that is a symlink updates its target and keeps the link.
 - [ ] Restart with a file tab open: the tab is titled by the file again, unsaved edits still show `•`, and Ctrl+S saves to the same file.
+- [x] Restart with a saved connection, an active editor draft, a kept table tab and a preview table tab: restore the connection, draft and kept tab, omit the preview tab, and do not execute the draft until Run. **2026-10-22 installed 0.2.0 binary, isolated Xvfb/AT-SPI:** passed 1/1; the draft then ran against the restored connection. See [installed Wayland and package evidence](evidence/installed-wayland-0.2.0-2026-10-22/README.md). Native Wayland repeat remains untested.
 - [ ] Delete that file, then restart: the tab keeps its text and a toast says it is no longer linked.
 - [ ] Ctrl+S on a browse or structure tab still saves pending edits there.
 - [ ] A `.sql` file above the size limit is refused with an explanation, not truncated.
@@ -213,7 +216,7 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 
 - [ ] Stop appears only where server cancellation is supported; stopping a session query records the terminal outcome and permits later supported queries.
 - [ ] A session timeout reports its actual cancelled/unknown state in the UI and audit; it does not present an ambiguous write as safely undone.
-- [ ] Failed COMMIT after an aborted PostgreSQL transaction shows rollback; a deferred-constraint failure clears the transaction-open state and retry does not fabricate a second commit.
+- [ ] Failed COMMIT after an aborted PostgreSQL transaction shows rollback; a deferred-constraint failure clears the transaction-open state and retry does not fabricate a second commit. **2026-10-22 installed binary in Xvfb/AT-SPI:** the aborted transaction rolled back with zero rows; rolling back to a savepoint and committing stored exactly one row. Deferred-constraint behavior was not covered.
 - [ ] Window close and Disconnect with an open transaction ask first, honor Cancel, and finish the chosen rollback/commit before teardown; verify persisted rows.
 - [ ] With an editor Session open, stop the database host (or block its port) and close the window. After the cleanup timeout, **Could not close database sessions** offers **Keep Open** (default) and **Close Anyway**; Close Anyway closes the window, Keep Open leaves it usable.
 - [ ] A retired session turns its toggle off; late state messages cannot relabel a replacement session. Automatic reconnect retires the previous tab sessions.
@@ -231,9 +234,9 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 
 ## ENUM and SET pickers (PostgreSQL, MySQL and MariaDB)
 
-- [ ] Double-click an ENUM cell: a list of the declared members opens with the current one highlighted; choosing another shows a pending change and Save writes that member. **2026-10-12 Hyprland dark:** passed on PostgreSQL; the keyboard highlight starts on the first member, [#660](https://github.com/cozyGarage/BookiE/issues/660).
+- [ ] Double-click an ENUM cell: a list of the declared members opens with the current one highlighted; choosing another shows a pending change and Save writes that member. **2026-10-12 Hyprland dark:** passed on PostgreSQL; the keyboard highlight starts on the first member, [#660](https://github.com/cozyGarage/BookiE/issues/660). **2026-10-22 installed binary in Xvfb/AT-SPI, MySQL 8.0:** selected `done` from `ready`, observed a pending edit, saved it, and verified the server value; the rest of the fixture, including SQL NULL and empty values, remained unchanged. Initial highlight behavior was not asserted.
 - [ ] Choose the (empty) member of an ENUM that declares one: the cell shows empty and the stored value is the empty string, not NULL.
-- [ ] Double-click a SET cell: each member has a check; toggling and pressing Apply writes the members in declared order; with none checked the stored value is the empty set, not NULL. **2026-10-12 Hyprland dark:** declared order passed on MariaDB (`red,green,blue`); the empty set not run. That run found the popover clipped its labels; the current popover behavior has not been retested. This was also reported in [#657](https://github.com/cozyGarage/BookiE/issues/657), which is closed after the editor-toolbar fix.
+- [ ] Double-click a SET cell: each member has a check; toggling and pressing Apply writes the members in declared order; with none checked the stored value is the empty set, not NULL. **2026-10-12 Hyprland dark:** declared order passed on MariaDB (`red,green,blue`); the empty set not run. That run found the popover clipped its labels; the current popover behavior has not been retested. This was also reported in [#657](https://github.com/cozyGarage/BookiE/issues/657), which is closed after the editor-toolbar fix. **2026-10-22 installed binary in Xvfb/AT-SPI, MySQL 8.0:** changed `read` to `read,write`, applied and verified declared order; existing SQL NULL and empty-set rows remained intact. Clearing all members to actively write the empty set was not tested.
 - [ ] Set to NULL from the cell menu still works on a nullable ENUM or SET.
 - [ ] On PostgreSQL, an enum column offers its labels in declared order; a column of an enum array type still opens the text editor.
 
@@ -335,24 +338,24 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 
 ## Preferences, About and application icons
 
-- [ ] Open Preferences and confirm the page navigation separates General, Appearance, Editor and MCP.
-- [ ] Change Appearance between System, Light and Dark; confirm the active application style changes and the choice survives a restart.
+- [x] Open Preferences and confirm the page navigation separates General, Appearance, Editor and MCP. **2026-10-22 native Wayland, dark:** all four page tabs rendered and were keyboard reachable. General showed Data browser and Query history groups; Editor showed font family and Vim keys; MCP showed client name, scope and Issue token controls. No MCP token was issued. Preference value persistence outside the Appearance check remains untested.
+- [ ] Change Appearance between System, Light and Dark; confirm the active application style changes and the choice survives a restart. **2026-10-22 native Wayland, dark:** System was read back as the selected mode after a Light comparison and restored to System. Dark selection and persistence across app restart were not tested.
 - [ ] Confirm the Data browser, Query history and SQL editor controls retain their current values and live-save behavior.
-- [ ] Open About and confirm project credits and third-party attribution are presented separately, and the copyright attribution remains visible.
+- [x] Open About and confirm project credits and third-party attribution are presented separately, and the copyright attribution remains visible. **2026-10-22 native Wayland, dark:** Details showed BookiE contributors and version 0.2.0; Credits lists BookiE contributors separately from "TablePro Authors (upstream project)"; Legal displays `© 2025–2026 TablePro Authors` and a GNU AGPL version 3 or later link. Screenshots: `/tmp/bookie-about-details.png`, `/tmp/bookie-about-credits.png`, `/tmp/bookie-about-legal.png`.
 - [ ] Check the BookiE launcher icon at small and large sizes in the application menu and task switcher; confirm the same artwork is used by the installed package.
 
 ## SQL code folding
 
-- [ ] Place the cursor inside a multiline CASE block and press Ctrl+Shift+[. The block body folds and its opening and closing lines remain visible.
-- [ ] Click the fold marker in the gutter. The body returns without changing the query text.
-- [ ] Fold two blocks, then use Unfold all and Ctrl+Shift+]. Both show the complete query.
-- [ ] Edit the query while a block is folded. The editor reveals the full query and clears stale fold markers.
+- [x] Place the cursor inside a multiline CASE block and press Ctrl+Shift+[. The block body folds and its opening and closing lines remain visible. **2026-10-22 native Wayland, dark:** passed on the installed 0.2.0 binary; the CASE body hid while `SELECT CASE` and `END AS case_value` remained visible, and the accessible query text was unchanged. Screenshot: `/tmp/bookie-folded.png`.
+- [ ] Click the fold marker in the gutter. The body returns without changing the query text. **Not verified 2026-10-22:** AT-SPI pointer injection did not activate the marker; the available native pointer tool requires system authentication to install.
+- [x] Fold two blocks, then use Unfold all and Ctrl+Shift+]. Both show the complete query. **2026-10-22 native Wayland, dark:** two CASE blocks folded independently; Unfold all restored both, and Ctrl+Shift+] restored the single-block case. The sentinel statement remained unchanged.
+- [x] Edit the query while a block is folded. The editor reveals the full query and clears stale fold markers. **2026-10-22 native Wayland, dark:** typing `s` at the end of the folded `'one'` literal changed it to `'ones'` and revealed the full CASE body. The test query was not run or saved. Screenshot: `/tmp/bookie-edit-unfolded.png`.
 
 ## Pinned results and gutter marks
 
 - [ ] Run `SELECT 1 AS first;`, then run `SELECT pg_sleep(3), 2 AS second;`: while it runs, the first result stays on screen, dimmed, with Running… and the spinner in the toolbar; when it finishes the dimming is gone and the second result is shown. Repeat with a query that fails, with Cancel, and with a statement that times out: each replaces the dimmed result. A streamed PostgreSQL SELECT keeps the previous result until its first page arrives.
 
-- [ ] On SQL Server, run `EXEC sys.sp_executesql N'SELECT 1 AS first_result; SELECT 2 AS second_result;'` as one query. Confirm the result-set selector shows both sets in source order and each displays its own column and value.
+- [x] On SQL Server, run `EXEC sys.sp_executesql N'SELECT 1 AS first_result; SELECT 2 AS second_result;'` as one query. Confirm the result-set selector shows both sets in source order and each displays its own column and value. **2026-10-22 installed 0.2.0 native Wayland:** passed. The selector listed Result set 1 then Result set 2; selecting each displayed its matching column/value (`first_result = 1`, `second_result = 2`). The `EXEC` batch prompted for approval before running; approved once. App status reported 17 ms. See [the installed Wayland evidence](evidence/installed-wayland-0.2.0-2026-10-22/README.md).
 - [ ] Run `SELECT 1 AS one; SELECT 2 AS two;`, pin both results, then run `SELECT 3 AS three;` and `SELECT 4 AS four; SELECT * FROM missing_table;`: pinned results stay first and the failed second statement is labelled **Statement 2**, not Statement 4. Unpin removes the pinned results. **2026-10-12 historical run:** pin ordering passed, but failure numbering after pinning was not checked; fixed by [#785](https://github.com/cozyGarage/BookiE/pull/785). The installed GTK scenario `pinned_results_stay_ahead_of_the_next_run` covers the failure; no installed Wayland retest is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
 - [ ] After running a script, each statement's first line shows a tick or, for a failed statement, a cross in the gutter, in light and dark. Edit the script and run it again: the marks follow the new run. **2026-10-12 Hyprland dark:** dark theme passed.
 - [ ] PostgreSQL: pin a result, then run a long streamed SELECT and press Stop (or let it time out): the pinned result stays above the Cancelled or Timed out page, and Pin is unavailable while the stream is still loading.
