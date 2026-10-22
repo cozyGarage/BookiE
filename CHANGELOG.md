@@ -13,7 +13,7 @@
 
 ### Fixed
 
-- Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout. A schema change now also stops the SQL-completion column lookups still running from before it, and the database switcher's list ignores a slow answer from the session before a database switch.
+- Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout. A schema change now also stops the SQL-completion column lookups still running from before it, the database switcher's list ignores a slow answer from the session before a database switch, and a cancelled Structure tab load no longer replaces the newer one.
 - Closing a result grid releases its selection and row inspector.
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.

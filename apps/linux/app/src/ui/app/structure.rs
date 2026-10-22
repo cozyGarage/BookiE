@@ -872,6 +872,9 @@ impl App {
                             return;
                         }
                     };
+                    if control.cancellation_token().is_cancelled() {
+                        return;
+                    }
                     sender_for_cmd.input(AppMsg::StructureDataLoaded {
                         tab_id,
                         columns,
