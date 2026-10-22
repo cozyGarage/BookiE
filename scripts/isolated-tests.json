@@ -710,6 +710,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::dispatch_tests::editor_actions_fit_narrow_rows_with_running_and_retry_controls"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::dropping_an_editor_releases_its_source_view_and_buffer"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::dispatch_tests::commenting_selected_lines_publishes_one_complete_query_change"
     ],
     [

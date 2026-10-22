@@ -9,3 +9,10 @@ The candidate tracks user-action nesting. Buffer changes still invalidate the ge
 The initial 100-line regression passed after the change: one final output, exact commented Unicode text, and one Undo restoring the original. The nested-action, no-op and ordinary-edit regression also passed: publication waits for the outer action, an empty action publishes nothing, and an ordinary insert publishes immediately. Full preflight and all 713 application unit tests passed. All 105 registered GTK widget tests and application all-target Clippy passed. Forgejo acceptance remains pending. This is a verified reduction in full-query publications, not a measured whole-app CPU improvement or an explanation of the native freeze.
 
 Raw before/after logs are retained under `~/bookie-test/editor-batch-*`. All widget interaction uses isolated Xvfb displays, with no native desktop input.
+
+
+## Combined editor lifetime integration
+
+This branch now integrates PR #1350 before the batching change. The changed handler remains in the batching module, using its signal-provided buffer; completion and Find callbacks retain the weak references from the lifetime fix. Both publication regressions and the controlled editor-release regression pass together. Full preflight, all 718 app unit tests, app all-target Clippy and all 107 registered GTK widget tests pass. The merged test registry retains the toolbar, lifetime and batching cases. Forgejo acceptance remains pending.
+
+This is a stacked input for a subsequent editor-resource train with workspace-save copy reduction (#1343). The large-result grid train (#1351) remains separate. The original profiling in the lifetime evidence identifies its own source and does not certify this combined source.
