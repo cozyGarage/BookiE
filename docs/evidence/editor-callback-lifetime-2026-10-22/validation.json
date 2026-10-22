@@ -14,5 +14,6 @@
   "app_all_target_clippy": "passed",
   "gtk_widget_count": 105,
   "independent_review": "not performed; separate self-review completed",
-  "optimized_comparison": "pending"
+  "optimized_comparison": "ten matched optimized runs passed; see paired-measurements.json; default-input-method RSS benefit unproven",
+  "app_unit_tests_passed": 718
 }
