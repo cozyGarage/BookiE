@@ -201,13 +201,24 @@ fn permissions_label(p: TokenPermissions) -> &'static str {
 }
 
 fn show_issued_token(parent: &impl IsA<gtk::Widget>, plaintext: &str, keyring_saved: bool) {
+    issued_token_dialog(plaintext, keyring_saved).present(Some(parent));
+}
+
+fn issued_token_dialog(plaintext: &str, keyring_saved: bool) -> adw::AlertDialog {
     let alert = adw::AlertDialog::new(
         Some(&tr!("Token issued")),
         Some(&issued_token_message(plaintext, keyring_saved)),
     );
+    alert.add_response("copy", &tr!("Copy Token"));
     alert.add_response("ok", &tr!("Done"));
     alert.set_default_response(Some("ok"));
-    alert.present(Some(parent));
+    let token = plaintext.to_owned();
+    alert.connect_response(Some("copy"), move |_, _| {
+        if let Some(display) = gtk::gdk::Display::default() {
+            display.clipboard().set_text(&token);
+        }
+    });
+    alert
 }
 
 fn issued_token_message(plaintext: &str, keyring_saved: bool) -> String {
@@ -225,4 +236,21 @@ fn issued_token_message(plaintext: &str, keyring_saved: bool) -> String {
         tr!("Endpoint: http://127.0.0.1:17432/mcp"),
         storage_notice,
     )
+}
+
+#[cfg(test)]
+mod copy_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_issued_token_dialog_copies_the_token_to_the_clipboard() {
+        adw::init().unwrap();
+        let dialog = issued_token_dialog("tok-abc-123", true);
+        assert!(dialog.has_response("copy"));
+        dialog.emit_by_name_with_details::<()>("response", gtk::glib::Quark::from_str("copy"), &[&"copy"]);
+        let content = gtk::gdk::Display::default().unwrap().clipboard().content().unwrap();
+        let value = content.value(gtk::glib::Type::STRING).unwrap();
+        assert_eq!(value.get::<String>().unwrap(), "tok-abc-123");
+    }
 }
