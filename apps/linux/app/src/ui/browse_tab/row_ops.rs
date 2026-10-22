@@ -672,7 +672,7 @@ impl BrowseTab {
         }
     }
 
-    pub(super) fn handle_preview_sql(&self) {
+    pub(super) fn handle_preview_sql(&self, sender: &ComponentSender<Self>) {
         let result = crate::services::change_tracker::with_tab_ref(self.tab_id, |t| {
             t.materialize(
                 &self.driver_id,
@@ -681,13 +681,18 @@ impl BrowseTab {
                 &self.current_columns,
             )
         });
-        if let Some(Ok((statements, _))) = result
-            && !statements.is_empty()
-        {
-            super::preview::present(
+        match result {
+            Some(Ok((statements, _))) if !statements.is_empty() => super::preview::present(
                 &self.pending_revealer,
                 &super::preview::preview_text(&self.driver_id, &statements),
-            );
+            ),
+            Some(Err(e)) => {
+                let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
+                    title: crate::tr!("Cannot preview"),
+                    body: format!("{e}"),
+                });
+            }
+            _ => {}
         }
     }
 

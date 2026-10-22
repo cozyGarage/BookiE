@@ -23,8 +23,17 @@ pub(super) fn preview_text(driver_id: &str, statements: &[EditStatement]) -> Str
         .join("\n\n")
 }
 
+const MAX_VALUE_CHARS: usize = 200;
+
 fn value_text(driver_id: &str, value: &Value) -> String {
-    tablepro_core::sql_literal::render_sql_literal(driver_id, value).unwrap_or_else(|_| format!("{value:?}"))
+    let text =
+        tablepro_core::sql_literal::render_sql_literal(driver_id, value).unwrap_or_else(|_| format!("{value:?}"));
+    let total = text.chars().count();
+    if total <= MAX_VALUE_CHARS {
+        return text;
+    }
+    let shown: String = text.chars().take(MAX_VALUE_CHARS).collect();
+    format!("{shown}… ({} more characters)", total - MAX_VALUE_CHARS)
 }
 
 pub(super) fn present(parent: &impl IsA<gtk::Widget>, text: &str) {
@@ -79,5 +88,23 @@ mod tests {
             preview_text("sqlite", &[("DELETE FROM t".into(), Vec::new())]),
             "DELETE FROM t;"
         );
+    }
+
+    #[test]
+    fn a_very_long_value_is_cut_and_says_how_much_is_hidden() {
+        let statements: Vec<EditStatement> = vec![("UPDATE t SET note = ?".into(), vec![Value::Text("x".repeat(500))])];
+        let text = preview_text("sqlite", &statements);
+        assert!(
+            text.contains(&format!("{}…", "x".repeat(MAX_VALUE_CHARS - 1))),
+            "{text}"
+        );
+        assert!(text.ends_with("(302 more characters)"), "{text}");
+        assert!(text.len() < 400, "{}", text.len());
+    }
+
+    #[test]
+    fn a_value_the_driver_cannot_render_as_a_literal_still_appears() {
+        let statements: Vec<EditStatement> = vec![("UPDATE t SET x = ?".into(), vec![Value::Float(f64::NAN)])];
+        assert!(preview_text("sqlite", &statements).contains("1: Float(NaN)"));
     }
 }
