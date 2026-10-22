@@ -18,8 +18,10 @@ Documented application limits, behavior differences and known defects. Entries l
   received-row summary identifies the retained range when earlier rows have
   been discarded; those rows cannot be revisited without running the query
   again. Row ranges are positions in the result, not database row identifiers.
-  That cache is bounded by page and row count, not by cell
-  bytes. A synthetic profile with four pinned results and one active stream
+  That cache also retains at most 64 MiB of estimated row storage, except
+  that the newest page is always kept even if it alone exceeds the budget.
+  Incoming decoding, concurrent snapshots, pins, widgets and allocator retention
+  remain outside this cache estimate. A synthetic profile with four pinned results and one active stream
   reached 1,325 MiB RSS; see the [profile evidence](evidence/stream-retention-synthetic-2026-10-16/README.md).
   This does not measure normal queries or the complete process ceiling. Other
   engines and unsupported statement shapes remain materialized.
@@ -67,7 +69,7 @@ Documented application limits, behavior differences and known defects. Entries l
 - Text and JSON values over the 8 KiB preview threshold can be edited in the full-value dialog up to 1 MiB. Invalid JSON cannot be staged; SQL NULL, empty text, JSON `null`, and text `null` remain separate values. View Value and Copy Value expose the full value. Values over 1 MiB remain read-only.
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
 - No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
-- PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata acceptance remains with #580.
+- PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata acceptance remain with [#580](https://github.com/cozyGarage/BookiE/issues/580), reopened on 2026-10-22.
 - Database snapshots and one-click rollback remain unavailable. ADR 0015 records the design; implementation is post-0.2.0 backlog work tracked by SNAP-2 to SNAP-4 / [#547](https://github.com/cozyGarage/BookiE/issues/547). PostgreSQL logical backup and restore are available through the installed `pg_dump` and `pg_restore` tools; see the [user guide](user-guide.md#back-up-and-restore-postgresql). They are not point-in-time snapshots.
 - Accessibility is not fully verified with Orca, keyboard-only navigation or high contrast (DOC-3). The specific missing-name and action reports in [#658](https://github.com/cozyGarage/BookiE/issues/658) were rechecked and resolved in [#920](https://github.com/cozyGarage/BookiE/pull/920); broader acceptance is tracked under DOC-3.
 
