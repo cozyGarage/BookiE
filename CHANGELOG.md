@@ -14,6 +14,7 @@
 
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
+- Discarding changes to a SQL file closes its tab without reopening the same save prompt.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
 
 ## [0.2.0] - 2026-10-21
