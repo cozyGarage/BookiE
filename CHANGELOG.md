@@ -14,10 +14,14 @@
 - Export reviews the table-page, loaded-result or query-rerun scope before file format; all matching table rows remain unavailable until consistent snapshot export is qualified.
 - Grid headers preserve exact engine type case and keep comments, key and nullability metadata in a native column-details menu.
 
+- Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
 - The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
 
 ### Fixed
 
+- Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
+- Streamed result pages wait until their first display frame before building a grid, avoiding work for discarded pages.
+- SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens or closes it at any window width, and the sidebar returns by itself when the window is widened.
 - Discarding changes to a SQL file closes its tab without reopening the same save prompt.
