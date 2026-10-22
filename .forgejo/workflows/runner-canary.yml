@@ -1,0 +1,31 @@
+name: ubuntu2604-canary
+on: [push]
+concurrency:
+  group: bookie-lab
+  cancel-in-progress: false
+jobs:
+  runner-canary:
+    runs-on: ubuntu2604-canary
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: /usr/local/libexec/bookie-ci-cache run {0}
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/runner-canary
+    steps:
+      - name: Verify isolated runner tools
+        run: |
+          test "$(hostname -s)" = runner-ubuntu2604
+          pkg-config --atleast-version=4.22 gtk4
+          pkg-config --atleast-version=2.88 glib-2.0
+          pkg-config --atleast-version=1.9 libadwaita-1
+          pkg-config --atleast-version=5.18 gtksourceview-5
+          rustup run 1.98.0 rustc --version
+          cargo nextest --version
+          cargo deny --version
+          sccache --version
+          docker info --format '{{.ServerVersion}}'
+          docker compose version
+          dbus-run-session -- xvfb-run -a sh -c 'xdpyinfo >/dev/null'
+          test -w "$CARGO_TARGET_DIR"
+          df -h /var/cache/ci
