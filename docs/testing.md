@@ -89,6 +89,8 @@ The exact driver list and supplementary targets are owned by [`ci-local.sh::run_
 
 To find UI-thread stalls while profiling or testing by hand, set `TABLEPRO_UI_STALL_MS=50` (any positive number of milliseconds). The app then logs a `UI thread stalled` warning with the stall length whenever the GTK main loop is late by at least that long. It is off by default and logs no content. It reports that a stall happened, not its cause; pair it with a profiler.
 
+Every clickable control on the SQL editor screen must have a registered keyboard path in `apps/linux/app/tests/keyboard_paths.py`: a shortcut, a menu entry, a tab stop, or a `gap:` entry naming what is missing. The GTK scenario `sql_editor_clickables_all_have_a_keyboard_path` fails when a new button appears without an entry. Add an entry rather than widening a pattern.
+
 The Forgejo driver matrix sets `TABLEPRO_TEST_RUN_ID` and runs each complete integration binary serially. PostgreSQL, MySQL and MariaDB fixtures reuse one primary server per engine and recreate the `test` database before each test; filtered and exact selectors start their own server. Deliberate restart tests also start a separate server. So a full-suite runtime estimate should count those cases rather than multiply every test by a database startup.
 
 Disposable PostgreSQL fixtures use tmpfs and disable `fsync`, `synchronous_commit` and `full_page_writes`. MySQL and MariaDB use tmpfs and disable transaction-log, doublewrite and binlog syncing; SQL Server uses tmpfs with writable permissions for its non-root service account. Lost-ack, crash and restart cases use durable containers so they still exercise persistent storage. The Docker tests assert the database settings and mounted filesystem.
@@ -202,6 +204,8 @@ bash scripts/test-gtk-safety.sh
 Use `cancelled_workbook_export_preserves_existing_file` for the cancellation case. Record the binary's commit/checksum; a prebuilt binary is not evidence for later Rust edits. Omit `TABLEPRO_GTK_BINARY` to build the current release profile.
 
 Each scenario creates a temporary profile and fixture connection/database. Its `environment` attribute selects the policy environment to exercise, and `audit_available` controls whether the fixture audit journal is present. These tests do not use existing saved connections or a user's production database.
+
+Memory profiles and second-launch checks retain the exact subprocess launched by the fixture. They verify its PID lifetime and executable file identity rather than scanning process names. Second launch reuses the supplied fixture environment; it never reads another process's environment. Profile rows record the owned PID and Linux process start ticks. An exited or replaced target fails the check instead of selecting another application.
 
 The Open Quickly scenario waits for the filtered result set before invoking its single action; the already-visible favorite is not proof that the debounced row rebuild has completed. It still requires the window to close and usage to be persisted.
 
