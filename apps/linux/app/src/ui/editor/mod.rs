@@ -8,6 +8,7 @@ mod folding;
 pub(crate) mod open_file;
 mod query_changes;
 mod run_lifecycle;
+mod session_age;
 mod session_lexing;
 use run_lifecycle::{clear_results_box, dim_previous_results};
 use tablepro_core::sql_format as format_plan;
@@ -31,7 +32,6 @@ mod toolbar_actions;
 use std::time::SystemTime;
 
 use relm4::adw::prelude::*;
-use relm4::gtk::glib;
 use relm4::prelude::*;
 use relm4::{adw, gtk};
 use sourceview5::prelude::*;
@@ -55,7 +55,7 @@ pub use statement_cursor::grammar_for;
 use outcomes::{ScriptRunResult, StatementRun, StreamUpdate, clear_box, render_outcomes, run_statements_with_stream};
 use run_generation::{RunGeneration, RunTerminal};
 use schema::{apply_editor_preferences, apply_editor_scheme};
-use sql_text::{export_name_for_query, read_sql_text, toggle_line_comment};
+use sql_text::{export_name_for_query, read_sql_text, text_to_run, toggle_line_comment};
 use statement_cursor::{
     PlannedStatements, adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor,
 };
@@ -76,6 +76,7 @@ pub struct SqlEditor {
     transaction_actions: toolbar_actions::TransactionActions,
     folding: std::rc::Rc<std::cell::RefCell<folding::FoldController>>,
     session_button: gtk::ToggleButton,
+    transaction_clock: session_age::TransactionClock,
     session: Option<session_mode::EditorSession>,
     retired_session_connection_id: Option<(Uuid, Uuid)>,
     opening_session_id: Option<Uuid>,
@@ -105,12 +106,6 @@ pub struct SqlEditor {
     drop_generation: std::rc::Rc<DropGeneration>,
     known_lexing: session_lexing::KnownLexing,
     reading_lexing: bool,
-    /// Disconnected in `shutdown`. Without this, every tab's
-    /// `connect_dark_notify` closure -- which strongly captures this
-    /// tab's `source_view` -- stayed registered on the process-global
-    /// `AdwStyleManager` forever, keeping the whole tab's widget tree
-    /// alive past the tab's own close.
-    dark_notify_handler: Option<glib::SignalHandlerId>,
 }
 
 pub struct SqlEditorInit {
@@ -550,10 +545,6 @@ impl SimpleComponent for SqlEditor {
             widgets.toolbar_view.add_top_bar(find.widget());
         }
         apply_editor_scheme(&widgets.source_view);
-        let view_for_theme = widgets.source_view.clone();
-        let dark_notify_handler = adw::StyleManager::default().connect_dark_notify(move |_| {
-            apply_editor_scheme(&view_for_theme);
-        });
 
         let preferences = init.preferences.load();
         apply_editor_preferences(&widgets.source_view, &preferences);
@@ -628,6 +619,7 @@ impl SimpleComponent for SqlEditor {
             run_options: widgets.run_options.clone(),
             transaction_actions,
             session_button: widgets.session_button.clone(),
+            transaction_clock: Default::default(),
             session: None,
             retired_session_connection_id: None,
             opening_session_id: None,
@@ -655,7 +647,6 @@ impl SimpleComponent for SqlEditor {
             drop_generation,
             known_lexing,
             reading_lexing: false,
-            dark_notify_handler: Some(dark_notify_handler),
         };
         model.refresh_run_options(&sender);
         ComponentParts { model, widgets }
@@ -665,9 +656,6 @@ impl SimpleComponent for SqlEditor {
         self.diagnostics.stop();
         if let Some(session) = self.session.take() {
             session_mode::close_detached(session.shared);
-        }
-        if let Some(handler) = self.dark_notify_handler.take() {
-            adw::StyleManager::default().disconnect(handler);
         }
     }
 
@@ -734,7 +722,16 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
             SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
-            SqlEditorInput::Run => self.run_scope(false, sender.clone()),
+            SqlEditorInput::Run => {
+                self.timeout_retry.clear_override();
+                let sql = text_to_run(&self.source_view.buffer());
+                let trimmed = sql.trim().to_string();
+                if trimmed.is_empty() {
+                    self.status.set_label(&crate::tr!("empty query"));
+                    return;
+                }
+                self.begin_run(trimmed, false, sender);
+            }
             SqlEditorInput::SessionAction { session_id, commit } => {
                 self.on_session_toolbar_action(session_id, commit, &sender);
             }

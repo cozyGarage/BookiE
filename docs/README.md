@@ -93,6 +93,8 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 
 ## Engineering review records (October 2026)
 
+- [Table-browse resource profile, October 22](evidence/table-browse-resource-2026-10-22/README.md): measured a wide SQLite page headlessly and exposed missing truncation feedback.
+
 - [Stream page construction, October 22](evidence/stream-frame-2026-10-22/README.md): regression for grids built before their first frame, CPU attribution and partial optimized acceptance.
 
 - [Editor toolbar rows, October 21](evidence/editor-toolbar-rows-2026-10-21/README.md): reproduced minimum-width mismatch, bounded action rows and headless allocation regression.
@@ -141,6 +143,8 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 - [GPUI client review, October 22](archive/gpui-client-review-2026-10-22.md): completed source research including dbdelve; open adoption proposals remain on their issues.
 - [Transaction-control proposal review, October 22](archive/transaction-control-review-2026-10-22.md): completed DBF-5 verification against existing shared-connection and owned-session guards.
 
+- [Selection statistics resource investigation, October 22](evidence/selection-statistics-2026-10-22/README.md): borrowed-cell computation, numeric behavior tests and matched headless heap profiles.
+- [Inspector preview resource investigation, October 22](evidence/inspector-preview-2026-10-22/README.md): borrowed-cell previews, preserved field semantics and matched headless heap/timing measurements.
 - [Browse inspector callback lifetime, October 22](evidence/inspector-cycle-2026-10-22/README.md): failing then passing GTK weak-reference regression for a selection-to-inspector ownership cycle.
 
 - [Query row decoding budget, October 22](evidence/query-row-budget-2026-10-22/README.md): pre-decode row checks, measured PostgreSQL client RSS reduction and remaining allocation limits.
@@ -150,3 +154,6 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 
 - [Arch wrapper release date, October 22](evidence/arch-wrapper-date-2026-10-22/README.md): mandatory-date forwarding, boundary regressions and real isolated package upgrade/removal evidence.
 - [Dedicated-session opening guard, October 22](evidence/session-opening-guard-2026-10-22/README.md): standalone held-open regression and current-Linux source checks.
+
+- [Completion popup initialization, October 22](evidence/completion-popup-initialization-2026-10-22/README.md): reproduced missing GtkSourceView initialization, independent probe and startup regression.
+- [Owned GTK process checks, October 22](evidence/owned-gtk-process-2026-10-22/README.md): fixture PID/lifetime ownership for memory sampling and second launch, with two-process regressions and targeted GTK acceptance.
