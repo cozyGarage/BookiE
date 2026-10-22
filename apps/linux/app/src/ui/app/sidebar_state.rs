@@ -11,7 +11,7 @@ pub(super) fn reveal_sidebar(split_view: &adw::OverlaySplitView, generation: &st
     let wanted = generation.get().wrapping_add(1);
     generation.set(wanted);
     if split_view.width() > 0 {
-        split_view.set_show_sidebar(true);
+        show_unless_overlay(split_view);
         return;
     }
     let generation = generation.clone();
@@ -22,9 +22,13 @@ pub(super) fn reveal_sidebar(split_view: &adw::OverlaySplitView, generation: &st
         if split_view.width() == 0 {
             return relm4::gtk::glib::ControlFlow::Continue;
         }
-        split_view.set_show_sidebar(true);
+        show_unless_overlay(split_view);
         relm4::gtk::glib::ControlFlow::Break
     });
+}
+
+fn show_unless_overlay(split_view: &adw::OverlaySplitView) {
+    split_view.set_show_sidebar(!split_view.is_collapsed());
 }
 
 pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
@@ -33,6 +37,12 @@ pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std:
 }
 
 impl App {
+    pub(super) fn on_window_widened(&self) {
+        if self.connected {
+            reveal_sidebar(&self.split_view, &self.sidebar_reveal);
+        }
+    }
+
     pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo]) {
         self.sidebar_tables = tables.to_vec();
         let nodes = build_nodes(tables, &self.sidebar_views);
@@ -254,5 +264,23 @@ fn row_for(
         kind,
         depth: node.depth,
         group,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_collapsed_window_keeps_the_sidebar_closed_so_it_cannot_cover_the_first_click() {
+        relm4::adw::init().unwrap();
+        let split_view = adw::OverlaySplitView::new();
+        split_view.set_collapsed(true);
+        show_unless_overlay(&split_view);
+        assert!(!split_view.shows_sidebar());
+        split_view.set_collapsed(false);
+        show_unless_overlay(&split_view);
+        assert!(split_view.shows_sidebar());
     }
 }

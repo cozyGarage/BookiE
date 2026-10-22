@@ -72,6 +72,7 @@ pub enum AppMsg {
     SetConnectionOrganization(Uuid, ConnectionOrganization),
     ConnectionOrganizationRejected,
     ImportConnectionUrl,
+    WindowWidened,
     ImportConnectionUrlText(String),
     ImportConnectionUrlSucceeded(String),
     ImportConnectionUrlFailed,
