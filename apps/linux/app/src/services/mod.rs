@@ -15,6 +15,7 @@ pub mod export_pages;
 pub mod gtk_approval;
 pub mod mcp_service;
 pub mod named_filter_presets;
+pub mod open_request;
 pub mod operation_control;
 pub mod persistence_stores;
 pub mod preferences;
@@ -22,6 +23,7 @@ pub mod query_parameters;
 pub mod quick_switcher;
 pub mod sidebar_tree;
 pub mod single_instance;
+pub mod ui_stall;
 
 pub mod window_registry;
 pub mod window_state;
