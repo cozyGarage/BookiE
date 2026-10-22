@@ -670,7 +670,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::mcp_preferences::copy_tests::the_issued_token_dialog_copies_the_token_to_the_clipboard"
+      "ui::mcp_preferences::copy_tests::the_copy_button_puts_the_token_on_the_clipboard_and_keeps_the_dialog_open"
     ],
     [
       "tablepro-app",
