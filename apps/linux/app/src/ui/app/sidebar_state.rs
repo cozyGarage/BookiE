@@ -7,10 +7,6 @@ use super::init_sidebar::refresh_visible;
 use crate::services::sidebar_tree::{CollapseState, NodeKind, Reveal, build_nodes, reveal_target};
 use crate::ui::sidebar_row::{GroupInit, SidebarObjectKind, SidebarRowInit, SidebarRowMsg};
 
-pub(super) fn reveal_sidebar(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
-    reveal_with(split_view, generation, |split_view| split_view.set_show_sidebar(true));
-}
-
 fn reveal_sidebar_unless_overlay(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
     reveal_with(split_view, generation, show_unless_overlay);
 }
@@ -48,6 +44,11 @@ fn show_unless_overlay(split_view: &adw::OverlaySplitView) {
     split_view.set_show_sidebar(!split_view.is_collapsed());
 }
 
+fn show_sidebar(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
+    generation.set(generation.get().wrapping_add(1));
+    split_view.set_show_sidebar(true);
+}
+
 pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
     generation.set(generation.get().wrapping_add(1));
     split_view.set_show_sidebar(false);
@@ -67,10 +68,19 @@ impl App {
         self.sidebar_tables = tables.to_vec();
         let nodes = build_nodes(tables, &self.sidebar_views);
         let schema_filter_enabled = self.current_driver_id.as_deref() == Some("postgres");
+        let timeout =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let source =
+            crate::ui::sidebar_columns::ColumnSource::capture(self.connection_id, self.database.clone(), timeout);
         let mut guard = self.sidebar_factory.guard();
         guard.clear();
         for node in &nodes {
-            guard.push_back(row_for(node, &self.sidebar_collapsed.borrow(), schema_filter_enabled));
+            guard.push_back(row_for(
+                node,
+                &self.sidebar_collapsed.borrow(),
+                schema_filter_enabled,
+                source.clone(),
+            ));
         }
         drop(guard);
         *self.sidebar_nodes.borrow_mut() = nodes;
@@ -134,7 +144,7 @@ impl App {
                 uncollapse,
                 clear_search,
             } => {
-                reveal_sidebar(&self.split_view, &self.sidebar_reveal);
+                show_sidebar(&self.split_view, &self.sidebar_reveal);
                 if clear_search {
                     self.table_search.set_text("");
                 }
@@ -163,7 +173,9 @@ impl App {
     }
 
     pub(super) fn restore_sidebar_state(&self) {
-        let state = self.connection_id.and_then(|id| self.workspace.load_connection(id));
+        let state = self
+            .workspace_target()
+            .and_then(|(id, database)| self.workspace.load_database(id, &database));
         *self.sidebar_collapsed.borrow_mut() = CollapseState::from_keys(
             state
                 .as_ref()
@@ -253,6 +265,7 @@ fn row_for(
     node: &crate::services::sidebar_tree::TreeNode,
     collapsed: &crate::services::sidebar_tree::CollapseState,
     schema_filter_enabled: bool,
+    column_source: Option<crate::ui::sidebar_columns::ColumnSource>,
 ) -> SidebarRowInit {
     use crate::services::sidebar_tree::{GroupKind, NodeKind};
     let (kind, group) = match &node.kind {
@@ -284,6 +297,7 @@ fn row_for(
         kind,
         depth: node.depth,
         group,
+        column_source,
     }
 }
 
@@ -320,5 +334,26 @@ mod tests {
             split_view.shows_sidebar(),
             "widening while connected docks the sidebar again"
         );
+    }
+}
+
+#[cfg(test)]
+mod explicit_reveal_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn an_explicit_reveal_opens_the_sidebar_in_a_narrow_window() {
+        relm4::adw::init().unwrap();
+        let split = adw::OverlaySplitView::builder()
+            .collapsed(true)
+            .show_sidebar(false)
+            .build();
+        let generation = std::rc::Rc::new(std::cell::Cell::new(3));
+        show_sidebar(&split, &generation);
+        assert!(split.shows_sidebar());
+        assert_eq!(generation.get(), 4);
+        hide_sidebar(&split, &generation);
+        assert!(!split.shows_sidebar());
     }
 }

@@ -1023,6 +1023,7 @@ impl SimpleComponent for BrowseTab {
                 let _ = sender.output(BrowseTabOutput::ExportResults {
                     result,
                     name: self.table_label(),
+                    filtered: !self.current_filter().is_empty(),
                 });
             }
             BrowseTabInput::GridExportStreamedResults(request) => {
