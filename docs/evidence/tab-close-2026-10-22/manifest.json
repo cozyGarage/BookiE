@@ -9,5 +9,15 @@
     "error": null
   },
   "display": "private D-Bus/Xvfb 1280x1024x24, X11/Cairo",
-  "physical_input": "existing X11 helper using window-relative widget allocation"
+  "physical_input": "existing X11 helper using window-relative widget allocation",
+  "independent_linux_build": {
+    "source": "15c3a9f9f303d4598672a11b5c062e3abe9f80dc",
+    "binary_sha256": "13b319c1e21179991ed1760e6d36d1bc2cf0b397c4b21c139ce992bd071894cc",
+    "base": "Linux plus the independent discard-close fix; no resource-train dependency"
+  },
+  "independent_scenario_result": {
+    "scenario": "closing_a_dirty_file_with_discard_closes_without_writing",
+    "status": "passed",
+    "error": null
+  }
 }

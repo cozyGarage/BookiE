@@ -17,3 +17,9 @@ The corrected optimized build passed the installed regression on the configured 
 Two earlier pointer probes were invalid setup checks: AT-SPI screen coordinates returned zero, and then the shared X11 helper could not find an app window on the platform’s default 640×480 Xvfb screen. The installed GTK tier already specifies 1280×1024. Running with that same display and the existing window-relative X11 input helper passed, without weakening the click or query assertions. These setup failures are not classified as an app freeze.
 
 Full preflight and all 105 isolated GTK widget tests subsequently passed, and the existing Save-and-close installed scenario also passed. This validation used the saved resource-candidate base. The close-path source does not depend on those performance changes; an independent Linux-based branch will rerun acceptance before publication. The reported native freeze remains open beyond the reproduced Discard case.
+
+## Independent Linux validation
+
+The fix was copied onto Linux `b150b59ae` without the pending performance train. A fresh optimized build at `15c3a9f9f` passed the same Discard/unchanged-file/final-tab/physical-click/query scenario. All 713 app unit tests and app all-target Clippy passed on this independent source. Its binary hash and scenario result are added to the manifest. The smaller test count reflects the absent performance-train tests, not removed tests. Refreshed preflight and the 103-case GTK widget suite remain active.
+
+The independent branch subsequently passed full preflight and all 103 registered GTK widget tests. The latest manual-testing documentation through `9b8bb2897` was merged afterward; runtime source, tests, scripts, Cargo inputs and workflows compare unchanged against the validated build source. The native notes classify the toolbar event as transient after restart and record a separate hidden-sidebar problem; neither is claimed fixed by this Discard change.
