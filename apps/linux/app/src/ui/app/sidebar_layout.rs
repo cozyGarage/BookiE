@@ -75,8 +75,8 @@ fn place_sidebar(split: &adw::OverlaySplitView, paned: &gtk::Paned, sidebar: &gt
         return;
     }
     split.set_sidebar(gtk::Widget::NONE);
-    split.set_min_sidebar_width(0.0);
-    split.set_max_sidebar_width(0.0);
+    split.set_min_sidebar_width(1.0);
+    split.set_max_sidebar_width(1.0);
     paned.set_start_child(Some(sidebar));
     sidebar.set_visible(split.shows_sidebar());
     paned.set_position(width);
@@ -158,7 +158,7 @@ mod allocated_tests {
         let split = adw::OverlaySplitView::builder()
             .sidebar(&sidebar)
             .content(&content)
-            .show_sidebar(true)
+            .show_sidebar(false)
             .build();
         install(&split);
         let window = adw::ApplicationWindow::builder()
@@ -176,6 +176,8 @@ mod allocated_tests {
         breakpoint.add_setter(&split, "show-sidebar", Some(&false.into()));
         window.add_breakpoint(breakpoint);
         window.present();
+        settle(&window);
+        split.set_show_sidebar(true);
         settle(&window);
         let paned = split.content().and_downcast::<gtk::Paned>().unwrap();
         assert!(!split.is_collapsed());
