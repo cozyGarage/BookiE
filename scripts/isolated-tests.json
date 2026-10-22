@@ -490,7 +490,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::editor::outcomes::tests::a_failed_statement_offers_a_copy_button"
+      "ui::editor::outcomes::tests::error_view_tests::a_failed_statement_offers_a_copy_button"
     ],
     [
       "tablepro-app",
@@ -801,6 +801,36 @@
       "tablepro-app",
       "--lib",
       "ui::grid::lifetime_tests::a_retired_grid_does_not_retain_its_inspector_through_selection_callback"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::error_navigation_tests::a_server_error_navigates_to_its_original_unicode_statement"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::error_navigation_tests::run_current_locates_the_second_identical_statement_and_restores_the_editor"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::error_navigation_tests::editing_the_query_disables_an_existing_error_navigation_action"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::error_navigation_tests::a_new_run_disables_the_previous_error_navigation_action"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::error_navigation_tests::closing_the_connection_disables_its_error_navigation_action"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::error_navigation_tests::error_navigation_does_not_mistake_a_comment_for_the_executed_statement"
     ]
   ],
   "keyring": [

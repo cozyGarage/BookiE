@@ -274,8 +274,10 @@ fn success() -> Result<QueryResultBatch, DriverError> {
 fn parameter_response() -> SqlEditorInput {
     SqlEditorInput::RunWithParameters {
         sql: "SELECT :value;".into(),
+        anchor: None,
         planned: super::PlannedStatements {
             statements: vec!["SELECT :value;".into()],
+            source_ranges: std::iter::once(0.."SELECT :value;".len()).collect(),
             error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy::StopScript,
             settings_check: None,
         },
@@ -686,3 +688,6 @@ fn descendants(root: &gtk::Widget) -> Vec<gtk::Widget> {
 
 #[path = "panel_tests.rs"]
 mod panel_tests;
+
+#[path = "error_navigation_tests.rs"]
+mod error_navigation_tests;
