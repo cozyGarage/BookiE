@@ -26,6 +26,7 @@
 - The database switcher ignores, and stops, a database list still loading from the session before a database switch.
 - A cancelled Structure tab load no longer replaces the newer one.
 - A new empty editor tab takes the first free "Query N" title instead of counting open editors, so closing Query 1 and opening a new tab no longer produces a second "Query 2".
+- Open tabs, the active tab and sidebar group state are saved per database. Switching a saved connection to another database no longer restores the first database's tabs against the second, where a same-named table could show with the wrong page, sort or filter. Each database gets its own tabs back when you return to it; workspaces saved by earlier versions restore for the database you connect to first.
 - Closing a result grid releases its selection and row inspector.
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
