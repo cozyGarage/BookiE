@@ -18,6 +18,7 @@
 
 - Choosing a kind in the Catalog dialog no longer resizes its dropdown and shifts the schema search field.
 - The main window has a minimum size, which stops repeated libadwaita warnings on older libadwaita releases.
+- Spaces pasted around a connection's host or database name are removed before connecting; file paths are kept as typed.
 - Closing SQL editors releases their retained query text and search state.
 - SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
 
