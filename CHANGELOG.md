@@ -17,6 +17,8 @@
 
 ### Fixed
 
+- Table browsing identifies when the result byte limit cuts a page short.
+- Next page in table browsing continues from the first row not shown when the result byte limit cut the page short, instead of skipping the remaining rows or disabling Next.
 - Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
 
 - Closing SQL editors releases their retained query text and search state.

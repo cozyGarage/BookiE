@@ -412,16 +412,15 @@ impl BrowseTab {
     }
 
     pub(super) fn update_next_page_sensitivity(&self) {
-        let loaded_rows = self
-            .current_result
-            .as_ref()
-            .map_or(0, |result| result.rows.len() as u64);
-        self.next_button.set_sensitive(next_page_available(
-            self.current_offset,
-            self.page_size,
-            self.current_total_rows,
-            loaded_rows,
-        ));
+        self.next_button.set_sensitive(
+            next_page_offset(
+                self.current_offset,
+                self.page_size,
+                self.current_total_rows,
+                self.current_result.as_deref(),
+            )
+            .is_some(),
+        );
     }
 
     pub(super) fn update_paginator_label(&self) {
@@ -429,34 +428,7 @@ impl BrowseTab {
             self.set_paginator_text("");
             return;
         };
-        let n_rows = result.rows.len();
-        if n_rows == 0 {
-            // Reachable when the user navigated past the end of a
-            // table that shrank in another session, before
-            // RowCountLoaded clamps the offset back. Human
-            // wording — the previous "No rows at offset N" read as
-            // a bug message.
-            self.set_paginator_text(&crate::tr!("No rows on this page"));
-            return;
-        }
-        let start = self.current_offset + 1;
-        let end = self.current_offset + n_rows as u64;
-        // Match the page-size dropdown's thousands grouping.
-        // "Rows 10,001 – 10,100 of 5,000,000" is faster to read than
-        // "Rows 10001 – 10100 of 5000000" and matches GNOME File's
-        // "1,234 items" idiom.
-        let start_s = format_thousands(start);
-        let end_s = format_thousands(end);
-        let label = match self.current_total_rows {
-            Some(total) => crate::tr!("Rows {start} – {end} of {total}")
-                .replace("{start}", &start_s)
-                .replace("{end}", &end_s)
-                .replace("{total}", &format_thousands(total)),
-            None => crate::tr!("Rows {start} – {end}")
-                .replace("{start}", &start_s)
-                .replace("{end}", &end_s),
-        };
-        self.set_paginator_text(&label);
+        self.set_paginator_text(&paginator_summary(result, self.current_offset, self.current_total_rows));
     }
 
     pub(super) fn replace_status_child(&self, name: &str, child: &impl IsA<gtk::Widget>) {
@@ -495,16 +467,46 @@ impl BrowseTab {
     }
 }
 
-pub(super) fn next_page_available(
+fn paginator_summary(result: &QueryResult, offset: u64, total: Option<u64>) -> String {
+    let n_rows = result.rows.len();
+    if n_rows == 0 {
+        return if result.truncated {
+            crate::tr!("No rows on this page (result truncated)")
+        } else {
+            crate::tr!("No rows on this page")
+        };
+    }
+    let template = match (total.is_some(), result.truncated) {
+        (true, true) => crate::tr!("Rows {start} – {end} of {total} (result truncated)"),
+        (true, false) => crate::tr!("Rows {start} – {end} of {total}"),
+        (false, true) => crate::tr!("Rows {start} – {end} (result truncated)"),
+        (false, false) => crate::tr!("Rows {start} – {end}"),
+    };
+    template
+        .replace("{start}", &format_thousands(offset + 1))
+        .replace("{end}", &format_thousands(offset + n_rows as u64))
+        .replace("{total}", &total.map(format_thousands).unwrap_or_default())
+}
+
+pub(super) fn next_page_offset(
     current_offset: u64,
     page_size: u64,
     total_rows: Option<u64>,
-    loaded_rows: u64,
-) -> bool {
-    match total_rows {
-        Some(total) => current_offset.saturating_add(loaded_rows) < total,
-        None => loaded_rows == page_size,
-    }
+    page: Option<&QueryResult>,
+) -> Option<u64> {
+    let loaded_rows = page.map_or(0, |page| page.rows.len() as u64);
+    let truncated = page.is_some_and(|page| page.truncated);
+    let shown_rows = if truncated { loaded_rows.max(1) } else { loaded_rows };
+    let available = match total_rows {
+        Some(total) => current_offset.saturating_add(shown_rows) < total,
+        None => truncated || loaded_rows == page_size,
+    };
+    let step = if truncated { shown_rows } else { page_size };
+    available.then(|| current_offset.saturating_add(step))
+}
+
+pub(super) fn previous_page_offset(current_offset: u64, page_size: u64) -> Option<u64> {
+    (current_offset > 0).then(|| current_offset.saturating_sub(page_size))
 }
 
 pub(super) fn extract_keyset_cursor(
@@ -607,7 +609,7 @@ pub(super) fn bind_inspector(
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_first_keyset_cursor, extract_keyset_cursor, format_thousands};
+    use super::{extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary};
     use tablepro_core::{ColumnInfo, QueryResult, Value};
 
     #[test]
@@ -656,6 +658,47 @@ mod tests {
         assert_eq!(format_thousands(5_000), "5,000");
         assert_eq!(format_thousands(10_000), "10,000");
         assert_eq!(format_thousands(1_000_000), "1,000,000");
+    }
+
+    fn page(rows: usize, truncated: bool) -> QueryResult {
+        QueryResult {
+            columns: vec![column("payload", false)],
+            rows: vec![vec![Value::Text("large".into())]; rows],
+            truncated,
+        }
+    }
+
+    #[test]
+    fn truncated_browse_pages_disclose_the_result_limit() {
+        assert_eq!(
+            paginator_summary(&page(37, true), 1_000, Some(5_000)),
+            "Rows 1,001 – 1,037 of 5,000 (result truncated)"
+        );
+        assert_eq!(
+            paginator_summary(&page(37, true), 0, None),
+            "Rows 1 – 37 (result truncated)"
+        );
+    }
+
+    #[test]
+    fn a_truncated_browse_page_without_rows_still_discloses_the_result_limit() {
+        assert_eq!(
+            paginator_summary(&page(0, true), 0, Some(5_000)),
+            "No rows on this page (result truncated)"
+        );
+    }
+
+    #[test]
+    fn untruncated_browse_pages_have_no_result_limit_suffix() {
+        assert_eq!(
+            paginator_summary(&page(100, false), 1_000, Some(5_000)),
+            "Rows 1,001 – 1,100 of 5,000"
+        );
+        assert_eq!(paginator_summary(&page(100, false), 0, None), "Rows 1 – 100");
+        assert_eq!(
+            paginator_summary(&page(0, false), 0, Some(5_000)),
+            "No rows on this page"
+        );
     }
 
     #[test]
