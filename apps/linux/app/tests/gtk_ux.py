@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import gtk_input
+import keyboard_paths
 
 
 class XWindowAttributes(ctypes.Structure):
@@ -725,6 +726,18 @@ GLib.MainLoop().run()
             if ui.node_role(node) in roles and not ui.node_name(node).strip()
         ]
         assert not unnamed, "controls without an accessible name:\n" + "\n".join(unnamed)
+
+    def sql_editor_clickables_all_have_a_keyboard_path(database, base):
+        ui.run_sql("SELECT 1 AS alpha")
+        wait_for_result_column("alpha")
+        clickable = (pyatspi.ROLE_PUSH_BUTTON, pyatspi.ROLE_TOGGLE_BUTTON)
+        names = [
+            ui.node_name(node).strip()
+            for node in ui.descendants(ui.application_node())
+            if ui.node_role(node) in clickable and node.getState().contains(pyatspi.STATE_SHOWING)
+        ]
+        missing = keyboard_paths.unregistered(names, keyboard_paths.SQL_EDITOR)
+        assert not missing, "clickable without a registered keyboard path:\n" + "\n".join(missing)
 
     def narrow_window_keeps_main_and_editor_toolbar_actions_reachable(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)
@@ -1634,6 +1647,7 @@ GLib.MainLoop().run()
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
+        sql_editor_clickables_all_have_a_keyboard_path,
         narrow_window_keeps_main_and_editor_toolbar_actions_reachable,
         connection_colour_chooser_has_an_accessible_button,
         alt_arrows_jump_between_statements,
