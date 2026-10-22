@@ -736,6 +736,16 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_waits_for_its_session_before_accepting_any_run_input"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connection_row::tests::connection_actions_leave_room_for_text_in_a_narrow_row"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connection_row::tests::connection_menu_dispatches_actions_for_its_own_record"
     ]
   ],
   "keyring": [
