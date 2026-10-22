@@ -21,3 +21,7 @@ The regression fails against the original 640-pixel editor minimum. It exposes r
 Local preflight, all 104 registered GTK tests and application all-target Clippy passed on the final two-row implementation. The updated full GTK suite also passed all 104 tests after the 910-pixel case and frame synchronization correction. Documentation and exact-head Forgejo acceptance remain pending at this checkpoint.
 
 These are headless layout and behavior checks. A sustained optimized before/after CPU comparison and native visual acceptance are not established by the GTK regression.
+
+## Current Linux refresh, October 22
+
+Merged Linux through `4f61f2f98`, including the accepted PostgreSQL terminal-page metadata fix and nonblocking GTK stderr capture. Full preflight and all 104 registered GTK tests passed again on merge head `1a66246d87a5100ac10cb1045fdd2c7a872c22ce`. The toolbar Rust source and isolated-test registry are unchanged from the previously tested toolbar head `250fb184046b7092f27fba7691842099afc3338b`. Exact-head Forgejo acceptance remains pending.
