@@ -72,7 +72,6 @@ pub enum AppMsg {
     SetConnectionOrganization(Uuid, ConnectionOrganization),
     ConnectionOrganizationRejected,
     ImportConnectionUrl,
-    WindowWidened,
     ImportConnectionUrlText(String, bool),
     OpenLaunchArguments(Vec<crate::services::open_request::LaunchArgument>),
     ImportConnectionUrlSucceeded(String),

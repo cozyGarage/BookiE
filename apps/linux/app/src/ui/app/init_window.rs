@@ -271,17 +271,12 @@ pub(super) fn install_window_lifecycle(
         adw::LengthUnit::Sp,
     ));
     breakpoint.add_setter(split_view, "collapsed", Some(&true.into()));
-    breakpoint.add_setter(split_view, "show-sidebar", Some(&false.into()));
     breakpoint.add_setter(sidebar_toggle, "visible", Some(&true.into()));
     sidebar_toggle
         .bind_property("active", split_view, "show-sidebar")
         .bidirectional()
         .sync_create()
         .build();
-    let widened = sender.input_sender().clone();
-    breakpoint.connect_unapply(move |_| {
-        let _ = widened.send(AppMsg::WindowWidened);
-    });
     window.add_breakpoint(breakpoint);
     handles
 }
