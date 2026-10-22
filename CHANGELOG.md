@@ -5,6 +5,9 @@
 ### Changed
 
 - Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
+### Fixed
+
+- PostgreSQL queries ending on a full result page complete without a false column-change error.
 
 ## [0.2.0] - 2026-10-21
 
