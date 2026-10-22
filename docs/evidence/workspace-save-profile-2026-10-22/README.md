@@ -32,3 +32,11 @@ These values cover the complete test, including fixture construction, initial sa
 The recorder reports approximately 1.65 KB outstanding at process exit in both cases. This has not been diagnosed as a product leak. Runs are short debug-test workloads, not native application RSS measurements. Other machine activity was not controlled, so elapsed times are not used for performance claims.
 
 The first Heaptrack invocation automatically opened its viewer. That owned viewer was immediately stopped. Subsequent recording used `--record-only`; no desktop capture or interaction occurred. Raw traces and reports remain under `~/bookie-test/workspace-save-profile/`.
+
+## Ownership optimization
+
+The save wrapper and disk writer now consume their owned workspace snapshot instead of cloning it twice. All callers already owned the snapshot and did not use it afterward. Pending states remain retained separately for failed-write recovery. The load, clamp, migration backup, atomic write and acknowledgement operations retain their existing order. This change does not yet avoid rereading and rewriting unrelated drafts.
+
+All eight persistence integration tests and forty workspace-focused unit tests passed, including legacy migration backup, failed writes, pending-save retry, preview cleanup, connection removal and exact Unicode restoration.
+
+Three repeated four-connection recordings of the saved baseline binary each measured 25.00 MB peak heap. Three recordings of the candidate each measured 18.77 MB, approximately 25% lower for this workload. An earlier candidate run measured 18.78 MB. These are complete debug-test heap peaks, not application RSS, CPU benchmarks or a proof of leak freedom. Functional tests pin existing behavior and are not presented as failing performance assertions. Full preflight and final acceptance remain pending.

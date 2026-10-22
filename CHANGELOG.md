@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- Saving workspaces with large SQL drafts uses less temporary memory.
+
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
 
 ## [0.2.0] - 2026-10-21
