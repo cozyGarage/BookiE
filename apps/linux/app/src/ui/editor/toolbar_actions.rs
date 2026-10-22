@@ -133,7 +133,7 @@ impl SqlEditor {
     pub(super) fn refresh_result_exports(&self) {
         let menu = gtk::gio::Menu::new();
         for (label, action, accelerator) in [
-            (crate::tr!("Run all statements"), "editor-run.all", "<Primary>Return"),
+            (crate::tr!("Run selection or all statements"), "editor-run.all", "<Primary>Return"),
             (
                 crate::tr!("Run current statement"),
                 "editor-run.current",

@@ -109,7 +109,7 @@ BookiE can let an AI assistant use saved connections through the Model Context P
 
 - The Run menu exposes whole-script and current-statement execution, with shortcuts, plus labeled export choices for individual loaded result sets or a guarded stream rerun.
 - Owned editor sessions show transaction state and commit/rollback-and-close controls. Shared-connection transaction refusal and audit rules still apply.
-- The tables sidebar is docked with a native resize divider in wide windows. Below 960 px it becomes an overlay that stays closed after connection and opens from the header **Tables sidebar** button. Tables expand for bounded field/type previews.
+- The header **Tables sidebar** button shows or hides the tables sidebar at every width. Wide windows dock it with a native resize divider; below 960 px it becomes an overlay that stays closed after connection. Tables expand for bounded field/type previews.
 - Grid headers retain exact engine type case. Their native details menu exposes key, nullability and comment metadata.
 - Export presents data scope before format and keeps unqualified full-table snapshot export unavailable.
 

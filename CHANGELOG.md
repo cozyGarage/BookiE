@@ -7,7 +7,7 @@
 - Positioned SQL errors offer Go to error in the result and Errors views, restoring the editor and placing the caret in the original statement; changed queries and connections require a fresh run.
 - SQL editors have a hideable, resizable results panel with an Errors view, maximize/restore controls and Ctrl+J.
 - The query editor has visible run scopes and result-file export choices, plus commit-and-close and rollback-and-close controls for an owned session with an open transaction.
-- Tables and views expand to show bounded field/type previews, with a Structure shortcut; the docked sidebar has a native resize handle.
+- Tables and views expand to show bounded field/type previews, with a Structure shortcut; the docked sidebar has a native resize handle, and the header **Tables sidebar** button shows or hides it at every window width.
 - Run (Ctrl+Enter or the Run button) executes the selected text when something is selected, and the whole editor otherwise. It goes through the same guard, policy and audit path as any run.
 - The Columns dialog has a Reset button that forgets the column widths you set by dragging for that table.
 - The Session button shows how long its transaction has been open ("Session · transaction open · 12 min") once it passes a minute, so a forgotten transaction holding locks stands out.
