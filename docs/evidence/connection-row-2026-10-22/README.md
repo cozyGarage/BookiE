@@ -26,6 +26,8 @@ Removal was also exercised without deleting any fixture data. It displayed `Remo
 - Installed Group and tags flow: passed, including the accessible color chooser.
 - GTK widget tier: 105 tests passed.
 - Preflight: passed; the distro package check reported that `dpkg-deb` is unavailable locally.
-- Final refreshed-base checks and Forgejo acceptance remain pending.
+- Refreshed onto Linux `6caa27f18` after #1331 and #1324. Final preflight, 713 application unit tests and application all-target Clippy passed.
+- The merge changed no application Rust code, crate source or isolated-test registrations relative to the widget-tested candidate. This was checked with `git diff 86a6d7681 HEAD -- apps/linux/app crates scripts/isolated-tests.json`.
+- [Manifest](manifest.json) records the saved binary checksum and installed case results. Forgejo acceptance remains pending.
 
 Raw local logs are retained under `~/bookie-test/connection-row-*`. Checks use isolated X11 displays and session buses. The native Wayland desktop, screen-reader narration, light theme and high contrast have not yet been verified for this change.
