@@ -15,6 +15,7 @@ async fn a_bare_table_name_resolves_through_the_whole_search_path() {
         "CREATE TABLE second_ns.only_second (x integer PRIMARY KEY)",
         "CREATE TABLE first_ns.shared (in_first integer)",
         "CREATE TABLE second_ns.shared (in_second integer)",
+        "CREATE TABLE second_ns.child_second (x integer REFERENCES second_ns.only_second (x))",
         "ALTER DATABASE test SET search_path = first_ns, second_ns",
     ] {
         setup.execute(statement).await.unwrap();
@@ -26,6 +27,9 @@ async fn a_bare_table_name_resolves_through_the_whole_search_path() {
     assert_eq!(names(conn.fetch_columns(None, "only_second").await.unwrap()), ["x"]);
     assert_eq!(names(conn.fetch_columns(None, "shared").await.unwrap()), ["in_first"]);
     assert_eq!(conn.fetch_indexes(None, "only_second").await.unwrap().len(), 1);
+    let foreign_keys = conn.fetch_foreign_keys(None, "child_second").await.unwrap();
+    assert_eq!(foreign_keys.len(), 1, "foreign keys resolve the bare name too");
+    assert!(conn.fetch_columns(None, "").await.unwrap().is_empty());
     assert_eq!(
         names(conn.fetch_columns(Some("second_ns"), "shared").await.unwrap()),
         ["in_second"]
