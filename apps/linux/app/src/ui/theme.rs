@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn the_default_theme_adds_no_overrides_and_others_define_every_surface() {
         assert!(surface(ThemePref::Default, true).is_none() && surface(ThemePref::Default, false).is_none());
-        let sheet = css(&surface(ThemePref::Ledger, true).unwrap());
+        let sheet = css(surface(ThemePref::Ledger, true).unwrap());
         for name in [
             "window_bg_color",
             "view_bg_color",
