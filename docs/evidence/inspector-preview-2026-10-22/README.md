@@ -43,18 +43,19 @@ Use `heaptrack_print -f <trace>` to inspect the captured allocation report.
 ## Validation
 
 The fixture passed on both versions. All three inspector unit tests pass on the
-candidate. Full preflight passed, including 2,053 non-GTK unit tests and the
-sandbox tier. All 719 application unit tests and 104 isolated GTK widget
-tests pass. All-target Clippy, documentation links and the ignored-test inventory pass. Forgejo
-acceptance and native desktop responsiveness are not yet checked.
+candidate. The initial branch passed full preflight, including 2,053 non-GTK
+unit tests and the sandbox tier, plus 719 application unit tests and 104
+isolated GTK widget tests. After merging Linux
+`ad9bb1447163c848919616773ab0971c5a2d2135`, refreshed preflight passed all
+2,054 tests (64 skipped), and all 105 isolated GTK widget tests passed.
+App all-target Clippy, documentation links, issue ledger and ignored-test
+inventory pass. Forgejo acceptance and native desktop responsiveness are not
+yet checked.
 
 ## Separate lifecycle candidate
 
-The browse selection callback captures the inspector strongly. The inspector
-owns its split-view content, which contains the grid and selection model. This
-is a possible ownership cycle, recorded on [#1333](https://github.com/cozyGarage/BookiE/issues/1333).
-It is not a confirmed leak. A regression must retain weak references to the
-actual browse selection and inspector, remove the browse component, pump its
-main context and check release. A plain native control must release under the
-same conditions before attributing a failure to application callbacks. This
+The browse selection callback retained the inspector and created an ownership
+cycle through the grid. A GTK regression reproduced it, and the weak-reference
+fix is under review in [#1373](https://github.com/cozyGarage/BookiE/pull/1373),
+tracked by [#1333](https://github.com/cozyGarage/BookiE/issues/1333). This
 preview-allocation change does not alter that graph.

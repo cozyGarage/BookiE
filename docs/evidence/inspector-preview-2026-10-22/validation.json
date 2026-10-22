@@ -18,5 +18,22 @@
   "clippy": {
     "result": "passed",
     "log_sha256": "c095365adef290199791a42e573af900754016bb30aaa7493ed01afcc2ad0b28"
+  },
+  "linux_refresh": {
+    "base": "ad9bb1447163c848919616773ab0971c5a2d2135",
+    "source_commit": "76fe7316b2065977fdd396037aba358507dfb013",
+    "preflight": {
+      "result": "2054 passed, 64 skipped",
+      "log_sha256": "0678d9cda1902559020350f8560b41c8f561ac6000d483e7e4ab454f2314055f"
+    },
+    "gtk_widgets": {
+      "result": "105 passed",
+      "log_sha256": "e15a037a47f74a4a32ab6b46325d8b0a56641a4de08b19433d1165567cca9093"
+    },
+    "app_clippy": {
+      "result": "passed",
+      "log_sha256": "149ec0ee795cb1ad1ada34d851059bbac220cc0cabaf14951dfc25557d5c8233"
+    },
+    "documentation_checks": "passed"
   }
 }
