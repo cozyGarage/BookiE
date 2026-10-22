@@ -1,7 +1,7 @@
 {
   "date": "2026-10-22",
   "source_base": "95fe08658e9b9e6834b62ef03d68b5f74f779f62",
-  "binary_sha256": "8cebfe50496dc0f52e44cb0d3d392d64fcf84e66cf4ddca8e6f1af084828b848",
+  "binary_sha256": "491388b60f85944edd92ae48cb52408c83c434976efdd40ea84c928f22722b56",
   "build": "cargo build --locked -p tablepro-app --bin tablepro-app (debug)",
   "gtk": "4.24.1",
   "libadwaita": "1.10.0",
@@ -11,7 +11,7 @@
     {
       "status": "passed",
       "backend": "native Wayland",
-      "pid": 1121799,
+      "pid": 1162532,
       "xwayland": false,
       "steps": [
         "real Ctrl+J hide/show from SQL and grid",
@@ -28,7 +28,7 @@
     {
       "status": "passed",
       "backend": "native Wayland",
-      "pid": 1123008,
+      "pid": 1165099,
       "xwayland": false,
       "steps": [
         "real Ctrl+J hide/show from SQL and grid",
@@ -45,7 +45,7 @@
     {
       "status": "passed",
       "backend": "native Wayland",
-      "pid": 1123609,
+      "pid": 1167736,
       "xwayland": false,
       "steps": [
         "real Ctrl+J hide/show from SQL and grid",
@@ -62,7 +62,7 @@
     {
       "status": "passed",
       "backend": "native Wayland",
-      "pid": 1124588,
+      "pid": 1169975,
       "xwayland": false,
       "steps": [
         "real Ctrl+J hide/show from SQL and grid",
@@ -93,5 +93,17 @@
     "crates/app-services/src/editor_panel.rs": "132e7cb8673dd6d69212728912ee7e52789074654f878d9116c50ec00ed8d062",
     "crates/app-services/src/lib.rs": "9b1896cb4c3ca444b3f07dae8e026df610076b060f418f4d2db06abcfb5ff118",
     "scripts/isolated-tests.json": "2da20e1c883ac6378d4d4e2db85617b6cd3c6f316edfb1b39aa0a5c5fabe585c"
+  },
+  "final_integration_commit": "4a787270c26f5a0ceab7b641defe31a70d24e340",
+  "final_checks": {
+    "gtk_widgets": 121,
+    "app_unit_passed": 725,
+    "strict_app_clippy": "passed",
+    "native_cases": 4,
+    "sqlite_no_rerun_scenario": "passed",
+    "preflight": "passed",
+    "non_gtk_unit_passed": 2056,
+    "sandbox_passed": 2057,
+    "redis_cancellation_passed": 1
   }
 }

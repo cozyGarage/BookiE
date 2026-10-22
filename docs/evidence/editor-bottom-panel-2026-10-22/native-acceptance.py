@@ -67,7 +67,7 @@ try:
         ui.wait_for_node(name='842',present=False)
         subprocess.run(['/tmp/bookie-panel-pointer','395','837'],check=True)
         ui.wait_for_node(name='842')
-        assert editor.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS).height == after, 'hide-maximized must retain divider size' 
+        assert editor.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS).height == after, 'hide-maximized must retain divider size'
         ui.invoke_accessible_action('win.open-editor')
         ui.run_sql('SELECT 843;');ui.wait_for_node(name='843')
         subprocess.run(['wtype','-M','ctrl','-k','j','-m','ctrl'],check=True)
@@ -75,6 +75,16 @@ try:
         ui.invoke_accessible_action('win.close-current')
         ui.wait_for_node(name='842')
         subprocess.run(['grim','-g',f'80,100 {width}x760',str(artifacts/'after-close-hidden.png')],check=True)
+        ui.invoke_accessible_action('win.open-editor')
+        ui.run_sql('WITH RECURSIVE loop(n) AS (VALUES(0) UNION ALL SELECT n+1 FROM loop WHERE n < 1000000000) SELECT sum(n) FROM loop;')
+        time.sleep(.1)
+        subprocess.run(['wtype','-M','ctrl','-k','j','-m','ctrl'],check=True)
+        ui.invoke_accessible_action('win.close-current')
+        ui.wait_for_node(name='842')
+        time.sleep(2)
+        ui.wait_for_node(name='842')
+        ui.wait_for_node(name='timed out',present=False)
+
     ui.run_sql('SELECT * FROM bookie_missing_panel_table;')
     ui.invoke(ui.wait_for_node(name='Errors (1)',role=ui.pyatspi.ROLE_PUSH_BUTTON))
     ui.wait_for_node_containing('bookie_missing_panel_table')

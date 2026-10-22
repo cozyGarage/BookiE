@@ -406,11 +406,11 @@ Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/134
 
 ## Editor bottom panel
 
-- [ ] On native Arch/Hyprland, run a query with a unique visible value, hide/show Results by button and Ctrl+J from SQL and the result grid, and confirm the same result and selection remain.
-- [ ] Resize the divider, maximize/restore, and hide while maximized. Confirm the normal divider size and the previously focused SQL split are restored.
-- [ ] Check normal and enlarged text at narrow/wide sizes in light/dark themes. Every panel control remains reachable.
-- [ ] Run successful, failed and timed-out queries. Errors shows only the latest accepted failures; switching views does not hide or rerun the result set.
-- [ ] Close a query with the panel hidden while another editor remains open. Its controls still work and no late result revives the closed editor.
+- [x] On native Arch/Hyprland, run a query with a unique visible value, hide/show Results by button and Ctrl+J from SQL and the result grid, and confirm the same result and selection remain.
+- [x] Resize the divider, maximize/restore, and hide while maximized. Confirm the normal divider size and the previously focused SQL split are restored.
+- [x] Check 1,200 px with normal SQL text and 802 px with a 20-point SQL font in light/dark themes. Every panel control remains reachable.
+- [x] Run successful, failed and timed-out queries. Errors shows only the latest accepted failures; switching views does not hide or rerun the result set.
+- [x] Close a query with the panel hidden while another editor remains open. Its controls still work and no late result revives the closed editor.
 
 Source tests and native acceptance for this change are recorded in its PR and linked evidence; the checklist is not automatically satisfied by Xvfb.
 

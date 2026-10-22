@@ -30,3 +30,7 @@ Run the registered GTK tier and the installed-style scenario using the current r
 The temporary [pointer probe](native-pointer.c) uses the compositor's advertised virtual-pointer protocol without root. Its header and protocol code were generated with wayland-scanner from the [official wlr virtual-pointer XML](https://github.com/swaywm/wlr-protocols/blob/master/unstable/wlr-virtual-pointer-unstable-v1.xml), then linked with libwayland-client. The probe's absolute geometry is specific to this 1,920 × 1,200 display. It is test evidence, not a product dependency or a general desktop automation API.
 
 Still separate: packaged installation/upgrade, the supported distro floor, broader accessibility/Orca qualification and maintainer Forgejo acceptance. No new claim is made about informational server messages, arbitrary shell execution or SQL error source navigation.
+
+## Final Linux integration
+
+The manifest records the final integration commit and source-built binary digest. After merging Linux's resource fixes, all 121 registered isolated GTK tests and 725 regular app unit tests passed; strict app Clippy and the SQLite no-rerun scenario also passed. All four native cases were repeated on that integrated binary. The pointer case additionally closed a busy hidden query and waited beyond its timeout; its late completion did not replace the first editor's retained result. Final preflight passed: 2,056 non-GTK unit tests, 2,057 sandbox tests and one Redis cancellation test.
