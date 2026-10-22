@@ -929,7 +929,7 @@ impl App {
             return;
         };
         self.schema_index.borrow_mut().invalidate_columns();
-        self.requested_columns.borrow_mut().clear();
+        self.reset_schema_fetches();
         let affected: Vec<Uuid> = self
             .workspace_tabs
             .borrow()
