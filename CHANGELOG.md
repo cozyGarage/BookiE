@@ -17,6 +17,7 @@
 ### Fixed
 
 - SQLite refuses to drop a table in an attached database while other tables there still reference it, so their ON DELETE actions no longer empty those tables.
+- The Structure tab lists MySQL tables that have an index on an expression, and Show CREATE TABLE explains that an expression index cannot be recreated instead of writing it as a column index (MySQL, PostgreSQL, SQLite).
 - Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.
 - Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout.
 - A schema change stops the SQL-completion column lookups still running from before it.
