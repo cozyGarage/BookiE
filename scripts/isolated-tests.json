@@ -705,6 +705,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::undoing_a_second_edit_keeps_the_persisted_original_for_later_edits_and_the_saved_update"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::dispatch_tests::editor_actions_fit_narrow_rows_with_running_and_retry_controls"
     ],
     [
@@ -896,6 +901,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::a_selected_query_error_keeps_its_original_unicode_offset"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::tests::a_closed_browse_tab_releases_its_root_widget"
     ]
   ],
   "keyring": [

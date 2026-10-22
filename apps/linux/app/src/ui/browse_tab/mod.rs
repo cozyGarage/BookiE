@@ -418,14 +418,21 @@ impl SimpleComponent for BrowseTab {
         root.set_content(Some(inspector.widget()));
 
         let sync_top_bar_slot: std::rc::Rc<dyn Fn()> = {
-            let root_for_sync = root.clone();
-            let read_only_for_sync = read_only_banner.clone();
-            let no_pk_for_sync = no_pk_banner.clone();
-            let filter_for_sync = filter_strip.widget.clone();
+            // Weak: these widgets own the notify handlers that hold this closure (#1432).
+            let root_for_sync = root.downgrade();
+            let read_only_for_sync = read_only_banner.downgrade();
+            let no_pk_for_sync = no_pk_banner.downgrade();
+            let filter_for_sync = filter_strip.widget.downgrade();
             std::rc::Rc::new(move || {
-                let any_revealed =
-                    read_only_for_sync.is_revealed() || no_pk_for_sync.is_revealed() || filter_for_sync.reveals_child();
-                root_for_sync.set_reveal_top_bars(any_revealed);
+                let (Some(root), Some(read_only), Some(no_pk), Some(filter)) = (
+                    root_for_sync.upgrade(),
+                    read_only_for_sync.upgrade(),
+                    no_pk_for_sync.upgrade(),
+                    filter_for_sync.upgrade(),
+                ) else {
+                    return;
+                };
+                root.set_reveal_top_bars(read_only.is_revealed() || no_pk.is_revealed() || filter.reveals_child());
             })
         };
         sync_top_bar_slot();
@@ -880,8 +887,8 @@ impl SimpleComponent for BrowseTab {
                 }
             }
             BrowseTabInput::PrevPage => {
-                if self.current_offset >= self.page_size {
-                    self.current_offset -= self.page_size;
+                if let Some(previous_offset) = previous_page_offset(self.current_offset, self.page_size) {
+                    self.current_offset = previous_offset;
                     self.reverse_page = self.current_offset >= tablepro_core::KEYSET_OFFSET_THRESHOLD
                         && self.current_sort.is_none()
                         && self.keyset_first_cursor.is_some();
@@ -899,19 +906,15 @@ impl SimpleComponent for BrowseTab {
                 }
             }
             BrowseTabInput::NextPage => {
-                let loaded_rows = self
-                    .current_result
-                    .as_ref()
-                    .map_or(0, |result| result.rows.len() as u64);
-                if !next_page_available(
+                let Some(next_offset) = next_page_offset(
                     self.current_offset,
                     self.page_size,
                     self.current_total_rows,
-                    loaded_rows,
-                ) {
+                    self.current_result.as_deref(),
+                ) else {
                     return;
-                }
-                self.current_offset += self.page_size;
+                };
+                self.current_offset = next_offset;
                 self.keyset_before_cursor = None;
                 self.reverse_page = false;
                 self.last_page = false;
