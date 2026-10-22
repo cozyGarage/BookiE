@@ -1,7 +1,9 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 use relm4::adw;
 use relm4::gtk;
+use relm4::gtk::glib;
+use sourceview5::prelude::*;
 
 use crate::services::preferences::ThemePref;
 
@@ -152,7 +154,97 @@ fn css(surface: &Surface) -> String {
     format!("{named}:root {{\n{variables}}}\n")
 }
 
+fn scheme_id(theme: ThemePref, dark: bool) -> String {
+    format!("bookie-{}-{}", theme.key(), if dark { "dark" } else { "light" })
+}
+
+fn scheme_xml(id: &str, dark: bool, s: &Surface) -> String {
+    let parent = if dark { "Adwaita-dark" } else { "Adwaita" };
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<style-scheme id="{id}" name="{id}" version="1.0" parent-scheme="{parent}">
+  <style name="text" foreground="{fg}" background="{view}"/>
+  <style name="line-numbers" foreground="{fg}" background="{view}"/>
+  <style name="current-line" background="{chrome}"/>
+  <style name="current-line-number" background="{chrome}"/>
+  <style name="selection" foreground="{accent_fg}" background="{accent_bg}"/>
+  <style name="cursor" foreground="{accent}"/>
+  <style name="def:keyword" foreground="{accent}" bold="true"/>
+</style-scheme>
+"#,
+        fg = s.window_fg,
+        view = s.view_bg,
+        chrome = s.chrome_bg,
+        accent_fg = s.accent_fg,
+        accent_bg = s.accent_bg,
+        accent = s.accent_text,
+    )
+}
+
+fn install_editor_schemes() -> bool {
+    let directory = glib::user_cache_dir()
+        .join(crate::config::storage_dir_name())
+        .join("styles");
+    if std::fs::create_dir_all(&directory).is_err() {
+        return false;
+    }
+    for theme in ThemePref::ALL {
+        for dark in [true, false] {
+            let Some(surface) = surface(theme, dark) else { continue };
+            let id = scheme_id(theme, dark);
+            if let Err(error) = std::fs::write(directory.join(format!("{id}.xml")), scheme_xml(&id, dark, surface)) {
+                tracing::warn!(%error, "editor colour scheme could not be written");
+                return false;
+            }
+        }
+    }
+    let manager = sourceview5::StyleSchemeManager::default();
+    manager.append_search_path(&directory.to_string_lossy());
+    manager.force_rescan();
+    true
+}
+
+fn editor_scheme() -> Option<sourceview5::StyleScheme> {
+    let dark = adw::StyleManager::default().is_dark();
+    let manager = sourceview5::StyleSchemeManager::default();
+    let themed = surface(CURRENT.get(), dark).and_then(|_| {
+        SCHEMES_INSTALLED
+            .with(|installed| *installed.get_or_init(install_editor_schemes))
+            .then(|| manager.scheme(&scheme_id(CURRENT.get(), dark)))
+            .flatten()
+    });
+    themed.or_else(|| manager.scheme(if dark { "Adwaita-dark" } else { "Adwaita" }))
+}
+
+pub fn style_editor(view: &sourceview5::View) {
+    EDITORS.with(|editors| {
+        let mut editors = editors.borrow_mut();
+        editors.retain(|weak| weak.upgrade().is_some());
+        if !editors.iter().any(|weak| weak.upgrade().as_ref() == Some(view)) {
+            editors.push(view.downgrade());
+        }
+    });
+    set_scheme(view, editor_scheme().as_ref());
+}
+
+fn set_scheme(view: &sourceview5::View, scheme: Option<&sourceview5::StyleScheme>) {
+    if let (Some(scheme), Ok(buffer)) = (scheme, view.buffer().downcast::<sourceview5::Buffer>()) {
+        buffer.set_style_scheme(Some(scheme));
+    }
+}
+
+fn restyle_editors() {
+    let scheme = editor_scheme();
+    EDITORS.with(|editors| {
+        for view in editors.borrow().iter().filter_map(|weak| weak.upgrade()) {
+            set_scheme(&view, scheme.as_ref());
+        }
+    });
+}
+
 thread_local! {
+    static EDITORS: RefCell<Vec<glib::WeakRef<sourceview5::View>>> = const { RefCell::new(Vec::new()) };
+    static SCHEMES_INSTALLED: std::cell::OnceCell<bool> = const { std::cell::OnceCell::new() };
     static PROVIDER: gtk::CssProvider = gtk::CssProvider::new();
     static ATTACHED: Cell<bool> = const { Cell::new(false) };
     static CURRENT: Cell<ThemePref> = const { Cell::new(ThemePref::Default) };
@@ -171,6 +263,7 @@ pub fn apply(theme: ThemePref) {
         let dark = adw::StyleManager::default().is_dark();
         provider.load_from_string(&surface(theme, dark).map(css).unwrap_or_default());
     });
+    restyle_editors();
 }
 
 pub fn labels() -> [String; 5] {
@@ -238,6 +331,21 @@ mod tests {
             "accent_color",
         ] {
             assert!(sheet.contains(&format!("@define-color {name} #")), "{name}");
+        }
+    }
+
+    #[test]
+    fn every_themed_editor_scheme_names_itself_and_inherits_adwaita() {
+        for theme in ThemePref::ALL {
+            for dark in [true, false] {
+                let Some(surface) = surface(theme, dark) else { continue };
+                let id = scheme_id(theme, dark);
+                let xml = scheme_xml(&id, dark, surface);
+                assert!(xml.contains(&format!("id=\"{id}\"")), "{id}");
+                let parent = if dark { "Adwaita-dark" } else { "Adwaita" };
+                assert!(xml.contains(&format!("parent-scheme=\"{parent}\"")), "{id}");
+                assert!(xml.contains(&format!("background=\"{}\"", surface.view_bg)), "{id}");
+            }
         }
     }
 
