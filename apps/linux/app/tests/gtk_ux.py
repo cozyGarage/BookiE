@@ -23,7 +23,7 @@ class XWindowAttributes(ctypes.Structure):
     ]
 
 
-ATSPI_WINDOW_Y_OFFSET = int(os.environ.get("TABLEPRO_GTK_Y_OFFSET", "19"))
+ATSPI_WINDOW_Y_OFFSET = gtk_input.window_y_offset()
 
 
 def x11_resize_window(width, height):
@@ -725,6 +725,42 @@ GLib.MainLoop().run()
             if ui.node_role(node) in roles and not ui.node_name(node).strip()
         ]
         assert not unnamed, "controls without an accessible name:\n" + "\n".join(unnamed)
+
+    def wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells(database, base):
+        ui.run_sql("SELECT " + ", ".join(f"{1000 + index} AS c{index}" for index in range(1, 301)))
+        wait_for_result_column("c1")
+
+        def showing(node):
+            return node is not None and node.getState().contains(pyatspi.STATE_SHOWING)
+
+        def left_edge(node):
+            return node.queryComponent().getExtents(pyatspi.WINDOW_COORDS).x
+
+        for index in (150, 300, 1):
+            ui.press_x11_key("j", ("Control_L", "Shift_L"))
+            search = ui.wait_for_node(name="Search columns")
+            search.queryEditableText().setTextContents(f"c{index}")
+            time.sleep(0.3)
+            ui.press_x11_key("Return")
+            ui.wait_for_node(name="Search columns", present=False)
+            frame = next(
+                node for node in ui.descendants(ui.application_node()) if ui.node_role(node) == pyatspi.ROLE_FRAME
+            )
+            window_width = frame.queryComponent().getExtents(pyatspi.WINDOW_COORDS).width
+
+            def aligned_in_view():
+                header = ui.find_node_containing(f"c{index}\n", role=pyatspi.ROLE_LABEL)
+                cell = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_LABEL)
+                if not (showing(header) and showing(cell)):
+                    return None
+                header_x, cell_x = left_edge(header), left_edge(cell)
+                in_view = 0 <= header_x < window_width and 0 <= cell_x < window_width
+                return (header_x, cell_x) if in_view and abs(header_x - cell_x) <= 12 else None
+
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while aligned_in_view() is None:
+                assert time.monotonic() < deadline, f"c{index} did not scroll into view over its header"
+                time.sleep(ui.POLL_SECONDS)
 
     def narrow_window_keeps_main_and_editor_toolbar_actions_reachable(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)
@@ -1662,6 +1698,7 @@ GLib.MainLoop().run()
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
+        wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells,
         narrow_window_keeps_main_and_editor_toolbar_actions_reachable,
         connection_colour_chooser_has_an_accessible_button,
         alt_arrows_jump_between_statements,
