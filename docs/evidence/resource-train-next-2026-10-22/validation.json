@@ -1,0 +1,14 @@
+{
+  "source": "a457fdc7d9b7343bb5087aee79dc76af8c250089",
+  "preflight": "passed",
+  "app_unit_count": 728,
+  "app_all_target_clippy": "passed",
+  "gtk_widget_count": 105,
+  "log_sha256": {
+    "preflight": "9b5743342605f9ea56896994369bdc27e87c284c1dfccf2a22a6ba55297e11e7",
+    "app-unit": "859f1c27db5c145cb7a17bdd1d4260929cadb9c0aeac97f4ca1fd7bc3c9aad9f",
+    "clippy": "09e26cad6da80764a1e190477529f560c6fe67dbd1f54330ab4b33a0a8cc4cf0",
+    "widgets": "79a35643c6a7cb12d4e8e163f1e995dde2c72cfdaacc7543ee2a48108757bcc4"
+  },
+  "forgejo": "pending"
+}
