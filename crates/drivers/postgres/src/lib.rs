@@ -296,8 +296,8 @@ impl Connection for PgConnection {
              LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation
              LEFT JOIN pg_catalog.pg_attrdef d
                  ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-             WHERE n.nspname = COALESCE($2, current_schema())
-               AND t.relname = $1
+             WHERE (($2::text IS NULL AND t.oid = (SELECT c.oid FROM unnest(pg_catalog.current_schemas(false)) WITH ORDINALITY AS path(name, position) JOIN pg_catalog.pg_namespace ns ON ns.nspname = path.name JOIN pg_catalog.pg_class c ON c.relnamespace = ns.oid AND c.relname = $1 ORDER BY path.position LIMIT 1))
+                  OR (n.nspname = $2 AND t.relname = $1))
                AND a.attnum > 0
                AND NOT a.attisdropped
              ORDER BY a.attnum",
@@ -496,13 +496,14 @@ impl Connection for PgConnection {
                 pg_catalog.pg_get_expr(ix.indpred, ix.indrelid, true) AS predicate,
                 (SELECT c.conname::text FROM pg_catalog.pg_constraint c
                  WHERE c.conindid = ix.indexrelid AND c.conrelid = ix.indrelid
-                   AND c.contype IN ('p', 'u', 'x') LIMIT 1) AS constraint_name
+                   AND c.contype IN ('p', 'u', 'x') LIMIT 1) AS constraint_name,
+                0 = ANY(ix.indkey::int2[]) AS has_expression_key
             FROM pg_catalog.pg_class t
             JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
             JOIN pg_catalog.pg_index ix ON ix.indrelid = t.oid
             JOIN pg_catalog.pg_class i ON i.oid = ix.indexrelid
-            WHERE n.nspname = COALESCE($2, current_schema())
-              AND t.relname = $1
+            WHERE (($2::text IS NULL AND t.oid = (SELECT c.oid FROM unnest(pg_catalog.current_schemas(false)) WITH ORDINALITY AS path(name, position) JOIN pg_catalog.pg_namespace ns ON ns.nspname = path.name JOIN pg_catalog.pg_class c ON c.relnamespace = ns.oid AND c.relname = $1 ORDER BY path.position LIMIT 1))
+                 OR (n.nspname = $2 AND t.relname = $1))
             ORDER BY i.relname",
         )
         .bind(table)
@@ -519,6 +520,7 @@ impl Connection for PgConnection {
                     columns: r.try_get(3).map_err(map_sqlx_error)?,
                     predicate: r.try_get(4).map_err(map_sqlx_error)?,
                     constraint: r.try_get(5).map_err(map_sqlx_error)?,
+                    has_expression_key: r.try_get(6).map_err(map_sqlx_error)?,
                 })
             })
             .collect()
@@ -567,8 +569,8 @@ impl Connection for PgConnection {
                 ON kfr.ordinality = kf.ordinality
             JOIN pg_catalog.pg_attribute fa ON fa.attrelid = c.confrelid AND fa.attnum = kfr.attnum
             WHERE c.contype = 'f'
-              AND n.nspname = COALESCE($2, current_schema())
-              AND t.relname = $1
+              AND (($2::text IS NULL AND t.oid = (SELECT c.oid FROM unnest(pg_catalog.current_schemas(false)) WITH ORDINALITY AS path(name, position) JOIN pg_catalog.pg_namespace ns ON ns.nspname = path.name JOIN pg_catalog.pg_class c ON c.relnamespace = ns.oid AND c.relname = $1 ORDER BY path.position LIMIT 1))
+                 OR (n.nspname = $2 AND t.relname = $1))
             GROUP BY c.conname, fn_class.relname, fn_ns.nspname, c.confdeltype, c.confupdtype
             ORDER BY c.conname",
         )

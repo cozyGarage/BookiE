@@ -93,6 +93,8 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 
 ## Engineering review records (October 2026)
 
+- [Merge baseline validation, October 23](evidence/merge-baseline-validation-2026-10-23/README.md): workspace-test compile repair, scoped local validation and the independent completion-popup timeout.
+
 - [Table-browse resource profile, October 22](evidence/table-browse-resource-2026-10-22/README.md): measured a wide SQLite page headlessly and exposed missing truncation feedback.
 
 - [Stream page construction, October 22](evidence/stream-frame-2026-10-22/README.md): regression for grids built before their first frame, CPU attribution and partial optimized acceptance.
@@ -143,15 +145,18 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 - [GPUI client review, October 22](archive/gpui-client-review-2026-10-22.md): completed source research including dbdelve; open adoption proposals remain on their issues.
 - [Transaction-control proposal review, October 22](archive/transaction-control-review-2026-10-22.md): completed DBF-5 verification against existing shared-connection and owned-session guards.
 
+- [Editor bottom panel desktop acceptance, October 22](evidence/editor-bottom-panel-2026-10-22/README.md): source-built native Wayland, keyboard/pointer, error/timeout and layout evidence; package and Forgejo gates stay separate.
 - [Selection statistics resource investigation, October 22](evidence/selection-statistics-2026-10-22/README.md): borrowed-cell computation, numeric behavior tests and matched headless heap profiles.
 - [Inspector preview resource investigation, October 22](evidence/inspector-preview-2026-10-22/README.md): borrowed-cell previews, preserved field semantics and matched headless heap/timing measurements.
 - [Browse inspector callback lifetime, October 22](evidence/inspector-cycle-2026-10-22/README.md): failing then passing GTK weak-reference regression for a selection-to-inspector ownership cycle.
+- [Editor error navigation, October 22](evidence/editor-error-navigation-2026-10-22/README.md): structured positions, exact statement origins, stale-action refusal and native PostgreSQL pointer/keyboard acceptance.
 
 - [Query row decoding budget, October 22](evidence/query-row-budget-2026-10-22/README.md): pre-decode row checks, measured PostgreSQL client RSS reduction and remaining allocation limits.
 - [Borrowed row identity checks, October 22](evidence/row-key-borrowing-2026-10-22/README.md): reduced copying during stale-edit validation, with key contract tests and allocation measurements.
 
 - [Linux follow-up review, October 22](archive/linux-follow-up-review-2026-10-22.md): merged result-memory fixes, corrected evidence status and nonduplicating UI acceptance order.
 
+- [Session opening and SQL execution ordering, October 22](evidence/session-opening-run-order-2026-10-22/README.md): held-open regression and shared execution readiness checks.
 - [Arch wrapper release date, October 22](evidence/arch-wrapper-date-2026-10-22/README.md): mandatory-date forwarding, boundary regressions and real isolated package upgrade/removal evidence.
 - [Dedicated-session opening guard, October 22](evidence/session-opening-guard-2026-10-22/README.md): standalone held-open regression and current-Linux source checks.
 

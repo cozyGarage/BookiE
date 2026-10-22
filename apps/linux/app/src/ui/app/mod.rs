@@ -23,6 +23,7 @@ mod row_ops;
 mod schema_index;
 mod session_teardown;
 mod shortcuts;
+mod sidebar_layout;
 mod sidebar_state;
 mod status_pages;
 mod structure;
@@ -127,6 +128,7 @@ pub struct App {
     databases_button: gtk::MenuButton,
     databases_list: gtk::ListBox,
     pending_database_switch: Option<(Uuid, String)>,
+    connected_database: Option<String>,
     health_state: Option<ConnectionHealth>,
     row_op_spinner: gtk::Spinner,
     read_only_badge: gtk::Label,
@@ -459,6 +461,7 @@ impl SimpleComponent for App {
             mcp_bridge,
         } = init;
         let widgets = view_output!();
+        sidebar_layout::install(&widgets.split_view);
         widgets
             .table_search
             .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Search tables"))]);
@@ -563,6 +566,7 @@ impl SimpleComponent for App {
             databases_button: widgets.databases_button.clone(),
             databases_list: database_switcher::build_database_popover(&widgets.databases_popover, &sender),
             pending_database_switch: None,
+            connected_database: None,
             health_state: None,
             row_op_spinner: widgets.row_op_spinner.clone(),
             read_only_badge: widgets.read_only_badge.clone(),
@@ -867,10 +871,11 @@ impl SimpleComponent for App {
             AppMsg::CloseWorkspaceTabsToRight(id) => self.close_workspace_tabs_to_right(id, sender),
             AppMsg::CloseActiveWorkspaceTab => self.close_active_workspace_tab(sender),
             AppMsg::ShowAlert { title, body } => self.show_error_alert(&title, &body),
-            AppMsg::ExportResults { result, name } => super::export_dialog::present(
+            AppMsg::ExportResults { result, name, scope } => super::export_dialog::present(
                 &self.window,
                 &self.toast_overlay,
                 super::export_dialog::ExportRequest {
+                    scope,
                     paged: None,
                     result,
                     suggested_name: name,
