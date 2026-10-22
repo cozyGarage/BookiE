@@ -116,7 +116,11 @@ def scenarios(ui):
     def wait_for_adw_dialog(name, present=True):
         if os.environ.get("TABLEPRO_GTK_OLD_ADW") == "1":
             return None
-        return ui.wait_for_node(name=name, role=pyatspi.ROLE_DIALOG, present=present)
+        roles = (pyatspi.ROLE_DIALOG, pyatspi.ROLE_LABEL)
+        wait_until(
+            lambda: any(ui.find_node(name=name, role=role) is not None for role in roles) == present,
+            f"dialog {name!r} did not become {'visible' if present else 'hidden'}",
+        )
 
     def text_of(node):
         text = node.queryText()
