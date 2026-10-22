@@ -93,6 +93,7 @@ pub struct App {
     mcp_bridge: Option<Arc<tablepro_mcp::McpBridge>>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
+    sidebar_toggle: gtk::ToggleButton,
     sidebar_reveal: std::rc::Rc<std::cell::Cell<u32>>,
     window_title: adw::WindowTitle,
     header_bar: adw::HeaderBar,
@@ -111,6 +112,7 @@ pub struct App {
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     schema_fetch_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
+    database_list_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     content_holder: adw::ToolbarView,
     history_paned: gtk::Paned,
     toast_overlay: adw::ToastOverlay,
@@ -299,7 +301,7 @@ impl SimpleComponent for App {
                     #[name = "sidebar_toggle"]
                     pack_start = &gtk::ToggleButton {
                         set_icon_name: "sidebar-show-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Show tables").as_str()),
+                        set_tooltip_text: Some(crate::tr!("Tables sidebar").as_str()),
                         set_visible: true,
                     },
 
@@ -524,6 +526,7 @@ impl SimpleComponent for App {
             mcp_bridge,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
+            sidebar_toggle: widgets.sidebar_toggle.clone(),
             sidebar_reveal: std::rc::Rc::default(),
             window_title: widgets.window_title.clone(),
             header_bar: widgets.header_bar.clone(),
@@ -542,6 +545,7 @@ impl SimpleComponent for App {
             catalog_generation: std::cell::Cell::new(0),
             catalog_cancel: Default::default(),
             schema_fetch_cancel: Default::default(),
+            database_list_cancel: Default::default(),
             content_holder: widgets.content_holder.clone(),
             history_paned: gtk::Paned::builder()
                 .orientation(gtk::Orientation::Vertical)
@@ -614,6 +618,7 @@ impl SimpleComponent for App {
         open_request::forward_open_signal(sender.input_sender());
         sender.input(AppMsg::ReloadConnections);
         model.content_holder.set_content(Some(&model.history_paned));
+        model.set_sidebar_connected(false);
         model.show_welcome_page(sender.clone());
 
         widgets
@@ -875,7 +880,6 @@ impl SimpleComponent for App {
             AppMsg::ExportStreamedResults(request) => self.on_export_streamed_results(request),
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
-            AppMsg::WindowWidened => self.on_window_widened(),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
             AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),
@@ -1109,9 +1113,7 @@ impl SimpleComponent for App {
             AppMsg::ImportConnectionUrlFailed => self.on_import_connection_url_failed(),
             AppMsg::OpenSaved(saved) => self.on_open_saved(saved, sender),
             AppMsg::LoadDatabases => self.on_load_databases(sender),
-            AppMsg::DatabasesLoaded { connection_id, result } => {
-                self.on_databases_loaded(connection_id, result, sender)
-            }
+            AppMsg::DatabasesLoaded { origin, result } => self.on_databases_loaded(origin, result, sender),
             AppMsg::SwitchDatabase(name) => self.on_switch_database(name, sender),
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),

@@ -21,6 +21,13 @@
 
 ### Fixed
 
+- In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
+- Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.
+- Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout.
+- A schema change stops the SQL-completion column lookups still running from before it.
+- The database switcher ignores, and stops, a database list still loading from the session before a database switch.
+- A cancelled Structure tab load no longer replaces the newer one.
+- A new empty editor tab takes the first free "Query N" title instead of counting open editors, so closing Query 1 and opening a new tab no longer produces a second "Query 2".
 - Closing a result grid releases its selection and row inspector.
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.

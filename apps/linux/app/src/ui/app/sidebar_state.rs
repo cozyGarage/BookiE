@@ -8,10 +8,22 @@ use crate::services::sidebar_tree::{CollapseState, NodeKind, Reveal, build_nodes
 use crate::ui::sidebar_row::{GroupInit, SidebarObjectKind, SidebarRowInit, SidebarRowMsg};
 
 pub(super) fn reveal_sidebar(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
+    reveal_with(split_view, generation, |split_view| split_view.set_show_sidebar(true));
+}
+
+fn reveal_sidebar_unless_overlay(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
+    reveal_with(split_view, generation, show_unless_overlay);
+}
+
+fn reveal_with(
+    split_view: &adw::OverlaySplitView,
+    generation: &std::rc::Rc<std::cell::Cell<u32>>,
+    show: fn(&adw::OverlaySplitView),
+) {
     let wanted = generation.get().wrapping_add(1);
     generation.set(wanted);
     if split_view.width() > 0 {
-        show_unless_overlay(split_view);
+        show(split_view);
         return;
     }
     let generation = generation.clone();
@@ -22,9 +34,14 @@ pub(super) fn reveal_sidebar(split_view: &adw::OverlaySplitView, generation: &st
         if split_view.width() == 0 {
             return relm4::gtk::glib::ControlFlow::Continue;
         }
-        show_unless_overlay(split_view);
+        show(split_view);
         relm4::gtk::glib::ControlFlow::Break
     });
+}
+
+fn sidebar_follows_connection(split_view: &adw::OverlaySplitView, toggle: &relm4::gtk::ToggleButton, connected: bool) {
+    split_view.set_pin_sidebar(!connected);
+    toggle.set_sensitive(connected);
 }
 
 fn show_unless_overlay(split_view: &adw::OverlaySplitView) {
@@ -42,10 +59,13 @@ pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std:
 }
 
 impl App {
-    pub(super) fn on_window_widened(&self) {
-        if self.connected {
-            reveal_sidebar(&self.split_view, &self.sidebar_reveal);
-        }
+    pub(super) fn show_sidebar_for_new_connection(&self) {
+        self.set_sidebar_connected(true);
+        reveal_sidebar_unless_overlay(&self.split_view, &self.sidebar_reveal);
+    }
+
+    pub(super) fn set_sidebar_connected(&self, connected: bool) {
+        sidebar_follows_connection(&self.split_view, &self.sidebar_toggle, connected);
     }
 
     pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo]) {
@@ -289,15 +309,33 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
-    fn a_collapsed_window_keeps_the_sidebar_closed_so_it_cannot_cover_the_first_click() {
+    fn the_sidebar_stays_closed_in_a_narrow_window_and_never_opens_empty() {
         relm4::adw::init().unwrap();
         let split_view = adw::OverlaySplitView::new();
+        let toggle = relm4::gtk::ToggleButton::new();
+        sidebar_follows_connection(&split_view, &toggle, false);
+        split_view.set_show_sidebar(false);
+        split_view.set_collapsed(true);
+        split_view.set_collapsed(false);
+        assert!(
+            !split_view.shows_sidebar(),
+            "widening without a connection keeps the empty sidebar closed"
+        );
+        assert!(!toggle.is_sensitive());
+
+        sidebar_follows_connection(&split_view, &toggle, true);
         split_view.set_collapsed(true);
         show_unless_overlay(&split_view);
-        assert!(!split_view.shows_sidebar());
+        assert!(
+            !split_view.shows_sidebar(),
+            "connecting in a narrow window does not cover the workspace"
+        );
+        assert!(toggle.is_sensitive());
         split_view.set_collapsed(false);
-        show_unless_overlay(&split_view);
-        assert!(split_view.shows_sidebar());
+        assert!(
+            split_view.shows_sidebar(),
+            "widening while connected docks the sidebar again"
+        );
     }
 }
 
