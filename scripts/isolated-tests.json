@@ -791,6 +791,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::hiding_results_falls_back_when_the_remembered_sql_split_was_closed"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::tests::a_stream_page_retired_before_a_frame_does_not_build_a_grid"
     ]
   ],
   "keyring": [
