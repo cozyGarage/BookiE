@@ -18,8 +18,10 @@ inspector and result `Arc` are all released.
 
 ## Validation
 
-The regression passed under GTK/Xvfb after failing on the unfixed code. Full
-preflight passed all 2,054 tests (64 skipped), and all 106 isolated GTK widget
-tests passed. Forgejo acceptance and repeated window RSS measurements remain
-pending. The test proves object release; it does not quantify process RSS
-impact.
+The regression passed under GTK/Xvfb after failing on the unfixed code. The
+first GitHub Fast check found that the strong helper was only used by tests;
+it is now compiled only in test builds. Refreshed preflight passed all 2,054
+tests (64 skipped), app all-target Clippy passed, and all 106 isolated GTK
+widget tests passed. GitHub checks and Forgejo acceptance remain pending.
+Repeated window RSS measurements have not been run. The test proves object
+release; it does not quantify process RSS impact.
