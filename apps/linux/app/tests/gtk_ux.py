@@ -113,10 +113,19 @@ def scenarios(ui):
     pyatspi = ui.pyatspi
     ssh_trust_prompt_roles = (pyatspi.ROLE_ALERT, pyatspi.ROLE_FRAME)
 
+    def saved_connection_action(name, action):
+        row = ui.wait_for_node(name=name, role=pyatspi.ROLE_LIST_ITEM)
+        ui.invoke(ui.wait_within(row, name="Connection actions", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.invoke(ui.wait_for_node(name=action))
+
     def wait_for_adw_dialog(name, present=True):
-        if os.environ.get("TABLEPRO_GTK_OLD_ADW") == "1":
+        if gtk_input.uses_old_adw():
             return None
-        return ui.wait_for_node(name=name, role=pyatspi.ROLE_DIALOG, present=present)
+        roles = (pyatspi.ROLE_DIALOG, pyatspi.ROLE_LABEL)
+        wait_until(
+            lambda: any(ui.find_node(name=name, role=role) is not None for role in roles) == present,
+            f"dialog {name!r} did not become {'visible' if present else 'hidden'}",
+        )
 
     def text_of(node):
         text = node.queryText()
@@ -349,7 +358,7 @@ GLib.MainLoop().run()
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        ui.invoke_named_action_within(ui.CONNECTION_B_NAME, "Edit connection")
+        saved_connection_action(ui.CONNECTION_B_NAME, "Edit connection")
         ui.wait_for_node(name=f"Edit {ui.CONNECTION_B_NAME}")
         name = ui.wait_for_node(name="Name (optional)", role=pyatspi.ROLE_TEXT)
         assert text_of(name) == ui.CONNECTION_B_NAME, text_of(name)
@@ -363,7 +372,7 @@ GLib.MainLoop().run()
 
     def open_edit_dialog_for(name):
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        ui.invoke_named_action_within(name, "Edit connection")
+        saved_connection_action(name, "Edit connection")
         ui.wait_for_node(name=f"Edit {name}")
 
     def test_connection_reports_success_in_the_dialog(database, base):
@@ -785,8 +794,7 @@ GLib.MainLoop().run()
         ui.invoke_accessible_action("win.disconnect")
         ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        row = ui.wait_for_node(name=ui.CONNECTION_NAME, role=pyatspi.ROLE_LIST_ITEM)
-        ui.invoke(ui.wait_within(row, name="Group and tags", role=pyatspi.ROLE_PUSH_BUTTON))
+        saved_connection_action(ui.CONNECTION_NAME, "Group and tags")
         chooser = ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON)
         actions = chooser.queryAction()
         assert any(actions.getName(index) == "click" for index in range(actions.nActions)), (
