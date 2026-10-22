@@ -19,6 +19,13 @@
 
 - Large JSON previews use less temporary memory.
 - Inspecting a row with oversized cell previews avoids copying the full row contents.
+- Saved connection names remain readable in narrow lists, with secondary actions available from a menu.
+- Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
+
+- Closing SQL editors releases their retained query text and search state.
+- Large JSON previews use less temporary memory.
+- Saving workspaces with large SQL drafts uses less temporary memory.
+
 - Closing SQL editors releases their retained query text and search state.
 - SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
 
