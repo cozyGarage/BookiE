@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- PostgreSQL: a table named without its schema is found through the whole `search_path`, as PostgreSQL itself resolves it. Before, only the first schema on the path was searched, so SQL completion showed no columns (and structure lookups found nothing) for a table that lives in a later schema.
 - Closing a result grid releases its selection and row inspector.
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
