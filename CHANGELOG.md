@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- Copying rows and pasting them back into the grid keeps NULL, empty text and text such as `\N` unchanged. Previously empty text pasted as `""`, and a cell holding `\N` could swap with a NULL.
 - Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
 
 - Closing SQL editors releases their retained query text and search state.
