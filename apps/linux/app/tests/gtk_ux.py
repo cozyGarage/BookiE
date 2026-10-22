@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import gtk_input
+import keyboard_paths
 
 
 class XWindowAttributes(ctypes.Structure):
@@ -658,6 +659,25 @@ GLib.MainLoop().run()
         ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
         session_toggle("Session")
 
+    def switching_connection_asks_before_rolling_back_an_open_session_transaction(database, base):
+        ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        time.sleep(0.5)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.open_saved_connection(ui.CONNECTION_B_NAME)
+        ui.wait_for_node(name="Switch with an open session transaction?")
+        time.sleep(0.5)
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Switch with an open session transaction?", present=False)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} \u2014 BookiE")
+        ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.open_saved_connection(ui.CONNECTION_B_NAME)
+        ui.wait_for_node(name="Switch with an open session transaction?")
+        ui.invoke(ui.wait_for_node(name="Roll Back and Switch", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} \u2014 BookiE")
+
     def wait_for_editor_text(expected):
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -783,6 +803,38 @@ GLib.MainLoop().run()
         ui.invoke(option)
         ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
         ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
+
+    def sql_editor_clickables_all_have_a_keyboard_path(database, base):
+        ui.run_sql("SELECT 1 AS alpha")
+        wait_for_result_column("alpha")
+        clickable = (
+            pyatspi.ROLE_PUSH_BUTTON,
+            pyatspi.ROLE_TOGGLE_BUTTON,
+            pyatspi.ROLE_CHECK_BOX,
+            pyatspi.ROLE_COMBO_BOX,
+            pyatspi.ROLE_LINK,
+        )
+        names = [
+            ui.node_name(node).strip()
+            for node in ui.descendants(ui.application_node())
+            if ui.node_role(node) in clickable and node.getState().contains(pyatspi.STATE_SHOWING)
+        ]
+        missing = keyboard_paths.unregistered(names, keyboard_paths.SQL_EDITOR)
+        assert not missing, "clickable without a registered keyboard path:\n" + "\n".join(missing)
+        line = ui.wait_for_node(name="SELECT 1 AS alpha", role=pyatspi.ROLE_LABEL)
+        extents = line.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
+        def main_menu_showing():
+            menu = ui.find_node(name="Main menu", role=pyatspi.ROLE_MENU)
+            return menu is not None and menu.getState().contains(pyatspi.STATE_SHOWING)
+
+        assert not main_menu_showing(), "the main menu was already open"
+        ui.press_x11_key("F10")
+        deadline = time.monotonic() + 5
+        while not main_menu_showing():
+            assert time.monotonic() < deadline, f"F10 did not open the main menu:\n{ui.accessible_snapshot()}"
+            time.sleep(0.1)
+        ui.press_x11_key("Escape")
 
     def alt_arrows_jump_between_statements(database, base):
         sql = "select 1;\nselect 2;\nselect 3"
@@ -1684,12 +1736,14 @@ GLib.MainLoop().run()
         connect_dialog_cancel_stops_a_hanging_connection,
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
+        switching_connection_asks_before_rolling_back_an_open_session_transaction,
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
         wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells,
         narrow_window_keeps_main_and_editor_toolbar_actions_reachable,
         connection_colour_chooser_has_an_accessible_button,
+        sql_editor_clickables_all_have_a_keyboard_path,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
         query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace,
