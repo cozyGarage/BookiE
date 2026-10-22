@@ -118,11 +118,16 @@ impl App {
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id)
                 .into(),
         );
+        let cancel = crate::services::request_generation::replace_in_flight(&self.database_list_cancel);
         let reply = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let result = match tokio::time::timeout(timeout, connection.list_databases()).await {
+                    let listing = tokio::select! {
+                        listing = tokio::time::timeout(timeout, connection.list_databases()) => listing,
+                        () = cancel.cancelled() => return,
+                    };
+                    let result = match listing {
                         Ok(Ok(names)) => Ok(names),
                         Ok(Err(error)) => Err(crate::services::error_text::driver_message(&error)),
                         Err(_) => Err(crate::tr!("Listing databases timed out.")),

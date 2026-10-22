@@ -110,6 +110,7 @@ pub struct App {
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     schema_fetch_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
+    database_list_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     content_holder: adw::ToolbarView,
     history_paned: gtk::Paned,
     toast_overlay: adw::ToastOverlay,
@@ -528,6 +529,7 @@ impl SimpleComponent for App {
             catalog_generation: std::cell::Cell::new(0),
             catalog_cancel: Default::default(),
             schema_fetch_cancel: Default::default(),
+            database_list_cancel: Default::default(),
             content_holder: widgets.content_holder.clone(),
             history_paned: gtk::Paned::builder()
                 .orientation(gtk::Orientation::Vertical)
