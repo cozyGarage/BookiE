@@ -8,6 +8,7 @@
 
 ### Changed
 
+- Oversized text and JSON cells use shorter visible previews to reduce text-layout work; full values remain available through View Value and Copy Value.
 - Editing rows with large values uses less temporary memory when verifying the row identity.
 
 - Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
@@ -17,6 +18,11 @@
 ### Fixed
 
 - Saved connection names remain readable in narrow lists, with secondary actions available from a menu.
+- Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
+
+- Closing SQL editors releases their retained query text and search state.
+- Large JSON previews use less temporary memory.
+- Saving workspaces with large SQL drafts uses less temporary memory.
 
 - Closing SQL editors releases their retained query text and search state.
 - SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
