@@ -14,6 +14,10 @@ The revised allocation test passes with at least 120 pixels reserved for the nam
 
 An initial menu-model implementation rendered all four actions but did not expose its entries through AT-SPI in the local GTK build. It was replaced with native labeled buttons. The installed tests interact with those buttons rather than bypassing them through exported actions.
 
+## Separate defect
+
+Removal was also exercised without deleting any fixture data. It displayed `Remove “name”?` followed by `Delete name?`. Cancelling the second confirmation preserved the complete saved-connection file. Both handlers predate the layout change. [#1337](https://github.com/cozyGarage/BookiE/issues/1337) tracks removing this duplicate prompt while preserving unconditional confirmation at the application boundary.
+
 ## Verification
 
 - Narrow allocation regression: failed before the change, passed after it under Xvfb.
