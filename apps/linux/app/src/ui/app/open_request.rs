@@ -9,9 +9,9 @@ pub(super) fn forward_open_signal(sender: &relm4::Sender<AppMsg>) {
     relm4::main_application().connect_open(move |app, files, _hint| {
         let arguments = files
             .iter()
-            .filter_map(|file| match file.path() {
-                Some(path) => Some(LaunchArgument::Path(path)),
-                None => Some(LaunchArgument::Uri(file.uri().to_string())),
+            .map(|file| match file.path() {
+                Some(path) => LaunchArgument::Path(path),
+                None => LaunchArgument::Uri(file.uri().to_string()),
             })
             .collect();
         let _ = sender.send(AppMsg::OpenLaunchArguments(arguments));
