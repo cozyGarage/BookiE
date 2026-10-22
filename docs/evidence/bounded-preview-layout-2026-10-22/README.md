@@ -27,3 +27,9 @@ Browse grids enable long-value previews only when primary-key indices are presen
 ## Current Linux refresh
 
 Merged Linux through `c3b2a054e`, including the accepted PostgreSQL terminal-page metadata fix and nonblocking GTK stderr capture. Full preflight and all 103 registered GTK widget tests passed again at merge head `bca4ef6876dce2bc64d00e2c0fa263d10e552f4a`. Documentation links, issue ledger and ignored-test inventory checks also passed. The owning issue remains open for the remaining resource scenarios and keyless browse coverage. Forgejo acceptance is pending; the retained-byte change must be accepted together with bounded preview layout.
+
+## Inspector regression found during aggregate validation
+
+The aggregate app-unit run executed 718 tests: 717 passed and the existing `long_value_inspection_shows_the_sample_and_native_byte_count` regression failed. The shared preview formatter had also shortened the row inspector sample from 8 KiB to 512 characters. The correction applies the 512-character limit at grid CellView construction and preserves the inspector formatter’s complete stored sample. The existing inspector regression is unchanged; the Unicode limit assertion now exercises grid CellView construction directly. The failed aggregate is not eligible for gating, and its manifest must be rebuilt with the corrected constituent head after validation.
+
+After the correction, all 716 non-ignored app unit tests passed, including the unchanged inspector sample regression and the grid’s Text/JsonText and Unicode preview-limit checks. App all-target Clippy also passed. Refreshed preflight, GTK widget tests and rebuilt aggregate acceptance remain pending at this checkpoint.

@@ -61,7 +61,7 @@ impl CellView {
 
     pub(super) fn from_preview(preview: &crate::ui::row_object::CellPreview) -> Self {
         Self {
-            display_text: preview_to_display_text(preview),
+            display_text: preview_display_text(preview, 512),
             is_null: false,
             inline_editable: false,
             auto_filled: false,
@@ -138,10 +138,17 @@ pub(crate) fn value_to_search_text(value: &Value) -> Cow<'_, str> {
 }
 
 pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPreview) -> String {
+    preview_display_text(preview, usize::MAX)
+}
+
+fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
     let total = crate::tr!("{n} bytes total").replace("{n}", &preview.byte_count.to_string());
     match &preview.value {
         Value::Text(text) | Value::JsonText(text) => {
-            let end = text.char_indices().nth(512).map_or(text.len(), |(index, _)| index);
+            let end = text
+                .char_indices()
+                .nth(text_limit)
+                .map_or(text.len(), |(index, _)| index);
             format!("{}… ({total})", text[..end].replace('\0', "\u{2400}"))
         }
         Value::Bytes(bytes) => {
@@ -641,7 +648,7 @@ mod tests {
             byte_count: 9000,
         };
         assert_eq!(
-            preview_to_display_text(&preview),
+            CellView::from_preview(&preview).display_text,
             format!("{}␀… (9000 bytes total)", "é".repeat(511))
         );
         assert_eq!(preview.value, Value::Text(text));
