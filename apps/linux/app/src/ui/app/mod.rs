@@ -1093,9 +1093,7 @@ impl SimpleComponent for App {
             AppMsg::ImportConnectionUrlFailed => self.on_import_connection_url_failed(),
             AppMsg::OpenSaved(saved) => self.on_open_saved(saved, sender),
             AppMsg::LoadDatabases => self.on_load_databases(sender),
-            AppMsg::DatabasesLoaded { connection_id, result } => {
-                self.on_databases_loaded(connection_id, result, sender)
-            }
+            AppMsg::DatabasesLoaded { origin, result } => self.on_databases_loaded(origin, result, sender),
             AppMsg::SwitchDatabase(name) => self.on_switch_database(name, sender),
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
