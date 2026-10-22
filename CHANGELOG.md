@@ -24,6 +24,8 @@
 ### Fixed
 
 - Table browsing identifies when the result byte limit cuts a page short.
+- The main window has a minimum size, which stops repeated libadwaita warnings on older libadwaita releases.
+- Choosing a kind in the Catalog dialog no longer resizes its dropdown and shifts the schema search field.
 - SQL completion popups remain usable when suggestions disappear and return, instead of triggering a GTK critical or showing a blank popup.
 - Spaces pasted around a connection's host or database name are removed before connecting; file paths are kept as typed.
 - Inspecting a row with oversized cell previews avoids copying the full row contents.
