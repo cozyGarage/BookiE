@@ -595,6 +595,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::sql_text::tests::run_uses_the_selection_when_there_is_one_and_the_whole_buffer_otherwise"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::app::environment_marker::tests::the_badge_and_header_tint_follow_the_connection_environment"
     ],
     [
@@ -666,11 +671,6 @@
       "tablepro-app",
       "--lib",
       "ui::editor::sql_text::tests::advisory_text_is_bounded_by_utf8_bytes_without_truncating_the_buffer"
-    ],
-    [
-      "tablepro-app",
-      "--lib",
-      "ui::editor::sql_text::tests::run_uses_the_selection_when_there_is_one_and_the_whole_buffer_otherwise"
     ],
     [
       "tablepro-app",
