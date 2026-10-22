@@ -1,20 +1,63 @@
 use super::grid_render::column_layout_matches;
 use super::paste::parse_clipboard_grid;
-use super::value_parse::parse_grid_cell_input;
+use super::value_parse::{parse_grid_cell_input, parse_pasted_cell};
 use super::{
     BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput, PageRequestTracker,
-    RowCountRequestTracker, columns_for_browse_page, next_page_available, projection_for_loaded_page,
+    RowCountRequestTracker, columns_for_browse_page, next_page_offset, previous_page_offset,
+    projection_for_loaded_page,
 };
 use relm4::{Component, ComponentController};
 
+fn browse_page(rows: usize, truncated: bool) -> QueryResult {
+    QueryResult {
+        columns: Vec::new(),
+        rows: vec![vec![Value::Int(1)]; rows],
+        truncated,
+    }
+}
+
 #[test]
 fn browse_next_page_uses_known_total_and_page_size_fallback() {
-    assert!(!next_page_available(0, 2, Some(2), 2));
-    assert!(next_page_available(0, 2, Some(3), 2));
-    assert!(!next_page_available(2, 2, Some(4), 2));
-    assert!(next_page_available(2, 2, Some(5), 2));
-    assert!(next_page_available(0, 2, None, 2));
-    assert!(!next_page_available(0, 2, None, 1));
+    let full = browse_page(2, false);
+    let short = browse_page(1, false);
+    assert_eq!(next_page_offset(0, 2, Some(2), Some(&full)), None);
+    assert_eq!(next_page_offset(0, 2, Some(3), Some(&full)), Some(2));
+    assert_eq!(next_page_offset(2, 2, Some(4), Some(&full)), None);
+    assert_eq!(next_page_offset(2, 2, Some(5), Some(&full)), Some(4));
+    assert_eq!(next_page_offset(0, 2, None, Some(&full)), Some(2));
+    assert_eq!(next_page_offset(0, 2, None, Some(&short)), None);
+}
+
+#[test]
+fn next_page_after_a_truncated_page_continues_from_the_first_row_not_shown() {
+    let truncated = browse_page(37, true);
+    assert_eq!(next_page_offset(0, 100, Some(5_000), Some(&truncated)), Some(37));
+    assert_eq!(
+        next_page_offset(10_037, 100, Some(50_000), Some(&truncated)),
+        Some(10_074)
+    );
+    assert_eq!(next_page_offset(4_963, 100, Some(5_000), Some(&truncated)), None);
+}
+
+#[test]
+fn a_truncated_page_has_a_next_page_when_the_total_is_unknown() {
+    assert_eq!(next_page_offset(0, 100, None, Some(&browse_page(37, true))), Some(37));
+}
+
+#[test]
+fn a_truncated_page_without_rows_skips_only_the_row_larger_than_the_budget() {
+    let empty = browse_page(0, true);
+    assert_eq!(next_page_offset(200, 100, None, Some(&empty)), Some(201));
+    assert_eq!(next_page_offset(200, 100, Some(5_000), Some(&empty)), Some(201));
+    assert_eq!(next_page_offset(4_999, 100, Some(5_000), Some(&empty)), None);
+}
+
+#[test]
+fn previous_page_after_a_truncated_advance_stops_at_the_first_row() {
+    assert_eq!(previous_page_offset(37, 100), Some(0));
+    assert_eq!(previous_page_offset(137, 100), Some(37));
+    assert_eq!(previous_page_offset(200, 100), Some(100));
+    assert_eq!(previous_page_offset(0, 100), None);
 }
 use tablepro_core::{ColumnInfo, QueryResult, Value};
 use uuid::Uuid;
@@ -319,12 +362,38 @@ fn sqlite_grid_parses_unknown_numeric_affinity_values_without_losing_precision()
 }
 
 #[test]
+fn pasted_null_and_empty_text_stay_distinct() {
+    let nullable_text = column("value", "text", false);
+    let required_text = column("value", "text", true);
+    let count = column("count", "integer", false);
+    assert_eq!(
+        parse_pasted_cell(None, Some(&nullable_text), "postgres", None),
+        Ok(Value::Null)
+    );
+    assert_eq!(
+        parse_pasted_cell(Some(""), Some(&nullable_text), "postgres", None),
+        Ok(Value::Text(String::new()))
+    );
+    assert!(parse_pasted_cell(None, Some(&required_text), "postgres", None).is_err());
+    assert_eq!(
+        parse_pasted_cell(Some(""), Some(&count), "postgres", None),
+        Ok(Value::Null)
+    );
+    let required_count = column("count", "integer", true);
+    assert!(parse_pasted_cell(Some(""), Some(&required_count), "postgres", None).is_err());
+    assert_eq!(
+        parse_pasted_cell(Some("7"), Some(&count), "postgres", None),
+        Ok(Value::Int(7))
+    );
+}
+
+#[test]
 fn grid_text_input_preserves_lf_and_crlf() {
     let text_column = column("value", "text", false);
     for clipboard in ["\"line1\nline2\"", "\"line1\r\nline2\""] {
-        let value = &parse_clipboard_grid(clipboard)[0][0];
+        let value = parse_clipboard_grid(clipboard)[0][0].clone().unwrap();
         assert_eq!(
-            parse_grid_cell_input(value, Some(&text_column), "postgres", None),
+            parse_grid_cell_input(&value, Some(&text_column), "postgres", None),
             Ok(Value::Text(value.clone()))
         );
     }
@@ -364,7 +433,13 @@ async fn grid_text_paste_stores_line_breaks_and_leaves_sibling_rows_unchanged() 
     let value_index = columns.iter().position(|column| column.name == "value").unwrap();
     let pasted = parse_clipboard_grid("\"line1\nline2\"\n\"line3\r\nline4\"");
     for (index, id) in [1, 3].into_iter().enumerate() {
-        let value = parse_grid_cell_input(&pasted[index][0], Some(&columns[value_index]), "sqlite", None).unwrap();
+        let value = parse_grid_cell_input(
+            pasted[index][0].as_deref().unwrap(),
+            Some(&columns[value_index]),
+            "sqlite",
+            None,
+        )
+        .unwrap();
         let update = tablepro_core::sql_dialect::build_keyed_update(
             "sqlite",
             None,
@@ -911,4 +986,38 @@ fn a_page_sql_export_leaves_out_columns_the_server_fills() {
         "INSERT INTO [dbo].[orders] ([qty]) VALUES (2);"
     );
     assert!(page[0].primary_key);
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn a_closed_browse_tab_releases_its_root_widget() {
+    use relm4::gtk::prelude::ObjectExt;
+    relm4::gtk::init().unwrap();
+    let controller = BrowseTab::builder()
+        .launch(BrowseTabInit {
+            tab_id: Uuid::new_v4(),
+            schema: Some("public".into()),
+            table: "customers".into(),
+            driver_id: "postgres".into(),
+            connection_id: None,
+            read_only: true,
+            page_size: 100,
+            initial_offset: 0,
+            initial_sort: None,
+            persistence: crate::services::persistence_stores::PersistenceStores {
+                column_widths: None,
+                filter_settings: None,
+                csv_import_mappings: None,
+                named_filter_presets: None,
+            },
+            database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        })
+        .detach();
+    let root = controller.widget().downgrade();
+    drop(controller);
+    spin_for(
+        &relm4::gtk::glib::MainContext::default(),
+        std::time::Duration::from_millis(100),
+    );
+    assert!(root.upgrade().is_none(), "the closed browse tab root is still alive");
 }
