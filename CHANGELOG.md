@@ -25,6 +25,8 @@
 
 ### Fixed
 
+- In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
+- Closing SQL editors releases their retained query text and search state.
 - SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
 
 - Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.

@@ -725,3 +725,36 @@ mod panel_tests;
 
 #[path = "error_navigation_tests.rs"]
 mod error_navigation_tests;
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn dropping_an_editor_releases_its_source_view_and_buffer() {
+    adw::init().unwrap();
+    let native = sourceview5::View::new();
+    native.set_im_module(Some("simple"));
+    let native_weak = native.downgrade();
+    drop(native);
+    spin_until(|| native_weak.upgrade().is_none());
+    let mut fixture = EditorFixture::new();
+    fixture.controller.model().source_view.set_im_module(Some("simple"));
+    fixture
+        .controller
+        .model()
+        .split_view
+        .secondary_view()
+        .set_im_module(Some("simple"));
+    let _runtime = std::mem::replace(&mut fixture._runtime, tokio::runtime::Runtime::new().unwrap());
+    let root = fixture.controller.widget().downgrade();
+    let view = fixture.controller.model().source_view.downgrade();
+    let buffer = fixture.controller.model().source_view.buffer().downgrade();
+    drop(fixture);
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let context = gtk::glib::MainContext::default();
+    while Instant::now() < deadline {
+        context.iteration(false);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(root.upgrade().is_none(), "editor root remains alive");
+    assert!(view.upgrade().is_none(), "editor view remains alive");
+    assert!(buffer.upgrade().is_none(), "editor buffer remains alive");
+}
