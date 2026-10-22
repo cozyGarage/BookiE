@@ -1549,6 +1549,14 @@ GLib.MainLoop().run()
         assert owner.poll() is None, owner.stderr.read().decode()
         return owner
 
+    def reopen_cell_menu(cell_text):
+        # A click that lands while the previous popover is still closing is swallowed on slower stacks.
+        for _ in range(3):
+            open_cell_menu(cell_text)
+            if ui.find_node(role=pyatspi.ROLE_MENU) is not None:
+                return
+            time.sleep(0.5)
+
     def invoke_menu_item(position):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
@@ -1584,7 +1592,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="apple", role=pyatspi.ROLE_LABEL, present=False)
         export_visible, export_all_loaded = 6, 7
         for item, rows in ((export_visible, "1 loaded rows / current page"), (export_all_loaded, "3 loaded rows / current page")):
-            open_cell_menu("pear")
+            reopen_cell_menu("pear")
             invoke_menu_item(item)
             ui.wait_for_node_containing(rows, role=pyatspi.ROLE_LABEL)
             ui.press_x11_key("Escape")
@@ -1594,7 +1602,7 @@ GLib.MainLoop().run()
             if ui.node_role(node) == pyatspi.ROLE_PAGE_TAB and ui.node_name(node).startswith("2 · ")
         )
         ui.invoke(second)
-        open_cell_menu("blue")
+        reopen_cell_menu("blue")
         invoke_menu_item(filter_by_this_value)
         ui.wait_for_node_containing("Showing 1 of 2 loaded rows", role=pyatspi.ROLE_LABEL)
 
