@@ -148,3 +148,4 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 - [Linux follow-up review, October 22](archive/linux-follow-up-review-2026-10-22.md): merged result-memory fixes, corrected evidence status and nonduplicating UI acceptance order.
 
 - [Completion popup initialization, October 22](evidence/completion-popup-initialization-2026-10-22/README.md): reproduced missing GtkSourceView initialization, independent probe and startup regression.
+- [Owned GTK process checks, October 22](evidence/owned-gtk-process-2026-10-22/README.md): fixture PID/lifetime ownership for memory sampling and second launch, with two-process regressions and targeted GTK acceptance.
