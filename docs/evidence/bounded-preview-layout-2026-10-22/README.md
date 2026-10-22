@@ -23,3 +23,7 @@ Relative to the earlier original baseline, sampled peak RSS was 44.59% lower and
 ## Remaining routing scope
 
 Browse grids enable long-value previews only when primary-key indices are present; RowObject::preview_long_values returns early without them. Streamed SQL results use a separate result-preview path. The 512-character limit therefore applies to preview-enabled cells, not every unkeyed table cell. Unkeyed browse layout needs a separate reproduction and safe full-value-access check before changing its path. This source distinction is recorded on #1032; it is not a measured keyless-table regression.
+
+## Current Linux refresh
+
+Merged Linux through `c3b2a054e`, including the accepted PostgreSQL terminal-page metadata fix and nonblocking GTK stderr capture. Full preflight and all 103 registered GTK widget tests passed again at merge head `bca4ef6876dce2bc64d00e2c0fa263d10e552f4a`. Documentation links, issue ledger and ignored-test inventory checks also passed. The owning issue remains open for the remaining resource scenarios and keyless browse coverage. Forgejo acceptance is pending; the retained-byte change must be accepted together with bounded preview layout.
