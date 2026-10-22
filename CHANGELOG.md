@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- Removing a saved connection asks for confirmation once and preserves the database.
+
 - Saved connection names remain readable in narrow lists, with secondary actions available from a menu.
 
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
