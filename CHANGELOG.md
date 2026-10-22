@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Table browsing identifies when the result byte limit cuts a page short.
 - Closing a result grid releases its selection and row inspector.
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
