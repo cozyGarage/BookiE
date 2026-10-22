@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, mpsc};
 
 use serde::{Deserialize, Serialize};
@@ -141,6 +141,44 @@ pub struct ConnectionWorkspaceState {
     pub collapsed_groups: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_schemas: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub other_databases: BTreeMap<String, ConnectionWorkspaceState>,
+}
+
+impl ConnectionWorkspaceState {
+    pub fn for_database(mut self, database: &str) -> Option<Self> {
+        match self.database.as_deref() {
+            None => Some(self),
+            Some(saved) if saved == database => Some(self),
+            Some(_) => self.other_databases.remove(database),
+        }
+    }
+
+    pub fn with_database(existing: Option<Self>, database: &str, mut current: Self) -> Self {
+        let mut others = BTreeMap::new();
+        if let Some(mut previous) = existing {
+            others = std::mem::take(&mut previous.other_databases);
+            if let Some(name) = previous.database.clone()
+                && name != database
+            {
+                others.insert(name, previous);
+            }
+        }
+        others.remove(database);
+        current.database = Some(database.to_owned());
+        current.other_databases = others;
+        current
+    }
+
+    pub fn all_tabs_mut(&mut self) -> impl Iterator<Item = &mut WorkspaceTabRecord> {
+        let nested = self
+            .other_databases
+            .values_mut()
+            .flat_map(|other| other.tabs.iter_mut());
+        self.tabs.iter_mut().chain(nested)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -342,6 +380,15 @@ impl WorkspaceStore {
             .get(&id)
             .cloned()
             .flatten()
+    }
+
+    pub fn load_database(&self, id: Uuid, database: &str) -> Option<ConnectionWorkspaceState> {
+        self.load_connection(id)?.for_database(database)
+    }
+
+    pub fn save_database(&self, id: Uuid, database: &str, conn_state: ConnectionWorkspaceState) {
+        let merged = ConnectionWorkspaceState::with_database(self.load_connection(id), database, conn_state);
+        self.save_connection(id, merged);
     }
 
     pub fn save_connection(&self, id: Uuid, mut conn_state: ConnectionWorkspaceState) {

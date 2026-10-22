@@ -592,3 +592,46 @@ fn an_older_workspace_defaults_to_no_hidden_schemas() {
     let older: ConnectionWorkspaceState = serde_json::from_str(r#"{"tabs":[],"active_idx":0}"#).unwrap();
     assert!(older.hidden_schemas.is_empty());
 }
+
+fn tabs_for(table: &str) -> ConnectionWorkspaceState {
+    ConnectionWorkspaceState {
+        tabs: vec![browse(table)],
+        ..Default::default()
+    }
+}
+
+fn table_of(state: &ConnectionWorkspaceState) -> &str {
+    match &state.tabs[0] {
+        WorkspaceTabRecord::Browse { table, .. } => table,
+        _ => "",
+    }
+}
+
+#[test]
+fn switching_databases_keeps_each_databases_own_workspace() {
+    let first = ConnectionWorkspaceState::with_database(None, "sales", tabs_for("sales_orders"));
+    let both = ConnectionWorkspaceState::with_database(Some(first), "hr", tabs_for("hr_people"));
+    assert_eq!(table_of(&both.clone().for_database("hr").unwrap()), "hr_people");
+    assert_eq!(table_of(&both.clone().for_database("sales").unwrap()), "sales_orders");
+    assert!(both.clone().for_database("billing").is_none());
+
+    let back = ConnectionWorkspaceState::with_database(Some(both), "sales", tabs_for("sales_refunds"));
+    assert_eq!(table_of(&back.clone().for_database("sales").unwrap()), "sales_refunds");
+    assert_eq!(table_of(&back.clone().for_database("hr").unwrap()), "hr_people");
+    assert_eq!(
+        back.other_databases.len(),
+        1,
+        "the current database is never stored twice"
+    );
+}
+
+#[test]
+fn a_workspace_saved_before_per_database_state_restores_for_the_current_database() {
+    let legacy = tabs_for("orders");
+    assert_eq!(table_of(&legacy.clone().for_database("anything").unwrap()), "orders");
+    let json = serde_json::to_string(&legacy).unwrap();
+    assert!(
+        !json.contains("database"),
+        "an untagged record keeps its old file shape"
+    );
+}
