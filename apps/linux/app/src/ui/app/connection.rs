@@ -214,6 +214,7 @@ impl App {
         // connection we're about to release. Reopening one against a
         // different connection would target a non-existent table.
         self.clear_closed_tabs_stack();
+        self.connected_database = None;
         if let Some(id) = self.connection_id.take() {
             if self.window_state.borrow().last_connection_id == Some(id) {
                 self.set_last_connection_id(None, sender.clone());
@@ -669,6 +670,7 @@ impl App {
         // Activation is additive, so this window releases the connection it is
         // replacing. Closing before activation keeps reconnecting to the same
         // saved connection correct: the identifier is reused, not cancelled.
+        self.connected_database = None;
         if let Some(previous) = self.connection_id.take() {
             self.database.close(previous);
         }
@@ -884,10 +886,6 @@ fn execute_delete_connection(
     });
 }
 
-// Stamp `last_opened_at = now()` then reload connections so the popover and
-// welcome view re-sort with the fresh timestamp. Sequencing matters:
-// ReloadConnections reads the JSON; firing it before the touch lands would
-// render the previous ordering until the next reload.
 fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
     relm4::spawn(async move {
         let result = tablepro_storage::touch_last_opened(connection_id).await;
