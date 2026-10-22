@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- The Structure tab lists MySQL tables that have an index on an expression, and Show CREATE TABLE explains that an expression index cannot be recreated instead of writing it as a column index (MySQL, PostgreSQL, SQLite).
 - SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
 - Discarding changes to a SQL file closes its tab without reopening the same save prompt.
 - PostgreSQL queries ending on a full result page complete without a false column-change error.
