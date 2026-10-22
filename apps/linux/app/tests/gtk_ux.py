@@ -316,14 +316,7 @@ GLib.MainLoop().run()
     def postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit(database, base):
         def run_session_sql(sql):
             ui.set_editor_text(sql)
-            deadline = time.monotonic() + ui.WAIT_SECONDS
-            while time.monotonic() < deadline:
-                button = ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
-                if button.getState().contains(pyatspi.STATE_SENSITIVE):
-                    ui.invoke(button)
-                    return
-                time.sleep(ui.POLL_SECONDS)
-            raise AssertionError(f"session query did not become available for {sql!r}:\n{ui.accessible_snapshot()}")
+            ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
 
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
@@ -726,6 +719,42 @@ GLib.MainLoop().run()
         ]
         assert not unnamed, "controls without an accessible name:\n" + "\n".join(unnamed)
 
+    def wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells(database, base):
+        ui.run_sql("SELECT " + ", ".join(f"{1000 + index} AS c{index}" for index in range(1, 301)))
+        wait_for_result_column("c1")
+
+        def showing(node):
+            return node is not None and node.getState().contains(pyatspi.STATE_SHOWING)
+
+        def left_edge(node):
+            return node.queryComponent().getExtents(pyatspi.WINDOW_COORDS).x
+
+        for index in (150, 300, 1):
+            ui.press_x11_key("j", ("Control_L", "Shift_L"))
+            search = ui.wait_for_node(name="Search columns")
+            search.queryEditableText().setTextContents(f"c{index}")
+            time.sleep(0.3)
+            ui.press_x11_key("Return")
+            ui.wait_for_node(name="Search columns", present=False)
+            frame = next(
+                node for node in ui.descendants(ui.application_node()) if ui.node_role(node) == pyatspi.ROLE_FRAME
+            )
+            window_width = frame.queryComponent().getExtents(pyatspi.WINDOW_COORDS).width
+
+            def aligned_in_view():
+                header = ui.find_node_containing(f"c{index}\n", role=pyatspi.ROLE_LABEL)
+                cell = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_LABEL)
+                if not (showing(header) and showing(cell)):
+                    return None
+                header_x, cell_x = left_edge(header), left_edge(cell)
+                in_view = 0 <= header_x < window_width and 0 <= cell_x < window_width
+                return (header_x, cell_x) if in_view and abs(header_x - cell_x) <= 12 else None
+
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while aligned_in_view() is None:
+                assert time.monotonic() < deadline, f"c{index} did not scroll into view over its header"
+                time.sleep(ui.POLL_SECONDS)
+
     def narrow_window_keeps_main_and_editor_toolbar_actions_reachable(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)
         window = ui.wait_for_frame_containing(" — BookiE")
@@ -1121,7 +1150,9 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
         ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
-        ui.run_sql("BEGIN")
+        ui.set_editor_text("BEGIN")
+        ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("done in")
         ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
         # Observe the insert result before issuing the SELECT. The GTK action
         # starts query work asynchronously, so dispatching both back-to-back
@@ -1634,6 +1665,7 @@ GLib.MainLoop().run()
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
+        wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells,
         narrow_window_keeps_main_and_editor_toolbar_actions_reachable,
         connection_colour_chooser_has_an_accessible_button,
         alt_arrows_jump_between_statements,
