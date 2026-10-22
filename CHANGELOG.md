@@ -23,6 +23,7 @@
 ### Fixed
 
 - In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
+- PostgreSQL: a table named without its schema is found through the whole `search_path`, as PostgreSQL itself resolves it. Before, only the first schema on the path was searched, so SQL completion showed no columns (and structure lookups found nothing) for a table that lives in a later schema.
 - Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.
 - Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout.
 - A schema change stops the SQL-completion column lookups still running from before it.
