@@ -18,8 +18,10 @@ Documented application limits, behavior differences and known defects. Entries l
   received-row summary identifies the retained range when earlier rows have
   been discarded; those rows cannot be revisited without running the query
   again. Row ranges are positions in the result, not database row identifiers.
-  That cache is bounded by page and row count, not by cell
-  bytes. A synthetic profile with four pinned results and one active stream
+  That cache also retains at most 64 MiB of estimated row storage, except
+  that the newest page is always kept even if it alone exceeds the budget.
+  Incoming decoding, concurrent snapshots, pins, widgets and allocator retention
+  remain outside this cache estimate. A synthetic profile with four pinned results and one active stream
   reached 1,325 MiB RSS; see the [profile evidence](evidence/stream-retention-synthetic-2026-10-16/README.md).
   This does not measure normal queries or the complete process ceiling. Other
   engines and unsupported statement shapes remain materialized.
@@ -29,7 +31,8 @@ Documented application limits, behavior differences and known defects. Entries l
 - **SQL result filters apply only to loaded rows** ([#609](https://github.com/cozyGarage/BookiE/issues/609)). Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **File exports use text markers for undecodable cells** ([#883](https://github.com/cozyGarage/BookiE/issues/883)). CSV, JSON, Markdown, HTML, XML, Excel, copied text and MCP CSV content use a visible `<undecodable TYPE>` string; these text representations do not retain a separate typed marker, so a real text value with the same spelling is ambiguous. SQL export refuses the value. MCP JSON retains an explicit tagged `undecodable` value.
 - **Long cells are shown as a preview** (PERF-10). Values over 8 KiB show a typed
-  preview and byte count. View Value and Copy Value use the full value, including
+  preview and byte count. Oversized text and JSON previews show at most 512
+  Unicode characters before their size suffix. View Value and Copy Value use the full value, including
   pending edits and drafts. Browse-table values are refetched by primary key; a
   table without one cannot refetch.
 - **Hidden-column projection still needs desktop acceptance** (PERF-9). Merged
