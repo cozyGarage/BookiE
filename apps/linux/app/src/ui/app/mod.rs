@@ -264,6 +264,8 @@ impl SimpleComponent for App {
             set_title: Some("BookiE"),
             set_default_width: 1200,
             set_default_height: 760,
+            set_width_request: 600,
+            set_height_request: 400,
 
             adw::ToolbarView {
                 #[name = "header_bar"]
@@ -345,6 +347,7 @@ impl SimpleComponent for App {
                     pack_end = &gtk::MenuButton {
                         set_icon_name: "open-menu-symbolic",
                         set_tooltip_text: Some(crate::tr!("Main menu").as_str()),
+                        set_primary: true,
                     },
                 },
 

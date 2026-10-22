@@ -350,12 +350,22 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::column_visibility::tests::resetting_widths_forgets_the_saved_widths_and_frees_the_columns"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::display::tests::typed_widget_slots_round_trip_and_keep_same_value_types_apart"
     ],
     [
       "tablepro-app",
       "--lib",
       "ui::grid::value_viewer::tests::the_viewer_dialog_builds_and_shows_the_full_value"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::catalog_dialog::tests::choosing_a_longer_kind_does_not_change_the_dropdown_width"
     ],
     [
       "tablepro-app",
@@ -560,6 +570,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::completion_provider::tests::populated_completion_is_presented_after_the_editor_is_rooted"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::completion_provider::tests::proposals_preserve_aliases_and_replace_only_the_identifier"
     ],
     [
@@ -596,6 +611,26 @@
       "tablepro-app",
       "--lib",
       "ui::app::environment_marker::tests::the_badge_and_header_tint_follow_the_connection_environment"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connection_row::tests::connection_actions_leave_room_for_text_in_a_narrow_row"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connection_row::tests::connection_menu_dispatches_actions_for_its_own_record"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::commenting_selected_lines_publishes_one_complete_query_change"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::query_publication_waits_for_nested_actions_and_keeps_ordinary_edits_immediate"
     ],
     [
       "tablepro-app",
