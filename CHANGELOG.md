@@ -5,10 +5,16 @@
 ### Added
 
 - F10 opens the main menu, as in other GNOME applications.
+- **Audit Log** in the main menu lists the operations recorded in the local audit journal, newest first: connection, who ran it, kind, outcome, rows and duration, with the operation id, policy rule, stored statement text and error on expand. A filter matches operation id, connection, outcome or statement. It verifies the journal chain before showing anything and reports a broken or unavailable journal instead of a partial list. It shows only what the journal stored; statement text is the redacted form. A failed statement's panel has **View in Audit Log**, which opens it with the newest operation, usually the failure, at the top.
+- A Preview SQL button in the unsaved-changes bar of a table tab shows the statements and values Save would run, without running them.
+- While a query result is locally filtered, its menu also offers **Export All Loaded Rows…** next to **Export Visible Rows…**, so the full loaded result can still be exported. Neither runs the query again.
+- The "Token issued" dialog for MCP has a **Copy Token** button, so the token (shown only once) no longer has to be selected by hand.
+- Preferences has a **Theme** choice: Default, Ledger (the BookiE brand colours), Catppuccin, Tokyo Night and Gruvbox, each with a light and a dark variant that follows the Appearance setting. The SQL editor, the Structure tab's SQL preview and the JSON cell editor follow the theme too.
 - SQLite files open from the file manager (Open With BookiE), and `bookie books.db` or `bookie postgres://user@host/db` opens a database file or a connection URL from a terminal. A URL asks you to confirm before it is imported and connected; a missing or non-database file is refused instead of creating an empty database. A second launch hands its argument to the running window. DuckDB files open from the terminal only.
 
 ### Changed
 
+- Oversized text and JSON cells use shorter visible previews to reduce text-layout work; full values remain available through View Value and Copy Value.
 - Editing rows with large values uses less temporary memory when verifying the row identity.
 
 - Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
@@ -16,6 +22,23 @@
 - The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
 
 ### Fixed
+
+- Spaces pasted around a connection's host or database name are removed before connecting; file paths are kept as typed.
+- Inspecting a row with oversized cell previews avoids copying the full row contents.
+- A PostgreSQL `VOID` result, such as `SELECT pg_sleep(0)`, shows as an empty value instead of undecodable.
+- Selecting rows with large text or binary cells no longer copies their contents to calculate numeric summaries.
+- In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
+- Large JSON previews use less temporary memory.
+- Inspecting a row with oversized cell previews avoids copying the full row contents.
+- Saved connection names remain readable in narrow lists, with secondary actions available from a menu.
+- Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
+
+- Closing SQL editors releases their retained query text and search state.
+- Large JSON previews use less temporary memory.
+- Saving workspaces with large SQL drafts uses less temporary memory.
+
+- Closing SQL editors releases their retained query text and search state.
+- SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
 
 - Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.
 - Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout.

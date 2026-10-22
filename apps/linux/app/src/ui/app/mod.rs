@@ -92,6 +92,7 @@ pub struct App {
     mcp_bridge: Option<Arc<tablepro_mcp::McpBridge>>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
+    sidebar_toggle: gtk::ToggleButton,
     sidebar_reveal: std::rc::Rc<std::cell::Cell<u32>>,
     window_title: adw::WindowTitle,
     header_bar: adw::HeaderBar,
@@ -296,6 +297,13 @@ impl SimpleComponent for App {
                         set_popover = &gtk::Popover {},
                     },
 
+                    #[name = "sidebar_toggle"]
+                    pack_start = &gtk::ToggleButton {
+                        set_icon_name: "sidebar-show-symbolic",
+                        set_tooltip_text: Some(crate::tr!("Tables sidebar").as_str()),
+                        set_visible: false,
+                    },
+
                     #[name = "databases_button"]
                     pack_start = &gtk::MenuButton {
                         set_icon_name: "network-server-symbolic",
@@ -465,8 +473,13 @@ impl SimpleComponent for App {
 
         init_css::install_pending_change_css();
 
-        let window_handles =
-            init_window::install_window_lifecycle(&widgets.window, &widgets.split_view, &workspace, &sender);
+        let window_handles = init_window::install_window_lifecycle(
+            &widgets.window,
+            &widgets.split_view,
+            &widgets.sidebar_toggle,
+            &workspace,
+            &sender,
+        );
 
         let sidebar = init_sidebar::build_sidebar(&widgets, &sender);
 
@@ -497,6 +510,7 @@ impl SimpleComponent for App {
         adw::StyleManager::default().set_color_scheme(crate::services::preferences::color_scheme_style(
             preferences.load().color_scheme,
         ));
+        crate::ui::theme::apply(preferences.load().theme);
         crate::ui::grid::set_null_display(preferences.load().null_display);
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
@@ -512,6 +526,7 @@ impl SimpleComponent for App {
             mcp_bridge,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
+            sidebar_toggle: widgets.sidebar_toggle.clone(),
             sidebar_reveal: std::rc::Rc::default(),
             window_title: widgets.window_title.clone(),
             header_bar: widgets.header_bar.clone(),
@@ -603,6 +618,7 @@ impl SimpleComponent for App {
         open_request::forward_open_signal(sender.input_sender());
         sender.input(AppMsg::ReloadConnections);
         model.content_holder.set_content(Some(&model.history_paned));
+        model.set_sidebar_connected(false);
         model.show_welcome_page(sender.clone());
 
         widgets
@@ -982,6 +998,9 @@ impl SimpleComponent for App {
             AppMsg::RefreshPage => self.on_refresh_active_tab(),
             AppMsg::ShowShortcuts => self.on_show_shortcuts(),
             AppMsg::ShowAbout => self.on_show_about(),
+            AppMsg::ShowAuditLog => {
+                crate::ui::audit_dialog::present(self.window.upcast_ref::<gtk::Window>(), &self.database)
+            }
             AppMsg::ShowActivity => {
                 crate::ui::activity_dialog::present(
                     self.window.upcast_ref::<gtk::Window>(),
