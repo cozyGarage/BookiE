@@ -59,7 +59,7 @@ const CATPPUCCIN_LIGHT: Surface = Surface {
     card_bg: "#ffffff",
     accent_bg: "#8839ef",
     accent_fg: "#eff1f5",
-    accent_text: "#8839ef",
+    accent_text: "#7028d6",
 };
 
 const TOKYO_DARK: Surface = Surface {
@@ -81,7 +81,7 @@ const TOKYO_LIGHT: Surface = Surface {
     card_bg: "#f2f3f8",
     accent_bg: "#2e5cb8",
     accent_fg: "#ffffff",
-    accent_text: "#2e5cb8",
+    accent_text: "#244a96",
 };
 
 const GRUVBOX_DARK: Surface = Surface {
@@ -120,7 +120,7 @@ fn surface(theme: ThemePref, dark: bool) -> Option<&'static Surface> {
     })
 }
 
-fn css(surface: &Surface) -> String {
+fn css(surface: &Surface, variables: bool) -> String {
     let colors = [
         ("window_bg_color", surface.window_bg),
         ("window_fg_color", surface.window_fg),
@@ -130,6 +130,11 @@ fn css(surface: &Surface) -> String {
         ("headerbar_fg_color", surface.window_fg),
         ("sidebar_bg_color", surface.chrome_bg),
         ("sidebar_fg_color", surface.window_fg),
+        ("sidebar_backdrop_color", surface.chrome_bg),
+        ("secondary_sidebar_bg_color", surface.chrome_bg),
+        ("secondary_sidebar_fg_color", surface.window_fg),
+        ("secondary_sidebar_backdrop_color", surface.chrome_bg),
+        ("headerbar_backdrop_color", surface.chrome_bg),
         ("card_bg_color", surface.card_bg),
         ("card_fg_color", surface.window_fg),
         ("popover_bg_color", surface.card_bg),
@@ -144,7 +149,7 @@ fn css(surface: &Surface) -> String {
         .iter()
         .map(|(name, value)| format!("@define-color {name} {value};\n"))
         .collect();
-    if gtk::minor_version() < 16 {
+    if !variables {
         return named;
     }
     let variables: String = colors
@@ -185,7 +190,8 @@ fn install_editor_schemes() -> bool {
     let directory = glib::user_cache_dir()
         .join(crate::config::storage_dir_name())
         .join("styles");
-    if std::fs::create_dir_all(&directory).is_err() {
+    if let Err(error) = std::fs::create_dir_all(&directory) {
+        tracing::warn!(%error, "editor colour schemes could not be installed");
         return false;
     }
     for theme in ThemePref::ALL {
@@ -261,19 +267,27 @@ pub fn apply(theme: ThemePref) {
             adw::StyleManager::default().connect_dark_notify(|_| apply(CURRENT.get()));
         }
         let dark = adw::StyleManager::default().is_dark();
-        provider.load_from_string(&surface(theme, dark).map(css).unwrap_or_default());
+        provider.load_from_string(
+            &surface(theme, dark)
+                .map(|surface| css(surface, adw::minor_version() >= 6))
+                .unwrap_or_default(),
+        );
     });
     restyle_editors();
 }
 
-pub fn labels() -> [String; 5] {
-    [
-        crate::tr!("Default"),
-        crate::tr!("Ledger"),
-        crate::tr!("Catppuccin"),
-        crate::tr!("Tokyo Night"),
-        crate::tr!("Gruvbox"),
-    ]
+pub fn labels() -> Vec<String> {
+    ThemePref::ALL.into_iter().map(label).collect()
+}
+
+fn label(theme: ThemePref) -> String {
+    match theme {
+        ThemePref::Default => crate::tr!("Default"),
+        ThemePref::Ledger => crate::tr!("Ledger"),
+        ThemePref::Catppuccin => crate::tr!("Catppuccin"),
+        ThemePref::Tokyo => crate::tr!("Tokyo Night"),
+        ThemePref::Gruvbox => crate::tr!("Gruvbox"),
+    }
 }
 
 #[cfg(test)]
@@ -311,6 +325,7 @@ mod tests {
                     (s.accent_fg, s.accent_bg, 4.5),
                     (s.accent_text, s.window_bg, 4.5),
                     (s.accent_text, s.view_bg, 4.5),
+                    (s.accent_text, s.chrome_bg, 4.5),
                 ] {
                     let ratio = contrast(fg, bg);
                     assert!(ratio >= floor, "{name}: {fg} on {bg} is {ratio:.2}, needs {floor}");
@@ -322,7 +337,7 @@ mod tests {
     #[test]
     fn the_default_theme_adds_no_overrides_and_others_define_every_surface() {
         assert!(surface(ThemePref::Default, true).is_none() && surface(ThemePref::Default, false).is_none());
-        let sheet = css(surface(ThemePref::Ledger, true).unwrap());
+        let sheet = css(surface(ThemePref::Ledger, true).unwrap(), true);
         for name in [
             "window_bg_color",
             "view_bg_color",
