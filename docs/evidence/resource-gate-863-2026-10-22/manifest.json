@@ -27,5 +27,49 @@
       "sha256": "c611299d40cb094fb9d4b7536032ab914dda56a9dde7cd96812d544ab4961b1c",
       "last_log_timestamp": "2026-10-22T01:14:10.5980744Z"
     }
+  ],
+  "run_status_at_recheck": "failure",
+  "jobs_at_recheck": {
+    "success": 23,
+    "failure": 4,
+    "running": 2
+  },
+  "interrupted_log_observations": [
+    {
+      "job_id": 23518,
+      "runner_group": "runner-group-1",
+      "last_log_timestamp": "2026-10-22T01:14:14.0154420Z",
+      "sha256": "fbf5cb05ab5a4f24ec7cd603e27500a75728253fa226ff6a6c07ba221e2d8923"
+    },
+    {
+      "job_id": 23521,
+      "runner_group": "runner-group-2",
+      "last_log_timestamp": "2026-10-22T01:14:16.4385537Z",
+      "sha256": "e88e4af6b4079f8443f3829cb70f7b22b04445dfe551dee45a50a9b5cb6ca915"
+    },
+    {
+      "job_id": 23522,
+      "runner_group": "runner-group-2",
+      "last_log_timestamp": "2026-10-22T01:14:18.9033333Z",
+      "sha256": "813bc4d8625c3fb1f47a2628db312664a846429e951af1785f04a68c35f9551a"
+    },
+    {
+      "job_id": 23523,
+      "runner_group": "runner-group-1",
+      "last_log_timestamp": "2026-10-22T01:14:15.9681165Z",
+      "sha256": "815a86667d66d3d242c947669efad44d63d3be960a0f53470c4cc7ac1c8b4264"
+    },
+    {
+      "job_id": 23525,
+      "runner_group": "runner-group-1",
+      "last_log_timestamp": "2026-10-22T01:14:10.5980744Z",
+      "sha256": "c611299d40cb094fb9d4b7536032ab914dda56a9dde7cd96812d544ab4961b1c"
+    },
+    {
+      "job_id": 23528,
+      "runner_group": "runner-group-3",
+      "last_log_timestamp": "2026-10-22T01:14:17.5643587Z",
+      "sha256": "301447d1ae1ea0b03879a5c74d0ed474eca52edf9abadfb67307dadb2398ca87"
+    }
   ]
 }
