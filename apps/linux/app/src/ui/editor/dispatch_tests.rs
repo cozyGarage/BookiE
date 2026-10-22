@@ -20,12 +20,14 @@ use super::{SqlEditor, SqlEditorInit, SqlEditorInput};
 use crate::services::database_service::{ConnectionMetadata, DatabaseService, ReconnectParams};
 
 struct PendingQuery {
+    dedicated_session: bool,
     token: CancellationToken,
     parameters: Vec<Value>,
     release: oneshot::Sender<Result<QueryResultBatch, DriverError>>,
 }
 
 struct HeldConnection {
+    open_wait: Arc<std::sync::Mutex<Option<oneshot::Receiver<()>>>>,
     calls: Arc<AtomicUsize>,
     requests: mpsc::Sender<PendingQuery>,
 }
@@ -42,12 +44,24 @@ impl Connection for HeldConnection {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.requests
             .send(PendingQuery {
+                dedicated_session: false,
                 token: control.cancellation_token().clone(),
                 parameters: parameters.to_vec(),
                 release,
             })
             .unwrap();
         wait.await.unwrap()
+    }
+
+    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+        let wait = self.open_wait.lock().unwrap().take();
+        if let Some(wait) = wait {
+            wait.await.unwrap();
+        }
+        Ok(Box::new(HeldSession {
+            calls: self.calls.clone(),
+            requests: self.requests.clone(),
+        }))
     }
 
     fn supports_server_cancellation(&self) -> bool {
@@ -97,12 +111,49 @@ impl Connection for HeldConnection {
     }
 }
 
+struct HeldSession {
+    calls: Arc<AtomicUsize>,
+    requests: mpsc::Sender<PendingQuery>,
+}
+
+#[async_trait::async_trait]
+impl tablepro_core::Session for HeldSession {
+    async fn query_params_controlled(
+        &mut self,
+        _sql: &str,
+        parameters: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        let (release, wait) = oneshot::channel();
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.requests
+            .send(PendingQuery {
+                dedicated_session: true,
+                token: control.cancellation_token().clone(),
+                parameters: parameters.to_vec(),
+                release,
+            })
+            .unwrap();
+        Ok(wait.await.unwrap()?.result_sets.remove(0))
+    }
+
+    fn is_usable(&self) -> bool {
+        true
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
+
 struct EditorFixture {
+    open_wait: Arc<std::sync::Mutex<Option<oneshot::Receiver<()>>>>,
     controller: Controller<SqlEditor>,
     database: Arc<DatabaseService>,
     connection_id: Uuid,
     calls: Arc<AtomicUsize>,
     requests: mpsc::Receiver<PendingQuery>,
+    outputs: mpsc::Receiver<super::SqlEditorOutput>,
     _runtime: tokio::runtime::Runtime,
 }
 
@@ -115,6 +166,7 @@ impl EditorFixture {
         let connection_id = Uuid::new_v4();
         let (requests, incoming) = mpsc::channel();
         let calls = Arc::new(AtomicUsize::new(0));
+        let open_wait = Arc::new(std::sync::Mutex::new(None));
         assert!(database.activate(
             connection_id,
             ConnectionMetadata {
@@ -127,6 +179,7 @@ impl EditorFixture {
                 query_timeout_secs: None,
             },
             Box::new(HeldConnection {
+                open_wait: open_wait.clone(),
                 calls: calls.clone(),
                 requests
             }),
@@ -139,6 +192,7 @@ impl EditorFixture {
                 environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse),
             },
         ));
+        let (output_sender, outputs) = mpsc::channel();
         let controller = SqlEditor::builder()
             .launch(SqlEditorInit {
                 schema_index: Default::default(),
@@ -148,14 +202,18 @@ impl EditorFixture {
                 database: database.clone(),
                 preferences: crate::services::preferences::PreferencesStore::new(),
             })
-            .detach();
+            .connect_receiver(move |_, output| {
+                let _ = output_sender.send(output);
+            });
         drop(_entered);
         Self {
+            open_wait,
             controller,
             database,
             connection_id,
             calls,
             requests: incoming,
+            outputs,
             _runtime: runtime,
         }
     }
@@ -254,6 +312,32 @@ fn parameter_response() -> SqlEditorInput {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn editor_waits_for_its_session_before_accepting_any_run_input() {
+    let fixture = EditorFixture::new();
+    let (release, wait) = oneshot::channel();
+    fixture.open_wait.lock().unwrap().replace(wait);
+    fixture.controller.model().session_button.set_active(true);
+    spin_until(|| fixture.controller.model().session_open_in_flight);
+    assert!(!fixture.controller.model().run_button.is_sensitive());
+    for secondary in [false, true] {
+        fixture.shortcut("<Primary>Return", secondary);
+        fixture.shortcut("<Primary><Shift>Return", secondary);
+    }
+    fixture.controller.sender().send(parameter_response()).unwrap();
+    fixture.process_inputs();
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+    assert!(fixture.requests.try_recv().is_err());
+    release.send(()).unwrap();
+    spin_until(|| fixture.controller.model().session.is_some() && fixture.controller.model().run_button.is_sensitive());
+    fixture.shortcut("<Primary>Return", false);
+    let running = fixture.next_query();
+    assert!(running.dedicated_session);
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
+    fixture.finish(running, success());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn editor_inputs_cannot_dispatch_or_cancel_an_active_query() {
     let fixture = EditorFixture::new();
     fixture.controller.model().run_button.emit_clicked();
@@ -297,6 +381,80 @@ fn editor_dispatch_resumes_after_success_cancel_and_timeout() {
     assert_eq!(parameterized.parameters, [Value::Int(2)]);
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 4);
     fixture.finish(parameterized, success());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn commenting_selected_lines_publishes_one_complete_query_change() {
+    let fixture = EditorFixture::new();
+    let buffer = fixture.controller.model().source_view.buffer();
+    let original = "SELECT '東京';\n".repeat(100);
+    buffer.set_text(&original);
+    let context = gtk::glib::MainContext::default();
+    while context.iteration(false) {}
+    while fixture.outputs.try_recv().is_ok() {}
+    buffer.select_range(&buffer.start_iter(), &buffer.end_iter());
+    fixture.controller.emit(SqlEditorInput::ToggleLineComment);
+    let expected = "-- SELECT '東京';\n".repeat(100);
+    spin_until(|| buffer.text(&buffer.start_iter(), &buffer.end_iter(), true) == expected);
+    let deadline = Instant::now() + Duration::from_millis(100);
+    while Instant::now() < deadline {
+        context.iteration(false);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    let changes: Vec<_> = fixture
+        .outputs
+        .try_iter()
+        .filter_map(|output| match output {
+            super::SqlEditorOutput::QueryChanged(text) => Some(text),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        changes,
+        vec![expected],
+        "one user action must publish only its completed query"
+    );
+    let buffer = buffer.downcast::<sourceview5::Buffer>().unwrap();
+    buffer.undo();
+    assert_eq!(buffer.text(&buffer.start_iter(), &buffer.end_iter(), true), original);
+}
+
+fn published_queries(fixture: &EditorFixture) -> Vec<String> {
+    let context = gtk::glib::MainContext::default();
+    let deadline = Instant::now() + Duration::from_millis(50);
+    while Instant::now() < deadline {
+        context.iteration(false);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    fixture
+        .outputs
+        .try_iter()
+        .filter_map(|output| match output {
+            super::SqlEditorOutput::QueryChanged(text) => Some(text),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn query_publication_waits_for_nested_actions_and_keeps_ordinary_edits_immediate() {
+    let fixture = EditorFixture::new();
+    let buffer = fixture.controller.model().source_view.buffer();
+    published_queries(&fixture);
+    buffer.begin_user_action();
+    buffer.begin_user_action();
+    buffer.insert(&mut buffer.end_iter(), " SELECT 2;");
+    buffer.end_user_action();
+    assert!(published_queries(&fixture).is_empty());
+    buffer.end_user_action();
+    assert_eq!(published_queries(&fixture), ["SELECT 1; SELECT 2;"]);
+    buffer.begin_user_action();
+    buffer.end_user_action();
+    assert!(published_queries(&fixture).is_empty());
+    buffer.insert(&mut buffer.end_iter(), " SELECT 3;");
+    assert_eq!(published_queries(&fixture), ["SELECT 1; SELECT 2; SELECT 3;"]);
 }
 
 fn exposed_toolbar(fixture: &EditorFixture) -> ([gtk::Button; 3], [gtk::Widget; 2]) {
@@ -380,4 +538,37 @@ fn editor_actions_fit_narrow_rows_with_running_and_retry_controls() {
     }
     gtk::style_context_remove_provider_for_display(&root.display(), &css);
     window.close();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn dropping_an_editor_releases_its_source_view_and_buffer() {
+    adw::init().unwrap();
+    let native = sourceview5::View::new();
+    native.set_im_module(Some("simple"));
+    let native_weak = native.downgrade();
+    drop(native);
+    spin_until(|| native_weak.upgrade().is_none());
+    let mut fixture = EditorFixture::new();
+    fixture.controller.model().source_view.set_im_module(Some("simple"));
+    fixture
+        .controller
+        .model()
+        .split_view
+        .secondary_view()
+        .set_im_module(Some("simple"));
+    let _runtime = std::mem::replace(&mut fixture._runtime, tokio::runtime::Runtime::new().unwrap());
+    let root = fixture.controller.widget().downgrade();
+    let view = fixture.controller.model().source_view.downgrade();
+    let buffer = fixture.controller.model().source_view.buffer().downgrade();
+    drop(fixture);
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let context = gtk::glib::MainContext::default();
+    while Instant::now() < deadline {
+        context.iteration(false);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(root.upgrade().is_none(), "editor root remains alive");
+    assert!(view.upgrade().is_none(), "editor view remains alive");
+    assert!(buffer.upgrade().is_none(), "editor buffer remains alive");
 }
