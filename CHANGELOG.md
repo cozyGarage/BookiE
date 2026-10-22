@@ -4,6 +4,8 @@
 
 ### Added
 
+- Run (Ctrl+Enter or the Run button) executes the selected text when something is selected, and the whole editor otherwise. It goes through the same guard, policy and audit path as any run.
+- The Columns dialog has a Reset button that forgets the column widths you set by dragging for that table.
 - The Session button shows how long its transaction has been open ("Session · transaction open · 12 min") once it passes a minute, so a forgotten transaction holding locks stands out.
 - F10 opens the main menu, as in other GNOME applications.
 - **Audit Log** in the main menu lists the operations recorded in the local audit journal, newest first: connection, who ran it, kind, outcome, rows and duration, with the operation id, policy rule, stored statement text and error on expand. A filter matches operation id, connection, outcome or statement. It verifies the journal chain before showing anything and reports a broken or unavailable journal instead of a partial list. It shows only what the journal stored; statement text is the redacted form. A failed statement's panel has **View in Audit Log**, which opens it with the newest operation, usually the failure, at the top.
@@ -24,6 +26,12 @@
 
 ### Fixed
 
+- Removing a saved connection asks for confirmation once and preserves the database.
+
+- Saved connection names remain readable in narrow lists, with secondary actions available from a menu.
+- SQLite refuses to drop a table in an attached database while other tables there still reference it, so their ON DELETE actions no longer empty those tables.
+- The Structure tab lists MySQL tables that have an index on an expression, and Show CREATE TABLE explains that an expression index cannot be recreated instead of writing it as a column index (MySQL, PostgreSQL, SQLite).
+- Open tabs, the active tab and sidebar group state are saved per database. Switching a saved connection to another database no longer restores the first database's tabs against the second, where a same-named table could show with the wrong page, sort or filter. Each database gets its own tabs back when you return to it; workspaces saved by earlier versions restore for the database you connect to first.
 - Table browsing identifies when the result byte limit cuts a page short.
 - The main window has a minimum size, which stops repeated libadwaita warnings on older libadwaita releases.
 - Choosing a kind in the Catalog dialog no longer resizes its dropdown and shifts the schema search field.

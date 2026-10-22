@@ -28,7 +28,7 @@ Use First, Previous, Next and Last to move through table pages. Unsorted tables 
 - **Edit**: double-click a cell, or press F2 or Enter. Changes stay pending (shown with a dot on the tab) until you press Ctrl+S. **Preview SQL** in the bar below the grid shows the statements and values that Save would run, without running them. Ctrl+Z and Ctrl+Y undo and redo pending changes.
 - **Insert and delete**: Ctrl+N inserts a row, Delete removes the selected rows. Ctrl+Shift+N sets the focused cell to NULL.
 - **Filter and sort**: Ctrl+F opens the filter bar. Save structured filters by name for the current connection, schema and table, then select and apply them later; you can rename or delete saved filters there too. Click a column header to sort. Right-click a cell and choose **Filter by This Value** for a quick filter. On a foreign key cell, **Go to Referenced Row** opens the referenced table filtered to that row (composite keys use every column of the key). If the column belongs to multiple foreign keys, choose the target table. Click a cell and press Ctrl+V to paste tab-separated text (for example copied from a spreadsheet) into the cells from that one: each value is checked like a typed edit, nothing is applied if any cell is refused, and the result is a set of pending changes you review and save. An empty pasted value on a nullable column becomes NULL. On PostgreSQL (a column whose type is an enum, or a domain over one; not arrays of enums) and on MySQL and MariaDB, double-clicking an ENUM cell opens a list of its members (choose one with the mouse or the arrow keys and Enter), and a SET cell opens a list with a check for each member and an Apply button; the empty member shows as (empty) and is stored as the empty value, not NULL.
-- **Columns**: the **Columns…** entry in the cell menu hides or shows columns. Drag a header to reorder columns. Both are remembered per table.
+- **Columns**: the **Columns…** entry in the cell menu hides or shows columns. Drag a header to reorder columns. Both are remembered per table. **Reset** in the Columns dialog forgets the widths you set by dragging.
 - **Find**: Ctrl+Alt+F lists loaded rows that contain a text.
 - **Long values**: cells longer than 8 KiB show a bounded preview and the full value's size. Text and JSON previews show up to 512 Unicode characters. **View Value** opens the whole value, and **Copy Value** copies it in full. Right-click an editable text or JSON cell and choose **Edit Full Value…** to edit the entire value up to 1 MiB. **Apply** stages the value for review; invalid JSON stays in the dialog without staging. **Format JSON** visibly formats semantic JSON values. Source-text JSON keeps its exact text, including key order and number spelling. **Set to NULL** is separate from empty text, JSON `null`, and the text `null`. **Cancel** stages nothing. Values over 1 MiB are not supported in this dialog. SQL result grids remain read-only. Exports use full values when fetched; full-row copy and current-page export are refused if hidden columns leave values unavailable.
 - **Row inspector**: shows every column of the selected row with its type.
@@ -56,7 +56,7 @@ Use **Split** in the editor toolbar to show the same query in a second side-by-s
 
 To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+Shift+[**. Click its gutter marker to unfold it, or choose **Unfold all** in the toolbar. **Ctrl+Shift+]** also unfolds every block. Folding hides lines in the editor without changing the SQL that runs. Editing the query clears folds so hidden text cannot be mistaken for the current query.
 
-- Ctrl+Enter runs the whole script; Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it.
+- Ctrl+Enter (and the Run button) runs the selected text when something other than blank space is selected, otherwise the whole script (a find match left selected counts as a selection); Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it.
 - Each statement has a result view. SQL Server statements that return multiple result sets show those sets in order within that view. More than five statement results collapse into a drop-down. **Pin results** keeps the current results above the next run.
 - After a run, the gutter marks each statement with a tick or a cross.
 - A failed statement shows the error, with **Copy error**, and on PostgreSQL the line and column of the error inside that statement.
@@ -124,7 +124,7 @@ Press Ctrl+? for the full list. The most used:
 | Keys | Action |
 |---|---|
 | Ctrl+E / Ctrl+T | New SQL editor tab |
-| Ctrl+Enter | Run the script |
+| Ctrl+Enter | Run the selection, or the script when nothing is selected |
 | Ctrl+Shift+Enter | Run the statement at the cursor |
 | Ctrl+S | Save pending changes (or the SQL file) |
 | Ctrl+Z / Ctrl+Y | Undo / redo a pending change |
