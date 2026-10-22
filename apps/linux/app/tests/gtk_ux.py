@@ -738,6 +738,20 @@ GLib.MainLoop().run()
         ]
         missing = keyboard_paths.unregistered(names, keyboard_paths.SQL_EDITOR)
         assert not missing, "clickable without a registered keyboard path:\n" + "\n".join(missing)
+        line = ui.wait_for_node(name="SELECT 1 AS alpha", role=pyatspi.ROLE_LABEL)
+        extents = line.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
+        def main_menu_showing():
+            menu = ui.find_node(name="Main menu", role=pyatspi.ROLE_MENU)
+            return menu is not None and menu.getState().contains(pyatspi.STATE_SHOWING)
+
+        assert not main_menu_showing(), "the main menu was already open"
+        ui.press_x11_key("F10")
+        deadline = time.monotonic() + 5
+        while not main_menu_showing():
+            assert time.monotonic() < deadline, f"F10 did not open the main menu:\n{ui.accessible_snapshot()}"
+            time.sleep(0.1)
+        ui.press_x11_key("Escape")
 
     def narrow_window_keeps_main_and_editor_toolbar_actions_reachable(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)

@@ -16,8 +16,8 @@ class KeyboardPathRegistryTests(unittest.TestCase):
         self.assertEqual(keyboard_paths.malformed(keyboard_paths.SQL_EDITOR), [])
         self.assertEqual(keyboard_paths.malformed({"Run": "press it"}), ["Run"])
 
-    def test_known_gaps_are_listed(self):
-        self.assertTrue(keyboard_paths.gaps(keyboard_paths.SQL_EDITOR))
+    def test_gaps_are_listed_with_their_reason(self):
+        self.assertEqual(keyboard_paths.gaps({"Split": "gap: no shortcut"}), ["Split: gap: no shortcut"])
 
 
 if __name__ == "__main__":
