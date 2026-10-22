@@ -4,6 +4,10 @@
 
 ### Added
 
+- A Preview SQL button in the unsaved-changes bar of a table tab shows the statements and values Save would run, without running them.
+- While a query result is locally filtered, its menu also offers **Export All Loaded Rows…** next to **Export Visible Rows…**, so the full loaded result can still be exported. Neither runs the query again.
+- The "Token issued" dialog for MCP has a **Copy Token** button, so the token (shown only once) no longer has to be selected by hand.
+- Preferences has a **Theme** choice: Default, Ledger (the BookiE brand colours), Catppuccin, Tokyo Night and Gruvbox, each with a light and a dark variant that follows the Appearance setting. The SQL editor, the Structure tab's SQL preview and the JSON cell editor follow the theme too.
 - SQLite files open from the file manager (Open With BookiE), and `bookie books.db` or `bookie postgres://user@host/db` opens a database file or a connection URL from a terminal. A URL asks you to confirm before it is imported and connected; a missing or non-database file is refused instead of creating an empty database. A second launch hands its argument to the running window. DuckDB files open from the terminal only.
 
 ### Changed
@@ -18,6 +22,14 @@
 ### Fixed
 
 - Copying rows and pasting them back into the grid keeps NULL, empty text and text such as `\N` unchanged. Previously empty text pasted as `""`, and a cell holding `\N` could swap with a NULL.
+- Spaces pasted around a connection's host or database name are removed before connecting; file paths are kept as typed.
+- Inspecting a row with oversized cell previews avoids copying the full row contents.
+- A PostgreSQL `VOID` result, such as `SELECT pg_sleep(0)`, shows as an empty value instead of undecodable.
+- Selecting rows with large text or binary cells no longer copies their contents to calculate numeric summaries.
+- In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Show tables** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
+- Large JSON previews use less temporary memory.
+- Inspecting a row with oversized cell previews avoids copying the full row contents.
+- Saved connection names remain readable in narrow lists, with secondary actions available from a menu.
 - Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
 
 - Closing SQL editors releases their retained query text and search state.
