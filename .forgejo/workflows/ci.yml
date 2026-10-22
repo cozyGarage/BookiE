@@ -25,6 +25,7 @@ jobs:
           cargo deny --version
           sccache --version
           docker info --format '{{.ServerVersion}}'
+          docker buildx version
           docker compose version
           dbus-run-session -- xvfb-run -a sh -c 'xdpyinfo >/dev/null'
           test -w "$CARGO_TARGET_DIR"
