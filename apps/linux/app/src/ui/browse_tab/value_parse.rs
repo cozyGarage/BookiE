@@ -314,6 +314,31 @@ pub(super) fn parse_grid_cell_input(
     parse_input_for_grid_cell(text, col, driver_id, current_value)
 }
 
+pub(super) fn parse_pasted_cell(
+    text: Option<&str>,
+    col: Option<&ColumnInfo>,
+    driver_id: &str,
+    current_value: Option<&Value>,
+) -> Result<Value, String> {
+    match text {
+        None if col.is_none_or(|column| column.nullable) => Ok(Value::Null),
+        None => Err(crate::tr!("Field is required")),
+        Some("")
+            if col.is_none_or(|column| {
+                column.enum_type.is_none() && is_character_type(&column.data_type.to_ascii_lowercase())
+            }) =>
+        {
+            let required = col.map(|column| ColumnInfo {
+                nullable: false,
+                default_value: None,
+                ..column.clone()
+            });
+            parse_grid_cell_input("", required.as_ref(), driver_id, current_value)
+        }
+        Some(text) => parse_grid_cell_input(text, col, driver_id, current_value),
+    }
+}
+
 fn parse_sql_single_quoted_string(text: &str) -> Option<String> {
     if text.len() < 2 {
         return None;
@@ -444,7 +469,11 @@ fn parse_mongodb_integer_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
     match column.data_type.trim().to_ascii_lowercase().as_str() {
         "int" => Some(text.parse::<i32>().map_or_else(
             |_| Err(crate::tr!("Integer is outside the supported MongoDB Int32 range")),
-            |value| Ok(Value::Json(serde_json::json!({"$numberInt": value.to_string()}))),
+            |value| {
+                Ok(Value::Json(Box::new(
+                    serde_json::json!({"$numberInt": value.to_string()}),
+                )))
+            },
         )),
         "long" => Some(parse_int_value(text)),
         _ => None,
@@ -461,7 +490,7 @@ fn parse_mongodb_decimal_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
     }
     Some(
         drivers_mongodb::canonical_decimal128_text(text)
-            .map(|canonical| Value::Json(serde_json::json!({"$numberDecimal": canonical})))
+            .map(|canonical| Value::Json(Box::new(serde_json::json!({"$numberDecimal": canonical}))))
             .map_err(|_| crate::tr!("Invalid decimal")),
     )
 }
@@ -833,6 +862,7 @@ pub(super) fn parse_uuid_value(text: &str) -> Result<Value, String> {
 
 pub(super) fn parse_json_value(text: &str) -> Result<Value, String> {
     serde_json::from_str::<serde_json::Value>(text)
+        .map(Box::new)
         .map(Value::Json)
         .map_err(|e| crate::tr!("Invalid JSON: {error}").replace("{error}", &e.to_string()))
 }

@@ -180,9 +180,21 @@ pub fn render_tsv(columns: &[ColumnInfo], rows: &[Vec<Value>], with_headers: boo
         lines.push(csv_header_line(columns, &options));
     }
     for row in rows {
-        lines.push(csv_row_line(row, &options));
+        let cells: Vec<String> = row
+            .iter()
+            .map(|value| match value_to_text(value) {
+                Some(text) if is_null_marker_shaped(&text) => quote_field(&text),
+                _ => format_csv_cell(value, &options),
+            })
+            .collect();
+        lines.push(cells.join("\t"));
     }
     lines.join("\n")
+}
+
+fn is_null_marker_shaped(text: &str) -> bool {
+    text.strip_prefix("\\N")
+        .is_some_and(|rest| rest.bytes().all(|byte| byte == b'N'))
 }
 
 fn rfc4180_options(header_row: bool) -> CsvOptions {
@@ -481,12 +493,12 @@ mod tests {
             vec![
                 Value::Bool(true),
                 Value::Uuid("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()),
-                Value::Json(serde_json::json!({"ok": true, "n": 1})),
+                Value::Json(Box::new(serde_json::json!({"ok": true, "n": 1}))),
             ],
             vec![
                 Value::Bool(false),
                 Value::Uuid("00000000-0000-4000-8000-000000000000".parse().unwrap()),
-                Value::Json(serde_json::json!([null, "a,b", {"x": 2}])),
+                Value::Json(Box::new(serde_json::json!([null, "a,b", {"x": 2}]))),
             ],
             vec![Value::Null, Value::Null, Value::Null],
         ];
@@ -848,7 +860,7 @@ mod tests {
 
         assert_eq!(
             render_tsv(&columns, &rows, false),
-            "NULL\n\"\"\n\\NNN\n\\N\n\\NN\n\"'=1+1\""
+            "NULL\n\"\"\n\\NNN\n\"\\N\"\n\"\\NN\"\n\"'=1+1\""
         );
     }
 
