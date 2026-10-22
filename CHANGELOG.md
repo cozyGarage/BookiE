@@ -9,6 +9,7 @@
 - The "Token issued" dialog for MCP has a **Copy Token** button, so the token (shown only once) no longer has to be selected by hand.
 - **Audit Log** in the main menu lists the operations recorded in the local audit journal, newest first: connection, who ran it, kind, outcome, rows and duration, with the operation id, policy rule, stored statement text and error on expand. A filter matches operation id, connection, outcome or statement. It verifies the journal chain before showing anything and reports a broken or unavailable journal instead of a partial list. It shows only what the journal stored; statement text is the redacted form. A failed statement's panel has **View in Audit Log**, which opens it with the newest operation, usually the failure, at the top.
 - F10 opens the main menu, as in other GNOME applications.
+- While a query result is locally filtered, its menu also offers **Export All Loaded Rows…** next to **Export Visible Rows…**, so the full loaded result can still be exported. Neither runs the query again.
 - SQLite files open from the file manager (Open With BookiE), and `bookie books.db` or `bookie postgres://user@host/db` opens a database file or a connection URL from a terminal. A URL asks you to confirm before it is imported and connected; a missing or non-database file is refused instead of creating an empty database. A second launch hands its argument to the running window. DuckDB files open from the terminal only.
 
 ### Changed
