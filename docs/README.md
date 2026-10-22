@@ -137,3 +137,5 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 
 - [Zed editor and panel review, October 22](archive/zed-editor-panel-review-2026-10-22.md): completed research, existing PR dependencies and issue-owned results/error/message panel follow-ups.
 - [GPUI client review, October 22](archive/gpui-client-review-2026-10-22.md): completed source research including dbdelve; open adoption proposals remain on their issues.
+
+- [Editor bottom panel desktop acceptance, October 22](evidence/editor-bottom-panel-2026-10-22/README.md): source-built native Wayland, keyboard/pointer, error/timeout and layout evidence; package and Forgejo gates stay separate.

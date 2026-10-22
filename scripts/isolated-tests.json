@@ -771,6 +771,26 @@
       "tablepro-app",
       "--lib",
       "ui::sidebar_columns::structure_action_tests::the_structure_shortcut_activates_the_owning_row_action"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::the_results_panel_can_be_hidden_without_releasing_or_rerunning_its_result"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::panel_tests::maximizing_and_hiding_restore_the_split_editor_and_divider"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::panel_tests::the_error_view_retains_results_and_clears_failures_after_success"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::panel_tests::hiding_results_falls_back_when_the_remembered_sql_split_was_closed"
     ]
   ],
   "keyring": [

@@ -403,3 +403,15 @@ Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/134
 - [ ] Run All and Run Current through the menu match their shortcuts in both split panes. File output names the statement/result set; exporting loaded rows never reruns SQL. A stream rerun is clearly labeled.
 - [ ] Table toolbar and grid-menu export both show Scope before Format. All matching rows explains its snapshot refusal and cannot proceed; returning to Current page restores the action. A joined query exports its result columns and cannot be mistaken for a full source-table export.
 - [ ] Header names and types retain their case; Column details exposes complete null/key metadata and a bounded column comment without making every header taller. Test keyboard menus and light/dark/high-contrast themes.
+
+## Editor bottom panel
+
+- [ ] On native Arch/Hyprland, run a query with a unique visible value, hide/show Results by button and Ctrl+J from SQL and the result grid, and confirm the same result and selection remain.
+- [ ] Resize the divider, maximize/restore, and hide while maximized. Confirm the normal divider size and the previously focused SQL split are restored.
+- [ ] Check normal and enlarged text at narrow/wide sizes in light/dark themes. Every panel control remains reachable.
+- [ ] Run successful, failed and timed-out queries. Errors shows only the latest accepted failures; switching views does not hide or rerun the result set.
+- [ ] Close a query with the panel hidden while another editor remains open. Its controls still work and no late result revives the closed editor.
+
+Source tests and native acceptance for this change are recorded in its PR and linked evidence; the checklist is not automatically satisfied by Xvfb.
+
+The [October 22 source-built desktop matrix](evidence/editor-bottom-panel-2026-10-22/README.md) covers these panel interactions on Arch/Hyprland. Packaged acceptance and broader accessibility qualification remain separate.
