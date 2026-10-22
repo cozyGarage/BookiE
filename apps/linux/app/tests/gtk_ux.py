@@ -113,10 +113,19 @@ def scenarios(ui):
     pyatspi = ui.pyatspi
     ssh_trust_prompt_roles = (pyatspi.ROLE_ALERT, pyatspi.ROLE_FRAME)
 
+    def saved_connection_action(name, action):
+        row = ui.wait_for_node(name=name, role=pyatspi.ROLE_LIST_ITEM)
+        ui.invoke(ui.wait_within(row, name="Connection actions", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.invoke(ui.wait_for_node(name=action))
+
     def wait_for_adw_dialog(name, present=True):
-        if os.environ.get("TABLEPRO_GTK_OLD_ADW") == "1":
+        if gtk_input.uses_old_adw():
             return None
-        return ui.wait_for_node(name=name, role=pyatspi.ROLE_DIALOG, present=present)
+        roles = (pyatspi.ROLE_DIALOG, pyatspi.ROLE_LABEL)
+        wait_until(
+            lambda: any(ui.find_node(name=name, role=role) is not None for role in roles) == present,
+            f"dialog {name!r} did not become {'visible' if present else 'hidden'}",
+        )
 
     def text_of(node):
         text = node.queryText()
@@ -316,14 +325,7 @@ GLib.MainLoop().run()
     def postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit(database, base):
         def run_session_sql(sql):
             ui.set_editor_text(sql)
-            deadline = time.monotonic() + ui.WAIT_SECONDS
-            while time.monotonic() < deadline:
-                button = ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
-                if button.getState().contains(pyatspi.STATE_SENSITIVE):
-                    ui.invoke(button)
-                    return
-                time.sleep(ui.POLL_SECONDS)
-            raise AssertionError(f"session query did not become available for {sql!r}:\n{ui.accessible_snapshot()}")
+            ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
 
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
@@ -356,7 +358,7 @@ GLib.MainLoop().run()
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        ui.invoke_named_action_within(ui.CONNECTION_B_NAME, "Edit connection")
+        saved_connection_action(ui.CONNECTION_B_NAME, "Edit connection")
         ui.wait_for_node(name=f"Edit {ui.CONNECTION_B_NAME}")
         name = ui.wait_for_node(name="Name (optional)", role=pyatspi.ROLE_TEXT)
         assert text_of(name) == ui.CONNECTION_B_NAME, text_of(name)
@@ -370,7 +372,7 @@ GLib.MainLoop().run()
 
     def open_edit_dialog_for(name):
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        ui.invoke_named_action_within(name, "Edit connection")
+        saved_connection_action(name, "Edit connection")
         ui.wait_for_node(name=f"Edit {name}")
 
     def test_connection_reports_success_in_the_dialog(database, base):
@@ -726,6 +728,42 @@ GLib.MainLoop().run()
         ]
         assert not unnamed, "controls without an accessible name:\n" + "\n".join(unnamed)
 
+    def wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells(database, base):
+        ui.run_sql("SELECT " + ", ".join(f"{1000 + index} AS c{index}" for index in range(1, 301)))
+        wait_for_result_column("c1")
+
+        def showing(node):
+            return node is not None and node.getState().contains(pyatspi.STATE_SHOWING)
+
+        def left_edge(node):
+            return node.queryComponent().getExtents(pyatspi.WINDOW_COORDS).x
+
+        for index in (150, 300, 1):
+            ui.press_x11_key("j", ("Control_L", "Shift_L"))
+            search = ui.wait_for_node(name="Search columns")
+            search.queryEditableText().setTextContents(f"c{index}")
+            time.sleep(0.3)
+            ui.press_x11_key("Return")
+            ui.wait_for_node(name="Search columns", present=False)
+            frame = next(
+                node for node in ui.descendants(ui.application_node()) if ui.node_role(node) == pyatspi.ROLE_FRAME
+            )
+            window_width = frame.queryComponent().getExtents(pyatspi.WINDOW_COORDS).width
+
+            def aligned_in_view():
+                header = ui.find_node_containing(f"c{index}\n", role=pyatspi.ROLE_LABEL)
+                cell = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_LABEL)
+                if not (showing(header) and showing(cell)):
+                    return None
+                header_x, cell_x = left_edge(header), left_edge(cell)
+                in_view = 0 <= header_x < window_width and 0 <= cell_x < window_width
+                return (header_x, cell_x) if in_view and abs(header_x - cell_x) <= 12 else None
+
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while aligned_in_view() is None:
+                assert time.monotonic() < deadline, f"c{index} did not scroll into view over its header"
+                time.sleep(ui.POLL_SECONDS)
+
     def narrow_window_keeps_main_and_editor_toolbar_actions_reachable(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)
         window = ui.wait_for_frame_containing(" — BookiE")
@@ -756,8 +794,7 @@ GLib.MainLoop().run()
         ui.invoke_accessible_action("win.disconnect")
         ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        row = ui.wait_for_node(name=ui.CONNECTION_NAME, role=pyatspi.ROLE_LIST_ITEM)
-        ui.invoke(ui.wait_within(row, name="Group and tags", role=pyatspi.ROLE_PUSH_BUTTON))
+        saved_connection_action(ui.CONNECTION_NAME, "Group and tags")
         chooser = ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON)
         actions = chooser.queryAction()
         assert any(actions.getName(index) == "click" for index in range(actions.nActions)), (
@@ -1121,7 +1158,9 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
         ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
-        ui.run_sql("BEGIN")
+        ui.set_editor_text("BEGIN")
+        ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("done in")
         ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
         # Observe the insert result before issuing the SELECT. The GTK action
         # starts query work asynchronously, so dispatching both back-to-back
@@ -1634,6 +1673,7 @@ GLib.MainLoop().run()
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
+        wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells,
         narrow_window_keeps_main_and_editor_toolbar_actions_reachable,
         connection_colour_chooser_has_an_accessible_button,
         alt_arrows_jump_between_statements,
