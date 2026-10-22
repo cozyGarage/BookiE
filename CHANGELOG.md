@@ -8,12 +8,24 @@
 
 ### Changed
 
+- Editing rows with large values uses less temporary memory when verifying the row identity.
+
 - Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
+- Oversized streamed result rows are rejected before value decoding, reducing memory spikes.
 - The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
 
 ### Fixed
 
 - Open tabs, the active tab and sidebar group state are saved per database. Switching a saved connection to another database no longer restores the first database's tabs against the second, where a same-named table could show with the wrong page, sort or filter. Each database gets its own tabs back when you return to it; workspaces saved by earlier versions restore for the database you connect to first.
+- Closing SQL editors releases their retained query text and search state.
+- SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
+
+- Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.
+- Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout.
+- A schema change stops the SQL-completion column lookups still running from before it.
+- The database switcher ignores, and stops, a database list still loading from the session before a database switch.
+- A cancelled Structure tab load no longer replaces the newer one.
+- A new empty editor tab takes the first free "Query N" title instead of counting open editors, so closing Query 1 and opening a new tab no longer produces a second "Query 2".
 - Closing a result grid releases its selection and row inspector.
 
 - Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
