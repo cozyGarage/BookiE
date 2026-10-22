@@ -14,6 +14,7 @@ mod init_sidebar;
 mod init_window;
 mod init_workspace;
 mod msg;
+mod open_request;
 mod organization;
 mod ran_statements;
 mod referenced_row;
@@ -109,6 +110,7 @@ pub struct App {
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     schema_fetch_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
+    database_list_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     content_holder: adw::ToolbarView,
     history_paned: gtk::Paned,
     toast_overlay: adw::ToastOverlay,
@@ -527,6 +529,7 @@ impl SimpleComponent for App {
             catalog_generation: std::cell::Cell::new(0),
             catalog_cancel: Default::default(),
             schema_fetch_cancel: Default::default(),
+            database_list_cancel: Default::default(),
             content_holder: widgets.content_holder.clone(),
             history_paned: gtk::Paned::builder()
                 .orientation(gtk::Orientation::Vertical)
@@ -596,6 +599,7 @@ impl SimpleComponent for App {
             poll_health_source: None,
             history_prune_source: None,
         };
+        open_request::forward_open_signal(sender.input_sender());
         sender.input(AppMsg::ReloadConnections);
         model.content_holder.set_content(Some(&model.history_paned));
         model.show_welcome_page(sender.clone());
@@ -833,6 +837,11 @@ impl SimpleComponent for App {
             AppMsg::FinishCloseWorkspaceTab(id) => {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
                     self.finish_close_workspace_tab(id, &tab_view, sender);
+                }
+            }
+            AppMsg::CloseDiscardedWorkspaceTab(id) => {
+                if let Some(tab_view) = self.workspace_tab_view.clone() {
+                    self.close_workspace_tab_after_pending(id, &tab_view, sender);
                 }
             }
             AppMsg::CloseOtherWorkspaceTabs(id) => self.close_other_workspace_tabs(id, sender),
@@ -1080,14 +1089,13 @@ impl SimpleComponent for App {
             }
             AppMsg::ConnectionOrganizationRejected => self.on_connection_organization_rejected(),
             AppMsg::ImportConnectionUrl => self.on_import_connection_url(sender),
-            AppMsg::ImportConnectionUrlText(url) => self.on_import_connection_url_text(url, sender),
+            AppMsg::ImportConnectionUrlText(url, connect) => self.on_import_connection_url_text(url, connect, sender),
+            AppMsg::OpenLaunchArguments(arguments) => self.on_open_launch_arguments(arguments, sender),
             AppMsg::ImportConnectionUrlSucceeded(name) => self.on_import_connection_url_succeeded(name),
             AppMsg::ImportConnectionUrlFailed => self.on_import_connection_url_failed(),
             AppMsg::OpenSaved(saved) => self.on_open_saved(saved, sender),
             AppMsg::LoadDatabases => self.on_load_databases(sender),
-            AppMsg::DatabasesLoaded { connection_id, result } => {
-                self.on_databases_loaded(connection_id, result, sender)
-            }
+            AppMsg::DatabasesLoaded { origin, result } => self.on_databases_loaded(origin, result, sender),
             AppMsg::SwitchDatabase(name) => self.on_switch_database(name, sender),
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
