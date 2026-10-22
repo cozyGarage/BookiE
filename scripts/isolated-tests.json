@@ -726,6 +726,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::lifetime_tests::a_retired_grid_does_not_retain_its_inspector_through_selection_callback"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::editor_waits_for_its_session_before_accepting_any_run_input"
     ]
   ],
   "keyring": [
