@@ -67,12 +67,16 @@ fn saved_position(paned: &gtk::Paned, position: i32, saved: &Cell<i32>) {
 
 fn place_sidebar(split: &adw::OverlaySplitView, paned: &gtk::Paned, sidebar: &gtk::Widget, width: i32) {
     if split.is_collapsed() {
+        split.set_max_sidebar_width(280.0);
+        split.set_min_sidebar_width(220.0);
         paned.set_start_child(gtk::Widget::NONE);
         split.set_sidebar(Some(sidebar));
         sidebar.set_visible(true);
         return;
     }
     split.set_sidebar(gtk::Widget::NONE);
+    split.set_min_sidebar_width(0.0);
+    split.set_max_sidebar_width(0.0);
     paned.set_start_child(Some(sidebar));
     sidebar.set_visible(split.shows_sidebar());
     paned.set_position(width);
@@ -176,6 +180,10 @@ mod allocated_tests {
         let paned = split.content().and_downcast::<gtk::Paned>().unwrap();
         assert!(!split.is_collapsed());
         assert!(split.shows_sidebar());
+        assert!(
+            paned.compute_bounds(&split).unwrap().x().abs() <= 1.0,
+            "the empty overlay sidebar must not reserve another column"
+        );
         paned.set_position(900);
         settle(&window);
         assert!(
