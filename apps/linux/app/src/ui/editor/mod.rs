@@ -992,7 +992,7 @@ impl SqlEditor {
         parameter_values: std::collections::HashMap<String, tablepro_core::Value>,
         sender: ComponentSender<Self>,
     ) {
-        if self.session_ending() {
+        if !self.can_start_run() || self.session_ending() {
             self.status.set_label(&crate::tr!("Waiting for session to finish"));
             return;
         }
