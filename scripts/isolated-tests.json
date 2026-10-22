@@ -831,6 +831,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::error_navigation_does_not_mistake_a_comment_for_the_executed_statement"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::editor_waits_for_its_session_before_accepting_any_run_input"
     ]
   ],
   "keyring": [
