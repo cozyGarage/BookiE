@@ -643,7 +643,12 @@ GLib.MainLoop().run()
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         wait_for_result_column("beta")
         open_cell_menu("1")
-        choose_menu_item(7)
+        menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
+        items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+        assert len(items) == 10, f"expected the 10-item result menu, found {len(items)}"
+        actions = items[7].queryAction()
+        click_action = next(index for index in range(actions.nActions) if actions.getName(index) == "click")
+        assert actions.doAction(click_action)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switches = [
