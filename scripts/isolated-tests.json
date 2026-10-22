@@ -600,6 +600,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::app::sidebar_state::tests::a_collapsed_window_keeps_the_sidebar_closed_so_it_cannot_cover_the_first_click"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::dispatch_tests::editor_inputs_cannot_dispatch_or_cancel_an_active_query"
     ],
     [

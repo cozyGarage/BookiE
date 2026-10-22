@@ -74,6 +74,7 @@ pub enum AppMsg {
     ImportConnectionUrl,
     ImportConnectionUrlText(String, bool),
     OpenLaunchArguments(Vec<crate::services::open_request::LaunchArgument>),
+    WindowWidened,
     ImportConnectionUrlSucceeded(String),
     ImportConnectionUrlFailed,
     NewEditorTab,

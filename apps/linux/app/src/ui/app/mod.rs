@@ -295,6 +295,13 @@ impl SimpleComponent for App {
                         set_popover = &gtk::Popover {},
                     },
 
+                    #[name = "sidebar_toggle"]
+                    pack_start = &gtk::ToggleButton {
+                        set_icon_name: "sidebar-show-symbolic",
+                        set_tooltip_text: Some(crate::tr!("Show tables").as_str()),
+                        set_visible: false,
+                    },
+
                     #[name = "databases_button"]
                     pack_start = &gtk::MenuButton {
                         set_icon_name: "network-server-symbolic",
@@ -463,8 +470,13 @@ impl SimpleComponent for App {
 
         init_css::install_pending_change_css();
 
-        let window_handles =
-            init_window::install_window_lifecycle(&widgets.window, &widgets.split_view, &workspace, &sender);
+        let window_handles = init_window::install_window_lifecycle(
+            &widgets.window,
+            &widgets.split_view,
+            &widgets.sidebar_toggle,
+            &workspace,
+            &sender,
+        );
 
         let sidebar = init_sidebar::build_sidebar(&widgets, &sender);
 
@@ -855,6 +867,7 @@ impl SimpleComponent for App {
             AppMsg::ExportStreamedResults(request) => self.on_export_streamed_results(request),
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
+            AppMsg::WindowWidened => self.on_window_widened(),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
             AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),
