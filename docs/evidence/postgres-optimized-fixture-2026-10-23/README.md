@@ -47,3 +47,9 @@ A separate fresh-process heaptrack run executed count and the same many-column q
 The interpreted capture reported 407.22 MB peak tracked heap and 41.91 MB unfreed at exit, compared with 439.10 MB peak and 401.53 MB unfreed in the previous run that quit with the result open. Remaining allocation counts fell from approximately 5.29 million to 152,098. These are separate runs with measurement variability, not an exact allocation subtraction. They support release of most grid allocations on tab closure despite retained RSS. They do not exclude smaller leaks, framework caches or allocator retention.
 
 Local evidence and the instrumented probe copy are in `target/quality/postgres-heaptrack-close/`. Three repeated open/close cycles without heaptrack completed; [raw measurements](repeat-close.json). After-close RSS was 581.30, 583.79 and 586.28 MiB. This does not show another roughly 400 MiB retained per cycle, but the approximately 2.5 MiB increase per cycle needs a longer run before claiming a plateau. No steady-state or leak-free conclusion is established.
+
+## Ten-cycle follow-up
+
+A fresh unprofiled process completed ten many-column open/close cycles, using the same binary and synthetic fixture. [Measurements](repeat-close-10.json). Baseline RSS was 182.80 MiB. After-close RSS was 582.12, 584.71, 585.07, 585.43, 587.94, 587.99, 588.82, 589.94, 592.84 and 591.54 MiB. The first-to-last increase was 9.42 MiB, with a drop on the final cycle. This does not establish a plateau or exclude smaller retained owners.
+
+Query CPU time ranged from 4.03 to 11.11 seconds; elapsed time ranged from 4.795 to 12.724 seconds. Every query and close completed. These ten observations show substantial construction cost and modest additional RSS growth rather than another full grid retained per cycle. Attribution of the remaining growth and variable CPU cost remains open.
