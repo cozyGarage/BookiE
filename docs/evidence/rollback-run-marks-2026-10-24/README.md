@@ -18,4 +18,4 @@ The fixture tests terminal UI message handling. It does not establish database r
 
 ## Validation
 
-Full preflight, strict application Clippy and the complete GTK tier are pending. No guardrail, timeout or transaction outcome was weakened.
+Full preflight, strict application Clippy and the complete GTK tier are pending. The initial preflight caught the production file at 1,201 lines. Existing session tests were moved intact to session_mode/tests.rs, retaining their module paths and names; the size guard now passes without raising a baseline. No guardrail, timeout or transaction outcome was weakened.
