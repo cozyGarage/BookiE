@@ -1,6 +1,6 @@
 # Combined resource validation
 
-Status: local integration of [PR 1529](https://github.com/cozyGarage/BookiE/pull/1529) and [PR 1530](https://github.com/cozyGarage/BookiE/pull/1530), not Forgejo acceptance. [Inputs](inputs.json) pin the actual merged source heads. The two fixes change separate editor lifecycle and result presentation paths. Only additive documentation-index conflicts required resolution; both entries were preserved.
+Status: historical local integration of [PR 1529](https://github.com/cozyGarage/BookiE/pull/1529) and [PR 1530](https://github.com/cozyGarage/BookiE/pull/1530), not Forgejo acceptance. [Inputs](inputs.json) pin the actual merged source heads. The two fixes change separate editor lifecycle and result presentation paths. Only additive documentation-index conflicts required resolution; both entries were preserved.
 
 The [editor investigation](../local-resource-profiling-2026-10-23/README.md) and [stream investigation](../stream-page-realization-2026-10-23/README.md) own their separate measurements. This record owns checks performed with both changes present. Do not treat separate-head results as combined acceptance.
 
@@ -19,4 +19,4 @@ A matched fixture pair added explicit observed close latency: [candidate](utf8-c
 
 ## Remaining scope
 
-File-chooser loading, oversized-file refusal, a dedicated cold-start resource measurement, installed runtime-failure cases and empty welcome-view response remain unverified by this record. Native Wayland appearance also remains unchecked. The [stream investigation](../stream-page-realization-2026-10-23/README.md) records exact full CSV output and the unresolved clipboard interaction. [Issue 1531](https://github.com/cozyGarage/BookiE/issues/1531) owns the multiline preview-height defect. No permanent memory plateau or absence of other leaks is claimed.
+File-chooser loading, oversized-file refusal, a dedicated cold-start resource measurement, installed runtime-failure cases and empty welcome-view response remain unverified by this record. Native Wayland appearance also remains unchecked. The [stream investigation](../stream-page-realization-2026-10-23/README.md) records exact full CSV output and the unresolved clipboard interaction. [Issue 1531](https://github.com/cozyGarage/BookiE/issues/1531) owns the multiline preview-height defect. Both constituent fixes have since merged as #1529 and #1530, and the multiline preview repair merged as #1533. This record still proves only its pinned source, not the current Linux head. No permanent memory plateau or absence of other leaks is claimed.

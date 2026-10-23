@@ -10,12 +10,12 @@ Measure optimized application behavior before changing it. Preserve exact values
 
 | Scenario | Measurements and checks | Status |
 | --- | --- | --- |
-| Startup and idle | Startup time, idle CPU, RSS and private memory | Connected-idle CPU recorded in the [stream investigation](../stream-page-realization-2026-10-23/README.md); cold startup remains pending |
-| PostgreSQL streamed results | 250k, 1M and 2M six-column rows; completion or explicit timeout; retained range; CPU, elapsed time and RSS | 250k baseline recorded; 1M and 2M complete in the [combined validation](../performance-integration-2026-10-23/README.md) |
-| Wide results and browse | Bounded bytes, scrolling, visible previews, exact copy and export | Byte eviction and exact full CSV export recorded in the [stream investigation](../stream-page-realization-2026-10-23/README.md); clipboard and multiline geometry remain open |
-| Large SQL files | 1 MiB and near the 8 MiB limit; UTF-8; load, edit and close; oversized refusal | ASCII restore/edit/discard and combined UTF-8 restore/close recorded; file chooser and oversized refusal remain pending |
-| Repeated open and close | Repeated editor and result cycles; settled memory, live allocations and responsive welcome view | Query/close cycles and label lifetime regression recorded; permanent memory plateau and empty welcome-view response are not established |
-| Cancellation and failure | Cancel during streaming; query failure; release of retired pages | Stream cancellation and follow-up queries verified with server checks; new installed runtime-failure cases remain pending |
+| Startup and idle | Startup time, idle CPU, RSS and private memory | Pending |
+| PostgreSQL streamed results | 250k, 1M and 2M six-column rows; completion or explicit timeout; retained range; CPU, elapsed time and RSS | 250k cycles recorded; 1M and 2M pending |
+| Wide results and browse | Bounded bytes, scrolling, visible previews, exact copy and export | Pending |
+| Large SQL files | 1 MiB and near the 8 MiB limit; UTF-8; load, edit and close; oversized refusal | ASCII restore/edit/discard recorded; chooser, UTF-8 and refusal pending |
+| Repeated open and close | Repeated editor and result cycles; settled memory, live allocations and responsive welcome view | Pending |
+| Cancellation and failure | Cancel during streaming; query failure; release of retired pages | Pending |
 
 Recorded timing runs had no competing compilation on this desktop. Heaptrack and perf runs are diagnostic and their timings must not be treated as ordinary execution times. Record executable identity and toolkit versions with results.
 

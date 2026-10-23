@@ -57,8 +57,9 @@
 
 ### Fixed
 
-- Closing a SQL editor releases its syntax analysis engine so background highlighting does not keep growing memory for a closed large script.
+- Multiline read-only cell previews stay compact instead of expanding query result rows to many text lines.
 - Closing streamed query results releases hidden page labels instead of accumulating retired tab widgets.
+- Closing a SQL editor releases its syntax analysis engine so background highlighting does not keep growing memory for a closed large script.
 
 - Save-conflict messages keep the recovery advice without a redundant failure prefix or unrelated session warning, and save errors no longer double sentence-ending periods.
 - Restoring older workspaces skips empty table-structure tabs while keeping the active editor aligned and the empty workspace usable.
