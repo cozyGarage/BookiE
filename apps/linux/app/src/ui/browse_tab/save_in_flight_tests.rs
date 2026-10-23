@@ -2,7 +2,7 @@ use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseT
 use relm4::gtk::gio::prelude::ListModelExt;
 use relm4::gtk::glib::prelude::Cast;
 use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt};
-use relm4::{Component, ComponentController};
+use relm4::{Component, ComponentController, Controller};
 use std::sync::mpsc::Receiver;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
 use uuid::Uuid;
@@ -41,10 +41,7 @@ fn launch(tab_id: Uuid) -> (relm4::Controller<BrowseTab>, Receiver<BrowseTabOutp
     launch_with_read_only(tab_id, false)
 }
 
-pub(super) fn launch_with_read_only(
-    tab_id: Uuid,
-    read_only: bool,
-) -> (relm4::Controller<BrowseTab>, Receiver<BrowseTabOutput>) {
+pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<BrowseTab>, Receiver<BrowseTabOutput>) {
     let (output_sender, output_receiver) = relm4::channel::<BrowseTabOutput>();
     let (observed_sender, observed) = std::sync::mpsc::channel();
     relm4::spawn_local(async move {
@@ -56,7 +53,7 @@ pub(super) fn launch_with_read_only(
     });
     let controller = BrowseTab::builder()
         .launch(BrowseTabInit {
-            tab_id,
+            tab_id: id,
             schema: Some("public".into()),
             table: "notes".into(),
             driver_id: "postgres".into(),
