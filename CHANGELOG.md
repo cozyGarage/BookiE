@@ -55,6 +55,8 @@
 
 ### Fixed
 
+- Multiline read-only cell previews stay compact instead of expanding query result rows to many text lines.
+
 - Save-conflict messages keep the recovery advice without a redundant failure prefix or unrelated session warning, and save errors no longer double sentence-ending periods.
 - Restoring older workspaces skips empty table-structure tabs while keeping the active editor aligned and the empty workspace usable.
 
