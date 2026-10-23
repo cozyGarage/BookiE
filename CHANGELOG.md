@@ -48,6 +48,8 @@
 
 ### Fixed
 
+- Export cleanup warnings omit database error details that could contain private query text or values.
+
 - Keyboard cell menus refresh reference and loaded-row export availability for the current cell and filter.
 - A SQL editor result that was cut short by the result size limit now says so and shows how many rows were loaded, instead of only after sorting or filtering.
 - BookiE and `bookie-agentd` no longer crash when the terminal or pipe receiving their log output closes.
