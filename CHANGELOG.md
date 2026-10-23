@@ -50,6 +50,8 @@
 
 ### Fixed
 
+- Restoring older workspaces skips empty table-structure tabs while keeping the active editor aligned and the empty workspace usable.
+
 - Export cleanup warnings omit database error details that could contain private query text or values.
 - Exporting loaded results avoids two extra copies of the result data while choosing and writing the destination file.
 
