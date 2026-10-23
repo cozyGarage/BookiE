@@ -36,6 +36,11 @@ class CiWorkflowTests(unittest.TestCase):
         for name, feature in (("gtk4", "gnome_50"), ("glib", "v2_88"), ("libadwaita", "v1_9"), ("sourceview5", "v5_18")):
             self.assertIn(feature, dependencies[name]["features"])
 
+    def test_cached_gtk_image_enforces_the_native_library_baseline(self):
+        image = (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text()
+        for version, package in (("4.22", "gtk4"), ("2.88", "glib-2.0"), ("1.9", "libadwaita-1"), ("5.18", "gtksourceview-5")):
+            self.assertIn(f"pkg-config --atleast-version={version} {package}", image)
+
     def test_cargo_about_comes_from_the_pinned_installer_and_is_never_built_in_ci(self):
         for path in (
             ".github/workflows/build-linux.yml",

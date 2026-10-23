@@ -5,7 +5,7 @@ Recorded on 2026-10-23. This evidence describes the baseline branch before merge
 ## Local verification
 
 - The distro-floor workflow regression failed twice before replacing Ubuntu 24.04 package inputs, then passed all 34 existing cases.
-- The expanded workflow contract passes 35 cases, including native job placement and Cargo feature requirements.
+- The expanded workflow contract passes 36 cases, including native job placement and Cargo feature requirements.
 - Full preflight passed: script harness, guards, formatting, non-GTK Clippy, unit and sandbox tiers.
 - `cargo metadata --locked --offline --format-version 1 --no-deps` passed. No dependency version or lockfile changes were needed.
 - `python3 scripts/vendor-patches.py check` passed for all four vendored crates. Upstream checksums and recorded patches reproduce the committed sources.
@@ -29,3 +29,13 @@ The lab provisioning repository owns addresses, service configuration and cutove
 A newer native stack does not establish that the intermittent completion popup defect is fixed. Issue #1445 was closed by the separate completion-test correction in PR #1456; that change will be integrated before gating.
 
 The GitHub scheduled PostgreSQL release backup also builds the GTK application directly. Its host label now uses Ubuntu 26.04. GitHub documents that label as generally available in its [runner image inventory](https://github.com/actions/runner-images/blob/main/README.md). Container-only and headless GitHub orchestration jobs keep their existing host labels.
+
+## Integration with current Linux
+
+The baseline branch integrated PRs #1456, #1457, #1458 and #1459 from Linux commit `c753b6f7e`. The dist release profile and PostgreSQL toolchain-home correction were retained.
+
+Integrated preflight exposed a new comment in the completion test exceeding its zero-comment baseline. Only that comment was removed; the two-proposal test and its documented limitation remain.
+
+The integrated GTK suite also reproduced a narrow-toolbar overflow after restoring the transaction label: 616 px requested with 600 px available in the larger-text case. The existing width assertions were kept. The Session button now uses GTK's built-in shrinking, preserving its full label and accessible name.
+
+The cached GitHub GTK image now checks all four library floors during its build. Changing the Dockerfile also changes the image cache tag, preventing reuse of an older native stack.

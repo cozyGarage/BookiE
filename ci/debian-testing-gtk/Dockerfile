@@ -25,3 +25,8 @@ RUN apt-get update \
         at-spi2-core \
         python3-pyatspi \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pkg-config --atleast-version=4.22 gtk4 \
+    && pkg-config --atleast-version=2.88 glib-2.0 \
+    && pkg-config --atleast-version=1.9 libadwaita-1 \
+    && pkg-config --atleast-version=5.18 gtksourceview-5
