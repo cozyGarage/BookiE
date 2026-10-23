@@ -981,6 +981,11 @@
       "tablepro-app",
       "--lib",
       "ui::connect_dialog::controls::tests::dropping_a_choice_row_releases_its_popup"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::confirmed_session_rollbacks_retire_gutter_marks_and_stale_callbacks_do_not"
     ]
   ],
   "keyring": [

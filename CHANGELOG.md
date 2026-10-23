@@ -59,6 +59,8 @@
 
 ### Fixed
 
+- A confirmed session rollback clears obsolete query gutter marks, including when a commit request ends in rollback.
+
 - SQL completion avoids catalog reads for incomplete table names and coalesces rapid editor changes.
 - Connection choices open from the keyboard, mark the selected option and release their popups when the dialog closes.
 

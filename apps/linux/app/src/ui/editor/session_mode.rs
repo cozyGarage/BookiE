@@ -593,6 +593,7 @@ impl SqlEditor {
             self.session_button.set_active(false);
         }
         if result.is_ok() {
+            self.clear_run_marks();
             self.status.set_label(&crate::tr!("Session rolled back"));
         }
         self.finish_session_teardown(result);
@@ -648,7 +649,10 @@ impl SqlEditor {
                 self.end_session(sender);
                 let message = match outcome {
                     SessionCommitOutcome::Committed => crate::tr!("Session committed"),
-                    SessionCommitOutcome::RolledBack => crate::tr!("Session rolled back"),
+                    SessionCommitOutcome::RolledBack => {
+                        self.clear_run_marks();
+                        crate::tr!("Session rolled back")
+                    }
                 };
                 self.status.set_label(&message);
             }
