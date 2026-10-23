@@ -6,4 +6,4 @@ Each realized cell parsed the same Menu and Shift+F10 alternative trigger. The g
 
 The existing registered keyboard-menu regression now attaches two cells and compares their trigger identities before exercising keyboard action availability. It failed before the correction with two distinct GtkAlternativeTrigger instances and passes afterward with a single shared instance. Existing reference and filtered-export action behavior remains covered by the same test.
 
-Function-size checks pass; the changed file remains below 1,200 lines. Full preflight and isolated widgets are pending. This removes repeated parsing and trigger objects; no full-app RSS or elapsed-time improvement has been measured for this change.
+Function-size checks pass; the changed file remains below 1,200 lines. Full preflight passes on the integrated branch. The complete isolated GTK widget tier also passes, with 153 tests executed successfully. Forgejo acceptance remains pending. This removes repeated parsing and trigger objects; no full-app RSS or elapsed-time improvement has been measured for this change.
