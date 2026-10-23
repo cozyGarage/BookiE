@@ -59,6 +59,8 @@
 
 ### Fixed
 
+- Streamed result summaries use singular row and page labels when each count is one.
+
 - SQL completion avoids catalog reads for incomplete table names and coalesces rapid editor changes.
 - Connection choices open from the keyboard, mark the selected option and release their popups when the dialog closes.
 
