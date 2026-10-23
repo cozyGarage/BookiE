@@ -5,7 +5,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   runner-canary:
-    runs-on: ubuntu2604-canary
+    runs-on: gnome50-host
     timeout-minutes: 10
     defaults:
       run:
@@ -20,7 +20,7 @@ jobs:
           pkg-config --atleast-version=2.88 glib-2.0
           pkg-config --atleast-version=1.9 libadwaita-1
           pkg-config --atleast-version=5.18 gtksourceview-5
-          rustup run 1.98.0 rustc --version
+          rustup run 1.98 rustc --version
           cargo nextest --version
           cargo deny --version
           sccache --version
