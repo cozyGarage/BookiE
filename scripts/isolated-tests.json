@@ -966,6 +966,21 @@
       "tablepro-app",
       "--lib",
       "ui::editor::completion_provider::tests::column_refresh_coalesces_a_burst_of_editor_changes"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connect_dialog::controls::tests::choice_rows_expose_an_activation_target"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connect_dialog::controls::tests::choice_rows_show_only_the_current_selection"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connect_dialog::controls::tests::dropping_a_choice_row_releases_its_popup"
     ]
   ],
   "keyring": [
