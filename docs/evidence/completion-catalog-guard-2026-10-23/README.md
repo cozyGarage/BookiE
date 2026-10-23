@@ -19,3 +19,5 @@ The generated [ignored test inventory](ignored-test-inventory.txt) records the G
 ## Limits
 
 The callback count is measured at the metadata refresh boundary. This run does not measure PostgreSQL audit records or native Wayland keyboard behavior. Full preflight passed, including unit and sandbox tiers. Application Clippy passed with warnings denied. All 155 isolated GTK tests passed. Preflight ran 2,074 unit tests, 2,087 sandbox tests and the separate Redis check successfully.
+
+After integrating Linux at 575150120, full preflight passed again and all 158 isolated GTK tests passed, including the three connection-choice regressions.
