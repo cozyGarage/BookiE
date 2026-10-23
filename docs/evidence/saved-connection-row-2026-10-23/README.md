@@ -2,7 +2,7 @@
 
 This record captures the saved-connection row from commit `30f72c168` in light and dark themes at 320 px and 560 px widths. The synthetic connection uses a long Unicode name and endpoint. The GTK widget test applies 20 px text, measures the row in a mapped Xvfb window, and checks that the title receives at least 120 px and the favorite, actions-menu and open controls remain allocated.
 
-The images show the row widget only. They do not establish native Wayland, application-level welcome/popover layout, screen-reader behavior or transparency under Omarchy. The welcome list and saved-connection popover use the same row factory. The icon buttons receive explicit accessible labels; no AT-SPI assertion was made for these buttons in this run.
+The images show the row widget only and do not establish transparency under Omarchy. The welcome list and saved-connection popover use the same row factory. A source-built `ci` binary from `30f72c168` passed focused GTK/AT-SPI scenarios for editing a saved connection, Group/Tags, removal from the welcome list, and keyboard traversal of the row controls. The keyboard test checks the accessible names and click actions, tabs through Favorite, Actions and Open in order, then activates Open with Return. The test environment was Xvfb, not native Wayland.
 
 The GTK allocation test passed on the recorded commit. It emitted GTK warnings that an internal `GtkBox` reported a natural height smaller than its minimum height at both widths. This did not fail the assertions, but remains a native desktop review item.
 
@@ -11,7 +11,10 @@ The GTK allocation test passed on the recorded commit. It emitted GTK warnings t
 - `bash scripts/preflight.sh`: passed. This included 2,070 unit tests, 2,082 sandbox tests and the Redis cancellation test. Debian package validation was skipped because `dpkg-deb` is unavailable.
 - `bash scripts/test-gtk-widgets.sh`: 144 tests passed, including the saved-connection row allocation test.
 - Focused screenshot test: passed at commit `30f72c168` using Xvfb, 20 px CSS text and synthetic data.
+- `scripts/test-gtk-safety.sh` with four selected saved-connection scenarios: edit, Group/Tags, welcome-list removal, and keyboard focus order plus Return activation; all passed against the source-built binary from `30f72c168`.
 - `cargo clippy --locked -p tablepro-app --all-targets -- -D warnings`: passed before the final commit; the final commit changed no Rust after that check.
+
+Native Wayland visual review and screen-reader narration remain unverified.
 
 The Xvfb run emitted routine DRI3, portal and bus warnings in addition to the `GtkBox` measurement warning. These are test-environment messages, not proof of desktop acceptance.
 
