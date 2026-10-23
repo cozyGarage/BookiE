@@ -21,7 +21,7 @@
 
 ### Changed
 
-- SQL completion reuses catalog membership keys to reduce repeated work in large catalogs.
+- SQL completion checks table names faster in large catalogs.
 
 - Large PostgreSQL query results stream faster while retained pages remain available through the result pager.
 
