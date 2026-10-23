@@ -21,6 +21,8 @@
 
 ### Changed
 
+- Large result grids reuse keyboard-menu shortcuts to reduce cell setup allocations.
+
 - Editing a cell or pasting in a table tab no longer rebuilds every loaded row on the page, so large pages with long text values stay responsive.
 - Keyboard shortcuts use a native adaptive dialog that fits smaller windows and preserves keyboard and mouse gesture descriptions.
 
@@ -50,6 +52,7 @@
 
 - Restoring older workspaces skips empty table-structure tabs while keeping the active editor aligned and the empty workspace usable.
 
+- Export cleanup warnings omit database error details that could contain private query text or values.
 - Exporting loaded results avoids two extra copies of the result data while choosing and writing the destination file.
 
 - Keyboard cell menus refresh reference and loaded-row export availability for the current cell and filter.
