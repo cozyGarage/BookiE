@@ -198,3 +198,5 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 - [Compact multiline previews, October 23](evidence/compact-multiline-preview-2026-10-23/README.md): failing height regression and read-only cell layout correction with exact-text checks.
 - [Stream page realization, October 23](evidence/stream-page-realization-2026-10-23/README.md): optimized two-million-row comparisons and retained-page navigation checks.
 - [Local resource profiling, October 23](evidence/local-resource-profiling-2026-10-23/README.md): repeated query/close cycles, large saved SQL files, allocation tracing and paired early-close measurements.
+
+- [X11 popup targeting, October 23](evidence/x11-popup-target-2026-10-23/README.md): pointer and resize boundary regressions and a disposable Xvfb window experiment for GTK harness reliability.
