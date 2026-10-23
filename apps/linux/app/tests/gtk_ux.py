@@ -2,6 +2,7 @@ import ctypes
 import json
 import os
 import select
+import shutil
 import subprocess
 import sys
 import time
@@ -25,6 +26,45 @@ class XWindowAttributes(ctypes.Structure):
 
 
 ATSPI_WINDOW_Y_OFFSET = gtk_input.window_y_offset()
+
+
+def capture_grid_navigation_artifact(name):
+    folder = os.environ.get("TABLEPRO_GTK_ARTIFACT_DIR")
+    scrot, imagemagick = shutil.which("scrot"), shutil.which("import")
+    if folder is None or os.environ.get("GDK_BACKEND") != "x11" or not (scrot or imagemagick):
+        return
+    path = Path(folder) / f"{name}.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    command = [scrot, str(path)] if scrot else [imagemagick, "-window", "root", str(path)]
+    subprocess.run(command, check=True, timeout=10)
+
+
+def wait_for_focused_grid_row(ui, pyatspi, name):
+    deadline = time.monotonic() + ui.WAIT_SECONDS
+    while time.monotonic() < deadline:
+        node = next((
+            item for item in ui.descendants(ui.application_node())
+            if ui.node_name(item) == name
+            and ui.node_role(item) in (pyatspi.ROLE_TABLE_ROW, pyatspi.ROLE_TABLE_CELL)
+            and item.getState().contains(pyatspi.STATE_FOCUSED)
+            and item.getState().contains(pyatspi.STATE_SHOWING)
+        ), None)
+        if node is not None:
+            bounds = node.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+            frame = next(
+                item for item in ui.descendants(ui.application_node())
+                if ui.node_role(item) == pyatspi.ROLE_FRAME
+            )
+            window = frame.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+            if 0 <= bounds.y < window.height and bounds.height > 0:
+                capture_grid_navigation_artifact(name)
+                return
+        time.sleep(ui.POLL_SECONDS)
+    focused = [
+        (ui.node_name(item), item.getRoleName()) for item in ui.descendants(ui.application_node())
+        if item.getState().contains(pyatspi.STATE_FOCUSED)
+    ]
+    raise AssertionError(f"keyboard navigation did not focus and reveal {name}; focused={focused}\n{ui.accessible_snapshot()}")
 
 
 def x11_resize_window(width, height):
@@ -414,6 +454,36 @@ GLib.MainLoop().run()
         assert "Renamed B" in [connection["name"] for connection in after], after
         assert ui.CONNECTION_B_NAME not in [connection["name"] for connection in after], after
 
+    def saved_connection_row_controls_have_keyboard_focus_order(_database, _base):
+        ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        row = ui.wait_for_node(name=ui.CONNECTION_B_NAME, role=pyatspi.ROLE_LIST_ITEM)
+        favorite = ui.wait_within(row, name="Add to favourites", role=pyatspi.ROLE_PUSH_BUTTON)
+        actions = ui.wait_within(row, name="Connection actions", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        open_connection = ui.wait_within(row, name="Open connection", role=pyatspi.ROLE_PUSH_BUTTON)
+        for control in (favorite, actions, open_connection):
+            assert any(control.queryAction().getName(index) == "click" for index in range(control.queryAction().nActions)), (
+                f"{ui.node_name(control)!r} has no accessible click action"
+            )
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while not favorite.getState().contains(pyatspi.STATE_FOCUSED) and time.monotonic() < deadline:
+            ui.press_x11_key("Tab")
+            time.sleep(ui.POLL_SECONDS)
+        assert favorite.getState().contains(pyatspi.STATE_FOCUSED), (
+            f"favourite action is not keyboard reachable:\n{ui.accessible_snapshot()}"
+        )
+        ui.press_x11_key("Tab")
+        time.sleep(ui.POLL_SECONDS)
+        assert actions.getState().contains(pyatspi.STATE_FOCUSED), (
+            f"Tab did not move focus from favourite to actions:\n{ui.accessible_snapshot()}"
+        )
+        ui.press_x11_key("Tab")
+        time.sleep(ui.POLL_SECONDS)
+        assert open_connection.getState().contains(pyatspi.STATE_FOCUSED), (
+            f"Tab did not move focus from actions to open:\n{ui.accessible_snapshot()}"
+        )
+        ui.press_x11_key("Return")
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} — BookiE")
+
     def open_edit_dialog_for(name):
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
         saved_connection_action(name, "Edit connection")
@@ -794,7 +864,10 @@ GLib.MainLoop().run()
             def aligned_in_view():
                 header = ui.find_node_containing(f"c{index}\n", role=pyatspi.ROLE_LABEL)
                 cell = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_LABEL)
-                if not (showing(header) and showing(cell)):
+                target = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_TABLE_CELL)
+                if not (showing(header) and showing(cell) and showing(target)):
+                    return None
+                if not target.getState().contains(pyatspi.STATE_FOCUSED):
                     return None
                 header_x, cell_x = left_edge(header), left_edge(cell)
                 in_view = 0 <= header_x < window_width and 0 <= cell_x < window_width
@@ -804,6 +877,56 @@ GLib.MainLoop().run()
             while aligned_in_view() is None:
                 assert time.monotonic() < deadline, f"c{index} did not scroll into view over its header"
                 time.sleep(ui.POLL_SECONDS)
+            capture_grid_navigation_artifact(f"wide-result-column-{index}")
+            if index == 150:
+                ui.press_x11_key("j", ("Control_L", "Shift_L"))
+                ui.wait_for_node(name="Search columns")
+                ui.press_x11_key("Escape")
+                ui.wait_for_node(name="Search columns", present=False)
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while aligned_in_view() is None:
+                    assert time.monotonic() < deadline, "closing column search did not restore c150 focus and alignment"
+                    time.sleep(ui.POLL_SECONDS)
+
+    def grid_search_dialogs_return_keyboard_navigation_to_large_results(database, base):
+        ui.run_sql(
+            "WITH RECURSIVE rows(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM rows WHERE n < 5000) "
+            "SELECT printf('keyboard-row-%04d', n) AS keyboard_row FROM rows"
+        )
+        wait_for_result_column("keyboard_row")
+        ui.press_x11_key("j", ("Control_L", "Shift_L"))
+        search = ui.wait_for_node(name="Search columns")
+        search.queryEditableText().setTextContents("keyboard_row")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Search columns", present=False)
+
+        wait_for_focused_grid_row(ui, pyatspi, "keyboard-row-0001")
+        for key, expected in (("End", "keyboard-row-5000"), ("Home", "keyboard-row-0001")):
+            ui.press_x11_key(key, ("Control_L",))
+            wait_for_focused_grid_row(ui, pyatspi, expected)
+        ui.press_x11_key("j", ("Control_L", "Shift_L"))
+        ui.wait_for_node(name="Search columns")
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Search columns", present=False)
+        wait_for_focused_grid_row(ui, pyatspi, "keyboard-row-0001")
+        ui.press_x11_key("End", ("Control_L",))
+        wait_for_focused_grid_row(ui, pyatspi, "keyboard-row-5000")
+        ui.press_x11_key("f", ("Control_L", "Alt_L"))
+        search = ui.wait_for_node(name="Search the loaded rows")
+        search.queryEditableText().setTextContents("keyboard-row-2500")
+        ui.wait_for_node(name="2500 · keyboard_row: keyboard-row-2500")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Search the loaded rows", present=False)
+        wait_for_focused_grid_row(ui, pyatspi, "keyboard-row-2500")
+        ui.press_x11_key("Home", ("Control_L",))
+        wait_for_focused_grid_row(ui, pyatspi, "keyboard-row-0001")
+        ui.press_x11_key("f", ("Control_L", "Alt_L"))
+        ui.wait_for_node(name="Search the loaded rows")
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Search the loaded rows", present=False)
+        wait_for_focused_grid_row(ui, pyatspi, "keyboard-row-0001")
+        ui.press_x11_key("End", ("Control_L",))
+        wait_for_focused_grid_row(ui, pyatspi, "keyboard-row-5000")
 
     def narrow_window_keeps_main_and_editor_toolbar_actions_reachable(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)
@@ -1822,9 +1945,11 @@ GLib.MainLoop().run()
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
         wide_result_jumps_by_keyboard_and_keeps_headers_over_their_cells,
+        grid_search_dialogs_return_keyboard_navigation_to_large_results,
         narrow_window_keeps_main_and_editor_toolbar_actions_reachable,
         tables_sidebar_button_hides_the_docked_sidebar_and_opens_the_overlay,
         connection_colour_chooser_has_an_accessible_button,
+        saved_connection_row_controls_have_keyboard_focus_order,
         sql_editor_clickables_all_have_a_keyboard_path,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
