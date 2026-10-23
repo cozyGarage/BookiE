@@ -48,6 +48,10 @@
 - Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
 - Saving workspaces with large SQL drafts uses less temporary memory.
 
+### Security
+
+- Background session cleanup logs diagnostic categories without server error details.
+
 ### Fixed
 
 - Export cleanup warnings omit database error details that could contain private query text or values.
