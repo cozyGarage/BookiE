@@ -55,6 +55,8 @@
 
 ### Fixed
 
+- Closing a SQL editor releases its syntax analysis engine so background highlighting does not keep growing memory for a closed large script.
+
 - Restoring older workspaces skips empty table-structure tabs while keeping the active editor aligned and the empty workspace usable.
 
 - Export cleanup warnings omit database error details that could contain private query text or values.
