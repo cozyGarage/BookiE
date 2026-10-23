@@ -2386,6 +2386,40 @@ def committed_editor_ddl_refreshes_sidebar(database, base):
 committed_editor_ddl_refreshes_sidebar.environment = "local"
 
 
+def imported_socket_urls_connect_to_mysql(_database, base):
+    socket_path = os.environ["TABLEPRO_GTK_MYSQL_SOCKET"]
+    config_path = base / "config" / storage_dir_name() / "connections.json"
+    for scheme, database in (("mysql", "bookie_test"), ("mariadb", "mysql")):
+        invoke(wait_for_node(name="Import from URL", role=pyatspi.ROLE_PUSH_BUTTON))
+        set_text_by_name("Connection URL", f"{scheme}://root:tablepro_test@/{database}?socket={socket_path}")
+        invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
+        deadline = time.monotonic() + WAIT_SECONDS
+        record = None
+        while time.monotonic() < deadline:
+            records = json.loads(config_path.read_text(encoding="utf-8"))["connections"]
+            matches = [
+                item for item in records
+                if item.get("socket_path") == socket_path and item["database"] == database
+            ]
+            if len(matches) == 1:
+                record = matches[0]
+                break
+            time.sleep(POLL_SECONDS)
+        assert record is not None, f"{scheme} socket connection was not saved"
+        open_saved_connection(record["name"])
+        wait_for_frame_containing(f'{record["name"]} — BookiE')
+        invoke(wait_for_node(name="Open SQL editor"))
+        wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        run_sql("SELECT 42 AS socket_probe")
+        wait_for_node(name="42", role=pyatspi.ROLE_TABLE_CELL)
+        invoke_accessible_action("win.disconnect")
+        wait_for_frame_containing(" — BookiE", present=False)
+
+
+imported_socket_urls_connect_to_mysql.environment = "local"
+imported_socket_urls_connect_to_mysql.requires_editor = False
+
+
 def wait_for_socket_password(record):
     deadline = time.monotonic() + WAIT_SECONDS
     while time.monotonic() < deadline:
@@ -2653,6 +2687,8 @@ def main():
         restart_with_a_deleted_connection_opens_the_welcome_list,
         a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile,
     ]
+    if os.environ.get("TABLEPRO_GTK_MYSQL_SOCKET"):
+        scenarios.append(imported_socket_urls_connect_to_mysql)
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         scenarios.append(mysql_unparseable_routine_dialog_denial_preserves_database)
     scenarios.extend(gtk_workbook.scenarios(sys.modules[__name__]))

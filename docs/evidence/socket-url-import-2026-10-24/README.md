@@ -14,6 +14,19 @@ The first probe incorrectly expected a connected window after an import-only res
 
 ## Remaining acceptance
 
-This scenario does not connect to a real MySQL service through either imported socket. Native desktop acceptance and the Forgejo gate remain separate. The issue stays open until that acceptance is satisfied.
+Native desktop acceptance and the Forgejo gate remain separate. The issue stays open until that acceptance is satisfied.
 
 Local preflight also passed: 2,073 unit tests, 2,086 sandbox tests and the separate Redis cancellation check. The scenario itself ran on the unchanged executable identified above; no GTK widget production code changed.
+
+
+## Real MySQL socket connection
+
+The existing MySQL GTK fixture now exposes its Unix socket through a private bind mount and runs `imported_socket_urls_connect_to_mysql` by default. That scenario imports distinct MySQL and MariaDB URL forms, opens each saved connection, runs `SELECT 42 AS socket_probe`, and requires an accessible result cell containing 42. Both URL forms use a real MySQL 8.0 server; this is not MariaDB server qualification.
+
+The focused scenario passed in 5.221 seconds. In the complete MySQL GTK fixture, it passed in 8.634 seconds, followed by the existing grid edit/delete scenario in 11.278 seconds and enum/set scenario in 7.570 seconds. No retries were enabled. The fixture removed its own container afterward.
+
+Image identity: `mysql:8.0`, local image SHA-256 `7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b`. The client executable is unchanged from the result above.
+
+The first real-socket probe reached the server and completed its query, but expected a column-header accessibility role that this grid does not expose. The corrected probe asserts the actual result cell. Distinct database names prevent duplicate connection labels from selecting the first import twice.
+
+After the real-socket fixture extension, full preflight passed again (2,073 unit tests, 2,086 sandbox tests and the separate Redis check). The focused GTK harness contracts also passed all 58 tests. No shared or pre-existing container was stopped.
