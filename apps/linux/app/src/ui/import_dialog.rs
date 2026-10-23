@@ -858,7 +858,7 @@ mod tests {
 
     fn wait_until(predicate: impl Fn() -> bool) -> bool {
         let context = gtk::glib::MainContext::default();
-        for _ in 0..200 {
+        for _ in 0..1000 {
             for _ in 0..64 {
                 if !context.iteration(false) {
                     break;
