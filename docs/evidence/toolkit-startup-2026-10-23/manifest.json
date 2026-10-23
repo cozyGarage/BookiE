@@ -8,7 +8,7 @@
   },
   "log_sha256": {
     "before.log": "45b91755a881034a02a61602a0e3851d8a28167b139056e3b9cf6a82d7f1bed1",
-    "after.log": "9ac51e23d0f9355e70a8cef96f1128b6baa8a981f4618656db0a2fd27c215ccb"
+    "after.log": "8036b4272277ecf0623235181fbac74051833ef9b58dd0f8587fb9590e567abf"
   },
   "test": "tests::startup_reaches_the_application_loop_with_supported_toolkits",
   "validation": {

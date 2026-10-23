@@ -111,4 +111,3 @@ dbus-daemon[2091562]: [session uid=1000 pid=2091562 pidfd=5] Successfully activa
 test tests::startup_reaches_the_application_loop_with_supported_toolkits ... ok
 
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 956 filtered out; finished in 0.56s
-
