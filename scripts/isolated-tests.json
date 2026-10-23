@@ -961,6 +961,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::editing::tests::readonly_multiline_cells_keep_compact_height_and_exact_text"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::column_refresh_coalesces_a_burst_of_editor_changes"
     ]
   ],
   "keyring": [
