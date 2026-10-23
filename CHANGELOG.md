@@ -22,6 +22,8 @@
 ### Changed
 
 - Editing a cell or pasting in a table tab no longer rebuilds every loaded row on the page, so large pages with long text values stay responsive.
+- Keyboard shortcuts use a native adaptive dialog that fits smaller windows and preserves keyboard and mouse gesture descriptions.
+
 - Running statements no longer slows down as the audit log grows. The full audit log is checked when BookiE opens and when you view it; each new record checks only what was written since the last check.
 - BookiE now requires GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 or newer and exits with a message naming the missing versions on older systems; Ubuntu 26.04, Ubuntu 24.04 and Debian 13 are no longer supported.
 - The Debian and Arch packages and the AppImage install smaller program files, about a quarter smaller than before.
@@ -29,6 +31,7 @@
 - Export reviews the table-page, loaded-result or query-rerun scope before file format; all matching table rows remain unavailable until consistent snapshot export is qualified.
 - Grid headers preserve exact engine type case and keep comments, key and nullability metadata in a native column-details menu.
 - Oversized text and JSON cells use shorter visible previews to reduce text-layout work; full values remain available through View Value and Copy Value.
+- Column and loaded-row search return keyboard focus to the result grid after selection or dismissal.
 - Editing rows with large values uses less temporary memory when verifying the row identity.
 - Statements spend less time on sensitive-column checks, and desktop sessions that never mask results skip them.
 - Background database work runs on up to four threads, so one slow operation no longer holds up others such as loading the sidebar or another tab.
@@ -44,6 +47,9 @@
 - Saving workspaces with large SQL drafts uses less temporary memory.
 
 ### Fixed
+
+- When a connection had more than 32 open tabs, the table tabs left out on the next start are now reported in a notice instead of disappearing silently. Query editor tabs are always kept.
+- Query cursor cleanup warnings use diagnostic codes without including database error payloads.
 
 - Copying rows and pasting them back into the grid keeps NULL, empty text and text such as `\N` unchanged. Previously empty text pasted as `""`, and a cell holding `\N` could swap with a NULL.
 - Undoing or redoing a cell edit on a saved row no longer replaces the row's stored value with an unsaved one, so a later edit is no longer lost or rejected as a conflict when saved.
