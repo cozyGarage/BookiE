@@ -7,4 +7,4 @@ Two cleanup warnings formatted full ExportError values. Cursor finalization maps
 
 The regression cleanup_warning_keeps_source_payloads_out_of_logs_and_preserves_the_primary_error failed before the correction because the captured warning contained a synthetic private marker. Both call sites now use a shared diagnostic helper with exhaustive static variant codes and operation names. Error propagation and cleanup behavior are unchanged.
 
-Post-fix regression and full validation are pending. No Forgejo acceptance is claimed.
+The regression passes after the correction. On the integrated branch, all 786 non-display app tests and full scripts/preflight.sh pass. Display tests were not rerun for this logging-only correction. Adjacent export warning and source paths were reviewed; the remaining export-dialog warning concerns preference persistence. Independent review and Forgejo acceptance remain pending.
