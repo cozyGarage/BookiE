@@ -59,6 +59,8 @@
 
 ### Fixed
 
+- SQL files with lines over 256 KiB are refused before opening to prevent excessive text-layout memory use; the original file remains unchanged.
+
 - SQL completion avoids catalog reads for incomplete table names and coalesces rapid editor changes.
 - Connection choices open from the keyboard, mark the selected option and release their popups when the dialog closes.
 
