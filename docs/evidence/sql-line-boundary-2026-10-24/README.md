@@ -38,6 +38,6 @@ Full preflight passed (2,075 unit tests, 2,088 sandbox tests and the separate Re
 
 Three additional regressions failed before the follow-up: two individually admissible lines formed an overlong line, cumulative drops exceeded the total editor budget, and invalid UTF-8 byte cursor positions were admitted. All twelve file/drop tests pass with post-insertion validation. The complete candidate text is checked before any buffer mutation; the existing file reader still bounds the incoming file separately.
 
-The registered isolated GTK regression requires a rejected insertion to leave both editor text and cursor unchanged. An accepted Unicode insertion must preserve exact text and undo in one action. It passed under fatal GTK criticals. The [updated inventory](ignored-test-inventory.txt) records its registration. Strict application Clippy passed. Full follow-up validation is pending.
+The registered isolated GTK regression requires a rejected insertion to leave both editor text and cursor unchanged. An accepted Unicode insertion must preserve exact text and undo in one action. It passed under fatal GTK criticals. The [updated inventory](ignored-test-inventory.txt) records its registration. Strict application Clippy passed. Full follow-up preflight passed again (2,075 unit tests, 2,088 sandbox tests and the separate Redis check), and all 159 isolated GTK tests passed. Forgejo acceptance remains pending.
 
 This follow-up changes drop admission only. It does not intercept arbitrary paste or truncate persisted drafts.
