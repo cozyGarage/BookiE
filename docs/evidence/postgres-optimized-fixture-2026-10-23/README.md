@@ -27,3 +27,15 @@ Baseline RSS was 172.49 MiB. All seven checks completed; the over-budget case ex
 ## Next work
 
 The many-column case adds roughly 413 MiB of RSS even in the optimized build. Attribute live allocations and retained widget owners separately before changing grid construction. Use independent fresh-process scenarios for allocation baselines and a repeated run/close sequence for owner lifetime. Keep exact copy/export values and keyboard/accessibility behavior intact. A byte-safe PostgreSQL cursor continuation repair requires driver ownership review; lowering a fixed page row count alone is not acceptance.
+
+## Allocation capture
+
+A second fresh-process run preloaded the installed heaptrack library into the owned application only. It ran count followed by the many-column query, then quit normally. The binary hash was unchanged. Profiler overhead raised the many-column elapsed time to 25.597 seconds, so this run is not a timing comparison.
+
+Heaptrack interpretation reported 32,238,432 allocation calls, 3,731,850 temporary allocations and 439.10 MB peak tracked heap (tool-reported decimal units). Its peak RSS including profiler overhead was 717.09 MB. Dominant allocator groups include `g_malloc0` (202.55 MB at peak), `g_malloc` (101.91 MB) and `g_realloc` (80.64 MB). Group totals are allocator buckets, not independent root causes.
+
+Large backtraces pass through GTK object creation, the read-only cell setup path and streamed grid construction. One object-creation substack attributed 13.00 MB to 51,602 allocation calls through read-only cell setup; this does not itself count widget instances. The result contains 25,800 cells. This evidence directs the next experiment toward widget construction and lifetime rather than database row payload alone.
+
+Heaptrack reports 401.53 MB unfreed at process exit. That is not proof of unreachable memory: the run quit while the result remained open, and framework shutdown can retain reachable objects. Explicit result/tab closure and repeat-run ownership checks remain necessary.
+
+Raw and interpreted captures, instrumentation copies and the textual summary remain in local `target/quality/postgres-heaptrack-many-columns/`. The raw capture is approximately 1.2 GB and is not committed. No real data or credentials were profiled.
