@@ -136,6 +136,8 @@ pub(super) fn setup_readonly_cell(
         .margin_start(8)
         .margin_end(8)
         .build();
+    COLUMN_SLOT.set(&label, idx);
+    label.connect_map(sync_readonly_cell_focus);
     item.set_child(Some(&label));
     if let Some(menus) = menus {
         attach_cell_gesture(
@@ -150,6 +152,24 @@ pub(super) fn setup_readonly_cell(
             },
             menus,
         );
+    }
+}
+
+pub(super) fn sync_readonly_cell_focus(label: &gtk::Label) {
+    let Some(cell) = label
+        .parent()
+        .filter(|parent| parent.accessible_role() == gtk::AccessibleRole::GridCell)
+    else {
+        return;
+    };
+    if label.is_mapped() {
+        cell.set_focusable(true);
+    }
+    if let Some(position) = POSITION_SLOT.get(label) {
+        POSITION_SLOT.set(&cell, position);
+    }
+    if let Some(column) = COLUMN_SLOT.get(label) {
+        COLUMN_SLOT.set(&cell, column);
     }
 }
 
@@ -283,7 +303,7 @@ fn show_calendar_popover(label: &CellEditor, col_index: usize, sender: &relm4::S
     if let Ok(parsed) = chrono::NaiveDate::parse_from_str(label.text().as_str(), "%Y-%m-%d")
         && let Ok(dt) = glib::DateTime::from_local(parsed.year(), parsed.month() as i32, parsed.day() as i32, 0, 0, 0.0)
     {
-        calendar.set_date(Some(&dt));
+        calendar.set_date(&dt);
     }
 
     let popover = gtk::Popover::builder().child(&calendar).build();
