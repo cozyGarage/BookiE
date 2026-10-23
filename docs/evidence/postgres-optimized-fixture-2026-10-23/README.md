@@ -53,3 +53,19 @@ Local evidence and the instrumented probe copy are in `target/quality/postgres-h
 A fresh unprofiled process completed ten many-column open/close cycles, using the same binary and synthetic fixture. [Measurements](repeat-close-10.json). Baseline RSS was 182.80 MiB. After-close RSS was 582.12, 584.71, 585.07, 585.43, 587.94, 587.99, 588.82, 589.94, 592.84 and 591.54 MiB. The first-to-last increase was 9.42 MiB, with a drop on the final cycle. This does not establish a plateau or exclude smaller retained owners.
 
 Query CPU time ranged from 4.03 to 11.11 seconds; elapsed time ranged from 4.795 to 12.724 seconds. Every query and close completed. These ten observations show substantial construction cost and modest additional RSS growth rather than another full grid retained per cycle. Attribution of the remaining growth and variable CPU cost remains open.
+
+## Inclusive allocation attribution at process peak
+
+Heaptrack exported peak-cost stacks totaling 439,099,144 bytes, matching its reported peak heap. Summing stacks containing the recorded Rust symbols gives the following inclusive subsets:
+
+| Stack contains | Bytes at process peak |
+| --- | ---: |
+| Streamed grid widget construction | 303,465,109 |
+| Read-only cell setup | 173,995,604 |
+| Label builder | 132,932,993 |
+| Cell context-menu gesture setup | 41,071,780 |
+| Application shortcut parsing | 3,097,696 |
+
+These subsets overlap and must not be added. They identify allocation call paths, not unreachable owners or exclusive ownership. The cell-menu path installs a gesture and shortcut controller per cell; any consolidation must preserve pointer targeting, keyboard menus, editing, selection and accessibility. Shortcut parsing alone is a small fraction of the peak, so caching it alone would not resolve the many-column cost.
+
+The exported stacks and aggregation inputs remain in local `target/quality/postgres-heaptrack-many-columns/peak-stacks.txt`. This large diagnostic file is not committed.
