@@ -39,3 +39,7 @@ Integrated preflight exposed a new comment in the completion test exceeding its 
 The integrated GTK suite also reproduced a narrow-toolbar overflow after restoring the transaction label: 616 px requested with 600 px available in the larger-text case. The existing width assertions were kept. The Session button now uses GTK's built-in shrinking, preserving its full label and accessible name.
 
 The cached GitHub GTK image now checks all four library floors during its build. Changing the Dockerfile also changes the image cache tag, preventing reuse of an older native stack.
+
+Final integrated local validation passed: full preflight, app Clippy with warnings denied, and all 143 isolated GTK tests. The unchanged narrow-toolbar regression passes with the built-in button shrinking. Full Forgejo acceptance and package installation remain pending.
+
+Local logs are retained in the primary checkout under `target/quality/gnome50-baseline-2026-10-23/`; this document records the portable findings.
