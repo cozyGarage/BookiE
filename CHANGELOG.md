@@ -49,6 +49,7 @@
 ### Fixed
 
 - Export cleanup warnings omit database error details that could contain private query text or values.
+- Exporting loaded results avoids two extra copies of the result data while choosing and writing the destination file.
 
 - Keyboard cell menus refresh reference and loaded-row export availability for the current cell and filter.
 - A SQL editor result that was cut short by the result size limit now says so and shows how many rows were loaded, instead of only after sorting or filtering.
