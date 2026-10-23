@@ -22,7 +22,7 @@ The shared byte/cell/row limits and all production paths are unchanged. The new 
 - MySQL existing wide-payload transactional byte-budget case passed and retained transaction usability.
 - All 41 DuckDB integration tests passed after the support-module split.
 - All 38 Docker-selected ClickHouse cases passed before the support-module split; both moved budget cases then passed again under their final module-qualified names. The remaining non-ignored connection-refusal case is covered by preflight.
-- Full preflight, strict affected-driver Clippy and exact-head Forgejo acceptance are pending. The first preflight exposed file-size violations; splitting into existing support-module structure corrected them without raising baselines.
+- Full preflight and strict affected-driver Clippy passed. The first preflight exposed file-size violations; splitting into existing support-module structure corrected them without raising baselines. Exact-head Forgejo acceptance is pending.
 - Function/comment guards, ignored-test inventory and ledger format passed.
 
 The current baseline gate is red. Do not infer merge acceptance from these focused passes.
