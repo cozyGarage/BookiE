@@ -23,6 +23,19 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_native_build_jobs_require_the_supported_toolkit(self):
+        ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        nightly = (ROOT / ".forgejo/workflows/nightly.yml").read_text()
+        for name in ("clippy", "unit", "widgets", "e2e", "consumers", "gtk", "duckdb", "pg-release", "gtk-server"):
+            with self.subTest(job=name):
+                self.assertIn(f"  {name}:\n    runs-on: gnome50-host", ci)
+        for name in ("coverage", "gtk-soak", "values", "gtk-ubuntu"):
+            with self.subTest(job=name):
+                self.assertIn(f"  {name}:\n    runs-on: gnome50-host", nightly)
+        dependencies = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["dependencies"]
+        for name, feature in (("gtk4", "gnome_50"), ("glib", "v2_88"), ("libadwaita", "v1_9"), ("sourceview5", "v5_18")):
+            self.assertIn(feature, dependencies[name]["features"])
+
     def test_cargo_about_comes_from_the_pinned_installer_and_is_never_built_in_ci(self):
         for path in (
             ".github/workflows/build-linux.yml",
@@ -470,7 +483,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("DISTRO_FLOOR_PACKAGE=", floor)
         self.assertIn("PREBUILT_DEB=", floor)
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
-        self.assertIn("BASE=ubuntu:24.04", builder)
+        self.assertIn("BASE=ubuntu:26.04", builder)
         self.assertIn("scripts/build-deb.sh", builder)
         self.assertIn("flock", builder)
         self.assertIn('test -e "/probe/', builder)
@@ -490,7 +503,7 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_distro_package_builder_uses_a_distinct_image_tag(self):
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
-        self.assertIn("image=bookie-floor-package-ubuntu-24.04", builder)
+        self.assertIn("image=bookie-floor-package-ubuntu-26.04", builder)
         self.assertIn('docker build -q -t "$image"', builder)
         self.assertIn('"$image" bash -ceu', builder)
 

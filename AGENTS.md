@@ -66,6 +66,10 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 7. Keep changes focused. Do not mix unrelated cleanup into a fix.
 8. No feature gates based on accounts, licenses, subscriptions, payment or remote access checks.
 
+## Native build baseline
+
+Cargo, Meson and packages require GTK 4.22, GLib 2.88, libadwaita 1.9 and GtkSourceView 5.18 (ADR 0021). Ubuntu 26.04 is the distro-floor target. Native Forgejo builds select `gnome50-host`. Run GTK jobs on that stack or a compatible container; older hosts may run headless Rust checks. Do not lower package requirements to make installation pass.
+
 ## Workspace architecture
 
 The workspace manifest is `Cargo.toml`. [ARCHITECTURE.md](ARCHITECTURE.md) has the data flow.

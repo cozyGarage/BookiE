@@ -557,7 +557,7 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: PostgreSQL release fixture (docker)
     timeout-minutes: 45
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: pin-revision
     defaults:
       run:

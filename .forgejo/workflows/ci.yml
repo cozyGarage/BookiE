@@ -21,7 +21,7 @@ env:
   TABLEPRO_GTK_WAIT_SECONDS: "45"
   TABLEPRO_GTK_SCENARIO_RETRIES: "1"
   GITHUB_STEP_SUMMARY: /dev/null
-  PATH: /home/runner/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+  PATH: /home/ubuntu/.cargo/bin:/home/runner/.cargo/bin:/usr/local/bin:/usr/bin:/bin
   RUSTC_WRAPPER: sccache
   SCCACHE_DIR: /var/cache/ci/sccache
   SCCACHE_CACHE_SIZE: 40G
@@ -52,7 +52,7 @@ jobs:
           cargo fmt --all -- --check
 
   clippy:
-    runs-on: any-host
+    runs-on: gnome50-host
     steps:
       - name: Check out
         env:
@@ -67,7 +67,7 @@ jobs:
           cd src && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 
   unit:
-    runs-on: any-host
+    runs-on: gnome50-host
     steps:
       - name: Check out
         env:
@@ -104,7 +104,7 @@ jobs:
           cd src && bash scripts/test-sandbox.sh
 
   widgets:
-    runs-on: any-host
+    runs-on: gnome50-host
     steps:
       - name: Check out
         env:
@@ -129,10 +129,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - base: "ubuntu:24.04"
+          - base: "ubuntu:26.04"
             mcp_port_slot: 10
-          - base: "debian:13"
-            mcp_port_slot: 11
     steps:
       - name: Check out
         env:
@@ -204,7 +202,7 @@ jobs:
           cargo test --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
 
   e2e:
-    runs-on: any-host
+    runs-on: gnome50-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -239,7 +237,7 @@ jobs:
           cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
 
   consumers:
-    runs-on: any-host
+    runs-on: gnome50-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -271,7 +269,7 @@ jobs:
           cd src && python3 scripts/run-isolated-tests.py app-server
 
   gtk:
-    runs-on: any-host
+    runs-on: gnome50-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
@@ -302,7 +300,7 @@ jobs:
           cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
 
   duckdb:
-    runs-on: any-host
+    runs-on: gnome50-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name != 'pull_request'
     timeout-minutes: 90
@@ -329,7 +327,7 @@ jobs:
           cargo test --locked -p tablepro-driver-duckdb -- --include-ignored
           cargo build --locked -p tablepro-app --features duckdb
   pg-release:
-    runs-on: any-host
+    runs-on: gnome50-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -407,7 +405,7 @@ jobs:
           bash ./scripts/test-ssh.sh
 
   gtk-server:
-    runs-on: any-host
+    runs-on: gnome50-host
     needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60

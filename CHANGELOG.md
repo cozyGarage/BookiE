@@ -21,6 +21,7 @@
 
 ### Changed
 
+- Native Linux builds now require the GNOME 50 library baseline available on Ubuntu 26.04 LTS and current Arch Linux.
 - SQL execution marks follow statement boundaries, so SQL text inside comments is not marked as executed.
 - Export reviews the table-page, loaded-result or query-rerun scope before file format; all matching table rows remain unavailable until consistent snapshot export is qualified.
 - Grid headers preserve exact engine type case and keep comments, key and nullability metadata in a native column-details menu.

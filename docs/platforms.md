@@ -4,11 +4,9 @@ One page for what runs where. The [sprint](bookie-0.2-sprint.md) owns release ap
 
 ## Supported stacks
 
-Two native-library floors are defined in [ADR 0002](decisions/0002-rust-gtk4-libadwaita.md): the **Cargo compile / CI floor** and the **GNOME 50 Meson / package line**.
+[ADR 0021](decisions/0021-unified-gnome50-baseline.md) unifies Cargo, Meson, packages and GTK acceptance on GTK 4.22, GLib 2.88, libadwaita 1.9 and GtkSourceView 5.18. Ubuntu 26.04 LTS is the distro-floor target; current Arch/Omarchy is also supported. Ubuntu 24.04 and Debian 13's stock native libraries are below this baseline.
 
-The Cargo compile / CI floor is the Ubuntu 24.04 stack: GTK 4.14, GLib 2.80, libadwaita 1.5 and GtkSourceView 5.12. Debian 13 (GTK 4.18, libadwaita 1.7) and newer are above it. `scripts/test-distro-floor.sh` runs app unit and widget tests there; with `DISTRO_FLOOR_INSTALLED=1`, it also runs GTK safety against a Cargo-built binary staged under the target directory. This does not configure the root Meson project or install a distro package.
-
-The root Meson project declares the higher GNOME 50 library line (GTK 4.22, GLib 2.88, libadwaita 1.9, GtkSourceView 5.18). The released `.deb` has that same runtime baseline. Arch and Omarchy packages track current GNOME. Installed-package acceptance is tracked under PKG-1; Debian and Ubuntu desktop acceptance is tracked under the later GNOME target PKG-2. Neither floor replaces the other.
+GitHub host runner labels describe orchestration hosts, not the native library floor: containerized jobs must use a baseline-compatible image. Headless Rust checks can continue on older hosts. Installed GTK jobs require the newer native stack or an equivalent container. Published older releases keep their recorded compatibility; this change applies to subsequent builds.
 
 At the 2026-10-14 review, Arch packaged Rust 1.99.0 while Debian 13 packaged Rust 1.85.1 ([Arch package](https://archlinux.org/packages/extra/x86_64/rust/), [Debian package](https://packages.debian.org/trixie/rust/rustc)). Arch's `rust` package ignores `rust-toolchain.toml`, and Debian 13 is below the workspace MSRV. Use rustup to select the repository's pinned toolchain consistently.
 
@@ -19,7 +17,7 @@ The package artifacts recorded below are from [`linux-v0.1.5`](https://github.co
 | Target | Architecture | Artifact | Package / launch command |
 |---|---|---|---|
 | Arch Linux / Omarchy | x86_64 | `bookie-0.1.5-1-x86_64.pkg.tar.zst` | `bookie` |
-| Debian / Ubuntu with GNOME 50 libraries | amd64 | `tablepro_0.1.5-1_amd64.deb` | `tablepro` package, `bookie` command |
+| Debian / Ubuntu | amd64 | `tablepro_0.1.5-1_amd64.deb` | `tablepro` package, `bookie` command |
 
 The v0.1.5 release did not publish Fedora, AUR, Flathub, 32-bit or ARM packages.
 
