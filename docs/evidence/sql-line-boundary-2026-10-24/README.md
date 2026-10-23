@@ -31,4 +31,4 @@ Three repeated refusals passed without retries in a 14.936-second scenario. [Own
 
 This is a file-loading mitigation. It does not bound paste, programmatic buffer updates, restored drafts or a line formed by concatenating a dropped file with existing editor text. The file-size and line checks do not claim a process-wide resource ceiling. Native Wayland, prolonged editing and general long-line editing remain unverified. Keep #1299 open for those paths.
 
-Full repository checks and remote Forgejo acceptance are pending. No resource limit or guardrail test was weakened.
+Full preflight passed (2,075 unit tests, 2,088 sandbox tests and the separate Redis check), strict application Clippy passed, and all 158 isolated GTK tests passed. Remote Forgejo acceptance is pending. No resource limit or guardrail test was weakened.
