@@ -858,14 +858,18 @@ pub(super) fn build_stream_page_widget(
         if build.borrow().is_none() || scheduled.replace(true) {
             return;
         }
-        let build = build.clone();
+        let build = std::rc::Rc::downgrade(&build);
         let scheduled = scheduled.clone();
-        holder.add_tick_callback(move |holder, _| {
+        let holder = holder.downgrade();
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(50), move || {
             scheduled.set(false);
+            let Some(holder) = holder.upgrade().filter(|holder| holder.is_mapped()) else {
+                return;
+            };
+            let Some(build) = build.upgrade() else { return };
             if let Some(build) = build.borrow_mut().take() {
                 holder.append(&build());
             }
-            gtk::glib::ControlFlow::Break
         });
     });
     holder.upcast()

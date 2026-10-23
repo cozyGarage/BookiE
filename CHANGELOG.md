@@ -21,6 +21,8 @@
 
 ### Changed
 
+- Large PostgreSQL query results stream faster while retained pages remain available through the result pager.
+
 - Large result grids share keyboard and pointer menu handling to reduce per-cell allocations.
 - Large result grids share keyboard menu handling to reduce per-cell allocations.
 
