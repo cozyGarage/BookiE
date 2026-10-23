@@ -2386,6 +2386,118 @@ def committed_editor_ddl_refreshes_sidebar(database, base):
 committed_editor_ddl_refreshes_sidebar.environment = "local"
 
 
+def wait_for_socket_password(record):
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        secret = subprocess.run(
+            ["secret-tool", "lookup", "xdg:schema", "com.tablepro.linux.Password",
+             "connection-id", record["id"], "kind", "db_password"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if secret.returncode == 0 and secret.stdout.rstrip("\n") == "socket-url-fixture-password":
+            return
+        time.sleep(POLL_SECONDS)
+    raise AssertionError("socket credential was not stored in Secret Service")
+
+
+def round_trip_imported_socket_bundle(base, restart, expected):
+    bundle_path = base / "home" / "socket-urls.bundle"
+    invoke_accessible_action("welcome.export-bundle")
+    set_text_by_name("Passphrase (optional)", "socket bundle fixture passphrase")
+    invoke_export_file_chooser_response()
+    chooser = wait_for_node(name="Export connections", role=FILE_CHOOSER_ROLES)
+    set_visible_editable_within("Export connections", FILE_CHOOSER_ROLES, str(bundle_path))
+    invoke(wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline and not bundle_path.exists():
+        time.sleep(POLL_SECONDS)
+    assert bundle_path.exists(), "socket connection bundle was not exported"
+    for record in expected:
+        subprocess.run(
+            ["secret-tool", "clear", "xdg:schema", "com.tablepro.linux.Password",
+             "connection-id", record["id"], "kind", "db_password"],
+            capture_output=True, text=True, check=True, timeout=5,
+        )
+    second_config = base / "profile2" / "config" / storage_dir_name() / "connections.json"
+
+    def empty_second_profile(environment):
+        for kind in ("config", "data"):
+            (base / "profile2" / kind).mkdir(parents=True)
+        environment["XDG_CONFIG_HOME"] = str(base / "profile2" / "config")
+        environment["XDG_DATA_HOME"] = str(base / "profile2" / "data")
+
+    restart(empty_second_profile, empty=True)
+    choose_import_bundle(bundle_path)
+    wait_for_node(name="Passphrase", role=PASSPHRASE_ROLES)
+    set_text_by_name("Passphrase", "socket bundle fixture passphrase")
+    invoke(wait_for_node(name="Unlock", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name=expected[0]["name"])
+    invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
+    deadline = time.monotonic() + WAIT_SECONDS
+    imported = {}
+    while time.monotonic() < deadline:
+        if second_config.exists():
+            imported = {item["id"]: item for item in json.loads(second_config.read_text(encoding="utf-8"))["connections"]}
+        if all(item["id"] in imported for item in expected):
+            break
+        time.sleep(POLL_SECONDS)
+    for record in expected:
+        assert imported.get(record["id"]) == record, "bundle round-trip changed a socket connection"
+        wait_for_socket_password(record)
+    assert "socket-url-fixture-password" not in second_config.read_text(encoding="utf-8")
+
+
+def imported_mysql_socket_urls_survive_restart(_database, base, restart):
+    config_path = base / "config" / storage_dir_name() / "connections.json"
+    imported = []
+    password = "socket-url-fixture-password"
+    for scheme in ("mysql", "mariadb"):
+        socket_path = f"/tmp/bookie-{scheme}.sock"
+        database = f"socket_{scheme}"
+        invoke(wait_for_node(name="Import from URL", role=pyatspi.ROLE_PUSH_BUTTON))
+        set_text_by_name(
+            "Connection URL",
+            f"{scheme}://reader:{password}@/{database}?socket={socket_path}",
+        )
+        invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
+        deadline = time.monotonic() + WAIT_SECONDS
+        record = None
+        while time.monotonic() < deadline:
+            records = json.loads(config_path.read_text(encoding="utf-8"))["connections"]
+            record = next((item for item in records if item["database"] == database), None)
+            if record is not None:
+                break
+            time.sleep(POLL_SECONDS)
+        assert record is not None, f"{scheme} URL import was not persisted"
+        assert record["driver_id"] == "mysql"
+        assert record["socket_path"] == socket_path
+        assert record["username"] == "reader"
+        assert password not in config_path.read_text(encoding="utf-8")
+        wait_for_node(name=record["name"], role=pyatspi.ROLE_LIST_ITEM)
+        wait_for_socket_password(record)
+        imported.append(record)
+
+    restart(restored="welcome")
+    records = json.loads(config_path.read_text(encoding="utf-8"))["connections"]
+    for expected in imported:
+        record = next(item for item in records if item["id"] == expected["id"])
+        assert record == expected, "restart changed the imported socket connection"
+        row = wait_for_node(name=record["name"], role=pyatspi.ROLE_LIST_ITEM)
+        invoke(wait_within(row, name="Connection actions", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        invoke(wait_for_node(name="Edit connection", role=pyatspi.ROLE_PUSH_BUTTON))
+        path = wait_for_node(name="Socket path", role=pyatspi.ROLE_TEXT).queryText()
+        assert path.getText(0, path.characterCount) == record["socket_path"]
+        wait_for_node(name="Host", role=pyatspi.ROLE_TEXT, present=False)
+        press_x11_key("Escape")
+        wait_for_node(name="Socket path", present=False)
+    round_trip_imported_socket_bundle(base, restart, imported)
+
+
+imported_mysql_socket_urls_survive_restart.environment = "local"
+imported_mysql_socket_urls_survive_restart.requires_editor = False
+imported_mysql_socket_urls_survive_restart.needs_restart = True
+
+
 def mysql_unix_socket_endpoint_is_available_in_installed_form(_database, _base):
     def focus_combo(name):
         for _ in range(30):
@@ -2503,6 +2615,7 @@ def main():
         jump_to_column_keyboard_search,
         committed_editor_ddl_refreshes_sidebar,
         mysql_unix_socket_endpoint_is_available_in_installed_form,
+        imported_mysql_socket_urls_survive_restart,
         new_connection_form_keeps_title_and_help_text_visible,
         connection_choice_rows_open_from_keyboard_and_close_cleanly,
         sql_character_warnings_leave_query_unchanged,
