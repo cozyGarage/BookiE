@@ -4,6 +4,8 @@ Documented application limits, behavior differences and known defects. Entries l
 
 ## Data and values
 
+- **SQL file layout is bounded per line** ([#1299](https://github.com/cozyGarage/BookiE/issues/1299)). Opening or dropping a SQL file refuses physical lines over 256 KiB of UTF-8 text, alongside the 8 MiB total file limit. Files are not truncated or rewritten. This boundary prevents the measured single-line file-loading allocation; it does not constrain text already in an editor, pasted text, restored drafts or the combined line formed by inserting a dropped file into existing text. Those paths and native desktop qualification remain open.
+
 - **Full-table export is unavailable** ([ADR 0014](decisions/0014-full-table-export-snapshot.md)). The current drivers do not have
   a verified snapshot export path, so the application refuses full-table export
   before opening the destination dialog or publishing a file. Export the current

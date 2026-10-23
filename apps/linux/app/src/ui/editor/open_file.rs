@@ -4,8 +4,25 @@ use tablepro_core::text_file::{FileVersion, TextFile, TextFileError, read_text_f
 
 use super::MAX_SQL_FILE_BYTES;
 
+const MAX_SQL_LINE_BYTES: usize = 256 * 1024;
+
 pub(crate) fn read_sql_file(path: &std::path::Path) -> Result<TextFile, String> {
-    read_text_file(path, MAX_SQL_FILE_BYTES).map_err(|error| file_error_message(&error))
+    let file = read_text_file(path, MAX_SQL_FILE_BYTES).map_err(|error| file_error_message(&error))?;
+    validate_sql_line_lengths(&file.text)?;
+    Ok(file)
+}
+
+pub(super) fn validate_sql_line_lengths(text: &str) -> Result<(), String> {
+    for (index, line) in text.lines().enumerate() {
+        if line.len() > MAX_SQL_LINE_BYTES {
+            return Err(crate::tr!(
+                "The SQL file contains a line over {limit} KiB (line {line}). Split long lines before opening. The file has not been changed."
+            )
+            .replace("{limit}", &(MAX_SQL_LINE_BYTES / 1024).to_string())
+            .replace("{line}", &(index + 1).to_string()));
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn save_sql_file(
@@ -105,6 +122,49 @@ mod tests {
         let mut file = std::fs::File::create(&path).expect("create");
         file.write_all(bytes).expect("write");
         (dir, path)
+    }
+
+    #[test]
+    fn an_overlong_line_is_refused_without_changing_the_file() {
+        let text = format!("--{}\n", "x".repeat(256 * 1024 - 1));
+        let (_dir, path) = written(text.as_bytes());
+        assert!(read_sql_file(&path).is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+    }
+
+    #[test]
+    fn dropped_sql_uses_the_same_long_line_boundary() {
+        let text = "é".repeat(128 * 1024 + 1);
+        let (_dir, path) = written(text.as_bytes());
+        assert!(super::super::read_sql_text(&path, MAX_SQL_FILE_BYTES).is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+    }
+
+    #[test]
+    fn a_line_at_the_boundary_keeps_exact_utf8_and_crlf_content() {
+        for text in [
+            format!("{}\r\nSELECT 1;\r\n", "x".repeat(256 * 1024)),
+            format!("{}\nSELECT 1;\n", "é".repeat(128 * 1024)),
+        ] {
+            let (_dir, path) = written(text.as_bytes());
+            assert_eq!(read_sql_file(&path).unwrap().text, text);
+        }
+    }
+
+    #[test]
+    fn short_lines_still_fill_the_existing_eight_mib_file_budget() {
+        let text = format!("--{}\n", "x".repeat(125)).repeat(65_536);
+        assert_eq!(text.len(), 8 * 1024 * 1024);
+        let (_dir, path) = written(text.as_bytes());
+        assert_eq!(read_sql_file(&path).unwrap().text, text);
+    }
+
+    #[test]
+    fn an_existing_large_line_can_still_be_saved_without_truncation() {
+        let text = "x".repeat(256 * 1024 + 1);
+        let (_dir, path) = written(b"SELECT 1;");
+        save_sql_file(&path, &text, None).unwrap();
+        assert_eq!(std::fs::read_to_string(path).unwrap(), text);
     }
 
     #[test]
