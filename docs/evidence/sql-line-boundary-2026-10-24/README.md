@@ -29,6 +29,15 @@ Three repeated refusals passed without retries in a 14.936-second scenario. [Own
 
 ## Limits and remaining work
 
-This is a file-loading mitigation. It does not bound paste, programmatic buffer updates, restored drafts or a line formed by concatenating a dropped file with existing editor text. The file-size and line checks do not claim a process-wide resource ceiling. Native Wayland, prolonged editing and general long-line editing remain unverified. Keep #1299 open for those paths.
+This is a file-loading mitigation. It does not bound paste, programmatic buffer updates or restored drafts. The file-size and line checks do not claim a process-wide resource ceiling. Native Wayland, prolonged editing and general long-line editing remain unverified. Keep #1299 open for those paths.
 
 Full preflight passed (2,075 unit tests, 2,088 sandbox tests and the separate Redis check), strict application Clippy passed, and all 158 isolated GTK tests passed. Remote Forgejo acceptance is pending. No resource limit or guardrail test was weakened.
+
+
+## Dropped-file concatenation follow-up
+
+Three additional regressions failed before the follow-up: two individually admissible lines formed an overlong line, cumulative drops exceeded the total editor budget, and invalid UTF-8 byte cursor positions were admitted. All twelve file/drop tests pass with post-insertion validation. The complete candidate text is checked before any buffer mutation; the existing file reader still bounds the incoming file separately.
+
+The registered isolated GTK regression requires a rejected insertion to leave both editor text and cursor unchanged. An accepted Unicode insertion must preserve exact text and undo in one action. It passed under fatal GTK criticals. The [updated inventory](ignored-test-inventory.txt) records its registration. Strict application Clippy passed. Full follow-up validation is pending.
+
+This follow-up changes drop admission only. It does not intercept arbitrary paste or truncate persisted drafts.

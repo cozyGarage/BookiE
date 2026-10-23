@@ -25,6 +25,29 @@ pub(super) fn validate_sql_line_lengths(text: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub(super) fn validate_dropped_sql(current: &str, cursor: usize, text: &str) -> Result<(), String> {
+    let replacing = current.trim().is_empty();
+    let total = if replacing {
+        text.len()
+    } else {
+        current.len().saturating_add(text.len())
+    };
+    if total as u64 > MAX_SQL_FILE_BYTES {
+        return Err(crate::tr!(
+            "Adding this SQL file would exceed the editor's 8 MiB limit. Open it in a separate tab."
+        ));
+    }
+    if replacing {
+        return validate_sql_line_lengths(text);
+    }
+    if !current.is_char_boundary(cursor) {
+        return Err(crate::tr!("The insertion position changed. Drop the SQL file again."));
+    }
+    let mut combined = current.to_string();
+    combined.insert_str(cursor, text);
+    validate_sql_line_lengths(&combined)
+}
+
 pub(crate) fn save_sql_file(
     path: &std::path::Path,
     text: &str,
@@ -165,6 +188,31 @@ mod tests {
         let (_dir, path) = written(b"SELECT 1;");
         save_sql_file(&path, &text, None).unwrap();
         assert_eq!(std::fs::read_to_string(path).unwrap(), text);
+    }
+
+    #[test]
+    fn individually_safe_dropped_lines_cannot_form_an_overlong_editor_line() {
+        let current = "x".repeat(200 * 1024);
+        let dropped = "é".repeat(100 * 1024);
+        assert!(validate_sql_line_lengths(&current).is_ok());
+        assert!(validate_sql_line_lengths(&dropped).is_ok());
+        assert!(validate_dropped_sql(&current, current.len(), &dropped).is_err());
+    }
+
+    #[test]
+    fn dropped_sql_preserves_unicode_cursor_and_exact_line_boundary() {
+        let current = format!("é{}\nSELECT 1;", "x".repeat(256 * 1024 - 4));
+        assert!(validate_dropped_sql(&current, "é".len(), "😀").is_err());
+        assert!(validate_dropped_sql(&current, "é".len(), "xy").is_ok());
+        assert!(validate_dropped_sql(&current, 1, "x").is_err());
+    }
+
+    #[test]
+    fn dropping_files_cannot_accumulate_past_the_total_editor_budget() {
+        let current = "SELECT 1;\n".repeat(800_000);
+        let dropped = "SELECT 2;\n".repeat(100_000);
+        assert!(validate_dropped_sql(&current, 0, &dropped).is_err());
+        assert!(validate_dropped_sql("  \n", 0, "SELECT 1;").is_ok());
     }
 
     #[test]
