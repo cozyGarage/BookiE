@@ -81,5 +81,23 @@
     "all_complete": true,
     "post_close_rss_growth_kib": 13688,
     "production_change": false
+  },
+  "stack_candidate": {
+    "build_identity": "stack-build.json",
+    "preflight": "passed: 2073 unit, 2086 sandbox and Redis cancellation",
+    "all_target_clippy": "passed",
+    "app_unit_passed": 791,
+    "gtk_widgets_passed": 153,
+    "label_lifetime_regression": "fails on notebook; passes on stack under test and real AT-SPI backends",
+    "optimized_queries": {
+      "cycles": 10,
+      "rows_per_cycle": 2000000,
+      "all_complete": true
+    },
+    "pager_verified_cycles": 3,
+    "cancel_verified_cycles": 5,
+    "wide_verified_cycles": 3,
+    "forgejo": "not run",
+    "native_wayland": "not verified"
   }
 }

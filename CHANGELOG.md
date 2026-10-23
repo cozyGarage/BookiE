@@ -57,6 +57,8 @@
 
 ### Fixed
 
+- Closing streamed query results releases hidden page labels instead of accumulating retired tab widgets.
+
 - Save-conflict messages keep the recovery advice without a redundant failure prefix or unrelated session warning, and save errors no longer double sentence-ending periods.
 - Restoring older workspaces skips empty table-structure tabs while keeping the active editor aligned and the empty workspace usable.
 
