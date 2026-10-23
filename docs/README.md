@@ -185,3 +185,5 @@ Record a rule once in an ADR and a task once on Project #3. Do not copy old test
 - [Pull request maintenance, October 22](evidence/pr-maintenance-2026-10-22/README.md): historical source inventory, prepared refreshes and validation limits.
 
 - [Workspace restoration and cleanup privacy train, October 23](evidence/forgejo-train-1518-2026-10-23/README.md): exact-head Forgejo run 925, required GitHub checks and documentation-only post-merge source verification.
+
+- [Shared grid pointer routing, October 23](evidence/grid-pointer-routing-2026-10-23/README.md): controlled allocation measurements and local interaction checks; acceptance remains pending.
