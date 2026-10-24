@@ -45,6 +45,15 @@ A 31.015-second sample began after the query had completed, with the grid on the
 - [Current-head oldest-retained-page screenshot](native-current-head-100k-oldest-retained.png)
 - [Current-head completed-result process samples](native-current-head-postgres-100k-31s.json)
 
+## BookiE branch verification after byte-budget retention change
+
+The release-mode BookiE binary built from the `ux/stream-result-full-navigation` worktree ran the same query against the local PostgreSQL 17.11 lab. The UI reported completion in 146 ms and received 100,000 rows in 20 pages. I navigated backward from the newest page to rows 1–5,000; the grid displayed values starting at 1. This confirms that the former four-page cutoff no longer hides pages when the estimated row storage fits within the cache budget.
+
+After navigating to the first page, a 31-second idle sample recorded 275,509,248 bytes RSS before and after, with 0.01 seconds of process CPU time and no change in block-read or block-write counters. The process high-water RSS was also 275,509,248 bytes. This is a warm process measurement after the query and UI render, not query-only memory cost, and does not show that results larger than the 64 MiB estimated row budget remain fully navigable. The process sample records `/proc` counters; socket traffic is not included in block I/O.
+
+- [Page 1 screenshot](native-bookie-branch-100k-page1.png)
+- [31-second process sample](native-bookie-branch-100k-retained-page1-31s.json)
+
 ## Current linux-head MySQL browse capture
 
 The same extracted binary opened the saved Manual Lab MySQL connection and loaded the `people` table (2 rows). During a 31.238-second idle sample, RSS stayed at 124.2 MiB, PSS varied by 6 KiB, Private Dirty stayed at 36.0 MiB, CPU advanced by 0.02 seconds, and process block-read/write counters did not change. This is a small-table browse sample, not a cross-engine benchmark; the app binary was extracted from the Arch package and was not installed.
