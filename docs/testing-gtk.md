@@ -12,6 +12,8 @@ Run the installed safety suite with:
 
 The script builds `tablepro-app`, always starts a private runtime directory, isolated D-Bus session and Xvfb display, and drives the real application through PyAT-SPI. Each scenario gets temporary XDG directories and a fixture SQLite database. A scenario may mark its saved fixture connection as production to test policy prompts; it never opens a user's saved connection or production database. The runner uses a standalone AT-SPI D-Bus daemon and passes the Xvfb display to D-Bus activation, so it does not reuse desktop accessibility or portal processes. GTK tests exercise the X11/GTK portal path; they do not replace installed Wayland package testing.
 
+The runner refuses an empty scenario selection, including an empty shard, or a negative retry count. When selecting one scenario, clear any shard setting that would exclude it.
+
 After its configured retry a failed scenario is recorded and the runner carries on with the rest. Each failure prints a `FAILED:` line and its assertion text, and the run ends with one line that lists every failed scenario and exits non-zero. A scenario that fails only because an earlier one left a shared fixture in a bad state can still fail alongside it, so read the first failure first.
 
 When `TABLEPRO_GTK_ARTIFACT_DIR` is set, every scenario writes a JSON result and application stderr, including successful scenarios. Failures additionally retain the accessibility tree and a screenshot when available. Successful runs therefore have uploadable evidence; a missing artifact still fails CI. Python regressions exercise both result paths without needing a display.
@@ -101,3 +103,8 @@ Workflow prerequisites and runner-specific behavior live in `.forgejo/workflows/
 SQLite integration regressions also distinguish NULL from zero, false, empty text, and empty blobs in declared columns, and preserve binary values despite declared-type affinity mismatches. Export unit tests overlap writers deterministically and check that pre-existing temporary symlinks cannot redirect writes. Workspace tests preserve active-tab identity when unknown records are removed.
 
 For ordinary UI changes, test the affected flow manually and include before and after screenshots. Add deterministic automation when a regression can be reproduced without timing or desktop-session assumptions.
+
+## Lessons that shape GTK tests
+
+- **Replacing a selected model's contents in one remove-and-add notification makes GTK scan every inserted row.** Deselect, then send the removal, then the insertion. Assert the number of row objects constructed, which is deterministic, not wall-clock time ([TablePro collaboration review](archive/tablepro-collaboration-2026-10-21.md)).
+- **A scenario is promoted only after 30 consecutive attempts across at least six runs, and adding a scenario restarts that ledger** ([production audit](archive/production-audit.md)). A diagnostic probe that passes is not a product regression.

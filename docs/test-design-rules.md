@@ -17,7 +17,15 @@ Rules that earlier audits paid for. Each one names the failure it prevents. The 
 
 - **A parser is not its own oracle.** Testing a lexer or decoder only against itself hides shared mistakes. Take expected values from the engine or another independent source ([ADR 0007](decisions/0007-type-and-value-preservation.md), [oracle review](oracle-review.md)).
 - **Assert concrete boundaries and both branches.** Mutation checks exposed symbolic constants in assertions and tests that exercised only one branch. Use the literal boundary value, and test the refusal as well as the accepted case ([baseline review, 2026-09-17](archive/baseline-review-2026-09-17.md)).
+- **Unviable mutants are not catches.** A mutant that does not compile is neither a coverage success nor an equivalent mutant; report it separately, and report a missing mutation report as unavailable, not as zeros ([bug consistency review](archive/bug-consistency-2026-09.md), B9).
 - **A negative test proves a trusted control first.** For TLS and similar failures, show the same setup succeeds, then assert the specific error. `is_err()` lets an unrelated failure pass.
+
+- **Test the race, not only the error.** For cancellation and similar features, cover caller drop, a deadline during dispatch, a delayed stop after completion, a transport failure, pool reuse and shutdown, and assert the server's behaviour as well as the returned error ([ADR 0005](decisions/0005-server-side-cancellation.md)).
+
+## Escaping and decoding
+
+- **Every dialect's literal rendering needs a hostile-value test.** A rendered INSERT that escaped only quotes let a value ending in a backslash close the literal early on MySQL and ClickHouse, and MySQL evaluated the rest as SQL ([upstream sync history, 2026-08-22](archive/upstream-sync-history-2026-10-22.md)). Test backslashes, quotes and each dialect's escape modes against a real server.
+- **Fix a loss at its source, not by accepting the symptom.** Every SQLite column with no declared type once decoded as NULL, so expressions such as `count(*)` showed an empty cell (same record). Do not make a test pass by treating the empty result as expected.
 
 ## Changing a test or guard
 
