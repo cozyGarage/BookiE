@@ -61,6 +61,7 @@ def untracked_input_identity(working_tree, root=None):
             raise ValueError(f"unsupported untracked input type: {os.fsdecode(raw_path)}")
         digest.update(b"f")
         before = path.stat()
+        digest.update(b"x" if before.st_mode & 0o111 else b"-")
         update_hash_field(digest, before.st_size.to_bytes(8, "big"))
         read_size = 0
         with path.open("rb") as source:

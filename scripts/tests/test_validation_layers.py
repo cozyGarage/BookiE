@@ -62,12 +62,18 @@ class LayerRunnerTests(unittest.TestCase):
             self.assertEqual(paths_after_source_change, paths)
             self.assertNotEqual(second_digest, first_digest)
 
+            source.chmod(0o755)
+            executable_status = subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True)
+            executable_paths, executable_digest = runner.untracked_input_identity(executable_status, root)
+            self.assertEqual(executable_paths, paths)
+            self.assertNotEqual(executable_digest, second_digest)
+
             moved_source = root / "crates" / "renamed-input.rs"
             source.rename(moved_source)
             renamed_status = subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True)
             renamed_paths, renamed_digest = runner.untracked_input_identity(renamed_status, root)
             self.assertEqual(renamed_paths, ["crates/renamed-input.rs"])
-            self.assertNotEqual(renamed_digest, second_digest)
+            self.assertNotEqual(renamed_digest, executable_digest)
 
     def test_clean_tree_skips_untracked_input_scan(self):
         with patch.object(runner.subprocess, "check_output") as check_output:
