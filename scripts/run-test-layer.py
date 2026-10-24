@@ -36,6 +36,44 @@ def capture(*args):
     return subprocess.check_output(args, cwd=ROOT, text=True).strip()
 
 
+def update_hash_field(digest, value):
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def untracked_input_identity(working_tree, root=None):
+    if not any(line.startswith("?? ") for line in working_tree.splitlines()):
+        return [], None
+    root = ROOT if root is None else root
+    result = subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=root
+    )
+    raw_paths = sorted(path for path in result.split(b"\0") if path)
+    digest = hashlib.sha256()
+    for raw_path in raw_paths:
+        path = root / os.fsdecode(raw_path)
+        update_hash_field(digest, raw_path)
+        if path.is_symlink():
+            digest.update(b"l")
+            update_hash_field(digest, os.fsencode(os.readlink(path)))
+            continue
+        if not path.is_file():
+            raise ValueError(f"unsupported untracked input type: {os.fsdecode(raw_path)}")
+        digest.update(b"f")
+        before = path.stat()
+        digest.update(b"x" if before.st_mode & 0o111 else b"-")
+        update_hash_field(digest, before.st_size.to_bytes(8, "big"))
+        read_size = 0
+        with path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                digest.update(chunk)
+                read_size += len(chunk)
+        after = path.stat()
+        if (read_size, before.st_mtime_ns, before.st_size) != (after.st_size, after.st_mtime_ns, after.st_size):
+            raise ValueError(f"untracked input changed while collecting evidence: {os.fsdecode(raw_path)}")
+    return [os.fsdecode(path) for path in raw_paths], digest.hexdigest()
+
+
 def write_report(path, report):
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(report, indent=2) + "\n")
@@ -46,7 +84,10 @@ def execution_evidence(kind, output):
     if kind == "exit":
         return True
     if kind == "python-tests":
-        return bool(re.search(r"Ran [1-9]\d* tests? in", output) and re.search(r"^OK$", output, re.M))
+        lines = output.splitlines()
+        counts = [match[1] for line in lines if (match := re.fullmatch(r"Ran (\d+) tests? in .+", line))]
+        outcomes = [line for line in lines if line == "OK" or line.startswith(("OK (", "FAILED"))]
+        return len(counts) == 1 and int(counts[0]) > 0 and outcomes == ["OK"]
     output = re.sub(r"\x1b\[[0-9;]*m", "", output)
     libtest = [
         (row[0] == "ok" and row[2] == "0", int(row[1]))
@@ -114,10 +155,14 @@ def execute(step, log_path, cwd=ROOT):
 def run_layers(names, layers, directory):
     directory.mkdir(parents=True)
     report_path = directory / "report.json"
+    working_tree = capture("git", "status", "--porcelain")
+    untracked_paths, untracked_digest = untracked_input_identity(working_tree)
     report = {
         "schema_version": 1, "commit": capture("git", "rev-parse", "HEAD"),
-        "working_tree": capture("git", "status", "--porcelain"),
+        "working_tree": working_tree,
         "tracked_diff_sha256": hashlib.sha256(capture("git", "diff", "HEAD", "--binary").encode()).hexdigest(),
+        "untracked_inputs": untracked_paths,
+        "untracked_inputs_sha256": untracked_digest,
         "started_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "status": "running", "layers": {},
     }

@@ -2,13 +2,23 @@
 
 ## Delivery status
 
-The maintainer confirmed 0.2.0 delivery complete on 2026-10-18. Release `linux-v0.2.0` is published and the delivery sprint is closed. The [platform guide](platforms.md#published-020-release) records its assets and package names. Remaining work and candidate order for future releases are in the [backlog](backlog.md).
+The maintainer marked 0.2.0 delivery complete, and the release was published on 2026-10-23. The [platform guide](platforms.md#published-020-release) records its assets and package names. Remaining work and candidate order for future releases are in the [backlog](backlog.md).
 
-The [0.2.0 scope](0.2.0-scope.md) records the completed delivery boundary. The previous scope and sprint checklists are preserved in the [completion handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md). Their historical open rows do not reopen 0.2.0. This status records the maintainer's decision, not a new run of the package, driver or desktop checks.
+The previous scope, blocker table and sprint checklists are kept in the [history](#history). They are historical checklists, not fresh test, installed-package or soak evidence, and their open rows do not reopen 0.2.0.
+
+## Delivery boundary
+
+0.2.0 is the Linux development release for the Arch/Hyprland target, with hotfixes to follow from use:
+
+- PostgreSQL, MySQL/MariaDB and SQLite are the principal database paths; DuckDB is optional. SQL Server, ClickHouse, MongoDB and Redis retain the maturity and restrictions in [known limitations](known-limitations.md).
+- GUI and agent operations share the governed policy/audit path. Lost write acknowledgement does not authorize replay, and agent output remains subject to masking.
+- Arch/Hyprland is the selected desktop target. Debian/Ubuntu GNOME desktop acceptance and Flathub distribution stay in the post-0.2.0 backlog. The release page also carries a GNOME 50 Flatpak bundle; it does not establish Flathub publication or acceptance against the later GNOME 51 runtime.
+
+The app and agentd manifests identify source version `0.2.0`. The `bookie` Debian package name landed after the release tag and will be used for a later build. New upstream adoption, broader engine matrices and development-tooling changes are post-0.2.0 work. They do not reopen this milestone. Preserve exact source and environment evidence when selecting or closing each follow-up.
 
 ## Current continuation
 
-The [post-0.2.0 backlog](backlog.md) owns selected development order. [Project #3](https://github.com/users/cozyGarage/projects/3) owns issue status and Lane; the [ledger index](known-issues.md) maps IDs to issues. Existing open correctness, qualification and infrastructure issues keep their evidence and follow-up scope. They are not silently closed by a milestone-status change.
+[Project #3](https://github.com/users/cozyGarage/projects/3) owns issue status and Lane; the [ledger index](known-issues.md) maps IDs to issues. Existing open correctness, qualification and infrastructure issues keep their evidence and follow-up scope. They are not silently closed by a milestone-status change.
 
 ## Standing decisions
 

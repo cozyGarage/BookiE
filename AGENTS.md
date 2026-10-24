@@ -9,12 +9,12 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 - The rename covers the display name, packaging install names (`bookie`, `bookie-agentd`, with `tablepro*` aliases) and branding assets only. Cargo package and binary names stay `tablepro-app` / `tablepro-agentd`. App ID, config and data paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Crate names stay `tablepro-*`. Check the sprint before renaming any of them.
 - The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. No cross-platform UI layers, web views or source for another operating system.
 - Every shipped feature works without an account, license key, subscription, paid tier or remote entitlement check.
-- The root [LICENSE](LICENSE) applies. User-facing changes go in [CHANGELOG.md](CHANGELOG.md).
+- The root [LICENSE](LICENSE) applies. User-facing changes carry a `Release-Note:` line ([changelog and commits](#changelog-and-commits)).
 
 ## Where to start
 
 1. [docs/README.md](docs/README.md): the documentation map and where each fact belongs.
-2. [Completion and continuation](docs/bookie-0.2-sprint.md): the maintainer marked 0.2.0 delivery complete, and the release was published on 2026-10-23. The [0.2.0 scope](docs/0.2.0-scope.md) records its delivery boundary, the [backlog](docs/backlog.md) owns subsequent work, and [known limitations](docs/known-limitations.md) says what the application cannot do. No 0.2.1 or 0.3 scope is committed yet; select work from the backlog and define each release scope separately.
+2. [Completion and continuation](docs/bookie-0.2-sprint.md): the maintainer marked 0.2.0 delivery complete, and the release was published on 2026-10-23. The same page records the delivery boundary; the [backlog](docs/backlog.md) owns subsequent work, and [known limitations](docs/known-limitations.md) says what the application cannot do. No 0.2.1 or 0.3 scope is committed yet; select work from the backlog and define each release scope separately.
 3. [Bookie Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (B3, B4, UX, Maintainer).
 4. The ADR that governs your change ([index](docs/decisions/README.md)). Every type or value change follows [ADR 0007](docs/decisions/0007-type-and-value-preservation.md).
 
@@ -142,7 +142,7 @@ Every test belongs to one tier with one script and one gate. Use the [validation
 
 | Tier | Contents | Script |
 |---|---|---|
-| unit | `--lib` on the non-GTK crate list in `preflight.sh` (skips `tablepro-app`), run by nextest | `scripts/preflight.sh` |
+| unit | `--lib --bins` on the non-GTK crate list in `preflight.sh` (skips `tablepro-app`), run by nextest | `scripts/preflight.sh` |
 | sandbox | integration targets needing no Docker, database or display, run by nextest | `scripts/test-sandbox.sh` |
 | driver | `crates/drivers/*/tests/integration.rs`, SSH and socket fixtures | `scripts/ci-local.sh integration` |
 | driver-tls | `tests/driver-tls` | `scripts/test-driver-tls.sh` |
@@ -169,8 +169,8 @@ Driver integration tests need Docker. If a prerequisite is missing, say which ch
 
 ## Changelog and commits
 
-- [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) in `CHANGELOG.md` under `[Unreleased]`: one line per user-facing change, describing user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; record them on the owning board or in `docs/evidence/`. Do not add `Fixed` for a defect introduced and fixed before release.
-- Conventional Commits with a single-line subject and no body. Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`, `revert`, `security`. Scopes such as `app`, `core`, `policy`, `mcp`, `agentd`, `storage`, `ssh`, `drivers`, `driver-postgres`.
+- Release notes ([ADR 0022](docs/decisions/0022-release-notes-from-merge-commits.md)): do not edit `CHANGELOG.md`. Put one `Release-Note: <Category>: <text>` line per user-facing change (or `Release-Note: none`) in the PR body and the repository's squash-merge default uses the PR title and body, so the lines reach the commit; do not replace the body in the merge box. Categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Each line describes user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; record them on the owning board or in `docs/evidence/`. Do not add `Fixed` for a defect introduced and fixed before release.
+- Conventional Commits with a single-line subject and no body on branch commits (a squash commit's body is the PR description). Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`, `revert`, `security`. Scopes such as `app`, `core`, `policy`, `mcp`, `agentd`, `storage`, `ssh`, `drivers`, `driver-postgres`.
 - A public API change updates every caller and test in the same commit.
 
 ## Documentation rules

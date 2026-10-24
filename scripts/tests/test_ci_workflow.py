@@ -110,9 +110,12 @@ class CiWorkflowTests(unittest.TestCase):
             'scripts/ci-mcp-port.py "${{ matrix.run }}"',
         ]:
             self.assertIn(call, ci + nightly)
-        ports = [port_helper.port_for_run(137, slot) for slot in range(1, 12)]
+        ports = [port_helper.port_for_run(137, slot) for slot in range(1, 14)]
         self.assertEqual(len(ports), len(set(ports)))
         self.assertTrue(all(20000 <= port <= 59999 for port in ports))
+        for slot in (0, 14, 16):
+            with self.assertRaises(ValueError):
+                port_helper.port_for_run(137, slot)
 
     def test_forgejo_driver_jobs_reuse_and_clean_the_run_scoped_database(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -221,7 +224,7 @@ class CiWorkflowTests(unittest.TestCase):
         selection = "--workspace --exclude tablepro-driver-duckdb --lib --bins"
         self.assertIn(f"nextest run {selection}", ci)
         self.assertIn('"$ROOT/scripts/ensure-nextest.sh"', full)
-        self.assertIn(f'nextest run {selection} --profile "${{TABLEPRO_NEXTEST_PROFILE:-default}}" --no-tests=pass', full)
+        self.assertIn(f'nextest run {selection} --profile "${{TABLEPRO_NEXTEST_PROFILE:-default}}" --no-tests=fail', full)
         self.assertNotIn("cargo test --workspace", full)
 
     def test_jobs_share_an_immutable_checkout(self):
@@ -505,9 +508,19 @@ class CiWorkflowTests(unittest.TestCase):
         soak = nightly.split("\n  gtk-soak:\n", 1)[1].split("\n  arch-package:\n", 1)[0]
         self.assertIn('binary="$PWD/target-soak-${{ matrix.run }}/usr/bin/tablepro"', soak)
 
-    def test_forgejo_workflows_use_no_node_actions_on_host_executors(self):
+    def test_forgejo_artifact_actions_are_pinned_and_bootstrap_their_runtime(self):
+        allowed = {
+            "https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5",
+            "https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a",
+        }
         for workflow in (ROOT / ".forgejo/workflows").glob("*.yml"):
-            self.assertNotIn("uses:", workflow.read_text(), workflow.name)
+            for job in re.split(r"(?m)^  [a-z0-9-]+:\n", workflow.read_text().split("jobs:\n", 1)[1]):
+                actions = re.findall(r"(?m)^        uses: (\S+)$", job)
+                if not actions:
+                    continue
+                self.assertTrue(set(actions) <= allowed, workflow.name)
+                self.assertLess(job.index("ensure-node.sh"), job.index("uses:"), workflow.name)
+                self.assertIn('>> "$GITHUB_PATH"', job)
 
     def test_forgejo_distro_floor_reuses_one_package_across_bases(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -540,6 +553,23 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("image=bookie-floor-package-debian-testing", builder)
         self.assertIn('docker build -q -t "$image"', builder)
         self.assertIn('"$image" bash -ceu', builder)
+
+    def test_distro_scenarios_share_the_package_and_partition_all_three_shards(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        producer = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
+        scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
+        self.assertNotIn("scripts/test-distro-floor.sh", producer)
+        self.assertIn("scripts/test-deb-package.sh", producer)
+        self.assertIn("ci-gtk-artifact.py create --package", producer)
+        self.assertIn("needs: [distro-floor]", scenarios)
+        self.assertIn("shard: [1, 2, 3]", scenarios)
+        self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
+        self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3", scenarios)
+        self.assertIn('scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"', scenarios)
+        self.assertNotIn("scripts/distro-floor-package.sh", scenarios)
+        self.assertIn("scripts/test-distro-floor.sh debian:testing", scenarios)
+        for job in (producer, scenarios):
+            self.assertIn("name: floor-package-${{ github.run_id }}-${{ github.sha }}", job)
 
     def test_packaged_distro_smoke_does_not_mount_a_stale_build_target(self):
         with tempfile.TemporaryDirectory() as temporary:
