@@ -153,3 +153,9 @@ With the SQLite table open and no input, a 31.005-second process sample recorded
 At the same time, the existing user profile directories measured 126,020 bytes in config, 884,110 bytes in share, and 4,732 bytes in cache. The extracted candidate package tree occupied 76,183,256 bytes; this is not the installed package size. Pacman still reported `bookie 0.2.0-1`, so the candidate remains extracted and running rather than installed. The sample records persistent profile totals after this UI test, not bytes attributable to SQLite or `SELECT 1;`.
 
 - [31-second idle process samples](native-pr1568-sqlite-table-idle-31s.json)
+
+## GTK safety rerun
+
+The full Xvfb/AT-SPI GTK safety suite ran against the same extracted candidate with `TABLEPRO_TEST_MCP_HTTP_PORT=19433` to avoid colliding with the native app's MCP listener. All 111 scenarios passed; the script exited 0. The log ends with four D-Bus disconnect messages during fixture teardown, after the final passing scenario. This is automated GTK evidence and does not replace the native Wayland checks above.
+
+- [GTK safety run log](gtk-safety-xvfb-20261024.txt)
