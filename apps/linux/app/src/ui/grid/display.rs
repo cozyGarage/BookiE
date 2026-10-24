@@ -149,7 +149,17 @@ fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit
                 .char_indices()
                 .nth(text_limit)
                 .map_or(text.len(), |(index, _)| index);
-            format!("{}… ({total})", text[..end].replace('\0', "\u{2400}"))
+            let sample = text[..end]
+                .chars()
+                .map(|character| match character {
+                    '\0' => '\u{2400}',
+                    '\n' | '\u{2028}' | '\u{2029}' => '↵',
+                    '\r' => '␍',
+                    '\t' => '⇥',
+                    character => character,
+                })
+                .collect::<String>();
+            format!("{sample}… ({total})")
         }
         Value::Bytes(bytes) => {
             let head = bytes
@@ -690,6 +700,23 @@ mod tests {
             byte_count: 9000,
         };
         assert_eq!(preview_to_display_text(&preview), "sample… (9000 bytes total)");
+    }
+
+    #[test]
+    fn multiline_preview_collapses_line_breaks_without_changing_the_value() {
+        let text = "first\nsecond\r\nthird\u{2028}fourth\tlast";
+        let preview = crate::ui::row_object::CellPreview {
+            value: Value::Text(text.into()),
+            byte_count: text.len(),
+        };
+
+        let view = CellView::from_preview(&preview);
+
+        assert_eq!(
+            view.display_text,
+            format!("first↵second␍↵third↵fourth⇥last… ({} bytes total)", text.len())
+        );
+        assert_eq!(preview.value, Value::Text(text.into()));
     }
 
     #[test]
