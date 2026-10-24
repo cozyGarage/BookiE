@@ -355,6 +355,29 @@ def scenarios(ui):
         assert stored_notes(database) == [(1, "gamma"), (2, "beta")], stored_notes(database)
         ui.wait_for_node(name="1 unsaved change", present=False)
 
+    def closing_and_reopening_a_browse_tab_keeps_it_editable(database, base):
+        import sqlite3
+        with sqlite3.connect(database) as connection:
+            connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
+        ui.open_table_in_new_tab("safety_items")
+        ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
+        ui.invoke_accessible_action("win.close-current")
+        ui.wait_for_node(name="safety_items", role=pyatspi.ROLE_PAGE_TAB, present=False)
+        ui.press_x11_key("t", ("Control_L", "Shift_L"))
+        ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
+        click_cell("alpha", count=2)
+        for key in "gamma":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        assert stored_notes(database) == [(1, "alpha"), (2, "beta")], "reopened browse edit reached the database before save"
+        ui.press_x11_key("s", ("Control_L",))
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and stored_notes(database) != [(1, "gamma"), (2, "beta")]:
+            time.sleep(ui.POLL_SECONDS)
+        assert stored_notes(database) == [(1, "gamma"), (2, "beta")], stored_notes(database)
+        ui.wait_for_node(name="1 unsaved change", present=False)
+
     def grid_paste_preserves_multiline_text_and_sibling_rows(database, base):
         import sqlite3
         with sqlite3.connect(database) as connection:
@@ -1991,6 +2014,7 @@ GLib.MainLoop().run()
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
         browse_edit_cell_and_save_persists_to_the_database,
+        closing_and_reopening_a_browse_tab_keeps_it_editable,
         grid_paste_preserves_multiline_text_and_sibling_rows,
         test_connection_reports_success_in_the_dialog,
         test_connection_reports_failure_in_the_dialog,
