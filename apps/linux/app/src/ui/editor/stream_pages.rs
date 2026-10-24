@@ -153,6 +153,9 @@ mod tests {
             cache.pages().iter().map(|(index, _, _)| *index).collect::<Vec<_>>(),
             (0..20).collect::<Vec<_>>()
         );
+        let snapshot = cache.snapshot(StreamTerminal::Complete, None);
+        assert_eq!(snapshot.total_pages, 20);
+        assert_eq!(snapshot.page_indices, (0..20).collect::<Vec<_>>());
     }
 
     #[test]
