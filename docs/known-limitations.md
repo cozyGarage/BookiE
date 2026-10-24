@@ -16,15 +16,21 @@ Documented application limits, behavior differences and known defects. Entries l
   results stop at 1 million rows, 10 million cells or 64 MiB estimated size.
   Single-statement PostgreSQL `SELECT`s in the SQL editor now stream cursor
   pages through Core and PolicyGuard, retaining at most four pages of up to
-  5,000 rows each. Previous/Next controls navigate only retained pages. The
-  received-row summary identifies the retained range when earlier rows have
-  been discarded; those rows cannot be revisited without running the query
-  again. Row ranges are positions in the result, not database row identifiers.
+  5,000 rows each. Previous/Next controls navigate only retained pages. A
+  native 100,000-row PostgreSQL check received 20 pages but exposed only rows
+  80,001–100,000 after completion. The user-visible loss of the earlier rows is
+  being addressed under [#1032](https://github.com/cozyGarage/BookiE/issues/1032);
+  the current fixed page-count cap is not accepted as the final browsing
+  behavior for results that fit within the resource budget. Row ranges are
+  positions in the result, not database row identifiers.
   That cache also retains at most 64 MiB of estimated row storage, except
   that the newest page is always kept even if it alone exceeds the budget.
   Incoming decoding, concurrent snapshots, pins, widgets and allocator retention
   remain outside this cache estimate. A synthetic profile with four pinned results and one active stream
   reached 1,325 MiB RSS; see the [profile evidence](evidence/stream-retention-synthetic-2026-10-16/README.md).
+  A single local 100,000-row PostgreSQL profile retained only the latest 20,000
+  rows and showed a 24.8 MiB peak RSS increase over a 30-second sample; the
+  [capture](evidence/built-head-2026-10-24/README.md) records its limitations.
   This does not measure normal queries or the complete process ceiling. Other
   engines and unsupported statement shapes remain materialized.
   The historical grid measurement was about 2.5 times the result memory; #518
