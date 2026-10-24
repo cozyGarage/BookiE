@@ -33,6 +33,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -57,11 +58,50 @@ jobs:
           python3 scripts/check-comment-lines.py
           cargo fmt --all -- --check
 
+  gtk-build:
+    runs-on: any-host
+    needs: [guards]
+    if: github.event_name != 'pull_request'
+    timeout-minutes: 20
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
+      TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+    steps:
+      - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Build the shared GTK binary
+        run: |
+          cd src
+          cargo build --profile ci --locked -p tablepro-app --bin tablepro-app
+          python3 scripts/ci-gtk-artifact.py create "$CARGO_TARGET_DIR/ci/tablepro-app" "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}"
+      - name: Upload the source-pinned GTK binary
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ github.sha }}
+          path: gtk-artifact/
+          if-no-files-found: error
+          retention-days: 2
+
   clippy:
     runs-on: any-host
     timeout-minutes: 90
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -83,6 +123,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -101,13 +142,14 @@ jobs:
         run: |
           cd src
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
-          "$NEXTEST" nextest run --workspace --exclude tablepro-driver-duckdb --lib --bins --profile ci --no-tests=pass
+          "$NEXTEST" nextest run --workspace --exclude tablepro-driver-duckdb --lib --bins --profile ci --no-tests=fail
 
   sandbox:
     runs-on: any-host
     timeout-minutes: 90
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -132,6 +174,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -163,6 +206,7 @@ jobs:
             mcp_port_slot: 10
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -184,10 +228,22 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Build or reuse the distro-floor package
         run: |
-          cd src && bash scripts/distro-floor-package.sh "${{ github.sha }}" > floor-package-path
-      - name: Distro floor
+          cd src && bash scripts/distro-floor-package.sh "${{ github.sha }}" > "$GITHUB_WORKSPACE/floor-package-path"
+      - name: Prepare artifact runtime
+        env:
+          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare the shared release package
         run: |
-          cd src && package=$(cat floor-package-path) && DISTRO_FLOOR_PACKAGE="$package" bash scripts/test-distro-floor.sh ${{ matrix.base }}
+          package=$(cat "$GITHUB_WORKSPACE/floor-package-path")
+          python3 src/scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}"
+      - name: Upload the shared release package
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: floor-package-${{ github.run_id }}-${{ github.sha }}
+          path: floor-artifact/
+          if-no-files-found: error
+          retention-days: 2
       - name: Debian package build, install, upgrade from the released package and purge
         run: |
           released=/var/cache/ci/releases/tablepro_0.1.5-1_amd64.deb
@@ -196,7 +252,57 @@ jobs:
             curl -fsSL -o "$released.part" https://github.com/cozyGarage/BookiE/releases/download/linux-v0.1.5/tablepro_0.1.5-1_amd64.deb
             mv "$released.part" "$released"
           fi
-          cd src && package=$(cat floor-package-path) && PREVIOUS_DEB="$released" PREBUILT_DEB="$package" bash scripts/test-deb-package.sh ${{ matrix.base }}
+          cd src && package=$(cat "$GITHUB_WORKSPACE/floor-package-path") && PREVIOUS_DEB="$released" PREBUILT_DEB="$package" bash scripts/test-deb-package.sh ${{ matrix.base }}
+  distro-floor-scenarios:
+    runs-on: any-host
+    needs: [distro-floor]
+    if: github.event_name != 'pull_request'
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Prepare artifact runtime
+        env:
+          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared release package
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: floor-package-${{ github.run_id }}-${{ github.sha }}
+          path: floor-artifact/
+      - name: Verify the shared release package
+        run: |
+          package=$(python3 src/scripts/ci-gtk-artifact.py verify --package "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}")
+          printf 'DISTRO_FLOOR_PACKAGE=%s\n' "$package" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"
+      - name: Distro-floor scenario shard
+        run: |
+          cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-distro-floor.sh debian:testing
+
   driver:
     runs-on: any-host
     needs: [guards, clippy, unit, sandbox, widgets]
@@ -211,6 +317,7 @@ jobs:
         driver: [postgres, mysql, mssql, clickhouse, redis, mongodb]
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -243,11 +350,11 @@ jobs:
 
   e2e:
     runs-on: any-host
-    needs: [guards, clippy, unit, sandbox, widgets]
+    needs: [guards, clippy, unit, sandbox, widgets, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/e2e-${{ matrix.server }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
     strategy:
       fail-fast: false
       matrix:
@@ -258,6 +365,7 @@ jobs:
             mcp_port_slot: 6
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -270,6 +378,19 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Prepare artifact runtime
+        env:
+          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ github.sha }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
+          printf 'TABLEPRO_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -290,6 +411,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/consumers
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -320,17 +442,18 @@ jobs:
 
   gtk:
     runs-on: any-host
-    needs: [guards, clippy, unit, sandbox, widgets]
+    needs: [guards, clippy, unit, sandbox, widgets, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-${{ matrix.shard }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -343,6 +466,19 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Prepare artifact runtime
+        env:
+          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ github.sha }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
+          printf 'TABLEPRO_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -363,6 +499,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/duckdb
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -395,6 +532,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -427,6 +565,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-dump
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -456,6 +595,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -481,11 +621,11 @@ jobs:
 
   gtk-server:
     runs-on: any-host
-    needs: [guards, clippy, unit, sandbox, widgets]
+    needs: [guards, clippy, unit, sandbox, widgets, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-server-${{ matrix.server }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
     strategy:
       fail-fast: false
       matrix:
@@ -498,6 +638,7 @@ jobs:
             mcp_port_slot: 9
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -510,6 +651,19 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Prepare artifact runtime
+        env:
+          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ github.sha }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
+          printf 'TABLEPRO_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -529,6 +683,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -561,6 +716,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/keyring
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -586,6 +742,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/supply-chain
     steps:
       - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}

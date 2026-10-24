@@ -58,6 +58,9 @@ Other options and why they were rejected.
 | [0019](0019-database-tooling-without-sidecars.md) | Database tooling without sidecars | Accepted; partial implementation | DuckDB for file conversion, `refinery` behind `PolicyGuard` for migrations, supervised vendor dump tools for backup; no sidecar binaries |
 | [0020](0020-aggregate-forgejo-trains.md) | Aggregate pull requests are the Forgejo gate unit | Accepted | Gate one immutable aggregate head, verify its merge tree and close constituent PRs as included |
 | [0021](0021-toolkit-floor.md) | Support only the newest GTK toolkit | Accepted | GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 at startup, build, package and CI; older distributions are unsupported |
+| [0022](0022-release-notes-from-merge-commits.md) | Release notes come from merge commits | Accepted; workflow wiring pending | A `Release-Note:` trailer on each squash commit replaces edits to `CHANGELOG.md`; notes are assembled at release. |
+| [0023](0023-system-openssh-transport-boundaries.md) | System OpenSSH transport boundaries | Accepted | Askpass answers only exact prompts, forced client options, no global state, and no `core` dependency in the ssh crate. |
+| [0024](0024-keyed-grid-writes-check-what-they-overwrite.md) | Keyed grid writes check what they overwrite | Accepted | Relational updates compare edited columns' original values and must affect exactly one row; MongoDB guards by field and row; deletes and ABA are limits. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 
@@ -71,3 +74,5 @@ Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepte
 4. Add it to the index in the same change.
 5. Update the [checklist](checklist.md) row for that fork (Decided with a link, or leave Open).
 6. Submit it through the normal review process.
+7. Record every rejected alternative with its reason under **Alternatives considered**, including options a review or comparison document turned down. A dated review that declines something is not a decision record until it is here.
+8. A limitation entry never overrides an accepted ADR. If shipped behaviour differs from an ADR, amend the ADR or fix the behaviour.

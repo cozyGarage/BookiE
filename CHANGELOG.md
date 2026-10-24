@@ -21,6 +21,7 @@
 
 ### Changed
 
+- PostgreSQL CSV imports preserve BC-era `timestamptz` values exported with a year-zero timestamp.
 - If database editor sessions cannot close, the window offers the close-anyway choice after up to five seconds instead of waiting up to twenty.
 - Large sidebar catalogs filter faster, and saved collapse state cannot hide objects under a schema heading that is no longer present.
 - SQL completion checks table names faster in large catalogs.
@@ -54,6 +55,7 @@
 - Inspecting a row with oversized cell previews avoids copying the full row contents.
 - Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
 - Saving workspaces with large SQL drafts uses less temporary memory.
+- Oversized saved SQL drafts are kept on disk and shown as a read-only notice instead of being laid out or executed.
 
 ### Security
 
@@ -61,6 +63,9 @@
 
 ### Fixed
 
+- Workspace saves no longer rewrite other connections' editor drafts, preserving external edits and avoiding needless file I/O.
+- PostgreSQL CSV imports preserve the session time zone when a `timestamptz` value has no explicit offset.
+- Expanding a table in the sidebar now displays its field and type previews instead of remaining on “Loading fields…”.
 - SQL editor results keep every streamed page within the estimated memory budget, so users can navigate back through completed PostgreSQL results that fit the budget.
 - The tab overview no longer shows a duplicate window-close button beside its tab cards.
 
