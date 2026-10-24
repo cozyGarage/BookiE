@@ -35,6 +35,42 @@ def test_selector(command):
     return (candidates[-1] if candidates else None), exact
 
 
+def is_test_layer_report(manifest):
+    return all(
+        key in manifest
+        for key in ("commit", "working_tree", "tracked_diff_sha256", "status", "layers")
+    )
+
+
+def validate_test_layer_report(path, report):
+    errors = []
+    commit = report.get("commit")
+    if not isinstance(commit, str) or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
+        errors.append(f"{path}: invalid test-layer report commit")
+    if not isinstance(report.get("working_tree"), str):
+        errors.append(f"{path}: test-layer report working_tree must be a string")
+    if not isinstance(report.get("layers"), dict):
+        errors.append(f"{path}: test-layer report layers must be an object")
+    status = report.get("status")
+    if not isinstance(status, str) or status not in {"running", "passed", "failed"}:
+        errors.append(f"{path}: invalid test-layer report status")
+    tracked_digest = report.get("tracked_diff_sha256")
+    if not isinstance(tracked_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", tracked_digest):
+        errors.append(f"{path}: invalid test-layer report tracked diff digest")
+    if "untracked_inputs" in report or "untracked_inputs_sha256" in report:
+        untracked_paths = report.get("untracked_inputs")
+        untracked_digest = report.get("untracked_inputs_sha256")
+        if not isinstance(untracked_paths, list) or not all(isinstance(item, str) for item in untracked_paths):
+            errors.append(f"{path}: test-layer report untracked_inputs must be a path list")
+        if untracked_digest is not None and (
+            not isinstance(untracked_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", untracked_digest)
+        ):
+            errors.append(f"{path}: invalid test-layer report untracked inputs digest")
+        if isinstance(untracked_paths, list) and untracked_paths and untracked_digest is None:
+            errors.append(f"{path}: test-layer report paths require an untracked inputs digest")
+    return errors, []
+
+
 def validate_manifest(path, strict=False):
     errors = []
     warnings = []
@@ -44,6 +80,8 @@ def validate_manifest(path, strict=False):
         return [f"{path}: {error}"], warnings
     if manifest.get("schema_version") != 1:
         return errors, warnings
+    if is_test_layer_report(manifest):
+        return validate_test_layer_report(path, manifest)
     if not isinstance(manifest.get("source_commit", manifest.get("base_commit")), str):
         if strict:
             errors.append(f"{path}: source_commit or base_commit is required")
