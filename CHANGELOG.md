@@ -21,6 +21,8 @@
 
 ### Changed
 
+- PostgreSQL CSV imports preserve BC-era `timestamptz` values exported with a year-zero timestamp.
+- If database editor sessions cannot close, the window offers the close-anyway choice after up to five seconds instead of waiting up to twenty.
 - Large sidebar catalogs filter faster, and saved collapse state cannot hide objects under a schema heading that is no longer present.
 - SQL completion checks table names faster in large catalogs.
 
@@ -53,6 +55,7 @@
 - Inspecting a row with oversized cell previews avoids copying the full row contents.
 - Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
 - Saving workspaces with large SQL drafts uses less temporary memory.
+- Oversized saved SQL drafts are kept on disk and shown as a read-only notice instead of being laid out or executed.
 
 ### Security
 
@@ -60,12 +63,14 @@
 
 ### Fixed
 
+- Workspace saves no longer rewrite other connections' editor drafts, preserving external edits and avoiding needless file I/O.
+- PostgreSQL CSV imports preserve the session time zone when a `timestamptz` value has no explicit offset.
+- Expanding a table in the sidebar now displays its field and type previews instead of remaining on “Loading fields…”.
 - SQL editor results keep every streamed page within the estimated memory budget, so users can navigate back through completed PostgreSQL results that fit the budget.
 - The tab overview no longer shows a duplicate window-close button beside its tab cards.
 
 - A confirmed session rollback clears obsolete query gutter marks, including when a commit request ends in rollback.
 - SQL files with lines over 256 KiB are refused before opening to prevent excessive text-layout memory use; the original file remains unchanged.
-- A confirmed session rollback clears obsolete query gutter marks, including when a commit request ends in rollback.
 - Streamed result summaries use singular row and page labels when each count is one.
 
 - SQL completion avoids catalog reads for incomplete table names and coalesces rapid editor changes.
@@ -88,6 +93,7 @@
 - The Rows per page choice in a table tab works after the first page failed to load.
 - The "Couldn't load rows" page in a table tab has a Retry button.
 - The multi-row selection badge no longer suggests pressing Delete on read-only connections or tables without a primary key.
+- PostgreSQL dump and restore retries briefly when its client executable is temporarily busy starting.
 - Screen readers name the page navigation and export buttons of a table tab and read the Rows label with the page-size choice.
 - When a connection had more than 32 open tabs, the table tabs left out on the next start are now reported in a notice instead of disappearing silently. Query editor tabs are always kept.
 - Query cursor cleanup warnings use diagnostic codes without including database error payloads.
@@ -403,7 +409,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Deleting or pinning several history entries in quick succession no longer brings a deleted entry back into the list
 - Refreshing the table list and the editor's column suggestions now cancel the previous request at the database instead of letting it run on after a newer one or a connection change
 - Editing a number so that only its stored form changes (`1.5` to `1.50`, `0` to `-0`) is now saved instead of being dropped as no change
-- Copy Value preserves full previewed, pending and draft cell values; editing literal `<NULL>` text no longer turns it into an empty value.
+- Copy Value preserves full text and JSON values, including previewed, pending and draft values; binary cells currently copy a byte-count label only ([#1587](https://github.com/cozyGarage/BookiE/issues/1587)). Editing literal `<NULL>` text no longer turns it into an empty value.
 - MongoDB connections now reject malformed or URI-shaped host input before constructing the connection URI.
 - Closing a table tab, paging, or disconnecting now stops the slow read it started on the server instead of letting it run to the timeout.
 - PostgreSQL optimistic grid edits cast both new and previously read custom enum, enum-array, and domain values to qualified native types, so stale-row comparisons work across those columns.

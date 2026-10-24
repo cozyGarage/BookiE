@@ -4,7 +4,9 @@ import fcntl
 import os
 from pathlib import Path
 import shutil
+import signal
 import stat
+import subprocess
 import sys
 import time
 
@@ -71,10 +73,27 @@ def prune_job(job, cutoff):
             print(f'removed generated {profile} artifacts', flush=True)
 
 
-def prune(root, cutoff, reserve=None):
+def prune(root, cutoff, reserve=None, least_recent_first=False):
     directory = open_directory(root)
     try:
-        for name in sorted(os.listdir(directory)):
+        names = os.listdir(directory)
+        if least_recent_first:
+            marked = []
+            for name in names:
+                entry = metadata(name, directory)
+                if entry is None or not stat.S_ISDIR(entry.st_mode):
+                    continue
+                job = open_directory(name, directory)
+                try:
+                    marker = metadata('.bookie-last-used', job)
+                    if marker is not None and stat.S_ISREG(marker.st_mode):
+                        marked.append((marker.st_mtime, name))
+                finally:
+                    os.close(job)
+            names = [name for _, name in sorted(marked)]
+        else:
+            names.sort()
+        for name in names:
             if reserve is not None and shutil.disk_usage(root).free >= reserve:
                 return
             entry = metadata(name, directory)
@@ -96,12 +115,36 @@ def cleanup(root, reserve):
     prune(root, now - 5 * 86400)
     if shutil.disk_usage(root).free < reserve:
         prune(root, now - 86400, reserve)
+    if shutil.disk_usage(root).free < reserve:
+        prune(root, float('inf'), reserve, least_recent_first=True)
     after = shutil.disk_usage(root).free
     print(f'free after cleanup: {after} bytes; required reserve: {reserve} bytes', flush=True)
     if after < reserve:
         print('cache cleanup could not recover the required reserve', file=sys.stderr)
         return 1
     return 0
+
+
+def run_script(script):
+    child = subprocess.Popen(
+        ['/bin/bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', script],
+        start_new_session=True,
+    )
+
+    def forward_signal(signum, _frame):
+        try:
+            os.killpg(child.pid, signum)
+        except ProcessLookupError:
+            pass
+
+    signals = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+    handlers = {signum: signal.signal(signum, forward_signal) for signum in signals}
+    try:
+        returncode = child.wait()
+    finally:
+        for signum, handler in handlers.items():
+            signal.signal(signum, handler)
+    return 128 - returncode if returncode < 0 else returncode
 
 
 def main():
@@ -111,6 +154,9 @@ def main():
     commands = parser.add_subparsers(dest='command', required=True)
     run = commands.add_parser('run')
     run.add_argument('script')
+    checkout = commands.add_parser('checkout')
+    checkout.add_argument('script')
+    checkout.add_argument('--min-free-gib', type=int, default=45)
     maintenance = commands.add_parser('cleanup')
     maintenance.add_argument('--min-free-gib', type=int, default=45)
     args = parser.parse_args()
@@ -122,10 +168,23 @@ def main():
         if args.command == 'run':
             fcntl.flock(lock, fcntl.LOCK_SH)
             mark_used(root)
-            os.set_inheritable(lock, True)
-            os.execv('/bin/bash', ['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', args.script])
+            return run_script(args.script)
         if args.min_free_gib < 0:
             raise ValueError('minimum free space cannot be negative')
+        if args.command == 'checkout':
+            reserve = args.min_free_gib * 1024**3
+            fcntl.flock(lock, fcntl.LOCK_SH)
+            if shutil.disk_usage(root).free >= reserve:
+                mark_used(root)
+                return run_script(args.script)
+            fcntl.flock(lock, fcntl.LOCK_UN)
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            status = cleanup(root, reserve)
+            if status:
+                return status
+            fcntl.flock(lock, fcntl.LOCK_SH)
+            mark_used(root)
+            return run_script(args.script)
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:

@@ -15,7 +15,7 @@ MySQL lock-release and session-variable rollback contracts are merged
 (#522, #525, #526). There is no reason to merge these old branches again.
 
 The remaining B4 work falls into correctness fixes, candidate acceptance and
-later features. The new [0.2.0 scope](../0.2.0-scope.md) narrows delivery to an
+later features. The new [0.2.0 scope](../bookie-0.2-sprint.md#delivery-boundary) narrows delivery to an
 Arch/Hyprland development release. It does not require completing every old B4
 checkbox or every engine configuration before the release.
 
@@ -152,7 +152,9 @@ Unmodified source passed 219 policy unit tests, 6 AUD-11 integration tests and
 4 guard-transparency tests. The three added review reproductions failed as
 recorded above. Their patch and logs are saved in
 [archived review evidence](evidence/b4-release-review-2026-10-11/manifest.json);
-the failing test edits were removed from product test files after reproduction.
+the [preservation note](evidence/b4-release-review-2026-10-11/preserved-worktree-evidence.md)
+maps the retained records to the retired worktrees. The failing test edits were
+removed from product test files after reproduction.
 No full preflight, Docker driver, Forgejo, installed GTK or native Wayland run
 was performed by this review. Existing green tests do not establish the missing
 behaviour demonstrated by the failing reproductions.

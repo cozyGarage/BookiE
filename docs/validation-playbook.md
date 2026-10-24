@@ -60,7 +60,7 @@ Changes under `crates/core/src/`, `crates/core/tests/`, `apps/linux/app/src/`, `
 
 Choose the layers affected by the change; the examples are separate invocations, not a requirement to repeat overlapping unit suites. The runner executes selected layers sequentially. Independent steps and later layers still run after a failure; the overall result remains failed. Nothing retries automatically. Layers can compose existing tiers; each test keeps its original tier ownership.
 
-Each invocation writes `target/quality/<UTC timestamp>-layers/report.json` and one log per step. It records the commit, dirty status, tracked-diff digest, exact arguments, elapsed time, exit code and status. A dirty-tree report is development evidence, not reproducible release-candidate evidence: commit the tested changes before handing them off. The runner does not archive untracked file contents. Inspect a live log with `tail -f` in another terminal; do not pipe the test command through a command that discards its exit status.
+Each invocation writes `target/quality/<UTC timestamp>-layers/report.json` and one log per step. It records the commit, dirty status, tracked-diff digest, untracked input paths and their content digest, exact arguments, elapsed time, exit code and status. The untracked digest uses sorted repository-relative Git paths and file bytes; regular files also contribute executable status, and symlinks contribute their link target. Git-ignored build outputs are excluded, and a clean tree skips this scan. A dirty-tree report is development evidence, not reproducible release-candidate evidence: commit the tested changes before handing them off. The runner does not archive untracked file contents. Inspect a live log with `tail -f` in another terminal; do not pipe the test command through a command that discards its exit status.
 
 For the standalone security and workflow layers, match the hosted tool versions:
 
@@ -72,7 +72,7 @@ go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
 Put Go's bin directory on PATH and install ShellCheck for `workflow-lint`. Advisory databases remain live even with pinned tools; a later advisory failure is new evidence, not a reason to freeze or suppress the database.
 
-Missing tools, nonzero exits, timeouts, cancellations and absent required test summaries cannot produce a pass. Cargo layers require at least one executed test and no failed summaries. Environment-specific ignored tests still belong to their dedicated fixture layers. Value and isolated-test runners enforce stricter per-test execution contracts. Process exit alone is used for non-test tools and scripts that enforce their own evidence contract; it is not a coverage claim. SIGKILL, power loss or a runner crash can leave `status: running`; treat that as incomplete, never passed. Review every step status, not just the final log line.
+Missing tools, nonzero exits, timeouts, cancellations and absent required test summaries cannot produce a pass. Cargo layers require at least one executed test and no failed summaries. The Python harness requires one nonempty unittest summary and one plain `OK` outcome. Failed, skipped or additional suite summaries cannot be hidden by another success line, even when the command exits zero. Environment-specific ignored tests still belong to their dedicated fixture layers. Value and isolated-test runners enforce stricter per-test execution contracts. Process exit alone is used for non-test tools and scripts that enforce their own evidence contract; it is not a coverage claim. SIGKILL, power loss or a runner crash can leave `status: running`; treat that as incomplete, never passed. Review every step status, not just the final log line.
 
 ## Layers and boundaries
 
@@ -107,8 +107,8 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Scope | Entry point | Completion evidence |
 | --- | --- | --- |
 | Optional DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus app feature build |
-| Mutation | GitHub Linux test quality; Forgejo nightly; [local instructions](testing.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON; Forgejo also checks missed mutants against package baselines |
-| Coverage | Linux test quality; [local instructions](testing.md#coverage) | LCOV, exclusions and summary; this report has no threshold. Forgejo nightly separately enforces the unit-tier and per-crate floors. |
+| Mutation | GitHub Linux test quality; Forgejo nightly; [local instructions](testing-quality-and-performance.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON; Forgejo also checks missed mutants against package baselines |
+| Coverage | Linux test quality; [local instructions](testing-quality-and-performance.md#coverage) | LCOV, exclusions and summary; this report has no threshold. Forgejo nightly separately enforces the unit-tier and per-crate floors. |
 | Flatpak | Flatpak Linux (packaging only) | Pull requests build the default profile; push and `workflow_dispatch` also build development; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
 | GTK soak | GTK Safety Soak | Five independent retry-free attempts per run at one resolved SHA. The 30-attempt/six-run threshold is in the [archived 0.2.0 handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md), not a default for future releases; current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
@@ -116,7 +116,7 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 
 ## Hosted checks
 
-Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier. Accepted aggregate trains follow [ADR 0020](decisions/0020-aggregate-forgejo-trains.md) and the [train procedure](testing.md#aggregate-train-acceptance): one gate on the exact aggregate PR head replaces constituent Forgejo gates only after manifest, freshness and merge-tree verification. A standalone `forgejo-train.sh` preflight is not aggregate acceptance. The current workflow files and [AGENTS.md](../AGENTS.md) define which checks run for each change and where acceptance happens. Forgejo's `ci.yml` merge tier and `nightly.yml` share the `bookie-lab` workflow concurrency group with cancellation disabled. This queues scheduled and manual runs across refs on a best-effort basis; it does not promise strict ordering, and workflow runs already created from older revisions are not retroactively serialized. The gate script's local lock remains an additional guard for manual callers.
+Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier. Accepted aggregate trains follow [ADR 0020](decisions/0020-aggregate-forgejo-trains.md) and the [train procedure](testing-ci.md#aggregate-train-acceptance): one gate on the exact aggregate PR head replaces constituent Forgejo gates only after manifest, freshness and merge-tree verification. A standalone `forgejo-train.sh` preflight is not aggregate acceptance. The current workflow files and [AGENTS.md](../AGENTS.md) define which checks run for each change and where acceptance happens. Forgejo's `ci.yml` merge tier and `nightly.yml` share the `bookie-lab` workflow concurrency group with cancellation disabled. This queues scheduled and manual runs across refs on a best-effort basis; it does not promise strict ordering, and workflow runs already created from older revisions are not retroactively serialized. The gate script's local lock remains an additional guard for manual callers.
 
 The gate reports both the browser run number and the API run ID. They can differ. The train verifier's `--run` argument takes the API ID; task reporting uses the browser run number and the tested revision. Do not substitute one identifier for the other.
 
@@ -202,3 +202,13 @@ Disposition: confirmed framework-specific false positives from the web CSS analy
 ## CI tiers
 
 CI is split into fast feedback and slower integration or acceptance checks. Read the workflow definitions and [AGENTS.md](../AGENTS.md) for current triggers, required gates and ownership. A pull request is ready only when its required checks pass at the current head SHA. Skipped, cancelled, timed-out or unavailable checks are not passes. Scheduled runs and local results can add evidence, but do not replace a required check on the reviewed commit.
+
+### Pull request hygiene checks
+
+These small GitHub checks run on every pull request to `linux` and need no database or GTK. They make the squash commit and the workflows safe to merge; the Forgejo gate remains the acceptance record.
+
+| Check | What it enforces |
+|---|---|
+| `PR title` ([workflow](../.github/workflows/pr-title.yml), `scripts/check-pr-title.py`) | The title is a Conventional Commits subject, because it becomes the squash commit subject. Only a `chore(release)` pull request may edit the frozen `CHANGELOG.md`. |
+| `release-note` ([workflow](../.github/workflows/release-note-check.yml)) | The body has valid `Release-Note:` lines or `none` ([ADR 0022](decisions/0022-release-notes-from-merge-commits.md)). |
+| `workflow-lint` and `workflow-security` ([workflow](../.github/workflows/linux-ci-contracts.yml)) | `actionlint` and `zizmor` (offline, pinned, medium severity and confidence) over the GitHub workflows. Every checkout sets `persist-credentials: false`; a workflow value goes through `env`, not into a script. |

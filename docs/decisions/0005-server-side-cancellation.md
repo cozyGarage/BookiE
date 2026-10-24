@@ -55,10 +55,14 @@ Gained:
 
 ## Alternatives considered
 
-**Server-side statement timeouts only** (`statement_timeout`, `MAX_EXECUTION_TIME`). Rejected as the primary mechanism: it covers the deadline but not a user pressing Stop, and it is set per session rather than per statement. Worth adding later as a second layer.
+**Server-side statement timeouts only** (PostgreSQL `statement_timeout`; MySQL `max_execution_time` or its `MAX_EXECUTION_TIME(N)` hint for supported `SELECT`s). Rejected as the primary mechanism: deadline controls do not handle a user pressing Stop, and MySQL's hint does not cover every statement type. They may still be useful as a second layer ([MySQL optimizer hints](https://dev.mysql.com/doc/refman/8.4/en/optimizer-hints.html), [MySQL system variables](https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html)).
 
 **Treating a dispatched cancellation as confirmation.** Rejected. It would clear the poison flag while a write might still be running, which is the failure mode the audit rules exist to prevent.
 
 **Leaving non-PostgreSQL drivers on the dropped-future default and hiding Stop.** Rejected for PostgreSQL, MySQL, ClickHouse and SQLite, where a real mechanism exists. Retained for SQL Server, Redis, MongoDB, and DuckDB, which declare the capability as false.
 
 **`KILL <spid>` for SQL Server.** Deferred, not rejected. It ends the session and rolls back transactions still associated with it, which can take time ([Microsoft documentation](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/kill-transact-sql)). It cannot prove an autocommit write had not committed before the kill took effect. The session's disappearance from `sys.dm_exec_sessions` would confirm the session ended, but Stop would cost the user their connection and a write outcome could remain unknown. Both need deciding before it ships.
+
+**Switching the PostgreSQL client library to fix cancellation.** Not done. Upstream's switch made editor results text-only (simple-query metadata has no native types), inferred transaction status through `SAVEPOINT` probes and changed cursor planning. A migration must explicitly preserve typed result metadata, codecs, TLS service identity, session semantics, cursor behavior and `PolicyGuard` ([upstream movement review](../archive/upstream-linux-movement-2026-10-18.md), section 6.1).
+
+**Returning a connection to the pool before its stop settles.** Rejected. A connection-scoped stop can arrive late and hit the next request. Cancellation tests cover the race matrix and assert server and reuse behaviour, not only the returned error: caller drop, deadline during cancel dispatch, a delayed stop after the work completed, stop transport failure, pool reuse and shutdown (same review, section 6.2).
