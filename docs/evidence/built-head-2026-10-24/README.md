@@ -54,6 +54,10 @@ After navigating to the first page, a 31-second idle sample recorded 275,509,248
 - [Page 1 screenshot](native-bookie-branch-100k-page1.png)
 - [31-second process sample](native-bookie-branch-100k-retained-page1-31s.json)
 
+A repeat run of the same query was sampled every 250 ms for 31 seconds with the prior 100,000-row result already resident. RSS and PSS were 275,419,136 and 248,402,944 bytes at both the first and final samples; process CPU increased by 0.03 seconds and block I/O did not change. This warm repeat confirms that the second run did not raise this process's memory high-water mark. It does not measure the memory cost of the first query run.
+
+- [Warm repeat query samples](native-bookie-branch-100k-repeat-query-31s.json)
+
 ## Current linux-head MySQL browse capture
 
 The same extracted binary opened the saved Manual Lab MySQL connection and loaded the `people` table (2 rows). During a 31.238-second idle sample, RSS stayed at 124.2 MiB, PSS varied by 6 KiB, Private Dirty stayed at 36.0 MiB, CPU advanced by 0.02 seconds, and process block-read/write counters did not change. This is a small-table browse sample, not a cross-engine benchmark; the app binary was extracted from the Arch package and was not installed.
