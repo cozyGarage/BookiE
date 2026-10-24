@@ -168,6 +168,8 @@ On the same SQLite connection, I opened the editor's Session mode, ran the exist
 - [SELECT 1 succeeds after Session is toggled off](native-pr1568-session-close-query-success.png)
 - [31-second process sample while the closing status remained visible](native-pr1568-session-close-status-31s.json)
 
+After closing the extracted candidate, the existing profile directories measured 158,980 bytes in config, 886,809 bytes in share and 4,732 bytes in cache. The SQLite fixture remained 8,192 bytes. The extracted candidate package tree occupied 76,183,256 bytes. These are cumulative profile and package-tree sizes, not storage attributable to the session test. At capture time pacman still reported the installed package as 0.2.0-1; installed-package verification is pending authentication for the PR package.
+
 ## GTK safety rerun
 
 The full Xvfb/AT-SPI GTK safety suite ran against the same extracted candidate with `TABLEPRO_TEST_MCP_HTTP_PORT=19433` to avoid colliding with the native app's MCP listener. All 111 scenarios passed; the script exited 0. The log ends with four D-Bus disconnect messages during fixture teardown, after the final passing scenario. This is automated GTK evidence and does not replace the native Wayland checks above.
