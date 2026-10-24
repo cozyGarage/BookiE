@@ -124,3 +124,11 @@ After that wide query, the process held 384,832 KiB RSS, 373,697 KiB PSS and 316
 On the same live desktop, clicking Split opened a second editor pane; clicking it again returned to one pane. The [split](native-pr1568-split-on.png) and [unsplit](native-pr1568-split-unsplit.png) states were captured. The sidebar toggle opened and closed the panel. At full-window width, dragging its divider widened it from about 260 px to about 400 px; hiding and showing the sidebar preserved the resized width ([capture](native-pr1568-sidebar-resized.png)). In the side-by-side layout, the pane stayed near 260 px when dragged wider, consistent with the editor's 600 px minimum-width constraint at that window size.
 
 The isolated Xvfb GTK safety scenario `bundle_export_records_sanitized_audit_outcome` did not complete. The private D-Bus session activated the GNOME/GTK portal backends, but `xdg-desktop-portal` reported no `org.freedesktop.impl.portal.FileChooser` interface. The test could not find the app's “Export connections” dialog. This is an incomplete UI gate caused by the headless portal setup; it does not establish an application failure or a native Wayland export result.
+
+## Fresh-process idle profile
+
+I relaunched the extracted PR candidate on the native Wayland desktop with no query run. The startup log reached “main window activated” 59 ms after process start and “workspace ready” 174 ms after process start. These are internal log markers, not a measured first-frame time. GTK emitted a critical that `/run/user/1000/at-spi/bus_0` was missing, but the window and PostgreSQL workspace still loaded.
+
+At 15 seconds, RSS was 113,916 KiB, PSS 102,359 KiB and private dirty 45,677 KiB. At 69 seconds, RSS remained 113,916 KiB, PSS was 102,396 KiB and private dirty 45,645 KiB. During the following 30-second idle sample, CPU ticks did not increase; RSS and private dirty stayed at 113,916 and 45,636 KiB. Block-read and block-write counters stayed at 770,048 and 2,043,904 bytes.
+
+The whole profile directories measured 90,373 bytes in config, 747,606 bytes in share and 4,732 bytes in cache, unchanged during the idle sample. These are saved-profile totals, not data attributable to one launch. The run used the extracted candidate; the pacman-installed application is still 0.2.0-1.
