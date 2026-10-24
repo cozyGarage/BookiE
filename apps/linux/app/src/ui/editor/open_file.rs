@@ -28,9 +28,9 @@ pub(super) fn validate_buffer_insert(
     if current_bytes.saturating_add(text.len()) > MAX_SQL_FILE_BYTES as usize {
         return Err(crate::tr!("The SQL text exceeds the editor's 8 MiB limit."));
     }
-    let mut line_start = location.clone();
+    let mut line_start = *location;
     line_start.set_line_offset(0);
-    let mut line_end = location.clone();
+    let mut line_end = *location;
     line_end.forward_to_line_end();
     let prefix_len = buffer.text(&line_start, location, true).len();
     let suffix_len = buffer.text(location, &line_end, true).len();
