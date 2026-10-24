@@ -158,6 +158,16 @@ At the same time, the existing user profile directories measured 126,020 bytes i
 
 - [31-second idle process samples](native-pr1568-sqlite-table-idle-31s.json)
 
+## SQLite query-session toggle
+
+On the same SQLite connection, I opened the editor's Session mode, ran the existing read-only `SELECT 1;` successfully, and toggled Session off. The toolbar then showed `Closing session…` while Run was enabled. A 31-second sample taken in that display state recorded RSS at 270,784 KiB, swap at 150,424 KiB, a two-tick CPU increase (about 0.02 seconds), and no process block reads or writes. The BookiE process remained sleeping. Running `SELECT 1;` again succeeded and replaced the stale status with `done in 0 ms`; this confirms the session close had completed and the lingering text was presentation state, not a blocked session close. No database rows were changed. The 0 ms display is below useful timing resolution and is not a performance result.
+
+- While Session mode was open and idle, a separate 31.006-second sample held RSS at 277,282,816 bytes, PSS at 254,826,496 bytes, private dirty memory at 191,217,664 bytes and swap at 154,034,176 bytes. CPU increased by 0.01 seconds; process block reads and writes did not change. These are cumulative warm-process figures after earlier UI and result tests, not the isolated cost of a SQLite session.
+- [31-second process samples while Session mode was open](native-pr1568-sqlite-session-idle-31s.json)
+- [Toolbar showing stale closing status with Run enabled](native-pr1568-session-closing-status.png)
+- [SELECT 1 succeeds after Session is toggled off](native-pr1568-session-close-query-success.png)
+- [31-second process sample while the closing status remained visible](native-pr1568-session-close-status-31s.json)
+
 ## GTK safety rerun
 
 The full Xvfb/AT-SPI GTK safety suite ran against the same extracted candidate with `TABLEPRO_TEST_MCP_HTTP_PORT=19433` to avoid colliding with the native app's MCP listener. All 111 scenarios passed; the script exited 0. The log ends with four D-Bus disconnect messages during fixture teardown, after the final passing scenario. This is automated GTK evidence and does not replace the native Wayland checks above.
