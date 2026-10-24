@@ -197,3 +197,11 @@ The full Xvfb/AT-SPI GTK safety suite ran against the same extracted candidate w
 ## Provenance note for the installed PR #1568 capture
 
 The installed-package sample records package version `0.2.0-1` but not a source commit. Its archive digest matches the extracted package recorded above, and the installed executable and package member match that package's recorded binary digest. The package record attributes the binary to PR commit `748c75c0f904e6c53f41236b1a3d36668bd079b5`, which appears in the PR history. The `stream_pages.rs` implementation and its performance tests are byte-identical between that commit and merged commit `3e9f22a70`. The archive digest differs from the published `linux-v0.2.0` Arch asset. This pins the installed capture to the earlier PR package and cache implementation, but does not qualify the final merged UI build or the published release.
+
+## Installed package GTK rerun
+
+The installed `bookie 0.2.0-1` package was retested after PR #1568 merged. The installed executable SHA-256 was `b406fd8055670abc230cfead154eb27ff39dbff7f46ca8a4b0f67a6c6c50b971`; the package archive SHA-256 was `c23e787348daeeabeecc750735f0d7759c4567a663c391597ddee8cdf90fc2bd`. The run used `/usr/bin/bookie`, an isolated D-Bus session and Xvfb, and port 19434 for the MCP listener. All 111 GTK safety scenarios passed and the script exited 0.
+
+The default test wrapper sets `XDG_CURRENT_DESKTOP=GNOME`. On this host, the GNOME portal exposed no FileChooser interface under Xvfb, so an initial run passed 95 scenarios and could not reach file-picker dialogs in 16. A focused CSV-export scenario passed after setting `XDG_CURRENT_DESKTOP=Hyprland`; the full installed-package rerun used the same setting and passed all scenarios. This isolates the earlier failures to the portal selection in the headless test environment. The log contains D-Bus disconnect messages during teardown. Its private runtime directory was removed after the run.
+
+- [Installed-package GTK safety run log](gtk-safety-installed-hyprland-xvfb-20261024.txt)
