@@ -675,6 +675,12 @@
       "redaction": "Normalized the local home-directory path in the 2026-10-14 evidence cleanup; other line content and test outcomes are unchanged."
     },
     {
+      "path": "docs/evidence/built-head-2026-10-24/gtk-safety-installed-hyprland-xvfb-20261024.txt",
+      "original_sha256": "2d55cea333dd85789c5b551090e7fb5748246ffc14f4d5732c25f41d0b60cc92",
+      "redacted_sha256": "d96ae1e7e9a4176c5bc6c8c565a03b4fd3a09a6248a0e269057cf1cd8215e617",
+      "redaction": "Replaced the local home-directory prefix with $HOME; test outcomes and other bytes are unchanged."
+    },
+    {
       "path": "docs/evidence/built-head-2026-10-24/gtk-safety-xvfb-20261024.txt",
       "original_sha256": "a81303b0b7845f26dfa3280cee478a76ae8cb3e6c31b8a29882e8992b98dcc76",
       "redacted_sha256": "eacb10281d7fd6db1a31011b7b9561041045429c4080a61b813aa2f9b39ccae7",
