@@ -138,3 +138,18 @@ I relaunched the extracted PR candidate on the native Wayland desktop with no qu
 At 15 seconds, RSS was 113,916 KiB, PSS 102,359 KiB and private dirty 45,677 KiB. At 69 seconds, RSS remained 113,916 KiB, PSS was 102,396 KiB and private dirty 45,645 KiB. During the following 30-second idle sample, CPU ticks did not increase; RSS and private dirty stayed at 113,916 and 45,636 KiB. Block-read and block-write counters stayed at 770,048 and 2,043,904 bytes.
 
 The whole profile directories measured 90,373 bytes in config, 747,606 bytes in share and 4,732 bytes in cache, unchanged during the idle sample. These are saved-profile totals, not data attributable to one launch. The run used the extracted candidate; the pacman-installed application is still 0.2.0-1.
+
+## Native SQLite values and query-editor smoke check
+
+On the native Omarchy Wayland desktop, the extracted PR #1568 binary opened the temporary SQLite file `/tmp/bookie-native-ui-20261024.sqlite` (8,192 bytes) and displayed its `people` table. The visible sample distinguishes a Boolean, exact decimal values, NULL and empty text. No rows were edited. A query tab opened with Ctrl+E; running `SELECT 1;` displayed one result row (`1`), `Errors (0)`, and a UI elapsed time of 0 ms. The elapsed display is below useful timing resolution and is not a performance benchmark.
+
+- [SQLite mixed-value table](native-pr1568-sqlite-people.png)
+- [Query editor and SELECT 1 result](native-pr1568-sqlite-select1.png)
+
+The desktop captures include a notification reporting a `ydotool` helper crash. The BookiE process remained live throughout these checks; the notification is not an application crash report.
+
+With the SQLite table open and no input, a 31.005-second process sample recorded RSS at 310,489,088 bytes (296.1 MiB), PSS at 279,380,992 bytes (266.4 MiB), and private dirty memory at 224,063,488 bytes (213.7 MiB). The values stayed constant at the reported precision; CPU increased by 0.01 seconds and process block reads and writes did not change. `/proc` reported 125,095,936 bytes (119.3 MiB) of BookiE pages in swap. The host had 7.8 GiB available RAM, 4.9 GiB used in zram, and zero average memory-pressure stalls at capture time. This does not identify when or why BookiE pages entered swap. The process had been running during prior multi-engine and 100,000-row tests, so this is a cumulative warm-process state, not a fresh SQLite baseline.
+
+At the same time, the existing user profile directories measured 126,020 bytes in config, 884,110 bytes in share, and 4,732 bytes in cache. The extracted candidate package tree occupied 76,183,256 bytes; this is not the installed package size. Pacman still reported `bookie 0.2.0-1`, so the candidate remains extracted and running rather than installed. The sample records persistent profile totals after this UI test, not bytes attributable to SQLite or `SELECT 1;`.
+
+- [31-second idle process samples](native-pr1568-sqlite-table-idle-31s.json)
