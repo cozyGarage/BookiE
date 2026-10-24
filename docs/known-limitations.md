@@ -28,10 +28,10 @@ Documented application limits, behavior differences and known defects. Entries l
   remain outside this cache estimate. A synthetic profile with four pinned results and one active stream
   reached 1,325 MiB RSS; see the [profile evidence](evidence/stream-retention-synthetic-2026-10-16/README.md).
   An earlier local 100,000-row PostgreSQL profile retained only the latest
-  20,000 rows and showed a 24.8 MiB peak RSS increase over a 30-second sample;
-  the [capture](evidence/built-head-2026-10-24/README.md) records its limitations
-  and a follow-up with all pages retained. This does not measure normal queries
-  or the complete process ceiling. Other
+  20,000 rows. After the retention fix, a fresh-process native profile kept all
+  100,000 rows navigable and showed a 25.3 MiB peak RSS increase over a 31-second
+  sample; see the [capture](evidence/built-head-2026-10-24/README.md). This is one
+  narrow query, not a general workload or a process-memory ceiling. Other
   engines and unsupported statement shapes remain materialized.
   The historical grid measurement was about 2.5 times the result memory; #518
   now shares immutable values with materialized rows. Further comparable

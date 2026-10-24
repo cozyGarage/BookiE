@@ -47,16 +47,12 @@ A 31.015-second sample began after the query had completed, with the grid on the
 
 ## BookiE branch verification after byte-budget retention change
 
-The release-mode BookiE binary built from the `ux/stream-result-full-navigation` worktree ran the same query against the local PostgreSQL 17.11 lab. The UI reported completion in 146 ms and received 100,000 rows in 20 pages. I navigated backward from the newest page to rows 1–5,000; the grid displayed values starting at 1. This confirms that the former four-page cutoff no longer hides pages when the estimated row storage fits within the cache budget.
+The release-mode BookiE binary built from the `ux/stream-result-full-navigation` worktree ran the query against the local PostgreSQL 17.11 lab after a fresh app launch and connection. The UI reported completion in 161 ms and received 100,000 rows in 20 pages. I navigated backward from the newest page to rows 1–5,000; the grid displayed values starting at 1. This confirms that the former four-page cutoff no longer hides pages when the estimated row storage fits within the cache budget.
 
-After navigating to the first page, a 31-second idle sample recorded 275,509,248 bytes RSS before and after, with 0.01 seconds of process CPU time and no change in block-read or block-write counters. The process high-water RSS was also 275,509,248 bytes. This is a warm process measurement after the query and UI render, not query-only memory cost, and does not show that results larger than the 64 MiB estimated row budget remain fully navigable. The process sample records `/proc` counters; socket traffic is not included in block I/O.
+The process was sampled every 250 ms for 31.254 seconds, starting immediately before Run. RSS rose from 119,087,104 bytes (113.6 MiB) to a 145,596,416-byte peak (138.9 MiB), a 25.3 MiB increase. PSS rose from 91.2 MiB to a 116.5 MiB peak; private dirty memory rose from 28.1 MiB to 50.0 MiB. The peak occurred about 7.6 seconds into the sample, after the UI reported completion. Process CPU increased by 0.25 seconds; block reads increased by 16 KiB and writes by 124 KiB. The block-I/O counters do not include PostgreSQL socket traffic. This is one narrow synthetic query on one local machine, not a general benchmark or process-memory ceiling. It does not qualify results that exceed the 64 MiB estimated row-storage budget.
 
 - [Page 1 screenshot](native-bookie-branch-100k-page1.png)
-- [31-second process sample](native-bookie-branch-100k-retained-page1-31s.json)
-
-A repeat run of the same query was sampled every 250 ms for 31 seconds with the prior 100,000-row result already resident. RSS and PSS were 275,419,136 and 248,402,944 bytes at both the first and final samples; process CPU increased by 0.03 seconds and block I/O did not change. This warm repeat confirms that the second run did not raise this process's memory high-water mark. It does not measure the memory cost of the first query run.
-
-- [Warm repeat query samples](native-bookie-branch-100k-repeat-query-31s.json)
+- [31-second baseline-to-peak process sample](native-bookie-branch-100k-first-run-31s.json)
 
 ## Current linux-head MySQL browse capture
 
