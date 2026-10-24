@@ -104,3 +104,13 @@ After the ten-profile UI sweep, `du -sb` reported 125,812 bytes in `~/.config/ta
 ## Product finding
 
 The four-page cache and forward-only cursor are operating as designed under [ADR 0011](../../decisions/0011-paged-query-results.md), but a completed query can report all rows while making the earlier rows unavailable in the grid. This is a usability limitation, not a paging-control defect. Keep the memory bound while evaluating a way to revisit results, such as a scrollable cursor under the same guarded snapshot or a bounded disk-backed page spool. Any design must preserve the existing query policy, audit, cancellation, timeout, value-preservation and cleanup contracts. Broader large-result acceptance remains tracked by [#554](https://github.com/cozyGarage/BookiE/issues/554).
+
+## Native PR #1568 follow-up
+
+On 2026-10-24, the Arch package built from PR #1568 head `748c75c0f904e6c53f41236b1a3d36668bd079b5` was extracted and run on the Omarchy Wayland desktop. The installed package remained the older `0.2.0-1`; installation of the candidate package is still pending local administrator authentication. Package SHA-256: `c23e787348daeeabeecc750735f0d7759c4567a663c391597ddee8cdf90fc2bd`. Extracted `bookie` SHA-256: `b406fd8055670abc230cfead154eb27ff39dbff7f46ca8a4b0f67a6c6c50b971`.
+
+On PostgreSQL 17.11, `SELECT generate_series(1, 100000) AS n;` completed in 160 ms and returned 100,000 rows across 20 pages. The UI navigated from the last page back to rows 1–5,000. This confirms PR #1568 removes the installed build's four-page limit for this result. It does not test results that exceed the 64 MiB estimated in-memory page budget.
+
+The app process was at 107,472 KiB RSS, 96,537 KiB PSS and 39,044 KiB private dirty before Run. After the query, navigating to the first page and then sitting idle for 31.72 seconds, it held 239,190,016 B RSS, 227,978,240 B PSS and 168,579,072 B private dirty. RSS and private dirty were unchanged across that idle sample; PSS varied by 8 KiB. CPU rose by 0.02 seconds. `/proc/<pid>/io` block-read and block-write counters did not change. The RSS increase includes fetched pages and GTK result rendering; this profile does not isolate those costs.
+
+At the end of the run, `du -sb` reported 123,365 bytes in `~/.config/tablepro`, 675,264 bytes in `~/.local/share/tablepro` and 4,732 bytes in `~/.cache/tablepro`. These are whole-directory totals for the existing user profile, not per-query deltas. The screenshot records the first page after backward navigation: [native PR #1568 100,000-row result](native-pr1568-100k-page1.png).
