@@ -1,6 +1,6 @@
-# BookiE features
+# BookiE features on `linux`
 
-This page lists what BookiE 0.2.0 does, grouped by task. Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
+This page describes current behavior on the `linux` branch, including changes made after 0.2.0 was published. It does not certify that every listed feature is present in the [0.2.0 release assets](platforms.md#published-020-release). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
 
 ## Databases
 
@@ -34,15 +34,15 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 ![Browsing a table in the light theme](images/browse-light.png)
 
 - Click a table to open it in a preview tab. Edit or keep the tab to make it permanent.
-- Tables are read in bounded pages. Tables with a primary key use keyset seeks for the previous page and the last page.
+- Tables are read in bounded pages. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
 - Edit a cell with a double-click, F2 or Enter. Edits stay pending, with a dot on the tab, until Ctrl+S. Undo and redo apply to pending edits.
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.
 - NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL.
 - The header shows each column's type. Primary key columns have a key mark, foreign key columns a link mark, and a column comment appears under the name.
 - Filter with the filter bar, and save filters by name per table. Sort by clicking a header.
 - Hide and reorder columns, and reset dragged column widths. The choice is remembered per table.
-- Long values show a preview and their size. View Value, Copy Value and Edit Full Value work on the whole value.
-- The row inspector shows every column of the selected row. Selection statistics show count, sum, average, minimum and maximum.
+- Long cells in query results and keyed browse rows show a preview and byte count. View Value and Copy Value use the full value, including pending edits and drafts; eligible text/JSON cells can be edited in the full-value dialog up to 1 MiB. See [known limitations](known-limitations.md#data-and-values) for keyless-table behavior.
+- The row inspector lists every column and its type. Values omitted from the fetched page show as Not fetched. Selection statistics show count, sum, average, minimum and maximum.
 
 ## Write SQL
 
@@ -87,7 +87,7 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Import CSV, Rename
 
 - Every statement is checked before it runs. Writes on a read-only connection are refused.
 - Depending on the environment and policy, risky statements ask for approval first.
-- Governed operations are written to a local audit journal. Denied, failed, cancelled and timed-out work still gets a recorded outcome.
+- Governed operations record terminal outcomes in a local audit journal. Operations that require audit persistence are refused when it is unavailable; an explicit Local/Dev policy can allow a human write after audit-intent failure, so that write may not be recorded.
 - Values are never silently changed. An unsupported value stays visible as unsupported ([ADR 0007](decisions/0007-type-and-value-preservation.md)).
 
 ## PostgreSQL backup and restore
@@ -102,7 +102,7 @@ BookiE can let an AI assistant use saved connections through the Model Context P
 
 - No account, hosted service or paid tier.
 - No browser interface and no runtime driver plugins.
-- No database snapshots. The design is accepted in [ADR 0015](decisions/0015-database-snapshots.md) and the work is planned after 0.2.0.
+- No database snapshots. [ADR 0015](decisions/0015-database-snapshots.md) records the accepted design; implementation is in the [post-0.2.0 backlog](backlog.md) with no release target.
 - Linux only ([platforms](platforms.md)).
 
 ## Workspace controls

@@ -40,7 +40,7 @@ The same current-head process then ran `SELECT generate_series(1, 100000) AS n;`
 
 This is a product gap for a completed result: the first 80,000 rows are not reachable after the query finishes, even though this narrow result has only 20 pages. The fixed four-page count, rather than a user-visible decision or a confirmed byte-budget exhaustion, is the observed boundary. The issue is tracked in [#1032](https://github.com/cozyGarage/BookiE/issues/1032). The capture demonstrates the regression surface; it does not establish the memory cost of retaining all 20 pages.
 
-A 31.015-second sample began after the query had completed, with the grid on the newest retained page and no input. RSS stayed at 125.1 MiB, PSS varied by 13 KiB, Private Dirty decreased by 12 KiB, process CPU advanced by 0.02 seconds, and block-read/write counters did not change. This measures the retained-result idle state, not query execution or socket traffic. The earlier 30-second sample above covers a separate run that included query and UI work; the samples are not a controlled comparison.
+A 31.015-second sample began after the query had completed, with the grid on the newest retained page and no input. RSS stayed at 125.2 MiB, PSS varied by 13 KiB, Private Dirty decreased by 12 KiB, process CPU advanced by 0.02 seconds, and block-read/write counters did not change. This measures the retained-result idle state, not query execution or socket traffic. The earlier 30-second sample above covers a separate run that included query and UI work; the samples are not a controlled comparison.
 
 - [Current-head oldest-retained-page screenshot](native-current-head-100k-oldest-retained.png)
 - [Current-head completed-result process samples](native-current-head-postgres-100k-31s.json)
@@ -54,7 +54,7 @@ The same extracted binary opened the saved Manual Lab MySQL connection and loade
 
 ## Current linux-head SQL Server idle capture
 
-With the saved Manual Lab SQL Server connection open and its schema metadata loaded, a 31.029-second sample with no BookiE input recorded RSS at 132.8 MiB, PSS at about 106.1 MiB, CPU +0.02 seconds, and no process block I/O. This is a connected idle state with no query result displayed. The extracted package binary was used, not the installed package.
+Memory values in this section are sample-start readings rounded to one decimal MiB; CPU is the interval delta. With the saved Manual Lab SQL Server connection open and its schema metadata loaded, a 31.029-second sample with no BookiE input recorded RSS at 132.9 MiB, PSS at 106.2 MiB, CPU +0.02 seconds, and no process block I/O. This is a connected idle state with no query result displayed. The extracted package binary was used, not the installed package.
 
 - [SQL Server idle process samples](native-current-head-mssql-idle-31s.json)
 
@@ -62,12 +62,14 @@ With the saved Manual Lab SQL Server connection open and its schema metadata loa
 
 Each saved profile connected and displayed its sample data in the grid. These 31-second captures were taken sequentially in the same app process after switching profiles. RSS and PSS therefore include memory retained from earlier UI and connection work; they do not isolate per-engine cost. Each interval had no BookiE input and no process block-read or block-write delta.
 
+The table uses each profile's sample-start baseline for RSS and PSS, rounded to one decimal MiB. CPU is the last-minus-first sample delta.
+
 | Connection and view | RSS | PSS | Process CPU change | Samples |
 | --- | ---: | ---: | ---: | --- |
-| ClickHouse, `people` (2 rows) | 137.5 MiB | 111.3 MiB | +0.00 s | [Raw samples](native-current-head-clickhouse-people-31s.json) |
+| ClickHouse, `people` (2 rows) | 137.5 MiB | 111.4 MiB | +0.00 s | [Raw samples](native-current-head-clickhouse-people-31s.json) |
 | MongoDB, `people` (2 documents) | 145.3 MiB | 119.2 MiB | +0.03 s | [Raw samples](native-current-head-mongodb-people-31s.json) |
 | Redis DB 0 (5 keys) | 162.8 MiB | 135.5 MiB | +0.01 s | [Raw samples](native-current-head-redis-db0-31s.json) |
-| SQLite, `people` (4 rows, mixed and null values) | 168.9 MiB | 141.7 MiB | +0.02 s | [Raw samples](native-current-head-sqlite-people-31s.json) |
+| SQLite, `people` (4 rows, mixed and null values) | 169.0 MiB | 141.7 MiB | +0.02 s | [Raw samples](native-current-head-sqlite-people-31s.json) |
 
 The native UI sweep used the extracted package binary and the ten saved Manual Lab profiles. Each connection opened and its data view rendered successfully; no rows were changed.
 
@@ -94,4 +96,4 @@ After the ten-profile UI sweep, `du -sb` reported 125,812 bytes in `~/.config/ta
 
 ## Product finding
 
-The four-page cache and forward-only cursor are operating as designed under [ADR 0011](../../decisions/0011-paged-query-results.md), but a completed query can report all rows while making the earlier rows unavailable in the grid. This is a usability limitation, not a paging-control defect. Keep the memory bound while evaluating a way to revisit results, such as a scrollable cursor under the same guarded snapshot or a bounded disk-backed page spool. Any design must preserve the existing query policy, audit, cancellation, timeout, value-preservation and cleanup contracts. Broader large-result acceptance remains tracked by [#554](https://github.com/cozyGarage/BookiE/issues/554).
+The current four-page cache follows [ADR 0011](../../decisions/0011-paged-query-results.md), but these captures show it can discard earlier rows even when the result fits the estimated-byte budget. That is an unresolved navigation limitation tracked by [#1032](https://github.com/cozyGarage/BookiE/issues/1032). [PR #1568](https://github.com/cozyGarage/BookiE/pull/1568) proposes removing the page-count cap while retaining the byte budget; that behavior is not in the current linux source. Broader resource and other-engine acceptance remains tracked by [#554](https://github.com/cozyGarage/BookiE/issues/554). Any change must preserve the existing query policy, audit, cancellation, timeout, value-preservation and cleanup contracts.

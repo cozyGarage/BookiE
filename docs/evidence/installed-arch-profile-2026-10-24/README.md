@@ -25,7 +25,7 @@ All checks below ran against source commit `c21a05a` unless noted. The executabl
 | Harness checks | Passed |
 | Installed Wayland launch | Window opened and the saved SQL Server connection became ready with three tables |
 
-The first GTK safety attempt reported 14 import/export dialog failures because the desktop file chooser portal had no implementation. A focused retry with `GDK_DEBUG=no-portals` passed, followed by the complete installed-binary suite with the same setting. The initial failures were test-environment portal interception, not a product fix. Some isolated socket tests also needed to run outside the restricted sandbox; the reruns passed. Full run reports and logs are in local ignored `target/quality/` directories and `/tmp/bookie-installed-gtk-c21a05/`.
+These suite totals are reported by the run record. Their full reports and logs were kept in ignored local `target/quality/` directories and `/tmp/bookie-installed-gtk-c21a05/`; they are not included in this packet, so this audit could not independently verify those totals. The first GTK safety attempt reported 14 import/export dialog failures because the desktop file chooser portal had no implementation. A focused retry with `GDK_DEBUG=no-portals` passed, followed by the complete installed-binary suite with the same setting. The initial failures were test-environment portal interception, not a product fix. Some isolated socket tests also needed to run outside the restricted sandbox; the reruns passed.
 
 ## Resource observations
 
