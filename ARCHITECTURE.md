@@ -178,7 +178,7 @@ These traits are the seams that keep engines and UI replaceable. Behaviour detai
 
 Adding an engine means implementing `DatabaseDriver` + `Connection` behind those traits, not teaching the UI a new driver id ([ADR 0001](docs/decisions/0001-no-plugin-system.md)).
 
-The optional cursor path is governed by `PolicyGuard`: it accepts one read statement in a read-only session snapshot, masks and audits each fetched page under the same operation, and closes the cursor on terminal outcomes. PostgreSQL is the only driver that supports it today. The SQL editor uses this path for supported single-statement PostgreSQL `SELECT`s and retains up to four pages of at most 5,000 rows within a 64 MiB estimated-row budget, except that the newest page remains when it alone exceeds the budget. Pinned results and overlapping snapshots can retain additional pages. Other engines and unsupported query shapes use materialized results and their existing caps ([ADR 0011](docs/decisions/0011-paged-query-results.md)).
+The optional cursor path is governed by `PolicyGuard`: it accepts one read statement in a read-only session snapshot, masks and audits each fetched page under the same operation, and closes the cursor on terminal outcomes. PostgreSQL is the only driver that supports it today. The SQL editor uses this path for supported single-statement PostgreSQL `SELECT`s and retains pages within a 64 MiB estimated-row budget, except that the newest page remains when it alone exceeds the budget. Pinned results and overlapping snapshots can retain additional pages. Other engines and unsupported query shapes use materialized results and their existing caps ([ADR 0011](docs/decisions/0011-paged-query-results.md)).
 
 ## Governed request pipeline
 
@@ -371,7 +371,7 @@ Each engine exports a type implementing `tablepro_core::DatabaseDriver`. Connect
 | Command scope | Component-scoped commands for tab/component lifetime. Detached Relm4 tasks only for independent persistence/cleanup. |
 | Tabs | `AdwTabView` workspaces; Relm4 controllers keyed by tab UUID. |
 | Browse grid | Bounded pages in `RowStore` (`gio::ListModel`); weakly cached `RowObject`s. |
-| SQL editor results | Supported single-statement PostgreSQL `SELECT`s stream guarded cursor pages, retaining up to four pages of at most 5,000 rows within a 64 MiB estimated-row budget; a newest page larger than the budget remains. Pins and overlapping snapshots may retain more. Other engines and query shapes use capped materialization; these estimates are not a process-memory ceiling ([ADR 0011](docs/decisions/0011-paged-query-results.md), PERF-2/PERF-8). |
+| SQL editor results | Supported single-statement PostgreSQL `SELECT`s stream guarded cursor pages within a 64 MiB estimated-row budget; a newest page larger than the budget remains. Pins and overlapping snapshots may retain more. Other engines and query shapes use capped materialization; these estimates are not a process-memory ceiling ([ADR 0011](docs/decisions/0011-paged-query-results.md), PERF-2/PERF-8). |
 | Identity | Sidebar refresh tokens hold a weak session reference. Tab results keep their tab UUID across connection switches. |
 
 ## Persistence

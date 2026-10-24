@@ -14,38 +14,28 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   a separate feature with an accepted design and no release target ([ADR 0015](decisions/0015-database-snapshots.md)).
 - **Large results still have materialization limits** (PERF-2, PERF-8 / [#554](https://github.com/cozyGarage/BookiE/issues/554)). Materialized
   results stop at 1 million rows, 10 million cells or 64 MiB estimated size.
-  Single-statement PostgreSQL `SELECT`s in the SQL editor now stream cursor
-  pages through Core and PolicyGuard, retaining at most four pages of up to
-  5,000 rows each. Previous/Next controls navigate only retained pages. A
-  native 100,000-row PostgreSQL check received 20 pages but exposed only rows
-  80,001–100,000 after completion. The user-visible loss of the earlier rows is
-  addressed by the proposed cap removal in [#1568](https://github.com/cozyGarage/BookiE/pull/1568);
-  broader resource and lifecycle acceptance remains under
-  [#1032](https://github.com/cozyGarage/BookiE/issues/1032). The current
-  accepted [ADR 0011](decisions/0011-paged-query-results.md) still selects a
-  fixed page-count cap until that proposal merges; it is not the final browsing
-  behavior for results that fit within the resource budget. The capture shows
-  the fixed four-page limit, not exhaustion of the 64 MiB estimated byte budget.
-  The received-row summary identifies the retained range, but earlier rows
-  cannot be revisited without rerunning the query. Row ranges are positions in
-  the result, not database row identifiers. Each stream cache retains at most
-  64 MiB of estimated row storage, except
-  that the newest page is always kept even if it alone exceeds the budget.
+  Single-statement PostgreSQL `SELECT`s in the SQL editor stream cursor pages
+  through Core and PolicyGuard, retaining them while estimated row storage stays
+  within 64 MiB and always keeping the newest page, even if it alone exceeds the
+  estimate. A native 100,000-row PostgreSQL query returned 20 pages and navigated
+  back to rows 1–5,000 after completion. A wide result exceeded the budget and
+  evicted older pages, so results larger than the cache budget can still lose
+  access to earlier rows. The received-row summary identifies the retained
+  range; row ranges are positions in the result, not database row identifiers.
   Incoming decoding, concurrent snapshots, pins, widgets and allocator retention
-  remain outside this cache estimate. An October 16 synthetic stress profile at
-  source `9c23bc80` allocated about 1.28 GiB across four pinned results and one
-  active stream, reaching 1,325 MiB RSS ([record](evidence/stream-retention-synthetic-2026-10-16/README.md)).
+  remain outside this cache estimate, which is not a process-memory ceiling.
+  An October 16 synthetic stress profile at source `9c23bc80` allocated about
+  1.28 GiB across four pinned results and one active stream, reaching 1,325 MiB
+  RSS ([record](evidence/stream-retention-synthetic-2026-10-16/README.md)).
   Paging and ownership code changed after that run, so it is historical evidence,
-  not a current memory bound. A separate 100,000-row PostgreSQL profile on the
-  October 24 source retained only the latest 20,000 rows and showed a 24.8 MiB
-  peak RSS increase during a 30-second sample; the
-  [capture](evidence/built-head-2026-10-24/README.md) records its limits. That
-  single-query result does not measure the pinned-stream stress case, normal
-  workloads or the complete process ceiling. Other
-  engines and unsupported statement shapes remain materialized.
-  The historical grid measurement was about 2.5 times the result memory; #518
-  now shares immutable values with materialized rows. Further comparable
-  profiling is tracked with PERF-2/8 (ADR 0011).
+  not a current memory bound. The October 24 narrow-query profile kept all
+  100,000 rows navigable and showed a 25.3 MiB peak RSS increase over 31 seconds;
+  the [capture](evidence/built-head-2026-10-24/README.md) records its limits.
+  This single-query result does not measure the pinned-stream stress case, normal
+  workloads or the complete process ceiling. Other engines and unsupported
+  statement shapes remain materialized. Broader resource, lifecycle and
+  cross-engine acceptance remain under [#1032](https://github.com/cozyGarage/BookiE/issues/1032)
+  and [#554](https://github.com/cozyGarage/BookiE/issues/554) (ADR 0011).
 - **SQL result filters apply only to loaded rows.** Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **File exports use text markers for undecodable cells** ([#883](https://github.com/cozyGarage/BookiE/issues/883)). CSV, JSON, Markdown, HTML, XML, Excel, copied text and MCP CSV content use a visible `<undecodable TYPE>` string; these text representations do not retain a separate typed marker, so a real text value with the same spelling is ambiguous. SQL export refuses the value. MCP JSON retains an explicit tagged `undecodable` value.
 - **Long cells are shown as a preview** (PERF-10). Values over 8 KiB show a typed

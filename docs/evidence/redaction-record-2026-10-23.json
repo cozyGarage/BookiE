@@ -75,7 +75,7 @@
       "redaction": "local home-directory prefix replaced with $HOME"
     },
     {
-      "path": "docs/evidence/stream-byte-budget-2026-10-22/manifest.json",
+      "path": "docs/archive/evidence/stream-byte-budget-2026-10-22/manifest.json",
       "original_sha256": "5bf67cfba00267fc0c3df2cf2adc9af34761878e1df4ec393912191887d93ee8",
       "redacted_sha256": "fcdded38d1c344df8be46384aeea8ee080526e50efdfde6dc73f57b9e2d2b8df",
       "redaction": "local home-directory prefix replaced with $HOME"

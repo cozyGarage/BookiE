@@ -342,7 +342,7 @@ Resource regressions belong in the existing unit and gtk-widgets tiers. Prefer r
 
 | Risk | Regression coverage |
 | --- | --- |
-| A stream accumulates every received page | A 20,000-page sequence keeps at most four pages and releases each eviction; 1,000 empty pages do not accumulate payloads. |
+| A stream accumulates every received page | A 20,000-page sequence of small pages remains navigable within the byte budget and releases pages after the final owner drops them; 1,000 empty pages do not accumulate payloads. |
 | The retained-byte budget drifts | The exact 64 MiB boundary retains two half-budget pages; one additional row evicts an old page. Existing coverage keeps an oversized newest page explicitly. |
 | Snapshots duplicate payloads or retain retired data | Snapshot payload identity, external-owner release, terminal-state ownership and rejected-page release tests. |
 | Catalog checks return to a full scan | Four lookups against 10,000 names perform at most 16 identifier normalizations, counted only in test builds. Prefix eligibility and cached columns remain covered. |

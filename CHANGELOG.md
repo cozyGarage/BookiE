@@ -44,7 +44,7 @@
 - Background database work runs on up to four threads, so one slow operation no longer holds up others such as loading the sidebar or another tab.
 - Query results hold each cell in less than half the memory, so large results use less memory and more rows fit within the result size limit.
 
-- Large streamed results discard older wide pages sooner to limit retained row memory, while keeping the newest page and showing the retained range.
+- Large streamed results retain pages within a 64 MiB estimated row-storage budget, keep the newest page and show when earlier rows are no longer available.
 - Oversized streamed result rows are rejected before value decoding, reducing memory spikes.
 - The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
 - Selecting rows with large text or binary cells no longer copies their contents to calculate numeric summaries.
@@ -59,6 +59,9 @@
 
 ### Fixed
 
+- SQL editor results keep every streamed page within the estimated memory budget, so users can navigate back through completed PostgreSQL results that fit the budget.
+
+- A confirmed session rollback clears obsolete query gutter marks, including when a commit request ends in rollback.
 - SQL files with lines over 256 KiB are refused before opening to prevent excessive text-layout memory use; the original file remains unchanged.
 - A confirmed session rollback clears obsolete query gutter marks, including when a commit request ends in rollback.
 - Streamed result summaries use singular row and page labels when each count is one.
