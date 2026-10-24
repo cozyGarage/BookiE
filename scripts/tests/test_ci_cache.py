@@ -223,7 +223,7 @@ class CiCacheTests(unittest.TestCase):
             'pathlib.Path(os.environ[\'CHILD_PID\']).write_text(str(pid)) if pid else None; '
             '(os.close(1), os.close(2), time.sleep(30)) if pid == 0 else None"\n'
         )
-        env = dict(os.environ, PYTHON=sys.executable, CHILD_PID=str(child_pid))
+        env = dict(os.environ, CARGO_TARGET_DIR=str(self.cache / 'unit'), PYTHON=sys.executable, CHILD_PID=str(child_pid))
         try:
             result = subprocess.run(self.command + ['run', str(shell)], env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -237,7 +237,7 @@ class CiCacheTests(unittest.TestCase):
         child_pid = self.directory / 'child.pid'
         shell = self.directory / 'step.sh'
         shell.write_text('echo "$$" > "$CHILD_PID"\nexec sleep 30\n')
-        env = dict(os.environ, CHILD_PID=str(child_pid))
+        env = dict(os.environ, CARGO_TARGET_DIR=str(self.cache / 'unit'), CHILD_PID=str(child_pid))
         process = subprocess.Popen(self.command + ['run', str(shell)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
             deadline = time.monotonic() + 5
