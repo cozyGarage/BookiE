@@ -142,14 +142,13 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(sleeps, [1])
 
-    def test_readiness_workflow_checks_trusted_base_code_with_read_only_permissions(self):
+    def test_readiness_workflow_checks_exact_head_with_read_only_permissions(self):
         workflow = (ROOT / ".github/workflows/linux-pr-readiness.yml").read_text()
         checkout = workflow.split("- uses: actions/checkout", 1)[1].split("\n      - name", 1)[0]
 
         self.assertIn("pull_request:", workflow)
         self.assertNotIn("pull_request_target:", workflow)
-        self.assertIn("ref: ${{ github.event.pull_request.base.sha }}", checkout)
-        self.assertNotIn("pull_request.head.sha", checkout)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha }}", checkout)
         self.assertIn("  checks: read", workflow)
         self.assertIn("  contents: read", workflow)
         self.assertIn("  pull-requests: read", workflow)
