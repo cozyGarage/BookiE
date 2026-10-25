@@ -83,7 +83,12 @@ def evaluate_checks(required, runs):
             passed.append(name)
             continue
         failed.append(f"{name}: {run.get('conclusion') or 'no conclusion'}")
-    state = "failed" if failed else "waiting" if waiting else "passed"
+    if failed:
+        state = "failed"
+    elif waiting:
+        state = "waiting"
+    else:
+        state = "passed"
     return {"state": state, "passed": passed, "waiting": waiting, "failed": failed}
 
 
@@ -101,7 +106,10 @@ def retry_transient(operation, deadline, poll_seconds, sleep, monotonic):
 
 class GitHubApi:
     def __init__(self, repository, token, api_url):
-        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+        valid_repository = re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) and all(
+            part not in {".", ".."} for part in repository.split("/")
+        )
+        if not valid_repository:
             raise ReadinessError("GitHub repository identity is invalid")
         self.repository = repository
         self.token = token
