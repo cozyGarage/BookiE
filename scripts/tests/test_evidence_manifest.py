@@ -196,6 +196,57 @@ class EvidenceManifestTests(unittest.TestCase):
 
         self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
 
+    def test_manifest_refuses_invalid_per_file_source_mappings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+            source = repo / "source.rs"
+            source.write_text("recorded source")
+            self._commit(repo, "source.rs")
+            commit = self._revision(repo)
+            manifest_path = repo / "evidence/manifest.json"
+            manifest_path.parent.mkdir()
+            source_sha256 = {"source.rs": hashlib.sha256(b"recorded source").hexdigest()}
+
+            with mock.patch.object(VALIDATOR, "ROOT", repo):
+                manifest_path.write_text(json.dumps({
+                    "schema_version": 1,
+                    "source_commit": commit,
+                    "source_sha256": source_sha256,
+                    "source_commits": [],
+                }))
+                errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+                self.assertTrue(any("source_commits must map" in error for error in errors))
+
+                manifest_path.write_text(json.dumps({
+                    "schema_version": 1,
+                    "source_commit": commit,
+                    "source_sha256": source_sha256,
+                    "source_commits": {"orphan.rs": commit},
+                }))
+                errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+                self.assertTrue(any("has no matching source_sha256 entry" in error for error in errors))
+
+                manifest_path.write_text(json.dumps({
+                    "schema_version": 1,
+                    "source_commit": commit,
+                    "source_sha256": source_sha256,
+                    "source_commits": {"source.rs": "invalid"},
+                }))
+                errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+                self.assertTrue(any("invalid source commit" in error for error in errors))
+
+                missing_digest = hashlib.sha256(b"missing source").hexdigest()
+                manifest_path.write_text(json.dumps({
+                    "schema_version": 1,
+                    "source_commit": commit,
+                    "source_sha256": {"missing.rs": missing_digest},
+                    "source_commits": {"missing.rs": commit},
+                }))
+                errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+
+        self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
+
     @staticmethod
     def _commit(repo, path):
         subprocess.run(["git", "add", path], cwd=repo, check=True)
