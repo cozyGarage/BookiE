@@ -14,10 +14,16 @@ SPEC.loader.exec_module(VERSION)
 
 
 class ReleaseVersionTests(unittest.TestCase):
-    def test_published_release_metadata_matches_release_record(self):
+    def test_published_release_metadata_matches_record_after_newer_release(self):
         root = Path(__file__).resolve().parents[2]
         metadata = ET.parse(root / "apps/linux/flatpak/com.tablepro.linux.metainfo.xml")
-        release = metadata.find("releases/release")
+        releases = metadata.find("releases")
+
+        self.assertIsNotNone(releases)
+        if releases is None:
+            return
+        releases.insert(0, ET.Element("release", {"version": "0.2.1", "type": "stable", "date": "2026-10-24"}))
+        release = metadata.find("releases/release[@version='0.2.0']")
 
         self.assertIsNotNone(release)
         if release is None:
