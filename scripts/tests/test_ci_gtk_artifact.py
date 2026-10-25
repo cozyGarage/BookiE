@@ -12,6 +12,13 @@ SPEC = importlib.util.spec_from_file_location("ci_gtk_artifact", ROOT / "scripts
 artifact = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(artifact)
 SHA = "a" * 40
+FEATURES = {"defaults_enabled": True, "enabled_defaults": ["kerberos"]}
+TOOLKIT = {
+    "gtk4": "4.24.1",
+    "glib-2.0": "2.88.1",
+    "libadwaita-1": "1.10.0",
+    "gtksourceview-5": "5.22.0",
+}
 
 
 class GtkArtifactWorkflowTests(unittest.TestCase):
@@ -24,6 +31,10 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
             for index, heading in enumerate(headings)
         }
         self.assertIn("gtk-build", list(jobs))
+        build_job = jobs["gtk-build"]
+        self.assertIn("cargo build --profile ci --locked -p tablepro-app --bin tablepro-app", build_job)
+        self.assertNotIn("--no-default-features", build_job)
+        self.assertNotRegex(build_job, r"cargo build[^\n]*--features")
         self.assertEqual(len(re.findall(r"ci-gtk-artifact\.py create (?!--package)", workflow)), 1)
         for name in ("e2e", "gtk", "gtk-server"):
             job = jobs[name]
@@ -35,6 +46,15 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
             self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ github.sha }}", job)
             self.assertNotIn("cargo build", job)
             self.assertLess(job.index("ensure-node.sh"), job.index("uses:"))
+
+    def test_distro_floor_package_uses_the_default_app_feature_set(self):
+        package_workflow = (ROOT / "scripts/distro-floor-package.sh").read_text()
+        builder = (ROOT / "scripts/build-deb.sh").read_text()
+
+        self.assertIn("build-deb.sh", package_workflow)
+        self.assertRegex(builder, r"cargo build[^\n]*-p tablepro-app[^\n]*--locked")
+        self.assertNotIn("--no-default-features", builder)
+        self.assertNotRegex(builder, r"cargo build[^\n]*--features")
 
 
 class GtkArtifactTests(unittest.TestCase):
@@ -48,21 +68,73 @@ class GtkArtifactTests(unittest.TestCase):
         self.output = self.root / "artifact"
 
     def create(self):
-        with patch.object(artifact, "source_identity", return_value=SHA):
+        with (
+            patch.object(artifact, "source_identity", return_value=SHA),
+            patch.object(artifact, "feature_identity", return_value=FEATURES),
+            patch.object(artifact, "toolkit_identity", return_value=TOOLKIT),
+        ):
             artifact.create(self.binary, self.output, SHA)
+
+    def verify(self, expected_sha=SHA, *, package=False, features=FEATURES, toolkit=TOOLKIT):
+        with (
+            patch.object(artifact, "feature_identity", return_value=features),
+            patch.object(artifact, "toolkit_identity", return_value=toolkit),
+        ):
+            return artifact.verify(self.output, expected_sha, package=package)
+
+    def test_manifest_records_default_features_and_toolkit_runtime(self):
+        self.create()
+
+        manifest = json.loads((self.output / "manifest.json").read_text())
+        self.assertEqual(manifest["features"], FEATURES)
+        self.assertEqual(manifest["toolkit_runtime"], TOOLKIT)
+
+    def test_an_artifact_with_changed_default_features_is_refused(self):
+        self.create()
+
+        with self.assertRaisesRegex(ValueError, "feature"):
+            self.verify(features={"defaults_enabled": True, "enabled_defaults": []})
+
+    def test_an_incomplete_toolkit_runtime_identity_is_refused(self):
+        self.create()
+        manifest_path = self.output / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        del manifest["toolkit_runtime"]["libadwaita-1"]
+        manifest_path.write_text(json.dumps(manifest))
+
+        with self.assertRaisesRegex(ValueError, "toolkit runtime"):
+            self.verify()
+
+    def test_an_older_toolkit_runtime_is_refused(self):
+        self.create()
+        older_toolkit = {**TOOLKIT, "gtk4": "4.22.0"}
+
+        with self.assertRaisesRegex(ValueError, "toolkit runtime"):
+            self.verify(toolkit=older_toolkit)
+
+    def test_a_newer_abi_compatible_toolkit_runtime_is_accepted(self):
+        self.create()
+        newer_toolkit = {
+            "gtk4": "4.26.0",
+            "glib-2.0": "2.90.0",
+            "libadwaita-1": "1.12.0",
+            "gtksourceview-5": "5.24.0",
+        }
+
+        self.assertEqual(self.verify(toolkit=newer_toolkit).read_bytes(), self.binary.read_bytes())
 
     def test_transferred_binary_is_complete_and_permissions_are_restored_after_verification(self):
         self.create()
         transferred = self.output / "bookie"
         transferred.chmod(0o644)
-        result = artifact.verify(self.output, SHA)
+        result = self.verify()
         self.assertEqual(result.read_bytes(), self.binary.read_bytes())
         self.assertTrue(result.stat().st_mode & 0o111)
 
     def test_a_binary_from_another_source_is_refused(self):
         self.create()
         with self.assertRaisesRegex(ValueError, "source"):
-            artifact.verify(self.output, "b" * 40)
+            self.verify("b" * 40)
 
     def test_tampered_bytes_are_refused_before_becoming_executable(self):
         self.create()
@@ -70,7 +142,7 @@ class GtkArtifactTests(unittest.TestCase):
         binary.chmod(0o644)
         binary.write_bytes(b"changed")
         with self.assertRaisesRegex(ValueError, "digest"):
-            artifact.verify(self.output, SHA)
+            self.verify()
         self.assertFalse(binary.stat().st_mode & 0o111)
 
     def test_a_symlink_cannot_substitute_for_the_binary(self):
@@ -79,7 +151,7 @@ class GtkArtifactTests(unittest.TestCase):
         binary.unlink()
         binary.symlink_to(self.binary)
         with self.assertRaisesRegex(ValueError, "regular"):
-            artifact.verify(self.output, SHA)
+            self.verify()
 
     def test_an_incompatible_architecture_is_refused(self):
         self.create()
@@ -88,7 +160,7 @@ class GtkArtifactTests(unittest.TestCase):
         manifest["architecture"] = "different-machine"
         manifest_path.write_text(json.dumps(manifest))
         with self.assertRaisesRegex(ValueError, "architecture"):
-            artifact.verify(self.output, SHA)
+            self.verify()
 
     def test_an_unrecognized_build_profile_is_refused(self):
         self.create()
@@ -97,7 +169,7 @@ class GtkArtifactTests(unittest.TestCase):
         manifest["profile"] = "release"
         manifest_path.write_text(json.dumps(manifest))
         with self.assertRaisesRegex(ValueError, "profile"):
-            artifact.verify(self.output, SHA)
+            self.verify()
 
     def test_the_publisher_refuses_a_different_checkout(self):
         with patch.object(artifact, "source_identity", return_value="b" * 40):
@@ -114,7 +186,7 @@ class GtkArtifactTests(unittest.TestCase):
         self.create()
         self.binary.write_bytes(b"rebuilt")
         self.create()
-        self.assertEqual(artifact.verify(self.output, SHA).read_bytes(), b"rebuilt")
+        self.assertEqual(self.verify().read_bytes(), b"rebuilt")
         unrelated = self.output / "unrelated"
         unrelated.write_text("preserve")
         with self.assertRaisesRegex(ValueError, "unexpected"):
@@ -128,31 +200,31 @@ class GtkArtifactTests(unittest.TestCase):
         manifest.rename(original)
         manifest.symlink_to(original)
         with self.assertRaisesRegex(ValueError, "regular manifest"):
-            artifact.verify(self.output, SHA)
+            self.verify()
 
     def test_package_transfer_preserves_bytes_and_cannot_substitute_for_a_native_binary(self):
         with patch.object(artifact, "source_identity", return_value=SHA):
             artifact.create(self.binary, self.output, SHA, package=True)
-        package = artifact.verify(self.output, SHA, package=True)
+        package = self.verify(package=True)
         self.assertEqual(package.name, "bookie.deb")
         self.assertEqual(package.read_bytes(), self.binary.read_bytes())
         self.assertFalse(package.stat().st_mode & 0o111)
         with self.assertRaises(ValueError):
-            artifact.verify(self.output, SHA)
+            self.verify()
 
     def test_packages_reject_wrong_source_corruption_and_native_binary_packets(self):
         self.create()
         with self.assertRaises(ValueError):
-            artifact.verify(self.output, SHA, package=True)
+            self.verify(package=True)
         self.output.joinpath("bookie").unlink()
         self.output.joinpath("manifest.json").unlink()
         with patch.object(artifact, "source_identity", return_value=SHA):
             artifact.create(self.binary, self.output, SHA, package=True)
         with self.assertRaises(ValueError):
-            artifact.verify(self.output, "b" * 40, package=True)
+            self.verify("b" * 40, package=True)
         self.output.joinpath("bookie.deb").write_bytes(b"corrupted")
         with self.assertRaises(ValueError):
-            artifact.verify(self.output, SHA, package=True)
+            self.verify(package=True)
 
 
 if __name__ == "__main__":
