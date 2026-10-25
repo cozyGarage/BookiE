@@ -702,6 +702,19 @@ mod tests {
     }
 
     #[test]
+    fn refreshing_table_names_keeps_in_flight_column_fetches() {
+        let mut index = completion_index();
+        let request = request_one(&mut index);
+        let token = index.column_request_token();
+
+        index.set_tables(vec!["public.users".into(), "public.orders".into()]);
+
+        assert!(!token.is_cancelled());
+        assert!(index.complete_column_request(&request, Ok(vec!["id".into()])));
+        assert_eq!(index.columns_for("public.users"), Some(&vec!["id".into()]));
+    }
+
+    #[test]
     fn schema_invalidation_cancels_pending_reads_and_rejects_late_results() {
         let mut index = completion_index();
         let request = request_one(&mut index);
