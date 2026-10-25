@@ -12,12 +12,12 @@
     "crates/core/src/numeric_input.rs": "956455ea759d73cdc0ad98d040ab3a2a5763ec41252e7660d72ac1c52138916c"
   },
   "source_commits": {
-    "crates/app/src/ui/browse_tab/value_parse.rs": "63309074f79774bad50245c24484b5fb056f8198",
-    "crates/app/tests/support/sqlite_numeric_affinity.rs": "63309074f79774bad50245c24484b5fb056f8198",
-    "crates/core/src/import/cell.rs": "63309074f79774bad50245c24484b5fb056f8198",
-    "crates/core/src/import/cell/tests/sqlite_affinity.rs": "63309074f79774bad50245c24484b5fb056f8198",
-    "crates/core/src/lib.rs": "63309074f79774bad50245c24484b5fb056f8198",
-    "crates/core/src/numeric_input.rs": "63309074f79774bad50245c24484b5fb056f8198"
+    "crates/app/src/ui/browse_tab/value_parse.rs": "0b2f1a9a14a6174a552957cc93d042c7bb8ccd1f",
+    "crates/app/tests/support/sqlite_numeric_affinity.rs": "0b2f1a9a14a6174a552957cc93d042c7bb8ccd1f",
+    "crates/core/src/import/cell.rs": "0b2f1a9a14a6174a552957cc93d042c7bb8ccd1f",
+    "crates/core/src/import/cell/tests/sqlite_affinity.rs": "0b2f1a9a14a6174a552957cc93d042c7bb8ccd1f",
+    "crates/core/src/lib.rs": "0b2f1a9a14a6174a552957cc93d042c7bb8ccd1f",
+    "crates/core/src/numeric_input.rs": "0b2f1a9a14a6174a552957cc93d042c7bb8ccd1f"
   },
   "engine": "SQLite, in-memory, INTEGER/REAL/NUMERIC affinity",
   "case": "SQLite numeric-affinity edits preserve text and exact numbers while refusing overflow, underflow and rounding",
