@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cell::Cell;
+use std::io::{self, Write};
 use std::marker::PhantomData;
 use std::sync::OnceLock;
 
@@ -120,8 +121,69 @@ fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
 
 pub fn value_to_display_text(value: &Value) -> String {
     match value {
-        Value::Text(text) if text.contains('\0') => truncate_for_display(&text.replace('\0', "\u{2400}")),
+        Value::Text(text) => text_to_display_text(text),
+        Value::Json(json) => json_to_display_text(json),
         other => value_to_text(other, truncate_for_display),
+    }
+}
+
+fn text_to_display_text(text: &str) -> String {
+    if text.len() < DISPLAY_TEXT_BYTES_THRESHOLD {
+        return text.replace('\0', "\u{2400}");
+    }
+    let cut = text
+        .char_indices()
+        .nth(DISPLAY_TEXT_MAX_CHARS)
+        .map_or(text.len(), |(index, _)| index);
+    if cut == text.len() {
+        return text.replace('\0', "\u{2400}");
+    }
+    let head = text[..cut].replace('\0', "\u{2400}");
+    let remaining_bytes = text.len() - cut;
+    format!("{head}… (+{remaining_bytes} more bytes)")
+}
+
+fn json_to_display_text(value: &serde_json::Value) -> String {
+    let mut writer = BoundedJsonWriter::new(DISPLAY_TEXT_BYTES_THRESHOLD);
+    let result = serde_json::to_writer(&mut writer, value);
+    writer.into_display(result.is_err())
+}
+
+struct BoundedJsonWriter {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl BoundedJsonWriter {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::with_capacity(limit),
+            limit,
+        }
+    }
+
+    fn into_display(self, truncated: bool) -> String {
+        if !truncated {
+            return String::from_utf8_lossy(&self.bytes).into_owned();
+        }
+        let end = match std::str::from_utf8(&self.bytes) {
+            Ok(_) => self.bytes.len(),
+            Err(error) => error.valid_up_to(),
+        };
+        format!("{}…", String::from_utf8_lossy(&self.bytes[..end]))
+    }
+}
+
+impl Write for BoundedJsonWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let remaining = self.limit.saturating_sub(self.bytes.len());
+        let written = remaining.min(bytes.len());
+        self.bytes.extend_from_slice(&bytes[..written]);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
@@ -204,8 +266,8 @@ pub(super) fn truncate_for_display(s: &str) -> String {
         return s.to_string();
     }
     let head = &s[..cut];
-    let remaining = s[cut..].chars().count();
-    format!("{head}… (+{remaining} more chars)")
+    let remaining_bytes = s.len() - cut;
+    format!("{head}… (+{remaining_bytes} more bytes)")
 }
 
 #[derive(Debug)]
@@ -581,7 +643,7 @@ mod tests {
         let s = "a".repeat(100_000);
         let out = truncate_for_display(&s);
         assert!(out.starts_with(&"a".repeat(10_000)));
-        assert!(out.contains("more chars"));
+        assert!(out.ends_with("(+90000 more bytes)"));
         assert!(out.len() < 10_500);
     }
 
@@ -605,7 +667,7 @@ mod tests {
         assert_eq!(
             out,
             format!(
-                "{}… (+{expected_remaining} more chars)",
+                "{}… (+{expected_remaining} more bytes)",
                 "a".repeat(DISPLAY_TEXT_MAX_CHARS)
             )
         );
@@ -616,7 +678,7 @@ mod tests {
         let s = "🦀".repeat(30_000);
         let out = truncate_for_display(&s);
         assert!(std::str::from_utf8(out.as_bytes()).is_ok());
-        assert!(out.contains("more chars"));
+        assert!(out.ends_with("(+80000 more bytes)"));
     }
 
     #[test]
@@ -726,7 +788,7 @@ mod tests {
         let remaining = DISPLAY_TEXT_BYTES_THRESHOLD + 7 - DISPLAY_TEXT_MAX_CHARS;
         assert_eq!(
             display,
-            format!("{}… (+{remaining} more chars)", "b".repeat(DISPLAY_TEXT_MAX_CHARS))
+            format!("{}… (+{remaining} more bytes)", "b".repeat(DISPLAY_TEXT_MAX_CHARS))
         );
     }
 
@@ -735,7 +797,43 @@ mod tests {
         let huge = "x".repeat(1_000_000);
         let display = value_to_display_text(&Value::Text(huge));
         assert!(display.len() < 100_000);
-        assert!(display.contains("more chars"));
+        assert!(display.ends_with("(+990000 more bytes)"));
+    }
+
+    #[test]
+    fn large_json_display_stops_at_the_display_budget() {
+        let value = Value::Json(Box::new(serde_json::json!({"payload": "x".repeat(1_000_000)})));
+        let original = value.clone();
+        let display = value_to_display_text(&value);
+
+        assert!(display.starts_with("{\"payload\":\""));
+        assert!(display.len() <= DISPLAY_TEXT_BYTES_THRESHOLD + "…".len());
+        assert!(display.ends_with('…'));
+        assert_eq!(value, original);
+    }
+
+    #[test]
+    fn large_json_display_truncates_only_at_a_utf8_boundary() {
+        let value = Value::Json(Box::new(serde_json::json!({
+            "payload": "💾".repeat(DISPLAY_TEXT_BYTES_THRESHOLD)
+        })));
+        let display = value_to_display_text(&value);
+
+        assert!(display.ends_with('…'));
+        assert!(display.len() <= DISPLAY_TEXT_BYTES_THRESHOLD + "…".len());
+        assert!(!display.contains('\u{fffd}'));
+    }
+
+    #[test]
+    fn large_text_sanitizes_visible_nul_without_changing_omitted_data() {
+        let mut text = "x".repeat(100_000);
+        text.replace_range(1..2, "\0");
+        let original = Value::Text(text);
+        let display = value_to_display_text(&original);
+
+        assert!(display.starts_with("x␀"));
+        assert!(display.ends_with("(+90000 more bytes)"));
+        assert_eq!(original, Value::Text(format!("x\0{}", "x".repeat(99_998))));
     }
 
     #[test]
