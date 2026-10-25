@@ -146,7 +146,20 @@ fn text_to_display_text(text: &str) -> String {
 fn json_to_display_text(value: &serde_json::Value) -> String {
     let mut writer = BoundedJsonWriter::new(DISPLAY_TEXT_BYTES_THRESHOLD);
     let result = serde_json::to_writer(&mut writer, value);
-    writer.into_display(result.is_err())
+    let byte_budget_exceeded = result.is_err();
+    json_prefix_for_display(writer.into_display(), byte_budget_exceeded)
+}
+
+fn json_prefix_for_display(mut text: String, byte_budget_exceeded: bool) -> String {
+    let end = text.char_indices().nth(DISPLAY_TEXT_MAX_CHARS).map(|(index, _)| index);
+    if let Some(end) = end {
+        text.truncate(end);
+        return format!("{text}…");
+    }
+    if byte_budget_exceeded {
+        return format!("{text}…");
+    }
+    text
 }
 
 struct BoundedJsonWriter {
@@ -162,15 +175,12 @@ impl BoundedJsonWriter {
         }
     }
 
-    fn into_display(self, truncated: bool) -> String {
-        if !truncated {
-            return String::from_utf8_lossy(&self.bytes).into_owned();
-        }
+    fn into_display(self) -> String {
         let end = match std::str::from_utf8(&self.bytes) {
             Ok(_) => self.bytes.len(),
             Err(error) => error.valid_up_to(),
         };
-        format!("{}…", String::from_utf8_lossy(&self.bytes[..end]))
+        String::from_utf8_lossy(&self.bytes[..end]).into_owned()
     }
 }
 
@@ -808,6 +818,7 @@ mod tests {
 
         assert!(display.starts_with("{\"payload\":\""));
         assert!(display.len() <= DISPLAY_TEXT_BYTES_THRESHOLD + "…".len());
+        assert!(display.chars().count() <= DISPLAY_TEXT_MAX_CHARS + 1);
         assert!(display.ends_with('…'));
         assert_eq!(value, original);
     }
