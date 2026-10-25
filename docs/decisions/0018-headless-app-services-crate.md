@@ -3,9 +3,9 @@
 - **Status**: Accepted
 - **Date**: 2026-10-12
 
-### Implementation status (2026-10-20)
+### Implementation status (2026-10-25)
 
-Several GTK-free service modules have moved to `crates/app-services`; the crate has no GTK, libadwaita, glib or Relm4 dependencies. The headless tab model and workspace persistence now live in `crates/app-services/src/workspace.rs` and `workspace_state.rs`; GTK page handling remains in `apps/linux/app/src/ui/app/workspace_tabs.rs`. The staged migration remains active under APP-MOD in the [post-0.2.0 backlog](../backlog.md).
+Several GTK-free service modules have moved to `crates/app-services`; the crate has no GTK, libadwaita, glib or Relm4 dependencies. The headless tab model and workspace persistence live in `crates/app-services/src/workspace.rs` and `workspace_state.rs`. Completion metadata now keeps its cache, request deduplication, generation checks and cancellation state in `crates/app-services/src/completion.rs`; the GTK app still dispatches database reads through Relm4 messages. GTK page handling remains in `apps/linux/app/src/ui/app/workspace_tabs.rs`. The staged migration remains active under APP-MOD in the [post-0.2.0 backlog](../backlog.md).
 
 ## Context
 
