@@ -416,6 +416,13 @@ mod tests {
         stale.add_css_class("tp-stream-page-loading");
         stale_container.append(&stale);
         holder.append(&stale_container);
+        let window = gtk::Window::builder()
+            .default_width(900)
+            .default_height(600)
+            .child(&holder)
+            .build();
+        window.present();
+        while gtk::glib::MainContext::default().iteration(false) {}
 
         complete_page_load(
             PageLoadContext {
@@ -431,12 +438,6 @@ mod tests {
             Ok(page(&[7, 8])),
         );
 
-        let window = gtk::Window::builder()
-            .default_width(900)
-            .default_height(600)
-            .child(&holder)
-            .build();
-        window.present();
         let page_root = page_container.clone().upcast::<gtk::Widget>();
         wait_for_grid(&page_root);
         assert!(stale.has_css_class("tp-stream-page-loading"));
