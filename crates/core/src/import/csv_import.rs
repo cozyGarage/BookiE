@@ -1,3 +1,6 @@
+use std::fs::OpenOptions;
+use std::io::{Read, Take};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 use thiserror::Error;
@@ -146,10 +149,32 @@ pub struct CsvSheet {
 }
 
 pub fn read_csv_file(path: &Path, options: &CsvImportOptions, limit: Option<usize>) -> Result<CsvSheet, ImportError> {
-    let size = std::fs::metadata(path).map_err(|_| ImportError::Unreadable)?.len();
-    check_file_size(size)?;
-    let bytes = std::fs::read(path).map_err(|_| ImportError::Unreadable)?;
+    let bytes = read_import_file(path)?;
     read_csv(&bytes, options, limit)
+}
+
+pub fn read_import_file(path: &Path) -> Result<Vec<u8>, ImportError> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)
+        .map_err(|_| ImportError::Unreadable)?;
+    let metadata = file.metadata().map_err(|_| ImportError::Unreadable)?;
+    if !metadata.is_file() {
+        return Err(ImportError::Unreadable);
+    }
+    check_file_size(metadata.len())?;
+    read_bounded(file.by_ref().take(MAX_FILE_BYTES + 1), MAX_FILE_BYTES)
+}
+
+fn read_bounded(mut reader: impl Read, limit: u64) -> Result<Vec<u8>, ImportError> {
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes).map_err(|_| ImportError::Unreadable)?;
+    let size = bytes.len() as u64;
+    if size > limit {
+        return Err(ImportError::FileTooLarge { size, limit });
+    }
+    Ok(bytes)
 }
 
 fn check_file_size(size: u64) -> Result<(), ImportError> {
@@ -416,6 +441,13 @@ mod tests {
                 limit: MAX_FILE_BYTES,
             })
         );
+    }
+
+    #[test]
+    fn bounded_file_read_rejects_growth_past_the_limit() {
+        let error = read_bounded(std::io::Cursor::new(b"four"), 3).expect_err("refuse extra byte");
+
+        assert_eq!(error, ImportError::FileTooLarge { size: 4, limit: 3 });
     }
 
     #[test]
