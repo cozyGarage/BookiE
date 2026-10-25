@@ -200,6 +200,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::theme::tests::given_gruvbox_when_warning_text_is_styled_then_it_is_distinct_and_readable"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::app::workspace_overview::tests::the_tab_overview_hides_duplicate_window_close_controls"
     ],
     [
@@ -540,6 +545,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::structure_tab::tests::sql_preview_is_read_only_without_a_visible_cursor"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::export_dialog::tests::a_full_export_shows_a_refusal_without_opening_its_source"
     ],
     [
@@ -566,6 +576,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::completion_provider::tests::proposals_preserve_aliases_and_replace_only_the_identifier"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::completion_provider::tests::dropping_one_editor_completion_view_keeps_shared_columns_for_another"
     ],
     [
       "tablepro-app",
@@ -726,6 +741,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_actions_fit_narrow_rows_with_running_and_retry_controls"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::toolbar_operability_tests::narrow_editor_run_and_cancel_buttons_dispatch_inside_their_layout"
     ],
     [
       "tablepro-app",
@@ -996,6 +1016,11 @@
       "tablepro-app",
       "--lib",
       "ui::connect_dialog::controls::tests::dropping_a_choice_row_releases_its_popup"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connect_dialog::controls::tests::port_input_reserves_room_for_a_five_digit_port"
     ],
     [
       "tablepro-app",

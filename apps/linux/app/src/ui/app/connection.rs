@@ -197,6 +197,7 @@ impl App {
     }
 
     pub(super) fn finish_disconnect(&mut self, sender: ComponentSender<Self>) {
+        crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
         // Invalidate any candidate left behind by a stale dialog callback.
         // A late preparation result is rejected unless the transition is
         // still `Connecting`, so it cannot reconnect after this teardown.
@@ -207,7 +208,6 @@ impl App {
         // Persist + tear down workspace tabs before dropping the
         // connection (persist needs the active connection_id).
         self.teardown_workspace_tabs();
-        self.reset_schema_fetches();
         self.table_names.clear();
         self.schema_index.borrow_mut().clear();
         // Drop reopen-stack entries — they reference tables in the
@@ -663,6 +663,7 @@ impl App {
             self.show_toast(&crate::tr!("This connection is already open in another window."));
             return; // `prepared` drops here, closing the connection it dialled.
         }
+        crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
         if self.connected {
             // Persist while the old connection id is still active. Only then
             // dispose the old tab controllers and install the candidate.
