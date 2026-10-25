@@ -127,8 +127,8 @@ def validate_manifest(path, strict=False):
         if not isinstance(expected, str) or not SHA256_PATTERN.fullmatch(expected):
             errors.append(f"{path}: invalid source digest for {name}")
             continue
-        source_commit = source_commits.get(name)
-        if source_commit is not None:
+        if name in source_commits:
+            source_commit = source_commits[name]
             if not isinstance(source_commit, str) or not COMMIT_PATTERN.fullmatch(source_commit):
                 (errors if strict else warnings).append(f"{path}: invalid source commit for {name}")
                 continue

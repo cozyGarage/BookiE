@@ -247,6 +247,15 @@ class EvidenceManifestTests(unittest.TestCase):
                 errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
                 self.assertTrue(any("invalid source commit" in error for error in errors))
 
+                manifest_path.write_text(json.dumps({
+                    "schema_version": 1,
+                    "source_commit": commit,
+                    "source_sha256": source_sha256,
+                    "source_commits": {"source.rs": None},
+                }))
+                errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+                self.assertTrue(any("invalid source commit" in error for error in errors))
+
                 missing_digest = hashlib.sha256(b"missing source").hexdigest()
                 manifest_path.write_text(json.dumps({
                     "schema_version": 1,
