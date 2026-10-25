@@ -152,6 +152,13 @@ class EvidenceManifestTests(unittest.TestCase):
             historical_path.parent.mkdir(parents=True)
             historical_path.write_bytes(historical_source)
             self._commit(repo, f"{historical_prefix}/{historical_relative_path}")
+
+            already_prefixed_path = "/".join((historical_prefix, "generated", "source.py"))
+            prefixed_source = b"source path already includes the old prefix"
+            prefixed_path = repo / already_prefixed_path
+            prefixed_path.parent.mkdir(parents=True)
+            prefixed_path.write_bytes(prefixed_source)
+            self._commit(repo, already_prefixed_path)
             test_commit = self._revision(repo)
 
             current_source = repo / historical_relative_path
@@ -164,8 +171,12 @@ class EvidenceManifestTests(unittest.TestCase):
                 "source_commit": app_commit,
                 "source_sha256": {
                     historical_relative_path: hashlib.sha256(historical_source).hexdigest(),
+                    already_prefixed_path: hashlib.sha256(prefixed_source).hexdigest(),
                 },
-                "source_commits": {historical_relative_path: test_commit},
+                "source_commits": {
+                    historical_relative_path: test_commit,
+                    already_prefixed_path: test_commit,
+                },
             }))
 
             with mock.patch.object(VALIDATOR, "ROOT", repo):
@@ -244,6 +255,17 @@ class EvidenceManifestTests(unittest.TestCase):
                     "source_commits": {"missing.rs": commit},
                 }))
                 errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+                for unsafe_path in ("../outside.rs", "/outside.rs"):
+                    manifest_path.write_text(json.dumps({
+                        "schema_version": 1,
+                        "source_commit": commit,
+                        "source_sha256": {unsafe_path: missing_digest},
+                        "source_commits": {unsafe_path: commit},
+                    }))
+                    errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+                    self.assertTrue(any(
+                        "source digest does not match its recorded commit" in error for error in errors
+                    ))
 
         self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
 
