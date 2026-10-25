@@ -54,6 +54,13 @@ fn copying_a_previewed_cell_copies_the_full_value() {
     IS_NULL_SLOT.set(&editor, false);
 
     assert_eq!(copy_value_text(editor.upcast_ref(), Some(&row), 0), full);
+
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&row);
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    let snapshot = export_snapshot(&view, &[], false).unwrap();
+
+    assert_eq!(snapshot.rows, vec![vec![Value::Text(full)]]);
 }
 
 #[test]
