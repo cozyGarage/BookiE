@@ -9,6 +9,28 @@ SPEC.loader.exec_module(readiness)
 
 
 class PullRequestReadinessTests(unittest.TestCase):
+    def test_required_contexts_still_match_the_workflow_job_names(self):
+        sources = {
+            "pr-title": ("pr-title.yml", "  pr-title:"),
+            "release-note": ("release-note-check.yml", "  release-note:"),
+            "Pin tested revision": ("build-linux.yml", "name: Pin tested revision"),
+            "Ensure CI debian-testing GTK image": ("build-linux.yml", "name: Ensure CI debian-testing GTK image"),
+            "Preflight and sandbox tier (no GTK app)": ("build-linux.yml", "name: Preflight and sandbox tier (no GTK app)"),
+            "Fast checks (GTK)": ("build-linux.yml", "name: Fast checks (GTK)"),
+            "flatpak-builder (default)": ("flatpak-linux.yml", "name: flatpak-builder (${{ matrix.profile }})"),
+            "resolve-ref": ("linux-security.yml", "  resolve-ref:"),
+            "Security (security-policy)": ("linux-security.yml", "name: Security (${{ matrix.layer }})"),
+            "Security (supply-chain)": ("linux-security.yml", "layer: [security-policy, supply-chain]"),
+            "workflow-lint": ("linux-ci-contracts.yml", "  workflow-lint:"),
+            "workflow-security": ("linux-ci-contracts.yml", "  workflow-security:"),
+            "harness": ("linux-ci-contracts.yml", "  harness:"),
+        }
+
+        for context, (filename, marker) in sources.items():
+            with self.subTest(context=context):
+                workflow = (ROOT / ".github/workflows" / filename).read_text()
+                self.assertIn(marker, workflow)
+
     def test_code_changes_require_build_security_and_flatpak_contexts(self):
         required = readiness.required_contexts(["crates/core/src/query.rs"])
 
