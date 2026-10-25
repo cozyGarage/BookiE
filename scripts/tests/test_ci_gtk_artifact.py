@@ -89,6 +89,55 @@ class GtkArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["features"], FEATURES)
         self.assertEqual(manifest["toolkit_runtime"], TOOLKIT)
 
+    def test_feature_identity_reads_default_features_from_the_app_manifest(self):
+        self.assertEqual(artifact.feature_identity(), FEATURES)
+
+    def test_feature_identity_refuses_a_malformed_default_feature_list(self):
+        with patch.object(artifact.tomllib, "load", return_value={"features": {"default": [1]}}):
+            with self.assertRaisesRegex(ValueError, "default Cargo features"):
+                artifact.feature_identity()
+
+    def test_toolkit_identity_records_each_pkg_config_version(self):
+        with patch.object(artifact.subprocess, "check_output", side_effect=["4.24.1\n", "2.88.1\n", "1.10.0\n", "5.22.0\n"]):
+            self.assertEqual(artifact.toolkit_identity(), TOOLKIT)
+
+    def test_toolkit_identity_refuses_an_empty_pkg_config_version(self):
+        with patch.object(artifact.subprocess, "check_output", return_value="\n"):
+            with self.assertRaisesRegex(ValueError, "gtk4 version"):
+                artifact.toolkit_identity()
+
+    def test_toolkit_versions_require_numeric_components_and_matching_major(self):
+        with self.assertRaisesRegex(ValueError, "version is invalid"):
+            artifact.version_parts("4.24.1-1")
+        self.assertFalse(artifact.version_is_compatible("5.0", "4.99"))
+
+    def test_toolkit_identity_refuses_missing_runtime_data(self):
+        with self.assertRaisesRegex(ValueError, "runtime identity is incomplete"):
+            artifact.verify_toolkit_runtime({}, TOOLKIT)
+        with self.assertRaisesRegex(ValueError, "runtime identity is unavailable"):
+            artifact.verify_toolkit_runtime(TOOLKIT, {})
+
+    def test_package_manifest_refuses_a_native_toolkit_runtime_claim(self):
+        with patch.object(artifact, "source_identity", return_value=SHA):
+            artifact.create(self.binary, self.output, SHA, package=True)
+        manifest_path = self.output / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["toolkit_runtime"] = TOOLKIT
+        manifest_path.write_text(json.dumps(manifest))
+
+        with self.assertRaisesRegex(ValueError, "cannot claim a native GTK runtime"):
+            self.verify(package=True)
+
+    def test_an_unsupported_manifest_schema_is_refused(self):
+        self.create()
+        manifest_path = self.output / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["schema_version"] = 1
+        manifest_path.write_text(json.dumps(manifest))
+
+        with self.assertRaisesRegex(ValueError, "manifest version"):
+            self.verify()
+
     def test_an_artifact_with_changed_default_features_is_refused(self):
         self.create()
 
