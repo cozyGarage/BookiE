@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::io::{Read, Take};
+use std::io::Read;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
