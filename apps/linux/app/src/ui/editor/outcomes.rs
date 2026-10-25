@@ -345,12 +345,12 @@ fn bind_statement_for_run(
     identity: StatementIdentity,
     preview: String,
 ) -> Result<crate::services::query_parameters::BoundStatement, Box<StatementOutcome>> {
-    crate::services::query_parameters::bind_statement(sql, driver_id, parameter_values).map_err(|reason| {
+    crate::services::query_parameters::bind_statement(sql, driver_id, parameter_values).map_err(|error| {
         Box::new(StatementOutcome {
             identity,
             sql_preview: preview,
             elapsed_ms: 0,
-            kind: StatementOutcomeKind::Error(reason.into()),
+            kind: StatementOutcomeKind::Error(crate::ui::parameters_dialog::error_message(error).into()),
             pinned: false,
         })
     })
@@ -1007,6 +1007,14 @@ fn build_result_drop_down(stack: &adw::ViewStack, outcomes: &[StatementOutcome])
     drop_down
 }
 
+fn result_tab_icon(kind: &StatementOutcomeKind) -> &'static str {
+    match kind {
+        StatementOutcomeKind::Rows(_) | StatementOutcomeKind::Streamed(_) => "view-grid-symbolic",
+        StatementOutcomeKind::Error(_) => "dialog-error-symbolic",
+        StatementOutcomeKind::NotRun => "media-playback-stop-symbolic",
+    }
+}
+
 pub(crate) fn render_outcomes(
     holder: &gtk::Box,
     outcomes: &[StatementOutcome],
@@ -1049,11 +1057,7 @@ pub(crate) fn render_outcomes(
             settings_store.clone(),
             sender,
         );
-        let icon = match &o.kind {
-            StatementOutcomeKind::Rows(_) | StatementOutcomeKind::Streamed(_) => "view-grid-symbolic",
-            StatementOutcomeKind::Error(_) => "dialog-error-symbolic",
-            StatementOutcomeKind::NotRun => "emblem-synchronizing-symbolic",
-        };
+        let icon = result_tab_icon(&o.kind);
         let page = stack.add_titled_with_icon(&widget, Some(&format!("r{idx}")), &outcome_tab_label(o), icon);
         if !o.sql_preview.is_empty() {
             widget.set_tooltip_text(Some(&o.sql_preview));
@@ -1101,6 +1105,10 @@ mod lexing_tests;
 #[cfg(test)]
 #[path = "outcomes/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "outcomes/result_tab_icon_tests.rs"]
+mod result_tab_icon_tests;
 
 #[cfg(test)]
 #[path = "outcomes/lifetime_tests.rs"]
