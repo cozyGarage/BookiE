@@ -151,15 +151,15 @@ fn json_to_display_text(value: &serde_json::Value) -> String {
 }
 
 fn json_prefix_for_display(mut text: String, byte_budget_exceeded: bool) -> String {
+    if !byte_budget_exceeded {
+        return text;
+    }
     let end = text.char_indices().nth(DISPLAY_TEXT_MAX_CHARS).map(|(index, _)| index);
     if let Some(end) = end {
         text.truncate(end);
         return format!("{text}…");
     }
-    if byte_budget_exceeded {
-        return format!("{text}…");
-    }
-    text
+    format!("{text}…")
 }
 
 struct BoundedJsonWriter {
@@ -821,6 +821,18 @@ mod tests {
         assert!(display.chars().count() <= DISPLAY_TEXT_MAX_CHARS + 1);
         assert!(display.ends_with('…'));
         assert_eq!(value, original);
+    }
+
+    #[test]
+    fn json_below_the_byte_threshold_keeps_its_complete_display() {
+        let payload = "x".repeat(DISPLAY_TEXT_MAX_CHARS * 2);
+        let value = Value::Json(Box::new(serde_json::json!({"payload": payload})));
+        let display = value_to_display_text(&value);
+
+        assert_eq!(
+            display,
+            format!("{{\"payload\":\"{}\"}}", "x".repeat(DISPLAY_TEXT_MAX_CHARS * 2))
+        );
     }
 
     #[test]
