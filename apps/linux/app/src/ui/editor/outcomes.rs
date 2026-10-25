@@ -1111,8 +1111,13 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
                 .enumerate()
                 .map(|(index, _)| result_view_key(outcome.identity, index))
                 .collect::<Vec<_>>(),
-            StatementOutcomeKind::Streamed(result) => (0..result.total_pages)
-                .map(|page_index| result_view_key(outcome.identity, page_index as usize))
+            StatementOutcomeKind::Streamed(result) => result
+                .page_row_counts
+                .iter()
+                .enumerate()
+                .filter_map(|(page_index, row_count)| {
+                    (*row_count > 0).then(|| result_view_key(outcome.identity, page_index))
+                })
                 .collect::<Vec<_>>(),
             StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => Vec::new(),
         })

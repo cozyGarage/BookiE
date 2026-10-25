@@ -12,6 +12,8 @@
 - `cargo test -p tablepro-app-services stream_result_spool --lib`: 8 passed.
 - `cargo test -p tablepro-app stream_pages --lib`: 15 passed, 1 ignored for isolated GTK.
 - `cargo test -p tablepro-app --lib streamed_progress_pluralizes_rows_and_pages_independently`: passed.
+- `TABLEPRO_CHANGE_BASE=fa50f371c python3 scripts/run-change-contract-tests.py`: passed after fixing the existing empty-stream-page identity regression (796 app tests passed, 204 ignored).
+- `bash scripts/preflight.sh`: passed again after the page-identity fix. The Debian package check was skipped because this host is Arch Linux; no Debian tooling is needed for the Arch acceptance path.
 - `cargo build --profile ci --locked -p tablepro-app --bin tablepro-app`: passed.
 - `scripts/check-known-issues.py`, `scripts/check-doc-links.py`, `scripts/inventory-ignored-tests.py --check`, Python syntax compilation for `gtk_ux.py`, and `git diff --check`: passed.
 
@@ -28,4 +30,4 @@ It streamed 100,000 rows with 2 KiB text cells, navigated backward through every
 
 `python-atspi` was installed from Arch's `python-atspi` package because the selected `mise` Python did not include the binding. The GTK test uses `/usr/bin/python3`. The Debian package validation was skipped because `dpkg-deb` is not installed on this Arch host.
 
-The Forgejo gate and GitHub pull request checks have not run. This evidence is local and does not approve ADR 0025 or close #554.
+The installed GTK scenario and checks above are local evidence. GitHub's first PR run found an empty-stream-page identity regression in the full app suite; the fix is included in the current branch work and the full change-contract suite and preflight passed afterward. Refreshed GitHub checks and the Forgejo gate remain outstanding. This evidence does not approve ADR 0025 or close #554.
