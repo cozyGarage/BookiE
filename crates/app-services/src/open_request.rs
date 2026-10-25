@@ -31,7 +31,7 @@ pub fn classify_file(path: &Path) -> Result<DatabaseFile, OpenRejection> {
     }
     let extension = path
         .extension()
-        .and_then(|extension| extension.to_str())
+        .and_then(std::ffi::OsStr::to_str)
         .map(str::to_ascii_lowercase)
         .unwrap_or_default();
     let mut header = [0u8; 16];
