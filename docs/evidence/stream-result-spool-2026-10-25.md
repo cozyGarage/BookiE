@@ -2,6 +2,7 @@
 
 - **Branch**: `ux/stream-result-spool`
 - **Base**: `fa50f371c` (`fork/linux` fetched and equal before validation)
+- **Implementation commit**: `14634cc`
 - **Environment**: Arch Linux / Omarchy, PostgreSQL 17.11 fixture, installed local GTK test harness
 - **Acceptance**: #554, same-execution navigation through all fetched PostgreSQL result pages
 
