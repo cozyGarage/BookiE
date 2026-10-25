@@ -6387,6 +6387,7 @@ dependencies = [
  "chrono",
  "csv",
  "encoding_rs",
+ "libc",
  "rust_decimal",
  "rust_xlsxwriter",
  "secrecy",
