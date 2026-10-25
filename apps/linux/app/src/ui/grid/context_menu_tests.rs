@@ -58,9 +58,27 @@ fn copying_a_previewed_cell_copies_the_full_value() {
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
     rows.append(&row);
     let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
-    let snapshot = export_snapshot(&view, &[], false).unwrap();
+    let snapshot = export_snapshot(
+        &view,
+        &[ColumnInfo {
+            name: "value".into(),
+            data_type: "TEXT".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }],
+        false,
+    )
+    .unwrap();
 
     assert_eq!(snapshot.rows, vec![vec![Value::Text(full)]]);
+    assert_eq!(snapshot.columns.len(), 1);
 }
 
 #[test]
