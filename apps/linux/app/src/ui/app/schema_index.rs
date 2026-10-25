@@ -1,7 +1,7 @@
 use relm4::{ComponentController, ComponentSender};
 
 use super::{App, AppMsg};
-use crate::ui::editor::{catalog_reference, split_table_reference};
+use crate::ui::editor::catalog_reference;
 
 impl App {
     pub(super) fn set_completion_tables(
@@ -41,17 +41,15 @@ impl App {
                         if token.is_cancelled() {
                             break;
                         }
-                        let Some((schema, table)) = split_table_reference(&request.table, grammar) else {
-                            sender_clone.input(AppMsg::SchemaColumnsFetched(request, Err(())));
-                            continue;
-                        };
-                        let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
-                        let result = conn
-                            .fetch_columns_controlled(schema.as_deref(), &table, &control)
-                            .await
-                            .map(|columns| columns.into_iter().map(|column| column.name).collect())
-                            .map_err(|_| ());
-                        sender_clone.input(AppMsg::SchemaColumnsFetched(request, result));
+                        let (request, columns) = tablepro_app_services::completion::fetch_column_names(
+                            conn.clone(),
+                            request,
+                            grammar,
+                            timeout_secs,
+                            token.clone(),
+                        )
+                        .await;
+                        sender_clone.input(AppMsg::SchemaColumnsFetched(request, columns));
                     }
                 })
                 .drop_on_shutdown()
@@ -66,9 +64,9 @@ impl App {
         let Some(identity) = self.connection_id.and_then(|id| self.database.identity(id)) else {
             return;
         };
-        let mut index = self.schema_index.borrow_mut();
-        index.sync_connection(&identity);
-        index.complete_column_request(&request, columns);
+        self.schema_index
+            .borrow_mut()
+            .complete_column_request_for_connection(&identity, &request, columns);
     }
 
     pub(super) fn refresh_schema_index(&self) {
@@ -102,7 +100,7 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use super::split_table_reference;
+    use tablepro_app_services::completion_identifiers::split_table_reference;
     use tablepro_core::sql_syntax::SqlGrammar;
 
     #[test]
