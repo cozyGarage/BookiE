@@ -154,7 +154,7 @@ pub(super) fn install_page_loader(
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
             status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
         }
-        let _ = sender.input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
+        sender.input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
             generation,
             index,
             identity,
@@ -179,10 +179,7 @@ pub(super) fn complete_page_load(
     index: u64,
     identity: super::StatementIdentity,
     result: Result<Arc<QueryResult>, String>,
-    grid_sender: &relm4::Sender<GridMsg>,
-    connection_id: Option<uuid::Uuid>,
-    database: Arc<crate::services::database_service::DatabaseService>,
-    settings_store: LocalResultSettingsStore,
+    target: LiveStreamTarget<'_>,
 ) {
     let root = holder.clone().upcast::<gtk::Widget>();
     let Some(container) = named::<gtk::Box>(&root, &page_widget_name(generation, index)) else {
@@ -198,10 +195,10 @@ pub(super) fn complete_page_load(
         Ok(page) => {
             let widget = build_stream_page_widget(
                 &page,
-                grid_sender,
-                connection_id,
-                database,
-                settings_store,
+                target.grid_sender,
+                target.connection_id,
+                target.database,
+                target.settings_store,
                 result_view_key(identity, index as usize),
             );
             replace_stream_page_content(&container, &widget);
@@ -412,10 +409,12 @@ mod tests {
             0,
             StatementIdentity::default(),
             Ok(page(&[7, 8])),
-            &sender,
-            None,
-            Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
-            LocalResultSettingsStore::default(),
+            LiveStreamTarget {
+                grid_sender: &sender,
+                connection_id: None,
+                database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+                settings_store: LocalResultSettingsStore::default(),
+            },
         );
 
         let page_root = page_container.clone().upcast::<gtk::Widget>();

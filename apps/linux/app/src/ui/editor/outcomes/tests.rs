@@ -622,9 +622,11 @@ fn streamed_result_pages(
     let columns = pages.first().map_or_else(Vec::new, |page| page.columns.clone());
     let page_row_counts = (0..total_pages)
         .map(|index| {
-            (index >= first_page && index < first_page.saturating_add(pages.len() as u64))
-                .then(|| pages[(index - first_page) as usize].rows.len())
-                .unwrap_or(1)
+            if index >= first_page && index < first_page.saturating_add(pages.len() as u64) {
+                pages[(index - first_page) as usize].rows.len()
+            } else {
+                1
+            }
         })
         .collect();
     let streamed = StreamedResult {

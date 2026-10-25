@@ -87,7 +87,19 @@ impl SqlEditor {
                 export_query,
                 spool,
                 accepted,
-            } => self.on_stream_started(generation, identity, sql_preview, export_query, spool, accepted, sender),
+            } => self.on_stream_started(
+                ActiveStream {
+                    generation,
+                    identity,
+                    sql_preview,
+                    export_query,
+                    spool,
+                    cache: StreamPageCache::default(),
+                    error: None,
+                },
+                accepted,
+                sender,
+            ),
             Input::Page {
                 generation,
                 sequence,
@@ -107,44 +119,37 @@ impl SqlEditor {
                 index,
                 identity,
                 result,
-            } => super::stream_view::complete_page_load(
-                &self.results_holder,
-                generation,
-                index,
-                identity,
-                result,
-                &self.grid_sender,
-                self.connection_id,
-                self.database.clone(),
-                self.result_view_settings.clone(),
-            ),
+            } => {
+                let target = super::stream_view::LiveStreamTarget {
+                    grid_sender: &self.grid_sender,
+                    connection_id: self.connection_id,
+                    database: self.database.clone(),
+                    settings_store: self.result_view_settings.clone(),
+                };
+                super::stream_view::complete_page_load(
+                    &self.results_holder,
+                    generation,
+                    index,
+                    identity,
+                    result,
+                    target,
+                );
+            }
             Input::Finished { generation, terminal } => self.on_stream_finished(generation, terminal, sender),
         }
     }
 
     pub(super) fn on_stream_started(
         &mut self,
-        generation: u64,
-        identity: StatementIdentity,
-        sql_preview: String,
-        export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
-        spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
+        stream: ActiveStream,
         accepted: tokio::sync::oneshot::Sender<bool>,
         sender: &ComponentSender<Self>,
     ) {
-        if !self.run_generation.accepts(generation) {
+        if !self.run_generation.accepts(stream.generation) {
             let _ = accepted.send(false);
             return;
         }
-        self.streaming = Some(ActiveStream {
-            generation,
-            identity,
-            sql_preview,
-            export_query,
-            spool,
-            cache: StreamPageCache::default(),
-            error: None,
-        });
+        self.streaming = Some(stream);
         if self.results_holder.first_child().is_none() {
             let loading = waiting_for_stream_page();
             self.show_pins_above(&loading, sender);
@@ -311,7 +316,7 @@ fn load_stream_page(
                     .load_page(index, columns)
                     .await
                     .map_err(|_| crate::tr!("The saved result page could not be read.").to_string());
-                let _ = loader.input(SqlEditorInput::Stream(Input::PageLoaded {
+                loader.input(SqlEditorInput::Stream(Input::PageLoaded {
                     generation,
                     index,
                     identity,
