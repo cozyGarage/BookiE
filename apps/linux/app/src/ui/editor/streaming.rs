@@ -3,14 +3,7 @@ use super::*;
 use relm4::ComponentSender;
 
 pub(in crate::ui) enum Input {
-    Started {
-        generation: u64,
-        identity: StatementIdentity,
-        sql_preview: String,
-        export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
-        spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
-        accepted: tokio::sync::oneshot::Sender<bool>,
-    },
+    Started(StreamStart),
     Page {
         generation: u64,
         sequence: u64,
@@ -35,6 +28,15 @@ pub(in crate::ui) enum Input {
         generation: u64,
         terminal: StreamTerminal,
     },
+}
+
+pub(in crate::ui) struct StreamStart {
+    pub(super) generation: u64,
+    pub(super) identity: StatementIdentity,
+    pub(super) sql_preview: String,
+    pub(super) export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
+    pub(super) spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
+    pub(super) accepted: tokio::sync::oneshot::Sender<bool>,
 }
 
 pub(super) struct ActiveStream {
@@ -80,14 +82,7 @@ impl std::fmt::Debug for Input {
 impl SqlEditor {
     pub(super) fn on_stream_input(&mut self, input: Input, sender: &ComponentSender<Self>) {
         match input {
-            Input::Started {
-                generation,
-                identity,
-                sql_preview,
-                export_query,
-                spool,
-                accepted,
-            } => self.on_stream_started(generation, identity, sql_preview, export_query, spool, accepted, sender),
+            Input::Started(start) => self.on_stream_started(start, sender),
             Input::Page {
                 generation,
                 sequence,
@@ -108,30 +103,31 @@ impl SqlEditor {
                 identity,
                 result,
             } => super::stream_view::complete_page_load(
-                &self.results_holder,
-                generation,
-                index,
-                identity,
+                super::stream_view::PageLoadContext {
+                    holder: &self.results_holder,
+                    generation,
+                    index,
+                    identity,
+                    grid_sender: &self.grid_sender,
+                    connection_id: self.connection_id,
+                    database: self.database.clone(),
+                    settings_store: self.result_view_settings.clone(),
+                },
                 result,
-                &self.grid_sender,
-                self.connection_id,
-                self.database.clone(),
-                self.result_view_settings.clone(),
             ),
             Input::Finished { generation, terminal } => self.on_stream_finished(generation, terminal, sender),
         }
     }
 
-    pub(super) fn on_stream_started(
-        &mut self,
-        generation: u64,
-        identity: StatementIdentity,
-        sql_preview: String,
-        export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
-        spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
-        accepted: tokio::sync::oneshot::Sender<bool>,
-        sender: &ComponentSender<Self>,
-    ) {
+    pub(super) fn on_stream_started(&mut self, start: StreamStart, sender: &ComponentSender<Self>) {
+        let StreamStart {
+            generation,
+            identity,
+            sql_preview,
+            export_query,
+            spool,
+            accepted,
+        } = start;
         if !self.run_generation.accepts(generation) {
             let _ = accepted.send(false);
             return;
@@ -311,7 +307,7 @@ fn load_stream_page(
                     .load_page(index, columns)
                     .await
                     .map_err(|_| crate::tr!("The saved result page could not be read.").to_string());
-                let _ = loader.input(SqlEditorInput::Stream(Input::PageLoaded {
+                loader.input(SqlEditorInput::Stream(Input::PageLoaded {
                     generation,
                     index,
                     identity,

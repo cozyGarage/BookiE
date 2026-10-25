@@ -200,18 +200,19 @@ where
                 continue;
             }
         };
-        let attempt = StreamAttempt::new(
-            &target,
+        let attempt = StreamAttempt {
+            target: &target,
             single_statement,
             driver_id,
-            &bound,
+            bound_sql: &bound.sql,
+            bound_params: &bound.values,
             identity,
-            preview.clone(),
-            &sql,
+            preview: preview.clone(),
+            sql: &sql,
             started,
             control,
-            stream_spool_manager.clone(),
-        );
+            spool_manager: stream_spool_manager.clone(),
+        };
         let kind = match run_statement(attempt, &mut stream_update, &succeeded).await {
             Ok(kind) => kind,
             Err(Halt::Finished(result)) => return result,
@@ -388,35 +389,6 @@ struct StreamAttempt<'a> {
     started: std::time::Instant,
     control: &'a OperationControl,
     spool_manager: StreamResultSpoolManager,
-}
-
-impl<'a> StreamAttempt<'a> {
-    fn new(
-        target: &'a super::session_mode::StatementTarget,
-        single_statement: bool,
-        driver_id: &'a str,
-        bound: &'a crate::services::query_parameters::BoundStatement,
-        identity: StatementIdentity,
-        preview: String,
-        sql: &'a str,
-        started: std::time::Instant,
-        control: &'a OperationControl,
-        spool_manager: StreamResultSpoolManager,
-    ) -> Self {
-        Self {
-            target,
-            single_statement,
-            driver_id,
-            bound_sql: &bound.sql,
-            bound_params: &bound.values,
-            identity,
-            preview,
-            sql,
-            started,
-            control,
-            spool_manager,
-        }
-    }
 }
 
 async fn stream_statement_if_supported<F, Fut>(
@@ -1115,9 +1087,8 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
                 .page_row_counts
                 .iter()
                 .enumerate()
-                .filter_map(|(page_index, row_count)| {
-                    (*row_count > 0).then(|| result_view_key(outcome.identity, page_index))
-                })
+                .filter(|&(_, row_count)| *row_count > 0)
+                .map(|(page_index, _)| result_view_key(outcome.identity, page_index))
                 .collect::<Vec<_>>(),
             StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => Vec::new(),
         })

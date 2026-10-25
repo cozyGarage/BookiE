@@ -1,23 +1,21 @@
 # Stream result spool local evidence
 
 - **Branch**: `ux/stream-result-spool`
-- **Base**: `fa50f371c` (`fork/linux` fetched and equal before validation)
-- **Implementation commit**: `14634cc`
+- **Base**: `fa50f371c` (`fork/linux` was fetched; the branch contains the current Linux tip)
+- **Implementation commits**: `14634cc`, `fc2ec18`, `a799f05`, plus the incremental-encoding follow-up on this branch
 - **Environment**: Arch Linux / Omarchy, PostgreSQL 17.11 fixture, installed local GTK test harness
 - **Acceptance**: #554, same-execution navigation through all fetched PostgreSQL result pages
 
 ## Checks
 
-- `bash scripts/preflight.sh`: passed. This included 509 script-harness tests, 2,124 unit tests, 291 sandbox tests and the Redis sandbox integration. Formatting, Clippy, size, panic, crate-boundary and ignored-test inventory guards passed.
-- `cargo test -p tablepro-app-services stream_result_spool --lib`: 8 passed.
-- `cargo test -p tablepro-app stream_pages --lib`: 15 passed, 1 ignored for isolated GTK.
-- `cargo test -p tablepro-app --lib streamed_progress_pluralizes_rows_and_pages_independently`: passed.
-- `TABLEPRO_CHANGE_BASE=fa50f371c python3 scripts/run-change-contract-tests.py`: passed after fixing the existing empty-stream-page identity regression (796 app tests passed, 204 ignored).
-- `bash scripts/preflight.sh`: passed again after the page-identity fix. The Debian package check was skipped because this host is Arch Linux; no Debian tooling is needed for the Arch acceptance path.
-- `cargo build --profile ci --locked -p tablepro-app --bin tablepro-app`: passed.
-- `scripts/check-known-issues.py`, `scripts/check-doc-links.py`, `scripts/inventory-ignored-tests.py --check`, Python syntax compilation for `gtk_ux.py`, and `git diff --check`: passed.
+- `cargo test -p tablepro-app-services --lib stream_result_spool`: 9 passed. Coverage includes typed round trips, exact float bits and JSON precision, repeated-load idempotency, page order, tamper refusal, shared quota, cleanup, and stopping serialization when the quota is reached.
+- `cargo clippy --locked -p tablepro-app --lib --tests -- -D warnings`: passed after addressing the first hosted fast-check findings with context types and clearer iterator/control-flow code.
+- `bash scripts/ci-local.sh full`: passed after those changes. This ran 2,921 unit tests (220 skipped), 291 sandbox tests and one Redis sandbox integration. All validation guards passed.
+- `bash scripts/preflight.sh`: passed on the spool implementation before the final Clippy cleanup, with 509 script-harness tests, 2,125 unit tests, 291 sandbox tests and one Redis sandbox integration. Its first run had one timing failure in `approval_wait::time_spent_in_approval_is_reported_inside_a_tracked_run`; the focused test passed, and the full preflight passed on rerun.
+- `cargo build --profile ci --locked -p tablepro-app --bin tablepro-app`: passed after the incremental encoder change.
+- `python3 scripts/check-known-issues.py`, `python3 scripts/check-doc-links.py`, `python3 scripts/inventory-ignored-tests.py --check`, `cargo fmt --all -- --check`, and `git diff --check`: passed.
 
-The GTK scenario passed with this command:
+The installed GTK scenario passed after rebuilding the final local source state (26.079 seconds):
 
 ```bash
 PATH=/usr/bin:/bin:/home/trung/.cargo/bin \
@@ -26,8 +24,10 @@ TABLEPRO_GTK_SCENARIO=postgres_large_stream_pages_round_trip_from_spool \
 bash scripts/test-gtk-postgres.sh
 ```
 
-It streamed 100,000 rows with 2 KiB text cells, navigated backward through every 5,000-row page, reloaded earlier pages from the spool, returned to the first page, and checked that the transaction timestamp marker stayed unchanged after visiting other pages. This verifies that page navigation reads the original execution rather than rerunning the query.
+It streamed 100,000 rows with 2 KiB text cells, navigated backward through every 5,000-row page, reloaded earlier pages from the spool, returned to the first page, and verified that the transaction marker stayed unchanged after visiting other pages.
 
-`python-atspi` was installed from Arch's `python-atspi` package because the selected `mise` Python did not include the binding. The GTK test uses `/usr/bin/python3`. The Debian package validation was skipped because `dpkg-deb` is not installed on this Arch host.
+The first GitHub fast-check run found an empty-page identity regression; it was fixed in `a799f05`. The next run on that commit failed Clippy in newly changed editor functions and a test helper. Those findings were fixed in the incremental-encoding follow-up, and `ci-local.sh full` passed locally afterward. GitHub must rerun checks on the new commit. Forgejo has not run; the maintainer handles that gate. PR #1621 and issue #554 remain open. This evidence does not approve ADR 0025 or close #554.
 
-The installed GTK scenario and checks above are local evidence. GitHub's first PR run found an empty-stream-page identity regression in the full app suite; the fix is included in the current branch work and the full change-contract suite and preflight passed afterward. Refreshed GitHub checks and the Forgejo gate remain outstanding. This evidence does not approve ADR 0025 or close #554.
+The encoder writes MessagePack directly into encrypted 64 KiB chunks and refuses further output once the shared spool quota is exhausted, avoiding a second full-page serialization buffer. Exact arbitrary-precision JSON round trips still require rendering one JSON cell to temporary text during encoding. The existing page itself remains live until the editor acknowledges the append.
+
+`python-atspi` is installed from Arch's `python-atspi` package; the GTK scenario uses `/usr/bin/python3`. Debian package validation is skipped because this host is Arch Linux and does not have `dpkg-deb`.

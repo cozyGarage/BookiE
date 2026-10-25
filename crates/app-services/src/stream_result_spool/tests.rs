@@ -1,11 +1,32 @@
 use super::*;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::AsRawFd;
 use std::str::FromStr;
 use std::sync::Arc;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
+
+struct CountingSequence {
+    items: usize,
+    serialized: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl Serialize for CountingSequence {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut sequence = serializer.serialize_seq(Some(self.items))?;
+        for item in 0..self.items {
+            sequence.serialize_element(&(item as u64))?;
+            self.serialized.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        sequence.end()
+    }
+}
 
 fn result(values: Vec<Value>) -> Arc<QueryResult> {
     let columns = values
@@ -113,6 +134,31 @@ async fn quota_refusal_leaves_no_partial_page_and_releases_reservation() {
     let error = spool.append_page(0, page).await.expect_err("quota refusal");
 
     assert_eq!(error, StreamResultSpoolError::QuotaExceeded);
+    assert_eq!(spool.page_count(), 0);
+    assert_eq!(manager.reserved_bytes(), 0);
+}
+
+#[test]
+fn quota_refusal_stops_encoding_before_the_whole_page_is_serialized() {
+    let limit = ENCRYPTION_CHUNK_BYTES as u64 + FRAME_HEADER_BYTES + AUTH_TAG_BYTES + 1024;
+    let manager = StreamResultSpoolManager::with_limit(limit);
+    let spool = manager.create().expect("spool");
+    let serialized = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let page = CountingSequence {
+        items: 250_000,
+        serialized: serialized.clone(),
+    };
+
+    let error = append_serialized_page(
+        &spool.inner,
+        &mut spool.inner.file.lock().expect("spool file"),
+        0,
+        &page,
+    )
+    .expect_err("quota refusal");
+
+    assert_eq!(error, StreamResultSpoolError::QuotaExceeded);
+    assert!(serialized.load(std::sync::atomic::Ordering::Relaxed) < page.items);
     assert_eq!(spool.page_count(), 0);
     assert_eq!(manager.reserved_bytes(), 0);
 }

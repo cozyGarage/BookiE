@@ -1072,24 +1072,26 @@ impl SqlEditor {
                                     spool,
                                 } => {
                                     let (accepted, delivered) = tokio::sync::oneshot::channel();
-                                    sender.input(SqlEditorInput::Stream(streaming::Input::Started {
-                                        generation,
-                                        identity,
-                                        sql_preview,
-                                        export_query: export_origin.map(|origin| {
-                                            crate::ui::export_dialog::StreamExportQuery {
-                                                origin,
-                                                driver_id: export_driver_id.clone(),
-                                                sql,
-                                                params,
-                                                timeout_secs,
-                                                suggested_name: export_suggested_name.clone(),
-                                                session: export_session.clone(),
-                                            }
-                                        }),
-                                        spool,
-                                        accepted,
-                                    }));
+                                    sender.input(SqlEditorInput::Stream(streaming::Input::Started(
+                                        streaming::StreamStart {
+                                            generation,
+                                            identity,
+                                            sql_preview,
+                                            export_query: export_origin.map(|origin| {
+                                                crate::ui::export_dialog::StreamExportQuery {
+                                                    origin,
+                                                    driver_id: export_driver_id.clone(),
+                                                    sql,
+                                                    params,
+                                                    timeout_secs,
+                                                    suggested_name: export_suggested_name.clone(),
+                                                    session: export_session.clone(),
+                                                }
+                                            }),
+                                            spool,
+                                            accepted,
+                                        },
+                                    )));
                                     delivered.await.unwrap_or(false)
                                 }
                                 StreamUpdate::Page {

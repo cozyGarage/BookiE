@@ -154,7 +154,7 @@ pub(super) fn install_page_loader(
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
             status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
         }
-        let _ = sender.input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
+        sender.input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
             generation,
             index,
             identity,
@@ -173,17 +173,28 @@ fn page_index_from_name(widget: &gtk::Widget, generation: u64) -> Option<u64> {
     index.parse().ok()
 }
 
-pub(super) fn complete_page_load(
-    holder: &gtk::Box,
-    generation: u64,
-    index: u64,
-    identity: super::StatementIdentity,
-    result: Result<Arc<QueryResult>, String>,
-    grid_sender: &relm4::Sender<GridMsg>,
-    connection_id: Option<uuid::Uuid>,
-    database: Arc<crate::services::database_service::DatabaseService>,
-    settings_store: LocalResultSettingsStore,
-) {
+pub(super) struct PageLoadContext<'a> {
+    pub(super) holder: &'a gtk::Box,
+    pub(super) generation: u64,
+    pub(super) index: u64,
+    pub(super) identity: super::StatementIdentity,
+    pub(super) grid_sender: &'a relm4::Sender<GridMsg>,
+    pub(super) connection_id: Option<uuid::Uuid>,
+    pub(super) database: Arc<crate::services::database_service::DatabaseService>,
+    pub(super) settings_store: LocalResultSettingsStore,
+}
+
+pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Arc<QueryResult>, String>) {
+    let PageLoadContext {
+        holder,
+        generation,
+        index,
+        identity,
+        grid_sender,
+        connection_id,
+        database,
+        settings_store,
+    } = context;
     let root = holder.clone().upcast::<gtk::Widget>();
     let Some(container) = named::<gtk::Box>(&root, &page_widget_name(generation, index)) else {
         return;
@@ -407,15 +418,17 @@ mod tests {
         holder.append(&stale_container);
 
         complete_page_load(
-            &holder,
-            42,
-            0,
-            StatementIdentity::default(),
+            PageLoadContext {
+                holder: &holder,
+                generation: 42,
+                index: 0,
+                identity: StatementIdentity::default(),
+                grid_sender: &sender,
+                connection_id: None,
+                database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+                settings_store: LocalResultSettingsStore::default(),
+            },
             Ok(page(&[7, 8])),
-            &sender,
-            None,
-            Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
-            LocalResultSettingsStore::default(),
         );
 
         let page_root = page_container.clone().upcast::<gtk::Widget>();

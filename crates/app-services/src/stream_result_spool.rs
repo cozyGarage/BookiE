@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -84,6 +84,16 @@ struct PageLocation {
     offset: u64,
     chunks: u32,
     first_nonce: u64,
+}
+
+struct EncryptedPageWriter<'a> {
+    inner: &'a SpoolInner,
+    spool: &'a mut SpoolFile,
+    page_index: u64,
+    buffer: Vec<u8>,
+    chunks: u32,
+    reserved: u64,
+    failure: Option<StreamResultSpoolError>,
 }
 
 struct StoredPageRef<'a> {
@@ -306,52 +316,137 @@ fn append_page_blocking(inner: &Arc<SpoolInner>, index: u64, page: &QueryResult)
     if index != spool.pages.len() as u64 {
         return Err(StreamResultSpoolError::OutOfOrder);
     }
-    let payload = rmp_serde::to_vec(&StoredPageRef {
-        rows: &page.rows,
-        truncated: page.truncated,
-    })
-    .map_err(|_| StreamResultSpoolError::Decode)?;
-    append_encrypted_payload(inner, &mut spool, index, &payload)
+    append_serialized_page(
+        inner,
+        &mut spool,
+        index,
+        &StoredPageRef {
+            rows: &page.rows,
+            truncated: page.truncated,
+        },
+    )
 }
 
-fn append_encrypted_payload(
+fn append_serialized_page<T: Serialize>(
     inner: &SpoolInner,
     spool: &mut SpoolFile,
     page_index: u64,
-    payload: &[u8],
+    page: &T,
 ) -> Result<(), StreamResultSpoolError> {
     let offset = spool
         .file
         .seek(SeekFrom::End(0))
         .map_err(|_| StreamResultSpoolError::Io)?;
-    let first_nonce = spool.next_nonce;
-    let mut reserved = 0_u64;
-    let chunks = payload.chunks(ENCRYPTION_CHUNK_BYTES).collect::<Vec<_>>();
-    let result = write_payload_chunks(inner, spool, page_index, &chunks, &mut reserved);
-    if let Err(error) = result {
+    let (error, reserved, chunks) = {
+        let mut writer = EncryptedPageWriter::new(inner, spool, page_index);
+        let serialized = rmp_serde::encode::write(&mut writer, page);
+        if serialized.is_ok() {
+            writer.finish();
+        }
+        let error = writer
+            .failure
+            .take()
+            .or_else(|| serialized.err().map(|_| StreamResultSpoolError::Decode));
+        (error, writer.reserved, writer.chunks)
+    };
+    if let Some(error) = error {
         rollback_page(inner, spool, offset, reserved)?;
         return Err(error);
+    }
+    if chunks == 0 {
+        rollback_page(inner, spool, offset, reserved)?;
+        return Err(StreamResultSpoolError::InvalidFrame);
     }
     inner.reserved.fetch_add(reserved, Ordering::AcqRel);
     spool.pages.push(PageLocation {
         offset,
-        chunks: u32::try_from(chunks.len()).map_err(|_| StreamResultSpoolError::InvalidFrame)?,
-        first_nonce,
+        chunks,
+        first_nonce: spool.next_nonce - u64::from(chunks),
     });
     Ok(())
 }
 
-fn write_payload_chunks(
-    inner: &SpoolInner,
-    spool: &mut SpoolFile,
-    page_index: u64,
-    chunks: &[&[u8]],
-    reserved: &mut u64,
-) -> Result<(), StreamResultSpoolError> {
-    for chunk in chunks {
-        write_payload_chunk(inner, spool, page_index, chunk, reserved)?;
+impl<'a> EncryptedPageWriter<'a> {
+    fn new(inner: &'a SpoolInner, spool: &'a mut SpoolFile, page_index: u64) -> Self {
+        Self {
+            inner,
+            spool,
+            page_index,
+            buffer: Vec::with_capacity(ENCRYPTION_CHUNK_BYTES),
+            chunks: 0,
+            reserved: 0,
+            failure: None,
+        }
     }
-    spool.file.flush().map_err(|_| StreamResultSpoolError::Io)
+
+    fn finish(&mut self) {
+        if self.failure.is_some() {
+            return;
+        }
+        if let Err(error) = self.write_buffer() {
+            self.failure = Some(error);
+            return;
+        }
+        if self.spool.file.flush().is_err() {
+            self.failure = Some(StreamResultSpoolError::Io);
+        }
+    }
+
+    fn write_buffer(&mut self) -> Result<(), StreamResultSpoolError> {
+        if self.buffer.is_empty() {
+            return Ok(());
+        }
+        write_payload_chunk(
+            self.inner,
+            self.spool,
+            self.page_index,
+            &self.buffer,
+            &mut self.reserved,
+        )?;
+        self.buffer.clear();
+        self.chunks = self.chunks.checked_add(1).ok_or(StreamResultSpoolError::InvalidFrame)?;
+        Ok(())
+    }
+
+    fn io_error(&mut self, error: StreamResultSpoolError) -> io::Error {
+        self.failure = Some(error);
+        io::Error::other("encrypted result spool write failed")
+    }
+}
+
+impl io::Write for EncryptedPageWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.failure.is_some() {
+            return Err(io::Error::other("encrypted result spool write failed"));
+        }
+        let mut accepted = 0;
+        while accepted < bytes.len() {
+            let capacity = ENCRYPTION_CHUNK_BYTES - self.buffer.len();
+            let length = capacity.min(bytes.len() - accepted);
+            self.buffer.extend_from_slice(&bytes[accepted..accepted + length]);
+            accepted += length;
+            if self.buffer.len() == ENCRYPTION_CHUNK_BYTES
+                && let Err(error) = self.write_buffer()
+            {
+                let error = self.io_error(error);
+                return if accepted == 0 { Err(error) } else { Ok(accepted) };
+            }
+        }
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if let Some(error) = self.failure.take() {
+            return Err(self.io_error(error));
+        }
+        if let Err(error) = self.write_buffer() {
+            return Err(self.io_error(error));
+        }
+        if self.spool.file.flush().is_err() {
+            return Err(self.io_error(StreamResultSpoolError::Io));
+        }
+        Ok(())
+    }
 }
 
 fn write_payload_chunk(
