@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use tablepro_core::sql_syntax::SqlGrammar;
 use tablepro_core::sql_syntax::script::LexicalSettings;
+use tokio_util::sync::CancellationToken;
 
 use super::completion_identifiers::{bare_reference, table_key, words};
 
@@ -24,6 +25,27 @@ pub struct SchemaIndex {
     pub grammar: Option<SqlGrammar>,
     connection: Option<crate::connection_identity::ConnectionIdentity>,
     generation: u64,
+    requests: ColumnRequests,
+}
+
+#[derive(Default)]
+struct ColumnRequests {
+    pending: HashSet<String>,
+    cancellation: CancellationToken,
+}
+
+impl ColumnRequests {
+    fn retire(&mut self) {
+        self.pending.clear();
+        self.cancellation.cancel();
+        self.cancellation = CancellationToken::new();
+    }
+}
+
+impl Drop for ColumnRequests {
+    fn drop(&mut self) {
+        self.cancellation.cancel();
+    }
 }
 
 impl std::fmt::Debug for SchemaIndex {
@@ -59,6 +81,7 @@ impl SchemaIndex {
     pub fn invalidate_columns(&mut self) {
         self.generation = self.generation.wrapping_add(1);
         self.columns.clear();
+        self.retire_column_requests();
     }
 
     pub fn clear(&mut self) {
@@ -68,6 +91,7 @@ impl SchemaIndex {
         self.columns.clear();
         self.grammar = None;
         self.connection = None;
+        self.retire_column_requests();
     }
 
     pub fn sync_connection(&mut self, connection: &crate::connection_identity::ConnectionIdentity) -> bool {
@@ -80,6 +104,7 @@ impl SchemaIndex {
         self.tables.clear();
         self.table_keys = HashSet::new();
         self.columns.clear();
+        self.retire_column_requests();
         true
     }
 
@@ -88,6 +113,43 @@ impl SchemaIndex {
             generation: self.generation,
             table,
         }
+    }
+
+    pub fn request_missing_columns(&mut self, tables: Vec<String>) -> Vec<SchemaRequest> {
+        let mut requests = Vec::new();
+        for table in tables {
+            if !self.needs_columns(&table) {
+                continue;
+            }
+            let Some(key) = table_key(&table, self.grammar) else {
+                continue;
+            };
+            if self.requests.pending.insert(key) {
+                requests.push(self.request(table));
+            }
+        }
+        requests
+    }
+
+    pub fn column_request_token(&self) -> CancellationToken {
+        self.requests.cancellation.clone()
+    }
+
+    pub fn complete_column_request(&mut self, request: &SchemaRequest, columns: Result<Vec<String>, ()>) -> bool {
+        if !self.accepts(request) {
+            return false;
+        }
+        let Some(key) = table_key(&request.table, self.grammar) else {
+            return false;
+        };
+        if !self.requests.pending.contains(&key) {
+            return false;
+        }
+        if let Ok(columns) = columns {
+            self.columns.insert(key.clone(), columns);
+        }
+        self.requests.pending.remove(&key);
+        true
     }
 
     pub fn accepts(&self, request: &SchemaRequest) -> bool {
@@ -131,6 +193,10 @@ impl SchemaIndex {
         if let Some(key) = table_key(table, self.grammar) {
             self.columns.insert(key, columns);
         }
+    }
+
+    fn retire_column_requests(&mut self) {
+        self.requests.retire();
     }
 }
 
@@ -451,6 +517,9 @@ fn table_references(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn column_requests_require_a_complete_catalog_name() {
@@ -585,6 +654,179 @@ mod tests {
 
         assert!(!index.accepts(&current));
         assert!(index.accepts(&index.request("users".into())));
+    }
+
+    #[test]
+    fn a_shared_completion_fetch_survives_one_editor_closing_and_cancels_with_its_owner() {
+        let window = Rc::new(RefCell::new(completion_index()));
+        let requesting_editor = window.clone();
+        let remaining_editor = window.clone();
+        let request = request_one(&mut requesting_editor.borrow_mut());
+        let token = window.borrow().column_request_token();
+
+        drop(requesting_editor);
+
+        assert!(!token.is_cancelled());
+        assert!(
+            remaining_editor
+                .borrow_mut()
+                .request_missing_columns(vec!["public.users".into()])
+                .is_empty()
+        );
+        assert!(
+            remaining_editor
+                .borrow_mut()
+                .complete_column_request(&request, Ok(vec!["id".into()]))
+        );
+        assert_eq!(
+            remaining_editor.borrow().columns_for("public.users"),
+            Some(&vec!["id".into()])
+        );
+        drop(remaining_editor);
+        assert!(!token.is_cancelled());
+
+        drop(window);
+
+        assert!(token.is_cancelled());
+    }
+
+    #[test]
+    fn a_failed_completion_fetch_can_be_admitted_again() {
+        let mut index = completion_index();
+        let request = request_one(&mut index);
+
+        assert!(index.complete_column_request(&request, Err(())));
+        let retry = request_one(&mut index);
+        assert!(index.complete_column_request(&retry, Ok(Vec::new())));
+        assert!(index.request_missing_columns(vec!["public.users".into()]).is_empty());
+    }
+
+    #[test]
+    fn schema_invalidation_cancels_pending_reads_and_rejects_late_results() {
+        let mut index = completion_index();
+        let request = request_one(&mut index);
+        let token = index.column_request_token();
+
+        index.invalidate_columns();
+
+        assert!(token.is_cancelled());
+        assert_eq!(index.request(String::new()).generation, request.generation + 1);
+        assert!(!index.complete_column_request(&request, Ok(vec!["stale".into()])));
+    }
+
+    #[test]
+    fn clearing_connection_metadata_cancels_pending_reads_and_retires_the_generation() {
+        let mut index = completion_index();
+        let request = request_one(&mut index);
+        let token = index.column_request_token();
+
+        index.clear();
+
+        assert!(token.is_cancelled());
+        assert_eq!(index.request(String::new()).generation, request.generation + 1);
+        assert!(!index.complete_column_request(&request, Ok(vec!["stale".into()])));
+    }
+
+    #[test]
+    fn connection_replacement_cancels_old_fetches_and_rejects_late_results() {
+        let first: Arc<dyn tablepro_core::Connection> = Arc::new(IdentityConnection);
+        let replacement: Arc<dyn tablepro_core::Connection> = Arc::new(IdentityConnection);
+        let mut index = completion_index();
+        let first_identity = crate::connection_identity::ConnectionIdentity::from_connection(&first);
+        let replacement_identity = crate::connection_identity::ConnectionIdentity::from_connection(&replacement);
+
+        assert!(index.sync_connection(&first_identity));
+        index.set_tables(vec!["public.users".into()]);
+        let request = request_one(&mut index);
+        let token = index.column_request_token();
+        let old_generation = request.generation;
+        assert!(!index.sync_connection(&first_identity));
+
+        assert!(index.sync_connection(&replacement_identity));
+
+        assert!(token.is_cancelled());
+        assert_eq!(index.request(String::new()).generation, old_generation + 1);
+        assert!(!index.complete_column_request(&request, Err(())));
+        index.set_tables(vec!["public.users".into()]);
+        let next = request_one(&mut index);
+        assert!(!index.complete_column_request(&request, Ok(vec!["stale".into()])));
+        assert!(index.request_missing_columns(vec!["public.users".into()]).is_empty());
+        assert!(index.complete_column_request(&next, Ok(vec!["id".into()])));
+        assert_eq!(index.columns_for("public.users"), Some(&vec!["id".into()]));
+        assert!(!index.column_request_token().is_cancelled());
+    }
+
+    fn completion_index() -> SchemaIndex {
+        let mut index = SchemaIndex {
+            grammar: Some(SqlGrammar::PostgreSql),
+            ..SchemaIndex::default()
+        };
+        index.set_tables(vec!["public.users".into()]);
+        index
+    }
+
+    fn request_one(index: &mut SchemaIndex) -> SchemaRequest {
+        let mut requests = index.request_missing_columns(vec!["public.users".into()]);
+        assert_eq!(requests.len(), 1);
+        requests.remove(0)
+    }
+
+    struct IdentityConnection;
+
+    #[async_trait::async_trait]
+    impl tablepro_core::Connection for IdentityConnection {
+        async fn list_tables(&self) -> Result<Vec<tablepro_core::TableInfo>, tablepro_core::DriverError> {
+            Ok(Vec::new())
+        }
+
+        async fn fetch_columns(
+            &self,
+            _schema: Option<&str>,
+            _table: &str,
+        ) -> Result<Vec<tablepro_core::ColumnInfo>, tablepro_core::DriverError> {
+            Ok(Vec::new())
+        }
+
+        async fn fetch_rows(
+            &self,
+            _schema: Option<&str>,
+            _table: &str,
+            _offset: u64,
+            _limit: u64,
+        ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
+            Err(tablepro_core::DriverError::Unsupported("unused".into()))
+        }
+
+        async fn query(&self, _sql: &str) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
+            Err(tablepro_core::DriverError::Unsupported("unused".into()))
+        }
+
+        async fn execute(&self, _sql: &str) -> Result<tablepro_core::ExecResult, tablepro_core::DriverError> {
+            Err(tablepro_core::DriverError::Unsupported("unused".into()))
+        }
+
+        async fn execute_params(
+            &self,
+            _sql: &str,
+            _params: &[tablepro_core::Value],
+        ) -> Result<tablepro_core::ExecResult, tablepro_core::DriverError> {
+            Err(tablepro_core::DriverError::Unsupported("unused".into()))
+        }
+
+        async fn execute_in_transaction(
+            &self,
+            _statements: &[(String, Vec<tablepro_core::Value>)],
+        ) -> Result<Vec<u64>, tablepro_core::DriverError> {
+            Err(tablepro_core::DriverError::Unsupported("unused".into()))
+        }
+
+        async fn ping(&self) -> Result<(), tablepro_core::DriverError> {
+            Ok(())
+        }
+
+        async fn close(self: Box<Self>) -> Result<(), tablepro_core::DriverError> {
+            Ok(())
+        }
     }
 
     fn candidates(sql: &str) -> Vec<String> {
