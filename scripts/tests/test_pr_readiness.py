@@ -85,6 +85,25 @@ class PullRequestReadinessTests(unittest.TestCase):
 
         self.assertFalse(readiness.check_suite_matches(suite, 7, "a" * 40))
 
+    def test_renamed_files_classify_both_paths_when_selecting_checks(self):
+        class Api(readiness.GitHubApi):
+            def __init__(self):
+                super().__init__("cozyGarage/BookiE", "token", "https://api.github.com")
+
+            def get(self, _path):
+                return {"changed_files": 1}
+
+            def pages(self, _path, _key=None):
+                return [{"filename": "docs/query.md", "previous_filename": "crates/core/src/query.rs"}]
+
+        paths = Api().pull_request_paths(7)
+        required = readiness.required_contexts(paths)
+
+        self.assertIn("crates/core/src/query.rs", paths)
+        self.assertIn("docs/query.md", paths)
+        self.assertIn("Fast checks (GTK)", required)
+        self.assertIn("harness", required)
+
     def test_missing_checks_remain_pending(self):
         result = readiness.evaluate_checks(["pr-title"], [])
 

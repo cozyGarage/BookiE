@@ -147,9 +147,15 @@ class GitHubApi:
         changed_files = pull.get("changed_files")
         if not isinstance(changed_files, int) or changed_files != len(files):
             raise ReadinessError("Pull request file list is incomplete; split the pull request before merging")
-        paths = [file.get("filename") for file in files]
-        if not all(isinstance(path, str) and path for path in paths):
-            raise ReadinessError("GitHub API returned an invalid pull request path")
+        paths = []
+        for file in files:
+            filename = file.get("filename")
+            previous_filename = file.get("previous_filename")
+            if not isinstance(filename, str) or not filename:
+                raise ReadinessError("GitHub API returned an invalid pull request path")
+            if isinstance(previous_filename, str) and previous_filename:
+                paths.append(previous_filename)
+            paths.append(filename)
         return paths
 
     def check_runs_for_pull_request(self, pull_number, head_sha):
