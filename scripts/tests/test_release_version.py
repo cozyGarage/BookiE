@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
 
@@ -13,6 +14,19 @@ SPEC.loader.exec_module(VERSION)
 
 
 class ReleaseVersionTests(unittest.TestCase):
+    def test_published_release_metadata_matches_release_record(self):
+        root = Path(__file__).resolve().parents[2]
+        metadata = ET.parse(root / "apps/linux/flatpak/com.tablepro.linux.metainfo.xml")
+        release = metadata.find("releases/release")
+
+        self.assertIsNotNone(release)
+        if release is None:
+            return
+        self.assertEqual(
+            (release.get("version"), release.get("type"), release.get("date")),
+            ("0.2.0", "stable", "2026-10-23"),
+        )
+
     def fixture(self, root):
         (root / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/*"]\n[workspace.package]\nversion = "0.2.0"\n')
         crate = root / "crates/core/Cargo.toml"
