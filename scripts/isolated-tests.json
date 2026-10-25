@@ -58,6 +58,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::pinned::tests::evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width"
     ],
     [
@@ -535,6 +540,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::structure_tab::tests::sql_preview_is_read_only_without_a_visible_cursor"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::export_dialog::tests::a_full_export_shows_a_refusal_without_opening_its_source"
     ],
     [
@@ -996,6 +1006,11 @@
       "tablepro-app",
       "--lib",
       "ui::connect_dialog::controls::tests::dropping_a_choice_row_releases_its_popup"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::connect_dialog::controls::tests::port_input_reserves_room_for_a_five_digit_port"
     ],
     [
       "tablepro-app",
