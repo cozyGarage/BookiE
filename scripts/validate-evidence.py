@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE = ROOT / "docs/evidence"
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 COMMIT_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
+MAX_SOURCE_COMMITS = 128
 
 
 def test_selector(command):
@@ -121,6 +122,9 @@ def validate_manifest(path, strict=False):
     if not isinstance(source_commits, dict):
         (errors if strict else warnings).append(f"{path}: source_commits must map source paths to commits")
         source_commits = {}
+    if len(source_commits) > MAX_SOURCE_COMMITS:
+        errors.append(f"{path}: too many per-file source commits (maximum {MAX_SOURCE_COMMITS})")
+        return errors, warnings
     for name in source_commits.keys() - source_digests.keys():
         errors.append(f"{path}: source_commits has no matching source_sha256 entry for {name}")
     for name, expected in source_digests.items():

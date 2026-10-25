@@ -207,6 +207,20 @@ class EvidenceManifestTests(unittest.TestCase):
 
         self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
 
+    def test_manifest_rejects_an_oversized_per_file_source_commit_map_before_git_lookup(self):
+        path, manifest = self.fixture()
+        source_names = [f"source-{index}.rs" for index in range(VALIDATOR.MAX_SOURCE_COMMITS + 1)]
+        expected = hashlib.sha256(b"source").hexdigest()
+        manifest["source_sha256"] = {name: expected for name in source_names}
+        manifest["source_commits"] = {name: "a" * 40 for name in source_names}
+        path.write_text(json.dumps(manifest))
+
+        with mock.patch.object(VALIDATOR, "source_bytes_at_commit", return_value=b"source") as source_lookup:
+            errors, _ = VALIDATOR.validate_manifest(path, strict=True)
+
+        self.assertTrue(any("too many per-file source commits" in error for error in errors))
+        source_lookup.assert_not_called()
+
     def test_manifest_refuses_invalid_per_file_source_mappings(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
