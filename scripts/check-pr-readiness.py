@@ -20,7 +20,7 @@ REQUIRED_CODE_CHECKS = (
     "Security (supply-chain)",
 )
 REQUIRED_CONTRACT_CHECKS = ("harness", "workflow-lint", "workflow-security")
-REQUIRED_ALWAYS = ("PR title", "release-note")
+REQUIRED_ALWAYS = ("pr-title", "release-note")
 CONTRACT_PREFIXES = (".github/workflows/", ".github/actions/", "scripts/", "apps/linux/packaging/", "docs/")
 HEAD_SHA = re.compile(r"^[0-9a-f]{40}$")
 

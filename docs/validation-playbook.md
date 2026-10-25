@@ -207,7 +207,7 @@ CI is split into fast feedback and slower integration or acceptance checks. Read
 
 These small GitHub checks run on every pull request to `linux` and need no database or GTK. They make the squash commit and the workflows safe to merge; the Forgejo gate remains the acceptance record.
 
-`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled and failed checks as not ready. It is a GitHub readiness report, not Forgejo evidence; it blocks merging only if the repository ruleset is configured to require its stable check context.
+`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a GitHub readiness report, not Forgejo evidence; it blocks merging only if the repository ruleset is configured to require its stable check context.
 
 | Check | What it enforces |
 |---|---|

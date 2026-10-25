@@ -14,7 +14,7 @@ class PullRequestReadinessTests(unittest.TestCase):
 
         self.assertTrue(
             {
-                "PR title",
+                "pr-title",
                 "release-note",
                 "Pin tested revision",
                 "Ensure CI debian-testing GTK image",
@@ -33,7 +33,7 @@ class PullRequestReadinessTests(unittest.TestCase):
 
         self.assertEqual(
             set(required),
-            {"PR title", "release-note", "harness", "workflow-lint", "workflow-security"},
+            {"pr-title", "release-note", "harness", "workflow-lint", "workflow-security"},
         )
 
     def test_mixed_changes_require_code_and_contract_checks(self):
@@ -64,29 +64,29 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertFalse(readiness.check_suite_matches(suite, 7, "a" * 40))
 
     def test_missing_checks_remain_pending(self):
-        result = readiness.evaluate_checks(["PR title"], [])
+        result = readiness.evaluate_checks(["pr-title"], [])
 
         self.assertEqual(result["state"], "waiting")
-        self.assertEqual(result["waiting"], ["PR title: missing"])
+        self.assertEqual(result["waiting"], ["pr-title: missing"])
 
     def test_a_pending_latest_attempt_does_not_inherit_an_older_success(self):
         runs = [
-            {"name": "PR title", "status": "completed", "conclusion": "success", "started_at": "2026-01-01T00:00:00Z", "id": 1},
-            {"name": "PR title", "status": "in_progress", "conclusion": None, "started_at": "2026-01-01T00:01:00Z", "id": 2},
+            {"name": "pr-title", "status": "completed", "conclusion": "success", "started_at": "2026-01-01T00:00:00Z", "id": 1},
+            {"name": "pr-title", "status": "in_progress", "conclusion": None, "started_at": "2026-01-01T00:01:00Z", "id": 2},
         ]
 
-        result = readiness.evaluate_checks(["PR title"], runs)
+        result = readiness.evaluate_checks(["pr-title"], runs)
 
         self.assertEqual(result["state"], "waiting")
-        self.assertEqual(result["waiting"], ["PR title: in_progress"])
+        self.assertEqual(result["waiting"], ["pr-title: in_progress"])
 
     def test_a_newer_successful_attempt_replaces_an_older_failure(self):
         runs = [
-            {"name": "PR title", "status": "completed", "conclusion": "failure", "started_at": "2026-01-01T00:00:00Z", "id": 1},
-            {"name": "PR title", "status": "completed", "conclusion": "success", "started_at": "2026-01-01T00:01:00Z", "id": 2},
+            {"name": "pr-title", "status": "completed", "conclusion": "failure", "started_at": "2026-01-01T00:00:00Z", "id": 1},
+            {"name": "pr-title", "status": "completed", "conclusion": "success", "started_at": "2026-01-01T00:01:00Z", "id": 2},
         ]
 
-        result = readiness.evaluate_checks(["PR title"], runs)
+        result = readiness.evaluate_checks(["pr-title"], runs)
 
         self.assertEqual(result["state"], "passed")
 
@@ -94,8 +94,8 @@ class PullRequestReadinessTests(unittest.TestCase):
         for conclusion in ("failure", "cancelled", "skipped", "timed_out", "neutral"):
             with self.subTest(conclusion=conclusion):
                 result = readiness.evaluate_checks(
-                    ["PR title"],
-                    [{"name": "PR title", "status": "completed", "conclusion": conclusion, "started_at": "2026-01-01T00:00:00Z", "id": 1}],
+                    ["pr-title"],
+                    [{"name": "pr-title", "status": "completed", "conclusion": conclusion, "started_at": "2026-01-01T00:00:00Z", "id": 1}],
                 )
 
                 self.assertEqual(result["state"], "failed")
@@ -103,13 +103,13 @@ class PullRequestReadinessTests(unittest.TestCase):
     def test_all_required_checks_must_succeed(self):
         runs = [
             {"name": name, "status": "completed", "conclusion": "success", "started_at": "2026-01-01T00:00:00Z", "id": index}
-            for index, name in enumerate(("PR title", "release-note"), start=1)
+            for index, name in enumerate(("pr-title", "release-note"), start=1)
         ]
 
-        result = readiness.evaluate_checks(["PR title", "release-note"], runs)
+        result = readiness.evaluate_checks(["pr-title", "release-note"], runs)
 
         self.assertEqual(result["state"], "passed")
-        self.assertEqual(result["passed"], ["PR title", "release-note"])
+        self.assertEqual(result["passed"], ["pr-title", "release-note"])
 
     def test_a_transient_github_api_error_retries_before_reporting_readiness(self):
         class Client:
@@ -146,7 +146,8 @@ class PullRequestReadinessTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/linux-pr-readiness.yml").read_text()
         checkout = workflow.split("- uses: actions/checkout", 1)[1].split("\n      - name", 1)[0]
 
-        self.assertIn("pull_request_target:", workflow)
+        self.assertIn("pull_request:", workflow)
+        self.assertNotIn("pull_request_target:", workflow)
         self.assertIn("ref: ${{ github.event.pull_request.base.sha }}", checkout)
         self.assertNotIn("pull_request.head.sha", checkout)
         self.assertIn("  checks: read", workflow)
