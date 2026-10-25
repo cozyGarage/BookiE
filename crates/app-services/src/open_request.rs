@@ -11,14 +11,30 @@ pub enum LaunchArgument {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DatabaseFile {
-    pub driver_id: &'static str,
-    pub path: PathBuf,
+    driver_id: &'static str,
+    path: PathBuf,
+    database: String,
+}
+
+impl DatabaseFile {
+    pub fn driver_id(&self) -> &'static str {
+        self.driver_id
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn database_path(&self) -> &str {
+        &self.database
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum OpenRejection {
     Missing(PathBuf),
     NotADatabase(PathBuf),
+    NonUtf8Path(PathBuf),
 }
 
 const SQLITE_MAGIC: &[u8] = b"SQLite format 3\0";
@@ -29,6 +45,10 @@ pub fn classify_file(path: &Path) -> Result<DatabaseFile, OpenRejection> {
     if !path.is_file() {
         return Err(OpenRejection::Missing(path.to_path_buf()));
     }
+    let database = path
+        .to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| OpenRejection::NonUtf8Path(path.to_path_buf()))?;
     let extension = path
         .extension()
         .and_then(std::ffi::OsStr::to_str)
@@ -49,24 +69,27 @@ pub fn classify_file(path: &Path) -> Result<DatabaseFile, OpenRejection> {
     Ok(DatabaseFile {
         driver_id,
         path: path.to_path_buf(),
+        database,
     })
 }
 
-pub fn file_connection(driver_id: &str, path: &Path) -> SavedConnection {
-    let name = path.file_name().map_or_else(
-        || path.display().to_string(),
-        |name| name.to_string_lossy().into_owned(),
-    );
+pub fn file_connection(file: &DatabaseFile) -> SavedConnection {
+    let name = file
+        .path
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .map(str::to_owned)
+        .unwrap_or_else(|| file.database.clone());
     SavedConnection {
         auth_source: None,
         id: uuid::Uuid::new_v4(),
         name,
-        driver_id: driver_id.to_owned(),
+        driver_id: file.driver_id.to_owned(),
         host: String::new(),
         port: 0,
         socket_dir: None,
         socket_path: None,
-        database: path.display().to_string(),
+        database: file.database.clone(),
         username: String::new(),
         use_tls: false,
         tls_mode: Some(tablepro_core::TlsMode::Disabled),
@@ -108,6 +131,7 @@ mod tests {
             classify_file(&path),
             Ok(DatabaseFile {
                 driver_id: "sqlite",
+                database: path.to_str().expect("UTF-8 path").to_owned(),
                 path
             })
         );
@@ -120,14 +144,11 @@ mod tests {
         bytes.extend_from_slice(b"DUCK");
         bytes.extend_from_slice(&[0; 32]);
         let path = write(dir.path(), "shop.duckdb", &bytes);
+        let file = classify_file(&path).expect("database file");
 
-        assert!(matches!(
-            classify_file(&path),
-            Ok(DatabaseFile {
-                driver_id: "duckdb",
-                ..
-            })
-        ));
+        assert_eq!(file.driver_id(), "duckdb");
+        assert_eq!(file.path(), path);
+        assert_eq!(file.database_path(), path.to_str().expect("UTF-8 path"));
     }
 
     #[test]
@@ -152,14 +173,34 @@ mod tests {
         assert_eq!(classify_file(&empty), Err(OpenRejection::NotADatabase(empty.clone())));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn a_non_utf8_database_path_is_refused_instead_of_being_lossily_saved() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let name = OsString::from_vec(vec![b'b', 0xff, b'o', b'o', b'k', b'.', b'd', b'b']);
+        let path = dir.path().join(name);
+        let mut bytes = SQLITE_MAGIC.to_vec();
+        bytes.extend_from_slice(&[0; 84]);
+        std::fs::write(&path, bytes).unwrap();
+
+        assert_eq!(classify_file(&path), Err(OpenRejection::NonUtf8Path(path.clone())));
+        assert!(path.is_file());
+    }
+
     #[test]
     fn a_saved_file_record_keeps_its_path_and_omits_network_authentication() {
-        let saved = file_connection("sqlite", Path::new("/data/books.db"));
+        let dir = tempfile::tempdir().unwrap();
+        let mut bytes = SQLITE_MAGIC.to_vec();
+        bytes.extend_from_slice(&[0; 84]);
+        let path = write(dir.path(), "books.db", &bytes);
+        let file = classify_file(&path).unwrap();
+        let saved = file_connection(&file);
 
-        assert_eq!(
-            (saved.name.as_str(), saved.database.as_str()),
-            ("books.db", "/data/books.db")
-        );
+        assert_eq!(saved.name, "books.db");
+        assert_eq!(saved.database, path.to_str().unwrap());
         assert!(saved.host.is_empty() && saved.username.is_empty());
         assert!(saved.ssh.is_none());
         assert!(saved.tls_root_cert.is_none() && saved.tls_client_cert.is_none() && saved.tls_client_key.is_none());
