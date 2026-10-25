@@ -177,7 +177,8 @@ class ForgejoTrainTests(unittest.TestCase):
         self.assertEqual(git(self.fixture.repo, "rev-parse", "HEAD"), original_head)
 
     def test_branches_come_from_github_even_when_the_forgejo_mirror_shares_the_repository_path(self):
-        mirror = Path(self.tmp.name) / "hosts/10.61.0.11/cozyGarage/BookiE.git"
+        mirror = Path(self.tmp.name) / "hosts/forgejo.invalid/cozyGarage/BookiE.git"
+        self.assertEqual(mirror.parts[-3], "forgejo.invalid")
         mirror.mkdir(parents=True)
         init_git_repo(mirror, "--quiet", "--bare")
         git(self.fixture.repo, "remote", "add", "forgejo", str(mirror))
