@@ -9,7 +9,7 @@ class IssueTemplateContractTests(unittest.TestCase):
     def test_feature_request_template_asks_for_user_visible_acceptance(self):
         template = (ROOT / ".github/ISSUE_TEMPLATE/feature_request.yml").read_text()
 
-        self.assertIn("id: acceptance_scenarios", template)
+        self.assertIn("label: User-visible acceptance scenarios", template)
         self.assertIn("Given <starting state>", template)
         self.assertIn("When <user action>", template)
         self.assertIn("Then <observable outcome>", template)
