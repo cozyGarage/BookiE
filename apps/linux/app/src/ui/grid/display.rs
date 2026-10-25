@@ -170,7 +170,7 @@ struct BoundedJsonWriter {
 impl BoundedJsonWriter {
     fn new(limit: usize) -> Self {
         Self {
-            bytes: Vec::with_capacity(limit),
+            bytes: Vec::new(),
             limit,
         }
     }
