@@ -23,6 +23,33 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_actionlint_uses_a_read_only_go_module_lock(self):
+        workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+        module = (ROOT / "scripts/tools/actionlint/go.mod").read_text()
+        sums = ROOT / "scripts/tools/actionlint/go.sum"
+        self.assertIn("go-version: 1.25.12", workflow)
+        self.assertIn("working-directory: scripts/tools/actionlint", workflow)
+        self.assertIn("GOFLAGS: -mod=readonly", workflow)
+        self.assertIn("GOTOOLCHAIN: local", workflow)
+        self.assertIn("go install github.com/rhysd/actionlint/cmd/actionlint", workflow)
+        self.assertNotIn("actionlint/cmd/actionlint@", workflow)
+        self.assertIn("go 1.25.12", module)
+        self.assertIn("tool github.com/rhysd/actionlint/cmd/actionlint", module)
+        self.assertIn("github.com/rhysd/actionlint v1.7.12", module)
+        self.assertTrue(sums.is_file())
+        self.assertGreater(sums.stat().st_size, 0)
+    def test_headless_fixtures_wait_for_cheap_checks_without_serializing_behind_widgets(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        expected = {"guards", "clippy", "unit", "sandbox"}
+        for name in ("driver", "pg-release", "pg-dump", "socket-ssh", "driver-tls"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
+                self.assertEqual({item.strip() for item in dependencies.split(",")}, expected)
+        widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("test-gtk-widgets.sh", widgets)
+        self.assertNotRegex(widgets, r"(?m)^    (if|continue-on-error):")
+
     def test_cargo_path_covers_runner_service_homes(self):
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
@@ -183,6 +210,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers",
                 "value_contract_postgres_csv_import_preserves_explicit_identity_values",
                 "an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin",
+                "evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
