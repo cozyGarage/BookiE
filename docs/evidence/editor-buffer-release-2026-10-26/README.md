@@ -107,4 +107,10 @@ The 171.30-second recording reports 126,463,983 allocation calls, a 78.91 MB pea
 
 This separates tracked live heap from RSS and points to substantial allocation churn. Allocator retention, mappings, native memory and instrumentation overhead remain possible contributors to the gap. No product allocator setting or input-method workaround follows from this result alone. The private portal session again logged an unavailable secret service; timing comparisons remain limited.
 
-The 4.6 GB raw recording was removed after successful interpretation and compressed-file integrity validation. The 24.5 MB compressed trace remains in the ignored local analysis directory. The public evidence contains reports and reproducible scripts, rather than the binary trace.
+The multi-gigabyte raw recording was removed after successful interpretation and compressed-file integrity validation. The 25,716,072-byte compressed trace remains in the ignored local analysis directory. The public evidence contains reports and reproducible scripts, rather than the binary trace.
+
+## Allocator arena control
+
+The same fixed binary and corrected chooser harness completed 18 refusals with `GLIBC_TUNABLES=glibc.malloc.arena_max=2` and `GTK_IM_MODULE=simple`. The [result](arena-control/result.json) passed and the app exited normally. [Samples](arena-control/samples.json) show RSS rising from 168.8 to 208.0 MiB, compared with 173.4 to 302.3 MiB in the earlier simple-input-method run. Sampled application CPU was 50.23 seconds versus 64.15 seconds, and the initial-to-final interval was 159.57 versus 167.15 seconds. These are single runs, not a latency benchmark. Both include private portal secret-service activation failures.
+
+The setting was inherited by the private D-Bus fixture and its helpers as well as the app. This limits causal attribution. The [GNU libc manual](https://sourceware.org/glibc/manual/latest/html_node/Memory-Allocation-Tunables.html) documents the arena limit; the result supports allocator arena retention as a contributor in this workload. It does not prove that all retained memory is releasable or that a process-wide arena limit is suitable for database workloads. No application, desktop or runner allocator setting changed. A child-process-only repetition is needed before considering any wider tuning.
