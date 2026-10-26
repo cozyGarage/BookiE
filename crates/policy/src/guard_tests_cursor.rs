@@ -523,3 +523,44 @@ async fn completion_metadata_refuses_an_active_cursor_before_driver_dispatch() {
         .expect("close cursor");
     session.close().await.expect("close session");
 }
+
+#[tokio::test]
+async fn audited_completion_metadata_refuses_an_active_cursor_before_driver_dispatch() {
+    let (guard, script, audit) = make_guard(vec![page("secret", true)], None, false);
+    let mut session: Box<dyn tablepro_core::Session> =
+        Box::new(guard.open_session_with_audit().await.expect("open audited session"));
+    begin_read_snapshot(&mut session).await;
+    let control = OperationControl::new(CancellationToken::new(), None);
+    let cursor = session
+        .open_query_cursor_controlled("SELECT password FROM accounts", &[], &control)
+        .await
+        .expect("open guarded cursor");
+
+    let result = session
+        .fetch_completion_columns_controlled(None, "accounts", &control)
+        .await;
+
+    assert!(matches!(result, Err(DriverError::PolicyDenied(_))), "{result:?}");
+    assert!(
+        script
+            .completion_targets
+            .lock()
+            .expect("completion target lock")
+            .is_empty()
+    );
+    assert_eq!(
+        audit
+            .events
+            .lock()
+            .expect("audit lock")
+            .last()
+            .expect("refusal is audited")
+            .terminal_status,
+        AuditTerminalStatus::Denied
+    );
+    session
+        .close_query_cursor_controlled(cursor, &control)
+        .await
+        .expect("close cursor");
+    session.close().await.expect("close session");
+}

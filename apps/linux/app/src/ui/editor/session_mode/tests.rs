@@ -41,6 +41,41 @@ struct FailingRollback {
     close_calls: Arc<AtomicUsize>,
 }
 
+struct CompletionColumnsSession;
+
+#[async_trait::async_trait]
+impl Session for CompletionColumnsSession {
+    async fn query_params_controlled(
+        &mut self,
+        _: &str,
+        _: &[Value],
+        _: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        Ok(QueryResult {
+            columns: Vec::new(),
+            rows: Vec::new(),
+            truncated: false,
+        })
+    }
+
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        _: Option<&str>,
+        _: &str,
+        _: &OperationControl,
+    ) -> Result<Vec<String>, DriverError> {
+        Ok(vec!["id".into()])
+    }
+
+    fn is_usable(&self) -> bool {
+        true
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
+
 #[async_trait::async_trait]
 impl Session for DelayedClose {
     async fn query_params_controlled(
@@ -434,6 +469,26 @@ async fn an_ordinary_statement_error_keeps_a_usable_session() {
     assert!(target.query("SELECT invalid", &[], &control).await.is_err());
     assert_eq!(target.session_state().await, Some((id, false, true)));
     assert_eq!(queries.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn a_session_handle_forwards_completion_metadata_to_its_session() {
+    let shared = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+        CompletionColumnsSession,
+    )))));
+    let (_, columns) = tablepro_app_services::completion::fetch_session_column_names(
+        shared,
+        tablepro_app_services::completion::SchemaRequest {
+            generation: 1,
+            table: "public.users".into(),
+        },
+        Some(tablepro_core::sql_syntax::SqlGrammar::PostgreSql),
+        1,
+        tokio_util::sync::CancellationToken::new(),
+    )
+    .await;
+
+    assert_eq!(columns, Ok(vec!["id".into()]));
 }
 
 #[test]

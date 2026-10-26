@@ -167,6 +167,26 @@ impl Session for SessionHandle {
         self.close_cursor_with_audit(cursor_id, control).await.result
     }
 
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<String>, DriverError> {
+        match self {
+            Self::Audited(session) => {
+                session
+                    .fetch_completion_columns_controlled(schema, table, control)
+                    .await
+            }
+            Self::Plain(session) => {
+                session
+                    .fetch_completion_columns_controlled(schema, table, control)
+                    .await
+            }
+        }
+    }
+
     async fn lexical_settings_controlled(
         &mut self,
         control: &OperationControl,
@@ -762,8 +782,15 @@ impl SqlEditor {
         self.session_teardown_running = false;
         self.session_button.set_sensitive(true);
         self.refresh_run_button();
-        if let Err(message) = &result {
-            self.status.set_label(message);
+        match &result {
+            Err(message) => self.status.set_label(message),
+            Ok(()) => {
+                let status = self.status.label();
+                if status == crate::tr!("Closing session…") || status == crate::tr!("Rolling back and closing session…")
+                {
+                    self.status.set_label("");
+                }
+            }
         }
         for reply in self.session_teardown_waiters.drain(..) {
             let _ = reply.send(result.clone());

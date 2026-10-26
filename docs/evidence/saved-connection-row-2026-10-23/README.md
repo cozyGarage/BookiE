@@ -24,6 +24,8 @@ On Linux source head `d5274f0b571ae11821d12666b6fcad0a6856c331`, the focused all
 
 A bare `AdwActionRow` control with similar long Unicode title/subtitle text and the same 20 px CSS did not emit the measurement warning. The warning therefore appears with BookiE's composed row under the narrow allocation, but this comparison does not identify the specific child or establish visible clipping. Native Wayland visual review and screen-reader narration remain outstanding; the issue stays open.
 
+The GTK/GSK screenshot-helper follow-up, including a fresh Xvfb image set and the native Hyprland test limitation, is recorded in [the October 26 evidence](../saved-connection-row-2026-10-26/README.md).
+
 ## Screenshots
 
 | Theme | 320 px | 560 px |
