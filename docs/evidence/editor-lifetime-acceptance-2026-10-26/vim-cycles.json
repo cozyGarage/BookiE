@@ -1,0 +1,281 @@
+[
+  {
+    "phase": "initial",
+    "monotonic": 528370.7476373,
+    "cpu_ticks": 54,
+    "rss_kib": 177404,
+    "high_water_kib": 177404
+  },
+  {
+    "phase": "cycle-0-four-tabs",
+    "monotonic": 528374.803860206,
+    "cpu_ticks": 338,
+    "rss_kib": 220024,
+    "high_water_kib": 220024
+  },
+  {
+    "phase": "cycle-0-closed",
+    "monotonic": 528376.784905069,
+    "cpu_ticks": 364,
+    "rss_kib": 224376,
+    "high_water_kib": 224376
+  },
+  {
+    "phase": "cycle-1-four-tabs",
+    "monotonic": 528381.301213354,
+    "cpu_ticks": 680,
+    "rss_kib": 225428,
+    "high_water_kib": 225428
+  },
+  {
+    "phase": "cycle-1-closed",
+    "monotonic": 528383.289648629,
+    "cpu_ticks": 706,
+    "rss_kib": 229288,
+    "high_water_kib": 229288
+  },
+  {
+    "phase": "cycle-2-four-tabs",
+    "monotonic": 528387.597596744,
+    "cpu_ticks": 1004,
+    "rss_kib": 229468,
+    "high_water_kib": 230588
+  },
+  {
+    "phase": "cycle-2-closed",
+    "monotonic": 528389.583087274,
+    "cpu_ticks": 1031,
+    "rss_kib": 236592,
+    "high_water_kib": 236592
+  },
+  {
+    "phase": "cycle-3-four-tabs",
+    "monotonic": 528394.149906775,
+    "cpu_ticks": 1343,
+    "rss_kib": 236932,
+    "high_water_kib": 236932
+  },
+  {
+    "phase": "cycle-3-closed",
+    "monotonic": 528396.14737135,
+    "cpu_ticks": 1375,
+    "rss_kib": 230016,
+    "high_water_kib": 236424
+  },
+  {
+    "phase": "cycle-4-four-tabs",
+    "monotonic": 528400.660578017,
+    "cpu_ticks": 1687,
+    "rss_kib": 235384,
+    "high_water_kib": 236424
+  },
+  {
+    "phase": "cycle-4-closed",
+    "monotonic": 528402.644477553,
+    "cpu_ticks": 1714,
+    "rss_kib": 231372,
+    "high_water_kib": 237520
+  },
+  {
+    "phase": "cycle-5-four-tabs",
+    "monotonic": 528407.022429027,
+    "cpu_ticks": 2022,
+    "rss_kib": 235032,
+    "high_water_kib": 237520
+  },
+  {
+    "phase": "cycle-5-closed",
+    "monotonic": 528409.005159217,
+    "cpu_ticks": 2050,
+    "rss_kib": 236952,
+    "high_water_kib": 237520
+  },
+  {
+    "phase": "cycle-6-four-tabs",
+    "monotonic": 528413.768059218,
+    "cpu_ticks": 2381,
+    "rss_kib": 238852,
+    "high_water_kib": 238852
+  },
+  {
+    "phase": "cycle-6-closed",
+    "monotonic": 528415.751345641,
+    "cpu_ticks": 2408,
+    "rss_kib": 232416,
+    "high_water_kib": 238588
+  },
+  {
+    "phase": "cycle-7-four-tabs",
+    "monotonic": 528420.205567492,
+    "cpu_ticks": 2715,
+    "rss_kib": 239012,
+    "high_water_kib": 239012
+  },
+  {
+    "phase": "cycle-7-closed",
+    "monotonic": 528422.190928605,
+    "cpu_ticks": 2744,
+    "rss_kib": 232432,
+    "high_water_kib": 239684
+  },
+  {
+    "phase": "cycle-8-four-tabs",
+    "monotonic": 528426.421723536,
+    "cpu_ticks": 3038,
+    "rss_kib": 235168,
+    "high_water_kib": 239684
+  },
+  {
+    "phase": "cycle-8-closed",
+    "monotonic": 528428.40945825,
+    "cpu_ticks": 3066,
+    "rss_kib": 237816,
+    "high_water_kib": 239684
+  },
+  {
+    "phase": "cycle-9-four-tabs",
+    "monotonic": 528432.861233261,
+    "cpu_ticks": 3373,
+    "rss_kib": 241172,
+    "high_water_kib": 241172
+  },
+  {
+    "phase": "cycle-9-closed",
+    "monotonic": 528434.848356541,
+    "cpu_ticks": 3400,
+    "rss_kib": 232540,
+    "high_water_kib": 241944
+  },
+  {
+    "phase": "cycle-10-four-tabs",
+    "monotonic": 528439.356639791,
+    "cpu_ticks": 3711,
+    "rss_kib": 239016,
+    "high_water_kib": 241944
+  },
+  {
+    "phase": "cycle-10-closed",
+    "monotonic": 528441.333772006,
+    "cpu_ticks": 3736,
+    "rss_kib": 233816,
+    "high_water_kib": 241944
+  },
+  {
+    "phase": "cycle-11-four-tabs",
+    "monotonic": 528446.14483989,
+    "cpu_ticks": 4075,
+    "rss_kib": 241416,
+    "high_water_kib": 241944
+  },
+  {
+    "phase": "cycle-11-closed",
+    "monotonic": 528448.131232328,
+    "cpu_ticks": 4103,
+    "rss_kib": 233820,
+    "high_water_kib": 241944
+  },
+  {
+    "phase": "cycle-12-four-tabs",
+    "monotonic": 528452.72084776,
+    "cpu_ticks": 4421,
+    "rss_kib": 241284,
+    "high_water_kib": 241944
+  },
+  {
+    "phase": "cycle-12-closed",
+    "monotonic": 528454.715129892,
+    "cpu_ticks": 4450,
+    "rss_kib": 233844,
+    "high_water_kib": 242308
+  },
+  {
+    "phase": "cycle-13-four-tabs",
+    "monotonic": 528459.098961274,
+    "cpu_ticks": 4758,
+    "rss_kib": 241708,
+    "high_water_kib": 242308
+  },
+  {
+    "phase": "cycle-13-closed",
+    "monotonic": 528461.085623933,
+    "cpu_ticks": 4786,
+    "rss_kib": 235168,
+    "high_water_kib": 242952
+  },
+  {
+    "phase": "cycle-14-four-tabs",
+    "monotonic": 528465.657556725,
+    "cpu_ticks": 5109,
+    "rss_kib": 241600,
+    "high_water_kib": 242952
+  },
+  {
+    "phase": "cycle-14-closed",
+    "monotonic": 528467.638452361,
+    "cpu_ticks": 5137,
+    "rss_kib": 235624,
+    "high_water_kib": 243460
+  },
+  {
+    "phase": "cycle-15-four-tabs",
+    "monotonic": 528472.133258392,
+    "cpu_ticks": 5447,
+    "rss_kib": 241056,
+    "high_water_kib": 243460
+  },
+  {
+    "phase": "cycle-15-closed",
+    "monotonic": 528474.115291014,
+    "cpu_ticks": 5473,
+    "rss_kib": 235628,
+    "high_water_kib": 243460
+  },
+  {
+    "phase": "cycle-16-four-tabs",
+    "monotonic": 528478.820448263,
+    "cpu_ticks": 5803,
+    "rss_kib": 243736,
+    "high_water_kib": 243736
+  },
+  {
+    "phase": "cycle-16-closed",
+    "monotonic": 528480.820964844,
+    "cpu_ticks": 5832,
+    "rss_kib": 237664,
+    "high_water_kib": 245008
+  },
+  {
+    "phase": "cycle-17-four-tabs",
+    "monotonic": 528485.398691342,
+    "cpu_ticks": 6148,
+    "rss_kib": 244104,
+    "high_water_kib": 245008
+  },
+  {
+    "phase": "cycle-17-closed",
+    "monotonic": 528487.380748318,
+    "cpu_ticks": 6175,
+    "rss_kib": 237672,
+    "high_water_kib": 245008
+  },
+  {
+    "phase": "idle-start",
+    "monotonic": 528488.269358927,
+    "cpu_ticks": 6217,
+    "rss_kib": 240388,
+    "high_water_kib": 245008
+  },
+  {
+    "phase": "idle-end",
+    "monotonic": 528503.269672543,
+    "cpu_ticks": 6229,
+    "rss_kib": 240372,
+    "high_water_kib": 245008
+  },
+  {
+    "phase": "idle-summary",
+    "seconds": 15.000313616008498,
+    "cpu_seconds": 0.12,
+    "one_core_percent": 0.7999832741625795
+  }
+]
