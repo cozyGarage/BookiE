@@ -145,7 +145,12 @@ def validate_manifest(path, strict=False):
                 continue
             continue
         source = ROOT / name
-        if source.is_file() and hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+        if not source.is_file():
+            (errors if strict else warnings).append(
+                f"{path}: source file is unavailable in the current checkout without a per-file source commit: {name}"
+            )
+            continue
+        if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
             warnings.append(f"{path}: source differs from the current checkout: {name}")
     if legacy_source_only:
         return errors, warnings

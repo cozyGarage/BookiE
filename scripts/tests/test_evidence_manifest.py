@@ -134,7 +134,8 @@ class EvidenceManifestTests(unittest.TestCase):
         manifest["source_file"] = "source.rs"
         manifest["source_sha256"] = hashlib.sha256(b"source").hexdigest()
         path.write_text(json.dumps(manifest))
-        self.assertEqual(VALIDATOR.validate_manifest(path, strict=True)[0], [])
+        with mock.patch.object(VALIDATOR, "ROOT", path.parent):
+            self.assertEqual(VALIDATOR.validate_manifest(path, strict=True)[0], [])
 
     def test_manifest_verifies_a_source_digest_at_its_own_commit_after_checkout_drift(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -348,6 +349,36 @@ class EvidenceManifestTests(unittest.TestCase):
                 errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
 
         self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
+
+    def test_strict_manifest_rejects_a_missing_source_without_a_per_file_commit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "manifest.json"
+            path.write_text(json.dumps({
+                "schema_version": 1,
+                "source_commit": "a" * 40,
+                "source_sha256": {"removed.rs": hashlib.sha256(b"recorded source").hexdigest()},
+            }))
+
+            with mock.patch.object(VALIDATOR, "ROOT", root):
+                errors, _ = VALIDATOR.validate_manifest(path, strict=True)
+
+        self.assertTrue(any("source file is unavailable in the current checkout" in error for error in errors))
+
+    def test_legacy_inventory_warns_when_a_source_path_is_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "manifest.json"
+            path.write_text(json.dumps({
+                "source_commit": "a" * 40,
+                "source_sha256": {"removed.rs": hashlib.sha256(b"recorded source").hexdigest()},
+            }))
+
+            with mock.patch.object(VALIDATOR, "ROOT", root):
+                errors, warnings = VALIDATOR.validate_manifest(path)
+
+        self.assertEqual(errors, [])
+        self.assertTrue(any("source file is unavailable in the current checkout" in warning for warning in warnings))
 
     def test_unversioned_source_packet_checks_only_source_provenance(self):
         with tempfile.TemporaryDirectory() as directory:
