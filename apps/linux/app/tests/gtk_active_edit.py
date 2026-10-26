@@ -55,7 +55,7 @@ def scenarios(ui):
         assert notes(database) == [(1, "gamma"), (2, "beta")], "the typed value was lost or its sibling changed"
 
     def assert_single_staged_edit():
-        deadline = time.monotonic() + 2
+        deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
             assert ui.find_node(name="2 unsaved changes") is None, "moving focus staged the same edit more than once"
             assert ui.find_node(name="1 unsaved change") is not None, "the staged edit disappeared while focus settled"
