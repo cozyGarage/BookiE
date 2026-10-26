@@ -82,3 +82,11 @@ GTK_IM_MODULE=fcitx5 GTK_A11Y=none GDK_BACKEND=x11 GSK_RENDERER=cairo \
   dbus-run-session -- xvfb-run -a python3 \
   docs/evidence/editor-buffer-release-2026-10-26/lifetime-retired-im.py
 ```
+
+## Repeated oversized-file refusals
+
+The fixed CI-profile binary also completed 18 refusals of an 8 MiB single-line SQL file in one process. Each refusal preserved the existing query, editor tab count and source file. Each batch of three ended with a successful query. The process exited normally. The [scenario](refusal-repeat.py), [per-refusal measurements](refusal-repeat/refusal-cycles.jsonl) and [process samples](refusal-repeat/samples.json) record the workload.
+
+RSS reached 203.7, 236.8, 269.0, 279.0, 291.0 and 301.9 MiB after successive batches. It remained 301.8 MiB after 15 seconds idle, with 0.11 CPU seconds consumed. This does not establish a memory plateau. Repeated file-dialog use remains a separate resource investigation; the editor teardown fix does not claim to resolve it.
+
+A same-binary run with the simple input method failed at an accessibility action before producing a comparable workload. Its [result](refusal-simple/repeated_overlong_file_refusal-result.json) is inconclusive, not evidence for an input-method cause. An earlier attempt could not activate the accessibility registry; subsequent runs explicitly selected `ATSPI_DBUS_IMPLEMENTATION=dbus-daemon`.
