@@ -47,3 +47,7 @@ An initial broad selector mistakenly ran unrelated GTK tests together and failed
 ## Cancel a dirty file close
 
 The [focused scenario](cancel-file-close.py) passed on the recorded optimized binary. It restores one file-associated tab, replaces its SQL with unsaved text, requests close and chooses Cancel. It requires the tab and unsaved text to remain and the file to stay byte-for-byte unchanged. It then closes again, chooses Save, verifies the same file receives the unsaved text, and requires the empty-state editor action to appear. The [result](cancel-file-close-result.json) passed. This covers the Cancel/file-association acceptance in #1333 without claiming that the broader native freeze is resolved. The scenario pins existing behavior; it is evidence-only and is not registered in a permanent CI tier.
+
+## Forgejo acceptance
+
+[Run #990](http://10.61.0.11:3000/trung/bookie/actions/runs/990) passed all 32 jobs at `ab238b4acdacbcec941d11c82d7460c518685f45`, including the Vim-context follow-up. The [record](forgejo-990.json) lists every job and confirms that the GitHub branch still pointed to the tested commit when recorded. This is gate evidence, not a merge or native Wayland acceptance claim. GitHub PR #1694 owns merge readiness.
