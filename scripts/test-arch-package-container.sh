@@ -20,7 +20,7 @@ if [[ ! "$release_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || \
   exit 1
 fi
 
-docker run --rm -i -v "$PWD:/src:ro" -e RELEASED_URL="$released_url" -e VERSION="$version" \
+docker run --rm ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} -i -v "$PWD:/src:ro" -e RELEASED_URL="$released_url" -e VERSION="$version" \
   -e TABLEPRO_RC_DATE="$release_date" archlinux:latest bash -seu <<'CONTAINER'
   pacman -Syu --noconfirm --needed base-devel git rust pkgconf clang gettext sudo curl \
     gtk4 libadwaita gtksourceview5 libsecret krb5 sqlite openssl desktop-file-utils appstream namcap >/dev/null
@@ -29,7 +29,7 @@ docker run --rm -i -v "$PWD:/src:ro" -e RELEASED_URL="$released_url" -e VERSION=
   mkdir /home/builder/src
   tar -C /src --exclude=./target --exclude=./.git -cf - . | tar -C /home/builder/src -xf -
   chown -R builder /home/builder/src
-  sudo -u builder env RELEASED_URL="$RELEASED_URL" VERSION="$VERSION" TABLEPRO_RC_DATE="$TABLEPRO_RC_DATE" bash -seu <<'BUILD'
+  sudo -u builder env ${CARGO_BUILD_JOBS:+CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} RELEASED_URL="$RELEASED_URL" VERSION="$VERSION" TABLEPRO_RC_DATE="$TABLEPRO_RC_DATE" bash -seu <<'BUILD'
     cd /home/builder/src
     git init -q && git add -A && git -c user.email=ci@local -c user.name=ci commit -qm candidate
     curl -fsSL -o /home/builder/released.pkg.tar.zst -- "$RELEASED_URL"

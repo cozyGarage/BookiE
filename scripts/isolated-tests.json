@@ -1081,6 +1081,11 @@
       "tablepro-app",
       "--lib",
       "ui::import_dialog::lifetime_tests::dismissing_import_setup_releases_its_callback"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::export_dialog::lifetime_tests::dismissing_export_setup_releases_its_dialog"
     ]
   ],
   "keyring": [
