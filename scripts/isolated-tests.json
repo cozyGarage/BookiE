@@ -795,6 +795,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::outcomes::tests::error_view_tests::a_refused_statement_keeps_its_recorded_audit_action"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::dispatch_tests::run_scope_menu_executes_the_current_statement_and_blocks_overlap"
     ],
     [
