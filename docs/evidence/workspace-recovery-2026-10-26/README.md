@@ -20,12 +20,16 @@ On the combined tested code:
 
 - Script harness: 576 tests passed.
 - Preflight: formatting, size and boundary guards, Clippy, 2,197 unit/bin tests, 291 sandbox tests and the Redis cancellation test passed. The existing configurations skipped 16 unit and 50 sandbox tests.
-- All 174 isolated GTK widget tests passed.
+- The full application unit suite passed: 798 passed and 213 ignored by the existing registrations. All 174 isolated GTK widget tests were run separately and passed.
 - `cargo deny check`: advisories, bans, licenses and sources passed.
 - Focused checks passed: 124 import tests, 67 MCP tests and 11 connection-form tests.
 - The final documentation-only baseline sync passed documentation links, issue-ledger and source-tree comparison checks.
 
 The evidence validator reported 70 historical/source-drift warnings. These include missing old logs and outdated provenance; this audit does not turn those packets into current acceptance evidence.
+
+## Recent merge ordering
+
+GitHub check-run history was queried with `filter=all` on the exact merged PR heads and grouped by check name. The first observed successful Linux regression gate finished after the merge for [#1683](https://github.com/cozyGarage/BookiE/pull/1683) (merged 15:40:25 UTC; gate succeeded 15:57:35), [#1686](https://github.com/cozyGarage/BookiE/pull/1686) (merged 16:13:48; gate succeeded 16:28:17), and [#1687](https://github.com/cozyGarage/BookiE/pull/1687) (merged 15:41:28; gate succeeded 15:53:45). The relevant gate results subsequently passed. This establishes an acceptance-order gap, not a source-code failure. The existing [#1543](https://github.com/cozyGarage/BookiE/issues/1543) owns merge-order control and historical Forgejo reconciliation. This recovery does not change repository protection settings.
 
 ## Preservation and cleanup
 
