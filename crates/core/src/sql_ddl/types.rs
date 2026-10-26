@@ -215,12 +215,44 @@ pub enum CommentPlacement {
     Unsupported,
 }
 
-pub fn column_comment_placement(driver_id: &str) -> CommentPlacement {
-    match driver_id {
-        "mysql" | "clickhouse" => CommentPlacement::Inline,
-        "postgres" | "mssql" => CommentPlacement::Separate,
-        _ => CommentPlacement::Unsupported,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColumnCommentCapability {
+    #[default]
+    Unsupported,
+    NewColumnOnlyInline,
+    ExistingAndNewInline,
+    ExistingAndNewSeparate,
+}
+
+impl ColumnCommentCapability {
+    pub const fn is_supported(self) -> bool {
+        !matches!(self, Self::Unsupported)
     }
+
+    pub const fn allows_existing_column_edits(self) -> bool {
+        matches!(self, Self::ExistingAndNewInline | Self::ExistingAndNewSeparate)
+    }
+
+    pub const fn placement(self) -> CommentPlacement {
+        match self {
+            Self::Unsupported => CommentPlacement::Unsupported,
+            Self::NewColumnOnlyInline | Self::ExistingAndNewInline => CommentPlacement::Inline,
+            Self::ExistingAndNewSeparate => CommentPlacement::Separate,
+        }
+    }
+}
+
+pub fn column_comment_capability(driver_id: &str) -> ColumnCommentCapability {
+    match driver_id {
+        "mysql" => ColumnCommentCapability::ExistingAndNewInline,
+        "clickhouse" => ColumnCommentCapability::NewColumnOnlyInline,
+        "postgres" | "mssql" => ColumnCommentCapability::ExistingAndNewSeparate,
+        _ => ColumnCommentCapability::Unsupported,
+    }
+}
+
+pub fn column_comment_placement(driver_id: &str) -> CommentPlacement {
+    column_comment_capability(driver_id).placement()
 }
 
 const FK_ACTIONS: &[&str] = &["NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT"];

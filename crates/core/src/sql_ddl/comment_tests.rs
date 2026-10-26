@@ -1,7 +1,10 @@
 use crate::query::ColumnInfo;
 
 use super::diff::diff_to_ops;
-use super::types::{CommentPlacement, column_comment_placement, validate_safe_comment};
+use super::types::{
+    ColumnCommentCapability, CommentPlacement, column_comment_capability, column_comment_placement,
+    validate_safe_comment,
+};
 use super::{
     BuildDdlError, DraftColumn, StructureOp, build_add_column, build_alter_column, build_create_table,
     build_reorder_column, materialize_ops,
@@ -25,11 +28,27 @@ fn info(comment: Option<&str>) -> ColumnInfo {
 
 #[test]
 fn every_driver_agrees_with_the_placement_table() {
-    assert_eq!(column_comment_placement("mysql"), CommentPlacement::Inline);
-    assert_eq!(column_comment_placement("clickhouse"), CommentPlacement::Inline);
-    assert_eq!(column_comment_placement("postgres"), CommentPlacement::Separate);
-    assert_eq!(column_comment_placement("mssql"), CommentPlacement::Separate);
+    assert_eq!(
+        column_comment_capability("mysql"),
+        ColumnCommentCapability::ExistingAndNewInline
+    );
+    assert_eq!(
+        column_comment_capability("clickhouse"),
+        ColumnCommentCapability::NewColumnOnlyInline
+    );
+    assert_eq!(
+        column_comment_capability("postgres"),
+        ColumnCommentCapability::ExistingAndNewSeparate
+    );
+    assert_eq!(
+        column_comment_capability("mssql"),
+        ColumnCommentCapability::ExistingAndNewSeparate
+    );
     for unsupported in ["sqlite", "duckdb", "mongodb", "redis", "unknown"] {
+        assert_eq!(
+            column_comment_capability(unsupported),
+            ColumnCommentCapability::Unsupported
+        );
         assert_eq!(column_comment_placement(unsupported), CommentPlacement::Unsupported);
     }
 }

@@ -14,7 +14,7 @@
 | `supports_database_listing` | `supports_database_listing()` | Whether the database switcher can enumerate databases. |
 | `supports_index_metadata` | `supports_index_metadata()` | Whether index metadata is implemented rather than an empty-list default. |
 | `supports_foreign_key_metadata` | `supports_foreign_key_metadata()` | Whether foreign-key metadata is implemented rather than an empty-list default. |
-| `supports_column_comments` | `supports_column_comments()` | Derived from the SQL DDL comment-placement table; it must agree with what the builder can emit. |
+| `column_comment` | `column_comment_capability()` | Typed lifecycle and SQL placement for unsupported comments, new-column-only comments, or comments editable on both new and existing columns. |
 | `supports_view_metadata` | `supports_view_metadata()` | Whether the driver implements view metadata. |
 | `catalog_object_kinds` | `catalog_object_kinds()` | Static catalog kinds exposed by the driver. |
 | `supports_integrated_auth` | `supports_integrated_auth()` | Authentication form and transport validation. |
@@ -24,17 +24,17 @@
 | `supports_client_tls_auth` | `supports_client_tls_auth()` | Whether transport accepts client certificate authentication. |
 | `supports_explicit_auto_increment_values` | `supports_explicit_auto_increment_values()` | Whether CSV import may include explicit identity values in the insert plan and saved mapping. |
 
-Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL, real affected-row counts, and false/empty for the remaining support flags. Column-comment support is derived from the DDL placement table. Current per-driver overrides are:
+Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL, real affected-row counts, and false/empty for the remaining support flags. Column-comment capability defaults to `Unsupported`; its typed mapping also supplies the DDL placement. Current per-driver overrides are:
 
 | Driver | Overrides from the defaults |
 | --- | --- |
-| ClickHouse | `enum_input_style = SqlQuotedLabel`, database listing, no affected-row count, index metadata |
+| ClickHouse | `enum_input_style = SqlQuotedLabel`, database listing, no affected-row count, index metadata, column comments on new columns only |
 | DuckDB | `enum_input_style = SqlQuotedLabel`, `Experimental`, file-based, transactional DDL |
 | MongoDB | `Experimental`, database listing |
-| MySQL | `enum_input_style = DeclaredMemberList`, database listing, index and foreign-key metadata, client TLS auth, local socket and socket-file support, explicit auto-increment values |
-| PostgreSQL | transactional DDL, database listing, index and foreign-key metadata, view metadata and catalog kinds, client TLS auth, local socket and socket-directory support, explicit auto-increment values |
+| MySQL | `enum_input_style = DeclaredMemberList`, database listing, index and foreign-key metadata, client TLS auth, local socket and socket-file support, explicit auto-increment values, inline comments on new and existing columns |
+| PostgreSQL | transactional DDL, database listing, index and foreign-key metadata, view metadata and catalog kinds, client TLS auth, local socket and socket-directory support, explicit auto-increment values, separate comments on new and existing columns |
 | Redis | `Experimental` |
-| SQL Server | database listing, transactional DDL, index and foreign-key metadata, integrated authentication |
+| SQL Server | database listing, transactional DDL, index and foreign-key metadata, integrated authentication, separate comments on new and existing columns |
 | SQLite | file-based, transactional DDL, index and foreign-key metadata, explicit auto-increment values |
 
 ## Current consumers
@@ -49,7 +49,8 @@ Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL
 | `supports_database_listing` | Database switcher reads the typed profile. |
 | Integrated auth, local sockets and client TLS auth | The connect form reads the typed profile. GTK-free auth and endpoint visibility, plus file-versus-directory socket selection, live in `crates/app-services/src/connection_form.rs`; the form does not infer socket shape from an engine ID. Transport validation still reads the declarations directly and remains a backend consumer migration under [#1688](https://github.com/cozyGarage/BookiE/issues/1688). |
 | `supports_explicit_auto_increment_values` | CSV import planning, preview mapping and saved mapping validation. The profile is passed at runtime; it is not stored in the saved mapping file. |
-| Index/FK/view metadata, column comments and catalog kinds | Current source has declarations and driver tests, but no direct production consumer. This is a follow-up opportunity; do not treat the flag as proof the UI exposes the capability. |
+| Index/FK/view metadata and catalog kinds | Current source has declarations and driver tests, but no direct production consumer. This is a follow-up opportunity; do not treat metadata support as proof the UI exposes it. |
+| `column_comment` | B3 has made the DDL placement and lifecycle explicit in the profile. The Structure editor consumer is the second phase of #1688 and will be documented after its UX handoff. |
 
 ## Values outside the profile
 
