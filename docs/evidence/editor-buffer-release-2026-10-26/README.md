@@ -61,7 +61,7 @@ The highest sampled RSS was 252.6 MiB. Idle CPU was 0.09 CPU seconds over 15 sec
 
 The earlier [18-cycle record at source `9d82a5ebe`](https://github.com/cozyGarage/BookiE/blob/d3566e3b2/docs/evidence/editor-close-current-linux-2026-10-26/README.md) ended at 448.9 MiB with the default input method and 248.0 MiB with the simple control. The new default-input-method result is close to that control. These application runs use different source revisions and different welcome-button activation mechanisms, so they are contextual measurements rather than an isolated benchmark of a single patch. The lifetime probes and application regressions establish the release mechanism separately.
 
-An initial attempt stopped because the shared pointer helper found no window matching its size heuristic. The successful resource run uses accessibility activation and does not prove physical pointer reachability. Both attempts exposed the welcome button through accessibility; neither establishes the reported native Wayland freeze.
+An initial attempt used this machine's `xvfb-run` default of a 640×480 screen. Its recorded app frame was 640×480, below the pointer helper's minimum window search size of 800×600. This was a fixture mismatch, not evidence of an application layout defect. The successful run explicitly used a 1280×1024 screen and accessibility activation. It does not prove physical pointer reachability or establish the reported native Wayland freeze.
 
 ## Records and reproduction
 
@@ -72,6 +72,7 @@ An initial attempt stopped because the shared pointer helper found no window mat
 - [Default heap report](heaptrack-default.txt), [simple heap report](heaptrack-simple.txt), [default resource samples](default.json) and [simple resource samples](simple.json).
 - [Application repeated-close scenario](app-cycles.py).
 - [Application resource samples](app-fixed/resource-idle-samples.json), [scenario outcome](app-fixed/repeated_editor_close_cycles-result.json) and [binary hash](app-fixed/binary.sha256).
+- [First-attempt display mismatch](first-attempt-display.txt).
 - [Validation summaries](validation.txt), [default-input-method failure before context retirement](default-lifetime-before.txt), [source base](source-base.txt) and [source file hashes](source-files.sha256).
 
 Run a lifetime probe from the repository root:
