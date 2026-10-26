@@ -15,7 +15,19 @@ Given a saved connection with a long Unicode name and endpoint, when the GTK tes
 
 An earlier native Wayland attempt under Hyprland tiled the preview window to 1,896 px instead of the requested 320 px; the helper rejected the capture. A later source-built run at Linux `96a8cce2aa51a788b880db4ddf90a4c73d3f0b13` used an isolated XDG profile containing one synthetic PostgreSQL connection and no credentials. At the application's 600 x 900 px minimum window size, the long Unicode name and endpoint truncated with ellipses, and the favorite, actions and open controls remained visible. Sequential Tab presses moved the visible focus indicator from Actions to Open. The screenshots are native Wayland captures under Hyprland.
 
-This run does not test the 320 px child allocation from the GTK widget test and does not resolve the GtkBox minimum/natural-height warning. The log also records that GTK could not connect to this session's AT-SPI socket (`Connection refused`); Orca and pyatspi were unavailable. Screen-reader narration and accessible-name verification therefore remain outstanding. Issue #1332 remains open for those checks and review of the measurement warning.
+This run does not test the 320 px child allocation from the GTK widget test and does not resolve the GtkBox minimum/natural-height warning. The log records that GTK could not connect to this session's AT-SPI socket (`Connection refused`). It used the mise Python, where `pyatspi` was not importable; Orca was not installed. Screen-reader narration and accessible-name verification therefore remained outstanding for this run. Issue #1332 remained open for those checks and review of the measurement warning.
+
+## AT-SPI rerun
+
+On 2026-10-26, the existing saved-row accessibility scenario passed under the isolated X11/AT-SPI test harness. The binary was built from PR #1686 head `1a08568dcdc63207577dd3d24269a4b3d1a2de0a`, based on Linux `589c64f02a1c8fb8dd69d1304e3a4149bf75e338`. The `connection_row.rs` and `gtk_ux.py` files were identical to that Linux base.
+
+- Command: with `TABLEPRO_GTK_BINARY` pointing to the built binary from that worktree, `PATH=/usr/bin:/bin:/usr/local/bin:$PATH TABLEPRO_GTK_SCENARIO=saved_connection_row_controls_have_keyboard_focus_order bash scripts/test-gtk-safety.sh`.
+- Binary SHA-256: `df136150e42d68e8c94481ce2ee516c70c8892cc1d690ea342bd271ff2ac483e`.
+- Result: the selected scenario passed in 3.051 seconds. AT-SPI found the Favorite, Actions and Open controls by their accessible names and click actions; Tab moved focus in that order; Return opened the saved connection.
+- `/usr/bin/python3` imports the installed `pyatspi` module. The default mise Python does not.
+- Orca is not installed, so spoken screen-reader narration remains unverified. The run emitted `A connection to the bus can't be made` during shutdown after the scenario passed and the script returned exit status 0.
+
+This rerun verifies the AT-SPI tree and keyboard path under X11. It does not replace the outstanding native Wayland screen-reader review, reproduce the 320 px allocation under Hyprland, or resolve the GtkBox minimum/natural-height warning. Keep #1332 open for those items.
 
 ## Screenshots
 
