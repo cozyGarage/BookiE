@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tablepro_core::{ColumnInfo, import::supports_explicit_auto_increment_values};
+use tablepro_core::{ColumnInfo, DriverCapabilities};
 use uuid::Uuid;
 
 use super::config_io::xdg_config_path;
@@ -23,6 +23,7 @@ pub struct CsvMappingScope {
     pub connection_id: Uuid,
     pub database: String,
     pub driver_id: String,
+    pub capabilities: DriverCapabilities,
     pub schema: Option<String>,
     pub table: String,
 }
@@ -80,7 +81,7 @@ impl CsvMappingStore {
         has_header: bool,
     ) -> Result<(), String> {
         validate_scope(scope)?;
-        validate_inputs(&scope.driver_id, headers, columns, mapping, has_header)?;
+        validate_inputs(scope.capabilities, headers, columns, mapping, has_header)?;
         let stored = StoredMapping {
             columns: columns
                 .iter()
@@ -155,7 +156,7 @@ impl CsvMappingStore {
             if let Some(source) = stored_column.source {
                 if is_generated(&columns[*target])
                     || (columns[*target].is_auto_increment
-                        && !supports_explicit_auto_increment_values(&scope.driver_id))
+                        && !scope.capabilities.supports_explicit_auto_increment_values)
                 {
                     return Err("A saved mapping targets a column that cannot accept explicit values.".into());
                 }
@@ -190,7 +191,7 @@ fn validate_scope(scope: &CsvMappingScope) -> Result<(), String> {
 }
 
 fn validate_inputs(
-    driver_id: &str,
+    capabilities: DriverCapabilities,
     headers: &[String],
     columns: &[ColumnInfo],
     mapping: &[Option<usize>],
@@ -211,7 +212,7 @@ fn validate_inputs(
         if source.is_some_and(|index| index >= headers.len())
             || (source.is_some()
                 && (is_generated(column)
-                    || (column.is_auto_increment && !supports_explicit_auto_increment_values(driver_id))))
+                    || (column.is_auto_increment && !capabilities.supports_explicit_auto_increment_values)))
         {
             return Err("The selected mapping is invalid for this table.".into());
         }
@@ -280,6 +281,7 @@ mod tests {
             connection_id,
             database: database.into(),
             driver_id: "postgres".into(),
+            capabilities: DriverCapabilities::default(),
             schema: Some("public".into()),
             table: table.into(),
         }
@@ -338,6 +340,10 @@ mod tests {
             let store = CsvMappingStore::load_at(directory.path().join("mappings.json"));
             let mut scope = scope(Uuid::new_v4(), "appdb", "users");
             scope.driver_id = driver_id.into();
+            scope.capabilities = DriverCapabilities {
+                supports_explicit_auto_increment_values: true,
+                ..DriverCapabilities::default()
+            };
 
             store.save(&scope, &headers, &columns, &mapping, true).unwrap();
             let restored = store.restore(&scope, &headers, &columns, true).unwrap().unwrap();
@@ -346,6 +352,7 @@ mod tests {
             let plan = tablepro_core::import::build_insert_plan(
                 &tablepro_core::import::ImportTarget {
                     driver_id,
+                    capabilities: scope.capabilities,
                     schema: None,
                     table: "users",
                     columns: &columns,
@@ -413,6 +420,27 @@ mod tests {
                 .save(&scope, &headers(&["id"]), &columns, &[Some(0)], true)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn a_saved_identity_mapping_is_refused_when_current_capability_no_longer_allows_it() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CsvMappingStore::load_at(directory.path().join("mappings.json"));
+        let mut scope = scope(Uuid::new_v4(), "appdb", "users");
+        scope.capabilities = DriverCapabilities {
+            supports_explicit_auto_increment_values: true,
+            ..DriverCapabilities::default()
+        };
+        let headers = headers(&["id"]);
+        let columns = [ColumnInfo {
+            is_auto_increment: true,
+            ..column("id")
+        }];
+
+        store.save(&scope, &headers, &columns, &[Some(0)], true).unwrap();
+        scope.capabilities = DriverCapabilities::default();
+
+        assert!(store.restore(&scope, &headers, &columns, true).is_err());
     }
 
     #[test]

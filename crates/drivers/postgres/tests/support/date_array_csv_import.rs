@@ -46,6 +46,8 @@ async fn value_contract_date_array_csv_import_survives_datestyle_change() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "date_array_csv_target",
             columns: &columns,

@@ -16,6 +16,7 @@ struct CursorScript {
     unsupported_cursor: bool,
     materialized_sql: Mutex<Vec<String>>,
     closed: Mutex<usize>,
+    completion_targets: Mutex<Vec<(Option<String>, String)>>,
 }
 
 struct CursorSession {
@@ -62,6 +63,7 @@ fn make_guard(
         unsupported_cursor,
         materialized_sql: Mutex::new(Vec::new()),
         closed: Mutex::new(0),
+        completion_targets: Mutex::new(Vec::new()),
     });
     let audit = Arc::new(SequenceAuditSink::new(vec![]));
     let context = context(
@@ -146,6 +148,20 @@ impl tablepro_core::Session for CursorSession {
         assert_eq!(id, self.script.id);
         *self.script.closed.lock().expect("close lock") += 1;
         Ok(())
+    }
+
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        schema: Option<&str>,
+        table: &str,
+        _control: &OperationControl,
+    ) -> Result<Vec<String>, DriverError> {
+        self.script
+            .completion_targets
+            .lock()
+            .expect("completion target lock")
+            .push((schema.map(str::to_string), table.to_string()));
+        Ok(vec!["id".into()])
     }
 
     fn is_usable(&self) -> bool {
@@ -458,6 +474,46 @@ async fn typed_commit_refuses_an_active_cursor_without_dispatching_commit() {
             .expect("audit")
             .last()
             .expect("refusal")
+            .terminal_status,
+        AuditTerminalStatus::Denied
+    );
+    session
+        .close_query_cursor_controlled(cursor, &control)
+        .await
+        .expect("close cursor");
+    session.close().await.expect("close session");
+}
+
+#[tokio::test]
+async fn completion_metadata_refuses_an_active_cursor_before_driver_dispatch() {
+    let (guard, script, audit) = make_guard(vec![page("secret", true)], None, false);
+    let mut session = guard.open_session().await.expect("open guarded session");
+    begin_read_snapshot(&mut session).await;
+    let control = OperationControl::new(CancellationToken::new(), None);
+    let cursor = session
+        .open_query_cursor_controlled("SELECT password FROM accounts", &[], &control)
+        .await
+        .expect("open guarded cursor");
+
+    let result = session
+        .fetch_completion_columns_controlled(None, "accounts", &control)
+        .await;
+
+    assert!(matches!(result, Err(DriverError::PolicyDenied(_))), "{result:?}");
+    assert!(
+        script
+            .completion_targets
+            .lock()
+            .expect("completion target lock")
+            .is_empty()
+    );
+    assert_eq!(
+        audit
+            .events
+            .lock()
+            .expect("audit lock")
+            .last()
+            .expect("refusal is audited")
             .terminal_status,
         AuditTerminalStatus::Denied
     );

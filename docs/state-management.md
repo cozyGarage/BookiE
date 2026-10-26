@@ -73,6 +73,8 @@ sender.command(move |_, shutdown| {
 
 Why centralise: connection lifecycles, retries, health pings, cancellation and policy are concerns the interface must not reimplement.
 
+Editor failures carry only audit receipts returned by the exact guarded statement, including streamed cursor operations. A receipt is available only after its journal write succeeds. The error view offers a link for each receipt and opens the Audit Log filtered to that operation; it never guesses from the newest journal row. If the operation has left the recent-record window, the viewer reports that it is unavailable. Without a receipt, the existing error view has no Audit Log action.
+
 ## State that does not belong in a component
 
 Some state outlives any single component: open connections, user preferences, query history, the workspace cache and the MCP bridge. The application owns these as `Arc`s and passes them explicitly into each window, tab and dialog that needs them. They were global singletons until the 0.2 sprint, and that is exactly what the `Arc` handles replaced.

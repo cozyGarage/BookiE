@@ -168,7 +168,9 @@ impl App {
             let editor = SqlEditor::builder()
                 .launch(SqlEditorInit {
                     connection_id: connection_id_for_create,
-                    schema_index: schema_index_for_create.clone(),
+                    schema_index: std::rc::Rc::new(std::cell::RefCell::new(
+                        schema_index_for_create.borrow().editor_snapshot(),
+                    )),
                     initial_query: None,
                     history: history_for_create.clone(),
                     database: database_for_create.clone(),
@@ -543,7 +545,7 @@ impl App {
         let editor = SqlEditor::builder()
             .launch(SqlEditorInit {
                 connection_id: self.connection_id,
-                schema_index: self.schema_index.clone(),
+                schema_index: std::rc::Rc::new(std::cell::RefCell::new(self.schema_index.borrow().editor_snapshot())),
                 initial_query,
                 history: self.history.clone(),
                 database: self.database.clone(),
@@ -1138,7 +1140,6 @@ fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
         },
         SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
         SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
-        SqlEditorOutput::NeedColumns(tables) => AppMsg::EditorNeedsColumns(tables),
         SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
         SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
             title: crate::tr!("Row as JSON"),

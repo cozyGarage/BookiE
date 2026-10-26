@@ -78,6 +78,31 @@ fn every_registered_driver_profile_matches_its_declared_static_behavior() {
             driver.supports_local_socket_directory()
         );
         assert_matches_declaration!(capabilities.supports_client_tls_auth, driver.supports_client_tls_auth());
+        assert_matches_declaration!(
+            capabilities.supports_explicit_auto_increment_values,
+            driver.supports_explicit_auto_increment_values()
+        );
+    }
+}
+
+#[test]
+fn registered_driver_profiles_declare_explicit_auto_increment_import_support() {
+    let registry = crate::build_registry();
+    for driver_id in ["postgres", "mysql", "sqlite"] {
+        assert!(
+            registry
+                .get(driver_id)
+                .is_some_and(|driver| driver.capabilities().supports_explicit_auto_increment_values),
+            "driver {driver_id}"
+        );
+    }
+    for driver_id in ["mssql", "clickhouse", "redis", "mongodb"] {
+        assert!(
+            registry
+                .get(driver_id)
+                .is_some_and(|driver| !driver.capabilities().supports_explicit_auto_increment_values),
+            "driver {driver_id}"
+        );
     }
 }
 

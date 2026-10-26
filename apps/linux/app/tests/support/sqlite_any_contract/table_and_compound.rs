@@ -258,6 +258,8 @@ async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
     let plan = build_insert_plan(
         &ImportTarget {
             driver_id: "sqlite",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "restored",
             columns: &target_columns,
@@ -367,6 +369,8 @@ async fn sqlite_attached_any_csv_round_trip_preserves_runtime_storage_classes() 
     let plan = build_insert_plan(
         &ImportTarget {
             driver_id: "sqlite",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "restored",
             columns: &target_columns,

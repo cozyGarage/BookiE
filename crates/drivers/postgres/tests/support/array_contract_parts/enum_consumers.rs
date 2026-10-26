@@ -188,6 +188,8 @@ async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels()
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "value_contract_whitespace_target",
             columns: &columns,

@@ -112,6 +112,8 @@ async fn assert_invalid_calendar_csv_round_trip(
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "mysql",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "allow_invalid_dates_csv_copy",
             columns: &columns,

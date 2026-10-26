@@ -76,6 +76,7 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
 - [Performance review and first phases, October 22–23](archive/performance-review-2026-10-23.md): measured changes that landed, the remaining performance plan and follow-ups.
 - [Installed native Wayland run, October 23](evidence/installed-wayland-0.2.0-2026-10-23/README.md): oracle-checked end-to-end flows on Hyprland and the defects filed from them.
+- [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
 - [Installed Arch profile, October 24](evidence/installed-arch-profile-2026-10-24/README.md): package integrity, automated test results, native PostgreSQL UI checks and resource samples.
 - [Forgejo nightly #778 terminal inventory, October 20](evidence/nightly-778-selective-rerun-2026-10-20/README.md): dated record of completed, cancelled and OOM-interrupted jobs; it is not current runner guidance.
 - [Workspace unit coverage, October 24](evidence/workspace-unit-coverage-9d61c7a-2026-10-24/README.md): 61.42% line coverage on Linux `9d61c7a` against the 59% floor, with the command and its scope.

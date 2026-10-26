@@ -263,6 +263,8 @@ async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "mysql",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "temporal_grid_imported",
             columns: &import_columns,

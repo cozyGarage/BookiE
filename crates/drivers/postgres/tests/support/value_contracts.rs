@@ -72,6 +72,8 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
             let plan = tablepro_core::import::build_insert_plan(
                 &tablepro_core::import::ImportTarget {
                     driver_id: "postgres",
+
+                    capabilities: tablepro_core::DriverCapabilities::default(),
                     schema: None,
                     table: &table,
                     columns: &columns,
@@ -146,6 +148,8 @@ async fn value_contract_wide_numeric_csv_round_trips_through_native_insert_plan(
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "numeric_csv_target",
             columns: &columns,

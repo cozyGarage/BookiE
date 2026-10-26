@@ -82,6 +82,10 @@ impl DatabaseDriver for MysqlDriver {
         true
     }
 
+    fn supports_explicit_auto_increment_values(&self) -> bool {
+        true
+    }
+
     fn supports_local_socket(&self) -> bool {
         true
     }
