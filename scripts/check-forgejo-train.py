@@ -56,13 +56,13 @@ def check_release_notes(aggregate_body, member_bodies):
     for number, body in member_bodies.items():
         _, errors = release_notes.parse_notes(body or '')
         require(not errors, f'constituent #{number} Release-Note: ' + '; '.join(errors))
-        carried.update(f'Release-Note: {v}' for v in release_notes.TRAILER.findall(body) if v.lower() != 'none')
+        carried.update(f'Release-Note: {v}' for v in release_notes.note_values(body) if v.lower() != 'none')
     _, errors = release_notes.parse_notes(aggregate_body or '')
     require(not errors, 'aggregate PR Release-Note: ' + '; '.join(errors))
-    present = {f'Release-Note: {v}' for v in release_notes.TRAILER.findall(aggregate_body)}
+    present = {f'Release-Note: {v}' for v in release_notes.note_values(aggregate_body)}
     missing = sorted(carried - present)
     require(not missing, 'aggregate PR body is missing constituent release notes: ' + '; '.join(missing))
-    require(carried or present == {'Release-Note: none'} or all(v.lower() == 'none' for v in release_notes.TRAILER.findall(aggregate_body)),
+    require(carried or present == {'Release-Note: none'} or all(v.lower() == 'none' for v in release_notes.note_values(aggregate_body)),
             'no constituent has a release note, so the aggregate PR must say `Release-Note: none`')
 
 
