@@ -417,6 +417,12 @@ struct CompletionSession {
     calls: CompletionCalls,
 }
 
+impl AsMut<dyn tablepro_core::Session> for CompletionSession {
+    fn as_mut(&mut self) -> &mut (dyn tablepro_core::Session + 'static) {
+        self
+    }
+}
+
 #[async_trait::async_trait]
 impl tablepro_core::Session for CompletionSession {
     async fn query_params_controlled(
