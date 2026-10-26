@@ -1,0 +1,100 @@
+[
+  {
+    "cpu_ticks": 43,
+    "monotonic": 519661.91614896,
+    "phase": "initial",
+    "rss_kib": 176232,
+    "high_water_kib": 176232
+  },
+  {
+    "cpu_ticks": 352,
+    "monotonic": 519666.261285051,
+    "phase": "cycle-0-four-tabs",
+    "rss_kib": 216020,
+    "high_water_kib": 216020
+  },
+  {
+    "cpu_ticks": 379,
+    "monotonic": 519668.24988556,
+    "phase": "cycle-0-closed",
+    "rss_kib": 220376,
+    "high_water_kib": 220376
+  },
+  {
+    "cpu_ticks": 677,
+    "monotonic": 519672.693575185,
+    "phase": "cycle-1-four-tabs",
+    "rss_kib": 222156,
+    "high_water_kib": 222156
+  },
+  {
+    "cpu_ticks": 704,
+    "monotonic": 519674.677683932,
+    "phase": "cycle-1-closed",
+    "rss_kib": 227648,
+    "high_water_kib": 227648
+  },
+  {
+    "cpu_ticks": 999,
+    "monotonic": 519679.09716298,
+    "phase": "cycle-2-four-tabs",
+    "rss_kib": 225000,
+    "high_water_kib": 228320
+  },
+  {
+    "cpu_ticks": 1029,
+    "monotonic": 519681.090082118,
+    "phase": "cycle-2-closed",
+    "rss_kib": 228972,
+    "high_water_kib": 228972
+  },
+  {
+    "cpu_ticks": 1337,
+    "monotonic": 519685.620355874,
+    "phase": "cycle-3-four-tabs",
+    "rss_kib": 231872,
+    "high_water_kib": 231872
+  },
+  {
+    "cpu_ticks": 1364,
+    "monotonic": 519687.611178102,
+    "phase": "cycle-3-closed",
+    "rss_kib": 232448,
+    "high_water_kib": 232448
+  },
+  {
+    "cpu_ticks": 1669,
+    "monotonic": 519692.040262398,
+    "phase": "cycle-4-four-tabs",
+    "rss_kib": 233060,
+    "high_water_kib": 233060
+  },
+  {
+    "cpu_ticks": 1696,
+    "monotonic": 519694.028269561,
+    "phase": "cycle-4-closed",
+    "rss_kib": 228244,
+    "high_water_kib": 233392
+  },
+  {
+    "cpu_ticks": 2016,
+    "monotonic": 519698.746757836,
+    "phase": "cycle-5-four-tabs",
+    "rss_kib": 234460,
+    "high_water_kib": 234460
+  },
+  {
+    "cpu_ticks": 2044,
+    "monotonic": 519700.735946234,
+    "phase": "cycle-5-closed",
+    "rss_kib": 234584,
+    "high_water_kib": 234584
+  },
+  {
+    "cpu_ticks": 2138,
+    "monotonic": 519704.723045902,
+    "phase": "final",
+    "rss_kib": 234908,
+    "high_water_kib": 234908
+  }
+]
