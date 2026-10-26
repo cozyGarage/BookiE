@@ -240,7 +240,11 @@
       "hosted_gate": "Build Linux / fast",
       "steps": [
         {
-          "argv": ["python3", "scripts/run-isolated-tests.py", "app-server"],
+          "argv": [
+            "python3",
+            "scripts/run-isolated-tests.py",
+            "app-server"
+          ],
           "timeout_seconds": 900,
           "evidence": "exit"
         }
@@ -452,6 +456,25 @@
             "actionlint",
             "shellcheck"
           ]
+        }
+      ]
+    },
+    "no-default-features": {
+      "purpose": "Workspace and test targets compile without the default Kerberos feature",
+      "prerequisites": "Rust 1.98; GTK 4.24 development stack",
+      "hosted_gate": "None yet: add a Forgejo merge-tier job that runs this layer",
+      "steps": [
+        {
+          "argv": [
+            "cargo",
+            "check",
+            "--workspace",
+            "--all-targets",
+            "--locked",
+            "--no-default-features"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit"
         }
       ]
     }
