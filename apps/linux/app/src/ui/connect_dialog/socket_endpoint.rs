@@ -1,18 +1,19 @@
 use relm4::adw::prelude::*;
 
 use super::ConnectDialog;
-use super::form::{EndpointFormState, local_socket_options, resolved_socket_path, socket_directory_is_valid};
 use super::toggle_error;
+use crate::services::connection_form::{
+    EndpointFormState, LocalSocketPathKind, local_socket_options, resolved_postgres_socket_path,
+    socket_path_is_absolute,
+};
 
 impl ConnectDialog {
     pub(super) fn local_socket_is_file(&self) -> bool {
-        self.drivers
-            .get(self.driver_combo.selected() as usize)
-            .is_some_and(|driver| driver.id == "mysql")
+        self.form.local_socket_path_kind() == Some(LocalSocketPathKind::File)
     }
 
-    pub(super) fn configure_socket_field(&self, driver_id: &str) {
-        if driver_id == "mysql" {
+    pub(super) fn configure_socket_field(&self, kind: Option<LocalSocketPathKind>) {
+        if kind == Some(LocalSocketPathKind::File) {
             self.socket_dir.set_title(&crate::tr!("Socket path"));
             if self.socket_dir.text() == "/run/postgresql" {
                 self.socket_dir.set_text("/run/mysqld/mysqld.sock");
@@ -27,11 +28,11 @@ impl ConnectDialog {
 
     pub(super) fn refresh_socket_path(&self, selected: bool) {
         let text = self.socket_dir.text();
-        toggle_error(&self.socket_dir, selected && !socket_directory_is_valid(text.as_str()));
+        toggle_error(&self.socket_dir, selected && !socket_path_is_absolute(text.as_str()));
         let path = if self.local_socket_is_file() {
             std::path::PathBuf::from(text.as_str())
         } else {
-            resolved_socket_path(text.as_str(), self.port.value() as u16)
+            resolved_postgres_socket_path(text.as_str(), self.port.value() as u16)
         };
         self.resolved_socket.set_subtitle(&path.display().to_string());
     }
@@ -47,11 +48,11 @@ impl ConnectDialog {
 
     pub(super) fn selected_socket_options(
         &self,
-        driver_id: &str,
+        kind: Option<LocalSocketPathKind>,
         selected: bool,
     ) -> (Option<std::path::PathBuf>, Option<std::path::PathBuf>) {
         if selected {
-            local_socket_options(driver_id, self.socket_dir.text().as_str())
+            local_socket_options(kind, self.socket_dir.text().as_str())
         } else {
             (None, None)
         }

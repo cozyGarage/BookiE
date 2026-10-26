@@ -69,6 +69,12 @@ fn every_registered_driver_profile_matches_its_declared_static_behavior() {
         assert_matches_declaration!(capabilities.catalog_object_kinds, driver.catalog_object_kinds());
         assert_matches_declaration!(capabilities.supports_integrated_auth, driver.supports_integrated_auth());
         assert_matches_declaration!(capabilities.supports_local_socket, driver.supports_local_socket());
+        assert_eq!(
+            capabilities.supports_local_socket,
+            tablepro_app_services::connection_form::local_socket_path_kind(capabilities).is_some(),
+            "driver {} must declare one local socket path shape when socket mode is enabled",
+            driver.id()
+        );
         assert_matches_declaration!(
             capabilities.supports_local_socket_file,
             driver.supports_local_socket_file()

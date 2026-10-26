@@ -12,6 +12,7 @@ use tablepro_storage::{
 };
 
 use super::ssh_section::{SshInputs, SshSecretToStore, SshSection};
+use crate::services::connection_form::{ConnectFormState, socket_path_is_absolute};
 use crate::services::connection_service;
 use crate::services::database_service::ReconnectParams;
 
@@ -51,7 +52,7 @@ pub struct ConnectDialog {
     toast_overlay: adw::ToastOverlay,
     test_banner: adw::Banner,
     header_title: gtk::Label,
-    form: AuthFormState,
+    form: ConnectFormState,
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
     ssh_environment: tablepro_transport::SshEnvironment,
@@ -92,7 +93,7 @@ mod socket_endpoint;
 
 pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
-use form::{AuthFormState, EndpointFormState, default_driver_row, socket_directory_is_valid, test_result_text};
+use form::{default_driver_row, test_result_text};
 use identity::{ConnectionIdentity, find_existing, saved_connection_name};
 pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
 
@@ -395,7 +396,7 @@ impl Component for ConnectDialog {
             toast_overlay,
             test_banner,
             header_title,
-            form: AuthFormState::default(),
+            form: ConnectFormState::default(),
             preferences: init.preferences,
             bound_connection_id: init.bound_connection_id,
             ssh_environment: init.ssh_environment,
@@ -729,7 +730,7 @@ impl ConnectDialog {
             if !self.uses_local_socket() && self.host.text().trim().is_empty() {
                 return false;
             }
-            if self.uses_local_socket() && !socket_directory_is_valid(self.socket_dir.text().as_str()) {
+            if self.uses_local_socket() && !socket_path_is_absolute(self.socket_dir.text().as_str()) {
                 return false;
             }
             if self.form.shows_credentials() && !self.uses_local_socket() && self.username.text().trim().is_empty() {
@@ -827,7 +828,8 @@ impl ConnectDialog {
 
     fn collect_options(&self, driver: &dyn tablepro_core::DatabaseDriver) -> ConnectOptions {
         let socket = self.uses_local_socket();
-        let (local_socket_dir, local_socket_path) = self.selected_socket_options(driver.id(), socket);
+        let (local_socket_dir, local_socket_path) =
+            self.selected_socket_options(self.form.local_socket_path_kind(), socket);
         let (username, password) = if self.form.shows_credentials() {
             let entered = self.username.text().trim().to_string();
             let username = if socket && entered.is_empty() {
@@ -857,12 +859,8 @@ impl ConnectDialog {
         }
     }
 
-    fn endpoint_state(&self) -> EndpointFormState {
-        EndpointFormState {
-            file_based: self.form.file_based,
-            supports_local_socket: self.form.supports_local_socket,
-            socket_selected: self.endpoint_combo.selected() == 1,
-        }
+    fn endpoint_state(&self) -> crate::services::connection_form::EndpointFormState {
+        self.form.endpoint(self.endpoint_combo.selected() == 1)
     }
 
     fn uses_local_socket(&self) -> bool {

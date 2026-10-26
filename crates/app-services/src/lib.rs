@@ -4,6 +4,7 @@ pub mod completion;
 pub mod completion_identifiers;
 pub mod completion_proposals;
 pub mod config_io;
+pub mod connection_form;
 pub mod connection_identity;
 pub mod database_backup;
 pub mod driver_error_presentation;
