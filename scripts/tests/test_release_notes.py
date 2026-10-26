@@ -29,6 +29,17 @@ class ReleaseNotesTests(unittest.TestCase):
 
         self.assertEqual(release_notes.TRAILER.findall(body), ["Fixed: A", "Added: B"])
 
+    def test_a_wrapped_note_keeps_its_whole_sentence(self):
+        body = "## Release note\n\nRelease-Note: Changed: Transaction age labels show translated minute and\nhour units.\n\n## Validation\n- ok"
+
+        self.assertEqual(release_notes.note_values(body), ["Changed: Transaction age labels show translated minute and hour units."])
+        self.assertEqual(release_notes.parse_notes(body)[0], [("Changed", "Transaction age labels show translated minute and hour units.")])
+
+    def test_a_note_ends_at_a_blank_line_a_heading_or_the_next_note(self):
+        body = "Release-Note: Added: One\n## Next\nRelease-Note: Fixed: Two\nRelease-Note: none\n\ntail text"
+
+        self.assertEqual(release_notes.note_values(body), ["Added: One", "Fixed: Two", "none"])
+
     def test_assemble_groups_by_category_and_adds_pull_numbers(self):
         commits = [
             ("fix(core): keep NULLs (#12)", "Release-Note: Fixed: Export keeps NULLs"),
@@ -39,6 +50,20 @@ class ReleaseNotesTests(unittest.TestCase):
         result = release_notes.assemble(commits)
 
         self.assertEqual(result, "### Added\n\n- Pager (#13)\n\n### Changed\n\n- Wider footer (#13)\n\n### Fixed\n\n- Export keeps NULLs (#12)\n")
+
+    def test_assemble_skips_direct_pushes_and_merge_commits_without_a_note(self):
+        commits = [
+            ("docs: reconcile evidence", "no trailer"),
+            ("Merge remote-tracking branch 'fork/linux' into topic", ""),
+            ("docs: add a note when wanted", "Release-Note: Changed: Wider footer"),
+            ("fix(app): keep NULLs (#9)", "Release-Note: Fixed: Export keeps NULLs"),
+        ]
+
+        result = release_notes.assemble(commits)
+
+        self.assertIn("- Wider footer", result)
+        self.assertIn("- Export keeps NULLs (#9)", result)
+        self.assertNotIn("evidence", result)
 
     def test_assemble_refuses_a_commit_without_a_note_unless_allowed(self):
         commits = [("fix: x (#1)", "no trailer"), ("fix: y (#2)", "Release-Note: Fixed: y")]
