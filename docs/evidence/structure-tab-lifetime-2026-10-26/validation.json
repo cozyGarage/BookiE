@@ -1,0 +1,24 @@
+{
+  "fixed_commit": "7c4ed806e",
+  "focused_regression": {
+    "test": "ui::structure_tab::lifetime_tests::closing_a_structure_tab_releases_its_generated_views",
+    "before": "1 failed, 0 passed",
+    "after": "1 passed, 0 failed"
+  },
+  "environment": {
+    "display": "isolated Xvfb",
+    "input_method": "simple",
+    "G_DEBUG": "fatal-criticals"
+  },
+  "source_sha256": {
+    "apps/linux/app/src/ui/structure_tab/mod.rs": "15657dea76181d6a41ee548b4757452e8ffdc65e5b2b0a6d2a1464cc9f1c698f",
+    "apps/linux/app/src/ui/structure_tab/lifetime_tests.rs": "da81aec58fc10a1ab26e1afa6bef2313f9d7bf37741a79360469a7b3a4fd6ba5",
+    "scripts/isolated-tests.json": "7ca914e205ca6006c508c5420b418297cbee440acec284fe17f6f54f5d0e747e"
+  },
+  "remaining": [
+    "ordinary widget suite",
+    "full preflight",
+    "app Clippy",
+    "Forgejo acceptance"
+  ]
+}
