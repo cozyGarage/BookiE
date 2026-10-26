@@ -6,6 +6,7 @@ pub mod completion_proposals;
 pub mod config_io;
 pub mod connection_identity;
 pub mod database_backup;
+pub mod driver_error_presentation;
 pub mod editor_panel;
 pub mod enum_input;
 pub mod filter_settings;

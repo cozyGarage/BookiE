@@ -1,3 +1,4 @@
+use tablepro_app_services::driver_error_presentation::{DriverFailurePresentation, SaveFailure, TlsAdvice};
 use tablepro_core::DriverError;
 use tablepro_core::sql_dialect::BuildSqlError;
 
@@ -24,100 +25,97 @@ pub fn build_sql_message(error: &BuildSqlError) -> String {
     }
 }
 
-fn server_lacks_tls(detail: &str) -> bool {
-    let detail = detail.to_ascii_lowercase();
-    [
-        "does not support tls",
-        "does not support ssl",
-        "tls is not enabled",
-        "ssl is not enabled",
-        "server does not use tls",
-    ]
-    .iter()
-    .any(|marker| detail.contains(marker))
+pub fn driver_message(error: &DriverError) -> String {
+    let presentation = tablepro_app_services::driver_error_presentation::classify(error);
+    driver_presentation_message(&presentation)
 }
 
-pub fn driver_message(error: &DriverError) -> String {
-    match error {
-        DriverError::ConnectionRefused => crate::tr!("Could not reach the database. Is it running?"),
-        DriverError::AuthFailed => crate::tr!("Username or password is wrong."),
-        DriverError::Tls(detail) if server_lacks_tls(detail) => crate::tr!(
+fn driver_presentation_message(presentation: &DriverFailurePresentation) -> String {
+    match presentation {
+        DriverFailurePresentation::ConnectionRefused => crate::tr!("Could not reach the database. Is it running?"),
+        DriverFailurePresentation::AuthFailed => crate::tr!("Username or password is wrong."),
+        DriverFailurePresentation::Tls {
+            detail,
+            advice: TlsAdvice::ServerDoesNotSupportTls,
+        } => crate::tr!(
             "TLS handshake failed: {detail}. The server does not appear to use TLS. For a local container, set TLS to Disabled."
         )
         .replace("{detail}", detail),
-        DriverError::Tls(detail) => crate::tr!(
+        DriverFailurePresentation::Tls { detail, .. } => crate::tr!(
             "TLS handshake failed: {detail}. Check the server certificate, the certificate authority file and the TLS mode. Do not turn TLS off to get past a certificate error."
         )
         .replace("{detail}", detail),
-        DriverError::Query {
+        DriverFailurePresentation::Query {
             message,
-            sqlstate: Some(s),
+            sqlstate: Some(sqlstate),
             ..
         } => crate::tr!("Query failed (SQLSTATE {sqlstate}): {message}")
-            .replace("{sqlstate}", s)
+            .replace("{sqlstate}", sqlstate)
             .replace("{message}", message),
-        DriverError::Query { message, .. } => crate::tr!("Query failed: {message}").replace("{message}", message),
-        DriverError::Disconnected => crate::tr!("The connection was closed, or all connections are busy with other queries. Try reconnecting."),
-        DriverError::ConcurrentModification => crate::tr!(
+        DriverFailurePresentation::Query { message, .. } => {
+            crate::tr!("Query failed: {message}").replace("{message}", message)
+        }
+        DriverFailurePresentation::Disconnected => crate::tr!("The connection was closed, or all connections are busy with other queries. Try reconnecting."),
+        DriverFailurePresentation::ConcurrentModification => crate::tr!(
             "This row changed in the database after you loaded it. Your edits are still available; reload the row and reapply them."
         ),
-        DriverError::ReadOnly => {
+        DriverFailurePresentation::ReadOnly => {
             crate::tr!("This connection is read-only. Reopen it without read-only mode to make changes.")
         }
-        DriverError::PolicyDenied(detail) => crate::tr!("Blocked by policy: {detail}").replace("{detail}", detail),
-        DriverError::Unsupported(detail) => {
+        DriverFailurePresentation::PolicyDenied(detail) => {
+            crate::tr!("Blocked by policy: {detail}").replace("{detail}", detail)
+        }
+        DriverFailurePresentation::Unsupported(detail) => {
             crate::tr!("This driver does not support: {detail}").replace("{detail}", detail)
         }
-        DriverError::Internal(detail) => crate::tr!("Internal driver error: {detail}").replace("{detail}", detail),
-        DriverError::Cancelled => crate::tr!("The operation was cancelled."),
-        DriverError::TimedOut => crate::tr!("The operation timed out."),
-        DriverError::OperationOutcomeUnknown { source } => crate::tr!(
+        DriverFailurePresentation::Internal(detail) => {
+            crate::tr!("Internal driver error: {detail}").replace("{detail}", detail)
+        }
+        DriverFailurePresentation::Cancelled => crate::tr!("The operation was cancelled."),
+        DriverFailurePresentation::TimedOut => crate::tr!("The operation timed out."),
+        DriverFailurePresentation::OperationOutcomeUnknown(source) => crate::tr!(
             "The operation was interrupted, but the database outcome could not be confirmed: {detail}"
         )
-        .replace("{detail}", &driver_message(source)),
-        DriverError::IntegratedAuth(detail) => crate::tr!(
+        .replace("{detail}", &driver_presentation_message(source)),
+        DriverFailurePresentation::IntegratedAuth(detail) => crate::tr!(
             "Kerberos login failed: {detail}. Check that klist shows a valid ticket, run kinit if it does not, and make sure the server's SPN matches the host you typed."
         )
         .replace("{detail}", detail),
-        DriverError::Transaction { .. }
-        | DriverError::PartiallyApplied { .. }
-        | DriverError::TransactionRollbackFailed { .. } => save_failure_message(error),
+        DriverFailurePresentation::Save(failure) => save_failure_message(failure),
     }
 }
 
-fn save_failure_message(error: &DriverError) -> String {
-    match error {
-        DriverError::Transaction {
-            statement_index: 0,
-            source,
-        } if matches!(source.as_ref(), DriverError::ConcurrentModification) => driver_message(source),
-        DriverError::Transaction {
+fn save_failure_message(failure: &SaveFailure) -> String {
+    match failure {
+        SaveFailure::RolledBack {
             statement_index,
             source,
         } => {
             crate::tr!("Save failed at statement {n}: {error}. The rollback request succeeded; session state and other non-transactional side effects may remain.")
-                .replace("{n}", &(statement_index + 1).to_string())
-                .replace("{error}", driver_message(source).trim_end_matches('.'))
+                .replace("{n}", &statement_index.saturating_add(1).to_string())
+                .replace("{error}", driver_presentation_message(source).trim_end_matches('.'))
         }
-        DriverError::PartiallyApplied {
+        SaveFailure::PartiallyApplied {
             statement_index,
             source,
         } => crate::tr!(
             "Save failed at statement {n}: {error}. This database cannot roll a save back, so the statements before it were applied. Refresh the table before saving again."
         )
-        .replace("{n}", &(statement_index + 1).to_string())
-        .replace("{error}", driver_message(source).trim_end_matches('.')),
-        DriverError::TransactionRollbackFailed {
+        .replace("{n}", &statement_index.saturating_add(1).to_string())
+        .replace("{error}", driver_presentation_message(source).trim_end_matches('.')),
+        SaveFailure::RollbackFailed {
             statement_index,
             source,
             rollback_error,
         } => crate::tr!(
             "Save failed at statement {n}: {error}. Rollback also failed: {rollback_error}. Database changes may have been applied."
         )
-        .replace("{n}", &(statement_index + 1).to_string())
-        .replace("{error}", driver_message(source).trim_end_matches('.'))
-        .replace("{rollback_error}", driver_message(rollback_error).trim_end_matches('.')),
-        other => driver_message(other),
+        .replace("{n}", &statement_index.saturating_add(1).to_string())
+        .replace("{error}", driver_presentation_message(source).trim_end_matches('.'))
+        .replace(
+            "{rollback_error}",
+            driver_presentation_message(rollback_error).trim_end_matches('.'),
+        ),
     }
 }
 

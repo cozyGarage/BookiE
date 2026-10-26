@@ -6,6 +6,8 @@ GTK-free service modules are moving incrementally into `tablepro-app-services` u
 
 Scoped filter presets and import mappings, preference data, quick-switcher ranking and reconnect classification/backoff also live in app-services. GSettings access, style application, translated labels, registered actions and connection-monitor runtime wiring stay in the app.
 
+`tablepro-app-services::driver_error_presentation` classifies `DriverError` values into a typed, GTK-free model, including TLS guidance and transaction outcome details. The GTK adapter keeps `crate::tr!` localization and renders that model into user-facing text; error classification does not depend on GTK or localization.
+
 ## When to use which component flavour
 
 | Flavour | Use when |
