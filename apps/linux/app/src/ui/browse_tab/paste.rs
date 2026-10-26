@@ -5,6 +5,11 @@ use super::value_parse::parse_pasted_cell_with_style;
 use super::*;
 
 const MAX_PASTE_CELLS: usize = 5_000;
+const MAX_PASTE_BYTES: usize = tablepro_core::import::MAX_FIELD_BYTES;
+
+fn paste_size_allowed(size: usize) -> bool {
+    size <= MAX_PASTE_BYTES
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::ui) struct PasteSnapshot {
@@ -229,6 +234,12 @@ impl BrowseTab {
         let snapshot = self.capture_paste_snapshot();
         glib::spawn_future_local(async move {
             if let Ok(Some(text)) = clipboard.read_text_future().await {
+                if !paste_size_allowed(text.len()) {
+                    let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                        "Clipboard text is too large to paste; nothing was pasted"
+                    )));
+                    return;
+                }
                 sender.input(BrowseTabInput::PasteText(PasteTextInput {
                     row,
                     col,
@@ -344,6 +355,12 @@ impl BrowseTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paste_text_size_is_bounded_before_parsing() {
+        assert!(paste_size_allowed(MAX_PASTE_BYTES));
+        assert!(!paste_size_allowed(MAX_PASTE_BYTES + 1));
+    }
 
     fn grid(rows: &[&[&str]]) -> Vec<Vec<Option<String>>> {
         rows.iter()
