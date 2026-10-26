@@ -761,6 +761,33 @@ mod tests {
     }
 
     #[test]
+    fn a_token_issued_by_another_store_survives_a_spent_failed_attempt_budget() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tokens.json");
+        let store = Arc::new(TokenStore::open(path.clone()).unwrap());
+        let issuer = TokenStore::open(path).unwrap();
+        let bridge = McpBridge::with_limits(
+            Arc::new(NoProvider),
+            store,
+            McpLimits {
+                requests_per_minute: 2,
+                ..McpLimits::default()
+            },
+        );
+
+        for guess in ["guess-1", "guess-2", "guess-3", "guess-4"] {
+            assert!(bridge.authenticate(guess).is_err());
+        }
+        let (_, plaintext) = issuer
+            .issue("agent".into(), crate::auth::TokenPermissions::ReadOnly, vec![], None)
+            .unwrap();
+
+        bridge
+            .authenticate(&plaintext)
+            .expect("a token added by another process is still valid");
+    }
+
+    #[test]
     fn a_count_statement_quotes_the_target_for_the_engine() {
         assert_eq!(
             count_statement("postgres", Some("public"), "items").unwrap(),
