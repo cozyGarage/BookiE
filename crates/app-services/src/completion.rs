@@ -256,8 +256,8 @@ pub async fn fetch_column_names(
     (request, columns)
 }
 
-pub async fn fetch_session_column_names(
-    session: Arc<tokio::sync::Mutex<Option<Box<dyn Session>>>>,
+pub async fn fetch_session_column_names<S: Session + Send>(
+    session: Arc<tokio::sync::Mutex<Option<S>>>,
     request: SchemaRequest,
     grammar: Option<SqlGrammar>,
     timeout_secs: u32,
