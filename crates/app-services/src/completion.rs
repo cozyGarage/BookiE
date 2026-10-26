@@ -256,16 +256,13 @@ pub async fn fetch_column_names(
     (request, columns)
 }
 
-pub async fn fetch_session_column_names<S>(
+pub async fn fetch_session_column_names<S: Session + Send>(
     session: Arc<tokio::sync::Mutex<Option<S>>>,
     request: SchemaRequest,
     grammar: Option<SqlGrammar>,
     timeout_secs: u32,
     cancellation: CancellationToken,
-) -> (SchemaRequest, Result<Vec<String>, ()>)
-where
-    S: AsMut<dyn Session> + Send,
-{
+) -> (SchemaRequest, Result<Vec<String>, ()>) {
     let Some((schema, table)) = split_table_reference(&request.table, grammar) else {
         return (request, Err(()));
     };
@@ -280,7 +277,6 @@ where
             let mut session = session.lock().await;
             match session.as_mut() {
                 Some(session) => session
-                    .as_mut()
                     .fetch_completion_columns_controlled(schema.as_deref(), &table, &control)
                     .await
                     .map_err(|_| ()),
