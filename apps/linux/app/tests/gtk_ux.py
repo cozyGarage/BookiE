@@ -379,6 +379,15 @@ def scenarios(ui):
         assert stored_notes(database) == [(1, "gamma"), (2, "beta")], stored_notes(database)
         ui.wait_for_node(name="1 unsaved change", present=False)
 
+    def closing_and_reopening_an_editor_keeps_its_query(database, base):
+        query = "SELECT 'reopened editor query'"
+        ui.invoke_accessible_action("win.open-editor")
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.set_editor_text(query)
+        ui.invoke_accessible_action("win.close-current")
+        ui.press_x11_key("t", ("Control_L", "Shift_L"))
+        wait_for_editor_text(query)
+
     def postgres_reopened_browse_tab_keeps_its_schema_after_switching(database, base):
         try:
             psql(
@@ -2238,6 +2247,7 @@ GLib.MainLoop().run()
         ctrl_slash_toggles_a_comment_in_the_editor,
         browse_edit_cell_and_save_persists_to_the_database,
         closing_and_reopening_a_browse_tab_keeps_it_editable,
+        closing_and_reopening_an_editor_keeps_its_query,
         grid_paste_preserves_multiline_text_and_sibling_rows,
         test_connection_reports_success_in_the_dialog,
         test_connection_reports_failure_in_the_dialog,

@@ -1076,6 +1076,11 @@
       "tablepro-app",
       "--lib",
       "ui::structure_tab::lifetime_tests::closing_a_structure_tab_releases_its_generated_views"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::export_dialog::lifetime_tests::dismissing_export_setup_releases_its_dialog"
     ]
   ],
   "keyring": [
