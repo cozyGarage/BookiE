@@ -35,3 +35,7 @@ The app's idle CPU remains negligible after the workload. The reported tab-close
 - [GTK-only lifecycle control](linux-9d82a5ebe/sourceview-lifecycle-control.py)
 - [GTK-only default input-method result](linux-9d82a5ebe/sourceview-default/result.json)
 - [GTK-only simple input-method result](linux-9d82a5ebe/sourceview-simple/result.json)
+
+## Forgejo gate
+
+Run #989 passed all 32 jobs at code commit `d3566e3b210b47334cca4113f264530933485223`. The [record](forgejo-result.json) identifies the gated source and comparison base. The branch's own app, crate and script diff remained identical after the subsequent Linux merge and documentation updates. This gate covers the query-allocation transfer, not the separate editor-buffer and Vim-context follow-up.
