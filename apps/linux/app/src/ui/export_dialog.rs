@@ -390,8 +390,12 @@ fn present_export(
     let export_button = gtk::Button::builder().label(crate::tr!("Export\u{2026}")).build();
     export_button.add_css_class("suggested-action");
     if let Some(choice) = scope_choice.as_ref() {
-        let export_button = export_button.clone();
-        choice.connect_selected_notify(move |choice| export_button.set_sensitive(choice.selected() == 0));
+        let export_button = export_button.downgrade();
+        choice.connect_selected_notify(move |choice| {
+            if let Some(export_button) = export_button.upgrade() {
+                export_button.set_sensitive(choice.selected() == 0);
+            }
+        });
     }
 
     let footer = gtk::Box::builder()
@@ -419,10 +423,13 @@ fn present_export(
 
     let parent_for_export = parent.clone();
     let toast_overlay_for_export = toast_overlay.clone();
-    let dialog_for_export = dialog.clone();
+    let dialog_for_export = dialog.downgrade();
     let include_header_for_export = include_header.clone();
     let null_marker_for_export = null_marker.clone();
     export_button.connect_clicked(move |_| {
+        let Some(dialog_for_export) = dialog_for_export.upgrade() else {
+            return;
+        };
         if scope_choice.as_ref().is_some_and(|choice| choice.selected() != 0) {
             return;
         }
@@ -842,3 +849,6 @@ mod scope_presentation_tests {
         (choice, export)
     }
 }
+
+#[cfg(test)]
+mod lifetime_tests;
