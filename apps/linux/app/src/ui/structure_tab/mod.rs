@@ -391,8 +391,11 @@ impl StructureTab {
         }
         let columns_for_dialog = self.columns.clone();
         let sender_for_add = sender.clone();
-        let parent_box = self.indexes_box.clone();
+        let parent_box = self.indexes_box.downgrade();
         append_add_button(&list, &crate::tr!("Add Index…"), move || {
+            let Some(parent_box) = parent_box.upgrade() else {
+                return;
+            };
             present_index_dialog(
                 parent_box.upcast_ref(),
                 &columns_for_dialog.borrow(),
@@ -411,9 +414,12 @@ impl StructureTab {
         }
         let columns_for_dialog = self.columns.clone();
         let sender_for_add = sender.clone();
-        let parent_box = self.fks_box.clone();
+        let parent_box = self.fks_box.downgrade();
         let driver_id_for_dialog = driver_id.clone();
         let add_row = append_add_button(&list, &crate::tr!("Add Foreign Key…"), move || {
+            let Some(parent_box) = parent_box.upgrade() else {
+                return;
+            };
             present_fk_dialog(
                 parent_box.upcast_ref(),
                 &columns_for_dialog.borrow(),
@@ -679,12 +685,15 @@ impl SimpleComponent for StructureTab {
         retry_button.add_css_class("suggested-action");
         retry_button.add_css_class("pill");
         let sender_for_retry = sender.clone();
-        let inner_stack_for_retry = inner_stack.clone();
+        let inner_stack_for_retry = inner_stack.downgrade();
         retry_button.connect_clicked(move |_| {
             // Flip back to the loading page so the user sees we're
             // trying — otherwise the click looks like a no-op until
             // StructureLoaded arrives.
-            inner_stack_for_retry.set_visible_child_name("loading");
+            let Some(inner_stack) = inner_stack_for_retry.upgrade() else {
+                return;
+            };
+            inner_stack.set_visible_child_name("loading");
             let _ = sender_for_retry.output(StructureTabOutput::FetchStructure);
         });
         error_status.set_child(Some(&retry_button));
@@ -1097,3 +1106,6 @@ mod tests {
         assert!(!view.is_cursor_visible());
     }
 }
+
+#[cfg(test)]
+mod lifetime_tests;
