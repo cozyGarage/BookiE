@@ -1,0 +1,30 @@
+{
+  "binary_sha256": "1a6b17c38e0c5a059d31aafdd1e0f2f23cb0cd72bdd813ed1b01cc537f8c86b9",
+  "exit_code": 0,
+  "gdk_scale": 2,
+  "xvfb_screen": "2560x2048x24",
+  "results": [
+    {
+      "scenario": "restart_restores_active_editor_and_connection",
+      "status": "passed",
+      "seconds": 8.762
+    },
+    {
+      "scenario": "closing_a_clean_editor_tab_removes_it_and_keeps_the_other",
+      "status": "passed",
+      "seconds": 2.653
+    },
+    {
+      "scenario": "saved_connection_row_controls_have_keyboard_focus_order",
+      "status": "passed",
+      "seconds": 1.815
+    },
+    {
+      "scenario": "sql_editor_clickables_all_have_a_keyboard_path",
+      "status": "passed",
+      "seconds": 2.159
+    }
+  ],
+  "limits": "Keyboard and lifecycle checks; visual appearance and native Wayland not established.",
+  "source_commit": "ab238b4acdacbcec941d11c82d7460c518685f45"
+}
