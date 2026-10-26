@@ -43,13 +43,22 @@ wait_for_port() {
 }
 
 bash "$FIXTURE/generate-materials.sh"
+chmod 0755 "$FIXTURE/seed"
+chmod 0644 "$FIXTURE/seed/01-seed.sql"
 
 mkdir -p "$STATE/config"
 rm -f "$STATE/config/tablepro/known_hosts"
 
 trap teardown EXIT
 compose down --volumes --remove-orphans >/dev/null 2>&1 || true
-compose up -d --build --wait
+if compose up -d --build --wait --wait-timeout 300; then
+  :
+else
+  startup_status=$?
+  compose ps --all || true
+  compose logs --no-color --tail 50 || true
+  exit "$startup_status"
+fi
 
 wait_for_port 127.0.0.1 8474 "toxiproxy api"
 wait_for_port 127.0.0.1 5433 "postgres path"
