@@ -16,9 +16,29 @@ PULL_NUMBER = re.compile(r"\(#(\d+)\)\s*$")
 MAX_NOTE = 300
 
 
+def note_values(message):
+    """The text after each `Release-Note:` marker. A note continues over the following lines of its paragraph,
+    so a body wrapped at 72 columns keeps its whole sentence."""
+    values, current = [], None
+    for line in message.splitlines():
+        match = TRAILER.match(line)
+        if match:
+            if current is not None:
+                values.append(" ".join(current))
+            current = [match.group(1)]
+        elif current is not None and line.strip() and not line.lstrip().startswith(("#", "```", "Release-Note:")):
+            current.append(line.strip())
+        elif current is not None:
+            values.append(" ".join(current))
+            current = None
+    if current is not None:
+        values.append(" ".join(current))
+    return values
+
+
 def parse_notes(message):
     """Return (entries, errors) for the Release-Note trailers of a commit or PR body."""
-    values = TRAILER.findall(message)
+    values = note_values(message)
     if not values:
         return [], ["no Release-Note line: add `Release-Note: <Category>: <text>` or `Release-Note: none`"]
     entries, errors = [], []
@@ -46,11 +66,13 @@ def assemble(commits, allow_missing=False):
     grouped = {category: [] for category in CATEGORIES}
     problems = []
     for subject, message in commits:
+        pull = PULL_NUMBER.search(subject)
+        if subject.startswith("Merge ") or (pull is None and not note_values(message)):
+            continue  # only a pull request merge must carry a note; a direct push may add one
         entries, errors = parse_notes(message)
         if errors:
             problems.append(f"{subject}: {errors[0]}")
             continue
-        pull = PULL_NUMBER.search(subject)
         suffix = f" (#{pull.group(1)})" if pull else ""
         for category, text in entries:
             grouped[category].append(text + suffix)
@@ -132,7 +154,7 @@ def main():
         _, errors = parse_notes(body)
         if errors:
             raise SystemExit("Release-Note check failed: " + "; ".join(errors))
-        sys.stdout.write("\n".join(f"Release-Note: {value}" for value in TRAILER.findall(body)) + "\n")
+        sys.stdout.write("\n".join(f"Release-Note: {value}" for value in note_values(body)) + "\n")
         return
     if args.command == "assemble":
         sys.stdout.write(assemble(commits_between(args.since, args.until), args.allow_missing))
