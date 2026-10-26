@@ -678,6 +678,7 @@ impl SimpleComponent for SqlEditor {
             buffer.set_highlight_syntax(false);
             buffer.set_language(None);
         }
+        self.split_view.shutdown(&self.source_view);
         if let Some(session) = self.session.take() {
             session_mode::close_detached(session.shared);
         }

@@ -63,6 +63,13 @@ impl SplitEditorView {
         &self.secondary_view
     }
 
+    pub(super) fn shutdown(&self, primary: &sourceview5::View) {
+        for view in [primary, &self.secondary_view] {
+            view.set_im_module(Some("simple"));
+            view.set_buffer(None::<&gtk::TextBuffer>);
+        }
+    }
+
     pub(crate) fn set_visible(&self, visible: bool) {
         self.secondary_scroll.set_visible(visible);
         if visible {
