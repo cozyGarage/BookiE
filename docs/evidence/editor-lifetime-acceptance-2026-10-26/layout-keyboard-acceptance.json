@@ -1,0 +1,44 @@
+{
+  "binary_sha256": "1a6b17c38e0c5a059d31aafdd1e0f2f23cb0cd72bdd813ed1b01cc537f8c86b9",
+  "exit_code": 0,
+  "profile": "ci",
+  "display": "Xvfb 1280x1024 X11 Cairo",
+  "results": [
+    {
+      "scenario": "grid_paste_preserves_multiline_text_and_sibling_rows",
+      "status": "passed",
+      "seconds": 2.345
+    },
+    {
+      "scenario": "ctrl_tab_returns_to_the_most_recently_used_tab",
+      "status": "passed",
+      "seconds": 2.655
+    },
+    {
+      "scenario": "holding_ctrl_while_pressing_tab_walks_deeper_into_the_history",
+      "status": "passed",
+      "seconds": 2.707
+    },
+    {
+      "scenario": "narrow_window_keeps_main_and_editor_toolbar_actions_reachable",
+      "status": "passed",
+      "seconds": 3.305
+    },
+    {
+      "scenario": "saved_connection_row_controls_have_keyboard_focus_order",
+      "status": "passed",
+      "seconds": 1.618
+    },
+    {
+      "scenario": "sql_editor_clickables_all_have_a_keyboard_path",
+      "status": "passed",
+      "seconds": 1.922
+    },
+    {
+      "scenario": "paste_past_the_loaded_rows_changes_nothing",
+      "status": "passed",
+      "seconds": 3.128
+    }
+  ],
+  "source_commit": "ab238b4acdacbcec941d11c82d7460c518685f45"
+}
