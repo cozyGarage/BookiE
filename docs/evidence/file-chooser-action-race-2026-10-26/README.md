@@ -8,4 +8,6 @@ The regression supplies an action that disappears during invocation. On the orig
 
 The installed-app malformed-SQL refusal and oversized-restored-draft preservation scenarios pass on the editor-buffer fix binary. These exercise policy refusal and saved-text preservation; they do not establish complete security coverage.
 
+Validation passed: 582 harness tests, preflight with 2,197 unit/bin tests, 291 sandbox tests and the Redis cancellation check. The same installed binary completed all 18 oversized-file refusals with the corrected helper, preserved the query, tabs and file, then exited normally. [The profiling packet](https://github.com/cozyGarage/BookiE/blob/fix/editor-buffer-release/docs/evidence/editor-buffer-release-2026-10-26/README.md) is published separately on the editor-buffer fix branch; this branch does not contain that unmerged application change.
+
 Release-Note: none
