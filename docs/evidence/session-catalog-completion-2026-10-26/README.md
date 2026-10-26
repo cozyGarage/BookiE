@@ -12,7 +12,8 @@ The fix moves transaction-aware catalog tracking to GTK-free `tablepro-app-servi
 
 - Fix commit: `9d00c2594` (`fix(app): publish session catalog changes on completion`), based on Linux `f61a52b6d`.
 - The installed pre-fix binary SHA-256 is `504ae8c525948a33cefb6e69a67365cdc6be6d1f553dba76fbf604764dbadbba`. It was built for #1695 and includes that PR's unrelated Structure metadata change. The catalog and session-mode source at the reproduction base matched Linux `f2db1eed1`; the two failures isolate the session catalog behavior.
-- After the fix, both installed scenarios passed on a fresh optimized fixture-installed binary under isolated X11/Xvfb with AT-SPI and a private SQLite database: `session_commit_refreshes_committed_catalog` (9.874 s) and `session_rollback_does_not_hide_later_autocommit_ddl` (10.616 s). Each verifies the independent database oracle before asserting the sidebar state.
+- The fresh optimized post-fix fixture-installed binary SHA-256 is recorded in [binary.sha256](binary.sha256); the relevant model, controller and test source hashes are in [sources.sha256](sources.sha256). Its source commit is `9d00c2594`.
+- After the fix, both installed scenarios passed under isolated X11/Xvfb with AT-SPI and a private SQLite database: `session_commit_refreshes_committed_catalog` (9.874 s) and `session_rollback_does_not_hide_later_autocommit_ddl` (10.616 s). Each verifies the independent database oracle before asserting the sidebar state.
 - `CatalogChanges` focused tests cover acknowledged commit and rollback, duplicate completion, failure/retry, cancellation, timeout, no pending DDL, SQL `COMMIT AND CHAIN`, and non-transactional DDL behavior.
 - Existing application catalog tests passed: 2/2.
 - `bash scripts/preflight.sh` passed: 2,204 unit tests, 291 sandbox tests and the Redis cancellation test; the workspace contract checks passed.
