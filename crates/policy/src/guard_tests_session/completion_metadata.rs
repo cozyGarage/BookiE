@@ -194,6 +194,43 @@ async fn a_retired_session_refuses_completion_metadata_before_driver_dispatch() 
 }
 
 #[tokio::test]
+async fn an_audited_retired_session_refuses_completion_metadata_before_driver_dispatch() {
+    let h = harness(
+        SessionScript {
+            lose_on: Some("SELECT 1"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session: Box<dyn tablepro_core::Session> =
+        Box::new(h.guard.open_session_with_audit().await.expect("open audited session"));
+    run(&mut session, "SELECT 1")
+        .await
+        .expect_err("the session connection is lost");
+    let error = session
+        .fetch_completion_columns_controlled(None, "items", &OperationControl::with_timeout(Duration::from_secs(1)))
+        .await
+        .expect_err("a retired audited session cannot serve completion metadata");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(
+        h.script
+            .completion_targets
+            .lock()
+            .expect("completion target lock")
+            .is_empty()
+    );
+    let events = h.audit.events.lock().expect("events");
+    let outcome = events
+        .iter()
+        .rev()
+        .find(|event| event.phase == AuditRecordPhase::Outcome)
+        .expect("refusal outcome is audited");
+    assert_eq!(outcome.terminal_status, AuditTerminalStatus::Denied);
+    assert_eq!(outcome.decision_rule, "retired_session");
+}
+
+#[tokio::test]
 async fn a_read_only_connection_refuses_and_audits_a_read_write_begin() {
     let h = harness(SessionScript::default(), true);
     let mut session = h.guard.open_session().await.expect("open session");
