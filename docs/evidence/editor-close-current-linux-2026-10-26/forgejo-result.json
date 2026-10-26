@@ -1,0 +1,15 @@
+{
+  "run": 989,
+  "api_run_id": 990,
+  "status": "success",
+  "gated_commit": "d3566e3b210b47334cca4113f264530933485223",
+  "jobs_passed": 32,
+  "jobs_total": 32,
+  "compared_head": "ec933f13ffde8ceb51db062df4c4dd28f5ea7895",
+  "comparison_base": "a1226bbd5a4bce8381d0c3d11a2f28fb246596b0",
+  "own_diff_unchanged": [
+    "apps",
+    "crates",
+    "scripts"
+  ]
+}

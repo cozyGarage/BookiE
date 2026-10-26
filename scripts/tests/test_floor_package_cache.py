@@ -32,6 +32,7 @@ class FloorPackageCacheTests(unittest.TestCase):
                 PATH=f"{directory}{os.pathsep}{environment['PATH']}",
                 DOCKER_ARGUMENTS=str(log),
                 DISTRO_FLOOR_PACKAGE_CACHE=str(directory / "packages"),
+                CARGO_BUILD_JOBS="2",
             )
             for sha in ("a" * 40, "b" * 40, "b" * 40):
                 result = subprocess.run(
@@ -45,6 +46,10 @@ class FloorPackageCacheTests(unittest.TestCase):
             self.assertEqual(len(builds), 2)
             previous = None
             for build in builds:
+                self.assertIn("CARGO_BUILD_JOBS=2", build)
+                position = build.index("CARGO_BUILD_JOBS=2")
+                self.assertEqual(build[position - 1], "-e")
+                self.assertLess(position, build.index("bash"))
                 mounts = {
                     build[index + 1].split(":")[1]: build[index + 1].split(":")[0]
                     for index, arg in enumerate(build[:-1]) if arg == "-v"
