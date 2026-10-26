@@ -30,6 +30,12 @@ pub(crate) enum SessionHandle {
     Plain(Box<dyn Session>),
 }
 
+impl AsMut<dyn Session> for SessionHandle {
+    fn as_mut(&mut self) -> &mut (dyn Session + 'static) {
+        self
+    }
+}
+
 impl SessionHandle {
     pub(crate) fn plain(session: Box<dyn Session>) -> Self {
         Self::Plain(session)
