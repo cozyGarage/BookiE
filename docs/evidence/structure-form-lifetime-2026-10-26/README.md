@@ -9,3 +9,5 @@ The fix leaves form validation and submitted metadata unchanged. App Clippy pass
 Release-Note: Fixed: Dismissing index and foreign key setup releases the closed forms.
 
 The fixture now also submits a valid index and foreign key, verifies the chosen metadata appears in the SQL preview, and checks that the submitted dialog is released. All four lifecycle assertions fail on the original code; both added submission paths passed their initial focused fixed-code runs. The expanded 179-test widget tier, full preflight and app Clippy all passed. The earlier 177-test result applies to head `f9a571a42`.
+
+All four fixed lifecycle cases also passed three independent isolated runs each (12 of 12). These focused repetitions use the simple input method; the 179-test tier above covers the ordinary suite environment.
