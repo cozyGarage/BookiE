@@ -5,16 +5,28 @@ use relm4::{Component, ComponentController};
 #[test]
 #[ignore = "requires an isolated GTK display"]
 fn dismissing_index_setup_releases_its_dialog() {
-    assert_form_released("Add Index…");
+    assert_form_released("Add Index…", false);
 }
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
 fn dismissing_foreign_key_setup_releases_its_dialog() {
-    assert_form_released("Add Foreign Key…");
+    assert_form_released("Add Foreign Key…", false);
 }
 
-fn assert_form_released(title: &str) {
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn submitting_index_setup_updates_preview_and_releases_its_dialog() {
+    assert_form_released("Add Index…", true);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn submitting_foreign_key_setup_updates_preview_and_releases_its_dialog() {
+    assert_form_released("Add Foreign Key…", true);
+}
+
+fn assert_form_released(title: &str, submit: bool) {
     adw::init().unwrap();
     let application = adw::Application::builder()
         .application_id("com.tablepro.linux.structure-lifetime-test")
@@ -36,12 +48,35 @@ fn assert_form_released(title: &str) {
     window.present();
     let context = gtk::glib::MainContext::default();
     while context.iteration(false) {}
+    if submit {
+        controller.emit(StructureTabInput::AddColumn);
+        while context.iteration(false) {}
+    }
     find_action(controller.widget().upcast_ref(), title)
         .unwrap()
         .emit_by_name::<()>("activated", &[]);
     let dialog = window.visible_dialog().unwrap();
     let retired = dialog.downgrade();
-    dialog.close();
+    if submit {
+        submit_form(&dialog, title == "Add Foreign Key…");
+        while context.iteration(false) {}
+        let preview = descendants(controller.widget().upcast_ref())
+            .into_iter()
+            .find_map(|widget| widget.downcast::<gtk::TextView>().ok())
+            .unwrap()
+            .buffer();
+        let (start, end) = preview.bounds();
+        let sql = preview.text(&start, &end, true);
+        assert!(
+            sql.contains("form_test"),
+            "submitted metadata is absent from SQL preview"
+        );
+        if title == "Add Foreign Key…" {
+            assert!(sql.contains("parent_items"));
+        }
+    } else {
+        dialog.close();
+    }
     drop(dialog);
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     while retired.upgrade().is_some() && std::time::Instant::now() < deadline {
@@ -53,17 +88,43 @@ fn assert_form_released(title: &str) {
 }
 
 fn find_action(widget: &gtk::Widget, title: &str) -> Option<adw::ActionRow> {
-    if let Some(row) = widget.downcast_ref::<adw::ActionRow>()
-        && row.title() == title
-    {
-        return Some(row.clone());
+    descendants(widget)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<adw::ActionRow>().ok())
+        .find(|row| row.title() == title)
+}
+
+fn submit_form(dialog: &adw::Dialog, foreign_key: bool) {
+    let widgets = descendants(dialog.upcast_ref());
+    for widget in &widgets {
+        if let Some(row) = widget.downcast_ref::<adw::EntryRow>() {
+            match row.title().as_str() {
+                "Name" => row.set_text("form_test"),
+                "Table" if foreign_key => row.set_text("parent_items"),
+                "Columns" if foreign_key => row.set_text("id"),
+                _ => {}
+            }
+        }
     }
+    widgets
+        .iter()
+        .find_map(|widget| widget.downcast_ref::<gtk::CheckButton>())
+        .unwrap()
+        .set_active(true);
+    widgets
+        .iter()
+        .filter_map(|widget| widget.downcast_ref::<gtk::Button>())
+        .find(|button| button.label().as_deref() == Some("Add"))
+        .unwrap()
+        .emit_clicked();
+}
+
+fn descendants(widget: &gtk::Widget) -> Vec<gtk::Widget> {
+    let mut widgets = vec![widget.clone()];
     let mut child = widget.first_child();
     while let Some(current) = child {
         child = current.next_sibling();
-        if let Some(row) = find_action(&current, title) {
-            return Some(row);
-        }
+        widgets.extend(descendants(&current));
     }
-    None
+    widgets
 }

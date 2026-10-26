@@ -7,3 +7,5 @@ Two isolated GTK regressions launch the actual Structure component in new-table 
 The fix leaves form validation and submitted metadata unchanged. App Clippy passed with warnings denied. Full preflight passed (2,197 unit tests, 291 sandbox tests and one Redis cancellation test), and all 177 isolated GTK widget tests passed in the ordinary suite environment. Forgejo acceptance is pending. [Regression evidence](validation.json) records before/after outcomes and source hashes.
 
 Release-Note: Fixed: Dismissing index and foreign key setup releases the closed forms.
+
+The fixture now also submits a valid index and foreign key, verifies the chosen metadata appears in the SQL preview, and checks that the submitted dialog is released. All four lifecycle assertions fail on the original code; both added submission paths passed their initial focused fixed-code runs. The expanded 179-test widget tier, preflight and app Clippy are being rechecked. The earlier 177-test result applies to head `f9a571a42`.

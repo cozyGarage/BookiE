@@ -1081,6 +1081,16 @@
       "tablepro-app",
       "--lib",
       "ui::structure_tab_dialogs::lifetime_tests::dismissing_foreign_key_setup_releases_its_dialog"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::structure_tab_dialogs::lifetime_tests::submitting_index_setup_updates_preview_and_releases_its_dialog"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::structure_tab_dialogs::lifetime_tests::submitting_foreign_key_setup_updates_preview_and_releases_its_dialog"
     ]
   ],
   "keyring": [

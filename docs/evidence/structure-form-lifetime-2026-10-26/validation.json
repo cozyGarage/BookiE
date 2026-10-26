@@ -5,12 +5,22 @@
     {
       "test": "ui::structure_tab_dialogs::lifetime_tests::dismissing_index_setup_releases_its_dialog",
       "before": "1 failed, 0 passed",
-      "after": "1 passed, 0 failed"
+      "after": "expanded isolated tier pending"
     },
     {
       "test": "ui::structure_tab_dialogs::lifetime_tests::dismissing_foreign_key_setup_releases_its_dialog",
       "before": "1 failed, 0 passed",
-      "after": "1 passed, 0 failed"
+      "after": "expanded isolated tier pending"
+    },
+    {
+      "test": "ui::structure_tab_dialogs::lifetime_tests::submitting_index_setup_updates_preview_and_releases_its_dialog",
+      "before": "1 failed, 0 passed",
+      "after": "expanded isolated tier pending"
+    },
+    {
+      "test": "ui::structure_tab_dialogs::lifetime_tests::submitting_foreign_key_setup_updates_preview_and_releases_its_dialog",
+      "before": "1 failed, 0 passed",
+      "after": "expanded isolated tier pending"
     }
   ],
   "environment": {
@@ -20,22 +30,28 @@
   },
   "source_sha256": {
     "apps/linux/app/src/ui/structure_tab_dialogs.rs": "9ed507a49f4ff3a1023cc5ba1d07a1c623b4da25e732a12576c4244b24c93824",
-    "apps/linux/app/src/ui/structure_tab_dialogs/lifetime_tests.rs": "6126c036425fc802679a255e667c21b09b714b20dcd1f5b9c2c7b6180db4124e",
-    "scripts/isolated-tests.json": "d6d65bf6736a32689a03a9385c4b19e70dce617e27c922721449aa9e50c5788d"
+    "apps/linux/app/src/ui/structure_tab_dialogs/lifetime_tests.rs": "8767c278cbd5a900833e024075f2914efb5527677c5a51d4e3fb0eceea6a28e1",
+    "scripts/isolated-tests.json": "a637eff95d34d3cdd25d3dea43c59a9158c8a9336ce3df09a2c27ffeba59245d"
   },
-  "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings",
   "remaining": [
+    "expanded full preflight",
+    "expanded ordinary GTK widgets",
+    "app Clippy",
     "Forgejo acceptance"
   ],
-  "preflight": {
-    "unit": 2197,
-    "sandbox": 291,
-    "redis_cancellation": 1,
-    "result": "passed"
-  },
-  "gtk_widgets": {
-    "executed": 177,
-    "result": "passed",
-    "input_method": "ordinary suite environment"
+  "previous_validation": {
+    "head": "f9a571a42",
+    "preflight": {
+      "unit": 2197,
+      "sandbox": 291,
+      "redis_cancellation": 1,
+      "result": "passed"
+    },
+    "gtk_widgets": {
+      "executed": 177,
+      "result": "passed",
+      "input_method": "ordinary suite environment"
+    },
+    "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings"
   }
 }
