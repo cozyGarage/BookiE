@@ -1,0 +1,32 @@
+{
+  "base": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+  "fixed_commit": "e74729eb0",
+  "focused_regressions": [
+    {
+      "test": "ui::structure_tab_dialogs::lifetime_tests::dismissing_index_setup_releases_its_dialog",
+      "before": "1 failed, 0 passed",
+      "after": "1 passed, 0 failed"
+    },
+    {
+      "test": "ui::structure_tab_dialogs::lifetime_tests::dismissing_foreign_key_setup_releases_its_dialog",
+      "before": "1 failed, 0 passed",
+      "after": "1 passed, 0 failed"
+    }
+  ],
+  "environment": {
+    "display": "isolated Xvfb",
+    "input_method": "simple",
+    "G_DEBUG": "fatal-criticals"
+  },
+  "source_sha256": {
+    "apps/linux/app/src/ui/structure_tab_dialogs.rs": "9ed507a49f4ff3a1023cc5ba1d07a1c623b4da25e732a12576c4244b24c93824",
+    "apps/linux/app/src/ui/structure_tab_dialogs/lifetime_tests.rs": "6126c036425fc802679a255e667c21b09b714b20dcd1f5b9c2c7b6180db4124e",
+    "scripts/isolated-tests.json": "d6d65bf6736a32689a03a9385c4b19e70dce617e27c922721449aa9e50c5788d"
+  },
+  "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings",
+  "remaining": [
+    "full preflight",
+    "ordinary GTK widgets",
+    "Forgejo acceptance"
+  ]
+}
