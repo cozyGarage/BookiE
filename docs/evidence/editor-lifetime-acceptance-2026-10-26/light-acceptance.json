@@ -1,0 +1,24 @@
+{
+  "source_commit": "ab238b4acdacbcec941d11c82d7460c518685f45",
+  "binary_sha256": "1a6b17c38e0c5a059d31aafdd1e0f2f23cb0cd72bdd813ed1b01cc537f8c86b9",
+  "configured_color_scheme": "light",
+  "exit_code": 0,
+  "results": [
+    {
+      "scenario": "malformed_sql_is_blocked_before_approval",
+      "status": "passed",
+      "seconds": 4.576
+    },
+    {
+      "scenario": "dismissed_approval_denies",
+      "status": "passed",
+      "seconds": 5.938
+    },
+    {
+      "scenario": "closing_a_clean_editor_tab_removes_it_and_keeps_the_other",
+      "status": "passed",
+      "seconds": 2.336
+    }
+  ],
+  "limits": "No screenshot or style-manager observation; no claim of visual contrast acceptance."
+}
