@@ -231,7 +231,7 @@ pub(super) fn build_completion_refresh(
                 .collect();
         drop(index);
         if !missing.is_empty() {
-            let _ = sender.input(super::SqlEditorInput::FetchCompletionColumns(missing));
+            sender.input(super::SqlEditorInput::FetchCompletionColumns(missing));
         }
     }))
 }
