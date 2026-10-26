@@ -6,6 +6,6 @@ Two isolated GTK regressions fail before the fix: releasing format state leaves 
 
 The format callbacks remain active while setup is open because the Import button owns its state. Import submission still resolves the chosen format before closing setup and invoking its callback. Neither test accesses a database or a user file.
 
-App Clippy passed with warnings denied. Full preflight, ordinary widget validation, installed import acceptance and Forgejo acceptance are pending. [Focused regression evidence](validation.json) records source hashes and before/after outcomes.
+App Clippy passed with warnings denied. Three rebuilt optimized installed-app scenarios passed: importing refreshes the target table, failed import preserves unrelated edits, and importing refreshes every open view of the target table. Full preflight, ordinary widget validation and Forgejo acceptance are pending. [Focused regression evidence](validation.json) records source hashes and before/after outcomes.
 
 Release-Note: Fixed: Closing import setup releases its source data and callbacks.

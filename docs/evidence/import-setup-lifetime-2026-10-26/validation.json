@@ -27,7 +27,17 @@
   "remaining": [
     "full preflight",
     "ordinary GTK widgets",
-    "installed CSV import acceptance",
     "Forgejo gate"
-  ]
+  ],
+  "installed_acceptance": {
+    "profile": "ci",
+    "display": "isolated Xvfb with AT-SPI",
+    "scenarios": [
+      "import_refreshes_only_the_imported_table",
+      "failed_import_keeps_unrelated_edits",
+      "import_refreshes_every_open_tab_of_the_imported_table"
+    ],
+    "result": "3 passed",
+    "binary_sha256": "1106e73b581b2f4323a975243b5f0a8f0b78312859b434facd172da7c924e73a"
+  }
 }
