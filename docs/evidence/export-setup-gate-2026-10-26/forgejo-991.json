@@ -1,0 +1,136 @@
+{
+  "pull_request": 1699,
+  "forgejo_run": 991,
+  "tested_head": "e3e6688d40e5726c7d33c8a38a1d198651b6087a",
+  "status": "success",
+  "jobs": [
+    {
+      "name": "guards",
+      "status": "success"
+    },
+    {
+      "name": "gtk-build",
+      "status": "success"
+    },
+    {
+      "name": "clippy",
+      "status": "success"
+    },
+    {
+      "name": "unit",
+      "status": "success"
+    },
+    {
+      "name": "sandbox",
+      "status": "success"
+    },
+    {
+      "name": "widgets",
+      "status": "success"
+    },
+    {
+      "name": "distro-floor (debian:testing, 10)",
+      "status": "success"
+    },
+    {
+      "name": "distro-floor-scenarios (1)",
+      "status": "success"
+    },
+    {
+      "name": "distro-floor-scenarios (2)",
+      "status": "success"
+    },
+    {
+      "name": "distro-floor-scenarios (3)",
+      "status": "success"
+    },
+    {
+      "name": "driver (clickhouse)",
+      "status": "success"
+    },
+    {
+      "name": "driver (mongodb)",
+      "status": "success"
+    },
+    {
+      "name": "driver (mssql)",
+      "status": "success"
+    },
+    {
+      "name": "driver (mysql)",
+      "status": "success"
+    },
+    {
+      "name": "driver (postgres)",
+      "status": "success"
+    },
+    {
+      "name": "driver (redis)",
+      "status": "success"
+    },
+    {
+      "name": "e2e (5, postgres)",
+      "status": "success"
+    },
+    {
+      "name": "e2e (6, mysql)",
+      "status": "success"
+    },
+    {
+      "name": "consumers",
+      "status": "success"
+    },
+    {
+      "name": "gtk (1)",
+      "status": "success"
+    },
+    {
+      "name": "gtk (2)",
+      "status": "success"
+    },
+    {
+      "name": "gtk (3)",
+      "status": "success"
+    },
+    {
+      "name": "duckdb",
+      "status": "success"
+    },
+    {
+      "name": "pg-release",
+      "status": "success"
+    },
+    {
+      "name": "pg-dump",
+      "status": "success"
+    },
+    {
+      "name": "socket-ssh",
+      "status": "success"
+    },
+    {
+      "name": "gtk-server (7, clickhouse)",
+      "status": "success"
+    },
+    {
+      "name": "gtk-server (8, mysql-approval)",
+      "status": "success"
+    },
+    {
+      "name": "gtk-server (9, mongodb)",
+      "status": "success"
+    },
+    {
+      "name": "driver-tls",
+      "status": "success"
+    },
+    {
+      "name": "keyring",
+      "status": "success"
+    },
+    {
+      "name": "supply-chain",
+      "status": "success"
+    }
+  ]
+}

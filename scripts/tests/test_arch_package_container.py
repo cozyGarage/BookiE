@@ -95,7 +95,7 @@ class ArchPackageContainerTests(unittest.TestCase):
     def test_builder_receives_the_date_and_keeps_url_text_as_data(self):
         marker = self.root / "must-not-execute"
         url = f'https://example.invalid/$(touch {marker})/"quoted".pkg.tar.zst'
-        result = self.run_wrapper(ARCH_CANDIDATE_DATE="2026-10-19", ARCH_RELEASED_URL=url)
+        result = self.run_wrapper(ARCH_CANDIDATE_DATE="2026-10-19", ARCH_RELEASED_URL=url, CARGO_BUILD_JOBS="2")
         self.assertEqual(result.returncode, 0, result.stderr)
         record = json.loads(self.record.read_text())
         environment = self.docker_environment()
@@ -104,7 +104,7 @@ class ArchPackageContainerTests(unittest.TestCase):
         scripts = self.root / "scripts"
         (scripts / "build-arch-rc.sh").write_text(
             'python3 - <<\'PY\'\nimport json,os\nfrom pathlib import Path\n'
-            'Path(os.environ["BUILD_RECORD"]).write_text(json.dumps({key: os.environ.get(key) for key in ["TABLEPRO_RC_DATE", "TABLEPRO_RC_VERSION", "TABLEPRO_RC_COMMIT"]}))\nPY\n'
+            'Path(os.environ["BUILD_RECORD"]).write_text(json.dumps({key: os.environ.get(key) for key in ["TABLEPRO_RC_DATE", "TABLEPRO_RC_VERSION", "TABLEPRO_RC_COMMIT", "CARGO_BUILD_JOBS"]}))\nPY\n'
         )
         (scripts / "test-arch-package.sh").write_text('printf \'%s\\n\' "$@" > "$LIFECYCLE_RECORD"\n')
         commands = self.root / "commands"
@@ -131,7 +131,7 @@ class ArchPackageContainerTests(unittest.TestCase):
         self.assertEqual(builder.returncode, 0, builder.stderr)
         self.assertFalse(marker.exists())
         build = json.loads((self.root / "build.json").read_text())
-        self.assertEqual(build, {"TABLEPRO_RC_DATE": "2026-10-19", "TABLEPRO_RC_VERSION": "0.2.0", "TABLEPRO_RC_COMMIT": "0" * 39 + "1"})
+        self.assertEqual(build, {"TABLEPRO_RC_DATE": "2026-10-19", "TABLEPRO_RC_VERSION": "0.2.0", "TABLEPRO_RC_COMMIT": "0" * 39 + "1", "CARGO_BUILD_JOBS": "2"})
         self.assertEqual(json.loads((self.root / "curl.json").read_text())[-2:], ["--", url])
         self.assertIn("bookie-0.2.0-1-x86_64.pkg.tar.zst", (self.root / "lifecycle").read_text())
         self.assertFalse(marker.exists())
