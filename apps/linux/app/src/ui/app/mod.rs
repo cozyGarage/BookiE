@@ -968,8 +968,6 @@ impl SimpleComponent for App {
                 self.continue_connection_switch(sender);
             }
             AppMsg::EditorTabQueryChanged(id, text) => self.on_editor_tab_query_changed(id, text),
-            AppMsg::EditorNeedsColumns(tables) => self.on_editor_needs_columns(tables, sender),
-            AppMsg::SchemaColumnsFetched(table, columns) => self.on_schema_columns_fetched(table, columns),
             AppMsg::FavoritesLoaded(ticket, favorites) => self.on_favorites_loaded(ticket, favorites),
             AppMsg::PersistFavorite(favorite) => self.on_persist_favorite(favorite, sender),
             AppMsg::FavoriteSaved => self.show_toast(&crate::tr!("Saved as favorite")),

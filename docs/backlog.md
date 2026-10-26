@@ -60,7 +60,7 @@ From the 2026-10-22 dbflux review and the audit of closed issues. Each is an iss
 | DBF-1 / [#1355](https://github.com/cozyGarage/BookiE/issues/1355) | Error toasts carrying the operation id (the audit viewer shipped in #1378) | UX |
 | DBF-2 to DBF-4 / [#1356](https://github.com/cozyGarage/BookiE/issues/1356), [#1357](https://github.com/cozyGarage/BookiE/issues/1357), [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | Measure PostgreSQL row-cap drain, SQLite early cancel, verify-ca hostname per engine | B3 / B4 |
 | B4-24 / [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Decide the TLS fingerprint pin | B4 |
-| UI-43 / [#1366](https://github.com/cozyGarage/BookiE/issues/1366) | Completion through the session search_path | B4 |
+| UI-43 / [#1366](https://github.com/cozyGarage/BookiE/issues/1366) | Completion through the session search_path | UX |
 
 The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain related dbflux design notes in their comments. Vendored dependency patches: see [upstream patches](proposals/upstream-patches.md); `mongodb` SCRAM hunk can be dropped after the release containing [mongo-rust-driver#1833](https://github.com/mongodb/mongo-rust-driver/pull/1833).
 

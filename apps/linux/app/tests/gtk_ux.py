@@ -558,6 +558,104 @@ GLib.MainLoop().run()
             stored = psql("SELECT COUNT(*) FROM public.session_commit_probe")
             assert stored == count, (recover, stored, count)
 
+    def postgres_completion_uses_each_editor_session_search_path(database, base):
+        schemas = ("bookie_completion_a", "bookie_completion_b", "bookie_completion_c")
+        psql(
+            "DROP SCHEMA IF EXISTS " + ", ".join(schemas) + " CASCADE; "
+            + "; ".join(
+                f"CREATE SCHEMA {schema}; CREATE TABLE {schema}.bookie_completion_target ({column} integer)"
+                for schema, column in zip(schemas, ("alpha_only", "beta_only", "gamma_only"), strict=True)
+            )
+        )
+
+        def visible_editor():
+            candidates = []
+            for node in ui.descendants(ui.application_node()):
+                if ui.node_role(node) != pyatspi.ROLE_TEXT or not node.getState().contains(pyatspi.STATE_SHOWING):
+                    continue
+                try:
+                    node.queryEditableText()
+                    candidates.append(node)
+                except Exception:
+                    continue
+            focused = [node for node in candidates if node.getState().contains(pyatspi.STATE_FOCUSED)]
+            return (focused or candidates)[-1]
+
+        def visible_control(name, role):
+            return next(
+                node
+                for node in ui.descendants(ui.application_node())
+                if ui.node_name(node) == name
+                and ui.node_role(node) == role
+                and node.getState().contains(pyatspi.STATE_SHOWING)
+            )
+
+        def set_active_editor(sql):
+            visible_editor().queryEditableText().setTextContents(sql)
+
+        def run_active_editor(sql):
+            set_active_editor(sql)
+            ui.invoke(visible_control("Run", pyatspi.ROLE_PUSH_BUTTON))
+            ui.invoke(ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name="Approve once", present=False)
+            ui.wait_for_node_containing("done in")
+
+        def show_columns():
+            set_active_editor("SELECT * FROM bookie_completion_target WHERE bookie_completion_target")
+            editor = visible_editor()
+            extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+            x11_click(extents.x + 120, extents.y + 12, button=1)
+            editor.queryText().setCaretOffset(editor.queryText().characterCount)
+            ui.press_x11_key("period")
+
+        def wait_for_candidate(column, present=True):
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                found = any(
+                    ui.node_name(node) == column and node.getState().contains(pyatspi.STATE_SHOWING)
+                    for node in ui.descendants(ui.application_node())
+                )
+                if found == present:
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"completion candidate {column!r} present={present}:\n{ui.accessible_snapshot()}")
+
+        try:
+            ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+            ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+            ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+            ui.invoke(visible_control("Session", pyatspi.ROLE_TOGGLE_BUTTON))
+            run_active_editor(f"SET search_path TO {schemas[0]}")
+            time.sleep(0.5)
+            show_columns()
+            wait_for_candidate("alpha_only")
+            ui.press_x11_key("Escape")
+
+            ui.press_x11_key("t", ("Control_L",))
+            time.sleep(0.3)
+            set_active_editor("SELECT 1")
+            set_active_editor("/* second editor */ SELECT 1;")
+            ui.invoke(visible_control("Session", pyatspi.ROLE_TOGGLE_BUTTON))
+            run_active_editor(f"SET search_path TO {schemas[1]}")
+            show_columns()
+            wait_for_candidate("beta_only")
+            wait_for_candidate("alpha_only", present=False)
+            ui.press_x11_key("Escape")
+
+            ui.press_x11_key("Tab", ("Control_L",))
+            run_active_editor(f"SET search_path TO {schemas[2]}")
+            show_columns()
+            wait_for_candidate("gamma_only")
+            wait_for_candidate("alpha_only", present=False)
+            ui.press_x11_key("Escape")
+
+            ui.press_x11_key("Tab", ("Control_L",))
+            show_columns()
+            wait_for_candidate("beta_only")
+            wait_for_candidate("gamma_only", present=False)
+        finally:
+            psql("DROP SCHEMA IF EXISTS " + ", ".join(schemas) + " CASCADE")
+
     def check_saved_connection_removal(database, base, welcome):
         before = saved_connections(base)
         target = next(record for record in before if record["name"] == ui.CONNECTION_B_NAME)
@@ -2178,6 +2276,7 @@ GLib.MainLoop().run()
     if os.environ.get("TABLEPRO_GTK_CLICKHOUSE_CONTAINER"):
         result.append(clickhouse_enum_grid_edit_preserves_native_label_and_siblings)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
+        result.append(postgres_completion_uses_each_editor_session_search_path)
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit)
         result.append(postgres_saved_connection_browses_rows_and_values)
