@@ -1079,6 +1079,7 @@ impl SimpleComponent for StructureTab {
 fn build_sql_preview_view(buffer: &sourceview5::Buffer) -> sourceview5::View {
     let view = sourceview5::View::with_buffer(buffer);
     view.set_editable(false);
+    view.set_im_module(Some("simple"));
     view.set_cursor_visible(false);
     view.set_monospace(true);
     view.set_wrap_mode(gtk::WrapMode::Word);

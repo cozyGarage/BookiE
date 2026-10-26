@@ -7,3 +7,5 @@ An isolated regression initializes the actual Structure component, drops its con
 Full preflight, ordinary widget validation, app Clippy and Forgejo acceptance are pending. This evidence concerns Structure tab ownership; it does not establish an aggregate process-memory ceiling.
 
 Release-Note: Fixed: Closing structure tabs releases their views and SQL previews.
+
+The ordinary widget tier exposed a second retention source: after the three ownership cycles were removed, the SQL preview buffer remained alive with the default input method. The preview is read-only. Selecting its simple input context makes the focused regression pass without a process-wide input-method override. Editable widgets retain their configured input methods. Full widget validation is being repeated for this additional change; earlier focused success alone did not qualify the original fix.
