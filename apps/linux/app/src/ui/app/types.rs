@@ -97,6 +97,13 @@ pub enum WorkspaceTab {
 }
 
 impl WorkspaceTab {
+    pub fn editor_controller(&self) -> Option<&Controller<SqlEditor>> {
+        match self {
+            WorkspaceTab::Editor(slot) => Some(&slot.controller),
+            _ => None,
+        }
+    }
+
     pub fn browse_controller(&self) -> Option<&Controller<BrowseTab>> {
         match self {
             WorkspaceTab::Table(s) => Some(&s.browse),

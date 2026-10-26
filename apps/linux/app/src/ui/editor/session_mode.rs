@@ -505,8 +505,8 @@ fn retired_connection_matches(retired: Option<(Uuid, Uuid)>, active: Option<Uuid
 pub(crate) struct EditorSession {
     pub(super) id: Uuid,
     pub(super) shared: SharedSession,
-    connection_id: Uuid,
-    connection_identity: Option<ConnectionIdentity>,
+    pub(super) connection_id: Uuid,
+    pub(super) connection_identity: Option<ConnectionIdentity>,
     transaction_open: bool,
 }
 
@@ -692,6 +692,8 @@ impl SqlEditor {
         }
         self.refresh_run_button();
         self.try_start_session_teardown(sender);
+        self.schema_index.borrow_mut().invalidate_columns();
+        (self.completion_refresh)();
     }
 
     pub(super) fn prepare_for_teardown(
@@ -828,6 +830,8 @@ impl SqlEditor {
         } else if self.session_button.is_active() {
             self.session_button.set_active(false);
         }
+        self.schema_index.borrow_mut().invalidate_columns();
+        (self.completion_refresh)();
     }
 
     pub(super) fn rollback_and_end(&mut self, session_id: Uuid, sender: &ComponentSender<Self>) {

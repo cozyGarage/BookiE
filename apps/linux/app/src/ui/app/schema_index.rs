@@ -1,6 +1,6 @@
-use relm4::{ComponentController, ComponentSender};
+use relm4::ComponentController;
 
-use super::{App, AppMsg};
+use super::App;
 use crate::ui::editor::catalog_reference;
 
 impl App {
@@ -17,58 +17,6 @@ impl App {
             .collect();
     }
 
-    pub(super) fn on_editor_needs_columns(&self, tables: Vec<String>, sender: ComponentSender<Self>) {
-        let Some((conn, identity)) = self.connection_id.and_then(|id| self.database.get_with_identity(id)) else {
-            return;
-        };
-        let pending: Vec<crate::ui::editor::SchemaRequest> = {
-            let mut index = self.schema_index.borrow_mut();
-            index.sync_connection(&identity);
-            index.request_missing_columns(tables)
-        };
-        if pending.is_empty() {
-            return;
-        };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
-        let sender_clone = sender.clone();
-        let token = self.schema_index.borrow().column_request_token();
-        let grammar = self.schema_index.borrow().grammar;
-        sender.command(move |_, shutdown| {
-            shutdown
-                .register(async move {
-                    for request in pending {
-                        if token.is_cancelled() {
-                            break;
-                        }
-                        let (request, columns) = tablepro_app_services::completion::fetch_column_names(
-                            conn.clone(),
-                            request,
-                            grammar,
-                            timeout_secs,
-                            token.clone(),
-                        )
-                        .await;
-                        sender_clone.input(AppMsg::SchemaColumnsFetched(request, columns));
-                    }
-                })
-                .drop_on_shutdown()
-        });
-    }
-
-    pub(super) fn on_schema_columns_fetched(
-        &self,
-        request: crate::ui::editor::SchemaRequest,
-        columns: Result<Vec<String>, ()>,
-    ) {
-        let Some(identity) = self.connection_id.and_then(|id| self.database.identity(id)) else {
-            return;
-        };
-        self.schema_index
-            .borrow_mut()
-            .complete_column_request_for_connection(&identity, &request, columns);
-    }
-
     pub(super) fn refresh_schema_index(&self) {
         if let Some(identity) = self.connection_id.and_then(|id| self.database.identity(id)) {
             self.schema_index.borrow_mut().sync_connection(&identity);
@@ -81,6 +29,12 @@ impl App {
         let mut index = self.schema_index.borrow_mut();
         index.set_tables(self.table_names.clone());
         for tab in tabs.values() {
+            if let Some(editor) = tab.editor_controller() {
+                let snapshot = index.editor_snapshot();
+                let _ = editor
+                    .sender()
+                    .send(crate::ui::editor::SqlEditorInput::CompletionCatalogChanged(snapshot));
+            }
             if let Some(controller) = tab.browse_controller() {
                 let model = controller.model();
                 let columns: Vec<String> = model.columns().iter().map(|column| column.name.clone()).collect();

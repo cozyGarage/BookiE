@@ -1,6 +1,7 @@
 use tablepro_app_services::{completion, completion_identifiers, completion_proposals};
 mod bottom_panel;
 mod completion_provider;
+mod completion_requests;
 mod diagnostics;
 mod draft_guard;
 mod error_location;
@@ -112,6 +113,8 @@ pub struct SqlEditor {
     history: Option<HistoryStore>,
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
     preferences: crate::services::preferences::PreferencesStore,
+    schema_index: std::rc::Rc<std::cell::RefCell<SchemaIndex>>,
+    completion_refresh: std::rc::Rc<dyn Fn()>,
     run_generation: RunGeneration,
     drop_generation: std::rc::Rc<DropGeneration>,
     saved_draft_blocked: bool,
@@ -223,6 +226,13 @@ pub enum SqlEditorInput {
         result: Result<session_mode::OpenedSession, String>,
     },
     ConnectionIdentityChanged,
+    CompletionCatalogChanged(SchemaIndex),
+    FetchCompletionColumns(Vec<String>),
+    CompletionColumnsFetched {
+        identity: crate::services::database_service::ConnectionIdentity,
+        request: SchemaRequest,
+        columns: Result<Vec<String>, ()>,
+    },
     SessionState {
         session_id: Uuid,
         transaction_open: bool,
@@ -249,7 +259,6 @@ pub enum SqlEditorOutput {
     CatalogChanged(crate::services::catalog::CatalogOrigin),
     RunStateChanged(bool),
     QueryChanged(String),
-    NeedColumns(Vec<String>),
     CopyToClipboard(String),
     ShowRowAsJson(String),
     ExportResults { result: QueryResult, name: String },
@@ -568,6 +577,7 @@ impl SimpleComponent for SqlEditor {
             known_lexing.clone(),
             sender.clone(),
         );
+        let completion_refresh = refresh_completion.clone();
 
         refresh_completion();
         let refresh_on_cursor = refresh_completion.clone();
@@ -611,6 +621,8 @@ impl SimpleComponent for SqlEditor {
             navigation_origin: None,
             database: init.database.clone(),
             preferences: init.preferences.clone(),
+            schema_index: init.schema_index.clone(),
+            completion_refresh,
             diagnostics: diagnostics::Diagnostics::install(
                 &widgets.source_view,
                 &widgets.warnings_button,
@@ -708,17 +720,21 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::Grid(_) => {}
             SqlEditorInput::SplitToggled(visible) => self.split_view.set_visible(visible),
-            SqlEditorInput::SessionToggled(enabled) => self.on_session_toggled(enabled, &sender),
+            SqlEditorInput::SessionToggled(enabled) => self.on_session_toggle(enabled, &sender),
             SqlEditorInput::SessionOpened {
                 connection_id,
                 connection_identity,
                 session_id,
                 result,
             } => self.on_session_opened(connection_id, connection_identity, session_id, result, &sender),
-            SqlEditorInput::ConnectionIdentityChanged => {
-                self.known_lexing.forget();
-                self.on_connection_identity_changed(&sender);
-            }
+            SqlEditorInput::ConnectionIdentityChanged => self.on_connection_identity_notification(&sender),
+            SqlEditorInput::CompletionCatalogChanged(snapshot) => self.refresh_completion_catalog(snapshot),
+            SqlEditorInput::FetchCompletionColumns(tables) => self.fetch_completion_columns(tables, &sender),
+            SqlEditorInput::CompletionColumnsFetched {
+                identity,
+                request,
+                columns,
+            } => self.complete_completion_columns(&identity, &request, columns),
             SqlEditorInput::SessionState {
                 session_id,
                 transaction_open,
@@ -999,6 +1015,7 @@ impl SqlEditor {
             return;
         };
 
+        self.schema_index.borrow_mut().invalidate_columns();
         self.navigation_origin = origin.clone();
         if let Some(prev) = self.cancel_token.take() {
             prev.cancel();
