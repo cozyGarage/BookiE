@@ -2224,7 +2224,41 @@ GLib.MainLoop().run()
             "a disconnected editor offered a cached table"
         )
 
+    def cancelling_a_dirty_file_close_preserves_text_and_file_association(_database, base, restart):
+        path = base / "cancel-preserved.sql"
+        original = "SELECT 1;\n"
+        path.write_text(original, encoding="utf-8")
+
+        def seed(environment):
+            state = Path(environment["XDG_CONFIG_HOME"]) / ui.storage_dir_name() / "workspace_state.json"
+            state.write_text(json.dumps({
+                "connections": {
+                    "d4f5e246-c40a-4a30-90f2-39e93e94d920": {
+                        "tabs": [{"kind": "editor", "query": "", "draft_id": None, "file": str(path)}],
+                        "active_idx": 0,
+                    },
+                },
+            }), encoding="utf-8")
+
+        restart(before_start=seed, restored=True)
+        ui.wait_for_node_containing(path.name, role=pyatspi.ROLE_PAGE_TAB)
+        editor = ui.set_editor_text("SELECT 456;")
+        ui.invoke_accessible_action("win.close-current")
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Discard", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+        ui.wait_for_node_containing(path.name, role=pyatspi.ROLE_PAGE_TAB)
+        assert editor.queryText().getText(0, editor.queryText().characterCount) == "SELECT 456;"
+        assert path.read_text(encoding="utf-8") == original
+        ui.invoke_accessible_action("win.close-current")
+        ui.invoke(ui.wait_for_node(name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing(path.name, role=pyatspi.ROLE_PAGE_TAB, present=False)
+        assert path.read_text(encoding="utf-8") == "SELECT 456;"
+        ui.wait_for_node(name="Open SQL editor", role=pyatspi.ROLE_PUSH_BUTTON)
+
+    cancelling_a_dirty_file_close_preserves_text_and_file_association.needs_restart = True
+
     result = [
+        cancelling_a_dirty_file_close_preserves_text_and_file_association,
         sqlite_grid_context_menu_columns_action_is_reachable_via_atspi,
         grid_keyboard_menu_uses_the_current_focused_result_cell,
         grid_pointer_menu_uses_the_clicked_result_cell,
