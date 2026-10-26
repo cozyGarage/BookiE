@@ -270,6 +270,8 @@ async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
         build_insert_plan(
             &ImportTarget {
                 driver_id: "sqlite",
+
+                capabilities: tablepro_core::DriverCapabilities::default(),
                 schema: None,
                 table: "flexible",
                 columns: &columns,

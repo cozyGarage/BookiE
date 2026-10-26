@@ -50,6 +50,8 @@ async fn value_contract_mssql_server_owned_columns_use_native_defaults_across_co
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "mssql",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "csv_owned",
             columns: &columns,

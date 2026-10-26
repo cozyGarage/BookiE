@@ -63,11 +63,12 @@ impl SqlEditor {
             return;
         }
         let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database);
-        let Some(conn) = origin.as_ref().and_then(|origin| origin.connection(&self.database)) else {
+        let Some(guard) = origin.as_ref().and_then(|origin| origin.guard(&self.database)) else {
             self.status.set_label(&crate::tr!("no active connection"));
             return;
         };
-        let target = self.statement_target(conn);
+        let conn: std::sync::Arc<dyn tablepro_core::Connection> = guard.clone();
+        let target = self.statement_target(conn, Some(guard));
         let source = self.lexing_source();
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);

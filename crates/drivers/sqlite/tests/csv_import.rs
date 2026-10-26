@@ -108,6 +108,8 @@ fn plan_for(table: &str, columns: &[ColumnInfo], csv: &[u8]) -> InsertPlan {
         .collect();
     let target = ImportTarget {
         driver_id: "sqlite",
+
+        capabilities: tablepro_core::DriverCapabilities::default(),
         schema: None,
         table,
         columns,

@@ -359,6 +359,8 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "duckdb",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "mood_csv_target",
             columns: &columns,
@@ -391,6 +393,8 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
     let safe_plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "duckdb",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "mood_csv_target",
             columns: &columns,

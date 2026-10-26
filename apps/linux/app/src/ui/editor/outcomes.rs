@@ -12,6 +12,7 @@ use stream_result_view::build_streamed_result_widget;
 use tablepro_app_services::stream_result_spool::{StreamResultSpool, StreamResultSpoolManager};
 use tablepro_core::sql_syntax::script::{BatchErrorPolicy, LexicalSettings};
 use tablepro_core::{DriverError, OperationControl, QueryResult};
+use tablepro_policy::AuditReceipt;
 
 pub(crate) fn clear_box(b: &gtk::Box) {
     while let Some(child) = b.first_child() {
@@ -364,7 +365,8 @@ async fn query_statement(
     control: &OperationControl,
     succeeded: &impl Fn(&str),
 ) -> Result<StatementOutcomeKind, ScriptRunResult> {
-    match target.query(bound_sql, bound_params, control).await {
+    let audited = target.query_with_audit(bound_sql, bound_params, control).await;
+    match audited.result {
         Ok(result) => {
             succeeded(sql);
             Ok(StatementOutcomeKind::Rows(
@@ -373,7 +375,9 @@ async fn query_statement(
         }
         Err(DriverError::Cancelled) => Err(ScriptRunResult::Cancelled),
         Err(DriverError::TimedOut) => Err(ScriptRunResult::TimedOut),
-        Err(error) => Ok(StatementOutcomeKind::Error(failure_message(&error, sql, bound_sql))),
+        Err(error) => Ok(StatementOutcomeKind::Error(
+            failure_message(&error, sql, bound_sql).with_audit_receipts(audited.audit_receipts),
+        )),
     }
 }
 
@@ -412,15 +416,17 @@ where
             pinned: false,
         })
     })?;
-    match attempt
+    let opened = attempt
         .target
-        .open_query_cursor(attempt.bound_sql, attempt.bound_params, attempt.control)
-        .await
-    {
+        .open_query_cursor_with_audit(attempt.bound_sql, attempt.bound_params, attempt.control)
+        .await;
+    let audit_receipts = opened.audit_receipts;
+    match opened.result {
         Ok(Some(cursor)) => Ok(Some(
             run_streamed_statement(
                 StreamExecution {
                     cursor,
+                    audit_receipts,
                     identity: attempt.identity,
                     preview: attempt.preview,
                     bound_sql: attempt.bound_sql.into(),
@@ -441,7 +447,9 @@ where
             identity: attempt.identity,
             sql_preview: attempt.preview,
             elapsed_ms: attempt.started.elapsed().as_millis(),
-            kind: StatementOutcomeKind::Error(failure_message(&error, attempt.sql, attempt.bound_sql)),
+            kind: StatementOutcomeKind::Error(
+                failure_message(&error, attempt.sql, attempt.bound_sql).with_audit_receipts(audit_receipts),
+            ),
             pinned: false,
         })),
     }
@@ -457,6 +465,7 @@ fn stream_candidate(sql: &str, driver_id: &str) -> bool {
 
 struct StreamExecution<'a> {
     cursor: super::session_mode::StatementCursor,
+    audit_receipts: Vec<AuditReceipt>,
     identity: StatementIdentity,
     preview: String,
     bound_sql: String,
@@ -477,6 +486,7 @@ where
 {
     let StreamExecution {
         cursor,
+        audit_receipts,
         identity,
         preview,
         bound_sql,
@@ -498,11 +508,21 @@ where
         finish_stream_cursor(cursor, true).await;
         return ScriptRunResult::Streamed(StreamTerminal::Cancelled);
     }
-    fetch_stream_pages(cursor, spool, (sql, &sent), control, stream_update, succeeded).await
+    fetch_stream_pages(
+        cursor,
+        audit_receipts,
+        spool,
+        (sql, &sent),
+        control,
+        stream_update,
+        succeeded,
+    )
+    .await
 }
 
 async fn fetch_stream_pages<F, Fut>(
     cursor: super::session_mode::StatementCursor,
+    mut audit_receipts: Vec<AuditReceipt>,
     spool: StreamResultSpool,
     (sql, sent): (&str, &str),
     control: &OperationControl,
@@ -515,7 +535,9 @@ where
 {
     let mut sequence = 0;
     loop {
-        let page = match cursor.fetch_page(control).await {
+        let fetched = cursor.fetch_page_with_audit(control).await;
+        merge_audit_receipts(&mut audit_receipts, fetched.audit_receipts);
+        let page = match fetched.result {
             Ok(page) => page,
             Err(DriverError::Cancelled) => {
                 finish_stream_cursor(cursor, false).await;
@@ -526,7 +548,7 @@ where
                 return ScriptRunResult::Streamed(StreamTerminal::TimedOut);
             }
             Err(error) => {
-                let message = failure_message(&error, sql, sent);
+                let message = failure_message(&error, sql, sent).with_audit_receipts(audit_receipts);
                 finish_stream_cursor(cursor, false).await;
                 return ScriptRunResult::Streamed(StreamTerminal::Failed(message));
             }
@@ -560,9 +582,11 @@ where
             ));
         }
         if !has_next_page {
-            if let Err(error) = cursor.finish(true).await {
+            let finished = cursor.finish_with_audit(true).await;
+            if let Err(error) = finished.result {
                 return ScriptRunResult::Streamed(StreamTerminal::Failed(
-                    crate::services::error_text::driver_message(&error).into(),
+                    super::StatementFailure::from(crate::services::error_text::driver_message(&error))
+                        .with_audit_receipts(finished.audit_receipts),
                 ));
             }
             succeeded(sql);
@@ -590,6 +614,14 @@ fn statement_identity(statement_index: usize, sql: &str) -> StatementIdentity {
 
 fn failure_message(error: &DriverError, written: &str, sent: &str) -> super::StatementFailure {
     super::StatementFailure::located(error, written, sent)
+}
+
+fn merge_audit_receipts(target: &mut Vec<AuditReceipt>, incoming: Vec<AuditReceipt>) {
+    for receipt in incoming {
+        if !target.contains(&receipt) {
+            target.push(receipt);
+        }
+    }
 }
 
 fn sql_preview(sql: &str) -> String {
@@ -744,12 +776,6 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
     let text = message.to_string();
     copy.connect_clicked(move |button| button.clipboard().set_text(&text));
     actions.insert(&copy, -1);
-    let audit = gtk::Button::builder()
-        .label(crate::tr!("View in Audit Log"))
-        .action_name("win.show-audit")
-        .css_classes(["pill", "flat"])
-        .build();
-    actions.insert(&audit, -1);
     if let Some(button) = message.navigation_button() {
         actions.insert(&button, -1);
     }
@@ -767,9 +793,38 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
         .vexpand(true)
         .build();
     holder.append(&title);
+    append_audit_actions(&holder, &actions, message);
     holder.append(&actions);
     holder.append(&scroll);
     holder
+}
+
+fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &super::StatementFailure) {
+    if !message.audit_operation_ids().is_empty() {
+        let audit_ids = message
+            .audit_operation_ids()
+            .iter()
+            .map(uuid::Uuid::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let label = gtk::Label::builder()
+            .label(crate::tr!("Audit operation: {id}").replace("{id}", &audit_ids))
+            .xalign(0.0)
+            .selectable(true)
+            .wrap(true)
+            .build();
+        holder.append(&label);
+    }
+    for operation_id in message.audit_operation_ids() {
+        let action_target = operation_id.to_string().to_variant();
+        let audit = gtk::Button::builder()
+            .label(crate::tr!("View in Audit Log"))
+            .action_name("win.show-audit-for")
+            .action_target(&action_target)
+            .css_classes(["pill", "flat"])
+            .build();
+        actions.insert(&audit, -1);
+    }
 }
 
 pub(in crate::ui::editor) fn build_stream_page_widget(

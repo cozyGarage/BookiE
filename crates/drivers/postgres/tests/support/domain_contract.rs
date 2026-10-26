@@ -1,5 +1,6 @@
 use tablepro_core::{Connection, FilterOp, FilterRule, FilterSet, FilterValue, Value};
 
+include!("domain_contract_parts/array_import_roundtrip.rs");
 use crate::{connect, start_pg};
 
 include!("domain_contract_parts/basic_domains.rs");
@@ -334,6 +335,8 @@ async fn value_contract_domain_over_enum_csv_round_trip_preserves_values_and_typ
     );
     let target = tablepro_core::import::ImportTarget {
         driver_id: "postgres",
+
+        capabilities: tablepro_core::DriverCapabilities::default(),
         schema: Some("value_contract_domain_csv"),
         table: "target_rows",
         columns: &target_columns,

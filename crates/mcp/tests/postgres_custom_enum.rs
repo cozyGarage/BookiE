@@ -254,6 +254,8 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("mcp_enum"),
             table: "target_rows",
             columns: &target_columns,
@@ -404,6 +406,8 @@ async fn postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_impor
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("mcp_domain_enum"),
             table: "target_rows",
             columns: &target_columns,

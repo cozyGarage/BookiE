@@ -217,10 +217,12 @@ async fn detached_cleanup_logs_category_without_server_payload() {
     let log = tempfile::NamedTempFile::new().unwrap();
     let subscriber = tracing_subscriber::fmt().with_writer(log.reopen().unwrap()).finish();
     let _guard = tracing::subscriber::set_default(subscriber);
-    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(CountedClose {
-        calls: Arc::new(AtomicUsize::new(0)),
-        result: Err(DriverError::query("private-session-payload")),
-    }))));
+    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+        CountedClose {
+            calls: Arc::new(AtomicUsize::new(0)),
+            result: Err(DriverError::query("private-session-payload")),
+        },
+    )))));
     close_detached_session(shared).await;
     let output = std::fs::read_to_string(log.path()).unwrap();
     assert!(!output.contains("private-session-payload"));
@@ -229,7 +231,9 @@ async fn detached_cleanup_logs_category_without_server_payload() {
 
 #[tokio::test]
 async fn a_failed_commit_leaves_the_session_available_for_retry() {
-    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(FailFirstCommit(true)))));
+    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+        FailFirstCommit(true),
+    )))));
     assert!(matches!(commit_session(&shared).await, Err(DriverError::TimedOut)));
     assert!(shared.lock().await.is_some());
     commit_session(&shared).await.expect("retry commit");
@@ -241,12 +245,14 @@ async fn rollback_completes_before_session_close_and_end_reports_only_after_clos
     let (finish_rollback, rollback_gate) = tokio::sync::oneshot::channel();
     let (close_started, mut closed) = tokio::sync::oneshot::channel();
     let (finish_close, close_gate) = tokio::sync::oneshot::channel();
-    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(DelayedRollback {
-        rollback_started: Some(rollback_started),
-        finish_rollback: Some(rollback_gate),
-        close_started: Some(close_started),
-        finish_close: Some(close_gate),
-    }))));
+    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+        DelayedRollback {
+            rollback_started: Some(rollback_started),
+            finish_rollback: Some(rollback_gate),
+            close_started: Some(close_started),
+            finish_close: Some(close_gate),
+        },
+    )))));
     let ending_shared = shared.clone();
     let ending = tokio::spawn(async move { rollback_and_close(&ending_shared).await });
 
@@ -263,9 +269,11 @@ async fn rollback_completes_before_session_close_and_end_reports_only_after_clos
 #[tokio::test]
 async fn rollback_failure_still_closes_and_returns_the_rollback_error() {
     let close_calls = Arc::new(AtomicUsize::new(0));
-    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(FailingRollback {
-        close_calls: close_calls.clone(),
-    }))));
+    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+        FailingRollback {
+            close_calls: close_calls.clone(),
+        },
+    )))));
 
     assert!(matches!(rollback_and_close(&shared).await, Err(DriverError::TimedOut)));
     assert!(shared.lock().await.is_none());
@@ -275,12 +283,14 @@ async fn rollback_failure_still_closes_and_returns_the_rollback_error() {
 #[tokio::test]
 async fn a_retired_transaction_session_closes_without_sending_rollback() {
     let queries = Arc::new(AtomicUsize::new(0));
-    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(HealthSession {
-        usable: Arc::new(AtomicBool::new(false)),
-        queries: queries.clone(),
-        fail_query: false,
-        close_unknown: true,
-    }))));
+    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+        HealthSession {
+            usable: Arc::new(AtomicBool::new(false)),
+            queries: queries.clone(),
+            fail_query: false,
+            close_unknown: true,
+        },
+    )))));
 
     assert!(matches!(
         rollback_and_close(&shared).await,
@@ -332,10 +342,9 @@ fn session_end_dialog_keeps_the_toggle_active_until_the_selected_action_finishes
 async fn teardown_waits_for_delayed_session_close_before_completing() {
     let (started, did_start) = tokio::sync::oneshot::channel();
     let (release, wait) = tokio::sync::oneshot::channel();
-    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(DelayedClose {
-        started,
-        release: wait,
-    }))));
+    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+        DelayedClose { started, release: wait },
+    )))));
     let closing = tokio::spawn(close_for_teardown(shared.clone()));
 
     did_start.await.expect("close started");
@@ -348,10 +357,12 @@ async fn teardown_waits_for_delayed_session_close_before_completing() {
 #[tokio::test]
 async fn teardown_propagates_close_errors_and_takes_the_session_once() {
     let calls = Arc::new(AtomicUsize::new(0));
-    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(CountedClose {
-        calls: calls.clone(),
-        result: Err(DriverError::TimedOut),
-    }))));
+    let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+        CountedClose {
+            calls: calls.clone(),
+            result: Err(DriverError::TimedOut),
+        },
+    )))));
 
     assert!(matches!(
         close_for_teardown(shared.clone()).await,
@@ -384,12 +395,14 @@ async fn a_retired_session_reports_its_identity_and_never_dispatches_again() {
     let queries = Arc::new(AtomicUsize::new(0));
     let target = StatementTarget::Session {
         id,
-        shared: Arc::new(tokio::sync::Mutex::new(Some(Box::new(HealthSession {
-            usable: Arc::new(AtomicBool::new(false)),
-            queries: queries.clone(),
-            fail_query: false,
-            close_unknown: false,
-        })))),
+        shared: Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+            HealthSession {
+                usable: Arc::new(AtomicBool::new(false)),
+                queries: queries.clone(),
+                fail_query: false,
+                close_unknown: false,
+            },
+        ))))),
     };
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(1));
 
@@ -407,12 +420,14 @@ async fn an_ordinary_statement_error_keeps_a_usable_session() {
     let queries = Arc::new(AtomicUsize::new(0));
     let target = StatementTarget::Session {
         id,
-        shared: Arc::new(tokio::sync::Mutex::new(Some(Box::new(HealthSession {
-            usable: Arc::new(AtomicBool::new(true)),
-            queries: queries.clone(),
-            fail_query: true,
-            close_unknown: false,
-        })))),
+        shared: Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
+            HealthSession {
+                usable: Arc::new(AtomicBool::new(true)),
+                queries: queries.clone(),
+                fail_query: true,
+                close_unknown: false,
+            },
+        ))))),
     };
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(1));
 
