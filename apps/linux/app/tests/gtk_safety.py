@@ -566,11 +566,11 @@ def show_file_chooser_location(chooser):
         for node in descendants(chooser):
             try:
                 actions = node.queryAction()
+                for index in range(actions.nActions):
+                    if actions.getName(index) == "show_location" and actions.doAction(index):
+                        return
             except Exception:
                 continue
-            for index in range(actions.nActions):
-                if actions.getName(index) == "show_location" and actions.doAction(index):
-                    return
         time.sleep(POLL_SECONDS)
     press_x11_key("l", ("Control_L",))
 
