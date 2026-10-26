@@ -6,6 +6,10 @@
     "apps/linux/app/src/ui/editor/completion_provider/tests.rs": "8acd2dce1afcbfe1738cb015fa302cef444c1d9c7181d0d95d095a8c3f4fde41",
     "scripts/isolated-tests.json": "e940fa9583815b8a1997a9db5b15011e9e794780cf80bed4206a125a81df1809"
   },
+  "source_commits": {
+    "apps/linux/app/src/lib.rs": "fc15056e2acbf426bbaada90bde5d26330018eef",
+    "apps/linux/app/src/ui/editor/completion_provider/tests.rs": "fc15056e2acbf426bbaada90bde5d26330018eef"
+  },
   "test_binary_sha256": "8ed3d59fa047bdb5388b121244f481b4c0a03d81bdfcb9ef81299d52c66bbb10",
   "checks": {
     "preflight": {

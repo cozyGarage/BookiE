@@ -10,6 +10,7 @@ python3 scripts/update-translations.py --check
 python3 scripts/check-moved-paths.py
 python3 scripts/check-known-issues.py
 python3 scripts/check-release-version.py
+python3 scripts/validate-evidence.py
 if [ -z "${CARGO_ABOUT:-}" ]; then
   CARGO_ABOUT="$(scripts/ensure-cargo-about.sh)"
   export CARGO_ABOUT

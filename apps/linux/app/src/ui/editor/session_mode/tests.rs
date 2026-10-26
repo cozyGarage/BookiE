@@ -42,6 +42,59 @@ struct FailingRollback {
 }
 
 struct CompletionColumnsSession;
+struct CompletionColumnsConnection;
+
+struct CompletionAudit;
+
+#[async_trait::async_trait]
+impl tablepro_policy::AuditSink for CompletionAudit {
+    async fn record(&self, _event: tablepro_policy::AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl Connection for CompletionColumnsConnection {
+    async fn list_tables(&self) -> Result<Vec<tablepro_core::TableInfo>, DriverError> {
+        Ok(Vec::new())
+    }
+
+    async fn open_session(&self) -> Result<Box<dyn Session>, DriverError> {
+        Ok(Box::new(CompletionColumnsSession))
+    }
+
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<tablepro_core::ColumnInfo>, DriverError> {
+        Ok(Vec::new())
+    }
+
+    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
+        Err(DriverError::Unsupported("fetching test rows".into()))
+    }
+
+    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
+        Err(DriverError::Unsupported("querying test connection".into()))
+    }
+
+    async fn execute(&self, _: &str) -> Result<tablepro_core::ExecResult, DriverError> {
+        Err(DriverError::Unsupported("executing test connection".into()))
+    }
+
+    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<tablepro_core::ExecResult, DriverError> {
+        Err(DriverError::Unsupported("executing test parameters".into()))
+    }
+
+    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        Err(DriverError::Unsupported("test transactions".into()))
+    }
+
+    async fn ping(&self) -> Result<(), DriverError> {
+        Ok(())
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
 
 #[async_trait::async_trait]
 impl Session for CompletionColumnsSession {
@@ -476,6 +529,40 @@ async fn a_session_handle_forwards_completion_metadata_to_its_session() {
     let shared = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
         CompletionColumnsSession,
     )))));
+    let (_, columns) = tablepro_app_services::completion::fetch_session_column_names(
+        shared,
+        tablepro_app_services::completion::SchemaRequest {
+            generation: 1,
+            table: "public.users".into(),
+        },
+        Some(tablepro_core::sql_syntax::SqlGrammar::PostgreSql),
+        1,
+        tokio_util::sync::CancellationToken::new(),
+    )
+    .await;
+
+    assert_eq!(columns, Ok(vec!["id".into()]));
+}
+
+#[tokio::test]
+async fn an_audited_session_handle_forwards_completion_metadata_to_its_session() {
+    let guard = PolicyGuard::new(
+        Arc::new(CompletionColumnsConnection),
+        tablepro_policy::GuardContext {
+            connection_id: Uuid::new_v4(),
+            connection_name: "completion forwarding".into(),
+            driver_id: "postgres".into(),
+            environment: tablepro_core::Environment::Local,
+            read_only: false,
+            principal: Principal::human_gui(),
+            policy: Arc::new(tablepro_policy::PolicyConfig::default()),
+            approval: Arc::new(tablepro_policy::AutoApproveSink),
+            audit: Arc::new(CompletionAudit),
+            audit_state: Arc::new(tablepro_policy::AuditState::new()),
+        },
+    );
+    let session = guard.open_session_with_audit().await.expect("open guarded session");
+    let shared = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::Audited(session))));
     let (_, columns) = tablepro_app_services::completion::fetch_session_column_names(
         shared,
         tablepro_app_services::completion::SchemaRequest {
