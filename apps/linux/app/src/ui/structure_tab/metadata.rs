@@ -22,7 +22,6 @@ pub(super) fn metadata_notice_row(title: &str, description: &str) -> relm4::adw:
         .subtitle(description)
         .build();
     row.add_prefix(&relm4::gtk::Image::from_icon_name("dialog-information-symbolic"));
-    row.add_css_class("dim-label");
     row
 }
 
