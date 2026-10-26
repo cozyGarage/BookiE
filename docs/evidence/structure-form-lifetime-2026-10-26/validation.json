@@ -5,22 +5,22 @@
     {
       "test": "ui::structure_tab_dialogs::lifetime_tests::dismissing_index_setup_releases_its_dialog",
       "before": "1 failed, 0 passed",
-      "after": "expanded isolated tier pending"
+      "after": "passed in ordinary isolated GTK tier"
     },
     {
       "test": "ui::structure_tab_dialogs::lifetime_tests::dismissing_foreign_key_setup_releases_its_dialog",
       "before": "1 failed, 0 passed",
-      "after": "expanded isolated tier pending"
+      "after": "passed in ordinary isolated GTK tier"
     },
     {
       "test": "ui::structure_tab_dialogs::lifetime_tests::submitting_index_setup_updates_preview_and_releases_its_dialog",
       "before": "1 failed, 0 passed",
-      "after": "expanded isolated tier pending"
+      "after": "passed in ordinary isolated GTK tier"
     },
     {
       "test": "ui::structure_tab_dialogs::lifetime_tests::submitting_foreign_key_setup_updates_preview_and_releases_its_dialog",
       "before": "1 failed, 0 passed",
-      "after": "expanded isolated tier pending"
+      "after": "passed in ordinary isolated GTK tier"
     }
   ],
   "environment": {
@@ -34,9 +34,6 @@
     "scripts/isolated-tests.json": "a637eff95d34d3cdd25d3dea43c59a9158c8a9336ce3df09a2c27ffeba59245d"
   },
   "remaining": [
-    "expanded full preflight",
-    "expanded ordinary GTK widgets",
-    "app Clippy",
     "Forgejo acceptance"
   ],
   "previous_validation": {
@@ -53,5 +50,17 @@
       "input_method": "ordinary suite environment"
     },
     "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings"
-  }
+  },
+  "preflight": {
+    "unit": 2197,
+    "sandbox": 291,
+    "redis_cancellation": 1,
+    "result": "passed"
+  },
+  "gtk_widgets": {
+    "executed": 179,
+    "result": "passed",
+    "input_method": "ordinary suite environment"
+  },
+  "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings"
 }
