@@ -1,6 +1,7 @@
 use relm4::adw::prelude::*;
-use tablepro_core::AuthMode;
 use tablepro_core::{ConnectionFormDefaults, DatabaseDriver, connection_form_defaults};
+
+use crate::services::connection_form::ConnectFormState;
 
 pub(super) fn apply_driver_values(
     dialog: &mut super::ConnectDialog,
@@ -22,14 +23,12 @@ pub(super) fn apply_driver_values(
 impl super::ConnectDialog {
     pub(super) fn apply_driver_form_visibility(&mut self, driver: &dyn tablepro_core::DatabaseDriver) {
         let capabilities = driver.capabilities();
-        self.form.file_based = capabilities.is_file_based;
-        self.form.supports_integrated = capabilities.supports_integrated_auth;
-        self.form.supports_local_socket = capabilities.supports_local_socket;
-        if !self.form.supports_local_socket {
+        self.form = ConnectFormState::from_capabilities(capabilities, self.form.selected);
+        if !self.form.endpoint(false).shows_endpoint_choice() {
             self.endpoint_combo.set_selected(0);
         }
         self.apply_form_state();
-        self.configure_socket_field(driver.id());
+        self.configure_socket_field(self.form.local_socket_path_kind());
         self.apply_tls_visibility();
         self.database_file_picker.set_visible(self.form.file_based);
         self.auth_source.set_visible(driver.id() == "mongodb");
@@ -59,81 +58,6 @@ fn apply_values(
         previous.map(|value| value.username),
         next.username,
     ));
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) struct AuthFormState {
-    pub(super) file_based: bool,
-    pub(super) supports_integrated: bool,
-    pub(super) supports_local_socket: bool,
-    pub(super) selected: AuthMode,
-}
-
-impl AuthFormState {
-    pub(super) fn mode(self) -> AuthMode {
-        if self.shows_method() {
-            self.selected
-        } else {
-            AuthMode::Password
-        }
-    }
-
-    pub(super) fn shows_method(self) -> bool {
-        !self.file_based && self.supports_integrated
-    }
-
-    pub(super) fn shows_credentials(self) -> bool {
-        !self.file_based && self.mode() == AuthMode::Password
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct EndpointFormState {
-    pub(super) file_based: bool,
-    pub(super) supports_local_socket: bool,
-    pub(super) socket_selected: bool,
-}
-
-impl EndpointFormState {
-    pub(super) fn shows_endpoint_choice(self) -> bool {
-        !self.file_based && self.supports_local_socket
-    }
-
-    pub(super) fn uses_local_socket(self) -> bool {
-        self.shows_endpoint_choice() && self.socket_selected
-    }
-
-    pub(super) fn shows_network(self) -> bool {
-        !self.file_based && !self.uses_local_socket()
-    }
-
-    pub(super) fn shows_port(self) -> bool {
-        !self.file_based
-    }
-
-    pub(super) fn shows_socket_rows(self) -> bool {
-        self.uses_local_socket()
-    }
-}
-
-pub(super) fn socket_directory_is_valid(directory: &str) -> bool {
-    std::path::Path::new(directory).is_absolute()
-}
-
-pub(super) fn resolved_socket_path(directory: &str, port: u16) -> std::path::PathBuf {
-    std::path::Path::new(directory).join(format!(".s.PGSQL.{port}"))
-}
-
-pub(super) fn local_socket_options(
-    driver_id: &str,
-    endpoint: &str,
-) -> (Option<std::path::PathBuf>, Option<std::path::PathBuf>) {
-    let path = std::path::PathBuf::from(endpoint);
-    if driver_id == "mysql" {
-        (None, Some(path))
-    } else {
-        (Some(path), None)
-    }
 }
 
 pub(super) fn test_result_text(result: &Result<usize, String>) -> String {
@@ -187,150 +111,6 @@ mod tests {
     fn the_first_driver_selection_applies_its_defaults() {
         assert_eq!(next_driver_value(0, None, 3306), 3306);
         assert_eq!(next_driver_text("", None, "mysql"), "mysql");
-    }
-
-    #[test]
-    fn auth_form_state_drives_mode_and_visibility() {
-        let cases = [
-            (AuthFormState::default(), AuthMode::Password, false, true),
-            (
-                AuthFormState {
-                    file_based: false,
-                    supports_integrated: true,
-                    supports_local_socket: false,
-                    selected: AuthMode::Password,
-                },
-                AuthMode::Password,
-                true,
-                true,
-            ),
-            (
-                AuthFormState {
-                    file_based: false,
-                    supports_integrated: true,
-                    supports_local_socket: false,
-                    selected: AuthMode::Kerberos,
-                },
-                AuthMode::Kerberos,
-                true,
-                false,
-            ),
-            (
-                AuthFormState {
-                    file_based: false,
-                    supports_integrated: false,
-                    supports_local_socket: false,
-                    selected: AuthMode::Kerberos,
-                },
-                AuthMode::Password,
-                false,
-                true,
-            ),
-            (
-                AuthFormState {
-                    file_based: true,
-                    supports_integrated: true,
-                    supports_local_socket: false,
-                    selected: AuthMode::Kerberos,
-                },
-                AuthMode::Password,
-                false,
-                false,
-            ),
-        ];
-        for (state, mode, method, credentials) in cases {
-            assert_eq!(state.mode(), mode, "{state:?}");
-            assert_eq!(state.shows_method(), method, "{state:?}");
-            assert_eq!(state.shows_credentials(), credentials, "{state:?}");
-        }
-    }
-
-    #[test]
-    fn a_file_based_driver_never_offers_an_endpoint_choice() {
-        let state = EndpointFormState {
-            file_based: true,
-            supports_local_socket: false,
-            socket_selected: true,
-        };
-        assert!(!state.shows_endpoint_choice());
-        assert!(!state.uses_local_socket());
-        assert!(!state.shows_socket_rows());
-        assert!(!state.shows_network());
-        assert!(!state.shows_port());
-    }
-
-    #[test]
-    fn a_driver_without_socket_support_stays_on_the_network_form() {
-        let state = EndpointFormState {
-            file_based: false,
-            supports_local_socket: false,
-            socket_selected: true,
-        };
-        assert!(!state.shows_endpoint_choice());
-        assert!(!state.uses_local_socket());
-        assert!(state.shows_network());
-        assert!(state.shows_port());
-        assert!(!state.shows_socket_rows());
-    }
-
-    #[test]
-    fn selecting_the_socket_endpoint_hides_every_network_row() {
-        let state = EndpointFormState {
-            file_based: false,
-            supports_local_socket: true,
-            socket_selected: true,
-        };
-        assert!(state.shows_endpoint_choice());
-        assert!(state.uses_local_socket());
-        assert!(state.shows_socket_rows());
-        assert!(!state.shows_network());
-        assert!(state.shows_port());
-    }
-
-    #[test]
-    fn returning_to_the_network_endpoint_restores_the_network_rows() {
-        let state = EndpointFormState {
-            file_based: false,
-            supports_local_socket: true,
-            socket_selected: false,
-        };
-        assert!(state.shows_endpoint_choice());
-        assert!(!state.uses_local_socket());
-        assert!(!state.shows_socket_rows());
-        assert!(state.shows_network());
-    }
-
-    #[test]
-    fn a_socket_directory_must_be_absolute() {
-        assert!(socket_directory_is_valid("/run/postgresql"));
-        assert!(socket_directory_is_valid("/tmp"));
-        assert!(!socket_directory_is_valid("run/postgresql"));
-        assert!(!socket_directory_is_valid(""));
-        assert!(!socket_directory_is_valid("~/sockets"));
-    }
-
-    #[test]
-    fn the_resolved_socket_follows_the_directory_and_port() {
-        assert_eq!(
-            resolved_socket_path("/run/postgresql", 5432),
-            std::path::PathBuf::from("/run/postgresql/.s.PGSQL.5432")
-        );
-        assert_eq!(
-            resolved_socket_path("/tmp", 6543),
-            std::path::PathBuf::from("/tmp/.s.PGSQL.6543")
-        );
-    }
-
-    #[test]
-    fn postgres_keeps_directory_sockets_and_mysql_uses_a_socket_file() {
-        assert_eq!(
-            local_socket_options("postgres", "/run/postgresql"),
-            (Some(std::path::PathBuf::from("/run/postgresql")), None)
-        );
-        assert_eq!(
-            local_socket_options("mysql", "/run/mysqld/mysqld.sock"),
-            (None, Some(std::path::PathBuf::from("/run/mysqld/mysqld.sock")))
-        );
     }
 
     fn driver(id: &str) -> crate::ui::connect_dialog::DriverEntry {

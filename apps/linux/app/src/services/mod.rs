@@ -1,6 +1,6 @@
 pub use tablepro_app_services::{
-    approval_wait, column_widths, config_io, filter_settings, ordered_refresh, read_scopes, recent_tabs,
-    request_generation, single_flight, state_file, structure_tracker,
+    approval_wait, column_widths, config_io, connection_form, filter_settings, ordered_refresh, read_scopes,
+    recent_tabs, request_generation, single_flight, state_file, structure_tracker,
 };
 pub mod approval_router;
 pub mod audit_view;
