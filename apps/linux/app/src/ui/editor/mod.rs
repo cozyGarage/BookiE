@@ -986,13 +986,11 @@ impl SqlEditor {
             return;
         }
         let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database);
-        let conn = match origin.as_ref().and_then(|origin| origin.connection(&self.database)) {
-            Some(c) => c,
-            None => {
-                self.status.set_label(&crate::tr!("no active connection"));
-                return;
-            }
+        let Some(guard) = origin.as_ref().and_then(|origin| origin.guard(&self.database)) else {
+            self.status.set_label(&crate::tr!("no active connection"));
+            return;
         };
+        let conn: std::sync::Arc<dyn tablepro_core::Connection> = guard.clone();
         let Some(metadata) = self.metadata() else {
             self.status.set_label(&crate::tr!("no active connection"));
             return;
@@ -1040,7 +1038,7 @@ impl SqlEditor {
             .unwrap_or_default();
         let export_driver_id = driver_id.clone();
         let stream_spool_manager = self.database.stream_result_spool_manager();
-        let target = self.statement_target(conn);
+        let target = self.statement_target(conn, Some(guard));
         let lexing_source = self.lexing_source();
         let export_session = StreamSession::of(&target);
         let sender_clone = sender.clone();

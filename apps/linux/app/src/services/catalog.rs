@@ -1,6 +1,7 @@
 use super::database_service::{ConnectionIdentity, DatabaseService};
 use std::sync::Arc;
 use tablepro_core::{Connection, TableInfo};
+use tablepro_policy::{PolicyGuard, Principal};
 use uuid::Uuid;
 
 pub type Catalog = (Vec<TableInfo>, Vec<TableInfo>);
@@ -65,6 +66,11 @@ impl CatalogOrigin {
     pub fn connection(&self, database: &DatabaseService) -> Option<Arc<dyn Connection>> {
         let (connection, identity) = database.get_with_identity(self.id)?;
         (identity == self.identity).then_some(connection)
+    }
+
+    pub(crate) fn guard(&self, database: &DatabaseService) -> Option<Arc<PolicyGuard>> {
+        let (guard, identity) = database.guard_with_identity(self.id, Principal::human_gui())?;
+        (identity == self.identity).then_some(guard)
     }
 }
 

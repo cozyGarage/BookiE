@@ -1005,6 +1005,11 @@ impl SimpleComponent for App {
             AppMsg::ShowAuditLog => {
                 crate::ui::audit_dialog::present(self.window.upcast_ref::<gtk::Window>(), &self.database)
             }
+            AppMsg::ShowAuditOperation(operation_id) => crate::ui::audit_dialog::present_for_operation(
+                self.window.upcast_ref::<gtk::Window>(),
+                &self.database,
+                operation_id,
+            ),
             AppMsg::ShowActivity => {
                 crate::ui::activity_dialog::present(
                     self.window.upcast_ref::<gtk::Window>(),

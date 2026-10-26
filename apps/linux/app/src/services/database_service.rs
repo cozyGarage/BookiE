@@ -510,12 +510,20 @@ impl DatabaseService {
         self.handle_with_identity(id, principal).map(|(handle, _)| handle)
     }
 
+    pub fn guard_with_identity(
+        &self,
+        id: Uuid,
+        principal: Principal,
+    ) -> Option<(Arc<PolicyGuard>, ConnectionIdentity)> {
+        self.build_guard_with_identity(id, principal)
+            .map(|(guard, identity)| (Arc::new(guard), identity))
+    }
+
     /// The same guarded handle as [`handle`], kept as its concrete type so
     /// a caller can open a scoped bulk insert on it. It is the same
     /// `PolicyGuard`; nothing here reaches the driver underneath.
     pub fn guard(&self, id: Uuid, principal: Principal) -> Option<Arc<PolicyGuard>> {
-        self.guard_with_identity(id, principal)
-            .map(|(guard, _)| Arc::new(guard))
+        self.guard_with_identity(id, principal).map(|(guard, _)| guard)
     }
 
     fn handle_with_identity(
@@ -524,10 +532,10 @@ impl DatabaseService {
         principal: Principal,
     ) -> Option<(Arc<dyn Connection>, ConnectionIdentity)> {
         let (guard, identity) = self.guard_with_identity(id, principal)?;
-        Some((Arc::new(guard) as Arc<dyn Connection>, identity))
+        Some((guard as Arc<dyn Connection>, identity))
     }
 
-    fn guard_with_identity(&self, id: Uuid, principal: Principal) -> Option<(PolicyGuard, ConnectionIdentity)> {
+    fn build_guard_with_identity(&self, id: Uuid, principal: Principal) -> Option<(PolicyGuard, ConnectionIdentity)> {
         let entries = self
             .connections
             .lock()
@@ -610,6 +618,9 @@ impl DatabaseService {
 mod tests {
     use super::*;
     use tablepro_core::DatabaseDriver;
+
+    #[path = "identity_tests.rs"]
+    mod identity_tests;
 
     #[test]
     fn policy_file_is_read_from_the_build_profile_config_directory() {
@@ -1153,46 +1164,5 @@ mod tests {
 
         assert!(service.metadata(first).is_none());
         assert_eq!(service.metadata(second).map(|m| m.name), Some("second".to_string()));
-    }
-    #[tokio::test]
-    async fn session_identity_survives_new_guards_but_changes_on_reconnect() {
-        let service = DatabaseService::new();
-        let id = open_memory_connection(&service, "identity").await;
-        let (first_guard, first) = service.get_with_identity(id).unwrap();
-        let (second_guard, second) = service.get_with_identity(id).unwrap();
-        assert!(!Arc::ptr_eq(&first_guard, &second_guard));
-        assert_eq!(first, second);
-        let origin = crate::services::catalog::CatalogOrigin {
-            id,
-            identity: first.clone(),
-        };
-        assert!(origin.matches(Some(id), Some(&second)));
-        assert!(!origin.matches(Some(Uuid::new_v4()), Some(&second)));
-        let mut index = tablepro_app_services::completion::SchemaIndex::default();
-        assert!(index.sync_connection(&first));
-        index.set_columns("items", vec!["id".into()]);
-        let request = index.request("items".into());
-        assert!(!index.sync_connection(&second));
-        assert!(index.knows_columns("items"));
-        assert!(index.accepts(&request));
-        let replacement = drivers_sqlite::SqliteDriver
-            .connect(ConnectOptions {
-                database: ":memory:".into(),
-                ..Default::default()
-            })
-            .await
-            .unwrap();
-        {
-            let entries = service.connections.lock().unwrap();
-            entries.get(&id).unwrap().inner.lock().unwrap().connection = Arc::from(replacement);
-        }
-        let current = service.identity(id).unwrap();
-        assert_ne!(first, current);
-        assert!(!origin.matches(Some(id), Some(&current)));
-        assert!(index.sync_connection(&current));
-        assert!(!index.accepts(&request));
-        service.close(id);
-        assert!(service.identity(id).is_none());
-        assert!(!origin.matches(Some(id), None));
     }
 }

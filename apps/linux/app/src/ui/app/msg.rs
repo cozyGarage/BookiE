@@ -138,6 +138,7 @@ pub enum AppMsg {
     ShowAbout,
     ShowActivity,
     ShowAuditLog,
+    ShowAuditOperation(Uuid),
     ShowCatalog,
     ExplainActiveQuery,
     ShowPreferences,
