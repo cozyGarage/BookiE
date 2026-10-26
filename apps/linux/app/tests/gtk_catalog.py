@@ -30,6 +30,20 @@ def scenarios(ui):
         print("database oracle: committed table exists; checking the sidebar", flush=True)
         ui.wait_for_node(name=table, role=ui.pyatspi.ROLE_LIST_ITEM)
 
+    def session_dialog_commit_refreshes_committed_catalog(database, _base):
+        table = "catalog_dialog_commit_probe"
+        begin_transaction()
+        ui.run_sql(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY)")
+        ui.wait_for_node_containing("done in")
+        assert not table_exists(database, table), "uncommitted DDL became visible to another connection"
+        ui.invoke(ui.wait_for_node(name="Session · transaction open", role=ui.pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="End the session with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Commit", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Session committed")
+        assert table_exists(database, table), "the dialog did not commit its DDL"
+        print("database oracle: dialog-committed table exists; checking the sidebar", flush=True)
+        ui.wait_for_node(name=table, role=ui.pyatspi.ROLE_LIST_ITEM)
+
     def session_rollback_does_not_hide_later_autocommit_ddl(database, _base):
         rolled_back = "catalog_button_rollback_probe"
         committed = "catalog_after_rollback_probe"
@@ -45,7 +59,11 @@ def scenarios(ui):
         print("database oracle: later autocommit table exists; checking the sidebar", flush=True)
         ui.wait_for_node(name=committed, role=ui.pyatspi.ROLE_LIST_ITEM)
 
-    result = [session_commit_refreshes_committed_catalog, session_rollback_does_not_hide_later_autocommit_ddl]
+    result = [
+        session_commit_refreshes_committed_catalog,
+        session_dialog_commit_refreshes_committed_catalog,
+        session_rollback_does_not_hide_later_autocommit_ddl,
+    ]
     for scenario in result:
         scenario.environment = "local"
     return result
