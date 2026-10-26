@@ -72,7 +72,7 @@ fn write_row(
     row: &mut Vec<String>,
     rows_written: &mut usize,
 ) -> Result<(), ImportError> {
-    if *rows_written >= MAX_IMPORT_ROWS {
+    if *rows_written > MAX_IMPORT_ROWS {
         return Err(ImportError::TooManyRows { limit: MAX_IMPORT_ROWS });
     }
     writer
@@ -111,16 +111,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn refuses_to_write_a_row_after_the_import_limit() {
+    fn keeps_room_for_a_header_before_refusing_rows_after_the_import_limit() {
         let mut writer = csv::WriterBuilder::new().flexible(true).from_writer(Vec::new());
         let mut row = vec!["value".to_owned()];
         let mut rows_written = MAX_IMPORT_ROWS;
 
+        write_row(&mut writer, &mut row, &mut rows_written).unwrap();
+        assert_eq!(rows_written, MAX_IMPORT_ROWS + 1);
         assert_eq!(
             write_row(&mut writer, &mut row, &mut rows_written),
             Err(ImportError::TooManyRows { limit: MAX_IMPORT_ROWS })
         );
-        assert_eq!(rows_written, MAX_IMPORT_ROWS);
+        assert_eq!(rows_written, MAX_IMPORT_ROWS + 1);
     }
 
     #[test]

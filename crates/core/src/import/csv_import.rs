@@ -154,7 +154,7 @@ pub fn read_csv_file(path: &Path, options: &CsvImportOptions, limit: Option<usiz
 }
 
 pub fn read_import_file(path: &Path) -> Result<Vec<u8>, ImportError> {
-    let mut file = OpenOptions::new()
+    let file = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NONBLOCK)
         .open(path)
@@ -164,12 +164,12 @@ pub fn read_import_file(path: &Path) -> Result<Vec<u8>, ImportError> {
         return Err(ImportError::Unreadable);
     }
     check_file_size(metadata.len())?;
-    read_bounded(file.by_ref().take(MAX_FILE_BYTES + 1), MAX_FILE_BYTES)
+    read_bounded(file, MAX_FILE_BYTES)
 }
 
-fn read_bounded(mut reader: impl Read, limit: u64) -> Result<Vec<u8>, ImportError> {
+fn read_bounded(reader: impl Read, limit: u64) -> Result<Vec<u8>, ImportError> {
     let mut bytes = Vec::new();
-    reader.read_to_end(&mut bytes).map_err(|_| ImportError::Unreadable)?;
+    reader.take(limit + 1).read_to_end(&mut bytes).map_err(|_| ImportError::Unreadable)?;
     let size = bytes.len() as u64;
     if size > limit {
         return Err(ImportError::FileTooLarge { size, limit });
@@ -445,9 +445,11 @@ mod tests {
 
     #[test]
     fn bounded_file_read_rejects_growth_past_the_limit() {
-        let error = read_bounded(std::io::Cursor::new(b"four"), 3).expect_err("refuse extra byte");
+        let mut reader = std::io::Cursor::new(b"four extra bytes");
+        let error = read_bounded(&mut reader, 3).expect_err("refuse extra byte");
 
         assert_eq!(error, ImportError::FileTooLarge { size: 4, limit: 3 });
+        assert_eq!(reader.position(), 4);
     }
 
     #[test]
