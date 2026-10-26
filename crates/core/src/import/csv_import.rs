@@ -169,7 +169,10 @@ pub fn read_import_file(path: &Path) -> Result<Vec<u8>, ImportError> {
 
 fn read_bounded(reader: impl Read, limit: u64) -> Result<Vec<u8>, ImportError> {
     let mut bytes = Vec::new();
-    reader.take(limit + 1).read_to_end(&mut bytes).map_err(|_| ImportError::Unreadable)?;
+    reader
+        .take(limit + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| ImportError::Unreadable)?;
     let size = bytes.len() as u64;
     if size > limit {
         return Err(ImportError::FileTooLarge { size, limit });
