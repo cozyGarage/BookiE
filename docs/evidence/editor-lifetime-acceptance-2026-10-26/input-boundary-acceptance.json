@@ -1,0 +1,33 @@
+{
+  "source_commit": "ab238b4acdacbcec941d11c82d7460c518685f45",
+  "binary_sha256": "1a6b17c38e0c5a059d31aafdd1e0f2f23cb0cd72bdd813ed1b01cc537f8c86b9",
+  "exit_code": 0,
+  "display": "Xvfb X11 Cairo",
+  "results": [
+    {
+      "scenario": "overlong_pasted_sql_is_refused_without_replacing_the_editor",
+      "status": "passed",
+      "seconds": 1.608
+    },
+    {
+      "scenario": "bundle_export_records_sanitized_audit_outcome",
+      "status": "passed",
+      "seconds": 2.149
+    },
+    {
+      "scenario": "bundle_import_records_sanitized_audit_outcome",
+      "status": "passed",
+      "seconds": 2.083
+    },
+    {
+      "scenario": "oversized_restored_sql_is_not_loaded_and_remains_saved",
+      "status": "passed",
+      "seconds": 5.033
+    },
+    {
+      "scenario": "a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile",
+      "status": "passed",
+      "seconds": 4.962
+    }
+  ]
+}
