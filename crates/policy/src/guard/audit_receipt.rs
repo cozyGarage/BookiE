@@ -221,6 +221,17 @@ impl Session for AuditedSession {
             .await
     }
 
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<String>, DriverError> {
+        self.inner
+            .fetch_completion_columns_controlled(schema, table, control)
+            .await
+    }
+
     async fn open_query_cursor_controlled(
         &mut self,
         sql: &str,
