@@ -76,6 +76,51 @@ async fn audited_session_forwards_completion_metadata_and_records_the_outcome() 
 }
 
 #[tokio::test]
+async fn audited_session_completion_metadata_preserves_timeout_and_audit_outcome() {
+    let h = harness(
+        SessionScript {
+            completion_timed_out: true,
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session_with_audit().await.expect("open audited session");
+    let error = session
+        .fetch_completion_columns_controlled(None, "items", &OperationControl::with_timeout(Duration::from_secs(1)))
+        .await
+        .expect_err("the timed out metadata read remains a timeout");
+
+    assert!(matches!(error, DriverError::TimedOut));
+    let events = h.audit.events.lock().expect("events");
+    let outcome = events
+        .iter()
+        .find(|event| event.phase == AuditRecordPhase::Outcome)
+        .expect("timeout outcome is audited");
+    assert_eq!(outcome.terminal_status, AuditTerminalStatus::TimedOut);
+}
+
+#[tokio::test]
+async fn audited_session_completion_metadata_respects_pre_dispatch_cancellation() {
+    let h = harness(SessionScript::default(), false);
+    let mut session = h.guard.open_session_with_audit().await.expect("open audited session");
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    cancellation.cancel();
+    let error = session
+        .fetch_completion_columns_controlled(None, "items", &OperationControl::new(cancellation, None))
+        .await
+        .expect_err("a cancelled metadata request is stopped before dispatch");
+
+    assert!(matches!(error, DriverError::Cancelled));
+    assert!(
+        h.script
+            .completion_targets
+            .lock()
+            .expect("completion target lock")
+            .is_empty()
+    );
+}
+
+#[tokio::test]
 async fn session_completion_metadata_records_a_timed_out_terminal_outcome() {
     let h = harness(
         SessionScript {
