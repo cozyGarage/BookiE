@@ -913,6 +913,29 @@ fn closing_an_editor_releases_its_large_buffer_even_when_its_views_are_retained(
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn closing_a_vim_editor_releases_both_views_and_its_buffer() {
+    adw::init().unwrap();
+    let mut fixture = EditorFixture::new();
+    let _runtime = std::mem::replace(&mut fixture._runtime, tokio::runtime::Runtime::new().unwrap());
+    let preferences = crate::services::preferences::Preferences {
+        editor_vim_mode: true,
+        ..Default::default()
+    };
+    let model = fixture.controller.model();
+    super::apply_editor_preferences(&model.source_view, &preferences);
+    super::apply_editor_preferences(model.split_view.secondary_view(), &preferences);
+    let primary = model.source_view.downgrade();
+    let secondary = model.split_view.secondary_view().downgrade();
+    let buffer = model.source_view.buffer().downgrade();
+    drop(model);
+
+    drop(fixture);
+
+    spin_until(|| primary.upgrade().is_none() && secondary.upgrade().is_none() && buffer.upgrade().is_none());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn confirmed_session_rollbacks_retire_gutter_marks_and_stale_callbacks_do_not() {
     for commit_reply in [false, true] {
         let fixture = EditorFixture::new();

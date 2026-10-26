@@ -65,6 +65,7 @@ impl SplitEditorView {
 
     pub(super) fn shutdown(&self, primary: &sourceview5::View) {
         for view in [primary, &self.secondary_view] {
+            super::schema::release_vim_context(view);
             view.set_im_module(Some("simple"));
             view.set_buffer(None::<&gtk::TextBuffer>);
         }
