@@ -17,6 +17,8 @@ use super::workspace_overview::build_workspace_tab_overview;
 use super::{App, AppMsg, ClosedTabDescriptor, EditorTabSlot, WorkspaceTab};
 mod bulk_close;
 use bulk_close::{add_bulk_close_actions, bulk_close_menu_model};
+mod closed_tab;
+use closed_tab::describe_closed_tab;
 
 impl App {
     /// Builds the unified AdwTabOverview tree once per connection.
@@ -748,7 +750,7 @@ impl App {
     pub(super) fn finish_close_workspace_tab_now(&mut self, id: Uuid, tab_view: &adw::TabView) {
         let preview = self.workspace_tabs.borrow().is_preview(&id);
         let removed = self.workspace_tabs.borrow_mut().remove(&id);
-        let Some(removed) = removed else {
+        let Some(mut removed) = removed else {
             return;
         };
         // Snapshot the closed tab into the reopen stack BEFORE running
@@ -757,7 +759,7 @@ impl App {
         // owns the latest query buffer. New-mode Structure drafts are
         // skipped because the table they describe doesn't exist yet,
         // so reopening a draft would be useless.
-        if let Some(descriptor) = describe_closed_tab(&removed, preview) {
+        if let Some(descriptor) = describe_closed_tab(&mut removed, preview) {
             push_closed_tab(&self.closed_tabs_stack, descriptor);
         }
         // Drop any close-after-save / window-close-after-save intent
@@ -1029,33 +1031,6 @@ fn browse_tab_tooltip(schema: Option<&str>, table: &str, label: &str) -> Option<
     let s = schema?;
     let qualified = format!("{s}.{table}");
     if qualified == label { None } else { Some(qualified) }
-}
-
-fn describe_closed_tab(slot: &WorkspaceTab, preview: bool) -> Option<ClosedTabDescriptor> {
-    match slot {
-        WorkspaceTab::Editor(s) => Some(ClosedTabDescriptor::Editor { query: s.query.clone() }),
-        WorkspaceTab::Table(_) if preview => None,
-        WorkspaceTab::Table(s) => {
-            let model = s.browse.model();
-            let sort = model.current_sort();
-            Some(ClosedTabDescriptor::Table {
-                schema: s.schema.clone(),
-                table: s.table.clone(),
-                offset: model.current_offset(),
-                page_size: model.page_size(),
-                sort,
-            })
-        }
-        WorkspaceTab::Structure(s) => match s.mode {
-            // New-Table drafts have no entity to point at and lose
-            // their in-progress DDL on close — nothing to reopen.
-            crate::ui::structure_tab::StructureMode::New => None,
-            crate::ui::structure_tab::StructureMode::Edit => Some(ClosedTabDescriptor::Structure {
-                schema: s.schema.clone(),
-                table: s.table.clone(),
-            }),
-        },
-    }
 }
 
 fn push_closed_tab(
