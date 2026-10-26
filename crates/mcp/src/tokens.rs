@@ -32,10 +32,25 @@ pub struct McpToken {
 
 pub struct TokenStore {
     path: PathBuf,
-    tokens: Mutex<HashMap<Uuid, McpToken>>,
+    cache: Mutex<TokenCache>,
 }
 
 const MAX_TOKEN_STORE_BYTES: u64 = 1024 * 1024;
+
+struct TokenCache {
+    tokens: HashMap<Uuid, McpToken>,
+    stamp: Option<TokenFileStamp>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct TokenFileStamp {
+    device: u64,
+    inode: u64,
+    size: u64,
+    modified_seconds: i64,
+    modified_nanoseconds: i64,
+    mode: u32,
+}
 
 struct ProcessLock {
     _file: File,
@@ -50,9 +65,10 @@ impl TokenStore {
         let path = normalized_store_path(path)?;
         let _lock = acquire_process_lock(&path)?;
         let tokens = load_tokens(&path)?;
+        let stamp = token_file_stamp(&path)?;
         Ok(Self {
             path,
-            tokens: Mutex::new(tokens),
+            cache: Mutex::new(TokenCache { tokens, stamp }),
         })
     }
 
@@ -82,7 +98,10 @@ impl TokenStore {
         let mut map = load_tokens(&self.path)?;
         map.insert(token.id, token.clone());
         persist_tokens(&self.path, &map)?;
-        *self.tokens.lock().map_err(|error| error.to_string())? = map;
+        let stamp = token_file_stamp(&self.path)?;
+        let mut cache = self.cache.lock().map_err(|error| error.to_string())?;
+        cache.tokens = map;
+        cache.stamp = stamp;
         Ok((token, plaintext))
     }
 
@@ -90,9 +109,12 @@ impl TokenStore {
         let hash = hash_token(plaintext);
         let _lock = acquire_process_lock(&self.path)?;
         let refreshed = load_tokens(&self.path)?;
-        let mut map = self.tokens.lock().map_err(|error| error.to_string())?;
-        *map = refreshed;
-        let token = map
+        let stamp = token_file_stamp(&self.path)?;
+        let mut cache = self.cache.lock().map_err(|error| error.to_string())?;
+        cache.tokens = refreshed;
+        cache.stamp = stamp;
+        let token = cache
+            .tokens
             .values()
             .find(|t| !t.revoked && hashes_match(&t.token_hash, &hash))
             .cloned()
@@ -105,6 +127,18 @@ impl TokenStore {
         Ok(token)
     }
 
+    pub(crate) fn has_live_candidate(&self, plaintext: &str) -> Result<bool, String> {
+        self.refresh_cache_if_stale()?;
+        let hash = hash_token(plaintext);
+        let cache = self.cache.lock().map_err(|error| error.to_string())?;
+        let now = Utc::now();
+        Ok(cache.tokens.values().any(|token| {
+            !token.revoked
+                && token.expires_at.as_ref().is_none_or(|expires_at| expires_at >= &now)
+                && hashes_match(&token.token_hash, &hash)
+        }))
+    }
+
     pub fn revoke(&self, id: Uuid) -> Result<(), String> {
         let _lock = acquire_process_lock(&self.path)?;
         let mut map = load_tokens(&self.path)?;
@@ -112,16 +146,53 @@ impl TokenStore {
             token.revoked = true;
         }
         persist_tokens(&self.path, &map)?;
-        *self.tokens.lock().map_err(|error| error.to_string())? = map;
+        let stamp = token_file_stamp(&self.path)?;
+        let mut cache = self.cache.lock().map_err(|error| error.to_string())?;
+        cache.tokens = map;
+        cache.stamp = stamp;
         Ok(())
     }
 
     pub fn list(&self) -> Vec<McpToken> {
-        self.tokens
+        self.cache
             .lock()
-            .map(|m| m.values().cloned().collect())
+            .map(|cache| cache.tokens.values().cloned().collect())
             .unwrap_or_default()
     }
+
+    fn refresh_cache_if_stale(&self) -> Result<(), String> {
+        for _ in 0..2 {
+            let stamp = token_file_stamp(&self.path)?;
+            if self.cache.lock().map_err(|error| error.to_string())?.stamp == stamp {
+                return Ok(());
+            }
+            let tokens = load_tokens(&self.path)?;
+            let refreshed_stamp = token_file_stamp(&self.path)?;
+            if stamp == refreshed_stamp {
+                let mut cache = self.cache.lock().map_err(|error| error.to_string())?;
+                cache.tokens = tokens;
+                cache.stamp = refreshed_stamp;
+                return Ok(());
+            }
+        }
+        Err("token store changed during refresh".into())
+    }
+}
+
+fn token_file_stamp(path: &Path) -> Result<Option<TokenFileStamp>, String> {
+    let metadata = match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("cannot inspect token store {}: {error}", path.display())),
+    };
+    Ok(Some(TokenFileStamp {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+        size: metadata.len(),
+        modified_seconds: metadata.mtime(),
+        modified_nanoseconds: metadata.mtime_nsec(),
+        mode: metadata.mode(),
+    }))
 }
 
 fn normalized_store_path(path: PathBuf) -> Result<PathBuf, String> {

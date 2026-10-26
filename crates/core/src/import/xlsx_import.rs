@@ -111,6 +111,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn keeps_room_for_a_header_before_refusing_rows_after_the_import_limit() {
+        let mut writer = csv::WriterBuilder::new().flexible(true).from_writer(Vec::new());
+        let mut row = vec!["value".to_owned()];
+        let mut rows_written = MAX_IMPORT_ROWS;
+
+        write_row(&mut writer, &mut row, &mut rows_written).unwrap();
+        assert_eq!(rows_written, MAX_IMPORT_ROWS + 1);
+        assert_eq!(
+            write_row(&mut writer, &mut row, &mut rows_written),
+            Err(ImportError::TooManyRows { limit: MAX_IMPORT_ROWS })
+        );
+        assert_eq!(rows_written, MAX_IMPORT_ROWS + 1);
+    }
+
+    #[test]
     fn a_workbook_becomes_comma_separated_text() {
         let mut workbook = rust_xlsxwriter::Workbook::new();
         let sheet = workbook.add_worksheet();
