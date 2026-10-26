@@ -40,7 +40,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertGreater(sums.stat().st_size, 0)
     def test_headless_fixtures_wait_for_cheap_checks_without_serializing_behind_widgets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        expected = {"guards", "clippy", "unit", "sandbox"}
+        expected = {"guards", "clippy"}
         for name in ("driver", "pg-release", "pg-dump", "socket-ssh", "driver-tls"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
@@ -49,6 +49,25 @@ class CiWorkflowTests(unittest.TestCase):
         widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("test-gtk-widgets.sh", widgets)
         self.assertNotRegex(widgets, r"(?m)^    (if|continue-on-error):")
+
+    def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        jobs = (
+            "distro-floor", "driver", "e2e", "consumers", "gtk", "duckdb",
+            "pg-release", "pg-dump", "socket-ssh", "gtk-server", "driver-tls",
+            "keyring", "supply-chain",
+        )
+        for name in jobs:
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
+                expected = {"guards", "clippy"}
+                if name in {"e2e", "gtk", "gtk-server"}:
+                    expected.add("gtk-build")
+                self.assertEqual({item.strip() for item in dependencies.split(",")}, expected)
+        for name in ("unit", "sandbox", "widgets"):
+            job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+            self.assertNotRegex(job, r"(?m)^    (if|continue-on-error):")
 
     def test_cargo_path_covers_runner_service_homes(self):
         for name in ("ci", "nightly"):

@@ -24,6 +24,14 @@ These behaviors are confirmed in the current script, workflow and Cargo profile.
 
 Sharing the GTK application would remove seven of the eight measured builds, about 11 execution minutes at this baseline. That alone does not establish the 15-minute target. Measure total execution demand and runner availability as well as the longest job; shortening one job cannot remove a capacity bottleneck elsewhere.
 
+## Early scheduling
+
+An earlier run #955 investigation recorded a 9m43 cache-lock wait despite the free-space reserve already being met. The reserve fast path was merged in PR #1598. That run also spent about eleven minutes in each of unit and sandbox. These are historical measurements, not timings for the current shared-artifact workflow.
+
+Independent integration jobs start after guards and Clippy pass. Native GTK consumers also wait for `gtk-build`, and distro-floor scenarios still wait for their package producer. Unit, sandbox and widget jobs remain mandatory and run alongside integration; no tier or test is removed. A complete gate must pass every required job before acceptance.
+
+This can spend integration capacity on a commit whose unit or sandbox tier later fails. Compare complete source-pinned runs before claiming a speed improvement; runner capacity, artifact transfer and the existing scenario shards still determine total time.
+
 ## Distro-floor scenario qualification
 
 The package producer publishes one source-pinned packet through the same artifact helper used for native GTK builds. Package packets have a separate profile and filename; consumers check source, architecture and digest before installation. A package cannot substitute for a native CI binary. Local unsharded commands retain their existing behavior.
