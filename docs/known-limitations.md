@@ -12,7 +12,7 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   page or a loaded query result instead. A per-engine consistent export path is
   an unselected future candidate; database snapshots for backup and restore are
   a separate feature with an accepted design and no release target ([ADR 0015](decisions/0015-database-snapshots.md)).
-- **Large results still have materialization limits** ([#1032](https://github.com/cozyGarage/BookiE/issues/1032)). Materialized
+- **Large results still have materialization limits** ([#1272](https://github.com/cozyGarage/BookiE/issues/1272)). Materialized
   results stop at 1 million rows, 10 million cells or 64 MiB estimated size.
   Single-statement PostgreSQL `SELECT`s in the SQL editor stream cursor pages
   through Core and PolicyGuard, retaining them while estimated row storage stays
@@ -48,7 +48,7 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   This single-query result does not measure the pinned-stream stress case, normal
   workloads or the complete process ceiling. Other engines and unsupported
   statement shapes remain materialized. Broader resource and lifecycle acceptance
-  remains under [#1032](https://github.com/cozyGarage/BookiE/issues/1032) (ADR 0011).
+  remains under [#1272](https://github.com/cozyGarage/BookiE/issues/1272) (ADR 0011). The earlier ownership tracker [#1032](https://github.com/cozyGarage/BookiE/issues/1032) is closed; its closure did not claim an aggregate process-memory bound.
 - **SQL result filters apply only to loaded rows.** Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **File exports use text markers for undecodable cells** ([#883](https://github.com/cozyGarage/BookiE/issues/883)). CSV, JSON, Markdown, HTML, XML, Excel, copied text and MCP CSV content use a visible `<undecodable TYPE>` string; these text representations do not retain a separate typed marker, so a real text value with the same spelling is ambiguous. SQL export refuses the value. MCP JSON retains an explicit tagged `undecodable` value.
 - **Long cells are shown as a preview** (PERF-10). Values over 8 KiB show a typed
