@@ -22,6 +22,7 @@
 | `supports_local_socket_file` | `supports_local_socket_file()` | Whether transport accepts a local socket file. |
 | `supports_local_socket_directory` | `supports_local_socket_directory()` | Whether transport accepts a local socket directory. |
 | `supports_client_tls_auth` | `supports_client_tls_auth()` | Whether transport accepts client certificate authentication. |
+| `supports_explicit_auto_increment_values` | `supports_explicit_auto_increment_values()` | Whether CSV import may include explicit identity values in the insert plan and saved mapping. |
 
 Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL, real affected-row counts, and false/empty for the remaining support flags. Column-comment support is derived from the DDL placement table. Current per-driver overrides are:
 
@@ -30,11 +31,11 @@ Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL
 | ClickHouse | `enum_input_style = SqlQuotedLabel`, database listing, no affected-row count, index metadata |
 | DuckDB | `enum_input_style = SqlQuotedLabel`, `Experimental`, file-based, transactional DDL |
 | MongoDB | `Experimental`, database listing |
-| MySQL | `enum_input_style = DeclaredMemberList`, database listing, index and foreign-key metadata, client TLS auth, local socket and socket-file support |
-| PostgreSQL | transactional DDL, database listing, index and foreign-key metadata, view metadata and catalog kinds, client TLS auth, local socket and socket-directory support |
+| MySQL | `enum_input_style = DeclaredMemberList`, database listing, index and foreign-key metadata, client TLS auth, local socket and socket-file support, explicit auto-increment values |
+| PostgreSQL | transactional DDL, database listing, index and foreign-key metadata, view metadata and catalog kinds, client TLS auth, local socket and socket-directory support, explicit auto-increment values |
 | Redis | `Experimental` |
 | SQL Server | database listing, transactional DDL, index and foreign-key metadata, integrated authentication |
-| SQLite | file-based, transactional DDL, index and foreign-key metadata |
+| SQLite | file-based, transactional DDL, index and foreign-key metadata, explicit auto-increment values |
 
 ## Current consumers
 
@@ -47,6 +48,7 @@ Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL
 | `reports_rows_affected` | Inline grid write handling. |
 | `supports_database_listing` | Database switcher. |
 | Integrated auth, local sockets and client TLS auth | Connect form and transport validation. |
+| `supports_explicit_auto_increment_values` | CSV import planning, preview mapping and saved mapping validation. The profile is passed at runtime; it is not stored in the saved mapping file. |
 | Index/FK/view metadata, column comments and catalog kinds | Current source has declarations and driver tests, but no direct production consumer. This is a follow-up opportunity; do not treat the flag as proof the UI exposes the capability. |
 
 ## Values outside the profile

@@ -48,6 +48,8 @@ async fn value_contract_interval_array_csv_import_survives_intervalstyle_change(
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "interval_csv_target",
             columns: &columns,

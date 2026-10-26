@@ -112,6 +112,8 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "timestamp_array_dmy_csv_target",
             columns: &columns,

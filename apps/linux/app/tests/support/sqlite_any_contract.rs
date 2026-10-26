@@ -48,6 +48,8 @@ async fn sqlite_result_csv_round_trip(
     let plan = build_insert_plan(
         &ImportTarget {
             driver_id: "sqlite",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: target_table,
             columns: &target_columns,

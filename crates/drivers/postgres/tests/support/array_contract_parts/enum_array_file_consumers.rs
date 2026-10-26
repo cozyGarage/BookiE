@@ -501,6 +501,8 @@ async fn value_contract_custom_enum_array_csv_import_preserves_labels_and_siblin
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("value_contract_enum_array_import"),
             table: "target",
             columns: &columns,
@@ -639,6 +641,8 @@ async fn value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape()
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("value_contract_enum_array_shape"),
             table: "target",
             columns: &columns,
@@ -724,6 +728,8 @@ async fn value_contract_custom_enum_array_csv_import_uses_target_type_under_shad
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("enum_array_shadow_b"),
             table: "target",
             columns: &columns,

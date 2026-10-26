@@ -89,6 +89,8 @@ async fn value_contract_bit_arrays_roundtrip_wire_and_csv() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "bit_array_target",
             columns: &columns,

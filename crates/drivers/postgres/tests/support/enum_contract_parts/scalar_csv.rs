@@ -59,6 +59,8 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
         .unwrap();
     let default_target = tablepro_core::import::ImportTarget {
         driver_id: "postgres",
+
+        capabilities: tablepro_core::DriverCapabilities::default(),
         schema: Some("value_contract_enum_import"),
         table: "target_rows",
         columns: &columns,
@@ -90,6 +92,8 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("value_contract_enum_import"),
             table: "target_rows",
             columns: &columns,

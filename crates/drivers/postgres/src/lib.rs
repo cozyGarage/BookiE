@@ -95,6 +95,10 @@ impl DatabaseDriver for PgDriver {
         true
     }
 
+    fn supports_explicit_auto_increment_values(&self) -> bool {
+        true
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         use tablepro_core::TlsMode;
         let mut pg_opts = postgres_connect_options(&opts)?;

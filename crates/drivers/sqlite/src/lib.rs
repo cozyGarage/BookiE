@@ -68,6 +68,10 @@ impl DatabaseDriver for SqliteDriver {
         true
     }
 
+    fn supports_explicit_auto_increment_values(&self) -> bool {
+        true
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let in_memory = opts.database.is_empty() || opts.database == ":memory:";
         let base = if in_memory {
