@@ -98,3 +98,13 @@ After correcting the chooser action race in harness source `b5e072fa818ea3f77fcf
 The comparison's private portal session logged an unavailable secret service, including a 120-second activation timeout. This limits timing and CPU comparison. It does not invalidate the successful content-preservation assertions or establish a product keyring failure.
 
 A [native dialog cancellation control](dialog-control.py) separately opened and cancelled 18 `Gtk.FileDialog` instances with the simple input method. Each callback completed and all 18 dialog objects finalized. [Final RSS](dialog-simple.json) was 123.8 MiB. No SQL was read, and accessibility was disabled. This excludes dialog-object retention in this cancellation-only control; it does not exercise accepted selections or BookiE callbacks.
+
+## Application allocation profile
+
+Heaptrack 1.5.0 completed the same 18-refusal workload on the fixed CI-profile binary, using chooser harness source `64b3e7d1d`. The [result](heaptrack-refusals/result.json) passed and the application exited normally. The [wrapper](profile-refusals.py) adds the preload library only to the application environment returned by the fixture, preserving direct application PID tracking. The [process samples](heaptrack-refusals/samples.json) and [allocation report](heaptrack-refusals/allocations.txt) are retained here.
+
+The 171.30-second recording reports 126,463,983 allocation calls, a 78.91 MB peak tracked heap and 445.27 MB peak RSS including profiler overhead. Its live-at-exit category is 58.70 MB; it includes process-lifetime toolkit and renderer allocations and is not proof of unreachable memory. The largest allocation-call category is `g_malloc`: 106,648,174 calls, with 4.51 MB peak consumption. The leading reported subpaths pass through GLib variant construction and GIO D-Bus message decoding. The report aggregates the full run; it does not attribute every allocation to accessibility or demonstrate its growth over individual cycles.
+
+This separates tracked live heap from RSS and points to substantial allocation churn. Allocator retention, mappings, native memory and instrumentation overhead remain possible contributors to the gap. No product allocator setting or input-method workaround follows from this result alone. The private portal session again logged an unavailable secret service; timing comparisons remain limited.
+
+The 4.6 GB raw recording was removed after successful interpretation and compressed-file integrity validation. The 24.5 MB compressed trace remains in the ignored local analysis directory. The public evidence contains reports and reproducible scripts, rather than the binary trace.
