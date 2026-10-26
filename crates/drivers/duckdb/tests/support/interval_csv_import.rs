@@ -44,6 +44,8 @@ async fn value_contract_interval_csv_import_preserves_native_components() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "duckdb",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "interval_csv_import",
             columns: &columns,
@@ -125,6 +127,8 @@ async fn value_contract_extended_calendar_csv_round_trips_exactly() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "duckdb",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "extended_calendar_import",
             columns: &columns,

@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::driver::DriverCapabilities;
 use crate::import::cell::{CsvRowError, row_to_values_for_driver};
 use crate::import::csv_import::{CsvImportOptions, CsvSheet};
 use crate::query::{ColumnInfo, Value};
@@ -15,12 +16,6 @@ pub const DEFAULT_IMPORT_BATCH_ROWS: usize = 500;
 
 /// Row failures the user is shown. The rest are counted, not listed.
 pub const MAX_REPORTED_ROW_ERRORS: usize = 20;
-
-pub fn supports_explicit_auto_increment_values(driver_id: &str) -> bool {
-    ["postgres", "mysql", "sqlite"]
-        .iter()
-        .any(|supported| driver_id.eq_ignore_ascii_case(supported))
-}
 
 #[derive(Debug, PartialEq, Eq, Error)]
 pub enum PlanError {
@@ -43,6 +38,7 @@ pub enum PlanError {
 /// Where the rows are going, and which field feeds each column.
 pub struct ImportTarget<'a> {
     pub driver_id: &'a str,
+    pub capabilities: DriverCapabilities,
     pub schema: Option<&'a str>,
     pub table: &'a str,
     pub columns: &'a [ColumnInfo],
@@ -135,7 +131,7 @@ fn insert_columns(target: &ImportTarget<'_>) -> Result<(Vec<ColumnInfo>, Vec<Opt
             continue;
         };
         if column.is_generated
-            || (column.is_auto_increment && !supports_explicit_auto_increment_values(target.driver_id))
+            || (column.is_auto_increment && !target.capabilities.supports_explicit_auto_increment_values)
         {
             continue;
         }
@@ -328,6 +324,10 @@ mod tests {
     fn target<'a>(columns: &'a [ColumnInfo], mapping: &'a [Option<usize>]) -> ImportTarget<'a> {
         ImportTarget {
             driver_id: "postgres",
+            capabilities: DriverCapabilities {
+                supports_explicit_auto_increment_values: true,
+                ..DriverCapabilities::default()
+            },
             schema: None,
             table: "people",
             columns,
@@ -375,6 +375,10 @@ mod tests {
         };
         let target = ImportTarget {
             driver_id: "mysql",
+            capabilities: DriverCapabilities {
+                supports_explicit_auto_increment_values: true,
+                ..DriverCapabilities::default()
+            },
             schema: None,
             table: "enum_rows",
             columns: &columns,
@@ -447,6 +451,8 @@ mod tests {
         let sheet = sheet(&[&["plain"]], &["note"]);
         let target = ImportTarget {
             driver_id: "mysql",
+
+            capabilities: DriverCapabilities::default(),
             schema: None,
             table: "people",
             columns: &columns,
@@ -590,6 +596,8 @@ mod tests {
         let mysql_rows = sheet(&[&["2001-02-03"]], &["date"]);
         let mysql_target = ImportTarget {
             driver_id: "mysql",
+
+            capabilities: DriverCapabilities::default(),
             schema: None,
             table: "people",
             columns: &mysql_columns,
@@ -736,10 +744,31 @@ mod tests {
         let sheet = sheet(&[&["901", "ada"]], &["id", "name"]);
         let mut target = target(&columns, &mapping);
         target.driver_id = "mssql";
+        target.capabilities = DriverCapabilities::default();
 
         let plan = build_insert_plan(&target, &sheet, &CsvImportOptions::default()).expect("plan");
 
         assert_eq!(plan.statement, "INSERT INTO [people] ([name]) VALUES (@P1)");
+        assert_eq!(plan.rows, vec![vec![Value::Text("ada".into())]]);
+    }
+
+    #[test]
+    fn explicit_identity_values_are_refused_when_the_profile_does_not_declare_support() {
+        let columns = vec![
+            ColumnInfo {
+                is_auto_increment: true,
+                ..column("id", "bigint")
+            },
+            column("name", "text"),
+        ];
+        let mapping = vec![Some(0), Some(1)];
+        let sheet = sheet(&[&["901", "ada"]], &["id", "name"]);
+        let mut target = target(&columns, &mapping);
+        target.capabilities = DriverCapabilities::default();
+
+        let plan = build_insert_plan(&target, &sheet, &CsvImportOptions::default()).expect("plan");
+
+        assert_eq!(plan.statement, "INSERT INTO \"people\" (\"name\") VALUES ($1)");
         assert_eq!(plan.rows, vec![vec![Value::Text("ada".into())]]);
     }
 
@@ -822,6 +851,10 @@ mod tests {
         let sheet = sheet(&[&["not-a-number"]], &["value"]);
         let sqlite = ImportTarget {
             driver_id: "sqlite",
+            capabilities: DriverCapabilities {
+                supports_explicit_auto_increment_values: true,
+                ..DriverCapabilities::default()
+            },
             schema: None,
             table: "flexible",
             columns: &columns,

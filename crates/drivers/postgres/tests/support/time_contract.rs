@@ -86,6 +86,8 @@ pub async fn assert_time_contract(connection: &dyn Connection) {
         let plan = tablepro_core::import::build_insert_plan(
             &tablepro_core::import::ImportTarget {
                 driver_id: "postgres",
+
+                capabilities: tablepro_core::DriverCapabilities::default(),
                 schema: None,
                 table: &table,
                 columns: &columns,
@@ -147,6 +149,8 @@ async fn assert_naive_timestamptz_csv_uses_the_server_session_zone(connection: &
         let plan = tablepro_core::import::build_insert_plan(
             &tablepro_core::import::ImportTarget {
                 driver_id: "postgres",
+
+                capabilities: tablepro_core::DriverCapabilities::default(),
                 schema: None,
                 table: "naive_timestamptz_csv",
                 columns: &columns,

@@ -74,6 +74,8 @@ async fn value_contract_extended_timestamptz_matches_duckdb_text_and_epoch() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "duckdb",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "extended_timestamptz_import",
             columns: &columns,
