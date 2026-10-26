@@ -20,6 +20,14 @@
         {
           "argv": [
             "python3",
+            "scripts/validate-evidence.py"
+          ],
+          "timeout_seconds": 180,
+          "evidence": "exit"
+        },
+        {
+          "argv": [
+            "python3",
             "-m",
             "unittest",
             "discover",

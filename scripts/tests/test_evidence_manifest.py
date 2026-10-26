@@ -322,6 +322,56 @@ class EvidenceManifestTests(unittest.TestCase):
             path.write_text(json.dumps({"format": "unrelated report"}))
             self.assertEqual(VALIDATOR.validate_manifest(path, strict=True), ([], []))
 
+    def test_manifest_with_an_unknown_explicit_schema_version_is_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "manifest.json"
+            path.write_text(json.dumps({"schema_version": 2, "source_sha256": {}}))
+            self.assertEqual(VALIDATOR.validate_manifest(path, strict=True), ([], []))
+
+    def test_unversioned_manifest_reports_a_source_hash_mismatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+            source = repo / "source.rs"
+            source.write_text("recorded source")
+            self._commit(repo, "source.rs")
+            commit = self._revision(repo)
+            manifest_path = repo / "evidence/manifest.json"
+            manifest_path.parent.mkdir()
+            manifest_path.write_text(json.dumps({
+                "source_commit": commit,
+                "source_sha256": {"source.rs": hashlib.sha256(b"different source").hexdigest()},
+                "source_commits": {"source.rs": commit},
+            }))
+
+            with mock.patch.object(VALIDATOR, "ROOT", repo):
+                errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+
+        self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
+
+    def test_unversioned_source_packet_checks_only_source_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+            source = repo / "source.rs"
+            source.write_text("recorded source")
+            self._commit(repo, "source.rs")
+            commit = self._revision(repo)
+            manifest_path = repo / "evidence/manifest.json"
+            manifest_path.parent.mkdir()
+            manifest_path.write_text(json.dumps({
+                "source_commit": commit,
+                "source_sha256": {"source.rs": hashlib.sha256(b"recorded source").hexdigest()},
+                "source_commits": {"source.rs": commit},
+                "log_sha256": {"absent.log": "bad"},
+            }))
+
+            with mock.patch.object(VALIDATOR, "ROOT", repo):
+                errors, warnings = VALIDATOR.validate_manifest(manifest_path, strict=True)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, [])
+
     def test_missing_or_malformed_manifest_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             missing = Path(directory) / "missing.json"
@@ -503,6 +553,32 @@ class EvidenceManifestTests(unittest.TestCase):
             result = VALIDATOR.main()
         self.assertEqual(result, 0)
         self.assertIn(str(path), output.getvalue())
+
+    def test_cli_counts_legacy_source_packets_separately_from_schema_v1(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence = root / "docs/evidence"
+            packet = evidence / "legacy/manifest.json"
+            packet.parent.mkdir(parents=True)
+            (root / "source.rs").write_text("recorded source")
+            packet.write_text(json.dumps({
+                "source_commit": "a" * 40,
+                "source_sha256": {"source.rs": hashlib.sha256(b"recorded source").hexdigest()},
+            }))
+            output = io.StringIO()
+            with (
+                mock.patch.object(VALIDATOR, "ROOT", root),
+                mock.patch.object(VALIDATOR, "EVIDENCE", evidence),
+                mock.patch.object(sys, "argv", ["validate-evidence"]),
+                contextlib.redirect_stdout(output),
+            ):
+                result = VALIDATOR.main()
+
+        self.assertEqual(result, 0)
+        self.assertIn(
+            "Validated 0 schema-v1 evidence manifests; checked source provenance in 1 legacy packets",
+            output.getvalue(),
+        )
 
 
 if __name__ == "__main__":
