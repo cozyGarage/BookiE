@@ -76,17 +76,11 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("/home/runner/.cargo/bin", cargo_path, name)
             self.assertIn("/home/ubuntu/.cargo/bin", cargo_path, name)
 
-    def test_ubuntu_canary_runs_only_headless_driver_tls_job(self):
+    def test_acceptance_jobs_use_only_the_isolated_pilot_pool(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        jobs = workflow.split("\njobs:\n", 1)[1]
-        headings = list(re.finditer(r"^  ([A-Za-z0-9_-]+):\s*$", jobs, re.MULTILINE))
-        canary_jobs = set()
-        for index, heading in enumerate(headings):
-            end = headings[index + 1].start() if index + 1 < len(headings) else len(jobs)
-            block = jobs[heading.start() : end]
-            if "runs-on: ubuntu2604-canary" in block:
-                canary_jobs.add(heading.group(1))
-        self.assertEqual(canary_jobs, {"driver-tls"})
+        labels = re.findall(r"^    runs-on: (.+)$", workflow, re.MULTILINE)
+        self.assertTrue(labels)
+        self.assertEqual(set(labels), {"ci-pilot"})
 
     def test_driver_tls_fixture_wait_is_bounded_with_failure_diagnostics(self):
         script = (ROOT / "scripts/test-driver-tls.sh").read_text()

@@ -29,7 +29,7 @@ env:
 
 jobs:
   guards:
-    runs-on: any-host
+    runs-on: ci-pilot
     timeout-minutes: 90
     steps:
       - name: Check out
@@ -59,7 +59,7 @@ jobs:
           cargo fmt --all -- --check
 
   gtk-build:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards]
     if: github.event_name != 'pull_request'
     timeout-minutes: 20
@@ -84,6 +84,8 @@ jobs:
       - name: Prepare artifact runtime
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Build the shared GTK binary
+        env:
+          CARGO_BUILD_JOBS: "4"
         run: |
           cd src
           cargo build --profile ci --locked -p tablepro-app --bin tablepro-app
@@ -97,7 +99,7 @@ jobs:
           retention-days: 2
 
   clippy:
-    runs-on: any-host
+    runs-on: ci-pilot
     timeout-minutes: 90
     steps:
       - name: Check out
@@ -119,7 +121,7 @@ jobs:
           cd src && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 
   unit:
-    runs-on: any-host
+    runs-on: ci-pilot
     timeout-minutes: 90
     steps:
       - name: Check out
@@ -145,7 +147,7 @@ jobs:
           "$NEXTEST" nextest run --workspace --exclude tablepro-driver-duckdb --lib --bins --profile ci --no-tests=fail
 
   sandbox:
-    runs-on: any-host
+    runs-on: ci-pilot
     timeout-minutes: 90
     steps:
       - name: Check out
@@ -170,7 +172,7 @@ jobs:
           cd src && bash scripts/test-sandbox.sh
 
   widgets:
-    runs-on: any-host
+    runs-on: ci-pilot
     timeout-minutes: 90
     steps:
       - name: Check out
@@ -192,7 +194,7 @@ jobs:
           cd src && bash scripts/test-gtk-widgets.sh
 
   distro-floor:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
@@ -254,7 +256,7 @@ jobs:
           fi
           cd src && package=$(cat "$GITHUB_WORKSPACE/floor-package-path") && PREVIOUS_DEB="$released" PREBUILT_DEB="$package" bash scripts/test-deb-package.sh ${{ matrix.base }}
   distro-floor-scenarios:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [distro-floor]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
@@ -304,7 +306,7 @@ jobs:
           cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-distro-floor.sh debian:testing
 
   driver:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -349,7 +351,7 @@ jobs:
           cargo test --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
 
   e2e:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -403,7 +405,7 @@ jobs:
           cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
 
   consumers:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -441,7 +443,7 @@ jobs:
           cd src && python3 scripts/run-isolated-tests.py app-server
 
   gtk:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
@@ -491,7 +493,7 @@ jobs:
           cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
 
   duckdb:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 90
@@ -524,7 +526,7 @@ jobs:
           cargo test --locked -p tablepro-driver-duckdb -- --include-ignored
           cargo build --locked -p tablepro-app --features duckdb
   pg-release:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -557,7 +559,7 @@ jobs:
           cd src && ./scripts/test-postgres-release.sh
 
   pg-dump:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
@@ -587,7 +589,7 @@ jobs:
         run: cd src && ./scripts/test-pg-dump.sh
 
   socket-ssh:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -620,7 +622,7 @@ jobs:
           bash ./scripts/test-ssh.sh
 
   gtk-server:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
@@ -675,7 +677,7 @@ jobs:
         run: |
           cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
   driver-tls:
-    runs-on: ubuntu2604-canary
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -708,7 +710,7 @@ jobs:
           cd src && ./scripts/test-driver-tls.sh
 
   keyring:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
@@ -734,7 +736,7 @@ jobs:
           cd src && ./scripts/test-secret-service.sh
 
   supply-chain:
-    runs-on: any-host
+    runs-on: ci-pilot
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
