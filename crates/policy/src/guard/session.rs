@@ -338,6 +338,52 @@ impl Session for PolicySession {
             .await
     }
 
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<String>, DriverError> {
+        check_pre_dispatch(control)?;
+        if self.cursor.is_some() {
+            return self
+                .refuse_policy(
+                    "SESSION COMPLETION COLUMNS",
+                    "query_cursor_active",
+                    "close the active query cursor before reading completion metadata",
+                )
+                .await;
+        }
+        if !self.is_usable() {
+            return self
+                .refuse_policy(
+                    "SESSION COMPLETION COLUMNS",
+                    "retired_session",
+                    "the session was retired after a connection fault and cannot read completion metadata",
+                )
+                .await;
+        }
+        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
+        let operation = self
+            .guard
+            .metadata_operation("SESSION COMPLETION COLUMNS", vec![target]);
+        self.guard.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .guard
+            .caught_read(
+                "SESSION COMPLETION COLUMNS",
+                self.inner.fetch_completion_columns_controlled(schema, table, control),
+            )
+            .await;
+        self.note_disconnect(&result);
+        let rows = result.as_ref().ok().map(|columns| columns.len() as u64);
+        self.guard
+            .audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
     fn is_usable(&self) -> bool {
         if self.retired.get() {
             return false;
@@ -614,7 +660,7 @@ impl PolicySession {
         result
     }
 
-    fn note_disconnect(&mut self, result: &Result<QueryResult, DriverError>) {
+    fn note_disconnect<T>(&mut self, result: &Result<T, DriverError>) {
         if matches!(result, Err(DriverError::Disconnected)) {
             self.retired.set(true);
         }
