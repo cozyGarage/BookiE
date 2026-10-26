@@ -6,6 +6,9 @@
   "source_sha256": {
     "crates/app/tests/support/sqlite_numeric_affinity.rs": "15ea3b2990f52786fb2474e6db41dac21414fefe86fa7dd72e82cde8d63b751d"
   },
+  "source_commits": {
+    "crates/app/tests/support/sqlite_numeric_affinity.rs": "2d114d4241777801ed27e2af6375e50dd4cb115b"
+  },
   "engine": "SQLite, in-memory NUMERIC affinity with CHECK(typeof(amount) != text)",
   "case": "A constraint-rejected nonnumeric grid edit leaves the original SQLite value unchanged",
   "test": "ui::browse_tab::value_parse::tests::sqlite_numeric_affinity::sqlite_numeric_affinity_grid_edit_respects_storage_class_constraints",
