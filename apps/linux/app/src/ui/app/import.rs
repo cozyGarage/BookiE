@@ -6,8 +6,8 @@ use relm4::gtk;
 use relm4::gtk::gio;
 use relm4::{ComponentController, ComponentSender};
 use tablepro_core::import::{
-    CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportTarget, InsertPlan, MAX_FILE_BYTES, PlanError, build_insert_plan,
-    detect_format, read_csv,
+    CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportError, ImportTarget, InsertPlan, MAX_FILE_BYTES, PlanError,
+    build_insert_plan, detect_format, read_csv, read_import_file,
 };
 use tablepro_core::sql_ddl::build_create_table;
 use tablepro_core::{ColumnInfo, Connection, DriverError, OperationControl};
@@ -589,14 +589,11 @@ fn suggested_table_name(path: &std::path::Path) -> String {
 }
 
 fn read_file(path: &std::path::Path) -> Result<Vec<u8>, String> {
-    let size = std::fs::metadata(path)
-        .map_err(|_| crate::tr!("The file could not be opened."))?
-        .len();
-    if size > MAX_FILE_BYTES {
-        return Err(crate::tr!("The file is larger than the {limit} MB import limit.")
-            .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string()));
-    }
-    let bytes = std::fs::read(path).map_err(|_| crate::tr!("The file could not be read."))?;
+    let bytes = read_import_file(path).map_err(|error| match error {
+        ImportError::FileTooLarge { .. } => crate::tr!("The file is larger than the {limit} MB import limit.")
+            .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string()),
+        _ => crate::tr!("The file could not be read."),
+    })?;
     if tablepro_core::import::is_xlsx(&bytes) {
         return tablepro_core::import::xlsx_to_csv(&bytes).map_err(|error| error.to_string());
     }
