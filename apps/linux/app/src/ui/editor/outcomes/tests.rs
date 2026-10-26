@@ -480,7 +480,9 @@ fn cursor_target(
     };
     StatementTarget::Session {
         id: uuid::Uuid::new_v4(),
-        shared: std::sync::Arc::new(tokio::sync::Mutex::new(Some(Box::new(session)))),
+        shared: std::sync::Arc::new(tokio::sync::Mutex::new(Some(
+            super::super::session_mode::SessionHandle::plain(Box::new(session)),
+        ))),
     }
 }
 
@@ -1134,3 +1136,6 @@ mod streamed_progress;
 
 #[path = "tests/export_partial_view.rs"]
 mod export_partial_view;
+
+#[path = "tests/audit_receipts.rs"]
+mod audit_receipts;

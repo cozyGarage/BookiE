@@ -35,6 +35,11 @@ async fn value_contract_postgres_csv_import_preserves_explicit_identity_values()
     let plan = build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities {
+                supports_explicit_auto_increment_values: true,
+                ..tablepro_core::DriverCapabilities::default()
+            },
             schema: None,
             table: "csv_identity",
             columns: &columns,

@@ -1,6 +1,4 @@
 use super::*;
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 #[test]
@@ -139,74 +137,51 @@ fn schema_requests_are_accepted_only_by_their_generation() {
 }
 
 #[test]
-fn a_shared_completion_fetch_survives_one_editor_closing_and_cancels_with_its_owner() {
-    let window = Rc::new(RefCell::new(completion_index()));
-    let requesting_editor = window.clone();
-    let remaining_editor = window.clone();
-    let request = request_one(&mut requesting_editor.borrow_mut());
-    let token = window.borrow().column_request_token();
+fn editor_completion_snapshots_keep_columns_and_requests_private() {
+    let connection: Arc<dyn tablepro_core::Connection> = Arc::new(IdentityConnection::ready());
+    let identity = crate::connection_identity::ConnectionIdentity::from_connection(&connection);
+    let mut catalog = completion_index();
+    catalog.sync_connection(&identity);
+    catalog.set_tables(vec!["public.users".into()]);
+    let mut first = catalog.editor_snapshot();
+    let mut second = catalog.editor_snapshot();
+    let first_request = request_one(&mut first);
+    let second_request = request_one(&mut second);
+    let first_token = first.column_request_token();
+    let second_token = second.column_request_token();
 
-    drop(requesting_editor);
+    assert!(first.complete_column_request(&first_request, Ok(vec!["first_only".into()])));
+    assert!(second.complete_column_request(&second_request, Ok(vec!["second_only".into()])));
 
-    assert!(!token.is_cancelled());
-    assert!(
-        remaining_editor
-            .borrow_mut()
-            .request_missing_columns(vec!["public.users".into()])
-            .is_empty()
-    );
-    assert!(
-        remaining_editor
-            .borrow_mut()
-            .complete_column_request(&request, Ok(vec!["id".into()]))
-    );
-    assert_eq!(
-        remaining_editor.borrow().columns_for("public.users"),
-        Some(&vec!["id".into()])
-    );
-    drop(remaining_editor);
-    assert!(!token.is_cancelled());
+    assert_eq!(first.columns_for("public.users"), Some(&vec!["first_only".into()]));
+    assert_eq!(second.columns_for("public.users"), Some(&vec!["second_only".into()]));
+    assert!(first.belongs_to_connection(&identity));
+    assert!(second.belongs_to_connection(&identity));
+    assert!(!first_token.is_cancelled());
+    assert!(!second_token.is_cancelled());
 
-    drop(window);
+    drop(first);
 
-    assert!(token.is_cancelled());
+    assert!(first_token.is_cancelled());
+    assert!(!second_token.is_cancelled());
+    assert_eq!(second.columns_for("public.users"), Some(&vec!["second_only".into()]));
 }
 
-#[tokio::test]
-async fn a_pending_shared_fetch_survives_the_requesting_editor_closing() {
-    let (started, started_rx) = tokio::sync::oneshot::channel();
-    let (release, release_rx) = tokio::sync::oneshot::channel();
-    let connection: Arc<dyn tablepro_core::Connection> = Arc::new(IdentityConnection::held(started, release_rx));
-    let identity = crate::connection_identity::ConnectionIdentity::from_connection(&connection);
-    let mut index = completion_index();
-    index.sync_connection(&identity);
-    index.set_tables(vec!["public.users".into()]);
-    let shared = Rc::new(RefCell::new(index));
-    let requesting_editor = shared.clone();
-    let remaining_editor = shared.clone();
-    let request = request_one(&mut requesting_editor.borrow_mut());
-    let token = shared.borrow().column_request_token();
-    let fetch = tokio::spawn(fetch_column_names(
-        connection.clone(),
-        request,
-        Some(SqlGrammar::PostgreSql),
-        0,
-        token.clone(),
-    ));
+#[test]
+fn refreshing_one_editor_retires_only_its_stale_completion_request() {
+    let catalog = completion_index();
+    let mut first = catalog.editor_snapshot();
+    let mut second = catalog.editor_snapshot();
+    let stale = request_one(&mut first);
+    let first_token = first.column_request_token();
+    let second_token = second.column_request_token();
 
-    assert!(started_rx.await.is_ok());
-    drop(requesting_editor);
-    assert!(!token.is_cancelled());
-    assert!(release.send(()).is_ok());
-    let Ok((request, columns)) = fetch.await else {
-        panic!("the shared completion read task failed");
-    };
-    assert!(
-        remaining_editor
-            .borrow_mut()
-            .complete_column_request_for_connection(&identity, &request, columns)
-    );
-    assert!(remaining_editor.borrow().knows_columns("public.users"));
+    first.refresh_editor_catalog(catalog.editor_snapshot());
+
+    assert!(first_token.is_cancelled());
+    assert!(!second_token.is_cancelled());
+    assert!(!first.complete_column_request(&stale, Ok(vec!["stale".into()])));
+    assert_eq!(second.request_missing_columns(vec!["public.users".into()]).len(), 1);
 }
 
 #[tokio::test]
@@ -231,6 +206,111 @@ async fn completion_column_reads_obey_the_configured_timeout() {
     };
     assert_eq!(result, Err(()));
     assert!(release.send(()).is_err());
+}
+
+#[tokio::test]
+async fn session_completion_fetch_preserves_the_qualified_relation_identity() {
+    let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let session: Arc<tokio::sync::Mutex<Option<Box<dyn tablepro_core::Session>>>> =
+        Arc::new(tokio::sync::Mutex::new(Some(Box::new(CompletionSession {
+            calls: calls.clone(),
+        }))));
+    let request = SchemaRequest {
+        generation: 4,
+        table: r#""odd.schema"."a.b""#.into(),
+    };
+
+    let (returned, columns) = fetch_session_column_names(
+        session.clone(),
+        request,
+        Some(SqlGrammar::PostgreSql),
+        0,
+        CancellationToken::new(),
+    )
+    .await;
+
+    assert_eq!(returned.generation, 4);
+    assert_eq!(columns, Ok(vec!["id".into()]));
+    assert_eq!(
+        *calls.lock().expect("completion calls"),
+        vec![(Some("odd.schema".into()), "a.b".into())]
+    );
+}
+
+#[tokio::test]
+async fn session_completion_fetch_reports_a_closed_editor_session() {
+    let session: Arc<tokio::sync::Mutex<Option<Box<dyn tablepro_core::Session>>>> =
+        Arc::new(tokio::sync::Mutex::new(None));
+    let (request, columns) = fetch_session_column_names(
+        session,
+        SchemaRequest {
+            generation: 0,
+            table: "users".into(),
+        },
+        Some(SqlGrammar::PostgreSql),
+        0,
+        CancellationToken::new(),
+    )
+    .await;
+
+    assert_eq!(request.table, "users");
+    assert_eq!(columns, Err(()));
+}
+
+#[tokio::test]
+async fn session_completion_fetch_cancels_while_waiting_for_the_session_lock() {
+    let session: Arc<tokio::sync::Mutex<Option<Box<dyn tablepro_core::Session>>>> =
+        Arc::new(tokio::sync::Mutex::new(Some(Box::new(CompletionSession {
+            calls: Arc::new(std::sync::Mutex::new(Vec::new())),
+        }))));
+    let _guard = session.lock().await;
+    let cancellation = CancellationToken::new();
+    let cancel = cancellation.clone();
+    let fetch = tokio::spawn(fetch_session_column_names(
+        session.clone(),
+        SchemaRequest {
+            generation: 1,
+            table: "public.users".into(),
+        },
+        Some(SqlGrammar::PostgreSql),
+        0,
+        cancellation,
+    ));
+    tokio::task::yield_now().await;
+    cancel.cancel();
+
+    let Ok(Ok((_, columns))) = tokio::time::timeout(Duration::from_secs(1), fetch).await else {
+        panic!("session completion did not stop after cancellation");
+    };
+    assert_eq!(columns, Err(()));
+}
+
+#[tokio::test]
+async fn session_completion_fetch_times_out_while_waiting_for_the_session_lock() {
+    let session: Arc<tokio::sync::Mutex<Option<Box<dyn tablepro_core::Session>>>> =
+        Arc::new(tokio::sync::Mutex::new(Some(Box::new(CompletionSession {
+            calls: Arc::new(std::sync::Mutex::new(Vec::new())),
+        }))));
+    let _guard = session.lock().await;
+
+    let Ok((_, columns)) = tokio::time::timeout(
+        Duration::from_secs(2),
+        fetch_session_column_names(
+            session.clone(),
+            SchemaRequest {
+                generation: 2,
+                table: "public.users".into(),
+            },
+            Some(SqlGrammar::PostgreSql),
+            1,
+            CancellationToken::new(),
+        ),
+    )
+    .await
+    else {
+        panic!("session completion did not stop at its deadline");
+    };
+    assert_eq!(columns, Err(()));
 }
 
 #[test]
@@ -296,7 +376,11 @@ fn connection_replacement_cancels_old_fetches_and_rejects_late_results() {
     let request = request_one(&mut index);
     let token = index.column_request_token();
     let old_generation = request.generation;
+    index.set_columns("public.users", vec!["cached".into()]);
     assert!(!index.sync_connection(&first_identity));
+    assert!(!token.is_cancelled());
+    assert_eq!(index.request(String::new()).generation, old_generation);
+    assert_eq!(index.columns_for("public.users"), Some(&vec!["cached".into()]));
 
     assert!(!index.complete_column_request_for_connection(&replacement_identity, &request, Err(())));
 
@@ -329,6 +413,45 @@ fn request_one(index: &mut SchemaIndex) -> SchemaRequest {
 struct IdentityConnection {
     started: tokio::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     release: tokio::sync::Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
+}
+
+type CompletionCalls = Arc<std::sync::Mutex<Vec<(Option<String>, String)>>>;
+
+struct CompletionSession {
+    calls: CompletionCalls,
+}
+
+#[async_trait::async_trait]
+impl tablepro_core::Session for CompletionSession {
+    async fn query_params_controlled(
+        &mut self,
+        _sql: &str,
+        _params: &[tablepro_core::Value],
+        _control: &tablepro_core::OperationControl,
+    ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
+        Err(tablepro_core::DriverError::Unsupported("query is unused".into()))
+    }
+
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        schema: Option<&str>,
+        table: &str,
+        _control: &tablepro_core::OperationControl,
+    ) -> Result<Vec<String>, tablepro_core::DriverError> {
+        self.calls
+            .lock()
+            .expect("completion calls")
+            .push((schema.map(str::to_string), table.to_string()));
+        Ok(vec!["id".into()])
+    }
+
+    fn is_usable(&self) -> bool {
+        true
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), tablepro_core::DriverError> {
+        Ok(())
+    }
 }
 
 impl IdentityConnection {
@@ -441,6 +564,23 @@ fn a_table_name_qualifier_resolves_without_an_alias() {
     let words = candidates("SELECT users.| FROM public.users");
     assert!(words.contains(&"email".to_string()));
     assert!(!words.contains(&"total".to_string()));
+}
+
+#[test]
+fn a_bare_qualifier_in_where_resolves_columns_after_session_lookup() {
+    let mut index = SchemaIndex {
+        grammar: Some(SqlGrammar::PostgreSql),
+        ..SchemaIndex::default()
+    };
+    index.set_tables(vec![
+        "bookie_completion_a.bookie_completion_target".into(),
+        "bookie_completion_b.bookie_completion_target".into(),
+        "bookie_completion_c.bookie_completion_target".into(),
+    ]);
+    index.set_columns("bookie_completion_target", vec!["alpha_only".into()]);
+    let sql = "SELECT * FROM bookie_completion_target WHERE bookie_completion_target.";
+
+    assert_eq!(candidate_words(sql, sql.len(), &index), vec!["alpha_only"]);
 }
 
 #[test]

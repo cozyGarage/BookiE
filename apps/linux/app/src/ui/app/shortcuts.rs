@@ -93,6 +93,8 @@ pub(super) fn install_window_actions(
         input_action!("back-up-database", AppMsg::BackUpDatabase),
         input_action!("restore-database", AppMsg::RestoreDatabase),
     ]);
+    let show_audit_for = show_audit_operation_action(sender.clone());
+    group.add_action(&show_audit_for);
     let disconnect_action = gio::SimpleAction::new("disconnect", None);
     let disconnect_sender = sender.clone();
     disconnect_action.connect_activate(move |_, _| disconnect_sender.input(AppMsg::Disconnect));
@@ -101,6 +103,20 @@ pub(super) fn install_window_actions(
     disconnect_action.set_enabled(false);
     tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");
     disconnect_action
+}
+
+fn show_audit_operation_action(sender: ComponentSender<App>) -> gio::SimpleAction {
+    let action = gio::SimpleAction::new("show-audit-for", Some(&String::static_variant_type()));
+    action.connect_activate(move |_, parameter| {
+        let Some(operation_id) = parameter
+            .and_then(|parameter| parameter.str())
+            .and_then(|value| uuid::Uuid::parse_str(value).ok())
+        else {
+            return;
+        };
+        sender.input(AppMsg::ShowAuditOperation(operation_id));
+    });
+    action
 }
 
 pub(super) const WINDOW_SHORTCUTS: &[(&str, &str)] = &[

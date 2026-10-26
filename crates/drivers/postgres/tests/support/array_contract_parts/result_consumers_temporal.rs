@@ -269,6 +269,8 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_n
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "timestamptz_array_csv_import_target",
             columns: &columns,
@@ -768,6 +770,8 @@ async fn value_contract_pg_lsn_array_result_bind_keyed_edit_and_csv_are_exact() 
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "pg_lsn_csv_target",
             columns: &columns,

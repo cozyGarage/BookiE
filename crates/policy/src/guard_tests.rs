@@ -632,6 +632,8 @@ mod gating;
 mod guard_tests_passthrough;
 #[path = "guard_tests_masking.rs"]
 mod masking;
+#[path = "guard_tests_operation_receipt.rs"]
+mod operation_receipt;
 #[path = "guard_tests_outcomes.rs"]
 mod outcomes;
 #[path = "guard_tests_session.rs"]

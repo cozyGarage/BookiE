@@ -5,7 +5,7 @@ use std::{
 };
 
 use tablepro_core::sql_syntax::script::LexicalSettings;
-use tablepro_core::{Connection, OperationControl, sql_syntax::SqlGrammar};
+use tablepro_core::{Connection, OperationControl, Session, sql_syntax::SqlGrammar};
 use tokio_util::sync::CancellationToken;
 
 use super::completion_identifiers::{bare_reference, split_table_reference, table_key, words};
@@ -70,6 +70,23 @@ pub struct SchemaRequest {
 }
 
 impl SchemaIndex {
+    pub fn editor_snapshot(&self) -> Self {
+        let mut snapshot = Self {
+            grammar: self.grammar,
+            connection: self.connection.clone(),
+            ..Self::default()
+        };
+        snapshot.set_tables(self.tables.clone());
+        snapshot
+    }
+
+    pub fn refresh_editor_catalog(&mut self, snapshot: Self) {
+        self.grammar = snapshot.grammar;
+        self.connection = snapshot.connection;
+        self.set_tables(snapshot.tables);
+        self.invalidate_columns();
+    }
+
     pub fn set_tables(&mut self, tables: Vec<String>) {
         self.table_keys.clear();
         self.table_grammar = self.grammar;
@@ -110,6 +127,10 @@ impl SchemaIndex {
         self.columns.clear();
         self.retire_column_requests();
         true
+    }
+
+    pub fn belongs_to_connection(&self, connection: &crate::connection_identity::ConnectionIdentity) -> bool {
+        self.connection.as_ref() == Some(connection)
     }
 
     pub fn request(&self, table: String) -> SchemaRequest {
@@ -233,6 +254,44 @@ pub async fn fetch_column_names(
         .map(|columns| columns.into_iter().map(|column| column.name).collect())
         .map_err(|_| ());
     (request, columns)
+}
+
+pub async fn fetch_session_column_names(
+    session: Arc<tokio::sync::Mutex<Option<Box<dyn Session>>>>,
+    request: SchemaRequest,
+    grammar: Option<SqlGrammar>,
+    timeout_secs: u32,
+    cancellation: CancellationToken,
+) -> (SchemaRequest, Result<Vec<String>, ()>) {
+    let Some((schema, table)) = split_table_reference(&request.table, grammar) else {
+        return (request, Err(()));
+    };
+    let deadline =
+        (timeout_secs > 0).then(|| tokio::time::Instant::now() + Duration::from_secs(u64::from(timeout_secs)));
+    let control = OperationControl::new(cancellation, deadline);
+    let deadline = control.deadline();
+    let columns = tokio::select! {
+        _ = control.cancellation_token().cancelled() => Err(()),
+        _ = wait_for_deadline(deadline) => Err(()),
+        columns = async {
+            let mut session = session.lock().await;
+            match session.as_mut() {
+                Some(session) => session
+                    .fetch_completion_columns_controlled(schema.as_deref(), &table, &control)
+                    .await
+                    .map_err(|_| ()),
+                None => Err(()),
+            }
+        } => columns,
+    };
+    (request, columns)
+}
+
+async fn wait_for_deadline(deadline: Option<tokio::time::Instant>) {
+    match deadline {
+        Some(deadline) => tokio::time::sleep_until(deadline).await,
+        None => std::future::pending().await,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -10,7 +10,7 @@ use tablepro_core::import::{
     build_insert_plan, detect_format, read_csv, read_import_file,
 };
 use tablepro_core::sql_ddl::build_create_table;
-use tablepro_core::{ColumnInfo, Connection, DriverError, OperationControl};
+use tablepro_core::{ColumnInfo, Connection, DriverCapabilities, DriverError, OperationControl};
 use tablepro_policy::{BulkBatch, BulkInsertEnd, BulkInsertRequest, PolicyGuard};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -36,6 +36,7 @@ pub struct CsvImportPreparation {
     pub format: CsvFormat,
     pub columns: Vec<ColumnInfo>,
     pub driver_id: String,
+    pub capabilities: DriverCapabilities,
 }
 
 /// How an import ended, as the GTK thread hears it.
@@ -137,6 +138,13 @@ impl App {
         let (Some(connection_id), Some(driver_id)) = (self.connection_id, self.current_driver_id.clone()) else {
             return;
         };
+        let Some(capabilities) = self.registry.get(&driver_id).map(|driver| driver.capabilities()) else {
+            self.show_error_alert(
+                &crate::tr!("Can't import"),
+                &crate::tr!("This connection type is not available in this build."),
+            );
+            return;
+        };
         let Some(conn) = self.database.get(connection_id) else {
             return;
         };
@@ -160,6 +168,7 @@ impl App {
                             table,
                             path,
                             driver_id,
+                            capabilities,
                             connection_id,
                             database,
                         },
@@ -192,17 +201,19 @@ impl App {
             connection_id: preparation.connection_id,
             database: preparation.database.clone(),
             driver_id: preparation.driver_id.clone(),
+            capabilities: preparation.capabilities,
             schema: preparation.schema.clone(),
             table: table.clone(),
         });
         let mode = match preparation.table {
             Some(table) => ImportMode::ExistingTable {
-                driver_id: preparation.driver_id.clone(),
+                capabilities: preparation.capabilities,
                 table,
                 columns: preparation.columns,
             },
             None => ImportMode::NewTable {
                 driver_id: preparation.driver_id,
+                capabilities: preparation.capabilities,
                 suggested_table: suggested_table_name(&preparation.path),
             },
         };
@@ -515,6 +526,7 @@ struct Prepare {
     table: Option<String>,
     path: PathBuf,
     driver_id: String,
+    capabilities: DriverCapabilities,
     connection_id: uuid::Uuid,
     database: String,
 }
@@ -540,6 +552,7 @@ async fn prepare_import(
         format,
         columns,
         driver_id: prepare.driver_id,
+        capabilities: prepare.capabilities,
     })
 }
 
@@ -604,6 +617,7 @@ fn plan_for(driver_id: &str, choice: &ImportChoice) -> Result<InsertPlan, String
     let sheet = read_csv(&choice.bytes, &choice.options, None).map_err(|error| error.to_string())?;
     let target = ImportTarget {
         driver_id,
+        capabilities: choice.capabilities,
         schema: choice.schema.as_deref(),
         table: &choice.table,
         columns: &choice.columns,
@@ -673,6 +687,7 @@ mod tests {
             options: CsvImportOptions::default(),
             mapping: Vec::new(),
             columns: Vec::new(),
+            capabilities: tablepro_core::DriverCapabilities::default(),
             create,
         }
     }
@@ -714,7 +729,11 @@ mod tests {
         let bytes = b"id,name\n51,Ada\n52,Grace\n".to_vec();
         let options = CsvImportOptions::default();
         let sheet = read_csv(&bytes, &options, None).expect("read CSV");
-        let mapping = crate::ui::import_dialog::suggested_existing_mapping("sqlite", &sheet.headers, &columns);
+        let capabilities = tablepro_core::DriverCapabilities {
+            supports_explicit_auto_increment_values: true,
+            ..tablepro_core::DriverCapabilities::default()
+        };
+        let mapping = crate::ui::import_dialog::suggested_existing_mapping(capabilities, &sheet.headers, &columns);
         assert_eq!(mapping, [Some(0), Some(1)]);
         let choice = ImportChoice {
             schema: None,
@@ -723,6 +742,7 @@ mod tests {
             options,
             mapping,
             columns,
+            capabilities,
             create: None,
         };
         let plan = plan_for("sqlite", &choice).expect("build import plan");

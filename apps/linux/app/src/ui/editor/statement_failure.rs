@@ -8,6 +8,7 @@ use super::error_navigation::ErrorTarget;
 #[derive(Clone, Debug)]
 pub struct StatementFailure {
     message: String,
+    audit_operation_ids: Vec<uuid::Uuid>,
     pub(super) position: Option<usize>,
     pub(super) target: Option<ErrorTarget>,
 }
@@ -23,9 +24,22 @@ impl StatementFailure {
         let message = crate::services::error_text::driver_message(error);
         Self {
             message: super::error_location::located_message(&message, written, position),
+            audit_operation_ids: Vec::new(),
             position,
             target: None,
         }
+    }
+
+    pub(super) fn with_audit_receipts(
+        mut self,
+        receipts: impl IntoIterator<Item = tablepro_policy::AuditReceipt>,
+    ) -> Self {
+        self.audit_operation_ids = receipts.into_iter().map(|receipt| receipt.operation_id).collect();
+        self
+    }
+
+    pub(super) fn audit_operation_ids(&self) -> &[uuid::Uuid] {
+        &self.audit_operation_ids
     }
 
     pub(super) fn navigation_button(&self) -> Option<gtk::Button> {
@@ -45,6 +59,7 @@ impl From<String> for StatementFailure {
     fn from(message: String) -> Self {
         Self {
             message,
+            audit_operation_ids: Vec::new(),
             position: None,
             target: None,
         }

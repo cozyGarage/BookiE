@@ -67,6 +67,15 @@ pub trait Session: Send {
         Ok(None)
     }
 
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        _schema: Option<&str>,
+        _table: &str,
+        _control: &OperationControl,
+    ) -> Result<Vec<String>, DriverError> {
+        Err(DriverError::Unsupported("session-scoped completion metadata".into()))
+    }
+
     fn is_usable(&self) -> bool;
 
     fn transaction_open(&self) -> bool {
@@ -135,6 +144,19 @@ mod tests {
         let result = session
             .close_query_cursor_controlled(
                 QueryCursorId::new(),
+                &OperationControl::with_timeout(std::time::Duration::from_secs(1)),
+            )
+            .await;
+        assert!(matches!(result, Err(DriverError::Unsupported(_))), "{result:?}");
+    }
+
+    #[tokio::test]
+    async fn a_session_without_completion_metadata_returns_a_typed_unsupported_error() {
+        let mut session = SessionWithoutCursor;
+        let result = session
+            .fetch_completion_columns_controlled(
+                None,
+                "items",
                 &OperationControl::with_timeout(std::time::Duration::from_secs(1)),
             )
             .await;

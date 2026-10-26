@@ -756,6 +756,8 @@ async fn assert_float8_array_csv_round_trip(
     let insert_plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "float8_array_csv_import",
             columns: &import_columns,
@@ -925,6 +927,8 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "array_csv_target",
             columns: &columns,

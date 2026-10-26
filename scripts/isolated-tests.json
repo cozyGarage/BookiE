@@ -785,7 +785,17 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::editor::outcomes::tests::error_view_tests::a_failed_statement_offers_a_copy_button"
+      "ui::editor::outcomes::tests::error_view_tests::a_failure_without_a_receipt_does_not_offer_audit_navigation"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::outcomes::tests::error_view_tests::a_failure_action_targets_its_exact_audit_operation"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::outcomes::tests::error_view_tests::a_refused_statement_keeps_its_recorded_audit_action"
     ],
     [
       "tablepro-app",

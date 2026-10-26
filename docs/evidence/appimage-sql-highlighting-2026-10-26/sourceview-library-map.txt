@@ -1,0 +1,6 @@
+7f41e8600000-7f41e862b000 r--p 00000000 00:37 3410873                    /tmp/bookie-appimage-1325/fixed2-squashfs-root/usr/lib/libgtksourceview-5.so.0
+7f41e862b000-7f41e86c8000 r-xp 0002b000 00:37 3410873                    /tmp/bookie-appimage-1325/fixed2-squashfs-root/usr/lib/libgtksourceview-5.so.0
+7f41e86c8000-7f41e88fe000 r--p 000c8000 00:37 3410873                    /tmp/bookie-appimage-1325/fixed2-squashfs-root/usr/lib/libgtksourceview-5.so.0
+7f41e88fe000-7f41e8903000 r--p 002fe000 00:37 3410873                    /tmp/bookie-appimage-1325/fixed2-squashfs-root/usr/lib/libgtksourceview-5.so.0
+7f41e8903000-7f41e8904000 rw-p 00303000 00:37 3410873                    /tmp/bookie-appimage-1325/fixed2-squashfs-root/usr/lib/libgtksourceview-5.so.0
+7f41e8905000-7f41e8917000 rw-p 00304000 00:37 3410873                    /tmp/bookie-appimage-1325/fixed2-squashfs-root/usr/lib/libgtksourceview-5.so.0

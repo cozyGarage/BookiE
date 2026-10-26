@@ -51,6 +51,25 @@ fn page(values: &[i64]) -> Arc<QueryResult> {
     })
 }
 
+fn wide_streamed(sql: &str, byte: u8) -> (StatementOutcome, std::sync::Weak<QueryResult>) {
+    let mut result = page(&[]).as_ref().clone();
+    result.rows = vec![vec![Value::Bytes(vec![byte; 8 * 1024 * 1024])]];
+    let result = Arc::new(result);
+    let weak = Arc::downgrade(&result);
+    let mut cache = super::super::stream_pages::StreamPageCache::default();
+    cache.append(0, result.clone()).expect("append wide page");
+    let snapshot = cache.snapshot(super::super::stream_pages::StreamTerminal::Complete, None);
+    drop(cache);
+    drop(result);
+    (
+        StatementOutcome {
+            kind: StatementOutcomeKind::Streamed(Box::new(snapshot)),
+            ..rows(sql)
+        },
+        weak,
+    )
+}
+
 #[test]
 fn nothing_is_pinned_until_asked() {
     let mut pins = PinnedResults::default();
@@ -227,6 +246,48 @@ fn evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest() {
     pins.show(vec![rows("SELECT after")]);
 
     assert!(pages.iter().all(|page| page.upgrade().is_none()));
+}
+
+#[test]
+fn closing_one_of_two_editors_releases_only_its_pinned_and_active_stream_pages() {
+    let mut editors = Vec::new();
+    let mut page_owners = Vec::new();
+    for index in 0..2 {
+        let mut editor = PinnedResults::default();
+        let (pinned, pinned_page) = wide_streamed(&format!("SELECT pinned_{index}"), index);
+        editor.show(vec![pinned]);
+        assert_eq!(editor.pin_last(), 1);
+
+        let (active, active_page) = wide_streamed(&format!("SELECT active_{index}"), index + 2);
+        let shown = editor.show(vec![active]);
+        drop(shown);
+
+        page_owners.push((pinned_page, active_page));
+        editors.push(editor);
+    }
+
+    assert!(
+        page_owners
+            .iter()
+            .flat_map(|(pinned, active)| [pinned, active])
+            .all(|page| page.upgrade().is_some())
+    );
+
+    drop(editors.remove(0));
+
+    assert!(page_owners[0].0.upgrade().is_none());
+    assert!(page_owners[0].1.upgrade().is_none());
+    assert!(page_owners[1].0.upgrade().is_some());
+    assert!(page_owners[1].1.upgrade().is_some());
+
+    drop(editors);
+
+    assert!(
+        page_owners
+            .iter()
+            .flat_map(|(pinned, active)| [pinned, active])
+            .all(|page| page.upgrade().is_none())
+    );
 }
 
 #[test]

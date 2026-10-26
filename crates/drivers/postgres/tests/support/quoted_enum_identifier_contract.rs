@@ -405,6 +405,8 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some(schema),
             table: "import rows",
             columns: &import_columns,
