@@ -39,6 +39,37 @@ async fn a_bare_table_name_resolves_through_the_whole_search_path() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn bare_metadata_lookup_uses_the_implicitly_visible_catalog_relation() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    connection
+        .execute("CREATE TABLE public.catalog_reference (id integer PRIMARY KEY)")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE public.pg_class (shadow_column integer REFERENCES public.catalog_reference (id))")
+        .await
+        .unwrap();
+
+    let bare_columns = connection.fetch_columns(None, "pg_class").await.unwrap();
+    let bare_indexes = connection.fetch_indexes(None, "pg_class").await.unwrap();
+    let bare_foreign_keys = connection.fetch_foreign_keys(None, "pg_class").await.unwrap();
+    let qualified_columns = connection.fetch_columns(Some("public"), "pg_class").await.unwrap();
+    let qualified_indexes = connection.fetch_indexes(Some("public"), "pg_class").await.unwrap();
+    let qualified_foreign_keys = connection.fetch_foreign_keys(Some("public"), "pg_class").await.unwrap();
+
+    assert!(bare_columns.iter().any(|column| column.name == "relname"));
+    assert!(!bare_columns.iter().any(|column| column.name == "shadow_column"));
+    assert!(!bare_indexes.is_empty());
+    assert!(bare_foreign_keys.is_empty());
+    assert_eq!(qualified_columns.len(), 1);
+    assert_eq!(qualified_columns[0].name, "shadow_column");
+    assert!(qualified_indexes.is_empty());
+    assert_eq!(qualified_foreign_keys.len(), 1);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_column_collation_is_read_and_survives_a_type_change() {
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;
