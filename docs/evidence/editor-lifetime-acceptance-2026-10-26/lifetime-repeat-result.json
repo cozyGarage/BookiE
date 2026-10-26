@@ -1,0 +1,15 @@
+{
+  "tests": 3,
+  "repetitions_each": 3,
+  "passed": 9,
+  "isolation": "one exact test per process",
+  "fatal_criticals": true,
+  "discarded_attempt": "broad selector ran unrelated GTK tests together; invalid isolation",
+  "source_commit": "ab238b4acdacbcec941d11c82d7460c518685f45",
+  "test_executable_sha256": "ed9cf40914850e1eba017de3c7de5772f7b9c61a044d138dc2a5e7065c93a0fe",
+  "exact_tests": [
+    "ui::editor::dispatch_tests::dropping_an_editor_releases_its_source_view_and_buffer",
+    "ui::editor::dispatch_tests::closing_an_editor_releases_its_large_buffer_even_when_its_views_are_retained",
+    "ui::editor::dispatch_tests::closing_a_vim_editor_releases_both_views_and_its_buffer"
+  ]
+}

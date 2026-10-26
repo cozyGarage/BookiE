@@ -37,3 +37,9 @@ Five additional [installed-app scenarios](input-boundary-acceptance.json) passed
 ## Configured light preference
 
 Three [configured-light scenarios](light-acceptance.json) passed on the same binary: malformed SQL is blocked before approval, dismissing approval leaves the database unchanged, and closing a clean editor preserves the other tab. The [wrapper](light-acceptance.py) seeds the light preference in the isolated profile before invoking the existing scenarios. No screenshot or live style-manager observation was captured, so these are interaction assertions under a configured preference, not visual contrast acceptance.
+
+## Repeated lifetime regressions
+
+The ordinary editor lifetime, retained-view buffer release and Vim editor lifetime regressions each passed three times, with one exact test in each fresh process and fatal GTK criticals enabled. The [record](lifetime-repeat-result.json) identifies the source, executable hash and nine results. These repetitions test object release, not process RSS.
+
+An initial broad selector mistakenly ran unrelated GTK tests together and failed; it did not satisfy the suite's process-isolation contract and was discarded. The successful runs use the same isolation rule as `scripts/test-gtk-widgets.sh`: one ignored test per process. They do not establish that arbitrary GTK tests can share a process.
