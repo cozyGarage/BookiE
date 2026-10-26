@@ -76,7 +76,7 @@ def _build_deb(profile: str | None) -> tuple[subprocess.CompletedProcess, Path]:
     env["DEB_VERSION"] = "0.0.0-1"
     checkout = _deb_checkout(root)
     result = subprocess.run(
-        ["bash", str(checkout / "scripts/build-deb.sh")], env=env, capture_output=True, text=True
+        ["bash", str(checkout / "scripts/build-deb.sh")], env=env, capture_output=True, text=True, umask=0o077
     )
     return result, root
 
@@ -111,6 +111,14 @@ def _cargo_calls(root: Path) -> list[str]:
 
 
 class PackageBuildProfileTests(unittest.TestCase):
+    def test_debian_control_files_remain_readable_with_a_private_umask(self) -> None:
+        result, root = _build_deb(None)
+        self.addCleanup(shutil.rmtree, root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        control = root / "out/bookie_0.0.0-1_amd64/DEBIAN"
+        self.assertEqual(stat.S_IMODE(control.stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE((control / "control").stat().st_mode), 0o644)
+
     def test_published_packages_build_with_the_distribution_profile(self) -> None:
         deb, deb_root = _build_deb(None)
         self.addCleanup(shutil.rmtree, deb_root)
