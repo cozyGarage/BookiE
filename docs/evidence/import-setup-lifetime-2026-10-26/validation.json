@@ -48,5 +48,16 @@
     "executed": 177,
     "result": "passed",
     "input_method": "ordinary suite environment"
+  },
+  "installed_security": {
+    "scenarios": [
+      "overlong_pasted_sql_is_refused_without_replacing_the_editor",
+      "audit_failure_denies",
+      "audit_journal_loss_after_connection_denies_mutation",
+      "bundle_export_records_sanitized_audit_outcome",
+      "bundle_import_records_sanitized_audit_outcome"
+    ],
+    "result": "5 passed",
+    "binary_sha256": "1106e73b581b2f4323a975243b5f0a8f0b78312859b434facd172da7c924e73a"
   }
 }
