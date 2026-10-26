@@ -105,6 +105,17 @@ impl TokenStore {
         Ok(token)
     }
 
+    pub(crate) fn has_live_candidate(&self, plaintext: &str) -> Result<bool, String> {
+        let hash = hash_token(plaintext);
+        let tokens = self.tokens.lock().map_err(|error| error.to_string())?;
+        let now = Utc::now();
+        Ok(tokens.values().any(|token| {
+            !token.revoked
+                && token.expires_at.as_ref().is_none_or(|expires_at| expires_at >= &now)
+                && hashes_match(&token.token_hash, &hash)
+        }))
+    }
+
     pub fn revoke(&self, id: Uuid) -> Result<(), String> {
         let _lock = acquire_process_lock(&self.path)?;
         let mut map = load_tokens(&self.path)?;

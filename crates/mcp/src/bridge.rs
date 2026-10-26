@@ -129,8 +129,12 @@ impl McpBridge {
 
     pub fn authenticate(&self, bearer: &str) -> Result<McpToken, String> {
         let token = bearer.strip_prefix("Bearer ").unwrap_or(bearer).trim();
+        let cached_candidate = self.tokens.has_live_candidate(token)?;
+        if !cached_candidate {
+            self.auth_rate_limiter.check(AUTH_ATTEMPT_KEY)?;
+        }
         let authenticated = self.tokens.authenticate(token);
-        if authenticated.is_err() {
+        if cached_candidate && authenticated.is_err() {
             self.auth_rate_limiter.check(AUTH_ATTEMPT_KEY)?;
         }
         authenticated
@@ -662,6 +666,47 @@ mod tests {
         assert!(bridge.authenticate("guess-2").is_err());
         let third = bridge.authenticate("guess-3").unwrap_err();
         assert!(third.contains("rate limit"), "{third}");
+    }
+
+    #[test]
+    fn rate_limited_guesses_do_not_wait_for_the_token_store_lock() {
+        use std::fs::OpenOptions;
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(TokenStore::open(dir.path().join("tokens.json")).unwrap());
+        let bridge = Arc::new(McpBridge::with_limits(
+            Arc::new(NoProvider),
+            store.clone(),
+            McpLimits {
+                requests_per_minute: 1,
+                ..McpLimits::default()
+            },
+        ));
+        assert!(bridge.authenticate("guess-1").is_err());
+
+        let lock_path = store.path().with_file_name("tokens.json.lock");
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(lock_path)
+            .unwrap();
+        lock.lock().unwrap();
+        let (started, was_started) = mpsc::channel();
+        let (completed, result) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            started.send(()).unwrap();
+            completed.send(bridge.authenticate("guess-2")).unwrap();
+        });
+        was_started.recv().unwrap();
+        let outcome = result.recv_timeout(Duration::from_secs(1));
+        drop(lock);
+        worker.join().unwrap();
+
+        assert!(matches!(outcome, Ok(Err(error)) if error.contains("rate limit")));
     }
 
     #[test]
