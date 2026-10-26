@@ -1,4 +1,6 @@
 use tablepro_core::Value;
+
+include!("enum_contract_parts/scalar_imports.rs");
 use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue};
 
 use crate::{connect, start_pg};
@@ -168,6 +170,8 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("Enum \"Shelf"),
             table: "Row \"Box",
             columns: &columns,

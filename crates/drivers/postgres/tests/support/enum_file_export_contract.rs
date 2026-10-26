@@ -441,6 +441,8 @@ async fn value_contract_custom_enum_csv_file_export_import_preserves_empty_and_n
         .unwrap();
     let target = tablepro_core::import::ImportTarget {
         driver_id: "postgres",
+
+        capabilities: tablepro_core::DriverCapabilities::default(),
         schema: Some("csv_file_enum"),
         table: "target_rows",
         columns: &target_columns,
@@ -542,6 +544,8 @@ async fn value_contract_custom_enum_csv_file_export_import_preserves_empty_and_n
         .unwrap();
     let safe_target = tablepro_core::import::ImportTarget {
         driver_id: "postgres",
+
+        capabilities: tablepro_core::DriverCapabilities::default(),
         schema: Some("csv_file_enum"),
         table: "safe_target_rows",
         columns: &safe_target_columns,

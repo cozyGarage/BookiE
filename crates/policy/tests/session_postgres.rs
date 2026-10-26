@@ -100,6 +100,51 @@ async fn run(
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn guarded_completion_metadata_uses_each_postgres_sessions_search_path() {
+    let (_container, opts) = start_pg().await;
+    let raw = connect(opts).await;
+    for statement in [
+        "CREATE SCHEMA completion_first",
+        "CREATE SCHEMA completion_second",
+        "CREATE TABLE completion_first.search_path_probe (first_only INT)",
+        "CREATE TABLE completion_second.search_path_probe (second_only INT)",
+    ] {
+        raw.execute(statement).await.expect("prepare search path fixture");
+    }
+
+    let audit = Arc::new(CapturingAudit::new());
+    let guard = PolicyGuard::new(
+        Arc::from(raw),
+        guard_context(audit.clone(), Arc::new(AuditState::new())),
+    );
+    let mut first = guard.open_session().await.expect("open first session");
+    let mut second = guard.open_session().await.expect("open second session");
+    run(&mut first, "SET search_path TO completion_first, completion_second")
+        .await
+        .expect("set first session path");
+    run(&mut second, "SET search_path TO completion_second, completion_first")
+        .await
+        .expect("set second session path");
+
+    for (session, expected) in [(&mut first, "first_only"), (&mut second, "second_only")] {
+        let columns = session
+            .fetch_completion_columns_controlled(None, "search_path_probe", &no_timeout())
+            .await
+            .expect("governed completion lookup");
+        assert_eq!(columns, [expected]);
+    }
+
+    let metadata = outcomes_of(&audit, AuditOperationClass::Read);
+    assert_eq!(metadata.len(), 2);
+    assert!(metadata.iter().all(|event| {
+        event.decision_rule == "metadata_read" && event.terminal_status == AuditTerminalStatus::Succeeded
+    }));
+    first.close().await.expect("close first session");
+    second.close().await.expect("close second session");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_postgres_commit_after_savepoint_recovery_matches_the_audit_and_stored_rows() {
     let (_container, opts) = start_pg().await;
     let raw = connect(opts.clone()).await;

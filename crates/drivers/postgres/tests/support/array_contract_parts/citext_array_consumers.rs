@@ -125,6 +125,8 @@ async fn value_contract_citext_array_decodes_and_rebinds_exact_values() {
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "citext_array_target",
             columns: &columns,

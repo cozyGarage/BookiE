@@ -33,7 +33,7 @@ pub enum EnumInputStyle {
     SqlQuotedLabel,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DriverCapabilities {
     pub maturity: DriverMaturity,
     pub enum_input_style: EnumInputStyle,
@@ -51,6 +51,7 @@ pub struct DriverCapabilities {
     pub supports_local_socket_file: bool,
     pub supports_local_socket_directory: bool,
     pub supports_client_tls_auth: bool,
+    pub supports_explicit_auto_increment_values: bool,
 }
 
 #[async_trait]
@@ -85,6 +86,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_local_socket_file: self.supports_local_socket_file(),
             supports_local_socket_directory: self.supports_local_socket_directory(),
             supports_client_tls_auth: self.supports_client_tls_auth(),
+            supports_explicit_auto_increment_values: self.supports_explicit_auto_increment_values(),
         }
     }
 
@@ -187,6 +189,10 @@ pub trait DatabaseDriver: Send + Sync {
         false
     }
 
+    fn supports_explicit_auto_increment_values(&self) -> bool {
+        false
+    }
+
     /// File name a forwarded Unix socket must use for this driver to
     /// dial it while verifying TLS against the original service
     /// hostname. `None` means the driver has no socket transport and an
@@ -259,6 +265,7 @@ mod tests {
         assert!(!capabilities.supports_foreign_key_metadata);
         assert!(!capabilities.supports_view_metadata);
         assert!(!capabilities.supports_column_comments);
+        assert!(!capabilities.supports_explicit_auto_increment_values);
         assert_eq!(driver.default_database(), "");
         assert_eq!(driver.default_username(), "");
     }
@@ -339,6 +346,10 @@ mod tests {
             true
         }
 
+        fn supports_explicit_auto_increment_values(&self) -> bool {
+            true
+        }
+
         async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
             Err(DriverError::Unsupported("test driver".into()))
         }
@@ -363,6 +374,7 @@ mod tests {
         assert!(capabilities.supports_local_socket_file);
         assert!(capabilities.supports_local_socket_directory);
         assert!(capabilities.supports_client_tls_auth);
+        assert!(capabilities.supports_explicit_auto_increment_values);
     }
 
     struct NamedDriver {

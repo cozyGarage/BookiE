@@ -131,6 +131,10 @@ pub fn matches(row: &OperationRow, query: &str) -> bool {
     .any(|field| field.to_lowercase().contains(&query))
 }
 
+pub fn contains_operation(rows: &[OperationRow], operation_id: Uuid) -> bool {
+    rows.iter().any(|row| row.operation_id == operation_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,5 +223,20 @@ mod tests {
             assert!(matches(row, query), "{query}");
         }
         assert!(!matches(row, "billing"));
+    }
+
+    #[test]
+    fn an_exact_operation_filter_does_not_select_a_concurrent_record() {
+        let requested = Uuid::new_v4();
+        let other = Uuid::new_v4();
+        let rows = operations(vec![
+            event(other, AuditRecordPhase::Outcome, AuditTerminalStatus::Failed),
+            event(requested, AuditRecordPhase::Outcome, AuditTerminalStatus::Denied),
+        ]);
+
+        assert!(contains_operation(&rows, requested));
+        assert!(!contains_operation(&rows, Uuid::new_v4()));
+        assert!(matches(&rows[1], &other.to_string()));
+        assert!(!matches(&rows[1], &requested.to_string()));
     }
 }

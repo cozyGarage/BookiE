@@ -362,6 +362,8 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         let plan = tablepro_core::import::build_insert_plan(
             &tablepro_core::import::ImportTarget {
                 driver_id: "mysql",
+
+                capabilities: tablepro_core::DriverCapabilities::default(),
                 schema: None,
                 table: "enum_csv_copy",
                 columns: &columns,
@@ -568,6 +570,8 @@ async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_str
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "mysql",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "enum_empty_mode_target",
             columns: &columns,
@@ -662,6 +666,8 @@ async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_str
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "mysql",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "enum_empty_mode_combined_target",
             columns: &columns,

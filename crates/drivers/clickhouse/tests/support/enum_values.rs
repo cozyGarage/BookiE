@@ -181,6 +181,8 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "clickhouse",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "enum_csv_copy",
             columns: &result.columns,
@@ -304,6 +306,8 @@ async fn value_contract_clickhouse_nullable_enum16_preserves_null_and_labels_acr
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "clickhouse",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: "nullable_enum16_csv",
             columns: &result.columns,

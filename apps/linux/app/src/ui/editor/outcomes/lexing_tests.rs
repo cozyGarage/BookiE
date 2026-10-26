@@ -59,7 +59,9 @@ async fn run_in_sql_mode(sql_mode: &str, script: &str) -> (Vec<String>, Vec<Stat
     });
     let target = StatementTarget::Session {
         id: uuid::Uuid::new_v4(),
-        shared: std::sync::Arc::new(tokio::sync::Mutex::new(Some(session))),
+        shared: std::sync::Arc::new(tokio::sync::Mutex::new(Some(
+            super::super::session_mode::SessionHandle::plain(session),
+        ))),
     };
     let result = run_statements_with_stream(
         StatementRun {

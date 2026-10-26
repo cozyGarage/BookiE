@@ -484,10 +484,16 @@ fn editor_actions_fit_narrow_rows_with_running_and_retry_controls() {
         .row
         .add_css_class("resource-toolbar");
     assert!(root.measure(gtk::Orientation::Horizontal, -1).0 <= 600);
+    let toolbar = root.first_child().unwrap().downcast::<adw::ToolbarView>().unwrap();
+    let layout = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    let sidebar = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    sidebar.set_size_request(370, -1);
+    layout.append(&sidebar);
+    layout.append(root);
     let window = gtk::Window::builder()
-        .default_width(630)
+        .default_width(1000)
         .default_height(700)
-        .child(root)
+        .child(&layout)
         .build();
     window.present();
     let css = gtk::CssProvider::new();
@@ -498,7 +504,7 @@ fn editor_actions_fit_narrow_rows_with_running_and_retry_controls() {
     for style in ["", ".resource-toolbar { font-size: 20px; }"] {
         css.load_from_string(style);
         for width in [630, 600, 910] {
-            window.set_default_size(width, 700);
+            window.set_default_size(width + 370, 700);
             let ready = std::rc::Rc::new(std::cell::Cell::new(false));
             let observed = ready.clone();
             let frames = std::cell::Cell::new(0);
@@ -511,7 +517,15 @@ fn editor_actions_fit_narrow_rows_with_running_and_retry_controls() {
                 gtk::glib::ControlFlow::Break
             });
             spin_until(|| ready.get() && root.width() > 0 && buttons.iter().all(|button| button.width() > 0));
+            assert_eq!(root.width(), width);
+            assert_eq!(sidebar.width(), 370);
             assert!(root.width() <= width);
+            let toolbar_minimum = toolbar.measure(gtk::Orientation::Horizontal, -1).0;
+            assert!(
+                toolbar_minimum <= root.width(),
+                "toolbar minimum width exceeds editor allocation: requested={toolbar_minimum} available={}",
+                root.width()
+            );
             for bar in &bars {
                 assert!(bar.measure(gtk::Orientation::Horizontal, -1).0 <= root.width());
             }
