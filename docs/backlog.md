@@ -114,7 +114,7 @@ The [peer-review tracker #1026](https://github.com/cozyGarage/BookiE/issues/1026
 
 ## Static driver contract
 
-- DRV-1 / [#1688](https://github.com/cozyGarage/BookiE/issues/1688): continue migrating typed static driver capabilities to user-visible consumers. The first candidate is foreign-key metadata in browse; transport changes require the B4 handoff. Keep connection-scoped cancellation and metadata-derived object permissions outside the static profile.
+- DRV-1 / [#1688](https://github.com/cozyGarage/BookiE/issues/1688): the typed column-comment lifecycle and DDL contract landed in B3 commit `416daa1`; UX is consuming that capability in the Structure editor and adding registered-driver behavior coverage. Keep connection-scoped cancellation and metadata-derived object permissions outside the static profile.
 
 ## Issue and lane status
 

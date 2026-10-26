@@ -64,7 +64,14 @@ fn every_registered_driver_profile_matches_its_declared_static_behavior() {
             capabilities.supports_foreign_key_metadata,
             driver.supports_foreign_key_metadata()
         );
-        assert_matches_declaration!(capabilities.supports_column_comments, driver.supports_column_comments());
+        assert_matches_declaration!(
+            capabilities.column_comment,
+            tablepro_core::sql_ddl::column_comment_capability(driver.id())
+        );
+        assert_matches_declaration!(
+            capabilities.column_comment.is_supported(),
+            driver.supports_column_comments()
+        );
         assert_matches_declaration!(capabilities.supports_view_metadata, driver.supports_view_metadata());
         assert_matches_declaration!(capabilities.catalog_object_kinds, driver.catalog_object_kinds());
         assert_matches_declaration!(capabilities.supports_integrated_auth, driver.supports_integrated_auth());

@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::connection::{ConnectOptions, Connection};
 use crate::error::DriverError;
+use crate::sql_ddl::ColumnCommentCapability;
 
 /// How complete a driver is for day-to-day use.
 ///
@@ -43,7 +44,7 @@ pub struct DriverCapabilities {
     pub supports_database_listing: bool,
     pub supports_index_metadata: bool,
     pub supports_foreign_key_metadata: bool,
-    pub supports_column_comments: bool,
+    pub column_comment: ColumnCommentCapability,
     pub supports_view_metadata: bool,
     pub catalog_object_kinds: &'static [crate::CatalogObjectKind],
     pub supports_integrated_auth: bool,
@@ -78,7 +79,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_database_listing: self.supports_database_listing(),
             supports_index_metadata: self.supports_index_metadata(),
             supports_foreign_key_metadata: self.supports_foreign_key_metadata(),
-            supports_column_comments: self.supports_column_comments(),
+            column_comment: crate::sql_ddl::column_comment_capability(self.id()),
             supports_view_metadata: self.supports_view_metadata(),
             catalog_object_kinds: self.catalog_object_kinds(),
             supports_integrated_auth: self.supports_integrated_auth(),
@@ -152,10 +153,7 @@ pub trait DatabaseDriver: Send + Sync {
     /// a per-driver override, so a driver cannot advertise a capability
     /// the builder would refuse to emit.
     fn supports_column_comments(&self) -> bool {
-        !matches!(
-            crate::sql_ddl::column_comment_placement(self.id()),
-            crate::sql_ddl::CommentPlacement::Unsupported
-        )
+        crate::sql_ddl::column_comment_capability(self.id()).is_supported()
     }
 
     fn supports_view_metadata(&self) -> bool {
@@ -264,7 +262,7 @@ mod tests {
         assert!(!capabilities.supports_index_metadata);
         assert!(!capabilities.supports_foreign_key_metadata);
         assert!(!capabilities.supports_view_metadata);
-        assert!(!capabilities.supports_column_comments);
+        assert_eq!(capabilities.column_comment, ColumnCommentCapability::Unsupported);
         assert!(!capabilities.supports_explicit_auto_increment_values);
         assert_eq!(driver.default_database(), "");
         assert_eq!(driver.default_username(), "");

@@ -8,7 +8,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{ComponentSender, adw, gtk};
 
-use tablepro_core::sql_ddl::{CommentPlacement, DraftColumn, column_comment_placement};
+use tablepro_core::sql_ddl::{ColumnCommentCapability, DraftColumn};
 
 use super::{ColumnField, StructureTab, StructureTabInput};
 
@@ -182,6 +182,7 @@ pub(super) fn build_column_expander_row(
     index: usize,
     col: &DraftColumn,
     driver_id: &str,
+    column_comment_capability: ColumnCommentCapability,
     sender: ComponentSender<StructureTab>,
     suppress_emit: Rc<Cell<bool>>,
     popover_registry: Rc<RefCell<Vec<gtk::Popover>>>,
@@ -349,7 +350,7 @@ pub(super) fn build_column_expander_row(
     });
     row.add_row(&auto_row);
 
-    add_comment_row(&row, index, col, driver_id, sender, suppress_emit);
+    add_comment_row(&row, index, col, column_comment_capability, sender, suppress_emit);
 
     row
 }
@@ -361,18 +362,31 @@ pub(super) enum CommentEditability {
     Unsupported,
 }
 
-/// Whether this column's comment can be edited now. ClickHouse has no
-/// ALTER for a column comment, so an existing column's comment is
-/// readable but fixed, while a column being drafted into a CREATE
-/// TABLE still carries one.
-pub(super) fn comment_editability(driver_id: &str, is_existing: bool) -> CommentEditability {
-    if column_comment_placement(driver_id) == CommentPlacement::Unsupported {
+pub(super) fn comment_editability(capability: ColumnCommentCapability, is_existing: bool) -> CommentEditability {
+    if !capability.is_supported() {
         return CommentEditability::Unsupported;
     }
-    if driver_id == "clickhouse" && is_existing {
+    if is_existing && !capability.allows_existing_column_edits() {
         return CommentEditability::CreateOnly;
     }
     CommentEditability::Editable
+}
+
+fn configure_comment_row(row: &adw::EntryRow, capability: ColumnCommentCapability, is_existing: bool) {
+    match comment_editability(capability, is_existing) {
+        CommentEditability::Unsupported => {
+            row.set_sensitive(false);
+            row.set_tooltip_text(Some(&crate::tr!("This database has no column comments.")));
+        }
+        CommentEditability::CreateOnly => {
+            row.set_sensitive(false);
+            row.set_tooltip_text(Some(&crate::tr!("This driver only supports comments on new columns.")));
+        }
+        CommentEditability::Editable => {
+            row.set_sensitive(true);
+            row.set_tooltip_text(None);
+        }
+    }
 }
 
 /// Comment (AdwEntryRow). Empty input means no comment, matching the
@@ -383,26 +397,14 @@ fn add_comment_row(
     row: &adw::ExpanderRow,
     index: usize,
     col: &DraftColumn,
-    driver_id: &str,
+    column_comment_capability: ColumnCommentCapability,
     sender: ComponentSender<StructureTab>,
     suppress_emit: Rc<Cell<bool>>,
 ) {
     let comment_row = adw::EntryRow::builder().title(crate::tr!("Comment")).build();
     comment_row.set_text(col.comment.as_deref().unwrap_or(""));
     comment_row.set_widget_name(&format!("col-comment-{index}"));
-    match comment_editability(driver_id, col.original.is_some()) {
-        CommentEditability::Unsupported => {
-            comment_row.set_sensitive(false);
-            comment_row.set_tooltip_text(Some(&crate::tr!("This database has no column comments.")));
-        }
-        CommentEditability::CreateOnly => {
-            comment_row.set_sensitive(false);
-            comment_row.set_tooltip_text(Some(&crate::tr!(
-                "ClickHouse can only set a column comment when the table is created."
-            )));
-        }
-        CommentEditability::Editable => {}
-    }
+    configure_comment_row(&comment_row, column_comment_capability, col.original.is_some());
     comment_row.connect_changed(move |e| {
         if suppress_emit.get() {
             return;
@@ -482,10 +484,11 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
 
 #[cfg(test)]
 mod tests {
-    use super::{CommentEditability, comment_editability};
+    use super::{CommentEditability, comment_editability, configure_comment_row};
     use super::{bind_expander_arrow, expander_arrow};
     use relm4::adw::prelude::*;
     use relm4::{adw, gtk};
+    use tablepro_core::sql_ddl::ColumnCommentCapability;
 
     fn pump() {
         let context = gtk::glib::MainContext::default();
@@ -512,22 +515,58 @@ mod tests {
 
     #[test]
     fn a_comment_is_editable_where_the_engine_can_alter_one() {
-        for driver_id in ["postgres", "mysql", "mssql"] {
-            assert_eq!(comment_editability(driver_id, true), CommentEditability::Editable);
-            assert_eq!(comment_editability(driver_id, false), CommentEditability::Editable);
+        for capability in [
+            ColumnCommentCapability::ExistingAndNewInline,
+            ColumnCommentCapability::ExistingAndNewSeparate,
+        ] {
+            assert_eq!(comment_editability(capability, true), CommentEditability::Editable);
+            assert_eq!(comment_editability(capability, false), CommentEditability::Editable);
         }
     }
 
     #[test]
     fn a_clickhouse_comment_is_editable_only_while_the_column_is_new() {
-        assert_eq!(comment_editability("clickhouse", false), CommentEditability::Editable);
-        assert_eq!(comment_editability("clickhouse", true), CommentEditability::CreateOnly);
+        assert_eq!(
+            comment_editability(ColumnCommentCapability::NewColumnOnlyInline, false),
+            CommentEditability::Editable
+        );
+        assert_eq!(
+            comment_editability(ColumnCommentCapability::NewColumnOnlyInline, true),
+            CommentEditability::CreateOnly
+        );
     }
 
     #[test]
     fn an_engine_without_column_comments_shows_the_field_as_unsupported() {
-        for driver_id in ["sqlite", "duckdb", "mongodb", "redis"] {
-            assert_eq!(comment_editability(driver_id, false), CommentEditability::Unsupported);
+        assert_eq!(
+            comment_editability(ColumnCommentCapability::Unsupported, false),
+            CommentEditability::Unsupported
+        );
+        assert_eq!(
+            comment_editability(ColumnCommentCapability::Unsupported, true),
+            CommentEditability::Unsupported
+        );
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn column_comment_editor_enabled_state_follows_typed_capability() {
+        adw::init().unwrap();
+        for (capability, is_existing, expected_sensitive) in [
+            (ColumnCommentCapability::ExistingAndNewInline, true, true),
+            (ColumnCommentCapability::ExistingAndNewSeparate, true, true),
+            (ColumnCommentCapability::NewColumnOnlyInline, false, true),
+            (ColumnCommentCapability::NewColumnOnlyInline, true, false),
+            (ColumnCommentCapability::Unsupported, false, false),
+        ] {
+            let row = adw::EntryRow::new();
+            row.set_text("preserved comment");
+
+            configure_comment_row(&row, capability, is_existing);
+
+            assert_eq!(row.is_sensitive(), expected_sensitive);
+            assert_eq!(row.text(), "preserved comment");
+            assert_eq!(row.tooltip_text().is_some(), !expected_sensitive);
         }
     }
 }

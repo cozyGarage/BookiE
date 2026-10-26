@@ -40,6 +40,6 @@ pub use index_fk::{
 };
 pub use table::{build_create_table, build_drop_table, build_rename_table, build_truncate_table};
 pub use types::{
-    BuildDdlError, CommentPlacement, DraftColumn, StructureOp, column_comment_placement, identifiers_fold_case,
-    supported_fk_actions,
+    BuildDdlError, ColumnCommentCapability, CommentPlacement, DraftColumn, StructureOp, column_comment_capability,
+    column_comment_placement, identifiers_fold_case, supported_fk_actions,
 };

@@ -271,12 +271,14 @@ impl App {
         };
         let tab_id = Uuid::new_v4();
         let driver_id = self.driver_id().to_string();
+        let column_comment_capability = crate::ui::structure_tab::comment_capability_for(&self.registry, &driver_id);
         let init = crate::ui::structure_tab::StructureTabInit {
             tab_id,
             schema: schema.clone(),
             table: String::new(),
             mode: crate::ui::structure_tab::StructureMode::New,
             driver_id,
+            column_comment_capability,
             // New mode has nothing to introspect (no real table yet).
             defer_initial_fetch: false,
         };
@@ -464,6 +466,7 @@ impl App {
         };
         let tab_id = Uuid::new_v4();
         let driver_id = self.driver_id().to_string();
+        let column_comment_capability = crate::ui::structure_tab::comment_capability_for(&self.registry, &driver_id);
         let mode = crate::ui::structure_tab::StructureMode::Edit;
         let init = crate::ui::structure_tab::StructureTabInit {
             tab_id,
@@ -471,6 +474,7 @@ impl App {
             table: table.clone(),
             mode,
             driver_id,
+            column_comment_capability,
             defer_initial_fetch: false,
         };
         let controller =

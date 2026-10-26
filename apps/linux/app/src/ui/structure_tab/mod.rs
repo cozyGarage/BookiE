@@ -36,6 +36,7 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{ComponentParts, ComponentSender, SimpleComponent, adw, gtk};
 
+use tablepro_core::sql_ddl::ColumnCommentCapability;
 use tablepro_core::sql_ddl::{BuildDdlError, DraftColumn};
 use tablepro_core::{ColumnInfo, ForeignKeyInfo, IndexInfo};
 use uuid::Uuid;
@@ -69,6 +70,7 @@ pub struct StructureTabInit {
     pub table: String,
     pub mode: StructureMode,
     pub driver_id: String,
+    pub column_comment_capability: ColumnCommentCapability,
     /// When `true`, skip the auto-`FetchStructure` fired at the end of
     /// init. Used by `append_table_tab` for Data-mode opens — the
     /// Structure pane is alive but invisible, so introspection is
@@ -79,12 +81,23 @@ pub struct StructureTabInit {
     pub defer_initial_fetch: bool,
 }
 
+pub(super) fn comment_capability_for(
+    registry: &tablepro_core::DriverRegistry,
+    driver_id: &str,
+) -> ColumnCommentCapability {
+    registry
+        .get(driver_id)
+        .map(|driver| driver.capabilities().column_comment)
+        .unwrap_or_default()
+}
+
 pub struct StructureTab {
     tab_id: Uuid,
     schema: Option<String>,
     table_name: Rc<RefCell<String>>,
     mode: Rc<RefCell<StructureMode>>,
     driver_id: String,
+    column_comment_capability: ColumnCommentCapability,
     columns: Rc<RefCell<Vec<DraftColumn>>>,
     indexes: Rc<RefCell<Vec<IndexInfo>>>,
     foreign_keys: Rc<RefCell<Vec<ForeignKeyInfo>>>,
@@ -352,6 +365,7 @@ impl StructureTab {
                 i,
                 col,
                 &driver_id,
+                self.column_comment_capability,
                 sender.clone(),
                 self.suppress_emit.clone(),
                 self.column_popovers.clone(),
@@ -752,6 +766,7 @@ impl SimpleComponent for StructureTab {
             table_name: Rc::new(RefCell::new(init.table)),
             mode: Rc::new(RefCell::new(init.mode)),
             driver_id: init.driver_id,
+            column_comment_capability: init.column_comment_capability,
             columns: Rc::new(RefCell::new(Vec::new())),
             indexes: Rc::new(RefCell::new(Vec::new())),
             foreign_keys: Rc::new(RefCell::new(Vec::new())),
