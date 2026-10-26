@@ -1,0 +1,239 @@
+{
+  "date": "2026-10-25",
+  "checked_at": "2026-10-25T22:52:43Z",
+  "bookie_commit": "636011dd8aa38b6b7ba9a17c54594c9d5247f903",
+  "peer_count": 14,
+  "github_source_repositories": 13,
+  "method": "Official GitHub REST API for repository default branch, head commit, and latest stable/prerelease releases; official TablePlus changelog pages; current BookiE source checks for the named comparisons.",
+  "deep_comparison_scope": [
+    "TableProApp/TablePro",
+    "t8y2/dbx",
+    "dbeaver/dbeaver",
+    "beekeeper-studio/beekeeper-studio",
+    "0xErwin1/dbflux"
+  ],
+  "coverage_limits": "The 13 GitHub source pins are freshness evidence, not full code audits. Feature-level comparisons were made for the five repositories listed in deep_comparison_scope. Other repository entries record source/release freshness only. No third-party application or benchmark was run. TablePlus is represented by official release notes only, with no source pin. pgAdmin has no GitHub release objects; its stable version is taken from official release documentation.",
+  "sources": [
+    {
+      "repository": "0xErwin1/dbflux",
+      "ref": "main",
+      "commit": "7cc2261ee2b388b114b66fb793f6aab04d5bd29e",
+      "commit_date": "2026-10-25T16:11:33Z",
+      "url": "https://github.com/0xErwin1/dbflux/commit/7cc2261ee2b388b114b66fb793f6aab04d5bd29e",
+      "latest_stable": {
+        "tag": "v0.8.13",
+        "published_at": "2026-10-24T18:15:25Z",
+        "url": "https://github.com/0xErwin1/dbflux/releases/tag/v0.8.13"
+      },
+      "latest_prerelease": {
+        "tag": "nightly",
+        "published_at": "2026-06-07T05:23:47Z",
+        "url": "https://github.com/0xErwin1/dbflux/releases/tag/nightly"
+      },
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "JosueRhea/dbui",
+      "ref": "main",
+      "commit": "6b98db2eeb01e4f2971b803383363993c4b99d7b",
+      "commit_date": "2026-10-21T14:49:39Z",
+      "url": "https://github.com/JosueRhea/dbui/commit/6b98db2eeb01e4f2971b803383363993c4b99d7b",
+      "latest_stable": {
+        "tag": "v0.5.1",
+        "published_at": "2026-10-21T14:52:38Z",
+        "url": "https://github.com/JosueRhea/dbui/releases/tag/v0.5.1"
+      },
+      "latest_prerelease": {
+        "tag": "v0.2.5",
+        "published_at": "2026-09-10T03:26:49Z",
+        "url": "https://github.com/JosueRhea/dbui/releases/tag/v0.2.5"
+      },
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "ShayanAbbas1/dbdelve",
+      "ref": "main",
+      "commit": "d1c4ac6bd347239acede5279a961b57f585e146c",
+      "commit_date": "2026-10-25T16:57:10Z",
+      "url": "https://github.com/ShayanAbbas1/dbdelve/commit/d1c4ac6bd347239acede5279a961b57f585e146c",
+      "latest_stable": {
+        "tag": "v0.5.1",
+        "published_at": "2026-10-22T20:21:46Z",
+        "url": "https://github.com/ShayanAbbas1/dbdelve/releases/tag/v0.5.1"
+      },
+      "latest_prerelease": null,
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "TableProApp/TablePro",
+      "ref": "main",
+      "commit": "7dad9d4b260a9bc7389f7778aa0bacb155848906",
+      "commit_date": "2026-10-25T19:56:27Z",
+      "url": "https://github.com/TableProApp/TablePro/commit/7dad9d4b260a9bc7389f7778aa0bacb155848906",
+      "latest_stable": {
+        "tag": "v0.82.2",
+        "published_at": "2026-10-23T02:15:52Z",
+        "url": "https://github.com/TableProApp/TablePro/releases/tag/v0.82.2"
+      },
+      "latest_prerelease": {
+        "tag": "v0.83.0-beta.2",
+        "published_at": "2026-10-23T03:07:46Z",
+        "url": "https://github.com/TableProApp/TablePro/releases/tag/v0.83.0-beta.2"
+      },
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "beekeeper-studio/beekeeper-studio",
+      "ref": "master",
+      "commit": "5f18a9ee676b808ea243d9a5340fad4b4dd98489",
+      "commit_date": "2026-10-23T17:53:41Z",
+      "url": "https://github.com/beekeeper-studio/beekeeper-studio/commit/5f18a9ee676b808ea243d9a5340fad4b4dd98489",
+      "latest_stable": {
+        "tag": "v6.1.6",
+        "published_at": "2026-10-07T22:22:01Z",
+        "url": "https://github.com/beekeeper-studio/beekeeper-studio/releases/tag/v6.1.6"
+      },
+      "latest_prerelease": {
+        "tag": "v6.2.0-beta.3",
+        "published_at": "2026-10-23T10:15:04Z",
+        "url": "https://github.com/beekeeper-studio/beekeeper-studio/releases/tag/v6.2.0-beta.3"
+      },
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "dbeaver/dbeaver",
+      "ref": "devel",
+      "commit": "811053f81f8304856ba9091b531bec4eddbf03c6",
+      "commit_date": "2026-10-24T05:28:14Z",
+      "url": "https://github.com/dbeaver/dbeaver/commit/811053f81f8304856ba9091b531bec4eddbf03c6",
+      "latest_stable": {
+        "tag": "26.2.3",
+        "published_at": "2026-10-18T17:33:40Z",
+        "url": "https://github.com/dbeaver/dbeaver/releases/tag/26.2.3"
+      },
+      "latest_prerelease": null,
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "duanebester/pgui",
+      "ref": "main",
+      "commit": "d01aed7838f1bdbe3aa07c656e9ac7b88f57675e",
+      "commit_date": "2026-05-09T23:56:52Z",
+      "url": "https://github.com/duanebester/pgui/commit/d01aed7838f1bdbe3aa07c656e9ac7b88f57675e",
+      "latest_stable": {
+        "tag": "v0.1.23",
+        "published_at": "2026-05-09T23:57:37Z",
+        "url": "https://github.com/duanebester/pgui/releases/tag/v0.1.23"
+      },
+      "latest_prerelease": null,
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "feigeCode/navop",
+      "ref": "main",
+      "commit": "9df4ebcc080035ef73a6ad7fac20543d5810e0f6",
+      "commit_date": "2026-10-25T14:47:55Z",
+      "url": "https://github.com/feigeCode/navop/commit/9df4ebcc080035ef73a6ad7fac20543d5810e0f6",
+      "latest_stable": {
+        "tag": "v0.21.1",
+        "published_at": "2026-10-22T15:32:22Z",
+        "url": "https://github.com/feigeCode/navop/releases/tag/v0.21.1"
+      },
+      "latest_prerelease": null,
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "fluxdb-alt/fluxDB",
+      "ref": "main",
+      "commit": "076c27acf7f3425504cad93490116d2886c594e9",
+      "commit_date": "2026-10-24T03:53:52Z",
+      "url": "https://github.com/fluxdb-alt/fluxDB/commit/076c27acf7f3425504cad93490116d2886c594e9",
+      "latest_stable": {
+        "tag": "v0.1.12",
+        "published_at": "2026-10-24T04:14:53Z",
+        "url": "https://github.com/fluxdb-alt/fluxDB/releases/tag/v0.1.12"
+      },
+      "latest_prerelease": null,
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "pavi2410/based",
+      "ref": "main",
+      "commit": "1d4c77da2f61e25d07f28af7e17021d4de1228c2",
+      "commit_date": "2026-10-25T22:08:27Z",
+      "url": "https://github.com/pavi2410/based/commit/1d4c77da2f61e25d07f28af7e17021d4de1228c2",
+      "latest_stable": {
+        "tag": "v2026.10.1",
+        "published_at": "2026-10-24T03:09:13Z",
+        "url": "https://github.com/pavi2410/based/releases/tag/v2026.10.1"
+      },
+      "latest_prerelease": null,
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "pgadmin-org/pgadmin4",
+      "ref": "master",
+      "commit": "ea293b335ead614b5c5bfc69d52663f24d5dbe0c",
+      "commit_date": "2026-10-22T12:48:27Z",
+      "url": "https://github.com/pgadmin-org/pgadmin4/commit/ea293b335ead614b5c5bfc69d52663f24d5dbe0c",
+      "latest_stable": null,
+      "latest_prerelease": null,
+      "github_release_feed_empty": true
+    },
+    {
+      "repository": "sqlitebrowser/sqlitebrowser",
+      "ref": "master",
+      "commit": "ba3a34f7373f4200a9cc1647dee0496e6d7404c9",
+      "commit_date": "2026-10-25T10:12:39Z",
+      "url": "https://github.com/sqlitebrowser/sqlitebrowser/commit/ba3a34f7373f4200a9cc1647dee0496e6d7404c9",
+      "latest_stable": {
+        "tag": "v3.13.1",
+        "published_at": "2024-10-16T08:42:55Z",
+        "url": "https://github.com/sqlitebrowser/sqlitebrowser/releases/tag/v3.13.1"
+      },
+      "latest_prerelease": {
+        "tag": "continuous",
+        "published_at": "2026-10-25T10:37:14Z",
+        "url": "https://github.com/sqlitebrowser/sqlitebrowser/releases/tag/continuous"
+      },
+      "github_release_feed_empty": false
+    },
+    {
+      "repository": "t8y2/dbx",
+      "ref": "main",
+      "commit": "febdfe08068803f9ddf3660756722473166e6925",
+      "commit_date": "2026-10-25T19:47:21Z",
+      "url": "https://github.com/t8y2/dbx/commit/febdfe08068803f9ddf3660756722473166e6925",
+      "latest_stable": {
+        "tag": "v0.6.55",
+        "published_at": "2026-10-25T21:12:59Z",
+        "url": "https://github.com/t8y2/dbx/releases/tag/v0.6.55"
+      },
+      "latest_prerelease": null,
+      "github_release_feed_empty": false
+    }
+  ],
+  "release_note_only_sources": [
+    {
+      "project": "TablePlus macOS",
+      "source": "official_changelog",
+      "version": "27.1.0 (830)",
+      "released_at": "2026-10-20",
+      "url": "https://tableplus.com/blog/2017/02/changelogs.html"
+    },
+    {
+      "project": "TablePlus Linux",
+      "source": "official_changelog",
+      "version": "1.7.0 (Build 310)",
+      "released_at": "2026-08-22",
+      "url": "https://tableplus.com/blog/2020/01/changelogs-linux.html"
+    },
+    {
+      "project": "pgAdmin 4",
+      "source": "official_release_documentation",
+      "version": "9.18",
+      "released_at": "2026-09-17",
+      "url": "https://www.pgadmin.org/docs/pgadmin4/9.18/release_notes_9_18.html"
+    }
+  ]
+}
