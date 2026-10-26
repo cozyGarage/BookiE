@@ -75,8 +75,11 @@ pub(crate) fn present(
     let start_button = gtk::Button::builder().label(crate::tr!("Import")).build();
     start_button.add_css_class("suggested-action");
     let dialog = build_dialog(&page, &start_button);
-    let dialog_for_start = dialog.clone();
+    let dialog_for_start = dialog.downgrade();
     start_button.connect_clicked(move |_| {
+        let Some(dialog_for_start) = dialog_for_start.upgrade() else {
+            return;
+        };
         let Some(choice) = state.choice() else {
             return;
         };
@@ -129,25 +132,36 @@ impl State {
 }
 
 fn connect_refresh(state: &std::rc::Rc<State>) {
-    let for_delimiter = state.clone();
-    state
-        .file
-        .delimiter
-        .connect_selected_notify(move |_| for_delimiter.refresh());
-    let for_quote = state.clone();
-    state.file.quote.connect_selected_notify(move |_| for_quote.refresh());
-    let for_encoding = state.clone();
-    state
-        .file
-        .encoding
-        .connect_selected_notify(move |_| for_encoding.refresh());
-    let for_backslash = state.clone();
-    state
-        .file
-        .backslash
-        .connect_active_notify(move |_| for_backslash.refresh());
-    let for_header = state.clone();
-    state.file.header.connect_active_notify(move |_| for_header.refresh());
+    let for_delimiter = std::rc::Rc::downgrade(state);
+    state.file.delimiter.connect_selected_notify(move |_| {
+        if let Some(state) = for_delimiter.upgrade() {
+            state.refresh();
+        }
+    });
+    let for_quote = std::rc::Rc::downgrade(state);
+    state.file.quote.connect_selected_notify(move |_| {
+        if let Some(state) = for_quote.upgrade() {
+            state.refresh();
+        }
+    });
+    let for_encoding = std::rc::Rc::downgrade(state);
+    state.file.encoding.connect_selected_notify(move |_| {
+        if let Some(state) = for_encoding.upgrade() {
+            state.refresh();
+        }
+    });
+    let for_backslash = std::rc::Rc::downgrade(state);
+    state.file.backslash.connect_active_notify(move |_| {
+        if let Some(state) = for_backslash.upgrade() {
+            state.refresh();
+        }
+    });
+    let for_header = std::rc::Rc::downgrade(state);
+    state.file.header.connect_active_notify(move |_| {
+        if let Some(state) = for_header.upgrade() {
+            state.refresh();
+        }
+    });
 }
 
 struct FileOptions {
@@ -976,3 +990,6 @@ mod tests {
         assert_eq!(headers, ["tag", "tag", "email"]);
     }
 }
+
+#[cfg(test)]
+mod lifetime_tests;
