@@ -28,12 +28,14 @@ At this snapshot, `linux` is `15ad48925` and contains 391 first-parent commits a
 
 ### Candidate scope
 
-- Freeze new feature work while qualifying the current `linux` tree. Fix only release-blocking defects found in qualification; each fix gets a regression and the normal GitHub and Forgejo gates.
+- Keep each release small enough to review and qualify. Continue development in bounded steps; selected fixes get regressions and the normal GitHub and Forgejo gates. Publication does not require completing the whole backlog.
 - Include all changes already merged after `linux-v0.2.0`; do not selectively omit merged features from release notes.
 - Preserve the existing database, saved-connection, keyring, workspace, audit and MCP compatibility contracts. No data-format or protocol change is planned.
 - Keep database snapshots, Flathub publication, Debian/Ubuntu desktop support, new driver maturity claims, and other unscheduled backlog candidates out of this release.
 
-### Release blockers
+### Incremental follow-ups
+
+These issues guide later iterations. Their full closure is not required for 0.2.1. Hold publication for a confirmed security defect, data-loss defect, broken primary workflow or failed applicable release check; document other limitations and carry them forward.
 
 1. Resolve AppStream version classification and dates for the published 0.2.0 entry and the unreleased current source under [#1585](https://github.com/cozyGarage/BookiE/issues/1585); validate the metadata and version fields.
 2. Complete and record native Arch/Omarchy/Hyprland install, upgrade from 0.2.0, and rollback checks under [#574](https://github.com/cozyGarage/BookiE/issues/574). Verify saved connections, credentials, workspace state and compatibility aliases after upgrade.
@@ -43,11 +45,11 @@ At this snapshot, `linux` is `15ad48925` and contains 391 first-parent commits a
 
 ### Qualification and cut
 
-1. **Release hygiene:** recheck Project #3 and open pull requests, resolve #1585, confirm the changelog entries match merged user-visible behavior, and freeze new feature work.
-2. **Desktop acceptance:** complete #574, triage release-critical items in #575, and gather the exact-source Forgejo GTK runs required to resolve #556. Fix any release-blocking issue in its owning lane, with a regression and fresh gates.
+1. **Release hygiene:** recheck Project #3 and open pull requests, resolve #1585, confirm the changelog entries match merged user-visible behavior, and select the next bounded release slice.
+2. **Desktop acceptance:** check install, upgrade and the primary workflows on the selected desktop. Record the covered subset under #574/#575 and continue collecting GTK reliability evidence under #556 over later iterations. Fix any release-blocking issue in its owning lane, with a regression and fresh gates.
 3. **Candidate qualification:** review release-critical test oracles under #594; record the candidate commit; run preflight, relevant GTK, driver/TLS/release fixture layers, packaging builds, GitHub checks and one serialized Forgejo gate. Complete install, 0.2.0-to-candidate upgrade and rollback on Arch/Hyprland. Skipped GitHub merge-tier checks are not passes.
 4. **Release cut:** update the workspace version, `meson.build`, AppStream metadata and release notes together to `0.2.1`; run `scripts/check-release-version.py`, `appstreamcli validate`, link, issue-ledger, ignored-test inventory and release-note checks. Archive the previous changelog according to the [release process](release-process.md).
-5. **Publish:** build every artifact from the exact candidate tag workflow, verify `SHA256SUMS` and provenance, install the tag-built Arch package, and inspect the draft. Publish only after blockers are closed or explicitly dispositioned and the maintainer approves. If the accumulated tree cannot meet patch-release qualification, keep the tag unpublished and revise the version/scope before cutting it.
+5. **Publish:** build every artifact from the exact candidate tag workflow, verify `SHA256SUMS` and provenance, install the tag-built Arch package, and inspect the draft. Publish when the selected scope passes its applicable checks, confirmed release-blocking defects are resolved and the maintainer approves. Record remaining limitations and continue them in later releases; complete backlog closure and 100% coverage are not publication criteria.
 
 Release-note boundary: summarize user-visible behavior since 0.2.0, grouped by added, changed, fixed and security impact. Do not copy test evidence or internal refactors into user-facing notes. The release workflow and [ADR 0022](decisions/0022-release-notes-from-merge-commits.md) govern the final notes.
 
