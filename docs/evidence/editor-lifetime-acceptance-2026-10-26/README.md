@@ -29,3 +29,11 @@ python3 docs/evidence/editor-lifetime-acceptance-2026-10-26/vim-app-cycles.py \
 ```
 
 The wrapper asserts live Vim cursor motion before the workload. A preceding attempt failed because the editor did not support the requested accessibility focus method; the successful wrapper uses the existing X11 click helper. The scripts assert normal app exit and preserve resource samples even if a later assertion fails. A failed result is not a completed 18-cycle measurement.
+
+## Input and persistence boundaries
+
+Five additional [installed-app scenarios](input-boundary-acceptance.json) passed on the same optimized binary: an overlong paste leaves the existing SQL unchanged; an oversized restored draft remains saved without loading into the editor; bundle import and export record sanitized audit outcomes; and a connection bundle imports unchanged into a second profile and survives restart. The suite exited successfully. These cases verify their specific refusal, persistence and audit assertions, not comprehensive import security or every malformed input.
+
+## Configured light preference
+
+Three [configured-light scenarios](light-acceptance.json) passed on the same binary: malformed SQL is blocked before approval, dismissing approval leaves the database unchanged, and closing a clean editor preserves the other tab. The [wrapper](light-acceptance.py) seeds the light preference in the isolated profile before invoking the existing scenarios. No screenshot or live style-manager observation was captured, so these are interaction assertions under a configured preference, not visual contrast acceptance.
