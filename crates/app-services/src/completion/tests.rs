@@ -211,10 +211,9 @@ async fn completion_column_reads_obey_the_configured_timeout() {
 #[tokio::test]
 async fn session_completion_fetch_preserves_the_qualified_relation_identity() {
     let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
-    let session: Arc<tokio::sync::Mutex<Option<Box<dyn tablepro_core::Session>>>> =
-        Arc::new(tokio::sync::Mutex::new(Some(Box::new(CompletionSession {
-            calls: calls.clone(),
-        }))));
+    let session = Arc::new(tokio::sync::Mutex::new(Some(CompletionSession {
+        calls: calls.clone(),
+    })));
     let request = SchemaRequest {
         generation: 4,
         table: r#""odd.schema"."a.b""#.into(),
@@ -239,8 +238,7 @@ async fn session_completion_fetch_preserves_the_qualified_relation_identity() {
 
 #[tokio::test]
 async fn session_completion_fetch_reports_a_closed_editor_session() {
-    let session: Arc<tokio::sync::Mutex<Option<Box<dyn tablepro_core::Session>>>> =
-        Arc::new(tokio::sync::Mutex::new(None));
+    let session: Arc<tokio::sync::Mutex<Option<CompletionSession>>> = Arc::new(tokio::sync::Mutex::new(None));
     let (request, columns) = fetch_session_column_names(
         session,
         SchemaRequest {
@@ -259,10 +257,9 @@ async fn session_completion_fetch_reports_a_closed_editor_session() {
 
 #[tokio::test]
 async fn session_completion_fetch_cancels_while_waiting_for_the_session_lock() {
-    let session: Arc<tokio::sync::Mutex<Option<Box<dyn tablepro_core::Session>>>> =
-        Arc::new(tokio::sync::Mutex::new(Some(Box::new(CompletionSession {
-            calls: Arc::new(std::sync::Mutex::new(Vec::new())),
-        }))));
+    let session = Arc::new(tokio::sync::Mutex::new(Some(CompletionSession {
+        calls: Arc::new(std::sync::Mutex::new(Vec::new())),
+    })));
     let _guard = session.lock().await;
     let cancellation = CancellationToken::new();
     let cancel = cancellation.clone();
@@ -287,10 +284,9 @@ async fn session_completion_fetch_cancels_while_waiting_for_the_session_lock() {
 
 #[tokio::test]
 async fn session_completion_fetch_times_out_while_waiting_for_the_session_lock() {
-    let session: Arc<tokio::sync::Mutex<Option<Box<dyn tablepro_core::Session>>>> =
-        Arc::new(tokio::sync::Mutex::new(Some(Box::new(CompletionSession {
-            calls: Arc::new(std::sync::Mutex::new(Vec::new())),
-        }))));
+    let session = Arc::new(tokio::sync::Mutex::new(Some(CompletionSession {
+        calls: Arc::new(std::sync::Mutex::new(Vec::new())),
+    })));
     let _guard = session.lock().await;
 
     let Ok((_, columns)) = tokio::time::timeout(
