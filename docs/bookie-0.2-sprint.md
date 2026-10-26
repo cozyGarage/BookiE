@@ -20,6 +20,39 @@ The app and agentd manifests identify source version `0.2.0`. The current AppStr
 
 [Project #3](https://github.com/users/cozyGarage/projects/3) owns issue status and Lane; the [ledger index](known-issues.md) maps IDs to issues. Existing open correctness, qualification and infrastructure issues keep their evidence and follow-up scope. They are not silently closed by a milestone-status change.
 
+## Proposed 0.2.1 release plan
+
+Status: draft for maintainer review, snapshot 2026-10-26. This does not authorize a release tag or publication. `0.2.1` is a patch version.
+
+At this snapshot, `linux` is `15ad48925` and contains 391 first-parent commits after `linux-v0.2.0`. The accumulated change is larger than a narrow maintenance patch: it includes the entries under `[Unreleased]` in `CHANGELOG.md`, including new workflows and substantial performance, import, editor, policy and driver work. A `0.2.1` release from `linux` must qualify that full accumulated delta. Do not describe it as only the fixes in the last PRs.
+
+### Candidate scope
+
+- Keep each release small enough to review and qualify. Continue development in bounded steps; selected fixes get regressions and the normal GitHub and Forgejo gates. Publication does not require completing the whole backlog.
+- Include all changes already merged after `linux-v0.2.0`; do not selectively omit merged features from release notes.
+- Preserve the existing database, saved-connection, keyring, workspace, audit and MCP compatibility contracts. No data-format or protocol change is planned.
+- Keep database snapshots, Flathub publication, Debian/Ubuntu desktop support, new driver maturity claims, and other unscheduled backlog candidates out of this release.
+
+### Incremental follow-ups
+
+These issues guide later iterations. Their full closure is not required for 0.2.1. Hold publication for a confirmed security defect, data-loss defect, broken primary workflow or failed applicable release check; document other limitations and carry them forward.
+
+1. Resolve AppStream version classification and dates for the published 0.2.0 entry and the unreleased current source under [#1585](https://github.com/cozyGarage/BookiE/issues/1585); validate the metadata and version fields.
+2. Complete and record native Arch/Omarchy/Hyprland install, upgrade from 0.2.0, and rollback checks under [#574](https://github.com/cozyGarage/BookiE/issues/574). Verify saved connections, credentials, workspace state and compatibility aliases after upgrade.
+3. Triage the manual checklist under [#575](https://github.com/cozyGarage/BookiE/issues/575). Cover every release-critical changed flow; file a follow-up for each remaining unchecked behavior rather than implying all 107 checks passed.
+4. Reconcile the intermittent installed GTK evidence under [#556](https://github.com/cozyGarage/BookiE/issues/556). Meet its current run-count criterion or record a maintainer-approved disposition based on recent exact-source runs.
+5. Review release-critical test oracles under [#594](https://github.com/cozyGarage/BookiE/issues/594), especially policy, type/value preservation, import and transaction outcomes. Open defects before the release candidate is frozen.
+
+### Qualification and cut
+
+1. **Release hygiene:** recheck Project #3 and open pull requests, resolve #1585, confirm the release notes match merged user-visible behavior (the `[Unreleased]` entries of `CHANGELOG.md` plus the `Release-Note:` lines from `python3 scripts/release-notes.py assemble --since 669635a06`, per [ADR 0022](decisions/0022-release-notes-from-merge-commits.md)), and select the next bounded release slice.
+2. **Desktop acceptance:** check install, upgrade and the primary workflows on the selected desktop. Record the covered subset under #574/#575 and continue collecting GTK reliability evidence under #556 over later iterations. Fix any release-blocking issue in its owning lane, with a regression and fresh gates.
+3. **Candidate qualification:** review release-critical test oracles under #594; record the candidate commit; run preflight, relevant GTK, driver/TLS/release fixture layers, packaging builds, GitHub checks and one serialized Forgejo gate. Complete install, 0.2.0-to-candidate upgrade and rollback on Arch/Hyprland. Skipped GitHub merge-tier checks are not passes.
+4. **Release cut:** update the workspace version, `meson.build`, AppStream metadata and release notes together to `0.2.1`, in a pull request titled `chore(release): 0.2.1` (the only kind that may edit `CHANGELOG.md`); run `scripts/check-release-version.py`, `appstreamcli validate`, link, issue-ledger and ignored-test inventory checks. Build the `[0.2.1]` section with `release-notes.py cut 0.2.1 <date>` and add the assembled notes to it by hand. Keep `CHANGELOG.md` in place: the Release workflow still reads that section, so removing it before the tag would fail the release.
+5. **Publish:** build every artifact from the exact candidate tag workflow, verify `SHA256SUMS` and provenance, install the tag-built Arch package, and inspect the draft. Publish when the selected scope passes its applicable checks, confirmed release-blocking defects are resolved and the maintainer approves. Record remaining limitations and continue them in later releases; complete backlog closure and 100% coverage are not publication criteria. After publication, retire the old changelog in a separate docs change ([release process](release-process.md), step 5): archive it unchanged, remove `CHANGELOG.md` and repoint its references. Switch the Release workflow to `release-notes.py assemble --since <previous tag>` before the following release.
+
+Release-note boundary: summarize user-visible behavior since 0.2.0, grouped by added, changed, fixed and security impact. Do not copy test evidence or internal refactors into user-facing notes. Notes are written as `Release-Note:` lines in pull request bodies ([ADR 0022](decisions/0022-release-notes-from-merge-commits.md)); only pull request merges carry one, and direct docs pushes do not. The release workflow and that ADR govern the final notes.
+
 ## Standing decisions
 
 | Topic | Canonical decision |
