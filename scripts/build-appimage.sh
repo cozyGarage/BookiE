@@ -29,6 +29,15 @@ DEB_OUT="$OUT/stage" "$ROOT/scripts/build-deb.sh"
 APPDIR="$OUT/BookiE.AppDir"
 cp -a "$OUT/stage/bookie_${VERSION}-1_amd64" "$APPDIR"
 rm -rf "$APPDIR/DEBIAN"
+GTK_SOURCE_DATA=/usr/share/gtksourceview-5
+GTK_SOURCE_SCHEMA="$GTK_SOURCE_DATA/language-specs/language.rng"
+if [[ ! -f "$GTK_SOURCE_SCHEMA" ]]; then
+  echo "missing GtkSourceView language schema: $GTK_SOURCE_SCHEMA" >&2
+  exit 1
+fi
+install -d "$APPDIR/usr/share"
+cp -a "$GTK_SOURCE_DATA" "$APPDIR/usr/share/"
+test -f "$APPDIR/usr/share/gtksourceview-5/language-specs/language.rng"
 
 cd "$OUT"
 export APPIMAGE_EXTRACT_AND_RUN=1 DEPLOY_GTK_VERSION=4 ARCH=x86_64 VERSION
