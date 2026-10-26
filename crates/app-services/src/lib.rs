@@ -38,3 +38,4 @@ pub mod query_parameters;
 pub mod quick_switcher;
 pub mod reconnect;
 pub mod sidebar_tree;
+pub mod sql_text;
