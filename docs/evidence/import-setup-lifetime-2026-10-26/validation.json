@@ -1,0 +1,33 @@
+{
+  "base": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+  "fixed_commit": "cca4237ce",
+  "environment": {
+    "display": "isolated Xvfb",
+    "input_method": "simple",
+    "G_DEBUG": "fatal-criticals"
+  },
+  "focused_regressions": [
+    {
+      "test": "ui::import_dialog::lifetime_tests::import_format_controls_release_their_source_bytes",
+      "before": "1 failed, 0 passed",
+      "after": "1 passed, 0 failed"
+    },
+    {
+      "test": "ui::import_dialog::lifetime_tests::dismissing_import_setup_releases_its_callback",
+      "before": "1 failed, 0 passed",
+      "after": "1 passed, 0 failed"
+    }
+  ],
+  "source_sha256": {
+    "apps/linux/app/src/ui/import_dialog.rs": "c24884317f5ea3b4920b2288217e074ce6272235d10496eff75f933ca92ad294",
+    "apps/linux/app/src/ui/import_dialog/lifetime_tests.rs": "39fb11ac139afa22ba111caea37505a9581d77376d8b2c9eeb2df961a7a2c28b",
+    "scripts/isolated-tests.json": "b53ad270f55f9154220da93bcb11076a9034677c5189af8131984df42ee5b505"
+  },
+  "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings",
+  "remaining": [
+    "full preflight",
+    "ordinary GTK widgets",
+    "installed CSV import acceptance",
+    "Forgejo gate"
+  ]
+}
