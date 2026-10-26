@@ -130,6 +130,7 @@ impl SqlEditor {
         let context = self.executions.remove(&generation)?;
         if terminal.became_idle {
             self.set_running(false, false, sender);
+            (self.completion_refresh)();
             if let Ok(elapsed) = context.started_at.elapsed() {
                 finish_notice::notify_if_unattended(&self.source_view, elapsed);
             }

@@ -68,6 +68,36 @@ impl tablepro_core::Session for PgSession {
         crate::reported_lexical_settings(connection).map(Some)
     }
 
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<String>, DriverError> {
+        if self.active_cursor.is_some() {
+            return Err(DriverError::Unsupported(
+                "completion metadata while a forward-only cursor is active".into(),
+            ));
+        }
+        let params = [
+            schema.map_or(Value::Null, |schema| Value::Text(schema.to_string())),
+            Value::Text(table.to_string()),
+        ];
+        let result = self
+            .run_query_controlled(COMPLETION_COLUMNS_SQL, &params, control)
+            .await?;
+        result
+            .rows
+            .into_iter()
+            .map(|row| match row.into_iter().next() {
+                Some(Value::Text(name)) => Ok(name),
+                _ => Err(DriverError::Internal(
+                    "PostgreSQL returned an invalid completion column name".into(),
+                )),
+            })
+            .collect()
+    }
+
     async fn open_query_cursor_controlled(
         &mut self,
         sql: &str,
@@ -240,6 +270,14 @@ impl PgSession {
 }
 
 const CURSOR_PREFIX: &str = "DECLARE bookie_cursor NO SCROLL CURSOR FOR ";
+const COMPLETION_COLUMNS_SQL: &str = "SELECT a.attname::text \
+    FROM pg_catalog.pg_attribute AS a \
+    WHERE a.attrelid = pg_catalog.to_regclass(CASE WHEN $1::text IS NULL \
+        THEN pg_catalog.quote_ident($2::text) \
+        ELSE pg_catalog.format('%I.%I', $1::text, $2::text) END) \
+      AND a.attnum > 0 \
+      AND NOT a.attisdropped \
+    ORDER BY a.attnum";
 
 fn position_in_cursor_query(error: DriverError) -> DriverError {
     let DriverError::Query {

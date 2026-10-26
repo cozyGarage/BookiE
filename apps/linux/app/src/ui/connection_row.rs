@@ -373,7 +373,7 @@ mod tests {
             }
         }
         if let Some(directory) = std::env::var_os("BOOKIE_CONNECTION_ROW_SCREENSHOT_DIR") {
-            capture_connection_row_screenshots(&window, std::path::Path::new(&directory));
+            capture_connection_row_screenshots(&window, &list, std::path::Path::new(&directory));
         }
         gtk::style_context_remove_provider_for_display(&gtk::gdk::Display::default().unwrap(), &provider);
         assert!(
@@ -389,7 +389,7 @@ mod tests {
         assert!(row.open_button.width() > 0, "open action is not reachable");
     }
 
-    fn capture_connection_row_screenshots(window: &gtk::Window, directory: &std::path::Path) {
+    fn capture_connection_row_screenshots(window: &gtk::Window, list: &gtk::ListBox, directory: &std::path::Path) {
         std::fs::create_dir_all(directory).unwrap();
         let style_manager = adw::StyleManager::default();
         let context = gtk::glib::MainContext::default();
@@ -406,26 +406,26 @@ mod tests {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
                 while context.iteration(false) {}
-                let ids = std::process::Command::new("xdotool")
-                    .args(["search", "--onlyvisible", "--name", "BookiE saved connection preview"])
-                    .output()
-                    .unwrap();
-                assert!(ids.status.success(), "preview window is not visible");
-                let window_id = String::from_utf8(ids.stdout)
-                    .unwrap()
-                    .lines()
-                    .next()
-                    .unwrap()
-                    .to_owned();
+                assert_eq!(
+                    window.width(),
+                    width,
+                    "preview window did not reach the requested width"
+                );
                 let path = directory.join(format!("{theme}-{layout}.png"));
-                let status = std::process::Command::new("import")
-                    .args(["-window", &window_id])
-                    .arg(path)
-                    .status()
-                    .unwrap();
-                assert!(status.success(), "could not save the {theme} {layout} screenshot");
+                save_widget_snapshot(window, list, &path);
             }
         }
+    }
+
+    fn save_widget_snapshot(window: &gtk::Window, widget: &gtk::ListBox, path: &std::path::Path) {
+        assert!(window.is_mapped(), "preview window is not mapped");
+        let paintable = gtk::WidgetPaintable::new(Some(widget));
+        let snapshot = gtk::Snapshot::new();
+        paintable.snapshot(&snapshot, f64::from(widget.width()), f64::from(widget.height()));
+        let node = snapshot.to_node().unwrap();
+        let renderer = window.renderer().unwrap();
+        let texture = renderer.render_texture(&node, None);
+        texture.save_to_png(path).unwrap();
     }
 
     #[test]

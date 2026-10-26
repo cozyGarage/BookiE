@@ -28,6 +28,8 @@ async fn assert_extended_temporal_csv_round_trip(connection: &dyn Connection, ki
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: None,
             table: &table,
             columns: &columns,
@@ -262,6 +264,8 @@ async fn value_contract_bc_dates_survive_default_csv_import() {
         let plan = tablepro_core::import::build_insert_plan(
             &tablepro_core::import::ImportTarget {
                 driver_id: "postgres",
+
+                capabilities: tablepro_core::DriverCapabilities::default(),
                 schema: None,
                 table: &target_table,
                 columns: &columns,

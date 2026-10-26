@@ -11,19 +11,20 @@ use tablepro_core::import::{
 };
 use tablepro_core::import::{CsvImportEncoding, CsvImportQuote};
 use tablepro_core::sql_ddl::DraftColumn;
-use tablepro_core::{ColumnInfo, import::supports_explicit_auto_increment_values, sql_dialect};
+use tablepro_core::{ColumnInfo, DriverCapabilities, sql_dialect};
 use tokio_util::sync::CancellationToken;
 
 /// Whether the rows go into a table that is already there, or into one
 /// the import creates first.
 pub(crate) enum ImportMode {
     ExistingTable {
-        driver_id: String,
+        capabilities: DriverCapabilities,
         table: String,
         columns: Vec<ColumnInfo>,
     },
     NewTable {
         driver_id: String,
+        capabilities: DriverCapabilities,
         suggested_table: String,
     },
 }
@@ -49,6 +50,7 @@ pub(crate) struct ImportChoice {
     pub options: CsvImportOptions,
     pub mapping: Vec<Option<usize>>,
     pub columns: Vec<ColumnInfo>,
+    pub capabilities: DriverCapabilities,
     /// The table to create first, when the import is making one. The
     /// CREATE is its own governed statement, run before any row.
     pub create: Option<Vec<DraftColumn>>,
@@ -116,6 +118,11 @@ impl State {
             options,
             mapping,
             columns,
+            capabilities: match &self.request.mode {
+                ImportMode::ExistingTable { capabilities, .. } | ImportMode::NewTable { capabilities, .. } => {
+                    *capabilities
+                }
+            },
             create,
         })
     }
@@ -223,12 +230,13 @@ impl ColumnSection {
     fn new(request: &ImportRequest) -> Self {
         match &request.mode {
             ImportMode::ExistingTable {
-                driver_id,
+                capabilities,
                 table,
                 columns,
+                ..
             } => Self::Existing(ExistingColumns::new(
                 table,
-                driver_id,
+                capabilities,
                 columns,
                 request.mapping_store.clone(),
                 request.mapping_scope.clone(),
@@ -236,6 +244,7 @@ impl ColumnSection {
             ImportMode::NewTable {
                 driver_id,
                 suggested_table,
+                ..
             } => Self::New(NewColumns::new(driver_id, suggested_table)),
         }
     }
@@ -270,7 +279,7 @@ impl ColumnSection {
 
 struct ExistingColumns {
     group: adw::PreferencesGroup,
-    driver_id: String,
+    capabilities: DriverCapabilities,
     table: String,
     columns: Vec<ColumnInfo>,
     rows: Vec<adw::ComboRow>,
@@ -282,7 +291,7 @@ struct ExistingColumns {
 impl ExistingColumns {
     fn new(
         table: &str,
-        driver_id: &str,
+        capabilities: &DriverCapabilities,
         columns: &[ColumnInfo],
         store: Option<CsvMappingStore>,
         scope: Option<CsvMappingScope>,
@@ -298,9 +307,9 @@ impl ExistingColumns {
             .map(|column| {
                 let row = adw::ComboRow::builder()
                     .title(&column.name)
-                    .subtitle(column_subtitle(driver_id, column))
+                    .subtitle(column_subtitle(*capabilities, column))
                     .build();
-                row.set_sensitive(!server_managed(driver_id, column));
+                row.set_sensitive(!server_managed(*capabilities, column));
                 row
             })
             .collect();
@@ -312,7 +321,7 @@ impl ExistingColumns {
         add_mapping_controls(
             &group,
             MappingActionsParams {
-                driver_id: driver_id.to_owned(),
+                capabilities: *capabilities,
                 rows: rows.clone(),
                 headers: headers.clone(),
                 has_header: has_header.clone(),
@@ -323,7 +332,7 @@ impl ExistingColumns {
         );
         Self {
             group,
-            driver_id: driver_id.to_owned(),
+            capabilities: *capabilities,
             table: table.to_owned(),
             columns: columns.to_vec(),
             rows,
@@ -340,7 +349,7 @@ impl ExistingColumns {
         if preserve {
             return;
         }
-        let suggestion = suggested_existing_mapping(&self.driver_id, &sheet.headers, &self.columns);
+        let suggestion = suggested_existing_mapping(self.capabilities, &sheet.headers, &self.columns);
         let mut labels = vec![SKIP_LABEL.to_string()];
         labels.extend(disambiguated_headers(&sheet.headers));
         for (row, field) in self.rows.iter().zip(suggestion) {
@@ -357,13 +366,13 @@ impl ExistingColumns {
             .iter()
             .map(|row| (row.selected() > 0).then(|| row.selected() as usize - 1))
             .collect();
-        editable_existing_mapping(&self.driver_id, &self.columns, selected)
+        editable_existing_mapping(self.capabilities, &self.columns, selected)
     }
 }
 
 struct MappingActions {
     status: gtk::Label,
-    driver_id: String,
+    capabilities: DriverCapabilities,
     rows: Vec<adw::ComboRow>,
     headers: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
     has_header: std::rc::Rc<std::cell::Cell<bool>>,
@@ -373,7 +382,7 @@ struct MappingActions {
 }
 
 struct MappingActionsParams {
-    driver_id: String,
+    capabilities: DriverCapabilities,
     rows: Vec<adw::ComboRow>,
     headers: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
     has_header: std::rc::Rc<std::cell::Cell<bool>>,
@@ -405,7 +414,7 @@ impl MappingActions {
     fn new(status: &gtk::Label, params: MappingActionsParams) -> Self {
         Self {
             status: status.clone(),
-            driver_id: params.driver_id,
+            capabilities: params.capabilities,
             rows: params.rows,
             headers: params.headers,
             has_header: params.has_header,
@@ -432,7 +441,7 @@ impl MappingActions {
                 .iter()
                 .map(|row| (row.selected() > 0).then(|| row.selected() as usize - 1))
                 .collect();
-            let mapping = editable_existing_mapping(&actions.driver_id, &actions.columns, selected);
+            let mapping = editable_existing_mapping(actions.capabilities, &actions.columns, selected);
             let result = store.save(
                 scope,
                 &actions.headers.borrow(),
@@ -491,7 +500,7 @@ impl MappingActions {
     fn clone_for_signal(&self) -> Self {
         Self {
             status: self.status.clone(),
-            driver_id: self.driver_id.clone(),
+            capabilities: self.capabilities,
             rows: self.rows.clone(),
             headers: self.headers.clone(),
             has_header: self.has_header.clone(),
@@ -518,18 +527,18 @@ fn disambiguated_headers(headers: &[String]) -> Vec<String> {
         .collect()
 }
 
-fn server_managed(driver_id: &str, column: &ColumnInfo) -> bool {
-    column.is_generated || (column.is_auto_increment && !supports_explicit_auto_increment_values(driver_id))
+fn server_managed(capabilities: DriverCapabilities, column: &ColumnInfo) -> bool {
+    column.is_generated || (column.is_auto_increment && !capabilities.supports_explicit_auto_increment_values)
 }
 
-fn column_subtitle(driver_id: &str, column: &ColumnInfo) -> String {
-    if column.is_auto_increment && supports_explicit_auto_increment_values(driver_id) {
+fn column_subtitle(capabilities: DriverCapabilities, column: &ColumnInfo) -> String {
+    if column.is_auto_increment && capabilities.supports_explicit_auto_increment_values {
         format!(
             "{} · {}",
             column.data_type,
             crate::tr!("Auto-increment values are inserted when mapped.")
         )
-    } else if server_managed(driver_id, column) {
+    } else if server_managed(capabilities, column) {
         format!(
             "{} · {}",
             column.data_type,
@@ -541,22 +550,28 @@ fn column_subtitle(driver_id: &str, column: &ColumnInfo) -> String {
 }
 
 pub(super) fn suggested_existing_mapping(
-    driver_id: &str,
+    capabilities: DriverCapabilities,
     headers: &[String],
     columns: &[ColumnInfo],
 ) -> Vec<Option<usize>> {
-    editable_existing_mapping(driver_id, columns, suggest_mapping(headers, columns))
+    editable_existing_mapping(capabilities, columns, suggest_mapping(headers, columns))
 }
 
 fn editable_existing_mapping(
-    driver_id: &str,
+    capabilities: DriverCapabilities,
     columns: &[ColumnInfo],
     mapping: Vec<Option<usize>>,
 ) -> Vec<Option<usize>> {
     mapping
         .into_iter()
         .zip(columns)
-        .map(|(field, column)| if server_managed(driver_id, column) { None } else { field })
+        .map(|(field, column)| {
+            if server_managed(capabilities, column) {
+                None
+            } else {
+                field
+            }
+        })
         .collect()
 }
 
@@ -906,15 +921,12 @@ mod tests {
             },
         ];
 
-        for driver_id in ["postgres", "mysql", "sqlite"] {
-            assert_eq!(
-                suggested_existing_mapping(driver_id, &headers, &columns),
-                [Some(0), Some(1), None],
-                "{driver_id}"
-            );
-        }
         assert_eq!(
-            suggested_existing_mapping("mssql", &headers, &columns),
+            suggested_existing_mapping(explicit_auto_increment_capabilities(), &headers, &columns),
+            [Some(0), Some(1), None]
+        );
+        assert_eq!(
+            suggested_existing_mapping(DriverCapabilities::default(), &headers, &columns),
             [None, Some(1), None]
         );
     }
@@ -934,16 +946,27 @@ mod tests {
         ];
 
         assert_eq!(
-            editable_existing_mapping("postgres", &columns, vec![Some(0), Some(1), Some(2)]),
+            editable_existing_mapping(
+                explicit_auto_increment_capabilities(),
+                &columns,
+                vec![Some(0), Some(1), Some(2)]
+            ),
             [Some(0), Some(1), None]
         );
         assert_eq!(
-            editable_existing_mapping("mssql", &columns, vec![Some(0), Some(1), Some(2)]),
+            editable_existing_mapping(DriverCapabilities::default(), &columns, vec![Some(0), Some(1), Some(2)]),
             [None, Some(1), None]
         );
-        assert!(!server_managed("postgres", &columns[0]));
-        assert!(server_managed("mssql", &columns[0]));
-        assert!(server_managed("postgres", &columns[2]));
+        assert!(!server_managed(explicit_auto_increment_capabilities(), &columns[0]));
+        assert!(server_managed(DriverCapabilities::default(), &columns[0]));
+        assert!(server_managed(explicit_auto_increment_capabilities(), &columns[2]));
+    }
+
+    fn explicit_auto_increment_capabilities() -> DriverCapabilities {
+        DriverCapabilities {
+            supports_explicit_auto_increment_values: true,
+            ..DriverCapabilities::default()
+        }
     }
 
     #[test]

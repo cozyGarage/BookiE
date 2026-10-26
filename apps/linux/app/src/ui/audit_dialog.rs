@@ -5,13 +5,23 @@ use relm4::adw::prelude::*;
 use relm4::gtk::glib;
 use relm4::{adw, gtk};
 
-use crate::services::audit_view::{OperationRow, approval_label, matches, needs_attention, operations, status_label};
+use crate::services::audit_view::{
+    OperationRow, approval_label, contains_operation, matches, needs_attention, operations, status_label,
+};
 use crate::services::database_service::DatabaseService;
 use crate::tr;
 
 const RECENT_RECORDS: usize = 1_000;
 
 pub fn present(parent: &gtk::Window, database: &Arc<DatabaseService>) {
+    present_with_operation(parent, database, None);
+}
+
+pub fn present_for_operation(parent: &gtk::Window, database: &Arc<DatabaseService>, operation_id: uuid::Uuid) {
+    present_with_operation(parent, database, Some(operation_id));
+}
+
+fn present_with_operation(parent: &gtk::Window, database: &Arc<DatabaseService>, operation_id: Option<uuid::Uuid>) {
     let dialog = adw::Dialog::builder().title(tr!("Audit Log")).build();
     dialog.set_content_width(900);
     dialog.set_content_height(620);
@@ -24,6 +34,9 @@ pub fn present(parent: &gtk::Window, database: &Arc<DatabaseService>) {
         .margin_end(12)
         .margin_bottom(6)
         .build();
+    if let Some(operation_id) = operation_id {
+        search.set_text(&operation_id.to_string());
+    }
     toolbar.add_top_bar(&search);
 
     let list = gtk::ListBox::builder()
@@ -53,22 +66,49 @@ pub fn present(parent: &gtk::Window, database: &Arc<DatabaseService>) {
 
     let database = database.clone();
     glib::spawn_future_local(async move {
-        match database.recent_audit(RECENT_RECORDS).await {
-            Ok(events) => {
-                let rows = Rc::new(operations(events));
-                if rows.is_empty() {
-                    status.set_title(&tr!("No audited operations yet"));
-                    return;
-                }
-                show_operations(&list, &stack, &search, rows);
-            }
-            Err(error) => {
-                status.set_icon_name(Some("dialog-warning-symbolic"));
-                status.set_title(&tr!("The audit journal could not be read"));
-                status.set_description(Some(&error));
-            }
-        }
+        load_recent_operations(database, operation_id, status, list, stack, search).await;
     });
+}
+
+async fn load_recent_operations(
+    database: Arc<DatabaseService>,
+    operation_id: Option<uuid::Uuid>,
+    status: adw::StatusPage,
+    list: gtk::ListBox,
+    stack: gtk::Stack,
+    search: gtk::SearchEntry,
+) {
+    match database.recent_audit(RECENT_RECORDS).await {
+        Ok(events) => {
+            let rows = Rc::new(operations(events));
+            if operation_id.is_some_and(|operation_id| !contains_operation(&rows, operation_id)) {
+                show_unavailable_operation(&status);
+                return;
+            }
+            if rows.is_empty() {
+                show_empty_operations(&status);
+                return;
+            }
+            show_operations(&list, &stack, &search, rows);
+        }
+        Err(error) => {
+            status.set_icon_name(Some("dialog-warning-symbolic"));
+            status.set_title(&tr!("The audit journal could not be read"));
+            status.set_description(Some(&error));
+        }
+    }
+}
+
+fn show_unavailable_operation(status: &adw::StatusPage) {
+    status.set_icon_name(Some("dialog-warning-symbolic"));
+    status.set_title(&tr!("Audit operation is unavailable"));
+    status.set_description(Some(&tr!(
+        "This operation is outside the recent audit history. No other operation was opened."
+    )));
+}
+
+fn show_empty_operations(status: &adw::StatusPage) {
+    status.set_title(&tr!("No audited operations yet"));
 }
 
 fn show_operations(list: &gtk::ListBox, stack: &gtk::Stack, search: &gtk::SearchEntry, rows: Rc<Vec<OperationRow>>) {

@@ -771,6 +771,8 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
     let plan = tablepro_core::import::build_insert_plan(
         &tablepro_core::import::ImportTarget {
             driver_id: "postgres",
+
+            capabilities: tablepro_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "timetz_array_csv_import_target",
             columns: &columns,
