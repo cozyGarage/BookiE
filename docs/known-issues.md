@@ -70,7 +70,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | SNAP-2 | [#547](https://github.com/cozyGarage/BookiE/issues/547) | UX |
 | SNAP-3 | [#547](https://github.com/cozyGarage/BookiE/issues/547) | UX |
 | SNAP-4 | [#547](https://github.com/cozyGarage/BookiE/issues/547) | UX |
-| DBF-1 | [#1355](https://github.com/cozyGarage/BookiE/issues/1355) | UX |
 | DBF-2 | [#1356](https://github.com/cozyGarage/BookiE/issues/1356) | B3 |
 | DBF-3 | [#1357](https://github.com/cozyGarage/BookiE/issues/1357) | B3 |
 | DBF-4 | [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | B4 |
