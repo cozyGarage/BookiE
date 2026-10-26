@@ -6,6 +6,12 @@
     "scripts/test-arch-package.sh": "e06f4e627de094b2a933f45aa9e3efc5158dfe026f4a45243cbc106030c4990f",
     "scripts/validate-arch-package.sh": "0888355eafda95fb73b718f97389f0cd61a7174934d97e0f44f90d8766eaa4f1"
   },
+  "source_commits": {
+    "scripts/test-arch-package-container.sh": "79375fcf16e84b3a4fb6a0b1544c23f72cf9c417",
+    "scripts/tests/test_arch_package_container.py": "79375fcf16e84b3a4fb6a0b1544c23f72cf9c417",
+    "scripts/test-arch-package.sh": "07bc0b76cf4cf08feb930f6fe9133e5123be3f55",
+    "scripts/validate-arch-package.sh": "7f181ee8b68f58b3c487dc4afd72ba1f26e296e4"
+  },
   "checks": {
     "wrapper_unit_tests": 10,
     "preflight": {
