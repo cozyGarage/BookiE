@@ -25,8 +25,6 @@
   },
   "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings",
   "remaining": [
-    "full preflight",
-    "ordinary GTK widgets",
     "Forgejo gate"
   ],
   "installed_acceptance": {
@@ -39,5 +37,16 @@
     ],
     "result": "3 passed",
     "binary_sha256": "1106e73b581b2f4323a975243b5f0a8f0b78312859b434facd172da7c924e73a"
+  },
+  "preflight": {
+    "unit": 2197,
+    "sandbox": 291,
+    "redis_cancellation": 1,
+    "result": "passed"
+  },
+  "gtk_widgets": {
+    "executed": 177,
+    "result": "passed",
+    "input_method": "ordinary suite environment"
   }
 }
