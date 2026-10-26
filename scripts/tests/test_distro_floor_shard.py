@@ -58,6 +58,7 @@ class DistroFloorShardTests(unittest.TestCase):
                         PATH=f"{directory}{os.pathsep}{environment['PATH']}",
                         DOCKER_ARGUMENTS=str(log),
                         TABLEPRO_GTK_SHARD="2/3",
+                        CARGO_BUILD_JOBS="2",
                     )
                     if packaged:
                         environment["DISTRO_FLOOR_PACKAGE"] = str(package)
@@ -72,6 +73,10 @@ class DistroFloorShardTests(unittest.TestCase):
                     arguments = runs[0]
                     self.assertIn("TABLEPRO_GTK_SHARD=2/3", arguments)
                     position = arguments.index("TABLEPRO_GTK_SHARD=2/3")
+                    self.assertEqual(arguments[position - 1], "-e")
+                    self.assertLess(position, arguments.index("bash"))
+                    self.assertIn("CARGO_BUILD_JOBS=2", arguments)
+                    position = arguments.index("CARGO_BUILD_JOBS=2")
                     self.assertEqual(arguments[position - 1], "-e")
                     self.assertLess(position, arguments.index("bash"))
 

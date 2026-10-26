@@ -25,7 +25,7 @@ for base in "${images[@]}"; do
     build_environment=(-e CARGO_TARGET_DIR=/target)
   fi
   docker build -q -t "$tag" --build-arg "BASE=$base" -f "$dockerfile" scripts/distro-floor >/dev/null
-  docker run --rm "${package_mount[@]}" "${package_env[@]}" -e TABLEPRO_GTK_SHARD="${TABLEPRO_GTK_SHARD:-}" -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" ${TABLEPRO_GTK_Y_OFFSET:+-e TABLEPRO_GTK_Y_OFFSET="$TABLEPRO_GTK_Y_OFFSET"} ${TABLEPRO_GTK_WAIT_SECONDS:+-e TABLEPRO_GTK_WAIT_SECONDS="$TABLEPRO_GTK_WAIT_SECONDS"} ${TABLEPRO_GTK_SCENARIO_RETRIES:+-e TABLEPRO_GTK_SCENARIO_RETRIES="$TABLEPRO_GTK_SCENARIO_RETRIES"} -v "$PWD:/src:ro" "${build_mounts[@]}" "${build_environment[@]}" "$tag" bash -ceu -o pipefail '
+  docker run --rm ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} "${package_mount[@]}" "${package_env[@]}" -e TABLEPRO_GTK_SHARD="${TABLEPRO_GTK_SHARD:-}" -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" ${TABLEPRO_GTK_Y_OFFSET:+-e TABLEPRO_GTK_Y_OFFSET="$TABLEPRO_GTK_Y_OFFSET"} ${TABLEPRO_GTK_WAIT_SECONDS:+-e TABLEPRO_GTK_WAIT_SECONDS="$TABLEPRO_GTK_WAIT_SECONDS"} ${TABLEPRO_GTK_SCENARIO_RETRIES:+-e TABLEPRO_GTK_SCENARIO_RETRIES="$TABLEPRO_GTK_SCENARIO_RETRIES"} -v "$PWD:/src:ro" "${build_mounts[@]}" "${build_environment[@]}" "$tag" bash -ceu -o pipefail '
     if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]; then
       apt-get update -qq
       apt-get install -y -qq "/package/$DISTRO_FLOOR_DEB_NAME" >/dev/null
