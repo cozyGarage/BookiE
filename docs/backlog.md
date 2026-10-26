@@ -115,7 +115,7 @@ The [peer-review tracker #1026](https://github.com/cozyGarage/BookiE/issues/1026
 
 ## Static driver contract
 
-- DRV-1 / [#1688](https://github.com/cozyGarage/BookiE/issues/1688): model column-comment support as a typed lifecycle capability, then consume it in the Structure editor. B3 owns the core capability and DDL contract; a recorded handoff returns the editor consumer to UX. Keep connection-scoped cancellation and metadata-derived object permissions outside the static profile.
+- DRV-1 / [#1688](https://github.com/cozyGarage/BookiE/issues/1688): the typed column-comment lifecycle and DDL contract landed in B3 commit `416daa1`; UX is consuming that capability in the Structure editor and adding registered-driver behavior coverage. Keep connection-scoped cancellation and metadata-derived object permissions outside the static profile.
 
 ## Issue and lane status
 

@@ -545,6 +545,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::structure_tab::columns::tests::column_comment_editor_enabled_state_follows_typed_capability"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::structure_tab::tests::sql_preview_is_read_only_without_a_visible_cursor"
     ],
     [
