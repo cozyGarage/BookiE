@@ -167,6 +167,26 @@ impl Session for SessionHandle {
         self.close_cursor_with_audit(cursor_id, control).await.result
     }
 
+    async fn fetch_completion_columns_controlled(
+        &mut self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<String>, DriverError> {
+        match self {
+            Self::Audited(session) => {
+                session
+                    .fetch_completion_columns_controlled(schema, table, control)
+                    .await
+            }
+            Self::Plain(session) => {
+                session
+                    .fetch_completion_columns_controlled(schema, table, control)
+                    .await
+            }
+        }
+    }
+
     async fn lexical_settings_controlled(
         &mut self,
         control: &OperationControl,
