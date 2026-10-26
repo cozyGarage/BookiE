@@ -103,7 +103,8 @@ def validate_manifest(path, strict=False):
         return [f"{path}: {error}"], warnings
     if not isinstance(manifest, dict):
         return [f"{path}: manifest must be an object"], warnings
-    if manifest.get("schema_version") != 1:
+    legacy_source_only = "schema_version" not in manifest and "source_sha256" in manifest
+    if manifest.get("schema_version") != 1 and not legacy_source_only:
         return errors, warnings
     if is_test_layer_report(manifest):
         return validate_test_layer_report(path, manifest)
@@ -144,8 +145,15 @@ def validate_manifest(path, strict=False):
                 continue
             continue
         source = ROOT / name
-        if source.is_file() and hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+        if not source.is_file():
+            (errors if strict else warnings).append(
+                f"{path}: source file is unavailable in the current checkout without a per-file source commit: {name}"
+            )
+            continue
+        if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
             warnings.append(f"{path}: source differs from the current checkout: {name}")
+    if legacy_source_only:
+        return errors, warnings
     log_digests = manifest.get("log_sha256", {})
     if isinstance(log_digests, str) and manifest.get("log"):
         log_digests = {manifest["log"]: log_digests}
@@ -216,21 +224,27 @@ def main():
     args = parser.parse_args()
     failures = []
     warnings = []
-    checked = 0
+    checked_v1 = 0
+    checked_legacy_source = 0
     for path in manifests(args.paths):
         errors, notes = validate_manifest(path, args.strict)
         try:
-            schema_version = json.loads(path.read_text()).get("schema_version")
+            manifest = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError):
-            schema_version = None
-        if schema_version == 1:
-            checked += 1
+            manifest = None
+        if isinstance(manifest, dict) and manifest.get("schema_version") == 1:
+            checked_v1 += 1
+        elif isinstance(manifest, dict) and "schema_version" not in manifest and "source_sha256" in manifest:
+            checked_legacy_source += 1
         failures.extend(errors)
         warnings.extend(notes)
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1
-    print(f"Validated {checked} evidence manifests; {len(warnings)} historical/source-drift checks need review.")
+    print(
+        f"Validated {checked_v1} schema-v1 evidence manifests; checked source provenance in "
+        f"{checked_legacy_source} legacy packets; {len(warnings)} historical/source-drift checks need review."
+    )
     if warnings:
         print("\n".join(warnings[:10]))
         if len(warnings) > 10:

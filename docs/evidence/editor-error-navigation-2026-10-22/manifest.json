@@ -30,6 +30,20 @@
     "apps/linux/app/src/ui/editor/toolbar_actions.rs": "d1717f104acb01f94cf00adb7e98cae5d2d7ef55a512c5d79bd4230554d1cdad",
     "scripts/isolated-tests.json": "f430a0e4d32387fd10d4b34fb58d54947dd5f08672030eb240e1a651648af344"
   },
+  "source_commits": {
+    "apps/linux/app/src/ui/editor/bottom_panel.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/drop_request.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/error_navigation.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/outcomes/fetch_errors.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/outcomes/tests.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/run_generation.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/run_marks.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/session_lexing.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/statement_cursor.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/statement_failure.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/stream_pages.rs": "402df5e98911c4b1162f8106faefcc349da694b4",
+    "apps/linux/app/src/ui/editor/streaming.rs": "402df5e98911c4b1162f8106faefcc349da694b4"
+  },
   "checks": {
     "app_units": {
       "status": "passed",
