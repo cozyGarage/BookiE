@@ -20,6 +20,8 @@ DIALOGS = {
     "structure_form": ("structure:Add Index…", "Add Index"),
     "column_jump": ("table:win.jump-column", "Jump to Column"),
     "export": ("table:win.export-csv", "Export Results"),
+    "value_viewer": ("grid-value:", "payload"),
+    "column_visibility": ("grid-columns:", "Columns"),
 }
 # AdwAlertDialog is not tracked: libadwaita keeps a closed alert alive even with no handlers.
 # Typing into a field before dismissal exercises the edit-then-discard path.
@@ -52,6 +54,37 @@ def scenarios(ui):
     def insert_row(database):
         with sqlite3.connect(database) as connection:
             connection.execute("INSERT OR IGNORE INTO safety_items(id, note) VALUES (1, 'alpha')")
+
+    def open_grid_value():
+        if ui.find_node(name="leak-probe", role=ui.pyatspi.ROLE_LABEL) is None:
+            focus_grid_cell()
+        ui.press_x11_key("Menu")
+        for _ in range(4):
+            ui.press_x11_key("Down")
+            time.sleep(0.1)
+        ui.press_x11_key("Return")
+
+    def open_grid_columns(database):
+        insert_row(database)
+        open_table()
+        cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
+        extents = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+        ui.gtk_ux.x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
+        time.sleep(0.4)
+        for _ in range(9):
+            ui.press_x11_key("Down")
+            time.sleep(0.1)
+        ui.press_x11_key("Return")
+
+    def focus_grid_cell():
+        ui.run_sql("SELECT 'leak-probe' AS payload")
+        ui.wait_for_node_containing("payload\n", role=ui.pyatspi.ROLE_LABEL)
+        ui.press_x11_key("j", ("Control_L", "Shift_L"))
+        search = ui.wait_for_node(name="Search columns")
+        search.queryEditableText().setTextContents("payload")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Search columns", present=False)
+        ui.gtk_ux.wait_for_focused_grid_row(ui, ui.pyatspi, "leak-probe")
 
     def open_table():
         if ui.find_node(name="safety_items", role=ui.pyatspi.ROLE_PAGE_TAB) is None:
@@ -93,7 +126,11 @@ def scenarios(ui):
 
         def scenario(_database, base):
             for index in range(CYCLES):
-                if action.startswith("table:"):
+                if action == "grid-value:":
+                    open_grid_value()
+                elif action == "grid-columns:":
+                    open_grid_columns(_database)
+                elif action.startswith("table:"):
                     if key == "export":
                         insert_row(_database)
                     open_table()
