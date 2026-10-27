@@ -930,9 +930,8 @@ impl SimpleComponent for App {
             AppMsg::StructureDataLoaded {
                 tab_id,
                 columns,
-                indexes,
-                fks,
-            } => self.on_structure_data_loaded(tab_id, columns, indexes, fks),
+                metadata,
+            } => self.on_structure_data_loaded(tab_id, columns, metadata),
             AppMsg::StructureLoadFailed { tab_id, message } => self.on_structure_load_failed(tab_id, message),
             AppMsg::StructureTabDirtyChanged(tab_id, dirty) => self.refresh_structure_tab_dirty(tab_id, dirty),
             AppMsg::SchemaChanged { origin, schema, table } => self.on_schema_changed(origin, schema, table, sender),
