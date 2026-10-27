@@ -891,13 +891,7 @@ impl HistoryDialog {
         let act_pin = gio::ActionEntry::builder("pin")
             .activate(move |_, _, _| s_pin.input(HistoryDialogInput::TogglePin(id)))
             .build();
-        let query_for_copy = entry.query.clone();
-        let row_for_copy = row.clone();
-        let act_copy = gio::ActionEntry::builder("copy")
-            .activate(move |_, _, _| {
-                row_for_copy.clipboard().set_text(&query_for_copy);
-            })
-            .build();
+        let act_copy = copy_sql_action(&row, entry.query.clone());
         let s_del2 = sender.clone();
         let act_del = gio::ActionEntry::builder("delete")
             .activate(move |_, _, _| s_del2.input(HistoryDialogInput::Delete(id)))
@@ -1086,6 +1080,17 @@ fn format_relative_time(when: SystemTime) -> String {
     }
 }
 
+fn copy_sql_action(row: &adw::ActionRow, query: String) -> gio::ActionEntry<gio::SimpleActionGroup> {
+    let row = row.downgrade();
+    gio::ActionEntry::builder("copy")
+        .activate(move |_, _, _| {
+            if let Some(row) = row.upgrade() {
+                row.clipboard().set_text(&query);
+            }
+        })
+        .build()
+}
+
 fn clear_listbox(listbox: &gtk::ListBox) {
     while let Some(child) = listbox.first_child() {
         listbox.remove(&child);
@@ -1104,6 +1109,22 @@ fn source_for_index(index: u32) -> Option<Source> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_history_row_is_freed_when_its_copy_action_group_is_dropped() {
+        adw::init().unwrap();
+        let row = adw::ActionRow::new();
+        let actions = gio::SimpleActionGroup::new();
+        actions.add_action_entries([copy_sql_action(&row, "SELECT 1".into())]);
+        row.insert_action_group("history-row", Some(&actions));
+        let weak = row.downgrade();
+
+        drop(actions);
+        drop(row);
+
+        assert!(weak.upgrade().is_none(), "the copy action keeps its row alive");
+    }
 
     #[test]
     fn the_first_ran_from_choice_keeps_every_source() {
