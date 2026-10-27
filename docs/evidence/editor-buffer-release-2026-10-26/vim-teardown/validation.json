@@ -1,0 +1,57 @@
+{
+  "binary_sha256": "1a6b17c38e0c5a059d31aafdd1e0f2f23cb0cd72bdd813ed1b01cc537f8c86b9",
+  "profile": "ci",
+  "process_exit": 0,
+  "allocator": "ordinary inherited settings; no experiment override",
+  "gtk_widgets_passed": 177,
+  "preflight_unit_passed": 2197,
+  "preflight_sandbox_passed": 291,
+  "app_clippy": "passed",
+  "e2e": [
+    {
+      "scenario": "dismissed_approval_denies",
+      "status": "passed",
+      "seconds": 6.047
+    },
+    {
+      "scenario": "mcp_client_disconnect_cancels_pending_approval",
+      "status": "passed",
+      "seconds": 4.553
+    },
+    {
+      "scenario": "audit_failure_denies",
+      "status": "passed",
+      "seconds": 3.796
+    },
+    {
+      "scenario": "audit_journal_loss_after_connection_denies_mutation",
+      "status": "passed",
+      "seconds": 4.176
+    },
+    {
+      "scenario": "running_query_is_cancelled_before_switch",
+      "status": "passed",
+      "seconds": 3.247
+    },
+    {
+      "scenario": "restart_restores_active_editor_and_connection",
+      "status": "passed",
+      "seconds": 8.273
+    },
+    {
+      "scenario": "closing_a_file_tab_with_save_writes_the_file_and_closes_the_tab",
+      "status": "passed",
+      "seconds": 3.009
+    },
+    {
+      "scenario": "closing_a_dirty_file_with_discard_closes_without_writing",
+      "status": "passed",
+      "seconds": 4.809
+    },
+    {
+      "scenario": "closing_a_clean_editor_tab_removes_it_and_keeps_the_other",
+      "status": "passed",
+      "seconds": 2.387
+    }
+  ]
+}
