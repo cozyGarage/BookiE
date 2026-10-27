@@ -1884,7 +1884,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Packages:
 
-- `redis 1.7.0`
+- `redis 1.8.0`
 
 ```text
 Copyright (c) 2022 by redis-rs contributors
