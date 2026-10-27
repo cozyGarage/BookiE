@@ -51,6 +51,19 @@ fn apply_vim_mode(view: &sourceview5::View, enabled: bool) {
     view.connect_destroy(move |_| context.set_client_widget(gtk::Widget::NONE));
 }
 
+pub(super) fn release_vim_context(view: &sourceview5::View) {
+    for controller in view.observe_controllers().iter::<gtk::glib::Object>().flatten() {
+        let Ok(keys) = controller.downcast::<gtk::EventControllerKey>() else {
+            continue;
+        };
+        let Some(context) = keys.im_context().and_downcast::<sourceview5::VimIMContext>() else {
+            continue;
+        };
+        keys.set_im_context(None::<&gtk::IMContext>);
+        context.set_client_widget(gtk::Widget::NONE);
+    }
+}
+
 pub(crate) fn apply_editor_preferences(
     view: &sourceview5::View,
     preferences: &crate::services::preferences::Preferences,

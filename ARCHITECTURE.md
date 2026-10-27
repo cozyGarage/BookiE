@@ -352,8 +352,8 @@ Each engine exports a type implementing `tablepro_core::DatabaseDriver`. Connect
 
 | Engine | Library | Notes |
 |---|---|---|
-| PostgreSQL | SQLx | Separate control pool for server-confirmed cancel; release fixture |
-| MySQL / MariaDB | SQLx | Driver + TLS fixtures |
+| PostgreSQL | SQLx | Cancel sends a protocol CancelRequest through `PgCancelToken`; release fixture |
+| MySQL / MariaDB | SQLx | Cancel runs `KILL QUERY` from a separate cancellation pool; driver + TLS fixtures |
 | SQLite | SQLx | Local and GTK tests |
 | SQL Server | Tiberius | Driver + TLS fixtures; BookiE does not yet use the driver's `cancel_query` API; Kerberos optional |
 | ClickHouse | `clickhouse` | Driver + TLS fixtures |

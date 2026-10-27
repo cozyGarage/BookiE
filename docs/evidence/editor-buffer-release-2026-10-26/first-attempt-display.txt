@@ -1,0 +1,8 @@
+Local /usr/bin/xvfb-run default:
+XVFBARGS="-screen 0 640x480x24"
+
+Recorded accessible application frame:
+Safety SQLite — BookiE [0,0 640x480]
+
+The pointer helper searches for a mapped window at least 800x600.
+The successful resource run explicitly uses -screen 0 1280x1024x24.

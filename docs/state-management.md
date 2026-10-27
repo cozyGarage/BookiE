@@ -95,7 +95,7 @@ Per-tab editing state is the deliberate exception. The headless `change_tracker`
 |---|---|---|
 | Unit of write | the whole `T` | per-connection entries |
 | Write shape | serialize the owned value | reload from disk, merge the pending entries, save |
-| Concurrency | one owner, revision coalescing | file lock across processes and windows, sequence-ordered |
+| Concurrency | one owner, revision coalescing | in-process lock, sequence-ordered; other processes are excluded only by the single-instance lock, which is skipped when its runtime directory is unavailable |
 | On failure | settles waiters with a write error | restores the pending entries for the next attempt |
 | Errors | `String` | typed `WorkspaceFlushError` |
 

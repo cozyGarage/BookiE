@@ -1,0 +1,74 @@
+{
+  "input_method": "fcitx5",
+  "cycles": 4,
+  "finalized": {
+    "views": 16,
+    "buffers": 16
+  },
+  "views_per_cycle": 4,
+  "payload_bytes_per_view": 1100000,
+  "idle_seconds": 1.0002,
+  "idle_cpu_seconds": 0.0,
+  "samples": [
+    {
+      "phase": "initial",
+      "monotonic": 523951.268807573,
+      "rss_kib": 111344,
+      "cpu_ticks": 12
+    },
+    {
+      "phase": "cycle-0-open",
+      "monotonic": 523952.701551753,
+      "rss_kib": 138104,
+      "cpu_ticks": 153
+    },
+    {
+      "phase": "cycle-0-closed",
+      "monotonic": 523952.711474216,
+      "rss_kib": 138268,
+      "cpu_ticks": 154
+    },
+    {
+      "phase": "cycle-1-open",
+      "monotonic": 523954.343060217,
+      "rss_kib": 146200,
+      "cpu_ticks": 314
+    },
+    {
+      "phase": "cycle-1-closed",
+      "monotonic": 523954.352111488,
+      "rss_kib": 146200,
+      "cpu_ticks": 315
+    },
+    {
+      "phase": "cycle-2-open",
+      "monotonic": 523955.738658777,
+      "rss_kib": 146204,
+      "cpu_ticks": 452
+    },
+    {
+      "phase": "cycle-2-closed",
+      "monotonic": 523955.748357488,
+      "rss_kib": 146204,
+      "cpu_ticks": 453
+    },
+    {
+      "phase": "cycle-3-open",
+      "monotonic": 523957.158707566,
+      "rss_kib": 146204,
+      "cpu_ticks": 592
+    },
+    {
+      "phase": "cycle-3-closed",
+      "monotonic": 523957.168195055,
+      "rss_kib": 146204,
+      "cpu_ticks": 593
+    },
+    {
+      "phase": "idle-end",
+      "monotonic": 523958.168493735,
+      "rss_kib": 146204,
+      "cpu_ticks": 593
+    }
+  ]
+}

@@ -555,6 +555,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::structure_tab::metadata::tests::metadata_notice_explains_that_reads_are_unavailable"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::export_dialog::tests::a_full_export_shows_a_refusal_without_opening_its_source"
     ],
     [
@@ -756,6 +761,16 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::dropping_an_editor_releases_its_source_view_and_buffer"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::closing_an_editor_releases_its_large_buffer_even_when_its_views_are_retained"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::closing_a_vim_editor_releases_both_views_and_its_buffer"
     ],
     [
       "tablepro-app",
