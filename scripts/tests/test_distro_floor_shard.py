@@ -11,6 +11,35 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class DistroFloorShardTests(unittest.TestCase):
+    def test_package_test_containers_receive_the_worker_compiler_limit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            docker = directory / "docker"
+            docker.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['DOCKER_ARGUMENTS'], 'a') as log:\n"
+                "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+            )
+            docker.chmod(0o755)
+            for script in ("test-deb-package.sh", "test-arch-package-container.sh"):
+                with self.subTest(script=script):
+                    log = directory / f"{script}.jsonl"
+                    environment = os.environ | {
+                        "PATH": f"{directory}{os.pathsep}{os.environ['PATH']}",
+                        "DOCKER_ARGUMENTS": str(log), "CARGO_BUILD_JOBS": "2",
+                    }
+                    result = subprocess.run(["bash", str(ROOT / "scripts" / script)],
+                                            env=environment, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    calls = [json.loads(line) for line in log.read_text().splitlines()]
+                    runs = [call for call in calls if call[0] == "run"]
+                    self.assertEqual(len(runs), 1)
+                    self.assertIn("CARGO_BUILD_JOBS=2", runs[0])
+                    position = runs[0].index("CARGO_BUILD_JOBS=2")
+                    self.assertEqual(runs[0][position - 1], "-e")
+                    self.assertLess(position, runs[0].index("bash"))
+
     def test_success_output_keeps_every_scenario_for_cross_shard_coverage_checks(self):
         script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         summaries = [line.strip() for line in script.splitlines() if 'grep -aE "^passed:' in line]
@@ -58,6 +87,7 @@ class DistroFloorShardTests(unittest.TestCase):
                         PATH=f"{directory}{os.pathsep}{environment['PATH']}",
                         DOCKER_ARGUMENTS=str(log),
                         TABLEPRO_GTK_SHARD="2/3",
+                        CARGO_BUILD_JOBS="2",
                     )
                     if packaged:
                         environment["DISTRO_FLOOR_PACKAGE"] = str(package)
@@ -72,6 +102,10 @@ class DistroFloorShardTests(unittest.TestCase):
                     arguments = runs[0]
                     self.assertIn("TABLEPRO_GTK_SHARD=2/3", arguments)
                     position = arguments.index("TABLEPRO_GTK_SHARD=2/3")
+                    self.assertEqual(arguments[position - 1], "-e")
+                    self.assertLess(position, arguments.index("bash"))
+                    self.assertIn("CARGO_BUILD_JOBS=2", arguments)
+                    position = arguments.index("CARGO_BUILD_JOBS=2")
                     self.assertEqual(arguments[position - 1], "-e")
                     self.assertLess(position, arguments.index("bash"))
 
