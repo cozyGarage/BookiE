@@ -23,9 +23,12 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
-    def test_prebuilt_test_bundle_strips_debug_info(self):
+    def test_ci_build_artifacts_strip_symbols(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
-        self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-debuginfo}"', build)
+        self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"', build)
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        gtk_build = re.search(r"(?ms)^  gtk-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("CARGO_PROFILE_CI_STRIP: symbols", gtk_build)
 
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
