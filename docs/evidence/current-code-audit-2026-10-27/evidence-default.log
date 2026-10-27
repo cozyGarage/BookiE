@@ -1,0 +1,12 @@
+Validated 165 schema-v1 evidence manifests; checked source provenance in 4 legacy packets; 87 historical/source-drift checks need review.
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/arch-wrapper-date-2026-10-22/manifest.json: source snapshot identity is incomplete
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/b4-hosted-linux-tip-2026-10-09/manifest.json: missing evidence log mysql-atomic.log
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/b4-hosted-linux-tip-2026-10-09/manifest.json: missing evidence log postgres-rollback.log
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/b4-hosted-linux-tip-2026-10-09/manifest.json: missing evidence log postgres-release.log
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/b4-hosted-linux-tip-2026-10-09/manifest.json: missing evidence log installed-gtk.log
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/completion-popup-initialization-2026-10-22/manifest.json: source snapshot identity is incomplete
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/completion-popup-initialization-2026-10-22/manifest.json: source differs from the current checkout: scripts/isolated-tests.json
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/duckdb-enum-list-result-refusal-results-2026-10-05/manifest.json: source snapshot identity is incomplete
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/duckdb-malformed-tail-results-2026-10-06/manifest.json: focused selector is absent, failed, or executed an unexpected number of times
+/home/trung/Projects/bookie-ux-code-audit/docs/evidence/duckdb-malformed-tail-results-2026-10-06/manifest.json: focused result count does not match a passing log summary
+... and 77 more warnings
