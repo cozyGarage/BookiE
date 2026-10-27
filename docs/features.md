@@ -52,12 +52,12 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Syntax highlighting, code folding and a side-by-side split of the same query.
 - Completion offers keywords, tables after `FROM` and `JOIN`, and the columns of the tables named in the statement. `alias.` and `table.` narrow the list. Chosen names are inserted quoted for the engine.
 - Write `:name` where a value belongs. BookiE asks for each value and sends it as a bound parameter. Each value has a type choice: `Auto`, `Text`, `Integer`, `Decimal`, `Boolean` or `Null`. Placeholders inside string literals, quoted identifiers, comments, dollar-quoted bodies, PostgreSQL `::` casts and existing `$1` or `?` placeholders are left alone.
-- Results load in pages. PostgreSQL single-statement `SELECT` queries stream within an estimated 64 MiB row-storage budget. When retained pages exceed the budget, earlier pages leave the grid; the newest page remains even if it alone exceeds the estimate. Each statement in a script has its own result view. Pin results to keep them above the next run.
+- Results load in pages. PostgreSQL single-statement `SELECT` queries stream within an estimated 64 MiB row-storage budget. When retained pages exceed the budget, earlier pages move to an encrypted on-disk spool and stay reachable; the newest page remains in memory even if it alone exceeds the estimate. Each statement in a script has its own result view. Pin results to keep them above the next run.
 - Sorting and filtering a result are local and do not run the SQL again.
 - Session keeps one connection for the tab, so settings, temporary tables and transactions carry over. While a transaction is open the button says so and, after a minute, how long it has been open.
 - Explain shows the plan. PostgreSQL and SQLite plans open as a tree with the share of estimated cost per step.
 - A query that hits the timeout offers Run again with a longer timeout, once, without changing the saved timeout.
-- Query history opens in a panel under the workspace. Statements that set a password or key are not saved.
+- Query history opens in a panel under the workspace. Statements that set a password or key are not saved in history; editor drafts keep their text on disk.
 - Favorites: Ctrl+D saves the current query under a name in `$XDG_CONFIG_HOME/tablepro/favorites.json`. Saving an existing name replaces its statement.
 - Open Quickly: Ctrl+P searches favorites, open tabs and saved connections.
 

@@ -62,7 +62,7 @@ The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A missing file
 
 Each record contains a sequence number, previous hash, current hash, and audit event. Mutation intents and transaction commit records use the durable append path. File locks serialize initialization and appends across processes.
 
-The GUI and `tablepro-agentd` may hold the journal at the same time. Each live owner holds a shared process lock; startup recovery requires the exclusive lock, so a second process does not record another process's in-flight mutation as `Unknown`. It validates the chain without recovery. New write intents are still refused while an earlier write remains pending. After all owners exit, the next opener recovers any intents left pending by a crash.
+The GUI and `tablepro-agentd` may hold the journal at the same time. Each live owner holds a shared process lock; startup recovery requires the exclusive lock, so a second process does not record another process's in-flight mutation as `Unknown`. It validates the chain without recovery. New write intents are still refused while an earlier write remains pending. After all owners exit, the next opener recovers any intents left pending by a crash. A query cursor that has delivered its first page is not yet covered: a crash mid-stream leaves its operation pending ([#1719](https://github.com/cozyGarage/BookiE/issues/1719)).
 
 The full chain is verified when the journal opens, by `verify_chain()`, and by `recent(limit)`, which streams the file once and retains only the requested tail. An append verifies only the records written since the same process last verified or appended, starting from the hash it last verified. That still checks records written by another process and repairs a trailing fragment left by a crashed writer. When the file was replaced or became shorter, the append verifies the full chain again. A change to records that this process had already verified is therefore found at the next open or on-demand verification, not at the next append. The maintainer chose this on 2026-10-23 so that append cost stays constant as the journal grows. There is no retention or compaction policy; do not prune audit history as a performance shortcut.
 
@@ -115,7 +115,7 @@ Exported: `id`, `name`, `driver_id`, `host`, `port`, `socket_dir`, `socket_path`
 
 Withheld: `use_tls` (the legacy boolean `tls_mode` replaced, so no bundle can claim `use_tls: true, tls_mode: disabled`), `last_opened_at` (local telemetry), unknown keys carried from a newer version, the contents of TLS certificate and key files and any SSH private key (paths only), and policy `connection_overrides`.
 
-`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal `KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on `SavedConnection` fails the build until someone classifies it.
+`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal `KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on `SavedConnection` fails the build until someone classifies it. Known gap: `connect_timeout_secs` and `query_timeout_secs` are not yet in `KNOWN_CONNECTION_FIELDS` and escape this check ([#1718](https://github.com/cozyGarage/BookiE/issues/1718)).
 
 ### Credentials
 

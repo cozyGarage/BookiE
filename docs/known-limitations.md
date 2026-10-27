@@ -17,14 +17,13 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   Single-statement PostgreSQL `SELECT`s in the SQL editor stream cursor pages
   through Core and PolicyGuard, retaining them while estimated row storage stays
   within 64 MiB and always keeping the newest page, even if it alone exceeds the
-  estimate. PR #1660 adds a process-local encrypted spool with a shared 1 GiB
-  quota and a 4,096-page per-result cap, so fetched pages remain revisitable
+  estimate. A process-local encrypted spool ([#1660](https://github.com/cozyGarage/BookiE/pull/1660)) with a shared 1 GiB
+  quota and a 4,096-page per-result cap keeps fetched pages revisitable
   after leaving the RAM cache without rerunning SQL. A storage, quota or page-cap
   refusal stops the stream as incomplete; pages already stored remain available
   while their result owners stay open. The installed 100,000-row PostgreSQL GTK
-  scenario and refreshed local preflight passed. Current hosted gate status is
-  tracked on [PR #1660](https://github.com/cozyGarage/BookiE/pull/1660); it is
-  separate from the product limitation and the proposed [ADR 0025](decisions/0025-transient-result-page-spool.md).
+  scenario and refreshed local preflight passed. The spool design is recorded in
+  [ADR 0025](decisions/0025-transient-result-page-spool.md).
   The received-row summary identifies the retained
   range; row ranges are positions in the result, not database row identifiers.
   Incoming decoding, concurrent snapshots, pins, widgets and allocator retention

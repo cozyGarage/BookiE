@@ -1,0 +1,11 @@
+---- ui::editor::dispatch_tests::dropping_an_editor_releases_its_source_view_and_buffer stdout ----
+
+thread 'ui::editor::dispatch_tests::dropping_an_editor_releases_its_source_view_and_buffer' (3719398) panicked at apps/linux/app/src/ui/editor/dispatch_tests.rs:890:5:
+editor view remains alive
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ui::editor::dispatch_tests::dropping_an_editor_releases_its_source_view_and_buffer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1012 filtered out; finished in 1.20s
