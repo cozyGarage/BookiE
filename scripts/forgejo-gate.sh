@@ -29,10 +29,9 @@ if docs_only; then
   exit 0
 fi
 
-lock_identity="$(printf '%s\n%s' "$remote_url" "$target" | sha256sum | cut -c1-24)"
-exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate-$lock_identity.lock}"
+exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate.lock}"
 if ! flock -n 9; then
-  echo "another gate for this remote branch is running; waiting for it to finish"
+  echo "another gate is running on this host; waiting for it to finish"
   flock 9
 fi
 latest_run_id() {
