@@ -223,6 +223,8 @@ jobs:
         run: |
           cd src
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
+          mkdir -p "$CARGO_TARGET_DIR"
+          export TMPDIR="$CARGO_TARGET_DIR"
           "$NEXTEST" nextest run --workspace --exclude tablepro-driver-duckdb --lib --bins --profile ci --no-tests=fail --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD"
 
   sandbox:
