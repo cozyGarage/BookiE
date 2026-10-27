@@ -117,6 +117,7 @@ impl App {
 
     pub(super) fn on_show_shortcuts(&self) {
         let shortcuts = shortcuts::build_shortcuts_dialog();
+        crate::ui::leak_probe::track("shortcuts", &shortcuts);
         shortcuts.present(Some(&self.window));
     }
 
@@ -137,6 +138,7 @@ impl App {
             .build();
         dialog.set_developers(ABOUT_DEVELOPERS);
         dialog.set_translator_credits(&crate::tr!("translator-credits"));
+        crate::ui::leak_probe::track("about", &dialog);
         dialog.present(Some(&self.window));
     }
 
