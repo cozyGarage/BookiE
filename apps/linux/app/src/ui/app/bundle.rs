@@ -629,13 +629,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_successful_reimport_reenables_workspace_saves_for_the_connection_id() {
+    async fn a_successful_reimport_rejects_old_session_saves_and_allows_new_ones() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("workspace.json");
         let drafts = directory.path().join("drafts");
         let workspace = crate::services::workspace_state::WorkspaceStore::new(Some(path.clone()), drafts.clone());
         let imported = item("restored");
         let id = imported.connection.id;
+        let old_session = workspace.connection_save_token(id);
         workspace.forget_connection(id);
 
         let outcome = apply_items(
@@ -648,8 +649,26 @@ mod tests {
         .await;
 
         assert_eq!(outcome, (1, None));
-        workspace.save_connection(
+        workspace.save_database_for_session(
             id,
+            "main",
+            &old_session,
+            tablepro_app_services::workspace_state::ConnectionWorkspaceState {
+                tabs: vec![tablepro_app_services::workspace_state::WorkspaceTabRecord::Editor {
+                    query: "SELECT stale_session".into(),
+                    draft_id: None,
+                    file: None,
+                }],
+                ..Default::default()
+            },
+        );
+        assert_eq!(workspace.flush().recv().unwrap(), Ok(()));
+
+        let new_session = workspace.connection_save_token(id);
+        workspace.save_database_for_session(
+            id,
+            "main",
+            &new_session,
             tablepro_app_services::workspace_state::ConnectionWorkspaceState {
                 tabs: vec![tablepro_app_services::workspace_state::WorkspaceTabRecord::Editor {
                     query: "SELECT after_reimport".into(),
@@ -663,7 +682,7 @@ mod tests {
         let reopened = crate::services::workspace_state::WorkspaceStore::new(Some(path), drafts);
         reopened.prefetch_connections(&[id]).unwrap();
         assert!(matches!(
-            &reopened.load_connection(id).unwrap().tabs[0],
+            &reopened.load_database(id, "main").unwrap().tabs[0],
             tablepro_app_services::workspace_state::WorkspaceTabRecord::Editor { query, .. }
                 if query == "SELECT after_reimport"
         ));

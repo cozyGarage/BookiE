@@ -138,12 +138,13 @@ fn forgetting_a_connection_only_removes_its_own_workspace_and_drafts() {
 }
 
 #[tokio::test]
-async fn reimporting_a_deleted_connection_id_allows_its_new_workspace_to_be_saved() {
+async fn reimporting_a_deleted_connection_rejects_its_old_session_and_allows_a_new_one() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("workspace.json");
     let drafts = dir.path().join("drafts");
     let id = Uuid::new_v4();
     let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    let old_session = store.connection_save_token(id);
     store.save_connection(
         id,
         ConnectionWorkspaceState {
@@ -159,8 +160,26 @@ async fn reimporting_a_deleted_connection_id_allows_its_new_workspace_to_be_save
 
     store.forget_connection(id);
     store.allow_connection_saves(id).await.unwrap();
-    store.save_connection(
+    store.save_database_for_session(
         id,
+        "main",
+        &old_session,
+        ConnectionWorkspaceState {
+            tabs: vec![WorkspaceTabRecord::Editor {
+                query: "SELECT stale_session".into(),
+                draft_id: None,
+                file: None,
+            }],
+            ..Default::default()
+        },
+    );
+    assert_eq!(flush(&store), Ok(()));
+
+    let new_session = store.connection_save_token(id);
+    store.save_database_for_session(
+        id,
+        "main",
+        &new_session,
         ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Editor {
                 query: "SELECT after_reimport".into(),
@@ -174,7 +193,7 @@ async fn reimporting_a_deleted_connection_id_allows_its_new_workspace_to_be_save
 
     let restored = WorkspaceStore::new(Some(path), drafts);
     restored.prefetch_connections(&[id]).unwrap();
-    let state = restored.load_connection(id).unwrap();
+    let state = restored.load_database(id, "main").unwrap();
     assert!(matches!(&state.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT after_reimport"));
 }
 
