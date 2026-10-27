@@ -3,6 +3,7 @@
 AT-SPI cannot see a dismissed dialog that is still referenced, so the app writes a leak report
 (see ui/leak_probe.rs) when asked through `win.report-leaks`.
 """
+import sqlite3
 import time
 from pathlib import Path
 
@@ -18,7 +19,9 @@ DIALOGS = {
     "connect": ("button:New connection", "Connect to PostgreSQL"),
     "structure_form": ("structure:Add Index…", "Add Index"),
     "column_jump": ("table:win.jump-column", "Jump to Column"),
+    "export": ("table:win.export-csv", "Export Results"),
 }
+# AdwAlertDialog is not tracked: libadwaita keeps a closed alert alive even with no handlers.
 # Typing into a field before dismissal exercises the edit-then-discard path.
 EDITS = {"connect": ("Host", "leak.example.invalid"), "structure_form": ("Name", "leak_idx")}
 CYCLES = 4
@@ -45,6 +48,10 @@ def scenarios(ui):
             if ui.node_name(node) in ("Close", "Cancel") and ui.node_role(node) == ui.pyatspi.ROLE_PUSH_BUTTON:
                 return ui.invoke(node)
         return False
+
+    def insert_row(database):
+        with sqlite3.connect(database) as connection:
+            connection.execute("INSERT OR IGNORE INTO safety_items(id, note) VALUES (1, 'alpha')")
 
     def open_table():
         if ui.find_node(name="safety_items", role=ui.pyatspi.ROLE_PAGE_TAB) is None:
@@ -87,6 +94,8 @@ def scenarios(ui):
         def scenario(_database, base):
             for index in range(CYCLES):
                 if action.startswith("table:"):
+                    if key == "export":
+                        insert_row(_database)
                     open_table()
                     ui.invoke_accessible_action(action[6:])
                 elif action.startswith("structure:"):

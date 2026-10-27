@@ -2,9 +2,9 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use relm4::gtk;
-use relm4::gtk::prelude::*;
+use relm4::adw::prelude::*;
 use relm4::gtk::{gio, glib};
+use relm4::{adw, gtk};
 
 type Tracked = Vec<(&'static str, glib::WeakRef<glib::Object>)>;
 
@@ -37,6 +37,15 @@ fn report() -> String {
         }
     });
     lines.join("\n")
+}
+
+pub(crate) fn present_tracked(
+    name: &'static str,
+    dialog: &(impl IsA<adw::Dialog> + IsA<glib::Object>),
+    parent: &impl IsA<gtk::Widget>,
+) {
+    track(name, dialog);
+    dialog.present(Some(parent));
 }
 
 pub(crate) fn install(group: &gio::SimpleActionGroup) {
