@@ -534,26 +534,7 @@ impl HistoryStore {
         out.push_str(&format!("-- Generated at {}\n", chrono::Utc::now().to_rfc3339()));
         out.push_str(&format!("-- Entries: {}\n\n", entries.len()));
         for entry in &entries {
-            let when = chrono::DateTime::<chrono::Utc>::from(entry.executed_at).to_rfc3339();
-            out.push_str(&format!(
-                "-- [{}] {} · {} · {}\n",
-                when,
-                entry.connection_name,
-                entry.driver_id,
-                outcome_summary(entry),
-            ));
-            if let Some(err) = &entry.error {
-                for line in err.lines() {
-                    out.push_str("-- error: ");
-                    out.push_str(line);
-                    out.push('\n');
-                }
-            }
-            out.push_str(entry.query.trim_end());
-            if !entry.query.trim_end().ends_with(';') {
-                out.push(';');
-            }
-            out.push_str("\n\n");
+            out.push_str(&sql_export_entry(entry));
         }
         Ok(out)
     }
@@ -596,6 +577,43 @@ fn csv_field(s: &str) -> String {
     } else {
         s.to_string()
     }
+}
+
+fn comment_text(text: &str) -> String {
+    text.chars()
+        .map(|character| {
+            if character.is_control() || matches!(character, '\u{2028}' | '\u{2029}') {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect()
+}
+
+fn sql_export_entry(entry: &Entry) -> String {
+    let mut out = String::new();
+    let when = chrono::DateTime::<chrono::Utc>::from(entry.executed_at).to_rfc3339();
+    out.push_str(&format!(
+        "-- [{}] {} · {} · {}\n",
+        when,
+        comment_text(&entry.connection_name),
+        comment_text(&entry.driver_id),
+        outcome_summary(entry),
+    ));
+    if let Some(err) = &entry.error {
+        for line in err.lines() {
+            out.push_str("-- error: ");
+            out.push_str(&comment_text(line));
+            out.push('\n');
+        }
+    }
+    out.push_str(entry.query.trim_end());
+    if !entry.query.trim_end().ends_with(';') {
+        out.push(';');
+    }
+    out.push_str("\n\n");
+    out
 }
 
 fn outcome_summary(entry: &Entry) -> String {
@@ -1039,6 +1057,25 @@ mod tests {
             error: None,
             source: Source::Editor,
         }
+    }
+
+    #[test]
+    fn exported_sql_keeps_untrusted_text_inside_comments() {
+        let mut entry = sample_entry();
+        entry.connection_name = "prod\nDROP TABLE users;\r\n-- ".into();
+        entry.driver_id = "sqlite\r\u{2028}DROP TABLE a;".into();
+        entry.error = Some("boom\rDROP TABLE b;\nDROP TABLE c;\u{85}DROP TABLE d;".into());
+
+        let exported = sql_export_entry(&entry);
+
+        for line in exported.split(['\n', '\r', '\u{85}', '\u{2028}', '\u{2029}']) {
+            assert!(
+                line.is_empty() || line.starts_with("-- ") || line == "SELECT 1;",
+                "a line escaped its comment: {line:?}"
+            );
+        }
+        assert!(exported.contains("prod"));
+        assert!(exported.ends_with("SELECT 1;\n\n"));
     }
 
     #[test]
