@@ -17,3 +17,9 @@ With the default allocator environment, all twenty cycles passed. RSS rose from 
 The standalone Rust control reproduces bounded reading, UTF-8 conversion and line validation on a fresh thread per cycle without GTK. It plateaued at 10.54 MiB RSS from cycle two through twenty. Its source and output are included. This control does not reproduce the entire application.
 
 The allocator comparison supports retention as a hypothesis but does not attribute live allocations or prove absence of a leak. Allocation stacks and a repeatable ownership test remain required before choosing a product fix. No allocator setting was added to the application. Timing is diagnostic and includes file chooser interaction.
+
+## Allocation trace
+
+A separate three-cycle refusal run passed with Heaptrack preloaded only into the application. The instrumentation was removed afterward. The installed CI-profile executable was unchanged. `heaptrack-summary.txt` records 64.56 MB peak tracked heap and 275.79 MB peak RSS including profiler overhead. The largest reported allocation group includes graphics-library frames; other frames are unsymbolized. This trace does not isolate a BookiE ownership defect.
+
+Heaptrack reports 48.38 MB as memory not freed at shutdown. That count includes library caches and must not be interpreted as demonstrated application leaks. A baseline trace and better symbolization are needed for attribution. Raw traces remain local build outputs; the concise analysis is retained here.

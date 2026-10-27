@@ -1,0 +1,2201 @@
+reading file "target/quality/refused-file-heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+finished reading file, now analyzing data:
+
+PEAK MEMORY CONSUMERS
+25.20M peak memory consumed over 19235 calls from
+0x7f5d929ec277
+  in ??
+525.06K consumed over 16 calls from:
+    0x7f5d9cdd0ae2
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cdd0bf4
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce36b45
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cedbbd8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e0f7
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e480
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8c645b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8d05da
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d152630
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d04a3ae
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d05d944
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8b62b1
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d171e5b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c96130e
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+525.06K consumed over 16 calls from:
+    0x7f5d9cdd0ae2
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cdd0bf4
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce36b45
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cedbbd8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e0f7
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e480
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8c645b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8d05da
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d152630
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d04a3ae
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d05d944
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8b64bb
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d171e5b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c96130e
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 24.15M from 7371 other places
+
+16.79M peak memory consumed over 455 calls from
+_RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsepY7R6AGWjB_5gimli
+  in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+16.78M consumed over 57 calls from:
+    _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedCsepY7R6AGWjB_5gimli
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtCs9k3SxhrAWiO_3std2io19default_read_to_endINtNtNtCsgxBkk5gSRhY_4core2io4util4TakeNtNtB4_2fs4FileEECskze4jfPMqVU_13tablepro_core
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCskze4jfPMqVU_13tablepro_core9text_file14read_text_file
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui6editor9open_file13read_sql_file
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceNCNCINvNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui6editor9open_file15choose_sql_fileNCNvMs_NtNtB1i_3app11app_helpersNtB2w_3App16on_open_sql_file0E00uEB1k_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNSNvYNCINvNtNtCs9k3SxhrAWiO_3std6thread9lifecycle15spawn_uncheckedNCNCINvNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui6editor9open_file15choose_sql_fileNCNvMs_NtNtB1e_3app11app_helpersNtB2s_3App16on_open_sql_file0E00uEs_0INtNtNtCsgxBkk5gSRhY_4core3ops8function6FnOnceuE9call_once6vtableB1g_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNvMs0_NtNtNtCs9k3SxhrAWiO_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    0x7f5db4498041
+      in /usr/lib/libc.so.6
+    0x7f5db452072b
+      in /usr/lib/libc.so.6
+1.79K consumed over 1 calls from:
+    _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedCsepY7R6AGWjB_5gimli
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvMs4_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVecNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE8grow_oneBT_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvMs3_NtNtCs6i54tJFfzR_5alloc11collections9vec_dequeINtB5_8VecDequeNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE4growB1c_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMso_Cs1Ng5mtMFfhM_5flumeINtB6_6SharedNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE4sendNtNtB6_6signal10SyncSignalINtNtCsgxBkk5gSRhY_4core6result6ResultuINtB6_19TrySendTimeoutErrorBD_EENCNvB2_9send_sync0NCB3c_s_0EBL_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvMs0_NtNtCsfhmrpZwloel_5relm47channel9componentINtB5_15ComponentSenderNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3AppE5inputB1e_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvXs3_NtNtCsb3L7BlZzJ2m_12tablepro_app2ui3appNtB5_3AppNtNtNtNtCsfhmrpZwloel_5relm49component4sync6traits15SimpleComponent4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvMs3_NtNtNtCsfhmrpZwloel_5relm49component4sync7builderINtB5_16ComponentBuilderNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3AppE25launch_with_input_channelB1m_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNvNtNtNtCsfruoU3bdRlJ_3gio4auto11application14ApplicationExt15connect_startup18startup_trampolineNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNCINvMNtCsfhmrpZwloel_5relm43appINtB2B_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtB3k_3AppE0EB3o_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    g_closure_invoke
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dbcfa
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dded3
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    g_application_register
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db4d01fd6
+      in /usr/lib/libgio-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 13.64K from 232 other places
+
+4.87M peak memory consumed over 869850 calls from
+g_malloc0
+  in /usr/lib/libglib-2.0.so.0
+173.68K consumed over 70 calls from:
+    g_type_create_instance
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65ced64
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_with_properties
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db52aa933
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b0226a
+      in /usr/lib/libglib-2.0.so.0
+    g_markup_parse_context_parse
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db52b625c
+      in /usr/lib/libgtk-4.so.1
+    gtk_svg_load_from_bytes
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50d7fe8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50d858e
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f6ba6f
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f6be40
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4cd07f1
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db5b3adba
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b37b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db4498041
+      in /usr/lib/libc.so.6
+    0x7f5db452072b
+      in /usr/lib/libc.so.6
+58.64K consumed over 733 calls from:
+    g_type_create_instance
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65ced64
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_with_properties
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db5c69a01
+      in /usr/lib/libgtksourceview-5.so.0
+    gtk_source_style_scheme_manager_get_scheme
+      in /usr/lib/libgtksourceview-5.so.0
+    _RNvMNtNtCs89MuaJf6beB_11sourceview54auto20style_scheme_managerNtB2_18StyleSchemeManager6scheme
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtCsb3L7BlZzJ2m_12tablepro_app2ui5theme13editor_scheme.llvm.14459760915884723360
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtCsb3L7BlZzJ2m_12tablepro_app2ui5theme5apply
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvXs3_NtNtCsb3L7BlZzJ2m_12tablepro_app2ui3appNtB5_3AppNtNtNtNtCsfhmrpZwloel_5relm49component4sync6traits15SimpleComponent4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvMs3_NtNtNtCsfhmrpZwloel_5relm49component4sync7builderINtB5_16ComponentBuilderNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3AppE25launch_with_input_channelB1m_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNvNtNtNtCsfruoU3bdRlJ_3gio4auto11application14ApplicationExt15connect_startup18startup_trampolineNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNCINvMNtCsfhmrpZwloel_5relm43appINtB2B_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtB3k_3AppE0EB3o_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    g_closure_invoke
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dbcfa
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dded3
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    g_application_register
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db4d01fd6
+      in /usr/lib/libgio-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 4.63M from 58576 other places
+
+4.48M peak memory consumed over 25469 calls from
+0x7f5d9d128947
+  in /usr/lib/libgallium-26.2.5-arch1.1.so
+843.47K consumed over 1 calls from:
+    0x7f5d9c961372
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+302.86K consumed over 1 calls from:
+    0x7f5d9c96130e
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 3.33M from 1062 other places
+
+2.88M peak memory consumed over 51925 calls from
+0x7f5db3e8f0d3
+  in /usr/lib/libcairo.so.2
+521.42K consumed over 1207 calls from:
+    0x7f5db3e1c094
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e93bd4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e9547b
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e9a401
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e47530
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1b3ba
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e6699d
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e66f89
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e0daa4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1abd9
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e65b64
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e15a78
+      in /usr/lib/libcairo.so.2
+    cairo_show_glyphs
+      in /usr/lib/libcairo.so.2
+    0x7f5db463b022
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db463b069
+      in /usr/lib/libpangocairo-1.0.so.0
+    pango_renderer_draw_glyphs
+      in /usr/lib/libpango-1.0.so.0
+    pango_cairo_show_glyph_string
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db53ec8c1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53b98e8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53cb4ef
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53a9a7b
+      in /usr/lib/libgtk-4.so.1
+    gsk_renderer_render
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff79fe
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52d76b1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db53857b7
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db535a599
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b04053
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5afc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b05c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_context_iteration
+      in /usr/lib/libglib-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+393.22K consumed over 2 calls from:
+    0x7f5db3eb270f
+      in /usr/lib/libcairo.so.2
+    0x7f5db3ea74c8
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1d7ad
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e67d31
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e68668
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e0d3e7
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e61679
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e10463
+      in /usr/lib/libcairo.so.2
+    cairo_paint
+      in /usr/lib/libcairo.so.2
+    0x7f5db5328354
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db535a78d
+      in /usr/lib/libgtk-4.so.1
+    gsk_renderer_render
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff79fe
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52d76b1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db53857b7
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db535a599
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b04053
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5afc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b05c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_context_iteration
+      in /usr/lib/libglib-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 1.97M from 2307 other places
+
+2.40M peak memory consumed over 6682030 calls from
+g_malloc
+  in /usr/lib/libglib-2.0.so.0
+32.77K consumed over 1 calls from:
+    g_intern_string
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5c69a4b
+      in /usr/lib/libgtksourceview-5.so.0
+    gtk_source_style_scheme_manager_get_scheme
+      in /usr/lib/libgtksourceview-5.so.0
+    _RNvMNtNtCs89MuaJf6beB_11sourceview54auto20style_scheme_managerNtB2_18StyleSchemeManager6scheme
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtCsb3L7BlZzJ2m_12tablepro_app2ui5theme13editor_scheme.llvm.14459760915884723360
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtCsb3L7BlZzJ2m_12tablepro_app2ui5theme5apply
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvXs3_NtNtCsb3L7BlZzJ2m_12tablepro_app2ui3appNtB5_3AppNtNtNtNtCsfhmrpZwloel_5relm49component4sync6traits15SimpleComponent4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvMs3_NtNtNtCsfhmrpZwloel_5relm49component4sync7builderINtB5_16ComponentBuilderNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3AppE25launch_with_input_channelB1m_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNvNtNtNtCsfruoU3bdRlJ_3gio4auto11application14ApplicationExt15connect_startup18startup_trampolineNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNCINvMNtCsfhmrpZwloel_5relm43appINtB2B_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtB3k_3AppE0EB3o_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    g_closure_invoke
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dbcfa
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dded3
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    g_application_register
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db4d01fd6
+      in /usr/lib/libgio-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+23.80K consumed over 36 calls from:
+    0x7f5db52b6abb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52b8db3
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52b8202
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52b88da
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52ac72c
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b0226a
+      in /usr/lib/libglib-2.0.so.0
+    g_markup_parse_context_parse
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db52b625c
+      in /usr/lib/libgtk-4.so.1
+    gtk_svg_load_from_bytes
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50d7fe8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50d858e
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f6ba6f
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f6be40
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4cd07f1
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db5b3adba
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b37b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db4498041
+      in /usr/lib/libc.so.6
+    0x7f5db452072b
+      in /usr/lib/libc.so.6
+  and 2.34M from 111486 other places
+
+2.20M peak memory consumed over 486647 calls from
+g_realloc
+  in /usr/lib/libglib-2.0.so.0
+394.75K consumed over 1 calls from:
+    0x7f5db5123583
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f0306e
+      in /usr/lib/libgtk-4.so.1
+    gtk_css_provider_load_from_file
+      in /usr/lib/libgtk-4.so.1
+    gtk_css_provider_load_from_resource
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65ceef9
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db4934f7a
+      in /usr/lib/libadwaita-1.so.0
+    0x7f5db493508a
+      in /usr/lib/libadwaita-1.so.0
+    adw_init
+      in /usr/lib/libadwaita-1.so.0
+    _RNvNtCs2zpZ8flyMgX_10libadwaita9functions4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsfhmrpZwloel_5relm44init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+262.14K consumed over 13 calls from:
+    0x7f5db5abf840
+      in /usr/lib/libglib-2.0.so.0
+    g_array_set_size
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db4f0120f
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f02d98
+      in /usr/lib/libgtk-4.so.1
+    gtk_css_provider_load_from_file
+      in /usr/lib/libgtk-4.so.1
+    gtk_css_provider_load_from_resource
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65ceef9
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db4934f7a
+      in /usr/lib/libadwaita-1.so.0
+    0x7f5db493508a
+      in /usr/lib/libadwaita-1.so.0
+    adw_init
+      in /usr/lib/libadwaita-1.so.0
+    _RNvNtCs2zpZ8flyMgX_10libadwaita9functions4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsfhmrpZwloel_5relm44init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 1.55M from 39307 other places
+
+1.36M peak memory consumed over 18891 calls from
+0x7f5db2743230
+  in /usr/lib/libpixman-1.so.0
+339.24K consumed over 1285 calls from:
+    pixman_glyph_cache_insert
+      in /usr/lib/libpixman-1.so.0
+    0x7f5db3e1b415
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e6699d
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e66f89
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e0daa4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1abd9
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e65b64
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e15a78
+      in /usr/lib/libcairo.so.2
+    cairo_show_glyphs
+      in /usr/lib/libcairo.so.2
+    0x7f5db463b022
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db463b069
+      in /usr/lib/libpangocairo-1.0.so.0
+    pango_renderer_draw_glyphs
+      in /usr/lib/libpango-1.0.so.0
+    pango_cairo_show_glyph_string
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db53ec8c1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53b98e8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53cb4ef
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53a9a7b
+      in /usr/lib/libgtk-4.so.1
+    gsk_renderer_render
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff79fe
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52d76b1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db53857b7
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db535a599
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b04053
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5afc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b05c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_context_iteration
+      in /usr/lib/libglib-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+318.65K consumed over 1207 calls from:
+    0x7f5db3e1c080
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e93bd4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e9547b
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e9a401
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e47530
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1b3ba
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e6699d
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e66f89
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e0daa4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1abd9
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e65b64
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e15a78
+      in /usr/lib/libcairo.so.2
+    cairo_show_glyphs
+      in /usr/lib/libcairo.so.2
+    0x7f5db463b022
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db463b069
+      in /usr/lib/libpangocairo-1.0.so.0
+    pango_renderer_draw_glyphs
+      in /usr/lib/libpango-1.0.so.0
+    pango_cairo_show_glyph_string
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db53ec8c1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53b98e8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53cb4ef
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53a9a7b
+      in /usr/lib/libgtk-4.so.1
+    gsk_renderer_render
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff79fe
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52d76b1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db53857b7
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db535a599
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b04053
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5afc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b05c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_context_iteration
+      in /usr/lib/libglib-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+  and 697.15K from 574 other places
+
+
+MEMORY LEAKS
+25.20M leaked over 19235 calls from
+0x7f5d929ec277
+  in ??
+525.06K leaked over 16 calls from:
+    0x7f5d9cdd0ae2
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cdd0bf4
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce36b45
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cedbbd8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e0f7
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e480
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8c645b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8d05da
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d152630
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d04a3ae
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d05d944
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8b64bb
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d171e5b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c96130e
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+525.06K leaked over 16 calls from:
+    0x7f5d9cdd0ae2
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cdd0bf4
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce36b45
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cedbbd8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e0f7
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e480
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8c645b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8d05da
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d152630
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d04a3ae
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d05d944
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8b62b1
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d171e5b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c96130e
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 24.15M from 7371 other places
+
+5.18M leaked over 869850 calls from
+g_malloc0
+  in /usr/lib/libglib-2.0.so.0
+173.68K leaked over 70 calls from:
+    g_type_create_instance
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65ced64
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_with_properties
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db52aa933
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b0226a
+      in /usr/lib/libglib-2.0.so.0
+    g_markup_parse_context_parse
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db52b625c
+      in /usr/lib/libgtk-4.so.1
+    gtk_svg_load_from_bytes
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50d7fe8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50d858e
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f6ba6f
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f6be40
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4cd07f1
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db5b3adba
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b37b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db4498041
+      in /usr/lib/libc.so.6
+    0x7f5db452072b
+      in /usr/lib/libc.so.6
+58.64K leaked over 733 calls from:
+    g_type_create_instance
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65ced64
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_with_properties
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db5c69a01
+      in /usr/lib/libgtksourceview-5.so.0
+    gtk_source_style_scheme_manager_get_scheme
+      in /usr/lib/libgtksourceview-5.so.0
+    _RNvMNtNtCs89MuaJf6beB_11sourceview54auto20style_scheme_managerNtB2_18StyleSchemeManager6scheme
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtCsb3L7BlZzJ2m_12tablepro_app2ui5theme13editor_scheme.llvm.14459760915884723360
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtCsb3L7BlZzJ2m_12tablepro_app2ui5theme5apply
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvXs3_NtNtCsb3L7BlZzJ2m_12tablepro_app2ui3appNtB5_3AppNtNtNtNtCsfhmrpZwloel_5relm49component4sync6traits15SimpleComponent4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvMs3_NtNtNtCsfhmrpZwloel_5relm49component4sync7builderINtB5_16ComponentBuilderNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3AppE25launch_with_input_channelB1m_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNvNtNtNtCsfruoU3bdRlJ_3gio4auto11application14ApplicationExt15connect_startup18startup_trampolineNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNCINvMNtCsfhmrpZwloel_5relm43appINtB2B_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtB3k_3AppE0EB3o_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    g_closure_invoke
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dbcfa
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dded3
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    g_application_register
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db4d01fd6
+      in /usr/lib/libgio-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 4.94M from 58576 other places
+
+4.48M leaked over 25469 calls from
+0x7f5d9d128947
+  in /usr/lib/libgallium-26.2.5-arch1.1.so
+843.47K leaked over 1 calls from:
+    0x7f5d9c961372
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+302.86K leaked over 1 calls from:
+    0x7f5d9c96130e
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 3.33M from 1062 other places
+
+2.91M leaked over 51925 calls from
+0x7f5db3e8f0d3
+  in /usr/lib/libcairo.so.2
+521.42K leaked over 1207 calls from:
+    0x7f5db3e1c094
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e93bd4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e9547b
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e9a401
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e47530
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1b3ba
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e6699d
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e66f89
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e0daa4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1abd9
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e65b64
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e15a78
+      in /usr/lib/libcairo.so.2
+    cairo_show_glyphs
+      in /usr/lib/libcairo.so.2
+    0x7f5db463b022
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db463b069
+      in /usr/lib/libpangocairo-1.0.so.0
+    pango_renderer_draw_glyphs
+      in /usr/lib/libpango-1.0.so.0
+    pango_cairo_show_glyph_string
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db53ec8c1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53b98e8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53cb4ef
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53a9a7b
+      in /usr/lib/libgtk-4.so.1
+    gsk_renderer_render
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff79fe
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52d76b1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db53857b7
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db535a599
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b04053
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5afc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b05c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_context_iteration
+      in /usr/lib/libglib-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+393.22K leaked over 2 calls from:
+    0x7f5db3eb270f
+      in /usr/lib/libcairo.so.2
+    0x7f5db3ea74c8
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1d7ad
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e67d31
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e68668
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e0d3e7
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e61679
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e10463
+      in /usr/lib/libcairo.so.2
+    cairo_paint
+      in /usr/lib/libcairo.so.2
+    0x7f5db5328354
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db535a78d
+      in /usr/lib/libgtk-4.so.1
+    gsk_renderer_render
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff79fe
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52d76b1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db53857b7
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db535a599
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b04053
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5afc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b05c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_context_iteration
+      in /usr/lib/libglib-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 2.00M from 2307 other places
+
+2.52M leaked over 6682030 calls from
+g_malloc
+  in /usr/lib/libglib-2.0.so.0
+32.77K leaked over 1 calls from:
+    g_intern_string
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5c69a4b
+      in /usr/lib/libgtksourceview-5.so.0
+    gtk_source_style_scheme_manager_get_scheme
+      in /usr/lib/libgtksourceview-5.so.0
+    _RNvMNtNtCs89MuaJf6beB_11sourceview54auto20style_scheme_managerNtB2_18StyleSchemeManager6scheme
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtCsb3L7BlZzJ2m_12tablepro_app2ui5theme13editor_scheme.llvm.14459760915884723360
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtNtCsb3L7BlZzJ2m_12tablepro_app2ui5theme5apply
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvXs3_NtNtCsb3L7BlZzJ2m_12tablepro_app2ui3appNtB5_3AppNtNtNtNtCsfhmrpZwloel_5relm49component4sync6traits15SimpleComponent4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvMs3_NtNtNtCsfhmrpZwloel_5relm49component4sync7builderINtB5_16ComponentBuilderNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3AppE25launch_with_input_channelB1m_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNvNtNtNtCsfruoU3bdRlJ_3gio4auto11application14ApplicationExt15connect_startup18startup_trampolineNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNCINvMNtCsfhmrpZwloel_5relm43appINtB2B_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtB3k_3AppE0EB3o_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    g_closure_invoke
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dbcfa
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dded3
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    g_application_register
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db4d01fd6
+      in /usr/lib/libgio-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+23.80K leaked over 36 calls from:
+    0x7f5db52b6abb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52b8db3
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52b8202
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52b88da
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52ac72c
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b0226a
+      in /usr/lib/libglib-2.0.so.0
+    g_markup_parse_context_parse
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db52b625c
+      in /usr/lib/libgtk-4.so.1
+    gtk_svg_load_from_bytes
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50d7fe8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50d858e
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f6ba6f
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f6be40
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4cd07f1
+      in /usr/lib/libgio-2.0.so.0
+    0x7f5db5b3adba
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b37b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db4498041
+      in /usr/lib/libc.so.6
+    0x7f5db452072b
+      in /usr/lib/libc.so.6
+  and 2.47M from 111486 other places
+
+2.29M leaked over 486647 calls from
+g_realloc
+  in /usr/lib/libglib-2.0.so.0
+394.75K leaked over 1 calls from:
+    0x7f5db5123583
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f0306e
+      in /usr/lib/libgtk-4.so.1
+    gtk_css_provider_load_from_file
+      in /usr/lib/libgtk-4.so.1
+    gtk_css_provider_load_from_resource
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65ceef9
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db4934f7a
+      in /usr/lib/libadwaita-1.so.0
+    0x7f5db493508a
+      in /usr/lib/libadwaita-1.so.0
+    adw_init
+      in /usr/lib/libadwaita-1.so.0
+    _RNvNtCs2zpZ8flyMgX_10libadwaita9functions4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsfhmrpZwloel_5relm44init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+262.14K leaked over 13 calls from:
+    0x7f5db5abf840
+      in /usr/lib/libglib-2.0.so.0
+    g_array_set_size
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db4f0120f
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f02d98
+      in /usr/lib/libgtk-4.so.1
+    gtk_css_provider_load_from_file
+      in /usr/lib/libgtk-4.so.1
+    gtk_css_provider_load_from_resource
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65ceef9
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db4934f7a
+      in /usr/lib/libadwaita-1.so.0
+    0x7f5db493508a
+      in /usr/lib/libadwaita-1.so.0
+    adw_init
+      in /usr/lib/libadwaita-1.so.0
+    _RNvNtCs2zpZ8flyMgX_10libadwaita9functions4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsfhmrpZwloel_5relm44init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startuE0Cs54EmfWQOcQ8_12tablepro_app.llvm.9002280939757062370
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    main
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+  and 1.64M from 39307 other places
+
+1.37M leaked over 18891 calls from
+0x7f5db2743230
+  in /usr/lib/libpixman-1.so.0
+339.24K leaked over 1285 calls from:
+    pixman_glyph_cache_insert
+      in /usr/lib/libpixman-1.so.0
+    0x7f5db3e1b415
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e6699d
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e66f89
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e0daa4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1abd9
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e65b64
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e15a78
+      in /usr/lib/libcairo.so.2
+    cairo_show_glyphs
+      in /usr/lib/libcairo.so.2
+    0x7f5db463b022
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db463b069
+      in /usr/lib/libpangocairo-1.0.so.0
+    pango_renderer_draw_glyphs
+      in /usr/lib/libpango-1.0.so.0
+    pango_cairo_show_glyph_string
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db53ec8c1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53b98e8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53cb4ef
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53a9a7b
+      in /usr/lib/libgtk-4.so.1
+    gsk_renderer_render
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff79fe
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52d76b1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db53857b7
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db535a599
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b04053
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5afc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b05c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_context_iteration
+      in /usr/lib/libglib-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+    _RINvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual16run_with_args_osNtNtNtCs9k3SxhrAWiO_3std3ffi6os_str8OsStringECsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvYNtNtNtCsb2UJzLDTK0f_4gtk44auto11application11ApplicationNtNtCsfruoU3bdRlJ_3gio11application20ApplicationExtManual3runCsb3L7BlZzJ2m_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvMNtCsfhmrpZwloel_5relm43appINtB3_7RelmAppNtNtNtNtCsb3L7BlZzJ2m_12tablepro_app2ui3app3msg6AppMsgE3runNtBL_3AppEBP_
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+318.65K leaked over 1207 calls from:
+    0x7f5db3e1c080
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e93bd4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e9547b
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e9a401
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e47530
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1b3ba
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e6699d
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e66f89
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e0daa4
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e1abd9
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e65b64
+      in /usr/lib/libcairo.so.2
+    0x7f5db3e15a78
+      in /usr/lib/libcairo.so.2
+    cairo_show_glyphs
+      in /usr/lib/libcairo.so.2
+    0x7f5db463b022
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db463b069
+      in /usr/lib/libpangocairo-1.0.so.0
+    pango_renderer_draw_glyphs
+      in /usr/lib/libpango-1.0.so.0
+    pango_cairo_show_glyph_string
+      in /usr/lib/libpangocairo-1.0.so.0
+    0x7f5db53ec8c1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53b98e8
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53ac137
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53fdcfb
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53caff4
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53cb4ef
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53a9a7b
+      in /usr/lib/libgtk-4.so.1
+    gsk_renderer_render
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff79fe
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db52d76b1
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db53857b7
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db535a599
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5b04053
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5afc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7f5db5b05c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_context_iteration
+      in /usr/lib/libglib-2.0.so.0
+    g_application_run
+      in /usr/lib/libgio-2.0.so.0
+  and 710.47K from 574 other places
+
+1.12M leaked over 39097 calls from
+0x7f5db3c1032c
+  in /usr/lib/libfontconfig.so.1
+209.41K leaked over 818 calls from:
+    0x7f5db3c416cd
+      in /usr/lib/libfontconfig.so.1
+    FcFontSetList
+      in /usr/lib/libfontconfig.so.1
+    0x7f5db3c90b11
+      in /usr/lib/libpangoft2-1.0.so.0
+    0x7f5db3c90fb9
+      in /usr/lib/libpangoft2-1.0.so.0
+    0x7f5db3c9107e
+      in /usr/lib/libpangoft2-1.0.so.0
+    0x7f5db3c98a74
+      in /usr/lib/libpangoft2-1.0.so.0
+    0x7f5db3c9903c
+      in /usr/lib/libpangoft2-1.0.so.0
+    pango_context_get_metrics
+      in /usr/lib/libpango-1.0.so.0
+    0x7f5db4f81232
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f85abf
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ece3e8
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4edfb2a
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ece3e8
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff66e2
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4952242
+      in /usr/lib/libadwaita-1.so.0
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db48d5e3b
+      in /usr/lib/libadwaita-1.so.0
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50b421b
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4eb0ac5
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50bcd16
+      in /usr/lib/libgtk-4.so.1
+    g_closure_invoke
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dbcfa
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dded3
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db532021d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53252ca
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50bc14a
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50bd63f
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+207.81K leaked over 6494 calls from:
+    FcFontSetList
+      in /usr/lib/libfontconfig.so.1
+    0x7f5db3c90b11
+      in /usr/lib/libpangoft2-1.0.so.0
+    0x7f5db3c90fb9
+      in /usr/lib/libpangoft2-1.0.so.0
+    0x7f5db3c9107e
+      in /usr/lib/libpangoft2-1.0.so.0
+    0x7f5db3c98a74
+      in /usr/lib/libpangoft2-1.0.so.0
+    0x7f5db3c9903c
+      in /usr/lib/libpangoft2-1.0.so.0
+    pango_context_get_metrics
+      in /usr/lib/libpango-1.0.so.0
+    0x7f5db4f81232
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4f85abf
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ece3e8
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4edfb2a
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ece3e8
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ff66e2
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4952242
+      in /usr/lib/libadwaita-1.so.0
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db48d5e3b
+      in /usr/lib/libadwaita-1.so.0
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4ebecb0
+      in /usr/lib/libgtk-4.so.1
+    gtk_layout_manager_measure
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c245
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50b421b
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db4eb0ac5
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db501c06d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50bcd16
+      in /usr/lib/libgtk-4.so.1
+    g_closure_invoke
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dbcfa
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db65dded3
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    0x7f5db532021d
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db53252ca
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50bc14a
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db50bd63f
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db65de019
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    gtk_widget_show
+      in /usr/lib/libgtk-4.so.1
+  and 701.71K from 1604 other places
+
+
+total runtime: 21.09s.
+calls to allocation functions: 8528429 (404363/s)
+temporary memory allocations: 1061879 (50347/s)
+peak heap memory consumption: 64.56M
+peak RSS (including heaptrack overhead): 275.79M
+total memory leaked: 48.38M
+suppressed leaks: 1.19K
