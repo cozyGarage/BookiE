@@ -125,9 +125,10 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("/home/runner/.cargo/bin", cargo_path, name)
             self.assertIn("/home/ubuntu/.cargo/bin", cargo_path, name)
 
-    def test_acceptance_jobs_use_the_pilot_and_builder_pools(self):
+    def test_acceptance_jobs_use_any_host_and_builder_pools(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow))
+        self.assertNotIn("ci-pilot", workflow)
         for name in ("gtk-build", "clippy", "test-build", "duckdb-build", "floor-build", "supply-chain"):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
@@ -137,7 +138,7 @@ class CiWorkflowTests(unittest.TestCase):
             "driver-tls", "keyring",
         ):
             with self.subTest(job=name):
-                self.assertIn("runs-on: ci-pilot", jobs[name])
+                self.assertIn("runs-on: any-host", jobs[name])
 
     def test_driver_tls_fixture_wait_is_bounded_with_failure_diagnostics(self):
         script = (ROOT / "scripts/test-driver-tls.sh").read_text()
