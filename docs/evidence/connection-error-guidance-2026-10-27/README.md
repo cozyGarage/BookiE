@@ -8,6 +8,6 @@ The regression `ui::connect_dialog::error_tests::connecting_with_a_bad_certifica
 
 Test, Connect and initial metadata reads now reuse the existing transport and driver presentation. Existing translation strings and TLS safety advice remain authoritative. The regression proves candidate opening; installed Test-button checks cover success and failure, not an actual TLS handshake.
 
-Full preflight, GTK widget checks, app Clippy and installed Test-button scenarios are pending. Forgejo acceptance is deferred during infrastructure migration.
+Full preflight passed: 2,208 unit tests, 291 sandbox tests and one Redis check. All 179 GTK widget tests and app Clippy passed. The 13 existing error-presentation tests also passed, including certificate safety and keyring recovery advice. A rebuilt installed app passed `test_connection_reports_success_in_the_dialog` and `test_connection_reports_failure_in_the_dialog` under isolated Xvfb. Forgejo acceptance is deferred during infrastructure migration.
 
 Release-Note: Fixed: Connection setup shows consistent recovery guidance for connection and metadata errors.

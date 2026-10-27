@@ -10,11 +10,17 @@
     "before": "one test failed: certificate recovery guidance absent",
     "after": "one test passed"
   },
-  "pending": [
-    "preflight",
-    "gtk widgets",
-    "app Clippy",
-    "installed Test success and failure"
-  ],
-  "forgejo": "deferred during infrastructure migration"
+  "pending": [],
+  "forgejo": "deferred during infrastructure migration",
+  "validation": {
+    "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
+    "gtk_widgets": "179 passed",
+    "app_clippy": "passed",
+    "existing_error_presentation_tests": "13 passed",
+    "installed_e2e": [
+      "test_connection_reports_success_in_the_dialog: passed",
+      "test_connection_reports_failure_in_the_dialog: passed"
+    ]
+  },
+  "installed_binary_sha256": "9608bbc319a6d39264924793ea932b69cd9a07f3c2e9904c6b4377bfbbc6ab91"
 }
