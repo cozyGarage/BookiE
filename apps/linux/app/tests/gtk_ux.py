@@ -970,7 +970,15 @@ GLib.MainLoop().run()
     def view_value_preserves_duplicate_json_keys_and_text_formatting(database, base):
         value = '  {"a":1,"a":2,"n":123456789012345678901234567890.000,"e":1e+004}  '
         ui.run_sql("SELECT '" + value + "' AS payload")
-        open_cell_menu(value)
+        wait_for_result_column("payload")
+        ui.press_x11_key("j", ("Control_L", "Shift_L"))
+        search = ui.wait_for_node(name="Search columns")
+        search.queryEditableText().setTextContents("payload")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Search columns", present=False)
+        wait_for_focused_grid_row(ui, pyatspi, value)
+        ui.press_x11_key("Menu")
+        ui.wait_for_node(role=pyatspi.ROLE_MENU)
         choose_menu_item(4)
         wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
