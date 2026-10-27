@@ -400,3 +400,56 @@ fn prefetch_refuses_invalid_connection_metadata_without_caching_requested_worksp
     assert!(store.load_connection(id).is_none());
     assert_eq!(std::fs::read(path).unwrap(), bytes);
 }
+
+fn two_drafts(first: Uuid, second: Uuid, first_text: &str, second_text: &str) -> ConnectionWorkspaceState {
+    ConnectionWorkspaceState {
+        tabs: vec![
+            WorkspaceTabRecord::Editor {
+                query: first_text.into(),
+                draft_id: Some(first),
+                file: None,
+            },
+            WorkspaceTabRecord::Editor {
+                query: second_text.into(),
+                draft_id: Some(second),
+                file: None,
+            },
+        ],
+        ..Default::default()
+    }
+}
+
+#[test]
+fn a_failed_later_draft_preserves_the_previous_acknowledged_workspace_body() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("workspace.json");
+    let drafts = directory.path().join("drafts");
+    let id = Uuid::new_v4();
+    let first = Uuid::new_v4();
+    let second = Uuid::new_v4();
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    store.save_connection(id, two_drafts(first, second, "old first", "old second"));
+    assert_eq!(flush(&store), Ok(()));
+    let metadata = std::fs::read(&path).unwrap();
+    let bodies = drafts.join(id.to_string());
+    let blocked = bodies.join(format!("{second}.sql"));
+    std::fs::remove_file(&blocked).unwrap();
+    std::fs::create_dir(&blocked).unwrap();
+    store.save_connection(id, two_drafts(first, second, "new first", "new second"));
+    assert!(flush(&store).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), metadata);
+    assert_eq!(
+        std::fs::read_to_string(bodies.join(format!("{first}.sql"))).unwrap(),
+        "old first"
+    );
+    assert_eq!(std::fs::read_dir(&bodies).unwrap().count(), 2);
+    std::fs::remove_dir(&blocked).unwrap();
+    std::fs::write(&blocked, "old second").unwrap();
+    assert_eq!(flush(&store), Ok(()));
+    let restored = WorkspaceStore::new(Some(path), drafts);
+    restored.prefetch_connections(&[id]).unwrap();
+    let saved = restored.load_connection(id).unwrap();
+    assert!(matches!(&saved.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "new first"));
+    assert!(matches!(&saved.tabs[1], WorkspaceTabRecord::Editor { query, .. } if query == "new second"));
+    assert_eq!(std::fs::read_dir(&bodies).unwrap().count(), 2);
+}
