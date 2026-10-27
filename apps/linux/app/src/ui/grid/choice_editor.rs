@@ -38,16 +38,19 @@ fn current_enum_choice_index(labels: &[String], current: &str) -> Option<usize> 
 
 #[derive(Clone)]
 struct Picker {
-    cell: CellEditor,
+    cell: gtk::glib::WeakRef<CellEditor>,
     col_index: usize,
     sender: relm4::Sender<GridMsg>,
-    popover: gtk::Popover,
+    popover: gtk::glib::WeakRef<gtk::Popover>,
 }
 
 impl Picker {
     fn commit(&self, text: String) {
-        let row_position = POSITION_SLOT.get(&self.cell).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(&self.cell).unwrap_or_default();
+        let Some(cell) = self.cell.upgrade() else {
+            return;
+        };
+        let row_position = POSITION_SLOT.get(&cell).unwrap_or(0);
+        let row_key = ROW_KEY_SLOT.cloned(&cell).unwrap_or_default();
         self.sender
             .send(GridMsg::CellEdited {
                 row_position,
@@ -56,7 +59,9 @@ impl Picker {
                 row_key,
             })
             .ok();
-        self.popover.popdown();
+        if let Some(popover) = self.popover.upgrade() {
+            popover.popdown();
+        }
     }
 }
 
@@ -151,10 +156,10 @@ pub(super) fn show_choice_popover(
     popover.set_parent(cell);
     POPOVER_SLOT.set(cell, popover.clone());
     let picker = Picker {
-        cell: cell.clone(),
+        cell: cell.downgrade(),
         col_index,
         sender: sender.clone(),
-        popover: popover.clone(),
+        popover: popover.downgrade(),
     };
     let current = cell.text().to_string();
     let content = if is_set {
@@ -172,10 +177,12 @@ pub(super) fn show_choice_popover(
         .child(&content)
         .build();
     popover.set_child(Some(&scrolled));
-    let cell_for_close = cell.clone();
+    let cell_for_close = cell.downgrade();
     popover.connect_closed(move |p| {
         p.unparent();
-        POPOVER_SLOT.take(&cell_for_close);
+        if let Some(cell_for_close) = cell_for_close.upgrade() {
+            POPOVER_SLOT.take(&cell_for_close);
+        }
     });
     popover.popup();
 }
