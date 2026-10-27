@@ -42,6 +42,41 @@ class RegistryExtractionTests(unittest.TestCase):
             registry.publish(Path('/unused'), 'a' * 40, 'default', 'https://registry.example/bundle/')
         request.assert_called_once_with('https://registry.example/bundle/manifest.json')
 
+    def test_publish_compresses_bundle_before_upload(self):
+        class Response:
+            status = 201
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'index.json').write_text('{}\n')
+            (root / 'program').write_bytes(b'test bundle')
+            uploaded = {}
+
+            def request(url, method='GET', data=None, size=None):
+                if method == 'PUT' and url.endswith('bundle.tar.gz'):
+                    uploaded['archive'] = data.read()
+                    self.assertEqual(size, len(uploaded['archive']))
+                return Response()
+
+            with patch.object(registry.bundle, 'verify', return_value={'build_group': 'duckdb'}), \
+                    patch.object(registry, 'existing_manifest', return_value=None), \
+                    patch.object(registry, 'request', side_effect=request):
+                registry.publish(root, 'a' * 40, 'duckdb', 'https://registry.example/bundle/')
+
+            self.assertEqual(uploaded['archive'][:2], b'\x1f\x8b')
+            archive = root / 'uploaded.tar.gz'
+            archive.write_bytes(uploaded['archive'])
+            destination = root / 'destination'
+            destination.mkdir()
+            registry.extract(archive, destination)
+            self.assertEqual((destination / 'program').read_bytes(), b'test bundle')
+
     def test_regular_payload_is_extracted(self):
         self.assertEqual(self.check_archive('tests/program'), b'test')
 

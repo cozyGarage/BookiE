@@ -28,7 +28,7 @@ def request(url, method='GET', data=None, size=None):
 
 
 def extract(archive, destination):
-    with tarfile.open(archive, 'r:') as source:
+    with tarfile.open(archive, 'r:*') as source:
         members = source.getmembers()
         if len(members) > 5000 or sum(member.size for member in members) > MAX_EXTRACTED:
             raise ValueError('test bundle exceeds extraction limits')
@@ -65,8 +65,8 @@ def publish(directory, revision, group, url):
         print(json.dumps(existing, sort_keys=True))
         return
     with tempfile.TemporaryDirectory() as temporary:
-        archive = Path(temporary) / 'bundle.tar'
-        with tarfile.open(archive, 'w') as output:
+        archive = Path(temporary) / 'bundle.tar.gz'
+        with tarfile.open(archive, 'w:gz', compresslevel=1) as output:
             for path in sorted(directory.rglob('*')):
                 if path.is_symlink():
                     raise ValueError('cannot publish a bundle containing links')
@@ -76,7 +76,7 @@ def publish(directory, revision, group, url):
             raise ValueError('test bundle exceeds upload size limit')
         manifest = {'schema_version': 1, 'source_commit': revision, 'build_group': group,
                     'sha256': bundle.digest(archive), 'size': size, 'index_sha256': bundle.digest(directory / 'index.json')}
-        with archive.open('rb') as content, request(url + 'bundle.tar', 'PUT', content, size) as response:
+        with archive.open('rb') as content, request(url + 'bundle.tar.gz', 'PUT', content, size) as response:
             if response.status != 201:
                 raise ValueError('registry did not accept the bundle')
         data = json.dumps(manifest, sort_keys=True).encode()
@@ -102,8 +102,8 @@ def fetch(directory, revision, group, url):
     directory.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=directory.parent) as temporary:
         temporary = Path(temporary)
-        archive = temporary / 'bundle.tar'
-        with request(url + 'bundle.tar') as response, archive.open('wb') as output:
+        archive = temporary / 'bundle.tar.gz'
+        with request(url + 'bundle.tar.gz') as response, archive.open('wb') as output:
             remaining = manifest['size']
             while remaining:
                 block = response.read(min(1024 * 1024, remaining))
