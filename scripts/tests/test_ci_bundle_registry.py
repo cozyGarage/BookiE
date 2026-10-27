@@ -16,8 +16,8 @@ class RegistryExtractionTests(unittest.TestCase):
     def check_archive(self, name, kind=tarfile.REGTYPE):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            archive = root / 'bundle.tar.gz'
-            with tarfile.open(archive, 'w:gz') as output:
+            archive = root / 'bundle.tar'
+            with tarfile.open(archive, 'w') as output:
                 entry = tarfile.TarInfo(name)
                 entry.type = kind
                 entry.linkname = '../outside'

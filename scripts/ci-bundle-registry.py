@@ -28,7 +28,7 @@ def request(url, method='GET', data=None, size=None):
 
 
 def extract(archive, destination):
-    with tarfile.open(archive, 'r:gz') as source:
+    with tarfile.open(archive, 'r:') as source:
         members = source.getmembers()
         if len(members) > 5000 or sum(member.size for member in members) > MAX_EXTRACTED:
             raise ValueError('test bundle exceeds extraction limits')
@@ -65,8 +65,8 @@ def publish(directory, revision, group, url):
         print(json.dumps(existing, sort_keys=True))
         return
     with tempfile.TemporaryDirectory() as temporary:
-        archive = Path(temporary) / 'bundle.tar.gz'
-        with tarfile.open(archive, 'w:gz', compresslevel=1) as output:
+        archive = Path(temporary) / 'bundle.tar'
+        with tarfile.open(archive, 'w') as output:
             for path in sorted(directory.rglob('*')):
                 if path.is_symlink():
                     raise ValueError('cannot publish a bundle containing links')
@@ -76,7 +76,7 @@ def publish(directory, revision, group, url):
             raise ValueError('test bundle exceeds upload size limit')
         manifest = {'schema_version': 1, 'source_commit': revision, 'build_group': group,
                     'sha256': bundle.digest(archive), 'size': size, 'index_sha256': bundle.digest(directory / 'index.json')}
-        with archive.open('rb') as content, request(url + 'bundle.tar.gz', 'PUT', content, size) as response:
+        with archive.open('rb') as content, request(url + 'bundle.tar', 'PUT', content, size) as response:
             if response.status != 201:
                 raise ValueError('registry did not accept the bundle')
         data = json.dumps(manifest, sort_keys=True).encode()
@@ -98,11 +98,12 @@ def fetch(directory, revision, group, url):
             or manifest.get('build_group') != group or not 0 < manifest['size'] <= MAX_ARCHIVE
             or not re.fullmatch('[0-9a-f]{64}', manifest['sha256'])):
         raise ValueError('registry bundle identity or size is invalid')
+    print(f"downloading {manifest['size'] / 1024**3:.2f} GiB {group} test bundle", flush=True)
     directory.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=directory.parent) as temporary:
         temporary = Path(temporary)
-        archive = temporary / 'bundle.tar.gz'
-        with request(url + 'bundle.tar.gz') as response, archive.open('wb') as output:
+        archive = temporary / 'bundle.tar'
+        with request(url + 'bundle.tar') as response, archive.open('wb') as output:
             remaining = manifest['size']
             while remaining:
                 block = response.read(min(1024 * 1024, remaining))
@@ -110,12 +111,17 @@ def fetch(directory, revision, group, url):
                     raise ValueError('registry returned a truncated bundle')
                 output.write(block)
                 remaining -= len(block)
+                downloaded = manifest['size'] - remaining
+                if downloaded and downloaded % (256 * 1024**2) < len(block):
+                    print(f"downloaded {downloaded / 1024**3:.2f} GiB", flush=True)
             if response.read(1):
                 raise ValueError('registry bundle exceeds its declared size')
+        print('verifying bundle checksum', flush=True)
         if bundle.digest(archive) != manifest['sha256']:
             raise ValueError('registry bundle digest mismatch')
         staging = temporary / 'verified'
         staging.mkdir()
+        print('extracting test bundle', flush=True)
         extract(archive, staging)
         if bundle.digest(staging / 'index.json') != manifest['index_sha256']:
             raise ValueError('registry bundle index digest mismatch')
@@ -123,6 +129,7 @@ def fetch(directory, revision, group, url):
         if index['build_group'] != group:
             raise ValueError('registry bundle build group mismatch')
         shutil.move(staging, directory)
+    print('test bundle ready', flush=True)
 
 
 class ArtifactRedirect(urllib.request.HTTPRedirectHandler):

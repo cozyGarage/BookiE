@@ -26,6 +26,7 @@ env:
   SCCACHE_DIR: /var/cache/ci/sccache
   SCCACHE_CACHE_SIZE: 40G
   CARGO_TARGET_DIR: /var/cache/ci/target/${{ github.job }}
+  TMPDIR: /var/cache/ci/target
 
 jobs:
   guards:
@@ -174,23 +175,58 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
-      - name: Build reusable test executables
-        run: cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles"
+      - name: Build the default test bundle
+        run: cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default
+      - name: Publish the default test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/default" "${{ github.sha }}" default
+
+  duckdb-build:
+    runs-on: build-host
+    needs: [test-build]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target
+      CARGO_HOME: /cargo
+      TABLEPRO_TOOL_DIR: /tools
+      CARGO_BUILD_JOBS: "8"
+      RUSTC_WRAPPER: ""
+      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
+    steps:
+      - name: Check out
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Build the DuckDB test bundle
+        run: cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" duckdb
       - name: DuckDB analysis and documentation tests
         run: |
           cd src
           cargo clippy --locked -p tablepro-driver-duckdb --all-targets -- -D warnings
           cargo test --locked -p tablepro-driver-duckdb --doc
-      - name: Publish immutable test bundles
+      - name: Publish the DuckDB test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: |
-          cd src
-          for group in default duckdb; do
-            python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ github.sha }}" "$group"
-          done
+        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/duckdb" "${{ github.sha }}" duckdb
 
   unit:
     runs-on: any-host
@@ -655,7 +691,7 @@ jobs:
 
   duckdb:
     runs-on: any-host
-    needs: [guards, clippy, test-build]
+    needs: [duckdb-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 90
     env:

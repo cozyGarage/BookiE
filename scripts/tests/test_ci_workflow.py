@@ -23,6 +23,10 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        self.assertIn("TMPDIR: /var/cache/ci/target\n", workflow)
+
     def test_actionlint_uses_a_read_only_go_module_lock(self):
         workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
         module = (ROOT / "scripts/tools/actionlint/go.mod").read_text()
@@ -50,6 +54,22 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("test-gtk-widgets.sh", widgets)
         self.assertNotRegex(widgets, r"(?m)^    (if|continue-on-error):")
 
+    def test_default_test_jobs_do_not_wait_for_duckdb_artifacts(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        default_build = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default', default_build)
+        duckdb_build = re.search(r"(?ms)^  duckdb-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("needs: [test-build]", duckdb_build)
+        self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" duckdb', duckdb_build)
+        for name in ("unit", "sandbox", "widgets", "driver", "consumers", "gtk"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
+                self.assertNotIn("duckdb-build", job)
+        duckdb = re.search(r"(?ms)^  duckdb:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("duckdb-build", re.search(r"(?m)^    needs: \[(.+)\]$", duckdb).group(1))
+        self.assertNotIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", duckdb).group(1))
+
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = (
@@ -62,7 +82,9 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 expected = {"guards", "clippy"}
-                if name == "distro-floor":
+                if name == "duckdb":
+                    expected = {"duckdb-build"}
+                elif name == "distro-floor":
                     expected.add("floor-build")
                 elif name != "supply-chain":
                     expected.add("test-build")
