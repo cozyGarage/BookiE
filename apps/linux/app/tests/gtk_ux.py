@@ -1358,6 +1358,33 @@ GLib.MainLoop().run()
         ui.press_x11_key("Return")
         ui.wait_for_node(name="Search the loaded rows", present=False)
 
+    def selected_history_exports_to_sql_and_csv(database, base):
+        query = "SELECT 'é' AS history_export_marker;"
+        ui.run_sql(query)
+        ui.invoke_accessible_action("win.show-history")
+        ui.wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.invoke(ui.wait_for_node(name="Select", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        row = ui.wait_for_node(name=query, role=pyatspi.ROLE_LABEL)
+        while row is not None and ui.node_role(row) != pyatspi.ROLE_LIST_ITEM:
+            row = row.parent
+        assert row is not None, "the recorded query has no history row"
+        ui.invoke(ui.wait_within(row, role=pyatspi.ROLE_CHECK_BOX))
+        for extension, label in [("sql", "Export as SQL"), ("csv", "Export as CSV")]:
+            ui.invoke(ui.wait_for_node(name="Export", role=pyatspi.ROLE_TOGGLE_BUTTON))
+            ui.invoke(ui.wait_for_node(name=label))
+            chooser = ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES)
+            ui.show_file_chooser_location(chooser)
+            path = base / "home" / f"selected-history.{extension}"
+            ui.set_visible_editable_within("Export query history", ui.FILE_CHOOSER_ROLES, str(path))
+            ui.invoke(ui.wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline and not path.exists():
+                time.sleep(ui.POLL_SECONDS)
+            assert path.exists(), f"history {extension} export was not created"
+            assert query in path.read_text(encoding="utf-8"), "the selected SQL was not preserved"
+        ui.invoke(ui.wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+
     def query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} — BookiE")
@@ -2302,6 +2329,7 @@ GLib.MainLoop().run()
         sql_editor_clickables_all_have_a_keyboard_path,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
+        selected_history_exports_to_sql_and_csv,
         query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace,
         server_activity_dialog_uses_title_case,
         find_in_loaded_rows_lists_matches_and_selects_one,
