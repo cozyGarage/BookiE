@@ -99,6 +99,7 @@ pub(super) fn install_window_actions(
     let disconnect_sender = sender.clone();
     disconnect_action.connect_activate(move |_, _| disconnect_sender.input(AppMsg::Disconnect));
     group.add_action(&disconnect_action);
+    crate::ui::leak_probe::install(&group);
     window.insert_action_group("win", Some(&group));
     disconnect_action.set_enabled(false);
     tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");

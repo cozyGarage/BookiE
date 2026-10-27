@@ -24,6 +24,7 @@ import gtk_editor_panel
 import gtk_csv_refresh
 import gtk_catalog
 import gtk_structure
+import gtk_sequences
 import gtk_input
 import gtk_runner
 import gtk_shard
@@ -925,6 +926,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
             "XDG_DATA_HOME": str(data),
             "XDG_CACHE_HOME": str(cache),
             "XDG_STATE_HOME": str(state),
+            "TABLEPRO_GTK_LEAK_REPORT": str(base / "leak-report.txt"),
             "XDG_RUNTIME_DIR": str(runtime),
             "GSETTINGS_BACKEND": "keyfile",
             "RUST_LOG": "tablepro_app=debug",
@@ -2833,6 +2835,7 @@ def main():
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_structure.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_sequences.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
     if selected:
         names = set(selected.split(","))
