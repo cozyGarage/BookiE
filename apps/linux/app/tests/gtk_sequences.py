@@ -6,7 +6,7 @@ AT-SPI cannot see a dismissed dialog that is still referenced, so the app writes
 import time
 from pathlib import Path
 
-# key -> (action that opens it, accessible title, name the app tracks it under)
+# key (the name the app tracks it under) -> (action, or "button:<name>", that opens it; accessible title)
 DIALOGS = {
     "preferences": ("win.preferences", "Preferences"),
     "shortcuts": ("win.shortcuts", "Keyboard Shortcuts"),
@@ -15,7 +15,11 @@ DIALOGS = {
     "audit": ("win.show-audit", "Audit Log"),
     "saved_queries": ("win.show-saved-queries", "Saved Queries"),
     "quick_switcher": ("win.open-quickly", "Open quickly"),
+    "connect": ("button:New connection", "Connect to PostgreSQL"),
+    "structure_form": ("structure:Add Index…", "Add Index"),
 }
+# Typing into a field before dismissal exercises the edit-then-discard path.
+EDITS = {"connect": ("Host", "leak.example.invalid"), "structure_form": ("Name", "leak_idx")}
 CYCLES = 4
 
 
@@ -37,9 +41,30 @@ def scenarios(ui):
             if actions.getName(index) == "window.close":
                 return actions.doAction(index)
         for node in ui.descendants(dialog):
-            if ui.node_name(node) == "Close" and ui.node_role(node) == ui.pyatspi.ROLE_PUSH_BUTTON:
+            if ui.node_name(node) in ("Close", "Cancel") and ui.node_role(node) == ui.pyatspi.ROLE_PUSH_BUTTON:
                 return ui.invoke(node)
         return False
+
+    def open_structure_form(add_button):
+        if ui.find_node(name="safety_items", role=ui.pyatspi.ROLE_PAGE_TAB) is None:
+            row = ui.wait_for_node(name="safety_items", role=ui.pyatspi.ROLE_LIST_ITEM)
+            actions = row.queryAction()
+            for index in range(actions.nActions):
+                if actions.getName(index) == "sidebar-row.edit-structure":
+                    actions.doAction(index)
+        ui.invoke(ui.wait_for_node(name="Indexes"))
+        row = ui.wait_for_sensitive_node(add_button, role=ui.pyatspi.ROLE_LIST_ITEM)
+        extents = row.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+        ui.gtk_ux.x11_click(extents.x + 40, extents.y + extents.height // 2, button=1)
+
+    def entry_text(name):
+        entry = ui.wait_for_node(name=name, role=(ui.pyatspi.ROLE_ENTRY, ui.pyatspi.ROLE_TEXT))
+        text = entry.queryText()
+        return text.getText(0, text.characterCount)
+
+    def set_entry(name, text):
+        entry = ui.wait_for_node(name=name, role=(ui.pyatspi.ROLE_ENTRY, ui.pyatspi.ROLE_TEXT))
+        entry.queryEditableText().setTextContents(text)
 
     def dismiss(title):
         # Escape is dropped when focus is not inside the dialog, so use the dialog's own close control.
@@ -55,8 +80,18 @@ def scenarios(ui):
 
         def scenario(_database, base):
             for index in range(CYCLES):
-                ui.invoke_accessible_action(action)
+                if action.startswith("structure:"):
+                    open_structure_form(action[10:])
+                elif action.startswith("button:"):
+                    ui.invoke(ui.wait_for_node(name=action[7:], role=ui.pyatspi.ROLE_PUSH_BUTTON))
+                else:
+                    ui.invoke_accessible_action(action)
                 ui.wait_for_node(name=title)
+                if key in EDITS:
+                    name, text = EDITS[key]
+                    shown = entry_text(name)
+                    assert text not in shown, f"{key} reopened with the discarded edit {shown!r}"
+                    set_entry(name, text)
                 dismiss(title)
                 # Closing animations and idle callbacks release a dialog shortly after it hides.
                 deadline = time.monotonic() + ui.WAIT_SECONDS
