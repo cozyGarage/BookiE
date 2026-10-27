@@ -140,10 +140,11 @@ fn changed_bodies_survive_a_failed_metadata_publish_and_retry_without_orphan_gro
         let old_text = std::fs::read(&old_body).unwrap();
         std::os::unix::fs::symlink(&original, &path).unwrap();
         let mut changed = workspace(&[draft]);
-        let WorkspaceTabRecord::Editor { query, .. } = &mut changed.tabs[0] else {
-            unreachable!()
+        changed.tabs[0] = WorkspaceTabRecord::Editor {
+            query: "SELECT 'changed body'".into(),
+            draft_id: Some(draft),
+            file: None,
         };
-        *query = "SELECT 'changed body'".into();
         assert!(save_update(&path, &drafts, id, changed.clone(), incremental).is_err());
         assert_eq!(std::fs::read(&original).unwrap(), previous);
         assert_eq!(std::fs::read(&old_body).unwrap(), old_text);
