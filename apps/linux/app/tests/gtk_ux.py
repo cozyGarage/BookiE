@@ -1400,12 +1400,16 @@ GLib.MainLoop().run()
             chooser = ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES)
             ui.show_file_chooser_location(chooser)
             path = base / "home" / f"selected-history.{extension}"
-            ui.set_visible_editable_within("Export query history", ui.FILE_CHOOSER_ROLES, str(path))
-            ui.invoke(ui.wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+            entry = ui.set_visible_editable_within("Export query history", ui.FILE_CHOOSER_ROLES, str(path))
+            text = entry.queryText()
+            assert text.getText(0, text.characterCount) == str(path), "the chooser did not accept the export path"
+            assert entry.queryComponent().grabFocus(), "the export path cannot receive focus"
+            ui.press_x11_key("Return")
+            ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES, present=False)
             deadline = time.monotonic() + ui.WAIT_SECONDS
             while time.monotonic() < deadline and not path.exists():
                 time.sleep(ui.POLL_SECONDS)
-            assert path.exists(), f"history {extension} export was not created"
+            assert path.exists(), f"history {extension} export was not created:\n{ui.accessible_snapshot()}"
             assert query in path.read_text(encoding="utf-8"), "the selected SQL was not preserved"
             if extension == "csv":
                 import csv

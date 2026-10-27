@@ -1096,6 +1096,16 @@
       "tablepro-app",
       "--lib",
       "ui::history_dialog::export_tests::a_failed_history_export_shows_a_dismissible_error"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::history_dialog::lifetime_tests::refreshing_history_releases_removed_rows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::history_dialog::lifetime_tests::closing_history_releases_its_rows_and_popovers"
     ]
   ],
   "keyring": [
