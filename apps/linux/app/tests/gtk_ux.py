@@ -1360,7 +1360,23 @@ GLib.MainLoop().run()
 
     def selected_history_exports_to_sql_and_csv(database, base):
         query = "SELECT 'é' AS history_export_marker;"
+        import sqlite3
         ui.run_sql(query)
+        ui.wait_for_node_containing("done in")
+        history = base / "config" / ui.storage_dir_name() / "history.db"
+        recorded = None
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            with sqlite3.connect(f"file:{history}?mode=ro", uri=True) as connection:
+                recorded = connection.execute(
+                    "SELECT query FROM history WHERE query LIKE ? ORDER BY id DESC LIMIT 1",
+                    ("%history_export_marker%",),
+                ).fetchone()
+            if recorded is not None:
+                break
+            time.sleep(ui.POLL_SECONDS)
+        assert recorded is not None, "the query was never recorded in history"
+        query = recorded[0]
         ui.invoke_accessible_action("win.show-history")
         ui.wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(ui.wait_for_node(name="Select", role=pyatspi.ROLE_TOGGLE_BUTTON))
@@ -1368,10 +1384,19 @@ GLib.MainLoop().run()
         while row is not None and ui.node_role(row) != pyatspi.ROLE_LIST_ITEM:
             row = row.parent
         assert row is not None, "the recorded query has no history row"
-        ui.invoke(ui.wait_within(row, role=pyatspi.ROLE_CHECK_BOX))
-        for extension, label in [("sql", "Export as SQL"), ("csv", "Export as CSV")]:
-            ui.invoke(ui.wait_for_node(name="Export", role=pyatspi.ROLE_TOGGLE_BUTTON))
-            ui.invoke(ui.wait_for_node(name=label))
+        checkbox = ui.wait_within(row, role=pyatspi.ROLE_CHECK_BOX)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while not checkbox.getState().contains(pyatspi.STATE_SHOWING) and time.monotonic() < deadline:
+            time.sleep(ui.POLL_SECONDS)
+        extents = checkbox.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        assert extents.width > 0 and extents.height > 0, "the history selection checkbox has no visible bounds"
+        x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
+        ui.wait_for_node(name="1 selected")
+        for position, extension in [(0, "sql"), (1, "csv")]:
+            ui.invoke(ui.wait_for_node_containing("Export", role=pyatspi.ROLE_TOGGLE_BUTTON))
+            ui.wait_for_node(role=pyatspi.ROLE_MENU)
+            ui.press_x11_key("Home")
+            choose_menu_item(position)
             chooser = ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES)
             ui.show_file_chooser_location(chooser)
             path = base / "home" / f"selected-history.{extension}"
@@ -1382,6 +1407,10 @@ GLib.MainLoop().run()
                 time.sleep(ui.POLL_SECONDS)
             assert path.exists(), f"history {extension} export was not created"
             assert query in path.read_text(encoding="utf-8"), "the selected SQL was not preserved"
+            if extension == "csv":
+                import csv
+                with path.open(encoding="utf-8", newline="") as output:
+                    assert [row["query"] for row in csv.DictReader(output)] == [query]
         ui.invoke(ui.wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
 

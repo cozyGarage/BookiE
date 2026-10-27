@@ -5,17 +5,19 @@
     "apps/linux/app/src/ui/history_dialog.rs": "ba07c5bf0f0bde4fa90f85a7acebe5e6e114a1bf6563c16f03fa73c56b503625",
     "apps/linux/app/src/ui/history_dialog/export.rs": "8048b6c5f03969b26db00325e0becd304386050ec5bf2714c69f97e795e28f75",
     "apps/linux/app/src/ui/history_dialog/export_tests.rs": "6c362842b8f59f382c4dca0aed0e9a1fc6f12bac50320d693e88b305230eb6e6",
-    "apps/linux/app/tests/gtk_ux.py": "33c19da03eb5c1d928aca96c610c4111aad63fa445588dfd267643ac972c139a",
+    "apps/linux/app/tests/gtk_ux.py": "cd7e975a8e7eb0c4a6ff4ccf56cdcebae4e2a8cfed75001d8f31c49b7a7a366e",
     "scripts/isolated-tests.json": "9be18b906d16e5fb3070432c7d0e39728dd4b335603fc589bd1ece4d5336b683"
   },
   "negative_control": "failure handler extracted unchanged; visible error regression failed",
   "focused_validation": "5 tests passed",
-  "pending": [
-    "preflight",
-    "GTK widgets",
-    "app Clippy",
-    "installed SQL and CSV history export"
-  ],
+  "pending": [],
   "forgejo": "deferred during infrastructure migration",
-  "merge_order": "1753 first; refresh and verify both regression sets"
+  "merge_order": "1753 first; refresh and verify both regression sets",
+  "validation": {
+    "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
+    "gtk_widgets": "180 passed",
+    "app_clippy": "passed",
+    "installed_e2e": "selected_history_exports_to_sql_and_csv passed"
+  },
+  "installed_binary_sha256": "a11decc3e6aeaa46befd5e0eead435571cb4fdfcc7e55891bb127fc0e77b2136"
 }
