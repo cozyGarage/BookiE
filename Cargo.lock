@@ -6316,7 +6316,6 @@ dependencies = [
  "relm4",
  "rust_decimal",
  "secrecy",
- "serde",
  "serde_json",
  "sha2 0.11.0",
  "sourceview5",
@@ -6442,7 +6441,6 @@ dependencies = [
  "tablepro-core",
  "tempfile",
  "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -6687,7 +6685,6 @@ dependencies = [
  "libc",
  "russh",
  "secrecy",
- "serde_json",
  "tempfile",
  "testcontainers",
  "thiserror",

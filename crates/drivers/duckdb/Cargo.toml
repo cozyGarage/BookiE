@@ -20,7 +20,6 @@ tempfile.workspace = true
 tokio = { workspace = true, features = ["rt"] }
 
 [dev-dependencies]
-uuid.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
