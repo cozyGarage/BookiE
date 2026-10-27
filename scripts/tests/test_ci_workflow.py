@@ -672,6 +672,17 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("gir1.2-gtk-4.0", runtime_image)
         self.assertNotIn("rustup", runtime_image)
 
+    def test_gtk_safety_uses_private_atspi_activation(self):
+        script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
+        self.assertIn('XDG_DATA_HOME="$gtk_runtime/data"', script)
+        self.assertIn("org.a11y.Bus.service", script)
+        self.assertIn("Name=org.a11y.Bus", script)
+        self.assertIn("Exec=/usr/lib/at-spi-bus-launcher", script)
+        self.assertLess(script.index("xvfb-run --auto-servernum"), script.index('dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh"'))
+        profile = (ROOT / "docs/evidence/postgres-stream-heap-profile-2026-10-25/run.sh").read_text()
+        self.assertIn('"$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"', profile)
+        self.assertLess(profile.index("xvfb-run --auto-servernum"), profile.index('dbus-run-session -- bash "$RUNTIME/run-inner.sh"'))
+
     def test_distro_package_builder_uses_a_distinct_image_tag(self):
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
         self.assertIn("image=bookie-floor-package-debian-testing", builder)
