@@ -268,6 +268,8 @@ fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {
     }
     popover.set_child(Some(&choices));
     popover.set_parent(&button);
+    let popover_for_destroy = popover.clone();
+    button.connect_destroy(move |_| popover_for_destroy.unparent());
     let popover_ref = popover.downgrade();
     button.connect_clicked(move |_| {
         if let Some(popover) = popover_ref.upgrade() {
@@ -418,6 +420,34 @@ fn split_tags(raw: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn descendant_popover(widget: &gtk::Widget) -> Option<gtk::Popover> {
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            if let Ok(popover) = current.clone().downcast::<gtk::Popover>() {
+                return Some(popover);
+            }
+            if let Some(found) = descendant_popover(&current) {
+                return Some(found);
+            }
+            child = current.next_sibling();
+        }
+        None
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_colour_popover_is_freed_with_its_row() {
+        adw::init().unwrap();
+        let (row, _) = color_chooser(0);
+        let popover = descendant_popover(row.upcast_ref()).expect("the colour button owns a popover");
+        let weak = popover.downgrade();
+
+        drop(popover);
+        drop(row);
+
+        assert!(weak.upgrade().is_none(), "the colour popover outlived its row");
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
