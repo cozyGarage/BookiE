@@ -379,6 +379,38 @@ def scenarios(ui):
         assert stored_notes(database) == [(1, "gamma"), (2, "beta")], stored_notes(database)
         ui.wait_for_node(name="1 unsaved change", present=False)
 
+    def closing_editors_removes_their_drafts_and_reopening_restores_sql(database, base):
+        drafts = base / "data" / ui.storage_dir_name() / "drafts"
+        for iteration in range(3):
+            query = f"SELECT 'retired draft é {iteration}'"
+            ui.invoke_accessible_action("win.open-editor")
+            ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+            ui.set_editor_text(query)
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            matches = []
+            while time.monotonic() < deadline:
+                matches = [path for path in drafts.glob("*/*.sql") if path.read_text(encoding="utf-8") == query]
+                if matches:
+                    break
+                time.sleep(ui.POLL_SECONDS)
+            assert len(matches) == 1, "the editor SQL was not saved as one draft"
+            path = matches[0]
+            ui.invoke_accessible_action("win.close-current")
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while path.exists() and time.monotonic() < deadline:
+                time.sleep(ui.POLL_SECONDS)
+            assert not path.exists(), "closing the editor left its SQL draft on disk"
+            if iteration == 2:
+                ui.press_x11_key("t", ("Control_L", "Shift_L"))
+                wait_for_editor_text(query)
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while time.monotonic() < deadline:
+                    matches = [item for item in drafts.glob("*/*.sql") if item.read_text(encoding="utf-8") == query]
+                    if matches:
+                        break
+                    time.sleep(ui.POLL_SECONDS)
+                assert len(matches) == 1, "reopened editor SQL was not saved again"
+
     def closing_and_reopening_an_editor_keeps_its_query(database, base):
         query = "SELECT 'reopened editor query'"
         ui.invoke_accessible_action("win.open-editor")
@@ -2281,6 +2313,7 @@ GLib.MainLoop().run()
         ctrl_slash_toggles_a_comment_in_the_editor,
         browse_edit_cell_and_save_persists_to_the_database,
         closing_and_reopening_a_browse_tab_keeps_it_editable,
+        closing_editors_removes_their_drafts_and_reopening_restores_sql,
         closing_and_reopening_an_editor_keeps_its_query,
         grid_paste_preserves_multiline_text_and_sibling_rows,
         test_connection_reports_success_in_the_dialog,
