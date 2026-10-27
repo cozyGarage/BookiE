@@ -1,0 +1,10 @@
+{
+  "source_commit": "0beff380a3069de3324071d0f0dfa96f6624a4a9",
+  "binary_sha256": "0114d41325f9a4240edadb8937b685b27be604e13c459c952e9a8ce19eacd4be",
+  "profile": "ci",
+  "environment": "Arch Linux, private Xvfb and D-Bus, synthetic SQLite data",
+  "scenario_count": 8,
+  "failed": 0,
+  "retries": 0,
+  "exit_code": 0
+}
