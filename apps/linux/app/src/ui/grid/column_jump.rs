@@ -205,6 +205,7 @@ fn present(
         }
     });
     dialog.set_child(Some(&content));
+    crate::ui::leak_probe::track("column_jump", &dialog);
     dialog.present(Some(view));
     search.grab_focus();
 }

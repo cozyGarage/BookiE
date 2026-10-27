@@ -1,0 +1,76 @@
+reading file "target/quality/refused-file-heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+finished reading file, now analyzing data:
+
+PEAK MEMORY CONSUMERS
+25.20M peak memory consumed over 19235 calls from
+0x7f5d929ec277
+  in ??
+525.06K consumed over 16 calls from:
+    0x7f5d9cdd0ae2
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cdd0bf4
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce36b45
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9cedbbd8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e0f7
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9ce8e480
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8c645b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8d05da
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d152630
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d04a3ae
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d05d944
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d8b62b1
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9d171e5b
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c96130e
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5d9c8bd8c8
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    driCreateContextAttribs
+      in /usr/lib/libgallium-26.2.5-arch1.1.so
+    0x7f5dac5b182f
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5dac5a3bec
+      in /usr/lib/libEGL_mesa.so.0
+    0x7f5db53666ac
+      in /usr/lib/libgtk-4.so.1
+    0x7f5db5366a4d
+      in /usr/lib/libgtk-4.so.1
+    gdk_gl_context_realize
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_prepare_gl
+      in /usr/lib/libgtk-4.so.1
+    gdk_x11_display_open
+      in /usr/lib/libgtk-4.so.1
+    gdk_display_manager_open_display
+      in /usr/lib/libgtk-4.so.1
+    gtk_init_check
+      in /usr/lib/libgtk-4.so.1
+    _RNvNtCsb2UJzLDTK0f_4gtk42rt4init
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RNvCsb3L7BlZzJ2m_12tablepro_app3run
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+    _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEuuECs54EmfWQOcQ8_12tablepro_app
+      in /home/trung/Projects/bookie-app-resource-refresh-20261027-6/target/installed-ci/usr/bin/tablepro
+
+[Remaining allocator groups omitted; full analysis remains in local build output.]
+
+
+total runtime: 21.09s.
+calls to allocation functions: 8528429 (404363/s)
+temporary memory allocations: 1061879 (50347/s)
+peak heap memory consumption: 64.56M
+peak RSS (including heaptrack overhead): 275.79M
+total memory leaked: 48.38M
+suppressed leaks: 1.19K
