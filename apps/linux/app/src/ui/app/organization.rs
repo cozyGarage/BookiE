@@ -252,7 +252,7 @@ fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {
     let current_label = labels
         .get(initial as usize)
         .map_or_else(|| labels[0].clone(), Clone::clone);
-    let button = gtk::Button::with_label(&current_label);
+    let button = gtk::MenuButton::builder().label(&current_label).build();
     button.update_property(&[gtk::accessible::Property::Label(&current_label)]);
     let popover = gtk::Popover::new();
     let choices = gtk::Box::builder()
@@ -267,13 +267,7 @@ fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {
         append_color_choice(&choices, &popover, &button, &selected, index as u32, label);
     }
     popover.set_child(Some(&choices));
-    popover.set_parent(&button);
-    let popover_ref = popover.downgrade();
-    button.connect_clicked(move |_| {
-        if let Some(popover) = popover_ref.upgrade() {
-            popover.popup();
-        }
-    });
+    button.set_popover(Some(&popover));
 
     let row = adw::ActionRow::builder().title(crate::tr!("Colour")).build();
     row.add_suffix(&button);
@@ -283,7 +277,7 @@ fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {
 fn append_color_choice(
     choices: &gtk::Box,
     popover: &gtk::Popover,
-    button: &gtk::Button,
+    button: &gtk::MenuButton,
     selected: &Rc<Cell<u32>>,
     index: u32,
     label: &str,
@@ -494,3 +488,6 @@ mod tests {
         assert_eq!(split_tags(&raw).len(), MAX_TAGS_PER_CONNECTION);
     }
 }
+
+#[cfg(test)]
+mod lifetime_tests;

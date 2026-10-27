@@ -1,0 +1,26 @@
+{
+  "issue": 1732,
+  "base": "887678414",
+  "source_sha256": {
+    "apps/linux/app/src/services/connection_service.rs": "3731d0d5c79369041553a343138e46ec337aeb9e69f29c3584c60c052904458d",
+    "apps/linux/app/src/ui/connect_dialog/mod.rs": "d3c48cfdc0766be148d72f39c1be0ec00ff9cd02b07a7850c0c9b446434f5b7f",
+    "apps/linux/app/src/ui/connect_dialog/error_tests.rs": "4ab104da3a8dfb9853696e1326106332fcd11b59d49435ac5f77e58321a47e0a"
+  },
+  "regression": {
+    "before": "one test failed: certificate recovery guidance absent",
+    "after": "one test passed"
+  },
+  "pending": [],
+  "forgejo": "deferred during infrastructure migration",
+  "validation": {
+    "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
+    "gtk_widgets": "179 passed",
+    "app_clippy": "passed",
+    "existing_error_presentation_tests": "13 passed",
+    "installed_e2e": [
+      "test_connection_reports_success_in_the_dialog: passed",
+      "test_connection_reports_failure_in_the_dialog: passed"
+    ]
+  },
+  "installed_binary_sha256": "9608bbc319a6d39264924793ea932b69cd9a07f3c2e9904c6b4377bfbbc6ab91"
+}
