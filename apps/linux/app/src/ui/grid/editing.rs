@@ -312,9 +312,7 @@ fn show_calendar_popover(label: &CellEditor, col_index: usize, sender: &relm4::S
         let dt = c.date();
         let formatted = format!("{:04}-{:02}-{:02}", dt.year(), dt.month(), dt.day_of_month());
         commit_popover_value(&label_for_cal, col_index, &sender_for_cal, formatted);
-        if let Some(popover_for_cal) = popover_for_cal.upgrade() {
-            popover_for_cal.popdown();
-        }
+        popdown_if_alive(&popover_for_cal);
     });
 
     install_popover_close_cleanup(label, &popover);
@@ -368,9 +366,7 @@ fn show_exact_text_popover(label: &CellEditor, col_index: usize, sender: &relm4:
         };
         let formatted = e.text().to_string();
         commit_popover_value(&label_for_commit, col_index, &sender_for_commit, formatted);
-        if let Some(popover_for_commit) = popover_for_commit.upgrade() {
-            popover_for_commit.popdown();
-        }
+        popdown_if_alive(&popover_for_commit);
     });
 
     install_popover_close_cleanup(label, &popover);
@@ -413,9 +409,7 @@ fn show_spin_button_popover(
             format!("{}", s.value() as i64)
         };
         commit_popover_value(&label_for_commit, col_index, &sender_for_commit, formatted);
-        if let Some(popover_for_commit) = popover_for_commit.upgrade() {
-            popover_for_commit.popdown();
-        }
+        popdown_if_alive(&popover_for_commit);
     });
 
     install_popover_close_cleanup(label, &popover);
@@ -478,9 +472,7 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
 
     let popover_for_cancel = popover.downgrade();
     cancel_button.connect_clicked(move |_| {
-        if let Some(popover_for_cancel) = popover_for_cancel.upgrade() {
-            popover_for_cancel.popdown();
-        }
+        popdown_if_alive(&popover_for_cancel);
     });
 
     let label_for_commit = label.downgrade();
@@ -496,9 +488,7 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
         let text = buffer_for_commit.text(&start, &end, true).to_string();
         FULL_EDIT_TEXT_SLOT.set(&label_for_commit, text.clone());
         commit_popover_value(&label_for_commit, col_index, &sender_for_commit, text);
-        if let Some(popover_for_commit) = popover_for_commit.upgrade() {
-            popover_for_commit.popdown();
-        }
+        popdown_if_alive(&popover_for_commit);
     });
 
     install_popover_close_cleanup(label, &popover);
@@ -533,6 +523,12 @@ pub(super) fn commit_popover_value(
             row_key,
         })
         .ok();
+}
+
+fn popdown_if_alive(popover: &glib::WeakRef<gtk::Popover>) {
+    if let Some(popover) = popover.upgrade() {
+        popover.popdown();
+    }
 }
 
 fn install_edit_commit_handler(label: &CellEditor, col_index: usize, sender: relm4::Sender<GridMsg>) {
