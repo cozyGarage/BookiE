@@ -57,6 +57,11 @@ def gate(tasks):
 
 
 class ForgejoGateTests(unittest.TestCase):
+    def test_run_list_requests_use_first_page(self):
+        script = (ROOT / "scripts/forgejo-gate.sh").read_text()
+        self.assertIn('"$api/actions/runs?page=1&limit=1"', script)
+        self.assertIn('"$api/actions/runs?page=1&limit=50"', script)
+
     def test_a_matching_retry_waits_when_api_id_differs_from_run_number(self):
         result = gate([{'run_number': 927, 'head_sha': HEAD, 'status': 'running', 'name': 'widgets'}])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

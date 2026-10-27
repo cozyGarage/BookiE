@@ -34,13 +34,14 @@ if docs_only; then
   exit 0
 fi
 
-exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate.lock}"
+lock_identity="$(printf '%s\n%s' "$remote_url" "$target" | sha256sum | cut -c1-24)"
+exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate-$lock_identity.lock}"
 if ! flock -n 9; then
-  echo "another gate is running on this host; waiting for it to finish"
+  echo "another gate for this remote branch is running; waiting for it to finish"
   flock 9
 fi
 latest_run_id() {
-  api_get "$api/actions/runs?limit=1" | python3 -c '
+  api_get "$api/actions/runs?page=1&limit=1" | python3 -c '
 import json, sys
 runs = json.load(sys.stdin)["workflow_runs"]
 print(runs[0]["id"] if runs else 0)
@@ -61,7 +62,7 @@ fi
 deadline=$((SECONDS + timeout_minutes * 60))
 
 summarize() {
-  api_get "$api/actions/runs?limit=50" | python3 -c '
+  api_get "$api/actions/runs?page=1&limit=50" | python3 -c '
 import json, sys
 sha, after = sys.argv[1], int(sys.argv[2])
 runs = [
