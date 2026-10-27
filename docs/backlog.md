@@ -9,7 +9,20 @@ it. Do not treat a capability gap as a release commitment.
 
 ## Current development order
 
-Check Project #3 for the live issue order and lane before starting work; issue bodies own acceptance. Reconcile open pull requests before taking the next eligible issue. The review findings below are candidates, not a priority order. Reproduce each report before changing behavior. Keep one lane-owned fix and one serialized Forgejo gate at a time.
+Check Project #3 for the live issue order and lane before starting work; issue bodies own acceptance. Reconcile open pull requests before taking the next eligible issue. The review findings below are candidates, not a priority order. Reproduce each report before changing behavior. Keep fixes lane-owned. Follow the capacity-one worker and per-target gate-lock rules in [AGENTS.md](../AGENTS.md#workflow); do not start duplicate gates for the same head. Final Forgejo `linux` synchronization remains serialized.
+
+## Current correctness review
+
+The [October 27 code audit](archive/current-code-correctness-audit-2026-10-27.md) records four failing diagnostic probes, documentation corrections and Project reconciliation at its pinned source. These findings are open work, not fixes or a release qualification.
+
+| Finding | Tracking | Lane |
+| --- | --- | --- |
+| Stale grid updates can accept a concurrent case-only change | [#1820](https://github.com/cozyGarage/BookiE/issues/1820) | B3 |
+| Failed workspace batches can change previously durable draft bodies | [#1821](https://github.com/cozyGarage/BookiE/issues/1821) | UX |
+| An unreadable draft blocks unrelated workspace restoration | [#1822](https://github.com/cozyGarage/BookiE/issues/1822) | UX |
+| Late preload can recache a deleted connection | [#1730](https://github.com/cozyGarage/BookiE/issues/1730) | UX |
+| A dangling policy symlink silently enables default policy | [#1823](https://github.com/cozyGarage/BookiE/issues/1823) | UX, B4 consultation |
+| Supported evidence packets are omitted from default discovery | [#1824](https://github.com/cozyGarage/BookiE/issues/1824) | UX |
 
 ## Post-release acceptance follow-ups
 
@@ -120,7 +133,7 @@ The [peer-review tracker #1026](https://github.com/cozyGarage/BookiE/issues/1026
 
 ## Static driver contract
 
-- DRV-1 / [#1688](https://github.com/cozyGarage/BookiE/issues/1688): the typed column-comment lifecycle, DDL contract, Structure consumer and registered-driver coverage landed in [#1690](https://github.com/cozyGarage/BookiE/pull/1690). [#1695](https://github.com/cozyGarage/BookiE/pull/1695) is under review for distinguishing unsupported index/FK metadata from supported empty results; it has not merged. View/catalog consumers remain deferred until a user-visible acceptance case warrants them. Transport validation still requires the B4 handoff. Keep connection-scoped cancellation and metadata-derived object permissions outside the static profile.
+- DRV-1 / [#1688](https://github.com/cozyGarage/BookiE/issues/1688): the typed column-comment lifecycle, DDL contract, Structure consumer and registered-driver coverage landed in [#1690](https://github.com/cozyGarage/BookiE/pull/1690). [#1695](https://github.com/cozyGarage/BookiE/pull/1695) merged the distinction between unsupported index/FK metadata and supported empty results. View/catalog consumers remain deferred until a user-visible acceptance case warrants them. Transport validation still requires the B4 handoff. Keep connection-scoped cancellation and metadata-derived object permissions outside the static profile.
 
 ## Issue and lane status
 
