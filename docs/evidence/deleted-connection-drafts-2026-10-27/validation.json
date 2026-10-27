@@ -14,15 +14,13 @@
     "failed": 0
   },
   "writer_batch_test": "passed: batch taken before deletion marker, then resumed under file lock",
-  "pending": [
-    "final preflight after test addition"
-  ],
+  "pending": [],
   "forgejo": "deferred by maintainer during infrastructure migration",
   "preflight": {
-    "unit": 2199,
+    "unit": 2200,
     "sandbox": 291,
     "redis_cancellation": 1,
-    "result": "passed before adding the unrelated-connection preservation test"
+    "result": "passed on expanded test head"
   },
   "writer_filter_negative_control": "failed when only the writer filter was removed; fixed code restored",
   "unrelated_connection": "passed: cloned store ignores deleted UUID and persists updated draft for another UUID"

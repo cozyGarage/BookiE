@@ -11,3 +11,5 @@ The deletion marker lasts for the shared store lifetime. Persisting a deleted UU
 Release-Note: Fixed: Deleted connection drafts stay removed when a late workspace save arrives.
 
 Removing only the writer-side filter makes the in-flight batch test fail; restoring it passes. An additional regression confirms that cloned-store saves cannot revive the deleted connection and still update another connection correctly. All 39 workspace-state tests pass. Full preflight passed before the final test addition (2,199 unit tests, 291 sandbox tests and the Redis cancellation check); the expanded test head is being checked again.
+
+Final expanded-head preflight passed: 2,200 unit tests, 291 sandbox tests and one Redis cancellation test, including formatting, Clippy and boundary checks. Forgejo acceptance remains deferred.
