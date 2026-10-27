@@ -23,3 +23,9 @@ The allocator comparison supports retention as a hypothesis but does not attribu
 A separate three-cycle refusal run passed with Heaptrack preloaded only into the application. The instrumentation was removed afterward. The installed CI-profile executable was unchanged. `heaptrack-summary.txt` records 64.56 MB peak tracked heap and 275.79 MB peak RSS including profiler overhead. The largest reported allocation group includes graphics-library frames; other frames are unsymbolized. This trace does not isolate a BookiE ownership defect.
 
 Heaptrack reports 48.38 MB as memory not freed at shutdown. That count includes library caches and must not be interpreted as demonstrated application leaks. A baseline trace and better symbolization are needed for attribution. Raw traces remain local build outputs; the concise analysis is retained here.
+
+## Refreshed-source acceptance follow-up
+
+A later retry-free full run on source `4b0e56e956432e671de6bdb35959261ab5fd1fc1` ended with 15 failed scenarios. Its MCP listener failed to bind the occupied test port; save-before-quit saved the value but timed out waiting for window closure; an AT-SPI traversal error preceded twelve immediate application-startup failures. The latter cascade remains unexplained. This full run is failed, not accepted.
+
+All fifteen failed scenarios subsequently passed in one fresh private Xvfb/D-Bus session with an isolated MCP port and no automatic retries. `isolated-followup-results.txt` records each scenario and duration. The executable was unchanged; this is focused follow-up evidence, not a clean rerun of the whole suite. The listener collision is tracked by #1815, with a request-ownership guard in #1817; the intermittent save/quit symptom is recorded on #1333. Neither the AT-SPI cascade nor the save/quit root cause is established by passing follow-up tests.
