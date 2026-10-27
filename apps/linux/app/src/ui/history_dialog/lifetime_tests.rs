@@ -44,7 +44,10 @@ fn assert_rows_released(close: bool) {
     wait_until(|| controller.model().listbox.first_child().is_some());
     let row = controller.model().listbox.first_child().unwrap().downgrade();
     if close {
+        let popover = controller.model().row_popovers[0].clone();
         drop(controller);
+        wait_until(|| popover.parent().is_none());
+        drop(popover);
         wait_until(|| row.upgrade().is_none());
     } else {
         runtime.block_on(history.clear_all()).unwrap();
