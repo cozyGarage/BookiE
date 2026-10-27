@@ -84,7 +84,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         labels = re.findall(r"^    runs-on: (.+)$", workflow, re.MULTILINE)
         self.assertTrue(labels)
-        self.assertEqual(set(labels), {"any-host", "desktop-build"})
+        self.assertEqual(set(labels), {"any-host", "build-host"})
         for name, block in re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow):
             if "runs-on: any-host" in block:
                 self.assertNotRegex(block, r"cargo (build|test|clippy|install)\b", name)
@@ -582,7 +582,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("\n  distro-floor-build:\n", workflow)
         floor = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  driver:\n", 1)[0]
         producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
-        self.assertIn("runs-on: desktop-build", producer)
+        self.assertIn("runs-on: build-host", producer)
         self.assertIn("scripts/build-deb.sh", producer)
         self.assertNotIn("scripts/distro-floor-package.sh", floor)
         self.assertIn("DISTRO_FLOOR_PACKAGE=", floor)

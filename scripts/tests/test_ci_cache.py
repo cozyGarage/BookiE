@@ -327,7 +327,7 @@ class CiCacheTests(unittest.TestCase):
                 step = block.split('\n      - name:', 1)[0]
                 if 'shell: bash' in step:
                     preceding = workflow[:workflow.index(step)].rsplit('    runs-on:', 1)[-1]
-                    self.assertIn('desktop-build', preceding, filename)
+                    self.assertIn('build-host', preceding, filename)
                 else:
                     self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout {0}', step, filename)
                 self.assertLess(step.index('shell:'), step.index('run:'), filename)
