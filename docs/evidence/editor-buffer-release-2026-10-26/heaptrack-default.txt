@@ -1,0 +1,71 @@
+reading file ".analysis/editor-close-heaptrack/default.zst" - please wait, this might take some time...
+Debuggee command was: python3 docs/evidence/editor-close-current-linux-2026-10-26/linux-9d82a5ebe/sourceview-lifecycle-control.py
+finished reading file, now analyzing data:
+
+PEAK MEMORY CONSUMERS
+312.61M peak memory consumed over 75489735 calls from
+0x7fc8fdaaf95a
+  in ??
+122.47M consumed over 1775000 calls from:
+    0x7fc8faa74d0f
+      in /usr/lib/libgtk-4.so.1
+    0x7fc8faa4aec2
+      in /usr/lib/libgtk-4.so.1
+    0x7fc8faa5335d
+      in /usr/lib/libgtk-4.so.1
+    0x7fc8d042ae48
+      in /usr/lib/libgtksourceview-5.so.0
+    g_closure_invoke
+      in /usr/lib/libgobject-2.0.so.0
+    0x7fc8fda15208
+      in /usr/lib/libgobject-2.0.so.0
+    0x7fc8fda16ed3
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit_valist
+      in /usr/lib/libgobject-2.0.so.0
+    g_signal_emit
+      in /usr/lib/libgobject-2.0.so.0
+    gtk_text_buffer_set_text
+      in /usr/lib/libgtk-4.so.1
+    0x7fc8fece8db5
+      in /usr/lib/libffi.so.8
+    0x7fc8fece4a6c
+      in /usr/lib/libffi.so.8
+    ffi_call
+      in /usr/lib/libffi.so.8
+    0x7fc8fdbd7838
+      in /usr/lib/python3.14/site-packages/gi/_gi.cpython-314-x86_64-linux-gnu.so
+    0x7fc8fdbce839
+      in /usr/lib/python3.14/site-packages/gi/_gi.cpython-314-x86_64-linux-gnu.so
+    0x7fc8ff267cd4
+      in /usr/lib/libpython3.14.so.1.0
+    0x7fc8ff3b7871
+      in /usr/lib/libpython3.14.so.1.0
+    PyEval_EvalCode
+      in /usr/lib/libpython3.14.so.1.0
+    0x7fc8ff4fecbe
+      in /usr/lib/libpython3.14.so.1.0
+    0x7fc8ff4fe3fd
+      in /usr/lib/libpython3.14.so.1.0
+    0x7fc8ff4fd43a
+      in /usr/lib/libpython3.14.so.1.0
+    0x7fc8ff4fd226
+      in /usr/lib/libpython3.14.so.1.0
+    Py_RunMain
+      in /usr/lib/libpython3.14.so.1.0
+    Py_BytesMain
+      in /usr/lib/libpython3.14.so.1.0
+    0x7fc8fee27780
+      in /usr/lib/libc.so.6
+    __libc_start_main
+      in /usr/lib/libc.so.6
+  and 190.13M from 43133 other places
+
+
+total runtime: 81.37s.
+calls to allocation functions: 83130281 (1021582/s)
+temporary memory allocations: 3969974 (48786/s)
+peak heap memory consumption: 327.21M
+peak RSS (including heaptrack overhead): 504.52M
+total memory leaked: 320.98M
+suppressed leaks: 1.19K

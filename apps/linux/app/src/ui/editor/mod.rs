@@ -265,7 +265,7 @@ pub enum SqlEditorOutput {
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
 }
 
-pub(super) const MAX_SQL_FILE_BYTES: u64 = 8 * 1024 * 1024;
+pub(super) const MAX_SQL_FILE_BYTES: u64 = tablepro_app_services::sql_text::EDITOR_MAX_SQL_BYTES;
 
 #[derive(Debug)]
 struct ExecutionContext {
@@ -678,6 +678,7 @@ impl SimpleComponent for SqlEditor {
             buffer.set_highlight_syntax(false);
             buffer.set_language(None);
         }
+        self.split_view.shutdown(&self.source_view);
         if let Some(session) = self.session.take() {
             session_mode::close_detached(session.shared);
         }
