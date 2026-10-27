@@ -260,3 +260,50 @@ async fn column_named_autoincrement_substring_is_not_flagged() {
     assert!(!cols[1].is_auto_increment, "non-PK INTEGER must not be flagged");
 }
 include!("../tests/support/pragma_shadow_tests.rs");
+
+#[tokio::test]
+async fn an_interrupt_requested_before_the_statement_steps_still_stops_it() {
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
+    let mut connection = pool.acquire().await.unwrap();
+    let handle = InterruptHandle::of(&mut connection).await.unwrap();
+    handle.interrupt();
+
+    let outcome = tokio::time::timeout(
+        Duration::from_secs(5),
+        sqlx::query(sqlx::AssertSqlSafe(
+            "WITH RECURSIVE counter(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM counter WHERE x < 400000000) \
+             SELECT count(*) FROM counter",
+        ))
+        .fetch_one(&mut *connection),
+    )
+    .await;
+
+    let error = outcome.expect("the statement must stop instead of running to completion");
+    assert!(confirms_cancellation(&map_sqlx_error(error.unwrap_err())));
+}
+
+#[tokio::test]
+async fn a_retired_interrupt_handle_does_not_stop_later_statements_on_the_connection() {
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
+    let mut connection = pool.acquire().await.unwrap();
+    let handle = InterruptHandle::of(&mut connection).await.unwrap();
+    handle.interrupt();
+    drop(handle);
+
+    let count: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(
+        "WITH RECURSIVE counter(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM counter WHERE x < 1000000) \
+         SELECT count(*) FROM counter",
+    ))
+    .fetch_one(&mut *connection)
+    .await
+    .unwrap();
+    assert_eq!(count, 1_000_000);
+}
