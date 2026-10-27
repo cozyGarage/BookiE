@@ -9,7 +9,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | ID | Issue | Lane |
 | --- | --- | --- |
 | CI-1 | [#1840](https://github.com/cozyGarage/BookiE/issues/1840) | UX |
-| UI-46 | [#1734](https://github.com/cozyGarage/BookiE/issues/1734) | B3 |
 | UI-44 | [#1349](https://github.com/cozyGarage/BookiE/issues/1349) | UX |
 | UI-41 | [#1333](https://github.com/cozyGarage/BookiE/issues/1333) | UX |
 | UI-42 | [#1332](https://github.com/cozyGarage/BookiE/issues/1332) | UX |
@@ -63,7 +62,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | TEST-32 | [#594](https://github.com/cozyGarage/BookiE/issues/594) | UX |
 | DOC-3 | [#561](https://github.com/cozyGarage/BookiE/issues/561) | Maintainer |
 | DOC-5 | [#561](https://github.com/cozyGarage/BookiE/issues/561) | Maintainer |
-| PERF-3 | [#555](https://github.com/cozyGarage/BookiE/issues/555) | B3 |
 | PERF-4 | [#550](https://github.com/cozyGarage/BookiE/issues/550) | B3 |
 | PERF-9 | [#596](https://github.com/cozyGarage/BookiE/issues/596) | B3 |
 | PERF-10 | [#597](https://github.com/cozyGarage/BookiE/issues/597) | B3 |
@@ -78,7 +76,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | DBF-2 | [#1356](https://github.com/cozyGarage/BookiE/issues/1356) | B3 |
 | DBF-3 | [#1357](https://github.com/cozyGarage/BookiE/issues/1357) | B3 |
 | DBF-4 | [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | B4 |
-| DBF-5 | [#1668](https://github.com/cozyGarage/BookiE/issues/1668) | B4 |
 | DRV-1 | [#1688](https://github.com/cozyGarage/BookiE/issues/1688) | UX |
 | B4-24 | [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | B4 |
 | PERF-11 | [#580](https://github.com/cozyGarage/BookiE/issues/580) | UX |
