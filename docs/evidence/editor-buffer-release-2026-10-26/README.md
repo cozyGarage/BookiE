@@ -99,6 +99,16 @@ The comparison's private portal session logged an unavailable secret service, in
 
 A [native dialog cancellation control](dialog-control.py) separately opened and cancelled 18 `Gtk.FileDialog` instances with the simple input method. Each callback completed and all 18 dialog objects finalized. [Final RSS](dialog-simple.json) was 123.8 MiB. No SQL was read, and accessibility was disabled. This excludes dialog-object retention in this cancellation-only control; it does not exercise accepted selections or BookiE callbacks.
 
+## Bounded SQL line preflight, 2026-10-28
+
+The follow-up for [issue 1299](https://github.com/cozyGarage/BookiE/issues/1299) scans a file in buffered chunks and stops once a physical line exceeds the editor limit, before `read_text_file` allocates the complete document. It keeps the full read and text validation for accepted files, including a second validation to catch a file that changes during the scan.
+
+The isolated Xvfb/Cairo scenario passed 18 attempts to open an 8 MiB single-line SQL file. It preserved the active query, tab count and source file. Application RSS started at 176300 KiB and ended at 195424 KiB, a 19124 KiB increase. The largest pre/post increase within one refusal was 928 KiB; process RSS then jumped by 9536 KiB before cycle 16 and 5776 KiB before cycle 18. Refusal interaction time ranged from 0.92 to 5.19 seconds and includes file chooser accessibility actions, so it is not a file-scan timing measurement. This single run had concurrent Rust builds on the host and no post-run idle sample. It suggests substantially lower repeated-refusal growth than the earlier ~302 MiB endpoint, but does not prove a memory plateau or identify all retained allocations.
+
+The [per-cycle measurements](sql-file-preflight-2026-10-28/refusal-cycles.jsonl) were collected from the isolated application process. The tested binary SHA-256 is `5a4309ec1b4d12b681647229678d2e11ce3aa5166af938f76b567602d42a8874`; the source base was `0a6c26290562c01a91cdf230b4ed807b6b1e6ae0`, with GTK 4.24.1, libadwaita 1.10.0 and GtkSourceView 5.22.0. Unit and GTK widget tests passed, as did the full preflight. Native Wayland behavior and Forgejo acceptance remain unverified.
+
+After merging Linux commit `d0a4191e4`, the same scenario passed three more refusals. RSS moved from 176700 to 177980 KiB, and chooser-to-refusal time was 0.86–1.00 seconds. The [current-head measurements](sql-file-preflight-2026-10-28/current-head-smoke.jsonl) identify binary SHA-256 `df362da98f71f1ae76b869641c0b6aa7ae1ff01f70062761c22a23970c4e17e5`. This is a short smoke test, not a repeated-refusal plateau measurement.
+
 ## Application allocation profile
 
 Heaptrack 1.5.0 completed the same 18-refusal workload on the fixed CI-profile binary, using chooser harness source `64b3e7d1d`. The [result](heaptrack-refusals/result.json) passed and the application exited normally. The [wrapper](profile-refusals.py) adds the preload library only to the application environment returned by the fixture, preserving direct application PID tracking. The [process samples](heaptrack-refusals/samples.json) and [allocation report](heaptrack-refusals/allocations.txt) are retained here.
