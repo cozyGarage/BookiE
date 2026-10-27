@@ -854,6 +854,20 @@ fn importing_a_different_mysql_socket_path_does_not_replace_the_local_endpoint()
 }
 
 #[test]
+fn importing_a_bundle_keeps_the_local_timeouts_of_an_existing_connection() {
+    let mut local = saved("local");
+    local.connect_timeout_secs = Some(5);
+    local.query_timeout_secs = Some(30);
+    let incoming = BundleConnection::from_saved(&local).to_saved();
+    assert_eq!(incoming.query_timeout_secs, None);
+
+    let merged = merge_without_downgrade(&local, incoming);
+
+    assert_eq!(merged.connect_timeout_secs, Some(5));
+    assert_eq!(merged.query_timeout_secs, Some(30));
+}
+
+#[test]
 fn an_import_keeps_an_existing_local_password_unless_replacement_is_asked_for() {
     let existing = || Some(SecretString::new("local".to_owned().into()));
 

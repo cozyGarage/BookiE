@@ -115,7 +115,7 @@ Exported: `id`, `name`, `driver_id`, `host`, `port`, `socket_dir`, `socket_path`
 
 Withheld: `use_tls` (the legacy boolean `tls_mode` replaced, so no bundle can claim `use_tls: true, tls_mode: disabled`), `last_opened_at` (local telemetry), unknown keys carried from a newer version, the contents of TLS certificate and key files and any SSH private key (paths only), and policy `connection_overrides`.
 
-`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal `KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on `SavedConnection` fails the build until someone classifies it. Known gap: `connect_timeout_secs` and `query_timeout_secs` are not yet in `KNOWN_CONNECTION_FIELDS` and escape this check ([#1718](https://github.com/cozyGarage/BookiE/issues/1718)).
+`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal `KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on `SavedConnection` fails the build until someone classifies it. `connect_timeout_secs` and `query_timeout_secs` are classified as withheld: a bundle does not carry them, and importing a bundle over an existing connection keeps that connection's local timeouts.
 
 ### Credentials
 

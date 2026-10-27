@@ -62,7 +62,12 @@ pub const BUNDLE_INCLUDED_FIELDS: &[&str] = &[
 /// `use_tls: true, tls_mode: disabled`. `last_opened_at` is local
 /// telemetry that would tell a recipient when each production database
 /// was last touched.
-pub const BUNDLE_EXCLUDED_FIELDS: &[&str] = &["use_tls", "last_opened_at"];
+pub const BUNDLE_EXCLUDED_FIELDS: &[&str] = &[
+    "use_tls",
+    "last_opened_at",
+    "connect_timeout_secs",
+    "query_timeout_secs",
+];
 
 #[derive(Debug, thiserror::Error)]
 pub enum BundleError {
@@ -896,6 +901,8 @@ fn merge_without_downgrade(local: &SavedConnection, incoming: SavedConnection) -
         use_tls: tls_mode.encrypts(),
         tls_mode: Some(tls_mode),
         last_opened_at: local.last_opened_at,
+        connect_timeout_secs: local.connect_timeout_secs,
+        query_timeout_secs: local.query_timeout_secs,
         ..incoming
     }
 }
