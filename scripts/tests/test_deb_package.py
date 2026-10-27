@@ -74,14 +74,14 @@ def _stage_package(
         + "Description: Native Linux database client\n"
         " BookiE test fixture\n"
     )
-    (stage / "DEBIAN").chmod(0o755)
     package = root / f"{package_name}_{version}_amd64.deb"
-    subprocess.run(
+    result = subprocess.run(
         ["dpkg-deb", "--root-owner-group", "--build", str(stage), str(package)],
-        check=True,
         capture_output=True,
         text=True,
     )
+    if result.returncode:
+        raise RuntimeError(f"dpkg-deb failed to build fixture package: {result.stderr}")
     return package
 
 
@@ -109,7 +109,6 @@ def check_package_test_reports_the_failing_command(source: Path) -> None:
 
 
 def main() -> None:
-    os.umask(0o077)
     source = Path(__file__).resolve().parents[2]
     check_builder_builds_and_installs_the_askpass_helper(source)
     check_package_test_reports_the_failing_command(source)
