@@ -421,6 +421,15 @@ impl Component for HistoryDialog {
         ComponentParts { model, widgets: () }
     }
 
+    fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
+        if let Some(timeout) = self.filter_debounce.borrow_mut().take() {
+            timeout.remove();
+        }
+        for popover in self.row_popovers.drain(..) {
+            popover.unparent();
+        }
+    }
+
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             HistoryDialogInput::Refresh => self.run_search(sender),
@@ -892,10 +901,12 @@ impl HistoryDialog {
             .activate(move |_, _, _| s_pin.input(HistoryDialogInput::TogglePin(id)))
             .build();
         let query_for_copy = entry.query.clone();
-        let row_for_copy = row.clone();
+        let row_for_copy = row.downgrade();
         let act_copy = gio::ActionEntry::builder("copy")
             .activate(move |_, _, _| {
-                row_for_copy.clipboard().set_text(&query_for_copy);
+                if let Some(row) = row_for_copy.upgrade() {
+                    row.clipboard().set_text(&query_for_copy);
+                }
             })
             .build();
         let s_del2 = sender.clone();
@@ -1122,3 +1133,6 @@ mod tests {
         assert_eq!(source_for_index(9), None);
     }
 }
+
+#[cfg(test)]
+mod lifetime_tests;
