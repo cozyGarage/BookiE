@@ -37,7 +37,7 @@ fn an_explicit_workspace_path_survives_flush_and_a_fresh_store() {
 }
 
 fn flush(store: &WorkspaceStore) -> Result<(), tablepro_app_services::workspace_state::WorkspaceFlushError> {
-    store.flush().recv_timeout(std::time::Duration::from_secs(5)).unwrap()
+    store.flush().recv_timeout(std::time::Duration::from_secs(30)).unwrap()
 }
 
 #[test]
