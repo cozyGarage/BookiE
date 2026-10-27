@@ -101,12 +101,44 @@ class CiCacheTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
         helper = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(helper)
-        readings = [SimpleNamespace(free=value) for value in (0, 0, 0, 100, 100, 100)]
+        readings = [SimpleNamespace(free=value) for value in (0, 0, 0, 100, 100, 100, 100)]
         with patch.object(helper.shutil, 'disk_usage', side_effect=readings):
             result = helper.cleanup(self.cache, 50)
         self.assertTrue((second / 'debug/deps/artifact').exists())
         self.assertFalse((first / 'debug').exists())
         self.assertEqual(result, 0)
+
+    def test_pressure_cleanup_evicts_old_bundles_but_preserves_current_and_unrelated_data(self):
+        bundle_root = self.directory / 'bundles'
+        bundle_root.mkdir()
+        oldest = bundle_root / ('a' * 40 + '-default')
+        newest = bundle_root / ('b' * 40 + '-duckdb')
+        current = bundle_root / ('c' * 40 + '-default')
+        unrelated = bundle_root / 'notes'
+        for path in (oldest, newest, current, unrelated):
+            path.mkdir()
+            (path / 'payload').write_text('bundle bytes')
+        os.utime(oldest, (1, 1))
+        os.utime(newest, (2, 2))
+        os.utime(current, (3, 3))
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        def disk_usage(_):
+            recovered = not oldest.exists()
+            return SimpleNamespace(free=100 if recovered else 0)
+
+        with patch.object(helper.shutil, 'disk_usage', side_effect=disk_usage), patch.dict(
+            os.environ, {'GITHUB_SHA': 'c' * 40}
+        ):
+            result = helper.cleanup(self.cache, 50)
+
+        self.assertEqual(result, 0)
+        self.assertFalse(oldest.exists())
+        self.assertTrue(newest.exists())
+        self.assertTrue(current.exists())
+        self.assertTrue((unrelated / 'payload').is_file())
 
     def test_checkout_refuses_to_run_when_cleanup_cannot_restore_the_reserve(self):
         self.target('unit', 0)
