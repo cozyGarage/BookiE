@@ -13,6 +13,14 @@ SPEC.loader.exec_module(registry)
 
 
 class RegistryExtractionTests(unittest.TestCase):
+    def test_registry_http_errors_identify_the_failed_request(self):
+        error = registry.urllib.error.HTTPError(
+            'https://registry.example/bundle/bundle.tar.gz', 500, 'Internal Server Error', {}, None)
+        with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
+                patch.object(registry.urllib.request, 'urlopen', side_effect=error), \
+                self.assertRaisesRegex(ValueError, 'PUT /bundle/bundle.tar.gz returned HTTP 500'):
+            registry.request('https://registry.example/bundle/bundle.tar.gz', 'PUT')
+
     def check_archive(self, name, kind=tarfile.REGTYPE):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

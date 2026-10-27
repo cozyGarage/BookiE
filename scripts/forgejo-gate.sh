@@ -84,11 +84,17 @@ if any(job["status"] in ("running", "waiting") for job in jobs):
 else:
     for job in jobs:
         if job["status"] not in ("success", "skipped", "blocked"):
-            print("  ", job["status"], job["name"])
+            print(job["status"], job["id"], job["name"], sep="\t")
 ')"
       if [ "$report" != "RUNNING" ]; then
         echo "forgejo run $run_number (API id $run_id) $status for $sha"
-        [ -n "$report" ] && echo "$report"
+        while IFS=$'\t' read -r job_status job_id job_name; do
+          [ -n "$job_id" ] || continue
+          echo "$job_status $job_name (job $job_id); last 80 log lines:"
+          if ! curl -fsS --retry 5 --retry-delay 5 --retry-all-errors --max-time 60 -H "Authorization: token $token" "$api/actions/jobs/$job_id/logs" | tail -n 80; then
+            echo "could not retrieve the job log"
+          fi
+        done <<< "$report"
         exit 1
       fi ;;
   esac

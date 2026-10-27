@@ -24,7 +24,12 @@ def request(url, method='GET', data=None, size=None):
     headers = {'Authorization': 'token ' + os.environ['BOOKIE_REGISTRY_TOKEN']}
     if size is not None:
         headers.update({'Content-Type': 'application/octet-stream', 'Content-Length': str(size)})
-    return urllib.request.urlopen(urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
+    try:
+        return urllib.request.urlopen(urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
+    except urllib.error.HTTPError as error:
+        path = urllib.parse.urlsplit(url).path
+        error.close()
+        raise ValueError(f'registry {method} {path} returned HTTP {error.code}') from error
 
 
 def extract(archive, destination):
