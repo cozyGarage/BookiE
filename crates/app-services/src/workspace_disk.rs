@@ -44,7 +44,6 @@ pub fn save(path: &Path, drafts: &Path, mut state: WorkspaceState) -> std::io::R
         .transpose()?
         .unwrap_or_default();
     if let Some(bytes) = &existing {
-        let previous: WorkspaceState = serde_json::from_slice(bytes).map_err(std::io::Error::other)?;
         if has_legacy_draft(&previous) {
             let backup = path.with_extension("before-drafts.json");
             if !backup.try_exists()? {
