@@ -51,7 +51,15 @@ pub fn save(path: &Path, drafts: &Path, mut state: WorkspaceState) -> std::io::R
         let connection = Uuid::parse_str(connection).map_err(std::io::Error::other)?;
         save_connection_drafts(connection, workspace, drafts)?;
     }
-    atomic_write_json(path, &state)
+    atomic_write_json(path, &state)?;
+    for (connection, workspace) in &mut state.connections {
+        retired_drafts::remove(
+            drafts,
+            Uuid::parse_str(connection).map_err(std::io::Error::other)?,
+            workspace,
+        )?;
+    }
+    Ok(())
 }
 
 pub fn forget_connection(path: &Path, connection: Uuid) -> std::io::Result<()> {
@@ -81,12 +89,19 @@ pub fn save_connections(
         }
     }
     super::workspace_state::clamp(&mut state);
+    let updated: Vec<Uuid> = updates.iter().map(|(connection, _)| *connection).collect();
     for (connection, mut workspace) in updates {
         super::workspace_state::clamp_connection(&mut workspace);
         save_connection_drafts(connection, &mut workspace, drafts)?;
         state.connections.insert(connection.to_string(), workspace);
     }
-    atomic_write_json(path, &state)
+    atomic_write_json(path, &state)?;
+    for connection in updated {
+        if let Some(workspace) = state.connections.get_mut(&connection.to_string()) {
+            retired_drafts::remove(drafts, connection, workspace)?;
+        }
+    }
+    Ok(())
 }
 
 fn read_existing(path: &Path) -> std::io::Result<Option<Vec<u8>>> {
@@ -343,3 +358,8 @@ mod tests {
         assert_eq!(std::fs::read(path).unwrap(), b"broken");
     }
 }
+
+#[cfg(test)]
+mod cleanup_tests;
+
+mod retired_drafts;
