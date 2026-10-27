@@ -1,0 +1,3 @@
+passed: restart_with_a_deleted_connection_opens_the_welcome_list (duration: 3.412s)
+passed: a_reimported_connection_saves_its_workspace_again (duration: 10.957s)
+passed: a_healthy_workspace_restores_when_another_connection_has_an_unreadable_draft (duration: 3.148s)
