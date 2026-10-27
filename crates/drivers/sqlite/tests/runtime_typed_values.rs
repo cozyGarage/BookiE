@@ -2,7 +2,8 @@
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, Value};
+use tablepro_core::sql_dialect::build_optimistic_keyed_update;
+use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, Value};
 
 fn memory_options() -> ConnectOptions {
     ConnectOptions {
@@ -451,6 +452,147 @@ async fn invalid_declared_temporal_values_remain_text() {
             Value::Text("25:61:62".into()),
             Value::Text("not-a-datetime".into()),
             Value::Text("2026-13-40 25:61:62".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
+async fn declared_temporals_preserve_offsets_and_sqlite_storage_classes() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    connection
+        .execute("CREATE TABLE temporal_storage (day DATE, clock TIME, moment DATETIME, legacy TIMESTAMP)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO temporal_storage VALUES \
+             ('2024-01-01', '10:00:00+05:00', '2024-01-01 10:00:00+05:00', '2024-01-01T10:00:00Z'), \
+             (1700000000, 1700000000, 1700000000, 1700000000), \
+             (-0.5, -0.5, -0.5, -0.5), \
+             (X'00FF', X'00FF', X'00FF', X'00FF')",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT day, typeof(day), clock, typeof(clock), moment, typeof(moment), legacy, typeof(legacy) \
+             FROM temporal_storage",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Date(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()),
+                Value::Text("text".into()),
+                Value::Text("10:00:00+05:00".into()),
+                Value::Text("text".into()),
+                Value::Text("2024-01-01 10:00:00+05:00".into()),
+                Value::Text("text".into()),
+                Value::Text("2024-01-01T10:00:00Z".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Int(1_700_000_000),
+                Value::Text("integer".into()),
+                Value::Int(1_700_000_000),
+                Value::Text("integer".into()),
+                Value::Int(1_700_000_000),
+                Value::Text("integer".into()),
+                Value::Int(1_700_000_000),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Float(-0.5),
+                Value::Text("real".into()),
+                Value::Float(-0.5),
+                Value::Text("real".into()),
+                Value::Float(-0.5),
+                Value::Text("real".into()),
+                Value::Float(-0.5),
+                Value::Text("real".into()),
+            ],
+            vec![
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+async fn optimistic_update_matches_offset_timestamp_text_without_changing_storage() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    connection
+        .execute("CREATE TABLE temporal_key (id INTEGER PRIMARY KEY, moment DATETIME)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO temporal_key VALUES (1, '2024-01-01T10:00:00Z')")
+        .await
+        .unwrap();
+    let original = connection
+        .query("SELECT moment FROM temporal_key WHERE id = 1")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let columns = [
+        ColumnInfo {
+            name: "id".into(),
+            data_type: "INTEGER".into(),
+            nullable: false,
+            primary_key: true,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        },
+        ColumnInfo {
+            name: "moment".into(),
+            data_type: "DATETIME".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        },
+    ];
+    let (sql, params) = build_optimistic_keyed_update(
+        "sqlite",
+        None,
+        "temporal_key",
+        &columns,
+        &[(1, original, Value::Text("2024-01-01T11:00:00Z".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    let outcome = connection.execute_params(&sql, &params).await.unwrap();
+    assert_eq!(outcome.rows_affected, 1);
+    let result = connection
+        .query("SELECT moment, typeof(moment) FROM temporal_key WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("2024-01-01T11:00:00Z".into()),
+            Value::Text("text".into())
         ]]
     );
 }

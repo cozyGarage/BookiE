@@ -762,23 +762,67 @@ fn extract_value(row: &SqliteRow, idx: usize) -> Value {
             .try_get::<bool, _>(idx)
             .map(Value::Bool)
             .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "DATE" | "TIME" | "DATETIME" | "TIMESTAMP" => {
+            decode_declared_temporal(row, idx, type_name.as_str(), runtime_type.as_str())
+        }
+        _ => untyped_value(row, idx),
+    }
+}
+
+fn decode_declared_temporal(row: &SqliteRow, idx: usize, declared_type: &str, runtime_type: &str) -> Value {
+    match runtime_type {
+        "INTEGER" => row
+            .try_get::<i64, _>(idx)
+            .map(Value::Int)
+            .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "REAL" => row
+            .try_get::<f64, _>(idx)
+            .map(Value::Float)
+            .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "BLOB" => row
+            .try_get::<Vec<u8>, _>(idx)
+            .map(Value::Bytes)
+            .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "TEXT" => decode_temporal_text(row, idx, declared_type),
+        _ => decode_fallback(row, idx),
+    }
+}
+
+fn decode_temporal_text(row: &SqliteRow, idx: usize, declared_type: &str) -> Value {
+    let Ok(text) = row.try_get::<String, _>(idx) else {
+        return decode_fallback(row, idx);
+    };
+    if temporal_text_has_offset(&text, declared_type) {
+        return Value::Text(text);
+    }
+    match declared_type {
         "DATE" => row
             .try_get::<chrono::NaiveDate, _>(idx)
             .map(Value::Date)
-            .or_else(|_| row.try_get::<String, _>(idx).map(Value::Text))
-            .unwrap_or_else(|_| decode_fallback(row, idx)),
+            .unwrap_or(Value::Text(text)),
         "TIME" => row
             .try_get::<chrono::NaiveTime, _>(idx)
             .map(Value::Time)
-            .or_else(|_| row.try_get::<String, _>(idx).map(Value::Text))
-            .unwrap_or_else(|_| decode_fallback(row, idx)),
+            .unwrap_or(Value::Text(text)),
         "DATETIME" | "TIMESTAMP" => row
             .try_get::<chrono::NaiveDateTime, _>(idx)
             .map(Value::DateTime)
-            .or_else(|_| row.try_get::<String, _>(idx).map(Value::Text))
-            .unwrap_or_else(|_| decode_fallback(row, idx)),
-        _ => untyped_value(row, idx),
+            .unwrap_or(Value::Text(text)),
+        _ => Value::Text(text),
     }
+}
+
+fn temporal_text_has_offset(text: &str, declared_type: &str) -> bool {
+    if text.ends_with('Z') || text.ends_with('z') {
+        return true;
+    }
+    let time_start = match declared_type {
+        "TIME" => 0,
+        "DATETIME" | "TIMESTAMP" => text.find(['T', ' ']).map_or(text.len(), |index| index + 1),
+        _ => return false,
+    };
+    text.get(time_start..)
+        .is_some_and(|time| time.contains('+') || time.contains('-'))
 }
 
 /// A column with no declared type - every expression, aggregate and
