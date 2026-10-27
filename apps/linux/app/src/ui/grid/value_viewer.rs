@@ -1,7 +1,6 @@
 use gtk4 as gtk;
 use gtk4::prelude::*;
 use libadwaita as adw;
-use libadwaita::prelude::*;
 use std::io::{self, Write};
 
 use tablepro_core::Value;
