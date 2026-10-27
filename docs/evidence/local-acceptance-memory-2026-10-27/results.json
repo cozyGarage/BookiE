@@ -1,0 +1,14 @@
+{
+  "source": "9582688e786653dbf73ec9cc1d30f6264582d9fb",
+  "equivalent_app_source": "fb124a29644720eeaeb8e4e71b0e80bdc2822c2d",
+  "binary_sha256": "d0e68a6ded8dc5693245109b93ebda74ac3e2a99a2ae80f7a75c0f7dad7799cc",
+  "profile": "ci",
+  "acceptance_passes": 144,
+  "acceptance_failures": 0,
+  "acceptance_retries": 0,
+  "toolkits": [
+    "4.24.1",
+    "1.10.0",
+    "5.22.0"
+  ]
+}
