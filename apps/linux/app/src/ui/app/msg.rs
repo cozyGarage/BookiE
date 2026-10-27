@@ -101,6 +101,7 @@ pub enum AppMsg {
     SaveQueryAsFavorite,
     ShowSavedQueries,
     SavedQueriesChanged(Vec<tablepro_storage::SavedQuery>),
+    SavedQueriesDialogClosed,
     ShowQuickSwitcher,
     QuickSwitcherChose(crate::services::quick_switcher::QuickTarget),
     ShowHistory,

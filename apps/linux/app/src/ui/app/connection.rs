@@ -80,6 +80,7 @@ impl App {
                 ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),
                 ConnectDialogOutput::Closed => AppMsg::DialogClosed,
             });
+        crate::ui::leak_probe::track("connect", dialog.widget());
         dialog.widget().present(Some(&self.window));
         self.dialog = Some(dialog);
     }

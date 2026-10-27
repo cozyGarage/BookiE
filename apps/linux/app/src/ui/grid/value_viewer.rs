@@ -1,7 +1,6 @@
 use gtk4 as gtk;
 use gtk4::prelude::*;
 use libadwaita as adw;
-use libadwaita::prelude::*;
 
 use tablepro_core::Value;
 
@@ -128,7 +127,7 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: &Valu
     dialog
         .upcast_ref::<gtk::Widget>()
         .update_property(&[gtk::accessible::Property::Label(column)]);
-    dialog.present(Some(parent));
+    crate::ui::leak_probe::present_tracked("value_viewer", &dialog, parent);
 }
 
 #[cfg(test)]

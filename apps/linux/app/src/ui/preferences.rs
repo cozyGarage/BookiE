@@ -181,7 +181,7 @@ pub fn present(
         .subtitle(crate::tr!("Removes every saved query, including pinned ones."))
         .build();
     clear_row.add_suffix(&clear_button);
-    let dialog_root = window.clone();
+    let dialog_root = window.downgrade();
     let history_for_clear = history.clone();
     clear_button.connect_clicked(move |_| {
         let alert = adw::AlertDialog::new(
@@ -209,7 +209,9 @@ pub fn present(
                 });
             }
         });
-        alert.present(Some(&dialog_root));
+        if let Some(dialog) = dialog_root.upgrade() {
+            alert.present(Some(&dialog));
+        }
     });
     history_group.add(&clear_row);
 
@@ -231,7 +233,7 @@ pub fn present(
     // where their history lives without resorting to the file manager.
     storage_row.set_tooltip_text(Some(&storage_subtitle));
     storage_row.add_suffix(&storage_button);
-    let parent_for_launcher = window.clone();
+    let parent_for_launcher = window.downgrade();
     let history_for_launcher = history;
     storage_button.connect_clicked(move |_| {
         let Some(path) = history_for_launcher.as_ref().map(|store| store.path().to_path_buf()) else {
@@ -241,7 +243,8 @@ pub fn present(
         let file = gio::File::for_path(&parent);
         let launcher = gtk::FileLauncher::new(Some(&file));
         let parent_window = parent_for_launcher
-            .root()
+            .upgrade()
+            .and_then(|window| window.root())
             .and_then(|r| r.downcast::<gtk::Window>().ok());
         launcher.launch(parent_window.as_ref(), gio::Cancellable::NONE, |_| {});
     });
@@ -361,6 +364,7 @@ pub fn present(
         move |_| s()
     });
 
+    crate::ui::leak_probe::track("preferences", &window);
     window.present(Some(parent));
 }
 
