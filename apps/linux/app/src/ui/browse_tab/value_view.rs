@@ -34,12 +34,7 @@ impl BrowseTab {
                 .get(col_index)
                 .is_some_and(|column| column.name == column_name)
         {
-            crate::ui::grid::present_value_viewer(
-                view,
-                &column_name,
-                &value,
-                crate::ui::grid::value_to_full_edit_text(&value),
-            );
+            crate::ui::grid::present_value_viewer(view, &column_name, value, None);
         }
     }
 }
