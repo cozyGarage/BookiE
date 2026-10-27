@@ -141,39 +141,55 @@ glib::wrapper! {
 }
 
 impl RowStore {
-    pub fn cells_for_search(&self, position: u32) -> Option<Vec<Option<tablepro_core::Value>>> {
+    pub(super) fn visit_search_cells(&self, position: u32, visit: impl FnMut(usize, &Value) -> bool) -> bool {
         let slots = self.imp().slots.borrow();
-        match slots.get(position as usize)? {
-            Slot::Object(row) => Some(row.loaded_cells()),
-            Slot::Shared(source_index) => self.source_cells(*source_index),
+        let Some(slot) = slots.get(position as usize) else {
+            return false;
+        };
+        match slot {
+            Slot::Object(row) => row.visit_cells(visit),
+            Slot::Shared(source_index) => self.visit_source_cells(*source_index, visit),
             Slot::Cached { source_index, object } => {
-                let mut source = self.source_cells(*source_index)?;
                 if let Some(row) = object.upgrade() {
-                    for (index, value) in row.loaded_cells().into_iter().enumerate() {
-                        if row.cell_preview(index).is_none() && value.is_some() {
-                            source[index] = value;
-                        }
-                    }
+                    return row.visit_cells(visit);
                 }
-                Some(source)
+                self.visit_source_cells(*source_index, visit)
             }
         }
     }
 
-    fn source_cells(&self, source_index: usize) -> Option<Vec<Option<tablepro_core::Value>>> {
+    fn visit_source_cells(&self, source_index: usize, mut visit: impl FnMut(usize, &Value) -> bool) -> bool {
         let source = self.imp().source.borrow();
-        let cells = source.as_ref()?.rows.get(source_index)?;
+        let Some(cells) = source.as_ref().and_then(|result| result.rows.get(source_index)) else {
+            return false;
+        };
         let projection = self.imp().projection.borrow();
-        Some(match projection.as_ref() {
-            Some((indices, width)) => {
-                let mut values = vec![None; *width];
-                for (index, value) in indices.iter().copied().zip(cells) {
-                    values[index] = Some(value.clone());
+        if let Some((indices, _)) = projection.as_ref() {
+            for (source_index, value) in cells.iter().enumerate() {
+                if indices.get(source_index).is_some_and(|column| visit(*column, value)) {
+                    return true;
                 }
-                values
             }
-            None => cells.iter().cloned().map(Some).collect(),
-        })
+        } else {
+            for (column, value) in cells.iter().enumerate() {
+                if visit(column, value) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn source_cell(&self, source_index: usize, column: usize) -> Option<Value> {
+        let source = self.imp().source.borrow();
+        let result = source.as_ref()?;
+        let cells = result.rows.get(source_index)?;
+        let projection = self.imp().projection.borrow();
+        let source_column = match projection.as_ref() {
+            Some((indices, _)) => indices.iter().position(|index| *index == column)?,
+            None => column,
+        };
+        cells.get(source_column).cloned()
     }
 
     pub fn from_shared(result: Arc<QueryResult>) -> Self {
@@ -325,7 +341,7 @@ impl RowStore {
                 Slot::Object(_) => return None,
             }
         };
-        self.source_cells(source_index)?.get(column)?.clone()
+        self.source_cell(source_index, column)
     }
 
     pub fn source_index_at(&self, position: u32) -> Option<usize> {
@@ -761,6 +777,23 @@ mod tests {
     }
 
     #[test]
+    fn search_visits_projected_cells_at_their_visible_columns() {
+        let result = Arc::new(QueryResult {
+            columns: vec![column("id"), column("name")],
+            rows: vec![vec![Value::Int(7), Value::Text("Ada".into())]],
+            truncated: false,
+        });
+        let store = RowStore::from_projected(result, vec![0, 2], 3).unwrap();
+
+        let mut searched = Vec::new();
+        store.visit_search_cells(0, |column, value| {
+            searched.push((column, value.clone()));
+            false
+        });
+        assert_eq!(searched, vec![(0, Value::Int(7)), (2, Value::Text("Ada".into()))]);
+    }
+
+    #[test]
     fn projected_browse_rows_preview_long_values_without_losing_the_key() {
         let text = "x".repeat(9000);
         let result = Arc::new(QueryResult {
@@ -850,7 +883,7 @@ mod tests {
     }
 
     #[test]
-    fn loaded_row_search_uses_full_shared_value_without_materializing_it_in_the_grid() {
+    fn loaded_row_search_visits_full_shared_value_without_materializing_it_in_the_grid() {
         let text = "x".repeat(9000);
         let result = Arc::new(QueryResult {
             columns: vec![column("id"), column("payload")],
@@ -862,7 +895,30 @@ mod tests {
 
         assert!(row.cell_preview(1).is_some());
         assert_eq!(row.cell_value(1), Value::Text(text.clone()));
-        assert_eq!(store.cells_for_search(0).unwrap()[1], Some(Value::Text(text)));
+        let mut found_full_value = false;
+        assert!(store.visit_search_cells(0, |index, value| {
+            if index == 1 {
+                found_full_value = matches!(value, Value::Text(value) if value == &text);
+                true
+            } else {
+                false
+            }
+        }));
+        assert!(found_full_value);
+    }
+
+    #[test]
+    fn search_visits_an_edited_cached_value() {
+        let store = RowStore::from_shared(shared(1));
+        let row = store.item(0).and_downcast::<RowObject>().unwrap();
+        row.set_cell(0, Value::Text("edited".into()));
+
+        let mut searched = None;
+        assert!(store.visit_search_cells(0, |column, value| {
+            searched = Some((column, value.clone()));
+            true
+        }));
+        assert_eq!(searched, Some((0, Value::Text("edited".into()))));
     }
 
     #[test]
