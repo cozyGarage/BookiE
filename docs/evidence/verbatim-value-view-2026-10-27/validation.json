@@ -25,6 +25,7 @@
     "gtk_widgets": "passed: 179 isolated tests on fixed Xvfb display 207, 1600x1200",
     "viewer_widget": "passed: the_viewer_dialog_builds_and_shows_the_full_value",
     "installed_e2e": "incomplete: app started and activated its main window, but AT-SPI exposed only xdg-desktop-portal-gtk",
-    "status": "not acceptance-gated"
+    "status": "not acceptance-gated",
+    "local_full_ci": "passed: 3012 workspace unit, 291 sandbox, 1 Redis check"
   }
 }
