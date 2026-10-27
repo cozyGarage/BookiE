@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-24
+- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0022-release-notes-come-from-merge-commits)
 - **Supersedes**: the 2026-10-19 [changelog fragment evaluation](../archive/changelog-fragment-evaluation-2026-10-19.md), which kept a shared `CHANGELOG.md` and named its own revisit trigger.
 - **Clarified**: 2026-10-25 for implementation status. The pull-request body validation workflow has landed; the release workflow still reads `CHANGELOG.md`.
 
@@ -51,7 +52,3 @@ Gained:
 - **A PR-body block read through the GitHub API at release time.** Rejected as the source of record: it needs network access and tokens at release time, and the text can be edited after merge. The same lines are in the PR body for validation only.
 - **Leave the squash-message setting alone and rely on the merger to copy the lines.** Rejected: the rule would live only in AGENTS.md.
 - **GitHub's generated release notes.** Rejected: they list titles and authors, not user impact.
-
-## Implementation status
-
-Landed: the trailer grammar, `check`, `trailers` and `assemble` in `scripts/release-notes.py` with tests, the PR template line, the documentation, and `.github/workflows/release-note-check.yml`, which validates pull-request bodies. Whether GitHub requires that check in the branch ruleset is not recorded here. `assemble` was run on the real history after the guard (22 notes, every pull request merge carries one); it skips direct pushes and merge commits without a note, and a note wrapped across lines keeps its whole sentence. Not landed: the `release.yml` step that calls `assemble` instead of reading `CHANGELOG.md`. Until then, the first cut must reconcile as described in point 4.

@@ -1,0 +1,36 @@
+running 3 tests
+test a_case_only_concurrent_change_is_not_overwritten ... FAILED
+test a_failed_draft_batch_preserves_the_previous_first_draft ... FAILED
+test an_unreadable_unrequested_connection_does_not_block_the_requested_workspace ... FAILED
+
+failures:
+
+---- a_case_only_concurrent_change_is_not_overwritten stdout ----
+
+thread 'a_case_only_concurrent_change_is_not_overwritten' (4106559) panicked at crates/app-services/tests/current_audit_probe.rs:84:5:
+assertion `left == right` failed: SQL: UPDATE "people" SET "name" = ? WHERE "id" = ? AND "name" IS NOT DISTINCT FROM ?
+  left: "1\nstale edit\n"
+ right: "0\nADA\n"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_failed_draft_batch_preserves_the_previous_first_draft stdout ----
+
+thread 'a_failed_draft_batch_preserves_the_previous_first_draft' (4106571) panicked at crates/app-services/tests/current_audit_probe.rs:40:5:
+assertion `left == right` failed
+  left: "new first"
+ right: "old first"
+
+---- an_unreadable_unrequested_connection_does_not_block_the_requested_workspace stdout ----
+
+thread 'an_unreadable_unrequested_connection_does_not_block_the_requested_workspace' (4106573) panicked at crates/app-services/tests/current_audit_probe.rs:58:5:
+assertion `left == right` failed
+  left: Err(WriteFailed)
+ right: Ok(())
+
+
+failures:
+    a_case_only_concurrent_change_is_not_overwritten
+    a_failed_draft_batch_preserves_the_previous_first_draft
+    an_unreadable_unrequested_connection_does_not_block_the_requested_workspace
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s

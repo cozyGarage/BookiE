@@ -688,6 +688,41 @@ async fn run_batch_sets(
     .await
 }
 
+struct RowAdmission {
+    budget: QueryResultBudget,
+    limit: usize,
+    retained_rows: usize,
+    refused: bool,
+}
+
+impl RowAdmission {
+    fn new(limit: usize) -> Self {
+        Self {
+            budget: QueryResultBudget::default(),
+            limit,
+            retained_rows: 0,
+            refused: false,
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        self.refused || self.retained_rows >= self.limit
+    }
+
+    fn admit(&mut self, values: Vec<Value>, result_set: &mut QueryResult) -> bool {
+        if self.is_closed() {
+            return false;
+        }
+        if !self.budget.admit(&values) {
+            self.refused = true;
+            return false;
+        }
+        result_set.rows.push(values);
+        self.retained_rows += 1;
+        true
+    }
+}
+
 async fn collect_result_sets(
     mut stream: tiberius::QueryStream<'_>,
     limit: usize,
@@ -695,9 +730,8 @@ async fn collect_result_sets(
 ) -> Result<QueryResultBatch, DriverError> {
     let mut result_sets: Vec<QueryResult> = Vec::new();
     let mut current: Option<QueryResult> = None;
-    let mut budget = QueryResultBudget::default();
+    let mut admission = RowAdmission::new(limit);
     let mut truncated = false;
-    let mut retained_rows = 0usize;
     // The stream is read to its end rather than dropped early: tiberius only
     // drains unread tokens at the start of the next call, so an early exit
     // leaves the batch running on the server holding its locks, and discards
@@ -717,7 +751,7 @@ async fn collect_result_sets(
                 }
             }
             QueryItem::Row(_) if current.is_none() => {}
-            QueryItem::Row(_) if retained_rows >= limit => {
+            QueryItem::Row(_) if admission.is_closed() => {
                 truncated = true;
                 if let Some(result_set) = current.as_mut() {
                     result_set.truncated = true;
@@ -730,12 +764,10 @@ async fn collect_result_sets(
                     .zip(types)
                     .map(|(data, column_type)| codec::column_data_to_value_for_type(&data, column_type))
                     .collect::<Vec<_>>();
-                if budget.admit(&values)
-                    && let Some(result_set) = current.as_mut()
-                {
-                    result_set.rows.push(values);
-                    retained_rows += 1;
-                } else {
+                let kept = current
+                    .as_mut()
+                    .is_some_and(|result_set| admission.admit(values, result_set));
+                if !kept {
                     truncated = true;
                     if let Some(result_set) = current.as_mut() {
                         result_set.truncated = true;
