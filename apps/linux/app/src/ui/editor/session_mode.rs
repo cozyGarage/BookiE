@@ -700,6 +700,7 @@ impl SqlEditor {
         self.opening_session_id = None;
         match result {
             Ok(OpenedSession(shared)) if self.session_button.is_active() => {
+                self.clear_catalog_changes();
                 self.retired_session_connection_id = None;
                 self.session = Some(EditorSession {
                     id: session_id,
@@ -750,6 +751,7 @@ impl SqlEditor {
         ) {
             return;
         }
+        self.clear_catalog_changes();
         if let Some(session) = self.session.take() {
             self.close_session_for_teardown(session.shared, sender);
         } else {
@@ -835,6 +837,7 @@ impl SqlEditor {
                 return;
             };
             self.retired_session_connection_id = Some((session.connection_id, session.id));
+            self.clear_catalog_changes();
             self.close_session_for_teardown(session.shared, sender);
             self.status.set_label(&crate::tr!(
                 "This editor session was retired after a connection failure. Reopen Session before running more SQL."
@@ -852,6 +855,7 @@ impl SqlEditor {
     }
 
     pub(super) fn end_session(&mut self, sender: &ComponentSender<Self>) {
+        self.clear_catalog_changes();
         self.opening_session_id = None;
         self.transaction_clock.reset(&self.session_button);
         self.session_button.remove_css_class("warning");
@@ -902,6 +906,7 @@ impl SqlEditor {
         ) {
             return;
         }
+        self.clear_catalog_changes();
         if let Some(session) = self.session.take()
             && result.is_err()
         {
@@ -963,6 +968,9 @@ impl SqlEditor {
         ) {
             return;
         }
+        if self.catalog_changes.transaction_finished(&result) {
+            self.publish_catalog_change(sender);
+        }
         self.ending_session_id = None;
         self.session_button.set_sensitive(true);
         match result {
@@ -981,6 +989,20 @@ impl SqlEditor {
                 self.session_button.set_active(true);
                 self.status.set_label(&message);
             }
+        }
+    }
+
+    fn clear_catalog_changes(&mut self) {
+        self.catalog_changes = Default::default();
+        self.catalog_origin = None;
+    }
+
+    fn publish_catalog_change(&self, sender: &ComponentSender<Self>) {
+        let Some(origin) = self.catalog_origin.as_ref() else {
+            return;
+        };
+        if origin.owns_window(self.connection_id, &self.database) {
+            let _ = sender.output(super::SqlEditorOutput::CatalogChanged(origin.clone()));
         }
     }
 
