@@ -260,7 +260,7 @@ fn prefetch_cannot_replace_a_save_started_while_snapshot_is_loading() {
     });
     load_started_receiver.recv().unwrap();
 
-    save_connection_coordinated(&memory, &queue, id, connection("SELECT new"));
+    save_connection_coordinated(&memory, &queue, id, connection("SELECT new"), None);
 
     continue_load_sender.send(()).unwrap();
     prefetch.join().unwrap();
@@ -300,7 +300,7 @@ fn a_save_does_not_wait_for_a_slow_prefetch() {
     let save_memory = Arc::clone(&memory);
     let save_queue = Arc::clone(&queue);
     let save = std::thread::spawn(move || {
-        save_connection_coordinated(&save_memory, &save_queue, id, connection("SELECT new"));
+        save_connection_coordinated(&save_memory, &save_queue, id, connection("SELECT new"), None);
         saved_sender.send(()).unwrap();
     });
     let finished_while_loading = saved_receiver.recv_timeout(std::time::Duration::from_secs(5)).is_ok();

@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, Weak, mpsc};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -10,6 +11,9 @@ use super::workspace_disk;
 pub struct WorkspaceStore {
     inner: Arc<WorkspaceStoreInner>,
 }
+
+#[derive(Clone)]
+pub struct WorkspaceSaveToken(Arc<AtomicBool>);
 
 struct WorkspaceStoreInner {
     file_lock: Arc<Mutex<()>>,
@@ -39,6 +43,7 @@ struct WorkspaceWriter {
 #[derive(Default)]
 struct WorkspaceQueue {
     forgotten: HashSet<Uuid>,
+    save_tokens: HashMap<Uuid, Weak<AtomicBool>>,
     next_sequence: u64,
     persisted_sequence: u64,
     pending: HashMap<Uuid, PendingWorkspace>,
@@ -433,8 +438,51 @@ impl WorkspaceStore {
 
     pub fn save_connection(&self, id: Uuid, mut conn_state: ConnectionWorkspaceState) {
         clamp_connection(&mut conn_state);
-        save_connection_coordinated(&self.inner.memory, &self.inner.writer.queue, id, conn_state);
-        wake_writer(&self.inner.writer);
+        if save_connection_coordinated(&self.inner.memory, &self.inner.writer.queue, id, conn_state, None) {
+            wake_writer(&self.inner.writer);
+        }
+    }
+
+    pub fn connection_save_token(&self, id: Uuid) -> WorkspaceSaveToken {
+        let mut queue = self
+            .inner
+            .writer
+            .queue
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if queue.forgotten.contains(&id) {
+            return WorkspaceSaveToken(Arc::new(AtomicBool::new(false)));
+        }
+        queue.save_tokens.retain(|_, token| token.strong_count() > 0);
+        if let Some(token) = queue.save_tokens.get(&id).and_then(Weak::upgrade) {
+            return WorkspaceSaveToken(token);
+        }
+        let token = Arc::new(AtomicBool::new(true));
+        queue.save_tokens.insert(id, Arc::downgrade(&token));
+        WorkspaceSaveToken(token)
+    }
+
+    pub fn save_database_for_session(
+        &self,
+        id: Uuid,
+        database: &str,
+        token: &WorkspaceSaveToken,
+        conn_state: ConnectionWorkspaceState,
+    ) {
+        if !token.0.load(Ordering::Acquire) {
+            return;
+        }
+        let existing = match self.saved_record(id) {
+            Ok(existing) => existing,
+            Err(error) => {
+                tracing::warn!(%id, %error, "workspace could not be read; existing files will be preserved");
+                return;
+            }
+        };
+        let merged = ConnectionWorkspaceState::with_database(existing, database, conn_state);
+        if save_connection_coordinated(&self.inner.memory, &self.inner.writer.queue, id, merged, Some(token)) {
+            wake_writer(&self.inner.writer);
+        }
     }
 
     pub fn forget_connection(&self, id: Uuid) {
@@ -451,18 +499,23 @@ impl WorkspaceStore {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             memory.cache.remove(&id);
             memory.saved_at.remove(&id);
-            self.inner
+            let mut queue = self
+                .inner
                 .writer
                 .queue
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .forgotten
-                .insert(id);
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            queue.forgotten.insert(id);
+            if let Some(token) = queue.save_tokens.remove(&id).and_then(|token| token.upgrade()) {
+                token.store(false, Ordering::Release);
+            }
         }
-        if let Some(path) = self.inner.paths.state.as_deref()
-            && let Err(error) = workspace_disk::forget_connection(path, id)
         {
-            tracing::warn!(%id, %error, "could not remove deleted connection from workspace state");
+            if let Some(path) = self.inner.paths.state.as_deref()
+                && let Err(error) = workspace_disk::forget_connection(path, id)
+            {
+                tracing::warn!(%id, %error, "could not remove deleted connection from workspace state");
+            }
         }
         let path = self.inner.paths.drafts.join(id.to_string());
         if let Err(error) = std::fs::remove_dir_all(&path)
@@ -470,6 +523,43 @@ impl WorkspaceStore {
         {
             tracing::warn!(%id, %error, "could not remove drafts for a deleted connection");
         }
+    }
+
+    pub async fn allow_connection_saves(&self, id: Uuid) -> Result<(), WorkspaceFlushError> {
+        let forgotten = self
+            .inner
+            .writer
+            .queue
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .forgotten
+            .contains(&id);
+        if !forgotten {
+            return Ok(());
+        }
+        let store = self.clone();
+        tokio::task::spawn_blocking(move || {
+            store
+                .flush()
+                .recv()
+                .map_err(|_| WorkspaceFlushError::WriterUnavailable)??;
+            let _guard = store
+                .inner
+                .file_lock
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            store
+                .inner
+                .writer
+                .queue
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .forgotten
+                .remove(&id);
+            Ok(())
+        })
+        .await
+        .map_err(|_| WorkspaceFlushError::WriterUnavailable)?
     }
 
     pub fn flush(&self) -> mpsc::Receiver<Result<(), WorkspaceFlushError>> {
@@ -518,17 +608,19 @@ fn save_connection_coordinated(
     queue: &Mutex<WorkspaceQueue>,
     id: Uuid,
     state: ConnectionWorkspaceState,
-) {
+    token: Option<&WorkspaceSaveToken>,
+) -> bool {
     let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut queue = queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if queue.forgotten.contains(&id) {
-        return;
+    if queue.forgotten.contains(&id) || token.is_some_and(|token| !token.0.load(Ordering::Acquire)) {
+        return false;
     }
     memory.clock += 1;
     let clock = memory.clock;
     memory.saved_at.insert(id, clock);
     memory.cache.insert(id, Some(state.clone()));
     queue.save(id, state);
+    true
 }
 
 fn wake_writer(writer: &WorkspaceWriter) -> bool {

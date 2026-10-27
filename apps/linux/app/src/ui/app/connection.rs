@@ -80,6 +80,7 @@ impl App {
                 ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),
                 ConnectDialogOutput::Closed => AppMsg::DialogClosed,
             });
+        crate::ui::leak_probe::track("connect", dialog.widget());
         dialog.widget().present(Some(&self.window));
         self.dialog = Some(dialog);
     }
@@ -100,6 +101,7 @@ impl App {
         self.dialog = None;
         self.connected = true;
         self.connection_id = Some(id);
+        self.workspace_save_token = Some(self.workspace.connection_save_token(id));
         self.connected_database = Some(connected_database);
         crate::services::window_registry::register(id, self.window.clone().upcast());
         self.current_driver_id = Some(driver_id.clone());
@@ -215,6 +217,7 @@ impl App {
         // different connection would target a non-existent table.
         self.clear_closed_tabs_stack();
         self.connected_database = None;
+        self.workspace_save_token = None;
         if let Some(id) = self.connection_id.take() {
             if self.window_state.borrow().last_connection_id == Some(id) {
                 self.set_last_connection_id(None, sender.clone());
@@ -674,6 +677,7 @@ impl App {
         // replacing. Closing before activation keeps reconnecting to the same
         // saved connection correct: the identifier is reused, not cancelled.
         self.connected_database = None;
+        self.workspace_save_token = None;
         if let Some(previous) = self.connection_id.take() {
             self.database.close(previous);
         }
