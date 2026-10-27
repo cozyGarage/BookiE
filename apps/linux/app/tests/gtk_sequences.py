@@ -17,6 +17,7 @@ DIALOGS = {
     "quick_switcher": ("win.open-quickly", "Open quickly"),
     "connect": ("button:New connection", "Connect to PostgreSQL"),
     "structure_form": ("structure:Add Index…", "Add Index"),
+    "column_jump": ("table:win.jump-column", "Jump to Column"),
 }
 # Typing into a field before dismissal exercises the edit-then-discard path.
 EDITS = {"connect": ("Host", "leak.example.invalid"), "structure_form": ("Name", "leak_idx")}
@@ -44,6 +45,11 @@ def scenarios(ui):
             if ui.node_name(node) in ("Close", "Cancel") and ui.node_role(node) == ui.pyatspi.ROLE_PUSH_BUTTON:
                 return ui.invoke(node)
         return False
+
+    def open_table():
+        if ui.find_node(name="safety_items", role=ui.pyatspi.ROLE_PAGE_TAB) is None:
+            ui.invoke_named_action_within("safety_items", "Open safety_items")
+            ui.wait_for_node(name="safety_items", role=ui.pyatspi.ROLE_PAGE_TAB)
 
     def open_structure_form(add_button):
         if ui.find_node(name="safety_items", role=ui.pyatspi.ROLE_PAGE_TAB) is None:
@@ -80,7 +86,10 @@ def scenarios(ui):
 
         def scenario(_database, base):
             for index in range(CYCLES):
-                if action.startswith("structure:"):
+                if action.startswith("table:"):
+                    open_table()
+                    ui.invoke_accessible_action(action[6:])
+                elif action.startswith("structure:"):
                     open_structure_form(action[10:])
                 elif action.startswith("button:"):
                     ui.invoke(ui.wait_for_node(name=action[7:], role=ui.pyatspi.ROLE_PUSH_BUTTON))
