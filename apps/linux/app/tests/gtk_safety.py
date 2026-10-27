@@ -1944,10 +1944,14 @@ def a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile(dat
     passphrase = "two profile passphrase"
     config_path = base / "config" / storage_dir_name() / "connections.json"
     def without_usage(records):
-        return {
-            record["id"]: {key: value for key, value in record.items() if key != "last_opened_at"}
-            for record in records
-        }
+        normalized = {}
+        for record in records:
+            values = {key: value for key, value in record.items() if key != "last_opened_at"}
+            values.setdefault("tls_client_cert", None)
+            values.setdefault("tls_client_key", None)
+            values.setdefault("read_only", False)
+            normalized[record["id"]] = values
+        return normalized
 
     original = without_usage(json.loads(config_path.read_text(encoding="utf-8"))["connections"])
     invoke_accessible_action("win.disconnect")
