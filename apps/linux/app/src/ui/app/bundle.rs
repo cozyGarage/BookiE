@@ -235,16 +235,20 @@ impl App {
         let secrets = pending.secrets;
         let replace = choice.replace_saved_passwords;
         let database = self.database.clone();
+        let workspace = self.workspace.clone();
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    match apply_import_with_audit(database, operation_id, plan, secrets, replace).await {
+                    match apply_import_with_audit(database, workspace, operation_id, plan, secrets, replace).await {
                         Ok((imported, planned)) => {
                             sender_clone.input(AppMsg::ImportBundleFinished(imported, planned));
                             sender_clone.input(AppMsg::ReloadConnections);
                         }
-                        Err(message) => sender_clone.input(AppMsg::BundleFailed(message)),
+                        Err(error) => {
+                            sender_clone.input(AppMsg::BundleFailed(error.message));
+                            sender_clone.input(AppMsg::ReloadConnections);
+                        }
                     }
                 })
                 .drop_on_shutdown()
@@ -258,11 +262,12 @@ impl App {
 
 async fn apply_import_with_audit(
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+    workspace: crate::services::workspace_state::WorkspaceStore,
     operation_id: Uuid,
     plan: ImportPlan,
     secrets: Vec<tablepro_storage::BundleSecrets>,
     replace: bool,
-) -> Result<(usize, usize), String> {
+) -> Result<(usize, usize), ImportFailure> {
     let planned_count = plan.items.len();
     if database
         .audit_administrative_action(
@@ -276,15 +281,18 @@ async fn apply_import_with_audit(
         .await
         .is_err()
     {
-        return Err(crate::tr!("The import was cancelled because its audit record could not be saved.").to_string());
+        return Err(ImportFailure {
+            message: crate::tr!("The import was cancelled because its audit record could not be saved.").to_string(),
+            affected_count: 0,
+        });
     }
 
     let started = std::time::Instant::now();
-    let outcome = apply_plan(plan, secrets, replace).await;
+    let outcome = apply_plan(plan, secrets, replace, workspace).await;
     let (status, affected_count) = match &outcome {
         Ok((imported, planned)) if imported == planned => (tablepro_policy::AuditTerminalStatus::Succeeded, *imported),
         Ok((imported, _)) => (tablepro_policy::AuditTerminalStatus::Failed, *imported),
-        Err(_) => (tablepro_policy::AuditTerminalStatus::Failed, 0),
+        Err(error) => (tablepro_policy::AuditTerminalStatus::Failed, error.affected_count),
     };
     if database
         .audit_administrative_action(
@@ -298,7 +306,10 @@ async fn apply_import_with_audit(
         .await
         .is_err()
     {
-        return Err(crate::tr!("The import finished, but its audit outcome could not be saved.").to_string());
+        return Err(ImportFailure {
+            message: crate::tr!("The import finished, but its audit outcome could not be saved.").to_string(),
+            affected_count,
+        });
     }
 
     outcome
@@ -395,12 +406,14 @@ async fn apply_plan(
     plan: ImportPlan,
     secrets: Vec<tablepro_storage::BundleSecrets>,
     replace_saved_passwords: bool,
-) -> Result<(usize, usize), String> {
+    workspace: crate::services::workspace_state::WorkspaceStore,
+) -> Result<(usize, usize), ImportFailure> {
     let planned = plan.items.len();
     let (imported, failure) = apply_items(
         plan.items,
         secrets,
         replace_saved_passwords,
+        workspace,
         |item, carried, replace| async move {
             let single_item = ImportPlan {
                 items: vec![item.clone()],
@@ -426,7 +439,18 @@ async fn apply_plan(
     )
     .await;
     if imported == 0 && failure == Some(ItemApplyFailure::ConnectionSave) {
-        return Err(crate::tr!("The connections could not be saved."));
+        return Err(ImportFailure {
+            message: crate::tr!("The connections could not be saved."),
+            affected_count: 0,
+        });
+    }
+    if failure == Some(ItemApplyFailure::WorkspaceSaveRecovery) {
+        return Err(ImportFailure {
+            message: crate::tr!(
+                "Some connections may have been imported, but workspace saves could not be re-enabled. Resolve the workspace storage problem and restart BookiE before relying on saved tabs."
+            ),
+            affected_count: imported,
+        });
     }
     Ok((imported, planned))
 }
@@ -435,12 +459,19 @@ async fn apply_plan(
 enum ItemApplyFailure {
     ConnectionSave,
     CredentialStore,
+    WorkspaceSaveRecovery,
+}
+
+struct ImportFailure {
+    message: String,
+    affected_count: usize,
 }
 
 async fn apply_items<F, Fut>(
     items: Vec<ImportItem>,
     secrets: Vec<tablepro_storage::BundleSecrets>,
     replace_saved_passwords: bool,
+    workspace: crate::services::workspace_state::WorkspaceStore,
     mut apply: F,
 ) -> (usize, Option<ItemApplyFailure>)
 where
@@ -454,10 +485,15 @@ where
             .find(|entry| entry.connection_id == item.source_id)
             .cloned();
         let _save_turn = crate::services::connection_save_turn::take().await;
+        let connection_id = item.connection.id;
         if let Err(failure) = apply(item, carried, replace_saved_passwords).await {
             return (imported, Some(failure));
         }
         imported += 1;
+        if let Err(error) = workspace.allow_connection_saves(connection_id).await {
+            tracing::warn!(%connection_id, ?error, "workspace saves remain disabled after connection import");
+            return (imported, Some(ItemApplyFailure::WorkspaceSaveRecovery));
+        }
     }
     (imported, None)
 }
@@ -500,176 +536,5 @@ fn should_forget_imported_secrets(item: &ImportItem, restored: bool) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tablepro_core::{AuthMode, Environment, TlsMode};
-
-    fn saved(name: &str) -> SavedConnection {
-        SavedConnection {
-            auth_source: None,
-            id: Uuid::new_v4(),
-            name: name.into(),
-            driver_id: "postgres".into(),
-            host: "localhost".into(),
-            port: 5432,
-            socket_dir: None,
-            socket_path: None,
-            database: "app".into(),
-            username: "app".into(),
-            use_tls: false,
-            tls_mode: Some(TlsMode::Disabled),
-            tls_root_cert: None,
-            tls_client_cert: None,
-            tls_client_key: None,
-            read_only: false,
-            auth_mode: AuthMode::Password,
-            environment: Environment::Local,
-            ssh: None,
-            last_opened_at: None,
-            connect_timeout_secs: None,
-            query_timeout_secs: None,
-        }
-    }
-
-    fn item(name: &str) -> ImportItem {
-        let connection = saved(name);
-        ImportItem {
-            disposition: ImportDisposition::New,
-            source_id: connection.id,
-            connection,
-            previous: None,
-            organization: None,
-        }
-    }
-
-    #[test]
-    fn unticked_entries_are_dropped_and_the_order_survives() {
-        let first = item("a");
-        let second = item("b");
-        let third = item("c");
-        let plan = ImportPlan {
-            items: vec![first.clone(), second.clone(), third.clone()],
-        };
-
-        let kept = accepted_items(&plan, &[third.source_id, first.source_id]);
-
-        assert_eq!(
-            kept.iter().map(|i| i.source_id).collect::<Vec<_>>(),
-            vec![first.source_id, third.source_id]
-        );
-    }
-
-    #[test]
-    fn ticking_nothing_imports_nothing() {
-        let plan = ImportPlan { items: vec![item("a")] };
-        assert!(accepted_items(&plan, &[]).is_empty());
-    }
-
-    #[tokio::test]
-    async fn an_import_failure_stops_before_saving_later_connections() {
-        let items = vec![item("first"), item("failed"), item("later")];
-        let attempted = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let imported = apply_items(items.clone(), Vec::new(), false, {
-            let attempted = attempted.clone();
-            move |item, _, _| {
-                let attempted = attempted.clone();
-                async move {
-                    attempted.lock().unwrap().push(item.connection.name.clone());
-                    if item.connection.name == "failed" {
-                        Err(ItemApplyFailure::CredentialStore)
-                    } else {
-                        Ok(())
-                    }
-                }
-            }
-        })
-        .await;
-
-        assert_eq!(imported, (1, Some(ItemApplyFailure::CredentialStore)));
-        assert_eq!(*attempted.lock().unwrap(), ["first", "failed"]);
-    }
-
-    #[tokio::test]
-    async fn an_import_holds_the_save_turn_while_each_connection_is_applied() {
-        let held_during_apply = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let outcome = apply_items(vec![item("a"), item("b")], Vec::new(), false, {
-            let held = held_during_apply.clone();
-            move |_, _, _| {
-                let held = held.clone();
-                async move {
-                    held.lock()
-                        .unwrap()
-                        .push(crate::services::connection_save_turn::is_held());
-                    Ok(())
-                }
-            }
-        })
-        .await;
-
-        assert_eq!(outcome, (2, None));
-        assert_eq!(*held_during_apply.lock().unwrap(), [true, true]);
-        assert!(
-            tokio::time::timeout(
-                std::time::Duration::from_secs(10),
-                crate::services::connection_save_turn::take()
-            )
-            .await
-            .is_ok(),
-            "the turn is released afterwards"
-        );
-    }
-
-    #[test]
-    fn a_failed_record_restore_keeps_imported_credentials() {
-        let mut item = item("new");
-        assert!(!should_forget_imported_secrets(&item, false));
-        assert!(should_forget_imported_secrets(&item, true));
-        item.disposition = ImportDisposition::UpdateInPlace;
-        assert!(!should_forget_imported_secrets(&item, true));
-    }
-
-    #[test]
-    fn a_file_that_is_not_a_bundle_is_reported_rather_than_parsed() {
-        assert!(read_bundle_file(b"nonsense").is_err());
-    }
-
-    #[test]
-    fn the_export_file_stamp_is_a_plain_date() {
-        let stamp = today_stamp();
-        assert_eq!(stamp.len(), 10);
-        assert_eq!(stamp.matches('-').count(), 2);
-    }
-
-    #[tokio::test]
-    async fn a_file_over_the_limit_is_refused_before_it_is_read() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("big.bundle");
-        std::fs::File::create(&path).unwrap().set_len(17).unwrap();
-        let error = read_bounded(&path, 16).await.unwrap_err();
-        assert!(
-            matches!(error, BundleError::TooLarge { got: 17, limit: 16 }),
-            "{error:?}"
-        );
-    }
-
-    #[tokio::test]
-    async fn a_directory_or_missing_path_is_not_a_bundle() {
-        let directory = tempfile::tempdir().unwrap();
-        assert!(matches!(
-            read_bounded(directory.path(), 16).await,
-            Err(BundleError::NotABundle)
-        ));
-        assert!(matches!(
-            read_bounded(&directory.path().join("missing"), 16).await,
-            Err(BundleError::NotABundle)
-        ));
-    }
-
-    #[tokio::test]
-    async fn a_file_at_the_limit_is_read_whole() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("ok.bundle");
-        std::fs::write(&path, [7u8; 16]).unwrap();
-        assert_eq!(read_bounded(&path, 16).await.unwrap(), vec![7u8; 16]);
-    }
-}
+#[path = "bundle_tests.rs"]
+mod tests;

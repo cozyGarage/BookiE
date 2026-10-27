@@ -20,6 +20,11 @@ esac
 CURL = """import json, os, pathlib, sys
 fixture = pathlib.Path(os.environ['GATE_TEST_FIXTURE'])
 data = json.loads(fixture.read_text())
+if any('fixture-token' in arg for arg in sys.argv):
+    raise SystemExit('gate token passed in curl arguments')
+config = pathlib.Path(sys.argv[sys.argv.index('--config') + 1]).read_text()
+if 'header = "Authorization: token fixture-token"' not in config:
+    raise SystemExit('gate authorization header missing from curl config')
 if '/actions/jobs/' in sys.argv[-1] and '/logs' in sys.argv[-1]:
     print(data['logs'])
 elif '/actions/runs/' in sys.argv[-1] and '/jobs' in sys.argv[-1]:

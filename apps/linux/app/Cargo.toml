@@ -35,7 +35,6 @@ tablepro-driver-redis = { path = "../../../crates/drivers/redis" }
 tablepro-driver-sqlite = { path = "../../../crates/drivers/sqlite" }
 chrono.workspace = true
 rust_decimal.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
@@ -61,12 +60,13 @@ async-trait.workspace = true
 
 [dev-dependencies]
 futures.workspace = true
+serde.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 testcontainers = { workspace = true, features = ["http_wait_plain"] }
 testcontainers-modules = { workspace = true, features = ["mongo", "mysql", "postgres", "mssql_server", "redis"] }
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
-zip = { version = "8.3", default-features = false, features = ["deflate"] }
+zip = { version = "9.1", default-features = false, features = ["deflate"] }
 sha2.workspace = true
 
 [build-dependencies]

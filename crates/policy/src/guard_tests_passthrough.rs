@@ -171,7 +171,7 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
         };
     }
     vec![
-        guard.list_databases().await.map(|_| ()),
+        read!(guard.list_databases(), |c| guard.list_databases_controlled(c)),
         read!(guard.list_tables(), |c| guard.list_tables_controlled(c)),
         read!(guard.list_views(), |c| guard.list_views_controlled(c)),
         read!(guard.list_objects(kind, schema), |c| guard
@@ -217,7 +217,7 @@ async fn a_cancelled_control_stops_every_controlled_read_before_it_reaches_the_d
     let control = OperationControl::with_timeout(Duration::from_secs(30));
     control.cancellation_token().cancel();
     let outcomes = run_every_read(&guard, Some(&control)).await;
-    let controlled_outcomes = &outcomes[1..outcomes.len() - 2];
+    let controlled_outcomes = &outcomes[..outcomes.len() - 2];
     assert!(
         controlled_outcomes
             .iter()
@@ -226,8 +226,8 @@ async fn a_cancelled_control_stops_every_controlled_read_before_it_reaches_the_d
     );
     assert_eq!(
         calls.load(Ordering::SeqCst),
-        3,
-        "only list_databases, server_version and ping are not controlled"
+        2,
+        "only server_version and ping are not controlled"
     );
 }
 

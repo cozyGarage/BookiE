@@ -40,6 +40,31 @@ class CiCacheTests(unittest.TestCase):
     def cleanup(self, reserve=0):
         return subprocess.run(self.command + ['cleanup', '--min-free-gib', str(reserve)], capture_output=True, text=True)
 
+    def test_default_reserve_is_30_gib_for_checkout_and_cleanup(self):
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        checkout = self.directory / 'checkout.sh'
+        checkout.write_text(':\n')
+        gib = 1024**3
+
+        for command in ('cleanup', 'checkout'):
+            args = [str(SCRIPT), '--root', str(self.cache), '--lock', str(self.lock), command]
+            if command == 'checkout':
+                args.append(str(checkout))
+            with patch.object(sys, 'argv', args), patch.dict(
+                os.environ, {'CARGO_TARGET_DIR': str(self.cache / 'job')}
+            ), patch.object(
+                helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=30 * gib)
+            ):
+                self.assertEqual(helper.main(), 0)
+            with patch.object(sys, 'argv', args), patch.dict(
+                os.environ, {'CARGO_TARGET_DIR': str(self.cache / 'job')}
+            ), patch.object(
+                helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=29 * gib)
+            ):
+                self.assertEqual(helper.main(), 1)
+
     def test_old_generated_artifacts_removed_but_siblings_preserved(self):
         target = self.target('sandbox', 6)
         for profile in ('release', 'ci'):
@@ -351,6 +376,8 @@ class CiCacheTests(unittest.TestCase):
                     self.assertNotIn('path: ${{ env.CARGO_TARGET_DIR }}', step)
 
     def test_every_forgejo_checkout_recovers_cache_before_writing_workspace(self):
+        pilot_target = '/var/cache/ci/target/bookie-guards-${{ github.run_id }}'
+        pilot_tmp = '/var/cache/ci/tmp/bookie-guards-${{ github.run_id }}'
         for filename in ('ci.yml', 'nightly.yml'):
             workflow = (ROOT / '.forgejo/workflows' / filename).read_text()
             checkout_steps = workflow.split('      - name: Check out\n')[1:]
@@ -359,7 +386,13 @@ class CiCacheTests(unittest.TestCase):
                 step = block.split('\n      - name:', 1)[0]
                 if 'shell: bash' in step:
                     preceding = workflow[:workflow.index(step)].rsplit('    runs-on:', 1)[-1]
-                    self.assertIn('build-host', preceding, filename)
+                    if 'any-host' in preceding:
+                        self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', preceding, filename)
+                        self.assertIn(f'TMPDIR: {pilot_tmp}', preceding, filename)
+                        self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', step, filename)
+                        self.assertIn('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"', workflow, filename)
+                    else:
+                        self.assertIn('build-host', preceding, filename)
                 else:
                     self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout {0}', step, filename)
                 self.assertLess(step.index('shell:'), step.index('run:'), filename)

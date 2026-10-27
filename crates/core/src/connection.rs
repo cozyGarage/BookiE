@@ -141,6 +141,9 @@ pub trait Connection: Send + Sync {
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         Err(DriverError::Unsupported("listing databases".into()))
     }
+    async fn list_databases_controlled(&self, control: &OperationControl) -> Result<Vec<String>, DriverError> {
+        run_controlled(self.list_databases(), control).await
+    }
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError>;
     async fn list_tables_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
         run_controlled(self.list_tables(), control).await
@@ -414,6 +417,10 @@ mod controlled_default_tests {
 
     #[async_trait]
     impl Connection for SlowConnection {
+        async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
+            self.stall().await
+        }
+
         async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
             self.stall().await
         }
@@ -545,6 +552,84 @@ mod controlled_default_tests {
             dispatched.load(Ordering::SeqCst),
             0,
             "a cancelled control must never reach the database"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_control_stops_database_listing_before_dispatch() {
+        let dispatched = Arc::new(AtomicUsize::new(0));
+        let connection = SlowConnection {
+            dispatched: dispatched.clone(),
+        };
+        let control = cancelled_control();
+
+        assert!(matches!(
+            connection.list_databases_controlled(&control).await,
+            Err(DriverError::Cancelled)
+        ));
+        assert_eq!(dispatched.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn cancelling_an_in_flight_database_listing_reports_an_unknown_outcome() {
+        let dispatched = Arc::new(AtomicUsize::new(0));
+        let connection = SlowConnection {
+            dispatched: dispatched.clone(),
+        };
+        let token = CancellationToken::new();
+        let control = OperationControl::new(token.clone(), None);
+        let task = tokio::spawn(async move { connection.list_databases_controlled(&control).await });
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while dispatched.load(Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("database listing starts before cancellation");
+        token.cancel();
+
+        let error = task
+            .await
+            .expect("database listing task")
+            .expect_err("cancellation cannot return success for an unfinished listing");
+        assert!(
+            matches!(error, DriverError::OperationOutcomeUnknown { .. }),
+            "{error:?}"
+        );
+        assert_eq!(
+            dispatched.load(Ordering::SeqCst),
+            1,
+            "the call started before cancellation"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_timed_out_database_listing_reports_an_unknown_outcome() {
+        let dispatched = Arc::new(AtomicUsize::new(0));
+        let connection = SlowConnection {
+            dispatched: dispatched.clone(),
+        };
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let task = tokio::spawn(async move { connection.list_databases_controlled(&control).await });
+
+        while dispatched.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+        tokio::time::advance(Duration::from_secs(5)).await;
+
+        let error = task
+            .await
+            .expect("database listing task")
+            .expect_err("the stalled call must time out");
+        assert!(
+            matches!(error, DriverError::OperationOutcomeUnknown { .. }),
+            "{error:?}"
+        );
+        assert_eq!(
+            dispatched.load(Ordering::SeqCst),
+            1,
+            "the database request started before timeout"
         );
     }
 

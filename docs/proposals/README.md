@@ -4,8 +4,9 @@ Proposals record designs that have not become accepted decisions. They do not se
 
 | Proposal | Current boundary |
 |---|---|
-| [CI hardening ideas from upstream](ci-hardening-from-upstream.md) | Proposed; the low-risk items and the release-cache question are done; four questions are open. |
+| [CI hardening ideas from upstream](ci-hardening-from-upstream.md) | Proposed; the low-risk items and the release-cache question are done; three questions are open. |
 | [CI build speed](ci-build-speed.md) | UX-owned, measurement-gated; no workflow split is selected. |
+| [Documentation lifecycle and decision lessons](doc-lifecycle.md) | Proposed; three rules and a deletion test, none adopted. |
 | [Evidence branch migration](evidence-branch.md) | Proposed; no branch or packet has been migrated. Retrieval and restore must pass the pilot first. |
 | [Import into existing rows](import-existing-rows.md) | Unscheduled candidate; no behavior is implemented. |
 | [Statement effects and joined verdict](policy-effects-and-verdict.md) | Behavioral defects are closed; only the post-0.2.0 single-AST-walk consolidation remains in #571. |
