@@ -3,7 +3,7 @@
 ## Scope
 
 This survey owns external test sources, reusable failure patterns and candidate
-scenarios. Current implementation status belongs on the [B3 board](../type-contract-strategy.md);
+scenarios. Current implementation status belongs on the [B3 board](../lane-boards.md#b3-types-and-values);
 source-pinned results belong in the [value evidence index](../value-contracts.md),
 linked manifests and histories. Completed case-result diaries are kept out of
 this survey.

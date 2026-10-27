@@ -952,7 +952,7 @@ The focused Docker test passed: 1 passed, 0 failed.
 
 ## Current corpus
 
-The [type-contract strategy](../type-contract-strategy.md) defines boundary families,
+The [type-contract strategy](../lane-boards.md#b3-types-and-values) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
 `linux` commit `b2bc42729b145b91f0f75f8d40b3fa0a69e7a31d` on 2026-09-29. The
 strict combined run passed with GTK and DuckDB enabled, including the app's
@@ -3111,7 +3111,7 @@ New unit contracts check temporal element lengths, out-of-range payloads, empty/
 
 Run `cargo test --locked -p tablepro-driver-postgres --lib value_contract`, then `cargo test --locked -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --include-ignored --exact --test-threads=1` with Docker available. The combined strict value runner discovers all seven PostgreSQL server contracts. Updated fixture declarations are recorded in [ignored tests](../../scripts/inventory-ignored-tests.py).
 
-Reference: [PostgreSQL interval input and storage](https://www.postgresql.org/docs/current/datatype-datetime.html#DATATYPE-INTERVAL-INPUT). The strategy for extending these proofs across drivers is in [type contracts](../type-contract-strategy.md).
+Reference: [PostgreSQL interval input and storage](https://www.postgresql.org/docs/current/datatype-datetime.html#DATATYPE-INTERVAL-INPUT). The strategy for extending these proofs across drivers is in [type contracts](../lane-boards.md#b3-types-and-values).
 
 Mutation evidence: `target/quality/20260927-b3-pg-native-mutants/mutants.out/outcomes.json` records 74 selected mutations: 73 caught, one unviable, zero survivors and zero timeouts. This measurement ran value-contract unit tests for interval decoding/formatting, temporal-array dispatch/text and scalar temporal decoding; it was not a full-workspace mutation run. The separate PostgreSQL 16 fixture run supplies real-server evidence. Reproduce from the Linux workspace:
 
