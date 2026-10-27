@@ -16,10 +16,7 @@
     "input_method": "simple",
     "G_DEBUG": "fatal-criticals"
   },
-  "pending": [
-    "ordinary widget tier",
-    "preflight"
-  ],
+  "pending": [],
   "unverified": [
     "real-engine enum/set editing"
   ],
@@ -34,5 +31,16 @@
     "result": "3 passed",
     "coverage": "general edit/save and cancellation; not engine-specific enum/set popovers",
     "binary_sha256": "894d212d95508b31e5a1d865b0c26c1289bd6fe96bee0c4fe8fb914d261319a6"
+  },
+  "gtk_widgets": {
+    "executed": 177,
+    "result": "passed",
+    "input_method": "ordinary suite environment"
+  },
+  "preflight": {
+    "unit": 2197,
+    "sandbox": 291,
+    "redis_cancellation": 1,
+    "result": "passed"
   }
 }

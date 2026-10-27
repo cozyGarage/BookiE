@@ -2,7 +2,7 @@
 
 Issue #1733, lane UX. A realized cell opens and closes enum, set, calendar, exact text, numeric and multiline edit popovers in sequence. The regression checks each popover's weak reference after closing. Original code fails on the first enum picker. Replacing descendant callbacks' strong popover captures with weak references makes all six variants release in the focused test.
 
-The test uses isolated Xvfb, fatal GTK criticals and a simple input method. It does not access a database. App Clippy passed with warnings denied. Full ordinary widget validation, preflight and installed edit acceptance are pending. Forgejo acceptance is deferred during infrastructure migration.
+The test uses isolated Xvfb, fatal GTK criticals and a simple input method. It does not access a database. App Clippy passed with warnings denied. All 177 ordinary isolated widget tests passed, including all six popover lifetimes. Full preflight passed (2,197 unit tests, 291 sandbox tests and one Redis cancellation test). Installed general edit acceptance passed as recorded below. Forgejo acceptance is deferred during infrastructure migration.
 
 Release-Note: Fixed: Closing cell edit popovers releases their widgets and callbacks.
 
