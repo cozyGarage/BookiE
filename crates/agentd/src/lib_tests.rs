@@ -240,7 +240,11 @@ impl DatabaseDriver for RotatingCaDriver {
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        std::fs::write(&self.ca_path, self.rotated_bytes).expect("rotate the ca file mid-connect");
+        let (path, bytes) = (self.ca_path.clone(), self.rotated_bytes);
+        tokio::task::spawn_blocking(move || std::fs::write(path, bytes))
+            .await
+            .expect("the rotation task is not cancelled")
+            .expect("rotate the ca file mid-connect");
         SqliteDriver.connect(opts).await
     }
 }
@@ -360,7 +364,11 @@ impl DatabaseDriver for RemovingCaDriver {
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        std::fs::remove_file(&self.ca_path).expect("remove ca material during connect");
+        let path = self.ca_path.clone();
+        tokio::task::spawn_blocking(move || std::fs::remove_file(path))
+            .await
+            .expect("the removal task is not cancelled")
+            .expect("remove ca material during connect");
         let _ = opts;
         Ok(Box::new(ProbeConnection {
             queries: self.queries.clone(),
