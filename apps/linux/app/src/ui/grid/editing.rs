@@ -577,7 +577,7 @@ fn install_edit_commit_handler(label: &CellEditor, col_index: usize, sender: rel
 }
 
 #[cfg(test)]
-mod lifetime_tests {
+mod cell_lifetime_tests {
     use std::time::{Duration, Instant};
 
     use super::*;
@@ -730,3 +730,6 @@ mod tests {
         assert_eq!(numeric_editor("-0.25", true), NumericEditor::Spin(-0.25));
     }
 }
+
+#[cfg(test)]
+mod lifetime_tests;

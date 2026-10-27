@@ -1085,7 +1085,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::grid::editing::lifetime_tests::every_grid_edit_popover_releases_its_cell_and_widget"
+      "ui::grid::editing::cell_lifetime_tests::every_grid_edit_popover_releases_its_cell_and_widget"
     ],
     [
       "tablepro-app",
@@ -1096,6 +1096,11 @@
       "tablepro-app",
       "--lib",
       "ui::export_dialog::lifetime_tests::dismissing_export_setup_releases_its_dialog"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::editing::lifetime_tests::closed_edit_popovers_release_their_widgets"
     ]
   ],
   "keyring": [
