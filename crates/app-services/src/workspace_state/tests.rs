@@ -757,6 +757,85 @@ fn dropping_unrestorable_structure_tabs_preserves_the_selected_editor() {
 }
 
 #[test]
+fn deleting_another_connection_does_not_read_or_replace_unreadable_drafts() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("workspace.json");
+    let drafts = dir.path().join("drafts");
+    let retained = Uuid::new_v4();
+    let deleted = Uuid::new_v4();
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    for id in [retained, deleted] {
+        store.save_connection(
+            id,
+            ConnectionWorkspaceState {
+                tabs: vec![editor("SELECT 'recoverable'")],
+                ..Default::default()
+            },
+        );
+    }
+    assert_eq!(store.flush().recv().unwrap(), Ok(()));
+    let draft_path = std::fs::read_dir(drafts.join(retained.to_string()))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let sql = std::fs::read(&draft_path).unwrap();
+    std::fs::write(&draft_path, [0xff]).unwrap();
+    store.forget_connection(deleted);
+    let metadata = workspace_disk::load_metadata(&path).unwrap();
+    assert!(!metadata.connections.contains_key(&deleted.to_string()));
+    assert_eq!(std::fs::read(&draft_path).unwrap(), [0xff]);
+    std::fs::write(&draft_path, sql).unwrap();
+    let restored = workspace_disk::load_connection(&path, &drafts, retained)
+        .unwrap()
+        .unwrap();
+    assert!(matches!(&restored.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT 'recoverable'"));
+}
+
+#[test]
+fn saving_a_database_after_a_failed_draft_read_preserves_the_previous_workspace() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("workspace.json");
+    let drafts = dir.path().join("drafts");
+    let id = Uuid::new_v4();
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    store.save_database(
+        id,
+        "sales",
+        ConnectionWorkspaceState {
+            tabs: vec![editor("SELECT 'sales'")],
+            ..Default::default()
+        },
+    );
+    assert_eq!(store.flush().recv().unwrap(), Ok(()));
+    let metadata = std::fs::read(&path).unwrap();
+    let draft = std::fs::read_dir(drafts.join(id.to_string()))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    std::fs::write(&draft, [0xff]).unwrap();
+    let reopened = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    reopened.save_database(
+        id,
+        "hr",
+        ConnectionWorkspaceState {
+            tabs: vec![editor("SELECT 'hr'")],
+            ..Default::default()
+        },
+    );
+    assert_eq!(reopened.flush().recv().unwrap(), Ok(()));
+    assert_eq!(std::fs::read(&path).unwrap(), metadata);
+    assert_eq!(std::fs::read(&draft).unwrap(), [0xff]);
+    std::fs::write(&draft, "SELECT 'sales'").unwrap();
+    let restored = workspace_disk::load_connection(&path, &drafts, id).unwrap().unwrap();
+    let sales = restored.for_database("sales").unwrap();
+    assert!(matches!(&sales.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT 'sales'"));
+}
+
+#[test]
 fn forgotten_connection_drafts_are_not_recreated_by_a_late_save() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("workspace.json");

@@ -399,11 +399,18 @@ impl WorkspaceStore {
     }
 
     pub fn save_database(&self, id: Uuid, database: &str, conn_state: ConnectionWorkspaceState) {
-        let merged = ConnectionWorkspaceState::with_database(self.saved_record(id), database, conn_state);
+        let existing = match self.saved_record(id) {
+            Ok(existing) => existing,
+            Err(error) => {
+                tracing::warn!(%id, %error, "workspace could not be read; existing files will be preserved");
+                return;
+            }
+        };
+        let merged = ConnectionWorkspaceState::with_database(existing, database, conn_state);
         self.save_connection(id, merged);
     }
 
-    fn saved_record(&self, id: Uuid) -> Option<ConnectionWorkspaceState> {
+    fn saved_record(&self, id: Uuid) -> std::io::Result<Option<ConnectionWorkspaceState>> {
         if let Some(cached) = self
             .inner
             .memory
@@ -412,17 +419,21 @@ impl WorkspaceStore {
             .cache
             .get(&id)
         {
-            return cached.clone();
+            return Ok(cached.clone());
         }
         let _guard = self
             .inner
             .file_lock
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let path = self.inner.paths.state.as_deref()?;
-        let mut workspace = workspace_disk::load_connection(path, &self.inner.paths.drafts, id).ok()??;
+        let Some(path) = self.inner.paths.state.as_deref() else {
+            return Ok(None);
+        };
+        let Some(mut workspace) = workspace_disk::load_connection(path, &self.inner.paths.drafts, id)? else {
+            return Ok(None);
+        };
         clamp_connection(&mut workspace);
-        Some(workspace)
+        Ok(Some(workspace))
     }
 
     pub fn save_connection(&self, id: Uuid, mut conn_state: ConnectionWorkspaceState) {
@@ -461,7 +472,14 @@ impl WorkspaceStore {
         if !token.0.load(Ordering::Acquire) {
             return;
         }
-        let merged = ConnectionWorkspaceState::with_database(self.saved_record(id), database, conn_state);
+        let existing = match self.saved_record(id) {
+            Ok(existing) => existing,
+            Err(error) => {
+                tracing::warn!(%id, %error, "workspace could not be read; existing files will be preserved");
+                return;
+            }
+        };
+        let merged = ConnectionWorkspaceState::with_database(existing, database, conn_state);
         if save_connection_coordinated(&self.inner.memory, &self.inner.writer.queue, id, merged, Some(token)) {
             wake_writer(&self.inner.writer);
         }
@@ -493,17 +511,10 @@ impl WorkspaceStore {
             }
         }
         {
-            match load_locked(&self.inner.paths) {
-                Ok(mut state) => {
-                    if state.connections.remove(&id.to_string()).is_some()
-                        && let Err(error) = save_locked(&self.inner.paths, state)
-                    {
-                        tracing::warn!(%id, ?error, "could not remove deleted connection from workspace state");
-                    }
-                }
-                Err(error) => {
-                    tracing::warn!(%id, ?error, "could not load workspace state to remove a deleted connection");
-                }
+            if let Some(path) = self.inner.paths.state.as_deref()
+                && let Err(error) = workspace_disk::forget_connection(path, id)
+            {
+                tracing::warn!(%id, %error, "could not remove deleted connection from workspace state");
             }
         }
         let path = self.inner.paths.drafts.join(id.to_string());
