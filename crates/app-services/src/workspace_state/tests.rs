@@ -933,3 +933,39 @@ fn forgetting_one_connection_preserves_another_connections_drafts() {
     );
     assert!(!drafts.join(deleted.to_string()).exists());
 }
+
+#[test]
+fn a_late_prefetch_cannot_restore_a_deleted_connection_but_keeps_unrelated_workspaces() {
+    let directory = tempfile::tempdir().unwrap();
+    let deleted = Uuid::new_v4();
+    let retained = Uuid::new_v4();
+    let store = WorkspaceStore::new(
+        Some(directory.path().join("workspace.json")),
+        directory.path().join("drafts"),
+    );
+    store.save_connection(deleted, connection("SELECT deleted"));
+    store.save_connection(retained, connection("SELECT retained"));
+    assert_eq!(
+        store.flush().recv_timeout(std::time::Duration::from_secs(5)).unwrap(),
+        Ok(())
+    );
+    prefetch_connections_coordinated(
+        &store.inner.memory,
+        &[deleted, retained],
+        || {},
+        || {
+            let snapshot = prefetch_locked(&store.inner.paths, &[deleted, retained])?;
+            store.forget_connection(deleted);
+            Ok(snapshot)
+        },
+    )
+    .unwrap();
+    assert!(
+        store.load_connection(deleted).is_none(),
+        "a deleted workspace was recached"
+    );
+    let surviving = store.load_connection(retained).unwrap();
+    assert!(matches!(&surviving.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT retained"));
+    let disk = load_locked(&store.inner.paths).unwrap();
+    assert!(!disk.connections.contains_key(&deleted.to_string()));
+}
