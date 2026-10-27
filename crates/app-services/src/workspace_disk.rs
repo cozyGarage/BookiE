@@ -70,14 +70,6 @@ pub fn forget_connection(path: &Path, connection: Uuid) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn forget_connection(path: &Path, connection: Uuid) -> std::io::Result<()> {
-    let mut state = load_metadata(path)?;
-    if state.connections.remove(&connection.to_string()).is_some() {
-        atomic_write_json(path, &state)?;
-    }
-    Ok(())
-}
-
 pub fn save_connections(
     path: &Path,
     drafts: &Path,
