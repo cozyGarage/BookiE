@@ -1,0 +1,92 @@
+[
+  {
+    "cycle": 1,
+    "finalized": 1,
+    "rss": "VmRSS:\t  125412 kB"
+  },
+  {
+    "cycle": 2,
+    "finalized": 2,
+    "rss": "VmRSS:\t  126744 kB"
+  },
+  {
+    "cycle": 3,
+    "finalized": 3,
+    "rss": "VmRSS:\t  126916 kB"
+  },
+  {
+    "cycle": 4,
+    "finalized": 4,
+    "rss": "VmRSS:\t  127004 kB"
+  },
+  {
+    "cycle": 5,
+    "finalized": 5,
+    "rss": "VmRSS:\t  127164 kB"
+  },
+  {
+    "cycle": 6,
+    "finalized": 6,
+    "rss": "VmRSS:\t  127220 kB"
+  },
+  {
+    "cycle": 7,
+    "finalized": 7,
+    "rss": "VmRSS:\t  127352 kB"
+  },
+  {
+    "cycle": 8,
+    "finalized": 8,
+    "rss": "VmRSS:\t  127480 kB"
+  },
+  {
+    "cycle": 9,
+    "finalized": 9,
+    "rss": "VmRSS:\t  127624 kB"
+  },
+  {
+    "cycle": 10,
+    "finalized": 10,
+    "rss": "VmRSS:\t  127704 kB"
+  },
+  {
+    "cycle": 11,
+    "finalized": 11,
+    "rss": "VmRSS:\t  127812 kB"
+  },
+  {
+    "cycle": 12,
+    "finalized": 12,
+    "rss": "VmRSS:\t  127864 kB"
+  },
+  {
+    "cycle": 13,
+    "finalized": 13,
+    "rss": "VmRSS:\t  128004 kB"
+  },
+  {
+    "cycle": 14,
+    "finalized": 14,
+    "rss": "VmRSS:\t  128056 kB"
+  },
+  {
+    "cycle": 15,
+    "finalized": 15,
+    "rss": "VmRSS:\t  128188 kB"
+  },
+  {
+    "cycle": 16,
+    "finalized": 16,
+    "rss": "VmRSS:\t  128280 kB"
+  },
+  {
+    "cycle": 17,
+    "finalized": 17,
+    "rss": "VmRSS:\t  128420 kB"
+  },
+  {
+    "cycle": 18,
+    "finalized": 18,
+    "rss": "VmRSS:\t  128488 kB"
+  }
+]

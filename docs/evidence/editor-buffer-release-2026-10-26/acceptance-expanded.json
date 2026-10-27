@@ -1,0 +1,34 @@
+{
+  "harness_commit": "c4d5018bca80eeacb1671f599d1d713e078090cd",
+  "binary_sha256": "32bfe8813d3390c243e2d019c5e5096662036c950fc06236fb25032b0a721a38",
+  "allocator": "ordinary inherited settings; no experiment override",
+  "display": "Xvfb 1280x1024, X11/Cairo, private D-Bus",
+  "process_exit": 0,
+  "results": [
+    {
+      "scenario": "dismissed_approval_denies",
+      "status": "passed",
+      "seconds": 6.028
+    },
+    {
+      "scenario": "mcp_client_disconnect_cancels_pending_approval",
+      "status": "passed",
+      "seconds": 4.55
+    },
+    {
+      "scenario": "welcome_connection_removal_confirms_once_and_preserves_the_database",
+      "status": "passed",
+      "seconds": 3.342
+    },
+    {
+      "scenario": "closing_and_reopening_a_browse_tab_keeps_it_editable",
+      "status": "passed",
+      "seconds": 2.504
+    },
+    {
+      "scenario": "restart_with_an_untouched_editor_restores_without_layout_criticals",
+      "status": "passed",
+      "seconds": 1.871
+    }
+  ]
+}
