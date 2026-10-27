@@ -1,0 +1,1 @@
+{"scenario":"session_dialog_commit_refreshes_committed_catalog","status":"failed","database_oracle":"table exists after dialog commit","error":"expected accessible node 'catalog_dialog_commit_probe' to appear"}

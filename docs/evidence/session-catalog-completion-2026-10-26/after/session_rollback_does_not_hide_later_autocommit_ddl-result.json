@@ -1,0 +1,1 @@
+{"scenario": "session_rollback_does_not_hide_later_autocommit_ddl", "status": "passed", "error": null}
