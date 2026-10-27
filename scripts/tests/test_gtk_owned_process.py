@@ -97,6 +97,47 @@ class OwnedApplicationTests(unittest.TestCase):
     def test_profile_metadata_identifies_the_owned_process_lifetime(self):
         self.assertEqual(self.owner.identity(), {"application_pid": 202, "application_start_ticks": 17})
 
+    def listener_fixture(self, owner, state="0A"):
+        net = self.root / "202/net"
+        net.mkdir(exist_ok=True)
+        (net / "tcp").write_text(
+            "header\n" + f"0: 0100007F:4418 00000000:0000 {state} 0:0 0:0 0 1000 0 12345\n"
+        )
+        descriptors = self.root / str(owner) / "fd"
+        descriptors.mkdir(exist_ok=True)
+        (descriptors / "9").symlink_to("socket:[12345]")
+        (self.root / "202/fd").mkdir(exist_ok=True)
+
+    def test_an_owned_loopback_listener_is_accepted(self):
+        self.listener_fixture(202)
+        self.owner.assert_owns_tcp_listener(17432)
+
+    def test_a_foreign_listener_on_the_same_port_is_refused(self):
+        self.listener_fixture(101)
+        with self.assertRaises(AssertionError):
+            self.owner.assert_owns_tcp_listener(17432)
+
+    def test_an_established_connection_is_not_a_listener(self):
+        self.listener_fixture(202, "01")
+        with self.assertRaises(AssertionError):
+            self.owner.assert_owns_tcp_listener(17432)
+
+    def test_a_real_owned_child_listener_is_accepted(self):
+        child = subprocess.Popen(
+            [sys.executable, "-c", "import socket,time; s=socket.socket(); s.bind(('127.0.0.1',0)); "
+             "s.listen(); print(s.getsockname()[1],flush=True); time.sleep(30)"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+        try:
+            self.assertTrue(select.select([child.stdout], [], [], 5)[0])
+            port = int(child.stdout.readline())
+            owner = gtk_process.OwnedApplication(child, sys.executable, {})
+            owner.assert_owns_tcp_listener(port)
+        finally:
+            child.terminate()
+            child.wait(timeout=5)
+            child.stdout.close()
+
     def test_an_exited_process_is_refused(self):
         self.code = 0
         with self.assertRaises(AssertionError):

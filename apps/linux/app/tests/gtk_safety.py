@@ -1134,6 +1134,7 @@ def mcp_client_disconnect_cancels_pending_approval(database, base):
             time.sleep(POLL_SECONDS)
     assert client is not None, "the installed app's MCP HTTP listener did not start"
     try:
+        owned_application().assert_owns_tcp_listener(MCP_HTTP_PORT)
         request = (
             b"POST /mcp HTTP/1.1\r\n"
             + f"Host: 127.0.0.1:{MCP_HTTP_PORT}\r\n".encode("ascii")
