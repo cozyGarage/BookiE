@@ -67,13 +67,15 @@ where
     let on_choice: Rc<dyn Fn(QuickTarget)> = Rc::new(on_choice);
 
     let activate = {
-        let window = window.clone();
+        let window = window.downgrade();
         let visible = visible.clone();
         let on_choice = on_choice.clone();
         Rc::new(move |index: usize| {
             let target = visible.borrow().get(index).map(|item| item.target.clone());
             if let Some(target) = target {
-                window.close();
+                if let Some(window) = window.upgrade() {
+                    window.close();
+                }
                 on_choice(target);
             }
         })
@@ -157,17 +159,20 @@ where
     });
     search.add_controller(keys);
 
-    let window_for_escape = window.clone();
+    let window_for_escape = window.downgrade();
     let escape = gtk::EventControllerKey::new();
     escape.connect_key_pressed(move |_, keyval, _, _| {
         if keyval == gtk::gdk::Key::Escape {
-            window_for_escape.close();
+            if let Some(window) = window_for_escape.upgrade() {
+                window.close();
+            }
             return glib::Propagation::Stop;
         }
         glib::Propagation::Proceed
     });
     window.add_controller(escape);
 
+    crate::ui::leak_probe::track("quick_switcher", &window);
     window.present();
     search.grab_focus();
 }

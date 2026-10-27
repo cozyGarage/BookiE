@@ -1,0 +1,29 @@
+{
+  "fixed_commit": "be6a27c38",
+  "focused_regression": {
+    "test": "ui::structure_tab::lifetime_tests::closing_a_structure_tab_releases_its_generated_views",
+    "before": "1 failed, 0 passed",
+    "after": "1 passed, 0 failed"
+  },
+  "environment": {
+    "display": "isolated Xvfb",
+    "input_method": "simple",
+    "G_DEBUG": "fatal-criticals"
+  },
+  "source_sha256": {
+    "apps/linux/app/src/ui/structure_tab/mod.rs": "4088025c47f1746b6ecd54b85d3258d422647f1da7a6dba47c737ab227b2b93e",
+    "apps/linux/app/src/ui/structure_tab/lifetime_tests.rs": "da81aec58fc10a1ab26e1afa6bef2313f9d7bf37741a79360469a7b3a4fd6ba5",
+    "scripts/isolated-tests.json": "7ca914e205ca6006c508c5420b418297cbee440acec284fe17f6f54f5d0e747e"
+  },
+  "remaining": [
+    "final full preflight",
+    "Forgejo acceptance"
+  ],
+  "gtk_widgets": {
+    "executed": 176,
+    "result": "passed",
+    "input_method": "ordinary suite environment"
+  },
+  "app_clippy": "passed with warnings denied",
+  "ordinary_focused_regression": "1 passed, 0 failed without GTK_IM_MODULE override"
+}
