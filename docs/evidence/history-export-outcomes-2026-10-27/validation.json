@@ -1,6 +1,6 @@
 {
+  "schema_version": 1,
   "issue": 1736,
-  "base": "887678414",
   "source_sha256": {
     "apps/linux/app/src/ui/history_dialog.rs": "2783f9035881b5a0ba074e83db7a363a9c13ced0c569c5782ecd71357a47f4f9",
     "apps/linux/app/src/ui/history_dialog/export.rs": "8048b6c5f03969b26db00325e0becd304386050ec5bf2714c69f97e795e28f75",
@@ -35,5 +35,15 @@
     "gtk_widgets": "fresh pass: 182 isolated tests, including history lifetime and export failures",
     "installed_binary_sha256": "528fc9c719513cd5aebd2fb8ddebed95606d044bd5058fcbd69b2dcf61063b87",
     "discarded_validation": "initial preflight reused draft-branch app-services test binary; removed generated app-services artifacts in debug and ci profiles and rebuilt"
+  },
+  "source_commit": "579bab05504d1f63f0c8e1e30436a54506ec448f",
+  "base_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
+  "source_commits": {
+    "apps/linux/app/src/ui/history_dialog.rs": "579bab05504d1f63f0c8e1e30436a54506ec448f",
+    "apps/linux/app/src/ui/history_dialog/export.rs": "579bab05504d1f63f0c8e1e30436a54506ec448f",
+    "apps/linux/app/src/ui/history_dialog/export_tests.rs": "579bab05504d1f63f0c8e1e30436a54506ec448f",
+    "apps/linux/app/tests/gtk_ux.py": "579bab05504d1f63f0c8e1e30436a54506ec448f",
+    "scripts/isolated-tests.json": "579bab05504d1f63f0c8e1e30436a54506ec448f",
+    "apps/linux/app/src/ui/history_dialog/lifetime_tests.rs": "579bab05504d1f63f0c8e1e30436a54506ec448f"
   }
 }
