@@ -3,21 +3,27 @@
   "fixed_commit": "dc43afe42",
   "source_sha256": {
     "crates/app-services/src/workspace_state.rs": "828017087c355ae471dcd0ca3fd4a4fc67a795223c03e324438a439cf3babad7",
-    "crates/app-services/src/workspace_state/tests.rs": "9add581744c691586bcd342e3ffa833ad15416cb9223d7736bd5172825c51b9a"
+    "crates/app-services/src/workspace_state/tests.rs": "74ed197db35eb4619231c2f51ea09768e395dc9e7c405d23279362d05133377f"
   },
   "public_late_save_regression": {
     "before": "failed: deleted workspace was recreated",
     "after": "passed"
   },
   "workspace_state_tests": {
-    "passed": 38,
+    "passed": 39,
     "failed": 0
   },
   "writer_batch_test": "passed: batch taken before deletion marker, then resumed under file lock",
   "pending": [
-    "full preflight",
-    "unrelated-connection preservation regression",
-    "writer-filter negative control"
+    "final preflight after test addition"
   ],
-  "forgejo": "deferred by maintainer during infrastructure migration"
+  "forgejo": "deferred by maintainer during infrastructure migration",
+  "preflight": {
+    "unit": 2199,
+    "sandbox": 291,
+    "redis_cancellation": 1,
+    "result": "passed before adding the unrelated-connection preservation test"
+  },
+  "writer_filter_negative_control": "failed when only the writer filter was removed; fixed code restored",
+  "unrelated_connection": "passed: cloned store ignores deleted UUID and persists updated draft for another UUID"
 }

@@ -817,3 +817,37 @@ fn a_writer_batch_waiting_for_the_file_lock_skips_a_forgotten_connection() {
     assert!(reopened.load_connection(id).is_none());
     assert!(!drafts.join(id.to_string()).exists());
 }
+
+#[test]
+fn forgetting_one_connection_preserves_another_connections_drafts() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("workspace.json");
+    let drafts = directory.path().join("drafts");
+    let deleted = Uuid::new_v4();
+    let retained = Uuid::new_v4();
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    store.save_connection(deleted, connection("SELECT deleted"));
+    store.save_connection(retained, connection("SELECT retained"));
+    store
+        .flush()
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    store.forget_connection(deleted);
+    let clone = store.clone();
+    clone.save_connection(deleted, connection("SELECT late_deleted"));
+    clone.save_connection(retained, connection("SELECT updated_retained"));
+    clone
+        .flush()
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    let reopened = WorkspaceStore::new(Some(path), drafts.clone());
+    reopened.prefetch_connections(&[deleted, retained]).unwrap();
+    assert!(reopened.load_connection(deleted).is_none());
+    let restored = reopened.load_connection(retained).unwrap();
+    assert!(
+        matches!(&restored.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT updated_retained")
+    );
+    assert!(!drafts.join(deleted.to_string()).exists());
+}
