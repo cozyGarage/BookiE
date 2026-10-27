@@ -40,6 +40,27 @@ class CiCacheTests(unittest.TestCase):
     def cleanup(self, reserve=0):
         return subprocess.run(self.command + ['cleanup', '--min-free-gib', str(reserve)], capture_output=True, text=True)
 
+    def test_default_reserve_is_30_gib_for_checkout_and_cleanup(self):
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        checkout = self.directory / 'checkout.sh'
+        checkout.write_text(':\n')
+        gib = 1024**3
+
+        for command in ('cleanup', 'checkout'):
+            args = [str(SCRIPT), '--root', str(self.cache), '--lock', str(self.lock), command]
+            if command == 'checkout':
+                args.append(str(checkout))
+            with patch.object(sys, 'argv', args), patch.object(
+                helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=30 * gib)
+            ):
+                self.assertEqual(helper.main(), 0)
+            with patch.object(sys, 'argv', args), patch.object(
+                helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=29 * gib)
+            ):
+                self.assertEqual(helper.main(), 1)
+
     def test_old_generated_artifacts_removed_but_siblings_preserved(self):
         target = self.target('sandbox', 6)
         for profile in ('release', 'ci'):
