@@ -1,0 +1,1 @@
+{"scenario":"session_dialog_commit_refreshes_committed_catalog","status":"passed","database_oracle":"table exists after dialog commit","duration_seconds":4.262}
