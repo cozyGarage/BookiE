@@ -77,15 +77,13 @@ pub(crate) fn present(
     let dialog = build_dialog(&page, &start_button);
     let dialog_for_start = dialog.downgrade();
     start_button.connect_clicked(move |_| {
-        let Some(dialog_for_start) = dialog_for_start.upgrade() else {
+        let Some(dialog) = dialog_for_start.upgrade() else {
             return;
         };
         let Some(choice) = state.choice() else {
             return;
         };
-        if let Some(dialog) = dialog_for_start.upgrade() {
-            dialog.close();
-        }
+        dialog.close();
         on_start(choice);
     });
     crate::ui::leak_probe::present_tracked("import_csv", &dialog, parent);
