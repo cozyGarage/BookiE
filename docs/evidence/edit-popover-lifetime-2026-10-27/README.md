@@ -5,3 +5,5 @@ Issue #1733, lane UX. A realized cell opens and closes enum, set, calendar, exac
 The test uses isolated Xvfb, fatal GTK criticals and a simple input method. It does not access a database. App Clippy passed with warnings denied. Full ordinary widget validation, preflight and installed edit acceptance are pending. Forgejo acceptance is deferred during infrastructure migration.
 
 Release-Note: Fixed: Closing cell edit popovers releases their widgets and callbacks.
+
+Three rebuilt installed SQLite scenarios passed: saving a grid edit persists to the database, reopening a browse tab preserves editability, and cancelling tab close preserves an active edit. These cover general edit workflows, not engine-specific enum/set popover behavior. [Validation record](validation.json) pins the binary hash.

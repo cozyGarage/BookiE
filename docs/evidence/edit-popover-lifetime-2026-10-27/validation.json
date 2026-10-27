@@ -18,12 +18,21 @@
   },
   "pending": [
     "ordinary widget tier",
-    "preflight",
-    "installed SQLite edit scenarios"
+    "preflight"
   ],
   "unverified": [
     "real-engine enum/set editing"
   ],
   "forgejo": "deferred during infrastructure migration",
-  "app_clippy": "passed with warnings denied"
+  "app_clippy": "passed with warnings denied",
+  "installed_sqlite": {
+    "scenarios": [
+      "browse_edit_cell_and_save_persists_to_the_database",
+      "closing_and_reopening_a_browse_tab_keeps_it_editable",
+      "active_cell_edit_survives_cancelled_tab_close"
+    ],
+    "result": "3 passed",
+    "coverage": "general edit/save and cancellation; not engine-specific enum/set popovers",
+    "binary_sha256": "894d212d95508b31e5a1d865b0c26c1289bd6fe96bee0c4fe8fb914d261319a6"
+  }
 }
