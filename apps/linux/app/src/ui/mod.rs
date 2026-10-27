@@ -18,6 +18,7 @@ mod grid;
 mod history_dialog;
 pub(crate) mod icons;
 mod import_dialog;
+mod leak_probe;
 mod mcp_preferences;
 mod parameters_dialog;
 mod preferences;

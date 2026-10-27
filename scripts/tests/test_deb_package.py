@@ -5,6 +5,7 @@ import stat
 import subprocess
 import tempfile
 import tomllib
+from unittest.mock import patch
 
 
 def _write_executable(path: Path, body: str) -> None:
@@ -74,14 +75,15 @@ def _stage_package(
         + "Description: Native Linux database client\n"
         " BookiE test fixture\n"
     )
-    (stage / "DEBIAN").chmod(0o755)
     package = root / f"{package_name}_{version}_amd64.deb"
-    subprocess.run(
+    result = subprocess.run(
         ["dpkg-deb", "--root-owner-group", "--build", str(stage), str(package)],
-        check=True,
         capture_output=True,
         text=True,
     )
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip() or "no diagnostic output"
+        raise RuntimeError(f"dpkg-deb --build failed with exit code {result.returncode}: {detail}")
     return package
 
 
@@ -108,11 +110,27 @@ def check_package_test_reports_the_failing_command(source: Path) -> None:
     assert "false" in result.stderr, result.stderr
 
 
+def check_deb_build_failure_reports_stderr(source: Path) -> None:
+    with tempfile.TemporaryDirectory(prefix="bookie-deb-error-test-") as temporary:
+        def run_failed_build(*args, **kwargs):
+            if kwargs.get("check"):
+                raise subprocess.CalledProcessError(2, args[0], output="", stderr="dpkg-deb: fixture failure")
+            return subprocess.CompletedProcess(args[0], 2, "", "dpkg-deb: fixture failure")
+
+        with patch("subprocess.run", side_effect=run_failed_build):
+            try:
+                _stage_package(source, Path(temporary), include_aliases=True)
+            except RuntimeError as error:
+                assert "dpkg-deb: fixture failure" in str(error), str(error)
+            else:
+                raise AssertionError("Debian package build failure was not reported")
+
+
 def main() -> None:
-    os.umask(0o077)
     source = Path(__file__).resolve().parents[2]
     check_builder_builds_and_installs_the_askpass_helper(source)
     check_package_test_reports_the_failing_command(source)
+    check_deb_build_failure_reports_stderr(source)
     if shutil.which("dpkg-deb") is None:
         print("Debian package validation skipped: dpkg-deb is unavailable")
         return
