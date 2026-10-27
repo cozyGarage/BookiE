@@ -9,6 +9,8 @@ Where each check runs is owned by [CI tiers in the validation playbook](validati
 The `Linux PR readiness` workflow is an always-running GitHub check for pull requests to `linux`. It reads the exact pull request head's GitHub check runs and waits for the checks applicable to the changed paths; missing or non-success results fail closed. The `pull_request` job has read-only permissions and checks out that exact head to run the readiness script. No repository secrets are passed to the script. This check reports GitHub readiness only. It does not run or replace the Forgejo gate, and it is not a branch-protection requirement until the repository ruleset explicitly requires its context. The workflow and path mapping are tested by `scripts/tests/test_pr_readiness.py`.
 Headless driver, TLS, PostgreSQL release and dump, and socket/SSH jobs start after guards, Clippy, unit and sandbox pass. They do not wait for widget tests. Widgets remain a required job, and GUI jobs retain their widget dependencies. Every tier must still pass for merge acceptance.
 
+Forgejo CI and nightly runs use a run-scoped concurrency key with cancellation disabled. Separate runs can overlap, and each job is eligible to take any matching free runner; queue order is best effort.
+
 Every job in the Forgejo merge workflow has an explicit timeout. Checkout credentials are supplied to Git as a host-scoped HTTP authorization header for the clone step; they are not embedded in the clone URL or saved in the checkout's `origin` URL. This reduces accidental exposure through process arguments and `.git/config`, but it does not isolate workflow code. `any-host` runners execute branch code on shared hosts with Docker access, so only trusted branch writers may trigger these workflows until a dedicated isolated runner is deployed and accepted. See the [runner maintenance and isolation proposal](proposals/runner-maintenance-and-isolation.md) for the pending deployment work.
 
 ### Shared native GTK artifact
@@ -17,7 +19,7 @@ On Forgejo merge-workflow runs, `gtk-build` compiles one `tablepro-app` binary f
 
 Artifact reuse reduces repeated builds but does not by itself establish the time saved. Compare queue, build and total workflow durations across equivalent Forgejo runs before claiming a gate-time improvement; keep every test job and fixture isolated.
 
-The `ubuntu2604-canary` runner executes the headless multi-database TLS fixture job, which builds and starts many containers. Its GTK, libadwaita and GtkSourceView versions are below the supported floor, so GTK jobs stay on eligible hosts.
+The headless multi-database TLS fixture runs on `any-host`; it builds and starts many containers and no longer waits on the `ubuntu2604-canary` runner. GTK jobs also use `any-host` and consume the shared GTK artifact.
 
 ### Gating several pull requests at once
 
