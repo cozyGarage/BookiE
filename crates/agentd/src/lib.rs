@@ -240,6 +240,10 @@ impl Connection for SessionConnection {
         self.inner.list_databases().await
     }
 
+    async fn list_databases_controlled(&self, control: &OperationControl) -> Result<Vec<String>, DriverError> {
+        self.inner.list_databases_controlled(control).await
+    }
+
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
         self.inner.open_session().await
     }
