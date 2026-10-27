@@ -41,7 +41,7 @@ struct Picker {
     cell: CellEditor,
     col_index: usize,
     sender: relm4::Sender<GridMsg>,
-    popover: gtk::Popover,
+    popover: gtk::glib::WeakRef<gtk::Popover>,
 }
 
 impl Picker {
@@ -56,7 +56,9 @@ impl Picker {
                 row_key,
             })
             .ok();
-        self.popover.popdown();
+        if let Some(popover) = self.popover.upgrade() {
+            popover.popdown();
+        }
     }
 }
 
@@ -154,7 +156,7 @@ pub(super) fn show_choice_popover(
         cell: cell.clone(),
         col_index,
         sender: sender.clone(),
-        popover: popover.clone(),
+        popover: popover.downgrade(),
     };
     let current = cell.text().to_string();
     let content = if is_set {

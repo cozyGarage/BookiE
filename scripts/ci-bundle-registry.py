@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -15,6 +16,7 @@ import zipfile
 
 MAX_ARCHIVE = 8 * 1024 ** 3
 MAX_EXTRACTED = 24 * 1024 ** 3
+UPLOAD_CHUNK_SIZE = 64 * 1024 ** 2
 SPEC = importlib.util.spec_from_file_location('bundle', Path(__file__).with_name('ci-test-bundle.py'))
 bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bundle)
@@ -24,7 +26,13 @@ def request(url, method='GET', data=None, size=None):
     headers = {'Authorization': 'token ' + os.environ['BOOKIE_REGISTRY_TOKEN']}
     if size is not None:
         headers.update({'Content-Type': 'application/octet-stream', 'Content-Length': str(size)})
-    return urllib.request.urlopen(urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
+    try:
+        return urllib.request.urlopen(urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
+    except urllib.error.HTTPError as error:
+        path = urllib.parse.urlsplit(url).path
+        error.msg = f'registry {method} {path} returned HTTP {error.code}'
+        error.close()
+        raise
 
 
 def extract(archive, destination):
@@ -48,12 +56,30 @@ def existing_manifest(url, revision, group):
         if error.code == 404:
             return None
         raise
-    if (manifest.get('schema_version') != 1 or manifest.get('source_commit') != revision
-            or manifest.get('build_group') != group or not 0 < manifest['size'] <= MAX_ARCHIVE
-            or not re.fullmatch('[0-9a-f]{64}', manifest['sha256'])
-            or not re.fullmatch('[0-9a-f]{64}', manifest['index_sha256'])):
-        raise ValueError('existing registry bundle manifest is invalid')
+    verify_manifest(manifest, revision, group)
     return manifest
+
+
+def verify_manifest(manifest, revision, group):
+    if (not isinstance(manifest, dict) or type(manifest.get('schema_version')) is not int
+            or manifest.get('schema_version') not in (1, 2) or manifest.get('source_commit') != revision
+            or manifest.get('build_group') != group or type(manifest.get('size')) is not int
+            or not 0 < manifest['size'] <= MAX_ARCHIVE
+            or not re.fullmatch('[0-9a-f]{64}', manifest.get('sha256', ''))
+            or not re.fullmatch('[0-9a-f]{64}', manifest.get('index_sha256', ''))):
+        raise ValueError('registry bundle identity or size is invalid')
+    if manifest['schema_version'] == 1:
+        return
+    chunks = manifest.get('chunks')
+    if not isinstance(chunks, list) or not chunks or len(chunks) > MAX_ARCHIVE // UPLOAD_CHUNK_SIZE + 1:
+        raise ValueError('registry bundle chunks are invalid')
+    if any(not isinstance(chunk, dict) or chunk.get('name') != f'bundle.tar.gz.part-{number:04d}'
+           or type(chunk.get('size')) is not int or not 0 < chunk['size'] <= UPLOAD_CHUNK_SIZE
+           or not re.fullmatch('[0-9a-f]{64}', chunk.get('sha256', ''))
+           for number, chunk in enumerate(chunks)):
+        raise ValueError('registry bundle chunks are invalid')
+    if sum(chunk['size'] for chunk in chunks) != manifest['size']:
+        raise ValueError('registry bundle chunk sizes do not match the archive')
 
 
 def publish(directory, revision, group, url):
@@ -74,11 +100,25 @@ def publish(directory, revision, group, url):
         size = archive.stat().st_size
         if size > MAX_ARCHIVE:
             raise ValueError('test bundle exceeds upload size limit')
-        manifest = {'schema_version': 1, 'source_commit': revision, 'build_group': group,
-                    'sha256': bundle.digest(archive), 'size': size, 'index_sha256': bundle.digest(directory / 'index.json')}
-        with archive.open('rb') as content, request(url + 'bundle.tar.gz', 'PUT', content, size) as response:
-            if response.status != 201:
-                raise ValueError('registry did not accept the bundle')
+        try:
+            with request(url.rstrip('/'), 'DELETE'):
+                pass
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+        manifest = {'schema_version': 2, 'source_commit': revision, 'build_group': group,
+                    'sha256': bundle.digest(archive), 'size': size,
+                    'index_sha256': bundle.digest(directory / 'index.json'), 'chunks': []}
+        with archive.open('rb') as content:
+            number = 0
+            while chunk := content.read(UPLOAD_CHUNK_SIZE):
+                name = f'bundle.tar.gz.part-{number:04d}'
+                chunk_sha256 = hashlib.sha256(chunk).hexdigest()
+                with request(url + name, 'PUT', chunk, len(chunk)) as response:
+                    if response.status != 201:
+                        raise ValueError('registry did not accept a bundle chunk')
+                manifest['chunks'].append({'name': name, 'size': len(chunk), 'sha256': chunk_sha256})
+                number += 1
         data = json.dumps(manifest, sort_keys=True).encode()
         with request(url + 'manifest.json', 'PUT', data, len(data)) as response:
             if response.status != 201:
@@ -91,31 +131,33 @@ def fetch(directory, revision, group, url):
         index = bundle.verify(directory, revision)
         if index['build_group'] != group:
             raise ValueError('cached test bundle build group mismatch')
+        os.utime(directory, None)
         return
     with request(url + 'manifest.json') as response:
         manifest = json.loads(response.read(65537))
-    if (manifest.get('schema_version') != 1 or manifest.get('source_commit') != revision
-            or manifest.get('build_group') != group or not 0 < manifest['size'] <= MAX_ARCHIVE
-            or not re.fullmatch('[0-9a-f]{64}', manifest['sha256'])):
-        raise ValueError('registry bundle identity or size is invalid')
+    verify_manifest(manifest, revision, group)
     print(f"downloading {manifest['size'] / 1024**3:.2f} GiB {group} test bundle", flush=True)
     directory.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=directory.parent) as temporary:
         temporary = Path(temporary)
         archive = temporary / 'bundle.tar.gz'
-        with request(url + 'bundle.tar.gz') as response, archive.open('wb') as output:
-            remaining = manifest['size']
-            while remaining:
-                block = response.read(min(1024 * 1024, remaining))
-                if not block:
-                    raise ValueError('registry returned a truncated bundle')
-                output.write(block)
-                remaining -= len(block)
-                downloaded = manifest['size'] - remaining
-                if downloaded and downloaded % (256 * 1024**2) < len(block):
-                    print(f"downloaded {downloaded / 1024**3:.2f} GiB", flush=True)
-            if response.read(1):
-                raise ValueError('registry bundle exceeds its declared size')
+        parts = manifest.get('chunks', [{'name': 'bundle.tar.gz', 'size': manifest['size'], 'sha256': manifest['sha256']}])
+        with archive.open('wb') as output:
+            for part in parts:
+                digest = hashlib.sha256()
+                with request(url + part['name']) as response:
+                    remaining = part['size']
+                    while remaining:
+                        block = response.read(min(1024 * 1024, remaining))
+                        if not block:
+                            raise ValueError('registry returned a truncated bundle chunk')
+                        output.write(block)
+                        digest.update(block)
+                        remaining -= len(block)
+                    if response.read(1):
+                        raise ValueError('registry bundle chunk exceeds its declared size')
+                if digest.hexdigest() != part['sha256']:
+                    raise ValueError('registry bundle chunk digest mismatch')
         print('verifying bundle checksum', flush=True)
         if bundle.digest(archive) != manifest['sha256']:
             raise ValueError('registry bundle digest mismatch')
@@ -129,6 +171,7 @@ def fetch(directory, revision, group, url):
         if index['build_group'] != group:
             raise ValueError('registry bundle build group mismatch')
         shutil.move(staging, directory)
+        os.utime(directory, None)
     print('test bundle ready', flush=True)
 
 

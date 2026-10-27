@@ -3,6 +3,7 @@ import argparse
 import fcntl
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import stat
@@ -12,6 +13,8 @@ import time
 
 
 DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+BUNDLE_DIRECTORY = re.compile(r'[0-9a-f]{40}-(?:default|duckdb)\Z')
+DEFAULT_MIN_FREE_GIB = 30
 
 
 def open_directory(name, parent=None):
@@ -117,12 +120,40 @@ def cleanup(root, reserve):
         prune(root, now - 86400, reserve)
     if shutil.disk_usage(root).free < reserve:
         prune(root, float('inf'), reserve, least_recent_first=True)
+    if shutil.disk_usage(root).free < reserve:
+        prune_bundles(root, reserve, os.environ.get('GITHUB_SHA', ''))
     after = shutil.disk_usage(root).free
     print(f'free after cleanup: {after} bytes; required reserve: {reserve} bytes', flush=True)
     if after < reserve:
         print('cache cleanup could not recover the required reserve', file=sys.stderr)
         return 1
     return 0
+
+
+def prune_bundles(root, reserve, revision):
+    bundle_root = root.parent / 'bundles'
+    try:
+        directory = open_directory(bundle_root)
+    except FileNotFoundError:
+        return
+    try:
+        candidates = []
+        current_prefix = revision + '-' if re.fullmatch(r'[0-9a-f]{40}', revision) else None
+        for name in os.listdir(directory):
+            if not BUNDLE_DIRECTORY.fullmatch(name):
+                continue
+            if current_prefix is not None and name.startswith(current_prefix):
+                continue
+            entry = metadata(name, directory)
+            if entry is not None and stat.S_ISDIR(entry.st_mode):
+                candidates.append((entry.st_mtime, name))
+        for _, name in sorted(candidates):
+            if shutil.disk_usage(root).free >= reserve:
+                return
+            shutil.rmtree(name, dir_fd=directory)
+            print(f'removed cached test bundle {name}', flush=True)
+    finally:
+        os.close(directory)
 
 
 def run_script(script):
@@ -155,9 +186,9 @@ def main():
     run.add_argument('script')
     checkout = commands.add_parser('checkout')
     checkout.add_argument('script')
-    checkout.add_argument('--min-free-gib', type=int, default=45)
+    checkout.add_argument('--min-free-gib', type=int, default=DEFAULT_MIN_FREE_GIB)
     maintenance = commands.add_parser('cleanup')
-    maintenance.add_argument('--min-free-gib', type=int, default=45)
+    maintenance.add_argument('--min-free-gib', type=int, default=DEFAULT_MIN_FREE_GIB)
     args = parser.parse_args()
     root = Path(os.path.abspath(args.root))
     lock = os.open(args.lock, os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK)
