@@ -227,6 +227,18 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("trap cleanup_testcontainers EXIT", driver)
         self.assertIn("--test-threads=1", driver)
 
+    def test_socket_ssh_job_cleans_run_scoped_containers_on_cancel(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        job = workflow.split("  socket-ssh:\n", 1)[1].split("  gtk-server:\n", 1)[0]
+        script = (ROOT / "scripts/test-postgres-socket.sh").read_text()
+        self.assertIn("TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh", job)
+        self.assertIn("cleanup-testcontainers.py", job)
+        self.assertIn("trap 'cleanup_testcontainers; exit 143' TERM", job)
+        self.assertIn("trap 'cleanup_testcontainers; exit 130' INT", job)
+        self.assertIn('--label "com.tablepro.test-run=$test_run_id"', script)
+        self.assertIn("trap 'exit 143' TERM", script)
+        self.assertIn("trap 'exit 130' INT", script)
+
     def test_bounded_operation_guard_catches_multiline_calls(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "fixture.rs"
