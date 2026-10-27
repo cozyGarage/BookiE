@@ -265,7 +265,7 @@ pub enum SqlEditorOutput {
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
 }
 
-pub(super) const MAX_SQL_FILE_BYTES: u64 = 8 * 1024 * 1024;
+pub(super) const MAX_SQL_FILE_BYTES: u64 = tablepro_app_services::sql_text::EDITOR_MAX_SQL_BYTES;
 
 #[derive(Debug)]
 struct ExecutionContext {
