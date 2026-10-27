@@ -124,3 +124,37 @@ fn a_symlinked_connection_directory_is_not_cleaned() {
     assert!(save_connections(&path, &drafts, vec![(id, workspace(&[]))]).is_err());
     assert_eq!(std::fs::read_to_string(draft).unwrap(), "outside draft");
 }
+
+#[test]
+fn changed_bodies_survive_a_failed_metadata_publish_and_retry_without_orphan_growth() {
+    for incremental in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let original = directory.path().join("original.json");
+        let path = directory.path().join("workspace.json");
+        let drafts = directory.path().join("drafts");
+        let id = Uuid::new_v4();
+        let draft = Uuid::new_v4();
+        save_update(&original, &drafts, id, workspace(&[draft]), incremental).unwrap();
+        let previous = std::fs::read(&original).unwrap();
+        let old_body = drafts.join(id.to_string()).join(format!("{draft}.sql"));
+        let old_text = std::fs::read(&old_body).unwrap();
+        std::os::unix::fs::symlink(&original, &path).unwrap();
+        let mut changed = workspace(&[draft]);
+        let WorkspaceTabRecord::Editor { query, .. } = &mut changed.tabs[0] else {
+            unreachable!()
+        };
+        *query = "SELECT 'changed body'".into();
+        assert!(save_update(&path, &drafts, id, changed.clone(), incremental).is_err());
+        assert_eq!(std::fs::read(&original).unwrap(), previous);
+        assert_eq!(std::fs::read(&old_body).unwrap(), old_text);
+        assert_eq!(std::fs::read_dir(drafts.join(id.to_string())).unwrap().count(), 2);
+        std::fs::remove_file(&path).unwrap();
+        std::fs::rename(&original, &path).unwrap();
+        save_update(&path, &drafts, id, changed, incremental).unwrap();
+        let loaded = load_connection(&path, &drafts, id).unwrap().unwrap();
+        assert!(
+            matches!(&loaded.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT 'changed body'")
+        );
+        assert_eq!(std::fs::read_dir(drafts.join(id.to_string())).unwrap().count(), 1);
+    }
+}
