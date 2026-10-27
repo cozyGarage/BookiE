@@ -15,5 +15,7 @@
     "workspace_connection_removal_confirms_once_and_preserves_the_database": "passed"
   },
   "installed_binary_sha256": "355904b9a2e9de4273ec29ddd62117d44a276c7fe346951e9a7ce12233d050b6",
-  "merge_order": "1754 first; refresh and verify both regression sets"
+  "merge_order": "1754 first; refresh and verify both regression sets",
+  "base_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
+  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot."
 }

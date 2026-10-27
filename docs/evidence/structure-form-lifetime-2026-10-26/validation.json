@@ -124,5 +124,7 @@
       "repeat": 3,
       "result": "passed"
     }
-  ]
+  ],
+  "base_commit": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot."
 }

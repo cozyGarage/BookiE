@@ -28,5 +28,7 @@
     "query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace"
   ],
   "installed_result": "2 passed",
-  "forgejo": "deferred by maintainer during infrastructure migration"
+  "forgejo": "deferred by maintainer during infrastructure migration",
+  "base_commit": "02198735fae33e6deaa02c7ed4c8540c94c3703b",
+  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot."
 }

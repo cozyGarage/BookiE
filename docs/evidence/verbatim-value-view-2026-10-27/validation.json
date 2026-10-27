@@ -38,5 +38,7 @@
     "allocation_limit_kib": 16384,
     "status": "local validation passed; Forgejo acceptance pending"
   },
-  "typed_json_negative_control": "before bounded serialization: 64 MiB typed JSON fixture added 70924 KiB peak RSS; the added regression failed"
+  "typed_json_negative_control": "before bounded serialization: 64 MiB typed JSON fixture added 70924 KiB peak RSS; the added regression failed",
+  "base_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
+  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot."
 }

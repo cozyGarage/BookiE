@@ -59,5 +59,7 @@
     ],
     "result": "5 passed",
     "binary_sha256": "1106e73b581b2f4323a975243b5f0a8f0b78312859b434facd172da7c924e73a"
-  }
+  },
+  "base_commit": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot."
 }

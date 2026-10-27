@@ -22,5 +22,7 @@
       "test_connection_reports_failure_in_the_dialog: passed"
     ]
   },
-  "installed_binary_sha256": "9608bbc319a6d39264924793ea932b69cd9a07f3c2e9904c6b4377bfbbc6ab91"
+  "installed_binary_sha256": "9608bbc319a6d39264924793ea932b69cd9a07f3c2e9904c6b4377bfbbc6ab91",
+  "base_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
+  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot."
 }
