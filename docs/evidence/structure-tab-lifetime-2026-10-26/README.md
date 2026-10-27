@@ -9,3 +9,5 @@ Full preflight, ordinary widget validation, app Clippy and Forgejo acceptance ar
 Release-Note: Fixed: Closing structure tabs releases their views and SQL previews.
 
 The ordinary widget tier exposed a second retention source: after the three ownership cycles were removed, the SQL preview buffer remained alive with the default input method. The preview is read-only. Selecting its simple input context makes the focused regression pass without a process-wide input-method override. Editable widgets retain their configured input methods. Full widget validation is being repeated for this additional change; earlier focused success alone did not qualify the original fix.
+
+Final input-context fix validation: all 176 isolated widget tests passed in the ordinary suite environment, and app Clippy passed with warnings denied. Final preflight and Forgejo acceptance remain pending. [Validation record](validation.json) identifies the final source hashes.
