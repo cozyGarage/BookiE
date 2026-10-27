@@ -1,0 +1,210 @@
+reading file ".analysis/editor-buffer-release/refusals.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /home/trung/Projects/bookie-ux-tab-close-investigation/target/installed-ci/usr/bin/tablepro
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+106648174 calls to allocation functions with 4.51M peak consumption from
+g_malloc
+  in /usr/lib/libglib-2.0.so.0
+4122906 calls with 0B peak consumption from:
+    g_variant_new_dict_entry
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a334fa5
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a33579a
+      in /usr/lib/libgio-2.0.so.0
+    g_dbus_message_new_from_blob
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a347384
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a2cab1b
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a2cab64
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b0fc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1b105c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_loop_run
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a33eb63
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b137b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf19a98041
+      in /usr/lib/libc.so.6
+    0x7fdf19b2072b
+      in /usr/lib/libc.so.6
+4122906 calls with 0B peak consumption from:
+    g_variant_type_new_dict_entry
+      in /usr/lib/libglib-2.0.so.0
+    g_variant_new_dict_entry
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a334fa5
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a33579a
+      in /usr/lib/libgio-2.0.so.0
+    g_dbus_message_new_from_blob
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a347384
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a2cab1b
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a2cab64
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b0fc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1b105c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_loop_run
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a33eb63
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b137b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf19a98041
+      in /usr/lib/libc.so.6
+    0x7fdf19b2072b
+      in /usr/lib/libc.so.6
+  and 98402362 from 123902 other places
+
+12063126 calls to allocation functions with 7.17M peak consumption from
+g_malloc0
+  in /usr/lib/libglib-2.0.so.0
+689255 calls with 0B peak consumption from:
+    g_type_create_instance
+      in /usr/lib/libgobject-2.0.so.0
+    0x7fdf1bc71d64
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_with_properties
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    g_task_new
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a34dca7
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a34df58
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a34e0f0
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b0fc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1b105c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_loop_run
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a33eb63
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b137b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf19a98041
+      in /usr/lib/libc.so.6
+    0x7fdf19b2072b
+      in /usr/lib/libc.so.6
+689239 calls with 0B peak consumption from:
+    g_source_new
+      in /usr/lib/libglib-2.0.so.0
+    g_idle_source_new
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a2d05bc
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a34d9a9
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a34df58
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a34e0f0
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b0fc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1b105c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_loop_run
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a33eb63
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b137b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf19a98041
+      in /usr/lib/libc.so.6
+    0x7fdf19b2072b
+      in /usr/lib/libc.so.6
+  and 10684632 from 64144 other places
+
+6024306 calls to allocation functions with 3.09M peak consumption from
+g_realloc
+  in /usr/lib/libglib-2.0.so.0
+688549 calls with 0B peak consumption from:
+    g_variant_builder_end
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a3356ca
+      in /usr/lib/libgio-2.0.so.0
+    g_dbus_message_new_from_blob
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a347384
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a2cab1b
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a2cab64
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b0fc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1b105c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_loop_run
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a33eb63
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b137b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf19a98041
+      in /usr/lib/libc.so.6
+    0x7fdf19b2072b
+      in /usr/lib/libc.so.6
+688549 calls with 32B peak consumption from:
+    0x7fdf1b0e03f5
+      in /usr/lib/libglib-2.0.so.0
+    g_hash_table_new_full
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a3309e3
+      in /usr/lib/libgio-2.0.so.0
+    g_type_create_instance
+      in /usr/lib/libgobject-2.0.so.0
+    0x7fdf1bc71d64
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new_with_properties
+      in /usr/lib/libgobject-2.0.so.0
+    g_object_new
+      in /usr/lib/libgobject-2.0.so.0
+    g_dbus_message_new_from_blob
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a347384
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a2cab1b
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1a2cab64
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b0fc75d
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1b105c4f
+      in /usr/lib/libglib-2.0.so.0
+    g_main_loop_run
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf1a33eb63
+      in /usr/lib/libgio-2.0.so.0
+    0x7fdf1b137b53
+      in /usr/lib/libglib-2.0.so.0
+    0x7fdf19a98041
+      in /usr/lib/libc.so.6
+    0x7fdf19b2072b
+      in /usr/lib/libc.so.6
+  and 4647208 from 42290 other places
+
+
+total runtime: 171.30s.
+calls to allocation functions: 126463983 (738268/s)
+temporary memory allocations: 15795087 (92208/s)
+peak heap memory consumption: 78.91M
+peak RSS (including heaptrack overhead): 445.27M
+total memory leaked: 58.70M
+suppressed leaks: 1.25K

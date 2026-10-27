@@ -277,8 +277,7 @@ pub enum AppMsg {
     StructureDataLoaded {
         tab_id: Uuid,
         columns: Vec<ColumnInfo>,
-        indexes: Vec<tablepro_core::IndexInfo>,
-        fks: Vec<tablepro_core::ForeignKeyInfo>,
+        metadata: tablepro_app_services::structure_metadata::StructureMetadata,
     },
     StructureLoadFailed {
         tab_id: Uuid,

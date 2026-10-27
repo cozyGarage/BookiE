@@ -858,13 +858,6 @@ fn dropping_an_editor_releases_its_source_view_and_buffer() {
     drop(native);
     spin_until(|| native_weak.upgrade().is_none());
     let mut fixture = EditorFixture::new();
-    fixture.controller.model().source_view.set_im_module(Some("simple"));
-    fixture
-        .controller
-        .model()
-        .split_view
-        .secondary_view()
-        .set_im_module(Some("simple"));
     let _runtime = std::mem::replace(&mut fixture._runtime, tokio::runtime::Runtime::new().unwrap());
     let root = fixture.controller.widget().downgrade();
     let view = fixture.controller.model().source_view.downgrade();
@@ -896,6 +889,49 @@ fn dropping_an_editor_releases_its_source_view_and_buffer() {
     assert!(root.upgrade().is_none(), "editor root remains alive");
     assert!(view.upgrade().is_none(), "editor view remains alive");
     assert!(buffer.upgrade().is_none(), "editor buffer remains alive");
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn closing_an_editor_releases_its_large_buffer_even_when_its_views_are_retained() {
+    adw::init().unwrap();
+    let mut fixture = EditorFixture::new();
+    let _runtime = std::mem::replace(&mut fixture._runtime, tokio::runtime::Runtime::new().unwrap());
+    let primary = fixture.controller.model().source_view.clone();
+    let secondary = fixture.controller.model().split_view.secondary_view().clone();
+    let buffer = primary.buffer();
+    buffer.set_text(&"-- retained editor payload\n".repeat(25_000));
+    let retired_buffer = buffer.downgrade();
+    drop(buffer);
+
+    drop(fixture);
+
+    spin_until(|| retired_buffer.upgrade().is_none());
+    assert_eq!(primary.buffer().char_count(), 0);
+    assert_eq!(secondary.buffer().char_count(), 0);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn closing_a_vim_editor_releases_both_views_and_its_buffer() {
+    adw::init().unwrap();
+    let mut fixture = EditorFixture::new();
+    let _runtime = std::mem::replace(&mut fixture._runtime, tokio::runtime::Runtime::new().unwrap());
+    let preferences = crate::services::preferences::Preferences {
+        editor_vim_mode: true,
+        ..Default::default()
+    };
+    let model = fixture.controller.model();
+    super::apply_editor_preferences(&model.source_view, &preferences);
+    super::apply_editor_preferences(model.split_view.secondary_view(), &preferences);
+    let primary = model.source_view.downgrade();
+    let secondary = model.split_view.secondary_view().downgrade();
+    let buffer = model.source_view.buffer().downgrade();
+    drop(model);
+
+    drop(fixture);
+
+    spin_until(|| primary.upgrade().is_none() && secondary.upgrade().is_none() && buffer.upgrade().is_none());
 }
 
 #[test]
