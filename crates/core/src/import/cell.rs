@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::import::csv_import::CsvImportOptions;
 use crate::import::extended_temporal::{duckdb_extended_date, duckdb_extended_timestamptz_nanos};
+use crate::import::integer_type::is_integer_type_name;
 use crate::query::{ColumnInfo, Value};
 
 mod mysql_calendar;
@@ -134,34 +135,6 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
         return ColumnKind::Float;
     }
     ColumnKind::Text
-}
-
-fn is_integer_type_name(name: &str) -> bool {
-    matches!(
-        name,
-        "int"
-            | "integer"
-            | "tinyint"
-            | "smallint"
-            | "mediumint"
-            | "bigint"
-            | "int2"
-            | "int4"
-            | "int8"
-            | "int16"
-            | "int32"
-            | "int64"
-            | "uint8"
-            | "uint16"
-            | "uint32"
-            | "uint64"
-            | "serial"
-            | "serial2"
-            | "serial4"
-            | "serial8"
-            | "smallserial"
-            | "bigserial"
-    )
 }
 
 fn temporal_kind(base: &str, lowered: &str) -> Option<ColumnKind> {
