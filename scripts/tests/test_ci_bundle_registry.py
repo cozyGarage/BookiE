@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import os
 from unittest.mock import patch
 from pathlib import Path
 import tarfile
@@ -81,6 +82,15 @@ class RegistryExtractionTests(unittest.TestCase):
                     patch.object(registry.bundle, 'verify', return_value={'build_group': 'default'}):
                 registry.fetch(destination, 'a' * 40, 'default', 'https://registry.example/bundle/')
             self.assertEqual((destination / 'program').read_bytes(), b'legacy bundle')
+
+    def test_fetch_refreshes_the_recency_of_a_verified_cached_bundle(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / 'cached'
+            destination.mkdir()
+            os.utime(destination, (1, 1))
+            with patch.object(registry.bundle, 'verify', return_value={'build_group': 'default'}):
+                registry.fetch(destination, 'a' * 40, 'default', 'https://registry.example/bundle/')
+            self.assertGreater(destination.stat().st_mtime, 1)
 
     def test_v2_manifest_rejects_untrusted_chunk_names(self):
         manifest = {'schema_version': 2, 'source_commit': 'a' * 40, 'build_group': 'default', 'size': 1,
