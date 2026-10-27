@@ -325,7 +325,11 @@ class CiCacheTests(unittest.TestCase):
             self.assertTrue(checkout_steps, filename)
             for block in checkout_steps:
                 step = block.split('\n      - name:', 1)[0]
-                self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout {0}', step, filename)
+                if 'shell: bash' in step:
+                    preceding = workflow[:workflow.index(step)].rsplit('    runs-on:', 1)[-1]
+                    self.assertIn('desktop-build', preceding, filename)
+                else:
+                    self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout {0}', step, filename)
                 self.assertLess(step.index('shell:'), step.index('run:'), filename)
 
     def test_missing_or_symlink_lock_fails_closed(self):

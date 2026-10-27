@@ -40,7 +40,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertGreater(sums.stat().st_size, 0)
     def test_headless_fixtures_wait_for_cheap_checks_without_serializing_behind_widgets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        expected = {"guards", "clippy"}
+        expected = {"guards", "clippy", "test-build"}
         for name in ("driver", "pg-release", "pg-dump", "socket-ssh", "driver-tls"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
@@ -62,6 +62,10 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 expected = {"guards", "clippy"}
+                if name == "distro-floor":
+                    expected.add("floor-build")
+                elif name != "supply-chain":
+                    expected.add("test-build")
                 if name in {"e2e", "gtk", "gtk-server"}:
                     expected.add("gtk-build")
                 self.assertEqual({item.strip() for item in dependencies.split(",")}, expected)
@@ -80,7 +84,10 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         labels = re.findall(r"^    runs-on: (.+)$", workflow, re.MULTILINE)
         self.assertTrue(labels)
-        self.assertEqual(set(labels), {"ci-pilot"})
+        self.assertEqual(set(labels), {"ci-pilot", "desktop-build"})
+        for name, block in re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow):
+            if "runs-on: ci-pilot" in block:
+                self.assertNotRegex(block, r"cargo (build|test|clippy|install)\b", name)
 
     def test_driver_tls_fixture_wait_is_bounded_with_failure_diagnostics(self):
         script = (ROOT / "scripts/test-driver-tls.sh").read_text()
@@ -572,7 +579,10 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         self.assertNotIn("\n  distro-floor-build:\n", workflow)
         floor = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        self.assertIn("scripts/distro-floor-package.sh", floor)
+        producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
+        self.assertIn("runs-on: desktop-build", producer)
+        self.assertIn("scripts/build-deb.sh", producer)
+        self.assertNotIn("scripts/distro-floor-package.sh", floor)
         self.assertIn("DISTRO_FLOOR_PACKAGE=", floor)
         self.assertIn("PREBUILT_DEB=", floor)
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
@@ -606,7 +616,9 @@ class CiWorkflowTests(unittest.TestCase):
         scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
         self.assertNotIn("scripts/test-distro-floor.sh", producer)
         self.assertIn("scripts/test-deb-package.sh", producer)
-        self.assertIn("ci-gtk-artifact.py create --package", producer)
+        builder = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
+        self.assertIn("ci-gtk-artifact.py create --package", builder)
+        self.assertIn("ci-gtk-artifact.py verify --package", producer)
         self.assertIn("needs: [distro-floor]", scenarios)
         self.assertIn("shard: [1, 2, 3]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
