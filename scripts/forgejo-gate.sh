@@ -14,6 +14,11 @@ export GIT_ASKPASS="${GIT_ASKPASS:-$HOME/.config/forgejo/askpass.sh}"
 sha="$(git rev-parse "$branch")"
 token="$(cat "$token_file")"
 
+api_get() {
+  curl -fsS --retry 5 --retry-delay 5 --retry-all-errors --max-time 60 \
+    --config <(printf 'header = "Authorization: token %s"\n' "$token") "$@"
+}
+
 docs_only() {
   git fetch --quiet "$remote" linux || return 1
   local changed
@@ -35,7 +40,7 @@ if ! flock -n 9; then
   flock 9
 fi
 latest_run_id() {
-  curl -fsS --retry 5 --retry-delay 5 --retry-all-errors --max-time 60 -H "Authorization: token $token" "$api/actions/runs?limit=1" | python3 -c '
+  api_get "$api/actions/runs?limit=1" | python3 -c '
 import json, sys
 runs = json.load(sys.stdin)["workflow_runs"]
 print(runs[0]["id"] if runs else 0)
@@ -56,7 +61,7 @@ fi
 deadline=$((SECONDS + timeout_minutes * 60))
 
 summarize() {
-  curl -fsS --retry 5 --retry-delay 5 --retry-all-errors --max-time 60 -H "Authorization: token $token" "$api/actions/runs?limit=50" | python3 -c '
+  api_get "$api/actions/runs?limit=50" | python3 -c '
 import json, sys
 sha, after = sys.argv[1], int(sys.argv[2])
 runs = [
@@ -76,7 +81,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
   case "$status" in
     success) echo "forgejo run $run_number (API id $run_id) passed for $sha"; exit 0 ;;
     failure|cancelled)
-      report="$(curl -fsS --retry 5 --retry-delay 5 --retry-all-errors --max-time 60 -H "Authorization: token $token" "$api/actions/runs/$run_id/jobs" | python3 -c '
+      report="$(api_get "$api/actions/runs/$run_id/jobs" | python3 -c '
 import json, sys
 jobs = json.load(sys.stdin)
 if any(job["status"] in ("running", "waiting") for job in jobs):
