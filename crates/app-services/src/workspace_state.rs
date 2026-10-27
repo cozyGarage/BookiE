@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex, mpsc};
 
 use serde::{Deserialize, Serialize};
@@ -38,6 +38,7 @@ struct WorkspaceWriter {
 
 #[derive(Default)]
 struct WorkspaceQueue {
+    forgotten: HashSet<Uuid>,
     next_sequence: u64,
     persisted_sequence: u64,
     pending: HashMap<Uuid, PendingWorkspace>,
@@ -437,6 +438,11 @@ impl WorkspaceStore {
     }
 
     pub fn forget_connection(&self, id: Uuid) {
+        let _guard = self
+            .inner
+            .file_lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         {
             let mut memory = self
                 .inner
@@ -445,18 +451,18 @@ impl WorkspaceStore {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             memory.cache.remove(&id);
             memory.saved_at.remove(&id);
-        }
-        {
-            let _guard = self
-                .inner
-                .file_lock
+            self.inner
+                .writer
+                .queue
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Some(path) = self.inner.paths.state.as_deref()
-                && let Err(error) = workspace_disk::forget_connection(path, id)
-            {
-                tracing::warn!(%id, %error, "could not remove deleted connection from workspace state");
-            }
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .forgotten
+                .insert(id);
+        }
+        if let Some(path) = self.inner.paths.state.as_deref()
+            && let Err(error) = workspace_disk::forget_connection(path, id)
+        {
+            tracing::warn!(%id, %error, "could not remove deleted connection from workspace state");
         }
         let path = self.inner.paths.drafts.join(id.to_string());
         if let Err(error) = std::fs::remove_dir_all(&path)
@@ -514,14 +520,15 @@ fn save_connection_coordinated(
     state: ConnectionWorkspaceState,
 ) {
     let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut queue = queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if queue.forgotten.contains(&id) {
+        return;
+    }
     memory.clock += 1;
     let clock = memory.clock;
     memory.saved_at.insert(id, clock);
     memory.cache.insert(id, Some(state.clone()));
-    queue
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .save(id, state);
+    queue.save(id, state);
 }
 
 fn wake_writer(writer: &WorkspaceWriter) -> bool {
@@ -551,7 +558,14 @@ fn run_writer(
             let _guard = file_lock.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             match paths.state.as_deref() {
                 Some(path) => {
-                    let updates = pending.iter().map(|(id, entry)| (*id, entry.state.clone())).collect();
+                    let updates = {
+                        let queue = queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                        pending
+                            .iter()
+                            .filter(|(id, _)| !queue.forgotten.contains(id))
+                            .map(|(id, entry)| (*id, entry.state.clone()))
+                            .collect()
+                    };
                     workspace_disk::save_connections(path, &paths.drafts, updates).map_err(|error| {
                         tracing::warn!(%error, "workspace could not be saved");
                         WorkspaceFlushError::WriteFailed
