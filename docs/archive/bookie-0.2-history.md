@@ -94,7 +94,7 @@ repeatable local gate and retained reports.
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
    per task. Reuse the existing corpus, engine fixtures and change-contract runner.
 2. **B4:** finish the open transport, policy, daemon and GUI tasks on the
-   [task board](../b4-task-board.md). A completed lane does not close the milestone.
+   [task board](../lane-boards.md#b4-transport-and-sessions). A completed lane does not close the milestone.
 3. **Arch Linux / Omarchy / Hyprland / native Wayland UI:** verify the resulting
    connection, session, grid and editor workflows, then package/upgrade/rollback.
    The existing B5/B6 implementations enter through this acceptance pass.
@@ -138,7 +138,7 @@ VM setup is a prerequisite for current B3/B4 implementation or the Arch UI pass.
 Start with **B3-P1**, then take one bounded case from P2–P5. Split a packet by
 engine/type/consumer before handing it off. Preserve known text fallbacks and
 explicit refusals; do not equate refusal with completed exact support. The
-[type matrix](../type-contract-strategy.md) and [value evidence](../value-contracts.md)
+[type matrix](../lane-boards.md#b3-types-and-values) and [value evidence](../value-contracts.md)
 carry detailed native-type targets. Do not rebuild completed scalar/BSON/export work.
 
 | Packet | Scope / files to inspect | Deliverable and completion evidence |
@@ -628,7 +628,7 @@ references, tests, and differences. Implementation and release verification diff
 - [ ] **B4 transport/sessions**: network/OpenSSH/session integration in GUI/daemon,
   policy/audit guarded. Dedicated editor sessions, cancellation, transaction ownership,
   terminal outcomes/retirement. No weaker auth/TLS fallback.
-  Open work is split into small tasks on the [B4 task board](../b4-task-board.md).
+  Open work is split into small tasks on the [B4 task board](../lane-boards.md#b4-transport-and-sessions).
 - [ ] **B5 editor/files**: shared-planner highlighting, existing shortcuts, GTK/GIO
   Open/Save/Save As, dirty prompts/external-change detection. Open creates a tab;
   atomic save rejects stale versions until reload/overwrite/Save As is selected.
@@ -1385,7 +1385,7 @@ DuckDB date/time/timestamp and enum results no longer expose implementation debu
 
 ### B3 PostgreSQL interval and temporal-array checkpoint — September 27
 
-PostgreSQL interval tests now compare independent native fields across 59 deterministic boundary/generated cases and all four IntervalStyle settings. Extreme-hour exports and ambiguous mixed signs are fixed. Date/timestamp infinities and date/time/timetz/timestamp/timestamptz/interval array elements now preserve their values through native wire comparisons, bound parameters, SQL INSERT and JSON checks, including non-UTC session imports. Malformed element payloads and unsupported calendar ranges remain explicit refusals. See the [type-contract strategy](../type-contract-strategy.md) for remaining per-driver targets; B3 remains open and Oracle stays deferred.
+PostgreSQL interval tests now compare independent native fields across 59 deterministic boundary/generated cases and all four IntervalStyle settings. Extreme-hour exports and ambiguous mixed signs are fixed. Date/timestamp infinities and date/time/timetz/timestamp/timestamptz/interval array elements now preserve their values through native wire comparisons, bound parameters, SQL INSERT and JSON checks, including non-UTC session imports. Malformed element payloads and unsupported calendar ranges remain explicit refusals. See the [type-contract strategy](../lane-boards.md#b3-types-and-values) for remaining per-driver targets; B3 remains open and Oracle stays deferred.
 
 ### B3 MySQL native temporal checkpoint — September 27
 
@@ -2446,14 +2446,14 @@ the PR evidence comments: [#314](https://github.com/cozyGarage/BookiE/pull/314#i
 [B3 PR #365](https://github.com/cozyGarage/BookiE/pull/365) merged with
 MySQL/MariaDB ENUM/SET malformed-metadata refusal and consumer regressions.
 [PR #369](https://github.com/cozyGarage/BookiE/pull/369) also merged with the
-PostgreSQL 513-layer enum-domain checkpoint; see the [B3 board](../type-contract-strategy.md)
+PostgreSQL 513-layer enum-domain checkpoint; see the [B3 board](../lane-boards.md#b3-types-and-values)
 for contract details. B3 remains open for the broader
 engine/type/consumer/configuration matrix,
 mutation triage and installed grid acceptance. B4 still needs the remaining
 privacy, daemon retirement, headless ownership and transport/session acceptance.
 B7 still needs a frozen candidate, installed Arch/Wayland and Debian/GNOME
 acceptance, upgrade/rollback and soak. Case-level evidence belongs on the
-[B3 board](../type-contract-strategy.md), [B4 board](../b4-task-board.md) and [value
+[B3 board](../lane-boards.md#b3-types-and-values), [B4 board](../lane-boards.md#b4-transport-and-sessions) and [value
 evidence index](../value-contracts.md); do not infer a lane pass or release
 qualification from these merged scenarios.
 
