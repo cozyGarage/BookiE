@@ -62,6 +62,7 @@ fn present_with_operation(parent: &gtk::Window, database: &Arc<DatabaseService>,
     stack.add_named(&scrolled, Some("list"));
     toolbar.set_content(Some(&stack));
     dialog.set_child(Some(&toolbar));
+    crate::ui::leak_probe::track("audit", &dialog);
     dialog.present(Some(parent));
 
     let database = database.clone();
