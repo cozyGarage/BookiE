@@ -17,8 +17,9 @@ if ! python3 -c "import pyatspi" >/dev/null 2>&1; then
 fi
 
 if [[ "${TABLEPRO_GTK_XVFB_ACTIVE:-0}" != "1" ]]; then
+  xvfb_server_num=$((1000 + RANDOM))
   exec env TABLEPRO_GTK_XVFB_ACTIVE=1 \
-    xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24 -nolisten tcp" "$ROOT/scripts/test-gtk-safety.sh" "$@"
+    xvfb-run --auto-servernum --server-num="$xvfb_server_num" --server-args="-screen 0 1280x1024x24 -nolisten tcp" "$ROOT/scripts/test-gtk-safety.sh" "$@"
 fi
 
 # Start the private bus after Xvfb so D-Bus activated accessibility services

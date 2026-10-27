@@ -184,14 +184,14 @@ class CiWorkflowTests(unittest.TestCase):
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
             group = settings["group"].strip()
             self.assertTrue(group, name)
-            self.assertEqual(group, "bookie-lab", name)
+            self.assertEqual(group, "bookie-lab-${{ github.ref }}", name)
             self.assertNotIn("${{ github.run_id }}", group, name)
             self.assertNotIn("${{ github.workflow }}", group, name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
             groups.append(group)
         self.assertEqual(groups[0], groups[1])
         gate = (ROOT / "scripts/forgejo-gate.sh").read_text()
-        self.assertIn('${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate.lock}', gate)
+        self.assertIn('printf \'%s/%s\' "$remote" "$target" | sha256sum', gate)
 
     def test_forgejo_gtk_jobs_select_distinct_run_scoped_mcp_ports(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -511,6 +511,19 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cargo build --locked --release -p tablepro-app", release)
         self.assertIn("target/release/tablepro-app target/installed/usr/bin/tablepro", release)
         self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", release)
+
+    def test_gtk_scripts_reduce_xvfb_display_collisions(self):
+        for path in [
+            "scripts/test-gtk-widgets.sh",
+            "scripts/test-gtk-safety.sh",
+            "scripts/test-flatpak-window.sh",
+        ]:
+            with self.subTest(path=path):
+                script = (ROOT / path).read_text()
+                self.assertIn("xvfb_server_num=$((1000 + RANDOM))", script)
+                self.assertIn('xvfb-run --auto-servernum --server-num="$xvfb_server_num"', script)
+                self.assertNotIn("--auto-display", script)
+                self.assertNotIn("xvfb-run -a", script)
 
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
