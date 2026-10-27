@@ -21,7 +21,7 @@ apps/linux/app/src/ui/app/init_css.rs 5
 apps/linux/app/src/ui/app/init_sidebar.rs 19
 apps/linux/app/src/ui/app/init_window.rs 36
 apps/linux/app/src/ui/app/init_workspace.rs 17
-apps/linux/app/src/ui/app/mod.rs 135
+apps/linux/app/src/ui/app/mod.rs 133
 apps/linux/app/src/ui/app/msg.rs 3
 apps/linux/app/src/ui/app/organization.rs 13
 apps/linux/app/src/ui/app/row_ops.rs 51
@@ -29,14 +29,14 @@ apps/linux/app/src/ui/app/status_pages.rs 20
 apps/linux/app/src/ui/app/structure.rs 119
 apps/linux/app/src/ui/app/workspace_chrome.rs 21
 apps/linux/app/src/ui/app/workspace_persist.rs 9
-apps/linux/app/src/ui/app/workspace_tabs.rs 145
+apps/linux/app/src/ui/app/workspace_tabs.rs 143
 apps/linux/app/src/ui/browse_tab/chrome.rs 89
 apps/linux/app/src/ui/browse_tab/grid_render.rs 126
 apps/linux/app/src/ui/browse_tab/mod.rs 218
 apps/linux/app/src/ui/browse_tab/row_ops.rs 142
 apps/linux/app/src/ui/browse_tab/selection.rs 61
 apps/linux/app/src/ui/browse_tab/tests.rs 2
-apps/linux/app/src/ui/browse_tab/value_parse.rs 20
+apps/linux/app/src/ui/browse_tab/value_parse.rs 19
 apps/linux/app/src/ui/cell_editor.rs 52
 apps/linux/app/src/ui/connect_dialog/identity.rs 6
 apps/linux/app/src/ui/connect_dialog/mod.rs 16
@@ -59,7 +59,7 @@ apps/linux/app/src/ui/row_object.rs 9
 apps/linux/app/src/ui/row_store.rs 5
 apps/linux/app/src/ui/sidebar_row.rs 79
 apps/linux/app/src/ui/ssh_section.rs 9
-apps/linux/app/src/ui/structure_tab/columns.rs 86
+apps/linux/app/src/ui/structure_tab/columns.rs 82
 apps/linux/app/src/ui/structure_tab/fks.rs 10
 apps/linux/app/src/ui/structure_tab/indexes.rs 14
 apps/linux/app/src/ui/structure_tab/mod.rs 262
@@ -83,7 +83,7 @@ crates/core/src/export/xlsx.rs 2
 crates/core/src/export/xml.rs 6
 crates/core/src/filter.rs 73
 crates/core/src/filter_tests.rs 11
-crates/core/src/import/cell.rs 32
+crates/core/src/import/cell.rs 29
 crates/core/src/import/csv_import.rs 35
 crates/core/src/import/infer.rs 21
 crates/core/src/import/mod.rs 5
@@ -130,7 +130,7 @@ crates/drivers/postgres/src/array.rs 4
 crates/drivers/postgres/src/lib.rs 43
 crates/drivers/postgres/src/session.rs 3
 crates/drivers/postgres/src/temporal.rs 1
-crates/drivers/redis/src/lib.rs 10
+crates/drivers/redis/src/lib.rs 9
 crates/drivers/redis/src/tests.rs 2
 crates/drivers/sqlite/src/interrupt.rs 13
 crates/drivers/sqlite/src/lib.rs 59
