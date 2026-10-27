@@ -1,0 +1,37 @@
+[
+  {
+    "number": 1820,
+    "url": "https://github.com/cozyGarage/BookiE/issues/1820",
+    "title": "Optimistic grid updates overwrite concurrent case-only changes on case-insensitive text columns",
+    "lane": "b3",
+    "project_item_id": "PVTI_lAHOAI1aOs4BmnAAzhD-DQg"
+  },
+  {
+    "number": 1821,
+    "url": "https://github.com/cozyGarage/BookiE/issues/1821",
+    "title": "A failed workspace draft batch changes an earlier durable draft before metadata publication",
+    "lane": "ux",
+    "project_item_id": "PVTI_lAHOAI1aOs4BmnAAzhD-DRo"
+  },
+  {
+    "number": 1822,
+    "url": "https://github.com/cozyGarage/BookiE/issues/1822",
+    "title": "One unreadable draft prevents prefetch from restoring unrelated requested connections",
+    "lane": "ux",
+    "project_item_id": "PVTI_lAHOAI1aOs4BmnAAzhD-DUI"
+  },
+  {
+    "number": 1823,
+    "url": "https://github.com/cozyGarage/BookiE/issues/1823",
+    "title": "GUI policy loading treats a dangling policy symlink as an absent policy and enables defaults",
+    "lane": "ux",
+    "project_item_id": "PVTI_lAHOAI1aOs4BmnAAzhD-DV0"
+  },
+  {
+    "number": 1824,
+    "url": "https://github.com/cozyGarage/BookiE/issues/1824",
+    "title": "The normal evidence harness skips schema-v1 validation.json packets with missing source provenance",
+    "lane": "ux",
+    "project_item_id": "PVTI_lAHOAI1aOs4BmnAAzhD-DY4"
+  }
+]

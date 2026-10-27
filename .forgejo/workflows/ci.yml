@@ -30,18 +30,13 @@ env:
 
 jobs:
   guards:
-    runs-on: build-host
+    runs-on: ci-pilot
     timeout-minutes: 90
     defaults:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target
-      TMPDIR: /target
-      CARGO_HOME: /cargo
-      TABLEPRO_TOOL_DIR: /tools
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      TABLEPRO_TOOL_DIR: /var/cache/ci/tools
     steps:
       - name: Check out
         shell: bash
