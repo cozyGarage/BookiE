@@ -6,7 +6,9 @@ use std::path::Path;
 use std::process::{Command, Output};
 use std::thread;
 
-const HELPER: &str = env!("CARGO_BIN_EXE_tablepro-askpass");
+fn helper() -> std::ffi::OsString {
+    std::env::var_os("CARGO_BIN_EXE_tablepro-askpass").unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into())
+}
 
 fn read_frame(stream: &mut UnixStream) -> io::Result<Vec<u8>> {
     let mut length = [0u8; 4];
@@ -30,7 +32,7 @@ fn serve_once(listener: &UnixListener, reply: &[u8]) -> io::Result<Vec<Vec<u8>>>
 }
 
 fn run_helper(socket: &Path, hint: Option<&str>, prompt: &str) -> io::Result<Output> {
-    let mut command = Command::new(HELPER);
+    let mut command = Command::new(helper());
     command.arg(prompt).env("TABLEPRO_ASKPASS_SOCKET", socket);
     match hint {
         Some(hint) => command.env("SSH_ASKPASS_PROMPT", hint),
@@ -88,7 +90,7 @@ fn a_missing_socket_exits_1() {
 
 #[test]
 fn no_socket_variable_exits_1() {
-    let output = Command::new(HELPER)
+    let output = Command::new(helper())
         .arg("Password: ")
         .env_remove("TABLEPRO_ASKPASS_SOCKET")
         .output()
