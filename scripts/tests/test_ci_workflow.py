@@ -84,9 +84,9 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         labels = re.findall(r"^    runs-on: (.+)$", workflow, re.MULTILINE)
         self.assertTrue(labels)
-        self.assertEqual(set(labels), {"ci-pilot", "desktop-build"})
+        self.assertEqual(set(labels), {"any-host", "desktop-build"})
         for name, block in re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow):
-            if "runs-on: ci-pilot" in block:
+            if "runs-on: any-host" in block:
                 self.assertNotRegex(block, r"cargo (build|test|clippy|install)\b", name)
 
     def test_driver_tls_fixture_wait_is_bounded_with_failure_diagnostics(self):
@@ -140,7 +140,8 @@ class CiWorkflowTests(unittest.TestCase):
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
             group = settings["group"].strip()
             self.assertTrue(group, name)
-            self.assertNotIn("${{", group, name)
+            self.assertIn("${{ github.run_id }}", group, name)
+            self.assertIn("${{ github.workflow }}", group, name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
             groups.append(group)
         self.assertEqual(groups[0], groups[1])
