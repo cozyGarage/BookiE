@@ -1,0 +1,22 @@
+{
+  "issue": 1729,
+  "fixed_commit": "1669a14",
+  "source_sha256": {
+    "apps/linux/app/src/ui/app/organization.rs": "7f0ce2c0269a06fed7db4391d0266278efe2477587cc11c5cb8687be1e9acb16",
+    "apps/linux/app/src/ui/app/organization/lifetime_tests.rs": "3e89e936e3ebb960825f4c06a88b7dc8dec72cd62dba1ed5d31cb8df14c10b01",
+    "scripts/isolated-tests.json": "a14e76b9bb0293c589bfb4bc18c9cfe26a80d6a8b109b67c2744fddaf1cb1fe2",
+    "apps/linux/app/tests/gtk_ux.py": "b6375b836930c4586c8c9bf0910425507e148f89fb792b797ec9acca98003520"
+  },
+  "focused_regression": {
+    "before": "failed: colour popover retained after chooser drop",
+    "after": "passed; Blue selection retained and popover released"
+  },
+  "pending": [],
+  "forgejo": "deferred during infrastructure migration",
+  "validation": {
+    "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
+    "gtk_widgets": "passed: 180 isolated tests",
+    "app_clippy": "passed",
+    "installed_accessibility": "passed: connection_colour_chooser_has_an_accessible_button; opens menu, selects Blue, verifies updated toggle"
+  }
+}

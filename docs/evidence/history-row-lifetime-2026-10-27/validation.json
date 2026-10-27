@@ -1,0 +1,32 @@
+{
+  "issue": 1728,
+  "base": "02198735f",
+  "source_sha256": {
+    "apps/linux/app/src/ui/history_dialog.rs": "030404fc81ea9b5c92a7bfdc7f7e18bee6430089bd59730545c3cd54e6f33078",
+    "apps/linux/app/src/ui/history_dialog/lifetime_tests.rs": "68398655a4904bb993d629a058808d7124734873a1c19f526a4967bf2ec69d6d",
+    "scripts/isolated-tests.json": "89a981070bc4b33c3055830c3abd87c653475a461c595b64b5fbb2738042b7ec"
+  },
+  "regressions": {
+    "refresh": {
+      "before": "failed: removed history row is retained",
+      "after": "passed"
+    },
+    "shutdown": {
+      "without_cleanup": "failed after GTK reported a row finalizing with its popover attached; inspecting the stale parent triggered a GTK type assertion",
+      "with_cleanup": "passed; retained popover has no parent after component shutdown"
+    }
+  },
+  "full_local_validation": {
+    "widgets": 178,
+    "unit": 2197,
+    "sandbox": 291,
+    "redis_cancellation": 1,
+    "app_clippy": "passed with warnings denied"
+  },
+  "installed_scenarios": [
+    "history_panel_refreshes_after_queries_run_while_closed",
+    "query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace"
+  ],
+  "installed_result": "2 passed",
+  "forgejo": "deferred by maintainer during infrastructure migration"
+}
