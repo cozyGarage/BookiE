@@ -3,15 +3,21 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+system_python="/usr/bin/python3"
 
-for command_name in dbus-run-session dbus-update-activation-environment gdbus xvfb-run python3; do
+for command_name in dbus-run-session dbus-update-activation-environment gdbus xvfb-run; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "missing required command: $command_name" >&2
     exit 1
   fi
 done
 
-if ! python3 -c "import pyatspi" >/dev/null 2>&1; then
+if [[ ! -x "$system_python" ]]; then
+  echo "missing required command: $system_python" >&2
+  exit 1
+fi
+
+if ! "$system_python" -c "import pyatspi" >/dev/null 2>&1; then
   echo "missing Python module: pyatspi" >&2
   exit 1
 fi
@@ -72,4 +78,4 @@ if [[ ! -x "$test_binary" ]]; then
   echo "installed GTK test binary is not executable: $test_binary" >&2
   exit 1
 fi
-timeout 1500s python3 -u "$ROOT/apps/linux/app/tests/gtk_safety.py" "$test_binary"
+timeout 1500s "$system_python" -u "$ROOT/apps/linux/app/tests/gtk_safety.py" "$test_binary"
