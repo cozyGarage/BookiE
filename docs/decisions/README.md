@@ -2,7 +2,7 @@
 
 These documents record the reasons behind major technical choices. Accepted decisions stay stable. A later decision may supersede an earlier one by linking to it explicitly.
 
-Which forks already have an answer (and which are still open) is listed in the [decision checklist](checklist.md). Prefer a link there over inventing a second record for the same choice.
+Which forks already have an answer (and which are still open) is listed in the [decision checklist](checklist.md). Prefer a link there over inventing a second record for the same choice. Closures and decisions that were later corrected are recorded in [decision lessons](lessons.md).
 
 ## Format
 
