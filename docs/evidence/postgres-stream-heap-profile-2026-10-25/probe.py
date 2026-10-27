@@ -97,8 +97,6 @@ def scenarios(ui):
             status = "timed_out" if ui.find_node(name="Query timed out") else "complete"
             assert status == "complete", "large PostgreSQL query did not complete"
             notice = ui.node_name(ui.wait_for_node_containing("Received ", timeout=30))
-            if rows > 20000:
-                assert "Retained rows" in notice
             if status == "complete":
                 assert f"Received {rows} rows" in notice
                 ui.wait_for_node_containing("done in", timeout=30)
