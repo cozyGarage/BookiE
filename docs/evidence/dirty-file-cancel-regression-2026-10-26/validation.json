@@ -1,0 +1,11 @@
+{
+  "product_base": "ac190e9b2",
+  "test_commit": "1623612c1",
+  "baseline_binary_sha256": "94d51a98a18231d0e3afa0cfa95e6e5c7467151fa8ac14e111fddf71b51b3215",
+  "scenario": "cancelling_a_dirty_file_close_preserves_text_and_file_association",
+  "scenario_passed": true,
+  "preflight_unit_passed": 2197,
+  "preflight_sandbox_passed": 291,
+  "scope": "pins existing behavior; no product-code change",
+  "forgejo": "pending"
+}

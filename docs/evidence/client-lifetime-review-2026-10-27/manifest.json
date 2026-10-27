@@ -1,0 +1,125 @@
+{
+  "review": "docs/archive/client-lifetime-review-2026-10-27.md",
+  "date": "2026-10-27",
+  "bookie": {
+    "branch": "linux",
+    "commit": "367006fe626d6ccb069508f032a754219d15482d"
+  },
+  "method": "Read-only source review; GitHub API, issue search, git log over shallow or history clones, crates.io and RustSec. No third-party code built or run.",
+  "sources": [
+    {
+      "repository": "dbeaver/dbeaver",
+      "pin": "9c9fd2431dc1bec7f1bc09d134daf663db7f5153",
+      "date": "2026-10-26",
+      "note": "devel, shallow; history from issue search"
+    },
+    {
+      "repository": "TableProApp/TablePro",
+      "pin": "fcc7073332423e7245af44f83c89043e264c8fd5",
+      "date": "2026-10-26"
+    },
+    {
+      "repository": "t8y2/dbx",
+      "pin": "015da4ebeb820e545045c5e281b5c1517fa5998b",
+      "date": "2026-10-26"
+    },
+    {
+      "repository": "dbgate/dbgate",
+      "pin": "b20193f458a11db88573d48de9d6cb6cd7a33ac0",
+      "date": "2026-10-26"
+    },
+    {
+      "repository": "antares-sql/antares",
+      "pin": "954b455f612d170742c1a1065276132f2cc115ea",
+      "date": "2025-10-14"
+    },
+    {
+      "repository": "beekeeper-studio/beekeeper-studio",
+      "pin": "f61eaf0b047c39561e033a8fc07624ef426e4a00",
+      "date": "2026-10-26"
+    },
+    {
+      "repository": "HeidiSQL/HeidiSQL",
+      "pin": "9d22904a955c0057645676355d6adf56c589e7a3",
+      "date": "2026-10-26"
+    },
+    {
+      "repository": "Sequel-Ace/Sequel-Ace",
+      "pin": "ca6566b1dae03be6d02f2a2352fdadb5203dffce",
+      "date": "2026-10-26"
+    },
+    {
+      "repository": "microsoft/azuredatastudio",
+      "pin": "issue dump, 6,593 bug issues",
+      "date": "2026-10-26",
+      "note": "archived product"
+    },
+    {
+      "repository": "dbcli/pgcli",
+      "pin": "d948fd0b2d5b5a07ca2e13761c73d91253095391",
+      "date": "2026-10-24"
+    },
+    {
+      "repository": "dbcli/mycli",
+      "pin": "793e295a25738757bdc85de6e34f3f9a594cd175",
+      "date": "2026-10-26"
+    },
+    {
+      "repository": "dbcli/litecli",
+      "pin": "aa53bb0c1530cd1dfb30534babb0bf47df33c60a",
+      "date": "2026-06-06"
+    },
+    {
+      "repository": "dbcli/pgspecial",
+      "pin": "3460cac48f3e88d220fd9ebac8b4c1125718ed9b",
+      "date": "2026-09-14"
+    },
+    {
+      "repository": "tconbeer/harlequin",
+      "pin": "09ae3cf345a4b1527f936ccaf55b603d83f700d6",
+      "date": "2026-10-26"
+    },
+    {
+      "repository": "achristmascarl/rainfrog",
+      "pin": "ecc77e73d4ef817303a3d7f46d4b65adf4222ad4",
+      "date": "2026-10-13"
+    },
+    {
+      "repository": "xo/usql",
+      "pin": "243291fcc998969011f84d6197c13aa6c4445125",
+      "date": "2026-10-20"
+    },
+    {
+      "repository": "TaKO8Ki/gobang",
+      "pin": "7b1b5f7eba3ea98a5d254a12ea31f383ee7737d1",
+      "date": "2023-01-25"
+    },
+    {
+      "repository": "rustsec/advisory-db",
+      "pin": "3279c99911354c400e1d41e47c7d60e39258b147",
+      "date": "2026-10-26"
+    }
+  ],
+  "dependencies_checked": {
+    "russh": [
+      "0.64.1",
+      "0.65.0"
+    ],
+    "duckdb": [
+      "1.10505.0",
+      "1.20000.0"
+    ],
+    "rust_xlsxwriter": [
+      "0.99.1",
+      "0.101.0"
+    ],
+    "redis": [
+      "1.7.0",
+      "1.8.0"
+    ],
+    "sqlx": [
+      "0.9.0",
+      "0.9.0"
+    ]
+  }
+}
