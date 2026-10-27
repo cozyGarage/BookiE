@@ -308,6 +308,43 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("tablepro-driver-tests", ledger)
         self.assertNotIn("tablepro-driver-src", ledger)
 
+    def test_ignored_arch_source_does_not_hide_new_nonignored_inventory_tests(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".gitignore").write_text("apps/linux/packaging/arch/src/\n")
+            (root / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/core"]\nresolver = "3"\n')
+            crate = root / "crates/core"
+            (crate / "src").mkdir(parents=True)
+            (crate / "Cargo.toml").write_text(
+                '[package]\nname = "tablepro-core"\nversion = "0.1.0"\nedition = "2024"\n'
+            )
+            (crate / "src/lib.rs").write_text(
+                '#[ignore = "requires Docker"]\nfn tracked_ignored_test() {}\n'
+            )
+            untracked = crate / "src/new_test.rs"
+            untracked.write_text('#[ignore = "requires Docker"]\nfn untracked_ignored_test() {}\n')
+            generated = root / "apps/linux/packaging/arch/src/TablePro/apps/linux/app/src/copied.rs"
+            generated.parent.mkdir(parents=True)
+            generated.write_text('#[ignore = "requires Docker"]\nfn copied_ignored_test() {}\n')
+            (root / "scripts").mkdir()
+            inventory = root / "scripts/inventory-ignored-tests.py"
+            inventory.write_text((ROOT / "scripts/inventory-ignored-tests.py").read_text())
+            (root / "scripts/isolated-tests.json").write_text("{}\n")
+            subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "add", ".gitignore", "Cargo.toml", "crates", "scripts"],
+                check=True,
+            )
+
+            result = subprocess.run(
+                ["python3", str(inventory)], capture_output=True, text=True, check=False
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("tracked_ignored_test", result.stdout)
+            self.assertIn("untracked_ignored_test", result.stdout)
+            self.assertNotIn("copied_ignored_test", result.stdout)
+
     def test_full_gate_enforces_function_size_like_preflight(self):
         script = (ROOT / "scripts/ci-local.sh").read_text()
         full = script.split("run_full() {", 1)[1].split("run_integration()", 1)[0]
