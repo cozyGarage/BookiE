@@ -528,7 +528,9 @@ impl WorkspaceStore {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             memory.cache.remove(&id);
-            memory.saved_at.remove(&id);
+            memory.clock += 1;
+            let clock = memory.clock;
+            memory.saved_at.insert(id, clock);
             let mut queue = self
                 .inner
                 .writer
