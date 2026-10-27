@@ -69,6 +69,12 @@ From the 2026-10-22 dbflux review and the audit of closed issues. Each is an iss
 
 The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain related dbflux design notes in their comments. Vendored dependency patches: see [upstream patches](proposals/upstream-patches.md); `mongodb` SCRAM hunk can be dropped after the release containing [mongo-rust-driver#1833](https://github.com/mongodb/mongo-rust-driver/pull/1833).
 
+## UI resource-lifetime follow-ups
+
+| Issue | Item | Lane |
+|---|---|---|
+| [#1733](https://github.com/cozyGarage/BookiE/issues/1733) | Release grid editor popovers and their cells after closing enum/set, calendar, numeric, text and JSON editors | UX |
+
 ## Feature candidates
 
 The native workflow improvements are tracked by [UI-44 / #1349](https://github.com/cozyGarage/BookiE/issues/1349): session transaction actions, visible run scopes, bounded sidebar fields and resizing, exact header metadata and scope-first export. The [workspace spec](../specs/database-workspace/spec.md) owns behavior; the issue and PR own implementation and acceptance. These candidates are not assigned to a release. The related narrow-window sidebar fix landed in [#1346](https://github.com/cozyGarage/BookiE/pull/1346).

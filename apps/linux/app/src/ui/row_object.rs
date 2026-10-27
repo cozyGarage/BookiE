@@ -213,6 +213,14 @@ impl RowObject {
             .collect()
     }
 
+    pub(super) fn visit_cells(&self, mut visit: impl FnMut(usize, &Value) -> bool) -> bool {
+        let len = self.imp().cells.borrow().len();
+        (0..len).any(|index| {
+            self.with_cell_value(index, |value| visit(index, value))
+                .unwrap_or(false)
+        })
+    }
+
     pub fn clone_preserving_loading_state(&self) -> Self {
         let row: Self = glib::Object::new();
         *row.imp().cells.borrow_mut() = self.imp().cells.borrow().clone();

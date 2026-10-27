@@ -1,0 +1,63 @@
+{
+  "base": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+  "fixed_commit": "cca4237ce",
+  "environment": {
+    "display": "isolated Xvfb",
+    "input_method": "simple",
+    "G_DEBUG": "fatal-criticals"
+  },
+  "focused_regressions": [
+    {
+      "test": "ui::import_dialog::lifetime_tests::import_format_controls_release_their_source_bytes",
+      "before": "1 failed, 0 passed",
+      "after": "1 passed, 0 failed"
+    },
+    {
+      "test": "ui::import_dialog::lifetime_tests::dismissing_import_setup_releases_its_callback",
+      "before": "1 failed, 0 passed",
+      "after": "1 passed, 0 failed"
+    }
+  ],
+  "source_sha256": {
+    "apps/linux/app/src/ui/import_dialog.rs": "c24884317f5ea3b4920b2288217e074ce6272235d10496eff75f933ca92ad294",
+    "apps/linux/app/src/ui/import_dialog/lifetime_tests.rs": "39fb11ac139afa22ba111caea37505a9581d77376d8b2c9eeb2df961a7a2c28b",
+    "scripts/isolated-tests.json": "b53ad270f55f9154220da93bcb11076a9034677c5189af8131984df42ee5b505"
+  },
+  "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings",
+  "remaining": [
+    "Forgejo gate"
+  ],
+  "installed_acceptance": {
+    "profile": "ci",
+    "display": "isolated Xvfb with AT-SPI",
+    "scenarios": [
+      "import_refreshes_only_the_imported_table",
+      "failed_import_keeps_unrelated_edits",
+      "import_refreshes_every_open_tab_of_the_imported_table"
+    ],
+    "result": "3 passed",
+    "binary_sha256": "1106e73b581b2f4323a975243b5f0a8f0b78312859b434facd172da7c924e73a"
+  },
+  "preflight": {
+    "unit": 2197,
+    "sandbox": 291,
+    "redis_cancellation": 1,
+    "result": "passed"
+  },
+  "gtk_widgets": {
+    "executed": 177,
+    "result": "passed",
+    "input_method": "ordinary suite environment"
+  },
+  "installed_security": {
+    "scenarios": [
+      "overlong_pasted_sql_is_refused_without_replacing_the_editor",
+      "audit_failure_denies",
+      "audit_journal_loss_after_connection_denies_mutation",
+      "bundle_export_records_sanitized_audit_outcome",
+      "bundle_import_records_sanitized_audit_outcome"
+    ],
+    "result": "5 passed",
+    "binary_sha256": "1106e73b581b2f4323a975243b5f0a8f0b78312859b434facd172da7c924e73a"
+  }
+}

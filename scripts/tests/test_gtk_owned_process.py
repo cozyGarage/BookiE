@@ -9,6 +9,8 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
+import json
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -30,6 +32,34 @@ def ux_function(name, ui):
 
 
 class GtkOwnedBoundaryTests(unittest.TestCase):
+    def test_foreign_mcp_listener_receives_no_fixture_request(self):
+        source = ROOT / "apps/linux/app/tests/gtk_safety.py"
+        tree = ast.parse(source.read_text())
+        node = next(item for item in tree.body if isinstance(item, ast.FunctionDef)
+                    and item.name == "mcp_client_disconnect_cancels_pending_approval")
+        sent = []
+        closed = []
+        client = SimpleNamespace(sendall=sent.append, close=lambda: closed.append(True))
+
+        def refuse(_port):
+            raise AssertionError("foreign listener")
+
+        namespace = dict(json=json, time=time, WAIT_SECONDS=1, POLL_SECONDS=0.01,
+                         MCP_HTTP_PORT=17432, MCP_DISCONNECT_TEST_TOKEN="fixture-only",
+                         storage_dir_name=lambda: "fixture", owned_application=lambda: SimpleNamespace(
+                             assert_owns_tcp_listener=refuse), socket=SimpleNamespace(
+                                 create_connection=lambda *args, **kwargs: client))
+        exec(compile(ast.Module(body=[node], type_ignores=[]), str(source), "exec"), namespace)
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            journal = base / "data/fixture/audit.jsonl"
+            journal.parent.mkdir(parents=True)
+            journal.write_text("")
+            with self.assertRaisesRegex(AssertionError, "foreign listener"):
+                namespace[node.name](None, base)
+        self.assertEqual(sent, [])
+        self.assertEqual(closed, [True])
+
     def fake_file(self, path, mode="r", *args, **kwargs):
         pid = str(path).split("/")[2]
         if str(path).endswith("environ"):
@@ -96,6 +126,47 @@ class OwnedApplicationTests(unittest.TestCase):
 
     def test_profile_metadata_identifies_the_owned_process_lifetime(self):
         self.assertEqual(self.owner.identity(), {"application_pid": 202, "application_start_ticks": 17})
+
+    def listener_fixture(self, owner, state="0A"):
+        net = self.root / "202/net"
+        net.mkdir(exist_ok=True)
+        (net / "tcp").write_text(
+            "header\n" + f"0: 0100007F:4418 00000000:0000 {state} 0:0 0:0 0 1000 0 12345\n"
+        )
+        descriptors = self.root / str(owner) / "fd"
+        descriptors.mkdir(exist_ok=True)
+        (descriptors / "9").symlink_to("socket:[12345]")
+        (self.root / "202/fd").mkdir(exist_ok=True)
+
+    def test_an_owned_loopback_listener_is_accepted(self):
+        self.listener_fixture(202)
+        self.owner.assert_owns_tcp_listener(17432)
+
+    def test_a_foreign_listener_on_the_same_port_is_refused(self):
+        self.listener_fixture(101)
+        with self.assertRaises(AssertionError):
+            self.owner.assert_owns_tcp_listener(17432)
+
+    def test_an_established_connection_is_not_a_listener(self):
+        self.listener_fixture(202, "01")
+        with self.assertRaises(AssertionError):
+            self.owner.assert_owns_tcp_listener(17432)
+
+    def test_a_real_owned_child_listener_is_accepted(self):
+        child = subprocess.Popen(
+            [sys.executable, "-c", "import socket,time; s=socket.socket(); s.bind(('127.0.0.1',0)); "
+             "s.listen(); print(s.getsockname()[1],flush=True); time.sleep(30)"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+        try:
+            self.assertTrue(select.select([child.stdout], [], [], 5)[0])
+            port = int(child.stdout.readline())
+            owner = gtk_process.OwnedApplication(child, sys.executable, {})
+            owner.assert_owns_tcp_listener(port)
+        finally:
+            child.terminate()
+            child.wait(timeout=5)
+            child.stdout.close()
 
     def test_an_exited_process_is_refused(self):
         self.code = 0
