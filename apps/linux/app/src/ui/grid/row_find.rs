@@ -1,3 +1,4 @@
+use std::io::{self, Write};
 use std::rc::Rc;
 
 use gtk4 as gtk;
@@ -30,14 +31,18 @@ impl CaseInsensitivePattern {
 
     fn matches(&self, text: &str) -> bool {
         let mut matched = 0;
+        self.matches_from(&mut matched, text)
+    }
+
+    fn matches_from(&self, matched: &mut usize, text: &str) -> bool {
         for character in text.chars().flat_map(char::to_lowercase) {
-            while matched > 0 && character != self.characters[matched] {
-                matched = self.prefix[matched - 1];
+            while *matched > 0 && character != self.characters[*matched] {
+                *matched = self.prefix[*matched - 1];
             }
-            if character == self.characters[matched] {
-                matched += 1;
+            if character == self.characters[*matched] {
+                *matched += 1;
             }
-            if matched == self.characters.len() {
+            if *matched == self.characters.len() {
                 return true;
             }
         }
@@ -45,16 +50,108 @@ impl CaseInsensitivePattern {
     }
 }
 
+struct JsonSearchWriter<'a> {
+    pattern: &'a CaseInsensitivePattern,
+    matched: usize,
+    found: bool,
+    pending: [u8; 4],
+    pending_len: usize,
+}
+
+impl<'a> JsonSearchWriter<'a> {
+    fn new(pattern: &'a CaseInsensitivePattern) -> Self {
+        Self {
+            pattern,
+            matched: 0,
+            found: false,
+            pending: [0; 4],
+            pending_len: 0,
+        }
+    }
+
+    fn matches(&self) -> bool {
+        self.found && self.pending_len == 0
+    }
+
+    fn scan(&mut self, text: &str) {
+        self.found = self.pattern.matches_from(&mut self.matched, text);
+    }
+}
+
+impl Write for JsonSearchWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if bytes.is_empty() || self.found {
+            return Ok(bytes.len());
+        }
+        let mut rest = bytes;
+        if self.pending_len > 0 {
+            let width = utf8_width(self.pending[0]).ok_or(io::ErrorKind::InvalidData)?;
+            let needed = width - self.pending_len;
+            let copied = needed.min(rest.len());
+            self.pending[self.pending_len..self.pending_len + copied].copy_from_slice(&rest[..copied]);
+            self.pending_len += copied;
+            rest = &rest[copied..];
+            if self.pending_len < width {
+                return Ok(bytes.len());
+            }
+            let completed = self.pending;
+            let text = std::str::from_utf8(&completed[..width]).map_err(io::Error::other)?;
+            self.scan(text);
+            self.pending_len = 0;
+            if self.found {
+                return Ok(bytes.len());
+            }
+        }
+        match std::str::from_utf8(rest) {
+            Ok(text) => self.scan(text),
+            Err(error) => {
+                let end = error.valid_up_to();
+                let text = std::str::from_utf8(&rest[..end]).map_err(io::Error::other)?;
+                self.scan(text);
+                if self.found {
+                    return Ok(bytes.len());
+                }
+                let incomplete = &rest[end..];
+                if error.error_len().is_some() || incomplete.len() > 3 {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                self.pending[..incomplete.len()].copy_from_slice(incomplete);
+                self.pending_len = incomplete.len();
+            }
+        }
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn utf8_width(first: u8) -> Option<usize> {
+    match first {
+        0x00..=0x7f => Some(1),
+        0xc2..=0xdf => Some(2),
+        0xe0..=0xef => Some(3),
+        0xf0..=0xf4 => Some(4),
+        _ => None,
+    }
+}
+
+fn matches_value(value: &Value, pattern: &CaseInsensitivePattern) -> bool {
+    let Value::Json(json) = value else {
+        return pattern.matches(&value_to_search_text(value));
+    };
+    let mut writer = JsonSearchWriter::new(pattern);
+    serde_json::to_writer(&mut writer, json).is_ok() && writer.matches()
+}
+
+#[cfg(test)]
 fn first_matching_cell(cells: &[Option<Value>], needle: &CaseInsensitivePattern) -> Option<(usize, String)> {
     cells
         .iter()
         .enumerate()
         .filter_map(|(column, value)| value.as_ref().map(|value| (column, value)))
-        .find_map(|(column, value)| {
-            needle
-                .matches(&value_to_search_text(value))
-                .then(|| (column, value_to_display_text(value)))
-        })
+        .find_map(|(column, value)| matches_value(value, needle).then(|| (column, value_to_display_text(value))))
 }
 
 fn prefix_lengths(pattern: &[char]) -> Vec<usize> {
@@ -74,21 +171,27 @@ fn prefix_lengths(pattern: &[char]) -> Vec<usize> {
 
 pub(super) fn matching_rows(
     count: u32,
-    row_at: impl Fn(u32) -> Option<Vec<Option<Value>>>,
+    mut visit_row: impl FnMut(u32, &mut dyn FnMut(usize, &Value) -> bool),
     query: &str,
     limit: usize,
 ) -> Vec<RowMatch> {
     let needle = query.trim().to_lowercase();
-    if needle.is_empty() {
+    if needle.is_empty() || limit == 0 {
         return Vec::new();
     }
     let needle = CaseInsensitivePattern::new(&needle);
     let mut found = Vec::new();
     for position in 0..count {
-        let Some(cells) = row_at(position) else {
-            continue;
-        };
-        if let Some((column, text)) = first_matching_cell(&cells, &needle) {
+        let mut matching_cell = None;
+        visit_row(position, &mut |column, value| {
+            if matches_value(value, &needle) {
+                matching_cell = Some((column, value_to_display_text(value)));
+                true
+            } else {
+                false
+            }
+        });
+        if let Some((column, text)) = matching_cell {
             found.push(RowMatch { position, column, text });
             if found.len() == limit {
                 break;
@@ -210,14 +313,12 @@ fn show_matches(widgets: &FindWidgets, model: &gtk::SelectionModel, names: &[Str
         .and_then(|model| model.downcast::<crate::ui::row_store::RowStore>().ok());
     let found = matching_rows(
         model.n_items(),
-        |position| {
-            let item = model.item(position)?.downcast::<RowObject>().ok()?;
-            Some(
-                row_store
-                    .as_ref()
-                    .and_then(|store| store.cells_for_search(position))
-                    .unwrap_or_else(|| item.loaded_cells()),
-            )
+        |position, visit| {
+            if let Some(store) = row_store.as_ref() {
+                store.visit_search_cells(position, visit);
+            } else if let Some(row) = model.item(position).and_then(|item| item.downcast::<RowObject>().ok()) {
+                row.visit_cells(visit);
+            }
         },
         &query,
         MAX_MATCHES,
@@ -322,9 +423,14 @@ mod tests {
         let rows = rows();
         matching_rows(
             rows.len() as u32,
-            |p| {
-                rows.get(p as usize)
-                    .map(|cells| cells.iter().cloned().map(Some).collect())
+            |p, visit| {
+                if let Some(cells) = rows.get(p as usize) {
+                    for (column, value) in cells.iter().enumerate() {
+                        if visit(column, value) {
+                            break;
+                        }
+                    }
+                }
             },
             query,
             limit,
@@ -346,6 +452,28 @@ mod tests {
     }
 
     #[test]
+    fn typed_json_search_matches_its_compact_serialized_representation() {
+        let json = serde_json::json!({"Name": "Zoë", "count": 42});
+        let value = Value::Json(Box::new(json.clone()));
+        let serialized = json.to_string();
+        for query in ["name", "ZOË", "42", "missing"] {
+            let pattern = CaseInsensitivePattern::new(query);
+            assert_eq!(matches_value(&value, &pattern), pattern.matches(&serialized));
+        }
+    }
+
+    #[test]
+    fn typed_json_search_matches_unicode_split_across_writer_chunks() {
+        let pattern = CaseInsensitivePattern::new("😀i\u{307}");
+        let serialized = serde_json::json!({"emoji": "😀İ"}).to_string();
+        let mut writer = JsonSearchWriter::new(&pattern);
+        for byte in serialized.bytes() {
+            writer.write_all(&[byte]).unwrap();
+        }
+        assert!(writer.matches());
+    }
+
+    #[test]
     fn an_empty_query_matches_nothing() {
         assert!(find("", 10).is_empty());
         assert!(find("   ", 10).is_empty());
@@ -353,7 +481,14 @@ mod tests {
 
     #[test]
     fn a_missing_projected_cell_is_not_a_search_match() {
-        let found = matching_rows(1, |_| Some(vec![Some(Value::Int(1)), None]), "not fetched", 10);
+        let found = matching_rows(
+            1,
+            |_, visit| {
+                visit(0, &Value::Int(1));
+            },
+            "not fetched",
+            10,
+        );
         assert!(found.is_empty());
     }
 
@@ -395,7 +530,14 @@ mod tests {
         });
         let store = crate::ui::row_store::RowStore::from_shared_with_previews(result, vec![0]);
 
-        let found = matching_rows(1, |position| store.cells_for_search(position), "needle", 10);
+        let found = matching_rows(
+            1,
+            |position, visit| {
+                store.visit_search_cells(position, visit);
+            },
+            "needle",
+            10,
+        );
         assert_eq!(
             found.iter().map(|hit| (hit.position, hit.column)).collect::<Vec<_>>(),
             vec![(0, 1)]
@@ -414,5 +556,68 @@ mod tests {
         assert!(!shown.contains('\n'));
         assert_eq!(shown.chars().count(), PREVIEW_CHARS + 1);
         assert!(shown.ends_with('…'));
+    }
+
+    #[test]
+    fn large_shared_value_search_has_bounded_temporary_memory() {
+        const KIND_ENV: &str = "BOOKIE_LARGE_ROW_SEARCH_KIND";
+        if let Ok(kind) = std::env::var(KIND_ENV) {
+            let mut text = String::with_capacity(64 * 1024 * 1024);
+            text.extend(std::iter::repeat_n('x', 64 * 1024 * 1024 - 6));
+            text.push_str("needle");
+            let value = match kind.as_str() {
+                "text" => Value::Text(text),
+                "json" => Value::Json(Box::new(serde_json::Value::String(text))),
+                _ => panic!("unknown row search fixture kind"),
+            };
+            let result = std::sync::Arc::new(tablepro_core::QueryResult {
+                columns: Vec::new(),
+                rows: vec![vec![value]],
+                truncated: false,
+            });
+            let store = crate::ui::row_store::RowStore::from_shared(result);
+            let before = peak_memory_kib();
+            let found = matching_rows(
+                1,
+                |position, visit| {
+                    store.visit_search_cells(position, visit);
+                },
+                "needle",
+                1,
+            );
+            let extra = peak_memory_kib().saturating_sub(before);
+            eprintln!("row-search-memory kind={kind} extra_peak_kib={extra}");
+            assert_eq!(found.len(), 1);
+            assert!(
+                extra < 16 * 1024,
+                "large-value search allocated {extra} KiB beyond its source"
+            );
+            return;
+        }
+
+        for kind in ["text", "json"] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "ui::grid::row_find::tests::large_shared_value_search_has_bounded_temporary_memory",
+                    "--nocapture",
+                ])
+                .env(KIND_ENV, kind)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{kind} row search exceeded its memory budget:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
+    fn peak_memory_kib() -> usize {
+        std::fs::read_to_string("/proc/self/status")
+            .expect("process memory status")
+            .lines()
+            .find_map(|line| line.strip_prefix("VmHWM:")?.split_whitespace().next()?.parse().ok())
+            .expect("peak resident memory")
     }
 }
