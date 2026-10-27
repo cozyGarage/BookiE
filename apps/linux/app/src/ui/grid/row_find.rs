@@ -80,8 +80,11 @@ impl<'a> JsonSearchWriter<'a> {
 
 impl Write for JsonSearchWriter<'_> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if bytes.is_empty() || self.found {
+        if bytes.is_empty() {
             return Ok(bytes.len());
+        }
+        if self.found {
+            return Err(io::ErrorKind::Other.into());
         }
         let mut rest = bytes;
         if self.pending_len > 0 {
@@ -99,7 +102,7 @@ impl Write for JsonSearchWriter<'_> {
             self.scan(text);
             self.pending_len = 0;
             if self.found {
-                return Ok(bytes.len());
+                return Err(io::ErrorKind::Other.into());
             }
         }
         match std::str::from_utf8(rest) {
@@ -109,7 +112,7 @@ impl Write for JsonSearchWriter<'_> {
                 let text = std::str::from_utf8(&rest[..end]).map_err(io::Error::other)?;
                 self.scan(text);
                 if self.found {
-                    return Ok(bytes.len());
+                    return Err(io::ErrorKind::Other.into());
                 }
                 let incomplete = &rest[end..];
                 if error.error_len().is_some() || incomplete.len() > 3 {
@@ -118,6 +121,9 @@ impl Write for JsonSearchWriter<'_> {
                 self.pending[..incomplete.len()].copy_from_slice(incomplete);
                 self.pending_len = incomplete.len();
             }
+        }
+        if self.found {
+            return Err(io::ErrorKind::Other.into());
         }
         Ok(bytes.len())
     }
@@ -142,7 +148,8 @@ fn matches_value(value: &Value, pattern: &CaseInsensitivePattern) -> bool {
         return pattern.matches(&value_to_search_text(value));
     };
     let mut writer = JsonSearchWriter::new(pattern);
-    serde_json::to_writer(&mut writer, json).is_ok() && writer.matches()
+    let _ = serde_json::to_writer(&mut writer, json);
+    writer.matches()
 }
 
 #[cfg(test)]
@@ -410,6 +417,24 @@ fn select_and_scroll(view: &gtk::ColumnView, position: u32) {
 mod tests {
     use super::*;
 
+    struct SerializationReached(std::cell::Cell<bool>);
+
+    impl serde::Serialize for SerializationReached {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.set(true);
+            serializer.serialize_str("later")
+        }
+    }
+
+    #[derive(serde::Serialize)]
+    struct JsonSearchSerializationProbe<'a> {
+        first: &'a str,
+        tail: &'a SerializationReached,
+    }
+
     fn rows() -> Vec<Vec<Value>> {
         vec![
             vec![Value::Int(1), Value::Text("Alice Smith".into())],
@@ -468,9 +493,26 @@ mod tests {
         let serialized = serde_json::json!({"emoji": "😀İ"}).to_string();
         let mut writer = JsonSearchWriter::new(&pattern);
         for byte in serialized.bytes() {
-            writer.write_all(&[byte]).unwrap();
+            if writer.write_all(&[byte]).is_err() {
+                break;
+            }
         }
         assert!(writer.matches());
+    }
+
+    #[test]
+    fn typed_json_search_stops_serialization_after_a_match() {
+        let pattern = CaseInsensitivePattern::new("needle");
+        let mut writer = JsonSearchWriter::new(&pattern);
+        let tail = SerializationReached(std::cell::Cell::new(false));
+        let probe = JsonSearchSerializationProbe {
+            first: "needle",
+            tail: &tail,
+        };
+        let error = serde_json::to_writer(&mut writer, &probe).unwrap_err();
+        assert!(error.is_io());
+        assert!(writer.matches());
+        assert!(!tail.0.get());
     }
 
     #[test]
