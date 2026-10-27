@@ -59,6 +59,7 @@
 
 ### Security
 
+- Updated the SSH library so a malicious or compromised SSH server can no longer exhaust BookiE's memory with repeated protocol messages or stall a tunnel by announcing a zero packet size.
 - Background session cleanup logs diagnostic categories without server error details.
 
 ### Fixed
