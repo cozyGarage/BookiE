@@ -1,6 +1,7 @@
 use gtk4 as gtk;
 use gtk4::prelude::*;
 use libadwaita as adw;
+use std::io::{self, Write};
 
 use tablepro_core::Value;
 
@@ -12,28 +13,20 @@ const HEX_MAX_BYTES: usize = 16 * 1024;
 
 pub(super) fn body(value: &Value) -> String {
     let text = match value {
+        Value::Text(text) | Value::JsonText(text) => return capped(text),
         Value::Null => readonly_null_sentinel(),
-        Value::Bytes(bytes) if is_binary(bytes) => hex_dump(bytes),
-        Value::Json(json) => serde_json::to_string_pretty(json).unwrap_or_else(|_| json.to_string()),
-        Value::JsonText(json) => json.clone(),
-        other => pretty_if_json(value_to_full_edit_text(other)),
+        Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
+            Ok(text) if !text.contains('\0') => return capped(text),
+            _ => hex_dump(bytes),
+        },
+        Value::Json(json) => return json_preview(json),
+        other => value_to_full_edit_text(other),
     };
-    capped(text)
-}
-
-fn is_binary(bytes: &[u8]) -> bool {
-    std::str::from_utf8(bytes).map_or(true, |text| text.contains('\0'))
-}
-
-fn pretty_if_json(text: String) -> String {
-    let trimmed = text.trim_start();
-    if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
-        return text;
+    if text.len() > MAX_VIEW_BYTES {
+        capped(&text)
+    } else {
+        text
     }
-    serde_json::from_str::<serde_json::Value>(&text)
-        .ok()
-        .and_then(|json| serde_json::to_string_pretty(&json).ok())
-        .unwrap_or(text)
 }
 
 fn hex_dump(bytes: &[u8]) -> String {
@@ -69,18 +62,53 @@ fn hex_dump(bytes: &[u8]) -> String {
     out
 }
 
-fn capped(text: String) -> String {
+fn capped(text: &str) -> String {
     if text.len() <= MAX_VIEW_BYTES {
-        return text;
+        return text.to_owned();
     }
     let mut end = MAX_VIEW_BYTES;
     while !text.is_char_boundary(end) {
         end -= 1;
     }
-    let note = crate::tr!("Showing the first {shown} of {total} bytes. Copy value copies the whole value.")
-        .replace("{shown}", &end.to_string())
-        .replace("{total}", &text.len().to_string());
-    format!("{}\n\n{note}", &text[..end])
+    format!("{}\n\n{}", &text[..end], truncation_note(end, text.len()))
+}
+
+fn json_preview(value: &serde_json::Value) -> String {
+    let mut preview = PreviewWriter::default();
+    if serde_json::to_writer_pretty(&mut preview, value).is_err() {
+        return crate::tr!("This JSON value could not be previewed.");
+    }
+    let end = std::str::from_utf8(&preview.bytes).map_or_else(|error| error.valid_up_to(), |_| preview.bytes.len());
+    let text = String::from_utf8_lossy(&preview.bytes[..end]).into_owned();
+    if preview.total <= MAX_VIEW_BYTES {
+        return text;
+    }
+    format!("{text}\n\n{}", truncation_note(end, preview.total))
+}
+
+fn truncation_note(shown: usize, total: usize) -> String {
+    crate::tr!("Showing the first {shown} of {total} bytes. Copy value copies the whole value.")
+        .replace("{shown}", &shown.to_string())
+        .replace("{total}", &total.to_string())
+}
+
+#[derive(Default)]
+struct PreviewWriter {
+    bytes: Vec<u8>,
+    total: usize,
+}
+
+impl Write for PreviewWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let available = MAX_VIEW_BYTES.saturating_sub(self.bytes.len());
+        self.bytes.extend_from_slice(&bytes[..bytes.len().min(available)]);
+        self.total = self.total.saturating_add(bytes.len());
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 fn build_text_view(text: &str) -> gtk::TextView {
@@ -105,13 +133,19 @@ fn build_text_view(text: &str) -> gtk::TextView {
     view
 }
 
-pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: &Value, copy_text: String) {
-    let view = build_text_view(&body(value));
+pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value, null_copy_text: Option<String>) {
+    let view = build_text_view(&body(&value));
     let scroller = gtk::ScrolledWindow::builder().child(&view).vexpand(true).build();
 
     let copy = gtk::Button::with_label(&crate::tr!("Copy value"));
     copy.add_css_class("suggested-action");
-    copy.connect_clicked(move |button| button.clipboard().set_text(&copy_text));
+    copy.connect_clicked(move |button| {
+        let text = null_copy_text
+            .as_deref()
+            .map(str::to_owned)
+            .unwrap_or_else(|| value_to_full_edit_text(&value));
+        button.clipboard().set_text(&text);
+    });
     let header = adw::HeaderBar::new();
     header.pack_end(&copy);
     let toolbar = adw::ToolbarView::new();
@@ -135,8 +169,80 @@ mod tests {
     use super::*;
 
     #[test]
-    fn json_text_is_pretty_printed_and_plain_text_is_left_alone() {
-        assert_eq!(body(&Value::Text(r#"{"a":1}"#.into())), "{\n  \"a\": 1\n}");
+    fn oversized_text_view_keeps_extra_memory_bounded() {
+        const CHILD_KIND: &str = "BOOKIE_VALUE_VIEW_MEMORY_KIND";
+        if let Ok(kind) = std::env::var(CHILD_KIND) {
+            let text = "é".repeat(32 * 1024 * 1024);
+            let expected_bytes = text.len() + usize::from(kind == "json") * 2;
+            let value = match kind.as_str() {
+                "text" => Value::Text(text),
+                "json-text" => Value::JsonText(text),
+                "bytes" => Value::Bytes(text.into_bytes()),
+                "json" => Value::Json(Box::new(serde_json::Value::String(text))),
+                _ => panic!("unknown synthetic value kind"),
+            };
+            let before = peak_memory_kib();
+            let shown = body(&value);
+            let extra = peak_memory_kib().saturating_sub(before);
+            eprintln!("viewer-memory kind={kind} input_bytes={expected_bytes} extra_peak_kib={extra}");
+            assert!(shown.len() < MAX_VIEW_BYTES + 200);
+            assert!(shown.contains(&format!("{expected_bytes} bytes")));
+            assert!(
+                extra < 16 * 1024,
+                "capped value viewing allocated {extra} KiB beyond its input"
+            );
+            return;
+        }
+        for kind in ["text", "json-text", "bytes", "json"] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "ui::grid::value_viewer::tests::oversized_text_view_keeps_extra_memory_bounded",
+                    "--nocapture",
+                    "--test-threads=1",
+                ])
+                .env(CHILD_KIND, kind)
+                .output()
+                .unwrap();
+            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stdout));
+        }
+    }
+
+    fn peak_memory_kib() -> u64 {
+        std::fs::read_to_string("/proc/self/status")
+            .unwrap()
+            .lines()
+            .find_map(|line| line.strip_prefix("VmHWM:"))
+            .unwrap()
+            .split_whitespace()
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap()
+    }
+
+    #[test]
+    fn json_looking_text_preserves_duplicate_keys_numbers_and_whitespace() {
+        for text in [
+            r#"{"a":1,"a":2}"#,
+            r#"  {"n":123456789012345678901234567890.000,"e":1e+004}  "#,
+            "\n[1, 2, 3]\t",
+            r#"{"escape":"\u0061","unicode":"é"}"#,
+        ] {
+            for value in [
+                Value::Text(text.into()),
+                Value::JsonText(text.into()),
+                Value::Bytes(text.as_bytes().to_vec()),
+            ] {
+                assert_eq!(body(&value), text);
+            }
+        }
+    }
+
+    #[test]
+    fn text_is_shown_without_reformatting() {
+        assert_eq!(body(&Value::Text(r#"{"a":1}"#.into())), r#"{"a":1}"#);
         assert_eq!(body(&Value::Text("{not json".into())), "{not json");
         assert_eq!(body(&Value::Text("hello".into())), "hello");
     }
@@ -177,6 +283,15 @@ mod tests {
     }
 
     #[test]
+    fn oversized_typed_json_preview_is_bounded_and_reports_serialized_size() {
+        let value = Value::Json(Box::new(serde_json::Value::String("é".repeat(MAX_VIEW_BYTES))));
+        let shown = body(&value);
+        let (preview, note) = shown.split_once("\n\n").expect("truncation notice");
+        assert!(preview.len() <= MAX_VIEW_BYTES);
+        assert!(note.contains(&format!("of {} bytes", MAX_VIEW_BYTES * 2 + 2)));
+    }
+
+    #[test]
     #[ignore = "requires an isolated GTK display"]
     fn the_viewer_dialog_builds_and_shows_the_full_value() {
         gtk::init().unwrap();
@@ -193,7 +308,7 @@ mod tests {
         assert!(end.has_tag(&tag));
         let window = adw::Window::new();
         window.present();
-        present(&window, "payload", &Value::Text(r#"{"a":1}"#.into()), "{}".into());
+        present(&window, "payload", Value::Text(r#"{"a":1}"#.into()), None);
         let dialogs = window.observe_children().n_items();
         assert!(dialogs >= 1);
         window.close();
