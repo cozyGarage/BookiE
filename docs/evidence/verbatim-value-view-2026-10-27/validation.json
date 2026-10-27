@@ -3,15 +3,17 @@
   "base": "887678414",
   "source_sha256": {
     "apps/linux/app/src/ui/grid/value_viewer.rs": "3b79261a73f0a0996c73b3f748c8bb291095768b911de063148db069c2fb9adc",
-    "apps/linux/app/tests/gtk_ux.py": "57a5cfd0622bc6fbb9315519c923b4d0aec651d706b98e01a24715cbde3703aa"
+    "apps/linux/app/tests/gtk_ux.py": "845b94131ac9ca844e106c9c514e57da1293e76fd0174408e457c5e36d9e51b4"
   },
   "negative_control": "new duplicate-key regression failed on original implementation",
   "focused_validation": "7 pure viewer tests passed; isolated GTK test deferred to widget runner",
-  "pending": [
-    "preflight",
-    "app Clippy",
-    "widgets",
-    "installed exact-text viewer scenario"
-  ],
-  "forgejo": "deferred during infrastructure migration"
+  "pending": [],
+  "forgejo": "deferred during infrastructure migration",
+  "validation": {
+    "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
+    "app_clippy": "passed",
+    "installed_e2e": "view_value_preserves_duplicate_json_keys_and_text_formatting passed using keyboard menu navigation",
+    "gtk_widgets": "179 isolated tests passed"
+  },
+  "installed_binary_sha256": "f961d264b7ef53ef5434cee008c362dfc3b5b2df7cda2be5dac4a5dc2df1df9f"
 }
