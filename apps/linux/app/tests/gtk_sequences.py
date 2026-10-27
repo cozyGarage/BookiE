@@ -22,6 +22,7 @@ DIALOGS = {
     "export": ("table:win.export-csv", "Export Results"),
     "value_viewer": ("grid-value:", "payload"),
     "column_visibility": ("grid-columns:", "Columns"),
+    "pending_sql": ("preview:", "Pending SQL"),
 }
 # AdwAlertDialog is not tracked: libadwaita keeps a closed alert alive even with no handlers.
 # Typing into a field before dismissal exercises the edit-then-discard path.
@@ -63,6 +64,13 @@ def scenarios(ui):
             ui.press_x11_key("Down")
             time.sleep(0.1)
         ui.press_x11_key("Return")
+
+    def open_pending_sql():
+        if ui.find_node(name="1 unsaved change") is None:
+            open_table()
+            ui.invoke(ui.wait_for_node(name="Insert row", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name="1 unsaved change")
+        ui.invoke(ui.wait_for_node(name="Preview SQL", role=ui.pyatspi.ROLE_PUSH_BUTTON))
 
     def open_grid_columns(database):
         insert_row(database)
@@ -128,6 +136,8 @@ def scenarios(ui):
             for index in range(CYCLES):
                 if action == "grid-value:":
                     open_grid_value()
+                elif action == "preview:":
+                    open_pending_sql()
                 elif action == "grid-columns:":
                     open_grid_columns(_database)
                 elif action.startswith("table:"):
