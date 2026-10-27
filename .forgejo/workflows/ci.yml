@@ -37,6 +37,7 @@ jobs:
         shell: bash
     env:
       CARGO_TARGET_DIR: /target
+      TMPDIR: /target
       CARGO_HOME: /cargo
       TABLEPRO_TOOL_DIR: /tools
       RUSTC_WRAPPER: ""
@@ -58,6 +59,7 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Script harness and guards
         run: |
+          mkdir -p "$TMPDIR"
           cd src
           cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
           bash scripts/test-harness.sh
