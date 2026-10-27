@@ -64,8 +64,14 @@ impl App {
         );
     }
 
-    pub(super) fn workspace_target(&self) -> Option<(Uuid, String)> {
-        Some((self.connection_id?, self.connected_database.clone()?))
+    pub(super) fn workspace_target(
+        &self,
+    ) -> Option<(Uuid, String, crate::services::workspace_state::WorkspaceSaveToken)> {
+        Some((
+            self.connection_id?,
+            self.connected_database.clone()?,
+            self.workspace_save_token.clone()?,
+        ))
     }
 
     fn replace_persist_timer(&self) {
@@ -79,13 +85,13 @@ impl App {
 
 fn do_persist_workspace_state(
     workspace: &workspace_state::WorkspaceStore,
-    target: Option<(Uuid, String)>,
+    target: Option<(Uuid, String, workspace_state::WorkspaceSaveToken)>,
     workspace_tabs: &std::rc::Rc<std::cell::RefCell<WorkspaceTabs<WorkspaceTab>>>,
     tab_view: Option<&relm4::adw::TabView>,
     collapsed_groups: Vec<String>,
     hidden_schemas: Vec<String>,
 ) {
-    let Some((connection_id, database)) = target else {
+    let Some((connection_id, database, save_token)) = target else {
         return;
     };
     let tabs = workspace_tabs.borrow();
@@ -124,9 +130,10 @@ fn do_persist_workspace_state(
         }
     }
     let active_idx = active_idx_among_kept(&kept, active_raw_index);
-    workspace.save_database(
+    workspace.save_database_for_session(
         connection_id,
         &database,
+        &save_token,
         ConnectionWorkspaceState {
             tabs: tab_records,
             active_idx,

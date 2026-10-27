@@ -5087,9 +5087,9 @@ dependencies = [
 
 [[package]]
 name = "russh"
-version = "0.64.1"
+version = "0.65.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba61e87b9ec9a39a59a6bbed4c0b8ff7fb07073405b24a767a1f2c8560ac8f58"
+checksum = "3bb77a4b259312b2abbc541bca1c13cb4e9b61c560a7fd894068c3b92e0c9dc3"
 dependencies = [
  "aes 0.9.3",
  "aws-lc-rs",
@@ -6316,7 +6316,6 @@ dependencies = [
  "relm4",
  "rust_decimal",
  "secrecy",
- "serde",
  "serde_json",
  "sha2 0.11.0",
  "sourceview5",
@@ -6442,7 +6441,6 @@ dependencies = [
  "tablepro-core",
  "tempfile",
  "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -6687,7 +6685,6 @@ dependencies = [
  "libc",
  "russh",
  "secrecy",
- "serde_json",
  "tempfile",
  "testcontainers",
  "thiserror",

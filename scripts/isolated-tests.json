@@ -1095,7 +1095,17 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::import_dialog::lifetime_tests::import_format_controls_release_their_source_bytes"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::structure_tab_dialogs::lifetime_tests::dismissing_index_setup_releases_its_dialog"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::import_dialog::lifetime_tests::dismissing_import_setup_releases_its_callback"
     ],
     [
       "tablepro-app",

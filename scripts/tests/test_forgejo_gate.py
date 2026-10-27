@@ -20,7 +20,14 @@ esac
 CURL = """import json, os, pathlib, sys
 fixture = pathlib.Path(os.environ['GATE_TEST_FIXTURE'])
 data = json.loads(fixture.read_text())
-if '/actions/runs/' in sys.argv[-1] and '/jobs' in sys.argv[-1]:
+if any('fixture-token' in arg for arg in sys.argv):
+    raise SystemExit('gate token passed in curl arguments')
+config = pathlib.Path(sys.argv[sys.argv.index('--config') + 1]).read_text()
+if 'header = "Authorization: token fixture-token"' not in config:
+    raise SystemExit('gate authorization header missing from curl config')
+if '/actions/jobs/' in sys.argv[-1] and '/logs' in sys.argv[-1]:
+    print(data['logs'])
+elif '/actions/runs/' in sys.argv[-1] and '/jobs' in sys.argv[-1]:
     print(json.dumps(data['tasks']))
 else:
     state = fixture.with_suffix('.polls')
@@ -41,7 +48,7 @@ def gate(tasks):
             path.write_text(source)
             path.chmod(0o755)
         fixture = root / 'fixture.json'
-        fixture.write_text(json.dumps({'run': {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml'}, 'tasks': tasks}))
+        fixture.write_text(json.dumps({'run': {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml'}, 'tasks': tasks, 'logs': 'compile failed: fixture error'}))
         token = root / 'token'
         token.write_text('fixture-token')
         env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'],
@@ -65,12 +72,13 @@ class ForgejoGateTests(unittest.TestCase):
 
     def test_failure_reporting_uses_jobs_for_the_failed_run(self):
         result = gate([
-            {'status': 'failure', 'name': 'expected-job'},
+            {'id': 101, 'status': 'failure', 'name': 'expected-job'},
             {'status': 'blocked', 'name': 'downstream-job'},
             {'status': 'success', 'name': 'passed-job'},
         ])
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('expected-job', result.stdout)
+        self.assertIn('compile failed: fixture error', result.stdout)
         self.assertNotIn('downstream-job', result.stdout)
         self.assertNotIn('passed-job', result.stdout)
 

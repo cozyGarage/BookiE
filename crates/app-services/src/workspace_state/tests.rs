@@ -260,7 +260,7 @@ fn prefetch_cannot_replace_a_save_started_while_snapshot_is_loading() {
     });
     load_started_receiver.recv().unwrap();
 
-    save_connection_coordinated(&memory, &queue, id, connection("SELECT new"));
+    save_connection_coordinated(&memory, &queue, id, connection("SELECT new"), None);
 
     continue_load_sender.send(()).unwrap();
     prefetch.join().unwrap();
@@ -300,7 +300,7 @@ fn a_save_does_not_wait_for_a_slow_prefetch() {
     let save_memory = Arc::clone(&memory);
     let save_queue = Arc::clone(&queue);
     let save = std::thread::spawn(move || {
-        save_connection_coordinated(&save_memory, &save_queue, id, connection("SELECT new"));
+        save_connection_coordinated(&save_memory, &save_queue, id, connection("SELECT new"), None);
         saved_sender.send(()).unwrap();
     });
     let finished_while_loading = saved_receiver.recv_timeout(std::time::Duration::from_secs(5)).is_ok();
@@ -754,4 +754,100 @@ fn dropping_unrestorable_structure_tabs_preserves_the_selected_editor() {
         matches!(&state.tabs[state.active_idx as usize], WorkspaceTabRecord::Editor { query, .. } if query == "selected")
     );
     assert_eq!(state.tabs.len(), 2);
+}
+
+#[test]
+fn forgotten_connection_drafts_are_not_recreated_by_a_late_save() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("workspace.json");
+    let drafts = directory.path().join("drafts");
+    let id = Uuid::new_v4();
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    store.save_connection(id, connection("SELECT before_delete"));
+    store
+        .flush()
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    store.forget_connection(id);
+    store.save_connection(id, connection("SELECT after_delete"));
+    store
+        .flush()
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    let reopened = WorkspaceStore::new(Some(path), drafts.clone());
+    reopened.prefetch_connections(&[id]).unwrap();
+    assert!(
+        reopened.load_connection(id).is_none(),
+        "deleted workspace was recreated"
+    );
+    assert!(
+        !drafts.join(id.to_string()).exists(),
+        "deleted SQL draft directory was recreated"
+    );
+}
+
+#[test]
+fn a_writer_batch_waiting_for_the_file_lock_skips_a_forgotten_connection() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("workspace.json");
+    let drafts = directory.path().join("drafts");
+    let id = Uuid::new_v4();
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    let file_guard = store.inner.file_lock.lock().unwrap();
+    store.save_connection(id, connection("SELECT queued_before_delete"));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !store.inner.writer.queue.lock().unwrap().pending.is_empty() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "writer did not take pending batch"
+        );
+        std::thread::yield_now();
+    }
+    store.inner.writer.queue.lock().unwrap().forgotten.insert(id);
+    drop(file_guard);
+    store
+        .flush()
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    let reopened = WorkspaceStore::new(Some(path), drafts.clone());
+    reopened.prefetch_connections(&[id]).unwrap();
+    assert!(reopened.load_connection(id).is_none());
+    assert!(!drafts.join(id.to_string()).exists());
+}
+
+#[test]
+fn forgetting_one_connection_preserves_another_connections_drafts() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("workspace.json");
+    let drafts = directory.path().join("drafts");
+    let deleted = Uuid::new_v4();
+    let retained = Uuid::new_v4();
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    store.save_connection(deleted, connection("SELECT deleted"));
+    store.save_connection(retained, connection("SELECT retained"));
+    store
+        .flush()
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    store.forget_connection(deleted);
+    let clone = store.clone();
+    clone.save_connection(deleted, connection("SELECT late_deleted"));
+    clone.save_connection(retained, connection("SELECT updated_retained"));
+    clone
+        .flush()
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    let reopened = WorkspaceStore::new(Some(path), drafts.clone());
+    reopened.prefetch_connections(&[deleted, retained]).unwrap();
+    assert!(reopened.load_connection(deleted).is_none());
+    let restored = reopened.load_connection(retained).unwrap();
+    assert!(
+        matches!(&restored.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT updated_retained")
+    );
+    assert!(!drafts.join(deleted.to_string()).exists());
 }
