@@ -321,3 +321,66 @@ fn saving_one_connection_preserves_an_external_change_to_an_unrelated_draft() {
         draft_id
     );
 }
+
+#[test]
+fn an_unreadable_unrequested_draft_does_not_block_a_healthy_workspace() {
+    assert_unrelated_workspace_restores(false);
+}
+
+#[test]
+fn an_unreadable_unrequested_draft_path_does_not_block_a_healthy_workspace() {
+    assert_unrelated_workspace_restores(true);
+}
+
+fn assert_unrelated_workspace_restores(unreadable_path: bool) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("workspace.json");
+    let drafts = directory.path().join("drafts");
+    let broken = Uuid::new_v4();
+    let healthy = Uuid::new_v4();
+    let draft = Uuid::new_v4();
+    let writer = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    writer.save_connection(
+        broken,
+        ConnectionWorkspaceState {
+            tabs: vec![WorkspaceTabRecord::Editor {
+                query: "SELECT 'preserve'".into(),
+                draft_id: Some(draft),
+                file: None,
+            }],
+            ..Default::default()
+        },
+    );
+    writer.save_connection(healthy, ConnectionWorkspaceState::default());
+    assert_eq!(flush(&writer), Ok(()));
+    let body = drafts.join(broken.to_string()).join(format!("{draft}.sql"));
+    if unreadable_path {
+        std::fs::remove_file(&body).unwrap();
+        std::fs::create_dir(&body).unwrap();
+    } else {
+        std::fs::write(&body, [0xff]).unwrap();
+    }
+    let metadata = std::fs::read(&path).unwrap();
+    let reader = WorkspaceStore::new(Some(path.clone()), drafts);
+    assert_eq!(reader.prefetch_connections(&[healthy]), Ok(()));
+    assert!(reader.load_connection(healthy).is_some());
+    let mixed = WorkspaceStore::new(Some(path.clone()), directory.path().join("drafts"));
+    assert!(mixed.prefetch_connections(&[broken, healthy]).is_err());
+    assert!(mixed.load_connection(healthy).is_some());
+    assert!(mixed.load_connection(broken).is_none());
+    assert!(reader.prefetch_connections(&[broken]).is_err());
+    if unreadable_path {
+        assert!(body.is_dir());
+    } else {
+        assert_eq!(std::fs::read(&body).unwrap(), [0xff]);
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), metadata);
+    if unreadable_path {
+        std::fs::remove_dir(&body).unwrap();
+    } else {
+        std::fs::remove_file(&body).unwrap();
+    }
+    assert_eq!(reader.prefetch_connections(&[broken]), Ok(()));
+    let restored = reader.load_connection(broken).unwrap();
+    assert!(matches!(&restored.tabs[0], WorkspaceTabRecord::Editor { query, draft_id: None, .. } if query.is_empty()));
+}

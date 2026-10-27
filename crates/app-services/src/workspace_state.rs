@@ -333,6 +333,33 @@ fn load_locked(paths: &WorkspacePaths) -> Result<WorkspaceState, WorkspaceFlushE
     Ok(state)
 }
 
+#[derive(Default)]
+struct WorkspacePrefetch {
+    state: WorkspaceState,
+    unreadable: HashSet<Uuid>,
+}
+
+fn prefetch_locked(paths: &WorkspacePaths, ids: &[Uuid]) -> Result<WorkspacePrefetch, WorkspaceFlushError> {
+    let path = paths.state.as_deref().ok_or(WorkspaceFlushError::WriteFailed)?;
+    let mut state = workspace_disk::load_metadata(path).map_err(|error| {
+        tracing::warn!(%error, "workspace could not be read; existing files will be preserved");
+        WorkspaceFlushError::WriteFailed
+    })?;
+    let mut unreadable = HashSet::new();
+    state
+        .connections
+        .retain(|id, _| Uuid::parse_str(id).is_ok_and(|id| ids.contains(&id)));
+    for (id, workspace) in &mut state.connections {
+        let id = Uuid::parse_str(id).map_err(|_| WorkspaceFlushError::WriteFailed)?;
+        if let Err(error) = workspace_disk::load_connection_drafts(id, workspace, &paths.drafts) {
+            tracing::warn!(connection = %id, %error, "workspace draft could not be read; existing files will be preserved");
+            unreadable.insert(id);
+        }
+    }
+    clamp(&mut state);
+    Ok(WorkspacePrefetch { state, unreadable })
+}
+
 fn save_locked(paths: &WorkspacePaths, mut state: WorkspaceState) -> Result<(), WorkspaceFlushError> {
     let path = paths.state.as_deref().ok_or(WorkspaceFlushError::WriteFailed)?;
     clamp(&mut state);
@@ -378,7 +405,7 @@ impl WorkspaceStore {
                     .file_lock
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
-                load_locked(&self.inner.paths)
+                prefetch_locked(&self.inner.paths, ids)
             },
         )
     }
@@ -586,19 +613,22 @@ fn prefetch_connections_coordinated(
     memory: &Mutex<Memory>,
     ids: &[Uuid],
     flush: impl FnOnce(),
-    load: impl FnOnce() -> Result<WorkspaceState, WorkspaceFlushError>,
+    load: impl FnOnce() -> Result<WorkspacePrefetch, WorkspaceFlushError>,
 ) -> Result<(), WorkspaceFlushError> {
     let started = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clock;
     flush();
-    let state = load()?;
+    let loaded = load()?;
     let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for id in ids {
-        if memory.saved_at.get(id).is_some_and(|saved| *saved > started) {
+        if loaded.unreadable.contains(id) || memory.saved_at.get(id).is_some_and(|saved| *saved > started) {
             continue;
         }
         memory
             .cache
-            .insert(*id, state.connections.get(&id.to_string()).cloned());
+            .insert(*id, loaded.state.connections.get(&id.to_string()).cloned());
+    }
+    if !loaded.unreadable.is_empty() {
+        return Err(WorkspaceFlushError::WriteFailed);
     }
     Ok(())
 }

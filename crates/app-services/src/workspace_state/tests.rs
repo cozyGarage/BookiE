@@ -253,7 +253,10 @@ fn prefetch_cannot_replace_a_save_started_while_snapshot_is_loading() {
             || {
                 load_started_sender.send(()).unwrap();
                 continue_load_receiver.recv().unwrap();
-                Ok(disk_state)
+                Ok(WorkspacePrefetch {
+                    state: disk_state,
+                    ..Default::default()
+                })
             },
         )
         .unwrap();
@@ -289,7 +292,7 @@ fn a_save_does_not_wait_for_a_slow_prefetch() {
             || {
                 load_started_sender.send(()).unwrap();
                 continue_load_receiver.recv().unwrap();
-                Ok(WorkspaceState::default())
+                Ok(WorkspacePrefetch::default())
             },
         )
         .unwrap();
