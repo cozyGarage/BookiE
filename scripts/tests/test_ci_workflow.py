@@ -271,7 +271,8 @@ class CiWorkflowTests(unittest.TestCase):
         full = script.split("run_full() {", 1)[1].split("run_integration()", 1)[0]
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         selection = "--workspace --exclude tablepro-driver-duckdb --lib --bins"
-        self.assertIn(f"nextest run {selection}", ci)
+        self.assertIn("--archive-file \"$BOOKIE_TEST_BUNDLE/nextest.tar.zst\"", ci)
+        self.assertIn("-E 'kind(lib) | kind(bin)'", ci)
         self.assertIn('"$ROOT/scripts/ensure-nextest.sh"', full)
         self.assertIn(f'nextest run {selection} --profile "${{TABLEPRO_NEXTEST_PROFILE:-default}}" --no-tests=fail', full)
         self.assertNotIn("cargo test --workspace", full)

@@ -35,15 +35,21 @@ done
 echo "==> sandbox tier: all integration targets"
 NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
 PROFILE="${TABLEPRO_NEXTEST_PROFILE:-default}"
-ARCHIVE_ARGS=()
 if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then
   mkdir -p "${CARGO_TARGET_DIR:?Cargo target directory required}"
   export TMPDIR="$CARGO_TARGET_DIR"
   python3 "$ROOT/scripts/ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE" "${GITHUB_SHA:?source revision required}"
-  ARCHIVE_ARGS=(--archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$ROOT")
-elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
+  packages=""
+  for crate in "${CRATES[@]}"; do
+    packages+="${packages:+ | }package(=$crate)"
+  done
+  "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$ROOT" --profile "$PROFILE" --no-tests=fail -E "($packages) & kind(test)"
+  "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$ROOT" --profile "$PROFILE" --no-tests=fail -E 'package(=tablepro-driver-redis) & binary(=cancellation)'
+  exit 0
+fi
+if [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
   echo 'a source-matched prebuilt test bundle is required' >&2
   exit 1
 fi
-"$NEXTEST" nextest run "${PKG_ARGS[@]}" --test '*' --profile "$PROFILE" --no-tests=fail "${ARCHIVE_ARGS[@]}"
-"$NEXTEST" nextest run -p tablepro-driver-redis --test cancellation --profile "$PROFILE" --no-tests=fail "${ARCHIVE_ARGS[@]}"
+"$NEXTEST" nextest run "${PKG_ARGS[@]}" --test '*' --profile "$PROFILE" --no-tests=fail
+"$NEXTEST" nextest run -p tablepro-driver-redis --test cancellation --profile "$PROFILE" --no-tests=fail
