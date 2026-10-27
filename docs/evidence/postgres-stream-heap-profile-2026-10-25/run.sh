@@ -24,6 +24,9 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$RUNTIME/home" "$RUNTIME/config" "$RUNTIME/data" "$RUNTIME/cache" "$RUNTIME/state" "$RUNTIME/runtime"
+mkdir -p "$RUNTIME/data/dbus-1/services"
+printf '[D-BUS Service]\nName=org.a11y.Bus\nExec=/usr/lib/at-spi-bus-launcher\n' \
+  > "$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"
 chmod 0700 "$RUNTIME/runtime"
 test -x "$REAL_BINARY"
 
@@ -82,8 +85,7 @@ printf 'tablepro_test' | secret-tool store --label='BookiE result heap profile' 
   xdg:schema com.tablepro.linux.Password \
   connection-id 0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11 \
   kind db_password
-xvfb-run --auto-servernum --server-args='-screen 0 1280x1024x24 -nolisten tcp' \
-  bash "$RUNTIME/run-display.sh"
+bash "$RUNTIME/run-display.sh"
 INNER
 chmod 0700 "$RUNTIME/run-inner.sh"
 
@@ -126,7 +128,9 @@ export TABLEPRO_GTK_POSTGRES_PORT="$PORT"
 export TABLEPRO_GTK_DBUS_ACTIVE=1
 export TABLEPRO_GTK_KEYRING_READY=1
 
-dbus-run-session -- bash "$RUNTIME/run-inner.sh"
+xvfb-run --auto-servernum --server-args='-screen 0 1280x1024x24 -nolisten tcp' \
+  dbus-run-session -- bash "$RUNTIME/run-inner.sh"
+
 if [[ "$HEAPTRACK" == "1" ]]; then
   heaptrack_print "$OUTPUT_DIR/bookie.heaptrack.zst" \
     | sed "s|$REAL_BINARY|BookiE release binary|g" \
