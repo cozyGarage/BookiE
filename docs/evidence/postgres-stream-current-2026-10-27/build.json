@@ -1,0 +1,24 @@
+{
+  "source_commit": "5587ba7b537293661a8a23fbe8f5b7617ad83fbf",
+  "executable": {
+    "profile": "release",
+    "sha256": "f8ea6ba397470f38f530c7033e6ee244472448b0358bef458a0d8cfe782d4aeb"
+  },
+  "toolchain": {
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "gtk4": "4.24.1",
+    "libadwaita": "1.10.0",
+    "gtksourceview": "5.22.0"
+  },
+  "host": "Arch Linux x86_64, kernel 7.2.8-9-omarchy",
+  "database": "postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+  "profile": {
+    "rows": 2000000,
+    "columns": 10,
+    "cycles": 6,
+    "heaptrack": false,
+    "concurrent_compilation": true,
+    "runner_script_sha256": "91974dfbe3b5a1d24526603a540975a9ab57dfac483078bf220295e7fdcf6620",
+    "probe_sha256": "f80d6a7ffe85013196d09920f62deb200e1a387146c9c174584e4f3c5e43b73f"
+  }
+}

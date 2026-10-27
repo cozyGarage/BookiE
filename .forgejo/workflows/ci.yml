@@ -30,13 +30,16 @@ env:
 
 jobs:
   guards:
-    runs-on: ci-pilot
+    runs-on: any-host
     timeout-minutes: 90
     defaults:
       run:
         shell: bash
     env:
       TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+      CARGO_TARGET_DIR: /var/cache/ci/target/bookie-guards-${{ github.run_id }}
+      TMPDIR: /var/cache/ci/tmp/bookie-guards-${{ github.run_id }}
+      RUSTC_WRAPPER: ""
     steps:
       - name: Check out
         shell: bash
@@ -44,6 +47,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -54,7 +58,7 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Script harness and guards
         run: |
-          mkdir -p "$TMPDIR"
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           cd src
           cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
           bash scripts/test-harness.sh
@@ -64,6 +68,9 @@ jobs:
           python3 scripts/check-function-size.py
           python3 scripts/check-comment-lines.py
           cargo fmt --all -- --check
+      - name: Clean pilot scratch
+        if: always()
+        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
   gtk-build:
     runs-on: build-host
@@ -80,6 +87,7 @@ jobs:
       CARGO_TARGET_DIR: /target
       TMPDIR: /target
       TABLEPRO_TOOL_DIR: /tools
+      CARGO_PROFILE_CI_STRIP: symbols
     steps:
       - name: Check out
         shell: bash
@@ -230,7 +238,7 @@ jobs:
         run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/duckdb" "${{ github.sha }}" duckdb
 
   unit:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [test-build]
     timeout-minutes: 90
     steps:
@@ -265,7 +273,7 @@ jobs:
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
 
   sandbox:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [test-build]
     timeout-minutes: 90
     steps:
@@ -297,7 +305,7 @@ jobs:
           cd src && bash scripts/test-sandbox.sh
 
   widgets:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [test-build]
     timeout-minutes: 90
     steps:
@@ -376,7 +384,7 @@ jobs:
           retention-days: 2
 
   distro-floor:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, floor-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
@@ -431,7 +439,7 @@ jobs:
           fi
           cd src && package=$(cat "$GITHUB_WORKSPACE/floor-package-path") && PREVIOUS_DEB="$released" PREBUILT_DEB="$package" bash scripts/test-deb-package.sh ${{ matrix.base }}
   distro-floor-scenarios:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [distro-floor]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
@@ -440,7 +448,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout {0}
@@ -478,10 +486,10 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"
       - name: Distro-floor scenario shard
         run: |
-          cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-distro-floor.sh debian:testing
+          cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6 bash scripts/test-distro-floor.sh debian:testing
 
   driver:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -532,7 +540,7 @@ jobs:
           bash scripts/run-rust-tests.sh --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
 
   e2e:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, gtk-build, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -592,7 +600,7 @@ jobs:
           cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
 
   consumers:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -636,7 +644,7 @@ jobs:
           cd src && python3 scripts/run-isolated-tests.py app-server
 
   gtk:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, gtk-build, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
@@ -692,7 +700,7 @@ jobs:
           cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
 
   duckdb:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [duckdb-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 90
@@ -729,7 +737,7 @@ jobs:
           cd src
           bash scripts/run-rust-tests.sh --locked -p tablepro-driver-duckdb -- --include-ignored
   pg-release:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -770,7 +778,7 @@ jobs:
           cd src && ./scripts/test-postgres-release.sh
 
   pg-dump:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
@@ -806,12 +814,13 @@ jobs:
         run: cd src && ./scripts/test-pg-dump.sh
 
   socket-ssh:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
+      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout {0}
@@ -841,11 +850,17 @@ jobs:
       - name: PostgreSQL socket and SSH fixtures
         run: |
           cd src
+          cleanup_testcontainers() {
+            python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
+          }
+          trap cleanup_testcontainers EXIT
+          trap 'cleanup_testcontainers; exit 143' TERM
+          trap 'cleanup_testcontainers; exit 130' INT
           ./scripts/test-postgres-socket.sh
           bash ./scripts/test-ssh.sh
 
   gtk-server:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, gtk-build, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
@@ -906,7 +921,7 @@ jobs:
         run: |
           cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
   driver-tls:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
@@ -945,7 +960,7 @@ jobs:
           cd src && ./scripts/test-driver-tls.sh
 
   keyring:
-    runs-on: ci-pilot
+    runs-on: any-host
     needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30

@@ -13,7 +13,7 @@ esac
 mkdir -p "$output"
 output=$(realpath "$output")
 export CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-8}
-export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-debuginfo}"
+export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"
 for group in "${groups[@]}"; do
   selection=(--workspace --exclude tablepro-driver-duckdb)
   if [[ "$group" == duckdb ]]; then

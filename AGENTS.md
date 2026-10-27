@@ -30,8 +30,8 @@ Lanes keep parallel agents from editing the same files. Pick open work from [Pro
 
 | Lane | Owns |
 | --- | --- |
-| B3 | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display, the [B3 board pointer](docs/type-contract-strategy.md) |
-| B4 | Transport, guard, audit, SSH, rollback and acceptance: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage, the [B4 board pointer](docs/b4-task-board.md) |
+| B3 | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display, the [B3 board pointer](docs/lane-boards.md#b3-types-and-values) |
+| B4 | Transport, guard, audit, SSH, rollback and acceptance: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage, the [B4 board pointer](docs/lane-boards.md#b4-transport-and-sessions) |
 | UX | App layer (`apps/linux/`), packaging, CI and the lab, the ledger index, and shared documentation. UX also runs the Forgejo gate for every pull request that is green on GitHub and merges it once both agree |
 | Cursor | Documentation and tests only. UX reviews its test pull requests; the maintainer merges its documentation pull requests, which need no Forgejo run |
 | Maintainer | Decisions and anything needing a person or a real desktop |

@@ -40,7 +40,7 @@ Unless a file says otherwise, source code and documentation in this Linux reposi
 
 Packages:
 
-- `zopfli 0.8.3`
+- `zopfli 0.8.4`
 
 ```text
 Apache License
@@ -1670,7 +1670,7 @@ limitations under the License.
 
 Packages:
 
-- `encoding_rs 0.8.41`
+- `encoding_rs 0.8.42`
 
 ```text
 // Copyright © WHATWG (Apple, Google, Mozilla, Microsoft).
@@ -1946,7 +1946,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 Packages:
 
-- `encoding_rs 0.8.41`
+- `encoding_rs 0.8.42`
 
 ```text
 Copyright © WHATWG (Apple, Google, Mozilla, Microsoft).
@@ -1981,7 +1981,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Packages:
 
-- `xxhash-rust 0.8.18`
+- `xxhash-rust 0.8.19`
 
 ```text
 Boost Software License - Version 1.0 - August 17th, 2003
@@ -2143,7 +2143,7 @@ express Statement of Purpose.
 
 Packages:
 
-- `webpki-roots 1.0.10`
+- `webpki-roots 1.0.11`
 
 ```text
 # Community Data License Agreement - Permissive - Version 2.0
@@ -2985,40 +2985,6 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `lazy_static 1.5.0`
-
-```text
-Copyright (c) 2010 The Rust Project Developers
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-```
-
-## MIT
-
-Packages:
-
 - `hex 0.4.3`
 
 ```text
@@ -3120,7 +3086,7 @@ Packages:
 
 - `cfg-if 1.0.5`
 - `futures-timer 3.0.4`
-- `openssl-probe 0.2.1`
+- `openssl-probe 0.2.2`
 - `openssl-sys 0.9.117`
 - `socket2 0.6.5`
 - `stacker 0.1.25`
@@ -3157,7 +3123,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `mio 1.2.3`
+- `mio 1.2.4`
 
 ```text
 Copyright (c) 2014 Carl Lerche and other MIO contributors
@@ -3366,7 +3332,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `uuid 1.28.0`
+- `uuid 1.29.0`
 
 ```text
 Copyright (c) 2014 The Rust Project Developers
@@ -3463,7 +3429,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `hyper 1.11.1`
+- `hyper 1.12.0`
 
 ```text
 Copyright (c) 2014-2026 Sean McArthur
@@ -3491,9 +3457,9 @@ THE SOFTWARE.
 
 Packages:
 
-- `either 1.18.0`
-- `serde_with 3.23.0`
-- `serde_with_macros 3.23.0`
+- `either 1.19.0`
+- `serde_with 3.24.0`
+- `serde_with_macros 3.24.0`
 
 ```text
 Copyright (c) 2015
@@ -3594,7 +3560,7 @@ Packages:
 
 - `heck 0.5.0`
 - `unicode-bidi 0.3.18`
-- `unicode-normalization 0.1.25`
+- `unicode-normalization 0.1.26`
 - `unicode-properties 0.1.4`
 - `unicode-segmentation 1.13.3`
 - `unicode-xid 0.2.6`
@@ -3899,9 +3865,9 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `hyper-rustls 0.27.9`
+- `hyper-rustls 0.27.10`
 - `rustls 0.23.46`
-- `rustls-native-certs 0.8.4`
+- `rustls-native-certs 0.8.5`
 
 ```text
 Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>
@@ -4063,7 +4029,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `equivalent 1.0.2`
+- `equivalent 1.0.3`
 
 ```text
 Copyright (c) 2016--2023
@@ -4235,7 +4201,7 @@ Packages:
 
 - `md-5 0.11.0`
 - `sha1 0.11.0`
-- `sha2 0.11.0`
+- `sha2 0.11.1`
 
 ```text
 Copyright (c) 2016-2026 The RustCrypto Project Developers
@@ -4497,7 +4463,7 @@ SOFTWARE.
 
 Packages:
 
-- `arc-swap 1.9.2`
+- `arc-swap 1.9.3`
 
 ```text
 Copyright (c) 2017 arc-swap developers
@@ -4565,7 +4531,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `tokio-rustls 0.26.5`
+- `tokio-rustls 0.26.6`
 
 ```text
 Copyright (c) 2017 quininer kel
@@ -4840,7 +4806,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `smallvec 1.16.1`
+- `smallvec 1.16.4`
 
 ```text
 Copyright (c) 2018 The Servo Project Developers
@@ -4908,7 +4874,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `want 0.3.1`
+- `want 0.3.2`
 
 ```text
 Copyright (c) 2018-2019 Sean McArthur
@@ -5284,7 +5250,7 @@ DEALINGS IN THE SOFTWARE.
 Packages:
 
 - `keccak 0.2.2`
-- `zeroize 1.9.0`
+- `zeroize 1.9.1`
 
 ```text
 Copyright (c) 2018-2026 The RustCrypto Project Developers
@@ -6036,7 +6002,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `elliptic-curve 0.14.1`
+- `elliptic-curve 0.14.3`
 - `p256 0.14.0`
 - `p521 0.14.0`
 
@@ -6074,7 +6040,7 @@ Packages:
 
 - `const-oid 0.10.2`
 - `cpufeatures 0.3.1`
-- `der 0.8.2`
+- `der 0.8.3`
 - `pkcs8 0.11.0`
 
 ```text
@@ -6109,7 +6075,6 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `sha3 0.11.0`
 - `sha3 0.12.0`
 
 ```text
@@ -6287,11 +6252,11 @@ DEALINGS IN THE SOFTWARE.
 Packages:
 
 - `argon2 0.6.0`
-- `crypto-bigint 0.7.6`
+- `crypto-bigint 0.7.10`
 - `pkcs5 0.8.1`
 - `scrypt 0.12.0`
 - `sec1 0.8.1`
-- `spki 0.8.0`
+- `spki 0.8.1`
 - `ssh-encoding 0.3.0`
 - `ssh-key 0.7.0-rc.11`
 
@@ -6458,7 +6423,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `inout 0.2.2`
+- `inout 0.2.5`
 
 ```text
 Copyright (c) 2022-2025 The RustCrypto Project Developers
@@ -6562,7 +6527,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `powerfmt 0.2.0`
+- `powerfmt 0.2.1`
 
 ```text
 Copyright (c) 2023 Jacob Pratt et al.
@@ -6590,7 +6555,7 @@ SOFTWARE.
 
 Packages:
 
-- `hyper-util 0.1.20`
+- `hyper-util 0.1.21`
 
 ```text
 Copyright (c) 2023-2025 Sean McArthur
@@ -6653,7 +6618,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `deranged 0.5.8`
+- `deranged 0.5.9`
 
 ```text
 Copyright (c) 2024 Jacob Pratt et al.
@@ -6683,9 +6648,9 @@ Packages:
 
 - `zbus 5.19.0`
 - `zbus_macros 5.19.0`
-- `zbus_names 4.3.4`
-- `zvariant 5.15.0`
-- `zvariant_derive 5.15.0`
+- `zbus_names 4.3.5`
+- `zvariant 5.15.1`
+- `zvariant_derive 5.15.1`
 
 ```text
 Copyright (c) 2024 Zeeshan Ali Khan & zbus contributors
@@ -6753,7 +6718,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `ml-kem 0.3.2`
+- `ml-kem 0.3.3`
 - `module-lattice 0.2.3`
 
 ```text
@@ -6816,7 +6781,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `ctutils 0.4.5`
+- `ctutils 0.4.6`
 
 ```text
 Copyright (c) 2025-2026 The RustCrypto Project Developers
@@ -6885,6 +6850,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
+- `shake 0.1.0`
 - `sponge-cursor 0.1.0`
 
 ```text
@@ -6963,12 +6929,12 @@ Packages:
 - `clap_lex 1.1.1`
 - `colorchoice 1.0.5`
 - `is_terminal_polyfill 1.70.2`
-- `serde_spanned 1.1.1`
-- `toml 1.1.6+spec-1.1.0`
-- `toml_datetime 1.1.1+spec-1.1.0`
-- `toml_edit 0.25.15+spec-1.1.0`
-- `toml_parser 1.1.3+spec-1.1.0`
-- `toml_writer 1.1.2+spec-1.1.0`
+- `serde_spanned 1.1.2`
+- `toml 1.1.8+spec-1.1.0`
+- `toml_datetime 1.1.2+spec-1.1.0`
+- `toml_edit 0.25.17+spec-1.1.0`
+- `toml_parser 1.1.5+spec-1.1.0`
+- `toml_writer 1.1.3+spec-1.1.0`
 
 ```text
 Copyright (c) Individual contributors
@@ -7054,7 +7020,7 @@ SOFTWARE.
 
 Packages:
 
-- `libc 0.2.189`
+- `libc 0.2.191`
 
 ```text
 Copyright (c) The Rust Project Developers
@@ -7189,7 +7155,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 Packages:
 
 - `bnum 0.13.0`
-- `rand 0.10.2`
+- `rand 0.10.3`
 - `rand 0.9.5`
 - `rand_chacha 0.9.0`
 - `rand_core 0.9.5`
@@ -7221,23 +7187,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-```
-
-## MIT
-
-Packages:
-
-- `multiversion 0.9.0`
-- `multiversion-macros 0.9.0`
-
-```text
-Copyright 2019 Caleb Zulawski
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ## MIT
@@ -7304,8 +7253,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 
 Packages:
 
-- `zerocopy 0.8.57`
-- `zerocopy-derive 0.8.57`
+- `zerocopy 0.8.63`
+- `zerocopy-derive 0.8.63`
 
 ```text
 Copyright 2023 The Fuchsia Authors
@@ -7368,7 +7317,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 Packages:
 
 - `codepage 0.1.3`
-- `encoding_rs 0.8.41`
+- `encoding_rs 0.8.42`
 - `multiversion_no_op 1.0.0`
 - `utf8_iter 1.0.4`
 
@@ -7672,7 +7621,7 @@ SOFTWARE.
 
 Packages:
 
-- `crc32fast 1.5.2`
+- `crc32fast 1.5.3`
 
 ```text
 MIT License
@@ -8199,7 +8148,7 @@ Packages:
 - `libgssapi-sys 0.3.4`
 - `libm 0.2.16`
 - `md5 0.8.1`
-- `rust_xlsxwriter 0.99.1`
+- `rust_xlsxwriter 0.101.0`
 - `sqlx-core 0.9.0`
 - `sqlx-postgres 0.9.0`
 - `sqlx-sqlite 0.9.0`
@@ -8231,9 +8180,9 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `tokio 1.53.3`
+- `tokio 1.54.1`
 - `tokio-stream 0.1.19`
-- `tokio-util 0.7.19`
+- `tokio-util 0.7.20`
 
 ```text
 MIT License
@@ -8395,7 +8344,7 @@ Packages:
 - `async-channel 2.5.0`
 - `async-lock 3.4.2`
 - `async-native-tls 0.6.0`
-- `async-recursion 1.1.1`
+- `async-recursion 1.2.0`
 - `async-trait 0.1.92`
 - `atomic-waker 1.1.2`
 - `clickhouse 0.15.3`
@@ -8412,6 +8361,7 @@ Packages:
 - `futures-lite 2.6.1`
 - `group 0.14.0`
 - `itoa 1.0.18`
+- `lazy_static 1.5.1`
 - `linux-raw-sys 0.12.1`
 - `once_cell 1.21.4`
 - `ordered-stream 0.2.0`
@@ -8424,7 +8374,7 @@ Packages:
 - `relm4 0.11.0`
 - `relm4-macros 0.11.0`
 - `rsa 0.10.0-rc.18`
-- `rustix 1.1.5`
+- `rustix 1.1.6`
 - `rustversion 1.0.23`
 - `semver 1.0.28`
 - `serde 1.0.229`
@@ -8437,13 +8387,13 @@ Packages:
 - `serde_repr 0.1.21`
 - `sqlformat 0.5.0`
 - `syn 2.0.119`
-- `syn 3.0.6`
-- `thiserror 2.0.20`
-- `thiserror-impl 2.0.20`
+- `syn 3.0.9`
+- `thiserror 2.0.21`
+- `thiserror-impl 2.0.21`
 - `typed-builder 0.22.0`
 - `typed-builder-macro 0.22.0`
-- `typed-path 0.12.3`
-- `unicode-ident 1.0.25`
+- `typed-path 0.13.0`
+- `unicode-ident 1.0.27`
 - `zmij 1.0.23`
 - `zvariant_utils 4.2.0`
 
@@ -8509,21 +8459,21 @@ Packages:
 - `cairo-sys-rs 0.22.9`
 - `gdk-pixbuf 0.22.0`
 - `gdk-pixbuf-sys 0.22.9`
-- `gdk4 0.11.4`
-- `gdk4-sys 0.11.4`
-- `gio 0.22.9`
+- `gdk4 0.11.5`
+- `gdk4-sys 0.11.5`
+- `gio 0.22.10`
 - `gio-sys 0.22.9`
-- `glib 0.22.9`
+- `glib 0.22.10`
 - `glib-macros 0.22.9`
 - `glib-sys 0.22.9`
 - `gobject-sys 0.22.9`
 - `graphene-rs 0.22.8`
 - `graphene-sys 0.22.9`
-- `gsk4 0.11.4`
-- `gsk4-sys 0.11.4`
-- `gtk4 0.11.4`
-- `gtk4-macros 0.11.4`
-- `gtk4-sys 0.11.4`
+- `gsk4 0.11.5`
+- `gsk4-sys 0.11.5`
+- `gtk4 0.11.5`
+- `gtk4-macros 0.11.5`
+- `gtk4-sys 0.11.5`
 - `libadwaita 0.9.2`
 - `libadwaita-sys 0.9.2`
 - `pango 0.22.9`
@@ -8602,8 +8552,7 @@ Packages:
 
 - `spin 0.9.9`
 - `tracing-core 0.1.36`
-- `zip 8.6.0`
-- `zip 9.0.5`
+- `zip 9.1.2`
 
 ```text
 The MIT License (MIT)
@@ -8697,7 +8646,7 @@ Packages:
 - `byteorder 1.5.0`
 - `csv 1.4.0`
 - `csv-core 0.1.13`
-- `jiff 0.2.37`
+- `jiff 0.2.38`
 - `jiff-core 0.1.1`
 - `memchr 2.8.3`
 
@@ -8822,7 +8771,7 @@ SOFTWARE.
 
 Packages:
 
-- `combine 4.6.8`
+- `combine 4.6.9`
 
 ```text
 The MIT License (MIT)
@@ -9327,7 +9276,8 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `unicode-ident 1.0.25`
+- `unicode-ident 1.0.27`
+- `unicode-normalization 0.1.26`
 
 ```text
 UNICODE LICENSE V3
@@ -9375,24 +9325,24 @@ authorization of the copyright holder.
 
 Packages:
 
-- `icu_collections 2.3.0`
-- `icu_locale_core 2.3.0`
-- `icu_normalizer 2.3.0`
-- `icu_normalizer_data 2.3.0`
-- `icu_properties 2.3.0`
-- `icu_properties_data 2.3.0`
-- `icu_provider 2.3.1`
+- `icu_collections 2.4.0`
+- `icu_locale_core 2.4.0`
+- `icu_normalizer 2.4.0`
+- `icu_normalizer_data 2.4.0`
+- `icu_properties 2.4.0`
+- `icu_properties_data 2.4.0`
+- `icu_provider 2.4.0`
 - `litemap 0.8.3`
 - `potential_utf 0.1.6`
-- `tinystr 0.8.4`
+- `tinystr 0.8.5`
 - `writeable 0.6.4`
-- `yoke 0.8.3`
+- `yoke 0.8.4`
 - `yoke-derive 0.8.4`
 - `zerofrom 0.1.8`
 - `zerofrom-derive 0.1.8`
 - `zerotrie 0.2.5`
-- `zerovec 0.11.8`
-- `zerovec-derive 0.11.6`
+- `zerovec 0.11.9`
+- `zerovec-derive 0.11.7`
 
 ```text
 UNICODE LICENSE V3
