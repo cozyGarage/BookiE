@@ -6,7 +6,7 @@ cd "$ROOT"
 
 # Never unlock or write a probe into the user's desktop keyring.
 if [[ "${TABLEPRO_SECRET_DBUS_ACTIVE:-0}" != "1" ]]; then
-  secret_root="$(mktemp -d /tmp/tablepro.XXXXXX)"
+  secret_root="$(mktemp -d "${TMPDIR:-/tmp}/tablepro.XXXXXX")"
   mkdir -p \
     "$secret_root/home" \
     "$secret_root/config" \
