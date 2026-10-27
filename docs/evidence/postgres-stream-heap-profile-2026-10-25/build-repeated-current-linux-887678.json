@@ -1,0 +1,17 @@
+{
+  "captured_at_utc": "2026-10-27T02:58:25Z",
+  "source_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
+  "binary": "target/installed-release/usr/bin/tablepro",
+  "binary_sha256": "b4c8e8ea797e1f3d65e46c8d204b077e0cb655e30642bffeff551cee0f03152b",
+  "build": "TABLEPRO_GTK_BUILD_PROFILE=release bash scripts/gtk-test-binary.sh",
+  "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "host": "Omarchy 4.0.6; Linux 7.2.8-9-omarchy x86_64",
+  "display": "Xvfb 1280x1024x24, GDK_BACKEND=x11, GSK_RENDERER=cairo, private D-Bus session and temporary Secret Service keyring",
+  "database": "PostgreSQL 16 in postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+  "workload": "six sequential SELECT * FROM big cycles, 2,000,000 rows and 10 columns per cycle, 400 streamed pages, 4-page backward and forward navigation each cycle",
+  "profiler": "HEAPTRACK=0",
+  "environment": "TABLEPRO_PROFILE_REPETITIONS=6",
+  "run_script_sha256": "729294086ba5909830d1b3f107eed02c846a23978c43e14a1a058982f1656a6b",
+  "probe_sha256": "f80d6a7ffe85013196d09920f62deb200e1a387146c9c174e4f3c5e43b73f",
+  "profile_sha256": "ad97029db2e5dcee9ccb586c865ee08f25fcd27be7e106fb49f362fdc102602a"
+}
