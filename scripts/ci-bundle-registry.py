@@ -28,8 +28,9 @@ def request(url, method='GET', data=None, size=None):
         return urllib.request.urlopen(urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
     except urllib.error.HTTPError as error:
         path = urllib.parse.urlsplit(url).path
+        error.msg = f'registry {method} {path} returned HTTP {error.code}'
         error.close()
-        raise ValueError(f'registry {method} {path} returned HTTP {error.code}') from error
+        raise
 
 
 def extract(archive, destination):

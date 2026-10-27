@@ -18,8 +18,15 @@ class RegistryExtractionTests(unittest.TestCase):
             'https://registry.example/bundle/bundle.tar.gz', 500, 'Internal Server Error', {}, None)
         with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
                 patch.object(registry.urllib.request, 'urlopen', side_effect=error), \
-                self.assertRaisesRegex(ValueError, 'PUT /bundle/bundle.tar.gz returned HTTP 500'):
+                self.assertRaisesRegex(registry.urllib.error.HTTPError, 'PUT /bundle/bundle.tar.gz returned HTTP 500') as raised:
             registry.request('https://registry.example/bundle/bundle.tar.gz', 'PUT')
+        self.assertEqual(raised.exception.code, 500)
+
+    def test_missing_registry_manifest_remains_a_cache_miss(self):
+        error = registry.urllib.error.HTTPError('https://registry.example/bundle/manifest.json', 404, 'Not Found', {}, None)
+        with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
+                patch.object(registry.urllib.request, 'urlopen', side_effect=error):
+            self.assertIsNone(registry.existing_manifest('https://registry.example/bundle/', 'a' * 40, 'default'))
 
     def check_archive(self, name, kind=tarfile.REGTYPE):
         with tempfile.TemporaryDirectory() as temporary:
