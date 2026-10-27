@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "${CHECK_INNER:-0}" != "1" ]]; then
-  exec env CHECK_INNER=1 dbus-run-session -- xvfb-run --auto-display --server-args="-screen 0 1280x1024x24 -nolisten tcp" "$0"
+  xvfb_server_num=$((1000 + RANDOM))
+  exec env CHECK_INNER=1 dbus-run-session -- xvfb-run --auto-servernum --server-num="$xvfb_server_num" --server-args="-screen 0 1280x1024x24 -nolisten tcp" "$0"
 fi
 export GDK_BACKEND=x11 GTK_A11Y=atspi
 unset NO_AT_BRIDGE

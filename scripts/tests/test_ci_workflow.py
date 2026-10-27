@@ -500,7 +500,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("target/release/tablepro-app target/installed/usr/bin/tablepro", release)
         self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", release)
 
-    def test_gtk_scripts_let_xvfb_select_a_live_display(self):
+    def test_gtk_scripts_reduce_xvfb_display_collisions(self):
         for path in [
             "scripts/test-gtk-widgets.sh",
             "scripts/test-gtk-safety.sh",
@@ -508,8 +508,9 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             with self.subTest(path=path):
                 script = (ROOT / path).read_text()
-                self.assertIn("xvfb-run --auto-display", script)
-                self.assertNotIn("--auto-servernum", script)
+                self.assertIn("xvfb_server_num=$((1000 + RANDOM))", script)
+                self.assertIn('xvfb-run --auto-servernum --server-num="$xvfb_server_num"', script)
+                self.assertNotIn("--auto-display", script)
                 self.assertNotIn("xvfb-run -a", script)
 
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
