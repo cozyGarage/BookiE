@@ -58,7 +58,7 @@ install -Dm644 apps/linux/flatpak/icons/scalable/com.tablepro.linux.svg \
 install -Dm644 apps/linux/packaging/policy.example.toml "$STAGE/usr/share/doc/bookie/policy.example.toml"
 install -Dm644 LICENSE.md "$STAGE/usr/share/doc/bookie/LICENSE.md"
 
-mkdir -p "$STAGE/DEBIAN"
+install -dm755 "$STAGE/DEBIAN"
 cat >"$STAGE/DEBIAN/control" <<EOF
 Package: bookie
 Version: ${VERSION}
@@ -75,6 +75,8 @@ Description: Native Linux database client
  BookiE is a native GTK4 / libadwaita database client. It installs
  bookie and bookie-agentd, with tablepro aliases.
 EOF
+
+chmod 0644 "$STAGE/DEBIAN/control"
 
 dpkg-deb --root-owner-group --build "$STAGE" "$OUT/${PKG_NAME}.deb"
 echo "Wrote $OUT/${PKG_NAME}.deb"
