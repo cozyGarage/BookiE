@@ -85,6 +85,7 @@ jobs:
       CARGO_TARGET_DIR: /target
       TMPDIR: /target
       TABLEPRO_TOOL_DIR: /tools
+      CARGO_PROFILE_CI_STRIP: symbols
     steps:
       - name: Check out
         shell: bash
