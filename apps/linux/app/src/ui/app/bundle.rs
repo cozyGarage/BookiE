@@ -245,7 +245,10 @@ impl App {
                             sender_clone.input(AppMsg::ImportBundleFinished(imported, planned));
                             sender_clone.input(AppMsg::ReloadConnections);
                         }
-                        Err(message) => sender_clone.input(AppMsg::BundleFailed(message)),
+                        Err(error) => {
+                            sender_clone.input(AppMsg::BundleFailed(error.message));
+                            sender_clone.input(AppMsg::ReloadConnections);
+                        }
                     }
                 })
                 .drop_on_shutdown()
@@ -264,7 +267,7 @@ async fn apply_import_with_audit(
     plan: ImportPlan,
     secrets: Vec<tablepro_storage::BundleSecrets>,
     replace: bool,
-) -> Result<(usize, usize), String> {
+) -> Result<(usize, usize), ImportFailure> {
     let planned_count = plan.items.len();
     if database
         .audit_administrative_action(
@@ -278,7 +281,10 @@ async fn apply_import_with_audit(
         .await
         .is_err()
     {
-        return Err(crate::tr!("The import was cancelled because its audit record could not be saved.").to_string());
+        return Err(ImportFailure {
+            message: crate::tr!("The import was cancelled because its audit record could not be saved.").to_string(),
+            affected_count: 0,
+        });
     }
 
     let started = std::time::Instant::now();
@@ -286,7 +292,7 @@ async fn apply_import_with_audit(
     let (status, affected_count) = match &outcome {
         Ok((imported, planned)) if imported == planned => (tablepro_policy::AuditTerminalStatus::Succeeded, *imported),
         Ok((imported, _)) => (tablepro_policy::AuditTerminalStatus::Failed, *imported),
-        Err(_) => (tablepro_policy::AuditTerminalStatus::Failed, 0),
+        Err(error) => (tablepro_policy::AuditTerminalStatus::Failed, error.affected_count),
     };
     if database
         .audit_administrative_action(
@@ -300,7 +306,10 @@ async fn apply_import_with_audit(
         .await
         .is_err()
     {
-        return Err(crate::tr!("The import finished, but its audit outcome could not be saved.").to_string());
+        return Err(ImportFailure {
+            message: crate::tr!("The import finished, but its audit outcome could not be saved.").to_string(),
+            affected_count,
+        });
     }
 
     outcome
@@ -398,7 +407,7 @@ async fn apply_plan(
     secrets: Vec<tablepro_storage::BundleSecrets>,
     replace_saved_passwords: bool,
     workspace: crate::services::workspace_state::WorkspaceStore,
-) -> Result<(usize, usize), String> {
+) -> Result<(usize, usize), ImportFailure> {
     let planned = plan.items.len();
     let (imported, failure) = apply_items(
         plan.items,
@@ -430,7 +439,18 @@ async fn apply_plan(
     )
     .await;
     if imported == 0 && failure == Some(ItemApplyFailure::ConnectionSave) {
-        return Err(crate::tr!("The connections could not be saved."));
+        return Err(ImportFailure {
+            message: crate::tr!("The connections could not be saved."),
+            affected_count: 0,
+        });
+    }
+    if failure == Some(ItemApplyFailure::WorkspaceSaveRecovery) {
+        return Err(ImportFailure {
+            message: crate::tr!(
+                "Some connections may have been imported, but workspace saves could not be re-enabled. Resolve the workspace storage problem and restart BookiE before relying on saved tabs."
+            ),
+            affected_count: imported,
+        });
     }
     Ok((imported, planned))
 }
@@ -439,6 +459,12 @@ async fn apply_plan(
 enum ItemApplyFailure {
     ConnectionSave,
     CredentialStore,
+    WorkspaceSaveRecovery,
+}
+
+struct ImportFailure {
+    message: String,
+    affected_count: usize,
 }
 
 async fn apply_items<F, Fut>(
@@ -463,10 +489,11 @@ where
         if let Err(failure) = apply(item, carried, replace_saved_passwords).await {
             return (imported, Some(failure));
         }
+        imported += 1;
         if let Err(error) = workspace.allow_connection_saves(connection_id).await {
             tracing::warn!(%connection_id, ?error, "workspace saves remain disabled after connection import");
+            return (imported, Some(ItemApplyFailure::WorkspaceSaveRecovery));
         }
-        imported += 1;
     }
     (imported, None)
 }
@@ -626,6 +653,24 @@ mod tests {
             .is_ok(),
             "the turn is released afterwards"
         );
+    }
+
+    #[tokio::test]
+    async fn workspace_save_recovery_failure_is_reported_after_connection_import() {
+        let workspace = test_workspace();
+        let imported = item("restored");
+        let id = imported.connection.id;
+        workspace.forget_connection(id);
+        workspace.save_connection(Uuid::new_v4(), Default::default());
+        assert_eq!(
+            workspace.flush().recv().unwrap(),
+            Err(tablepro_app_services::workspace_state::WorkspaceFlushError::WriteFailed)
+        );
+
+        let outcome = apply_items(vec![imported], Vec::new(), false, workspace, |_, _, _| async { Ok(()) }).await;
+
+        assert_eq!(outcome.0, 1);
+        assert_eq!(outcome.1, Some(ItemApplyFailure::WorkspaceSaveRecovery));
     }
 
     #[tokio::test]
