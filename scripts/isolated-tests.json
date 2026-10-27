@@ -1076,6 +1076,16 @@
       "tablepro-app",
       "--lib",
       "ui::export_dialog::lifetime_tests::dismissing_export_setup_releases_its_dialog"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::history_dialog::lifetime_tests::refreshing_history_releases_removed_rows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::history_dialog::lifetime_tests::closing_history_releases_its_rows_and_popovers"
     ]
   ],
   "keyring": [
