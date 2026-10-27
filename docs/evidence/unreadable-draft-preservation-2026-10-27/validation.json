@@ -3,8 +3,8 @@
   "base": "887678414",
   "source_sha256": {
     "crates/app-services/src/workspace_disk.rs": "a7abbc17e52fbf3d144124e6bc9c89cdd785f5f6b300fd33515ca42ae739f6c2",
-    "crates/app-services/src/workspace_state.rs": "2542f690f04c8ec67d596f21bc23bb35c4d5aa835df4732ef6eeaced1db008b2",
-    "crates/app-services/src/workspace_state/tests.rs": "4803759bc20160c6054c1662ee0f5312c96445f76f2074922efac4228ff3d0ee"
+    "crates/app-services/src/workspace_state.rs": "7960603f3e0b81f5accde2b1fc37766963fdd683b318b107e4d1915bb3e409f5",
+    "crates/app-services/src/workspace_state/tests.rs": "3855e139ea693bb2062d55c61745950c97a05c894bd91e3f0fc7f279eb86ebdb"
   },
   "negative_control": "all three regression tests failed on original implementation",
   "workspace_checks": "46 unit and 4 selected integration tests passed",
@@ -15,11 +15,5 @@
     "workspace_connection_removal_confirms_once_and_preserves_the_database": "passed"
   },
   "installed_binary_sha256": "355904b9a2e9de4273ec29ddd62117d44a276c7fe346951e9a7ce12233d050b6",
-  "merge_order": "1754 may land first; its head is integrated and both regression sets retained",
-  "integration": {
-    "branch": "fix/deleted-connection-drafts",
-    "head": "c20839a63",
-    "workspace_checks": "49 unit and 4 selected integration tests passed",
-    "preflight": "passed: 2214 unit, 291 sandbox, 1 Redis check"
-  }
+  "merge_order": "1754 first; refresh and verify both regression sets"
 }

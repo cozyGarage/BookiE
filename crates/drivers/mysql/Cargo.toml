@@ -22,7 +22,6 @@ sqlx = { workspace = true, features = ["mysql", "tls-rustls-aws-lc-rs", "mysql-r
 sqlparser.workspace = true
 tracing.workspace = true
 tokio.workspace = true
-uuid.workspace = true
 
 [dev-dependencies]
 secrecy.workspace = true
@@ -32,6 +31,7 @@ testcontainers-modules = { workspace = true, features = ["mysql"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tokio-util.workspace = true
 zip = { version = "8.3", default-features = false, features = ["deflate"] }
+uuid.workspace = true
 
 [lints]
 workspace = true

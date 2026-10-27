@@ -94,6 +94,23 @@ def source_bytes_at_commit(name, commit):
     return None
 
 
+def nested_source_digests(manifest):
+    digests = {}
+    for field in ("source", "test", "regression_test"):
+        entry = manifest.get(field)
+        if not isinstance(entry, dict):
+            continue
+        if isinstance(entry.get("path"), str) and isinstance(entry.get("sha256"), str):
+            digests[entry["path"]] = entry["sha256"]
+            continue
+        if field == "source" and entry and all(
+            isinstance(name, str) and ("/" in name or Path(name).suffix)
+            for name in entry
+        ):
+            digests.update(entry)
+    return digests
+
+
 def validate_manifest(path, strict=False):
     errors = []
     warnings = []
@@ -119,6 +136,12 @@ def validate_manifest(path, strict=False):
     if not isinstance(source_digests, dict):
         (errors if strict else warnings).append(f"{path}: source_sha256 must be a digest map or a digest with source_file")
         source_digests = {}
+    source_digests = dict(source_digests)
+    for name, digest in nested_source_digests(manifest).items():
+        if name in source_digests and source_digests[name] != digest:
+            errors.append(f"{path}: conflicting source digests for {name}")
+        else:
+            source_digests[name] = digest
     source_commits = manifest.get("source_commits", {})
     if not isinstance(source_commits, dict):
         (errors if strict else warnings).append(f"{path}: source_commits must map source paths to commits")
@@ -143,6 +166,10 @@ def validate_manifest(path, strict=False):
                     f"{path}: source digest does not match its recorded commit: {name}"
                 )
                 continue
+            continue
+        source_path = Path(name)
+        if source_path.is_absolute() or ".." in source_path.parts:
+            errors.append(f"{path}: unsafe source path: {name}")
             continue
         source = ROOT / name
         if not source.is_file():

@@ -25,7 +25,6 @@ uuid.workspace = true
 sha2.workspace = true
 hex.workspace = true
 libc.workspace = true
-secrecy.workspace = true
 axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "json"] }
 rmcp = { version = "3.5", default-features = false, features = ["server", "transport-io"], optional = true }
 
@@ -40,6 +39,7 @@ tablepro-driver-postgres = { path = "../drivers/postgres" }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mongo", "postgres"] }
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
+secrecy.workspace = true
 
 [lints]
 workspace = true
