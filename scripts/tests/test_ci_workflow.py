@@ -23,6 +23,10 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_prebuilt_test_bundle_strips_debug_info(self):
+        build = (ROOT / "scripts/build-test-bundles.sh").read_text()
+        self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-debuginfo}"', build)
+
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         self.assertIn("TMPDIR: /var/cache/ci/target\n", workflow)
@@ -115,14 +119,19 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("/home/runner/.cargo/bin", cargo_path, name)
             self.assertIn("/home/ubuntu/.cargo/bin", cargo_path, name)
 
-    def test_acceptance_jobs_use_only_the_isolated_pilot_pool(self):
+    def test_acceptance_jobs_use_the_pilot_and_builder_pools(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        labels = re.findall(r"^    runs-on: (.+)$", workflow, re.MULTILINE)
-        self.assertTrue(labels)
-        self.assertEqual(set(labels), {"any-host", "build-host"})
-        for name, block in re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow):
-            if "runs-on: any-host" in block:
-                self.assertNotRegex(block, r"cargo (build|test|clippy|install)\b", name)
+        jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow))
+        for name in ("guards", "gtk-build", "clippy", "test-build", "duckdb-build", "floor-build", "supply-chain"):
+            with self.subTest(job=name):
+                self.assertIn("runs-on: build-host", jobs[name])
+        for name in (
+            "unit", "sandbox", "widgets", "distro-floor", "distro-floor-scenarios", "driver", "e2e",
+            "consumers", "gtk", "duckdb", "pg-release", "pg-dump", "socket-ssh", "gtk-server",
+            "driver-tls", "keyring",
+        ):
+            with self.subTest(job=name):
+                self.assertIn("runs-on: ci-pilot", jobs[name])
 
     def test_driver_tls_fixture_wait_is_bounded_with_failure_diagnostics(self):
         script = (ROOT / "scripts/test-driver-tls.sh").read_text()
@@ -175,11 +184,14 @@ class CiWorkflowTests(unittest.TestCase):
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
             group = settings["group"].strip()
             self.assertTrue(group, name)
-            self.assertIn("${{ github.run_id }}", group, name)
-            self.assertIn("${{ github.workflow }}", group, name)
+            self.assertEqual(group, "bookie-lab", name)
+            self.assertNotIn("${{ github.run_id }}", group, name)
+            self.assertNotIn("${{ github.workflow }}", group, name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
             groups.append(group)
         self.assertEqual(groups[0], groups[1])
+        gate = (ROOT / "scripts/forgejo-gate.sh").read_text()
+        self.assertIn('${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate.lock}', gate)
 
     def test_forgejo_gtk_jobs_select_distinct_run_scoped_mcp_ports(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()

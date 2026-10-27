@@ -29,10 +29,9 @@ if docs_only; then
   exit 0
 fi
 
-lock_identity="$(printf '%s\n%s' "$remote_url" "$target" | sha256sum | cut -c1-24)"
-exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate-$lock_identity.lock}"
+exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate.lock}"
 if ! flock -n 9; then
-  echo "another gate for this remote branch is running; waiting for it to finish"
+  echo "another gate is running on this host; waiting for it to finish"
   flock 9
 fi
 latest_run_id() {
@@ -85,11 +84,17 @@ if any(job["status"] in ("running", "waiting") for job in jobs):
 else:
     for job in jobs:
         if job["status"] not in ("success", "skipped", "blocked"):
-            print("  ", job["status"], job["name"])
+            print(job["status"], job["id"], job["name"], sep="\t")
 ')"
       if [ "$report" != "RUNNING" ]; then
         echo "forgejo run $run_number (API id $run_id) $status for $sha"
-        [ -n "$report" ] && echo "$report"
+        while IFS=$'\t' read -r job_status job_id job_name; do
+          [ -n "$job_id" ] || continue
+          echo "$job_status $job_name (job $job_id); last 80 log lines:"
+          if ! curl -fsS --retry 5 --retry-delay 5 --retry-all-errors --max-time 60 -H "Authorization: token $token" "$api/actions/jobs/$job_id/logs" | tail -n 80; then
+            echo "could not retrieve the job log"
+          fi
+        done <<< "$report"
         exit 1
       fi ;;
   esac
