@@ -52,11 +52,15 @@ class CiCacheTests(unittest.TestCase):
             args = [str(SCRIPT), '--root', str(self.cache), '--lock', str(self.lock), command]
             if command == 'checkout':
                 args.append(str(checkout))
-            with patch.object(sys, 'argv', args), patch.object(
+            with patch.object(sys, 'argv', args), patch.dict(
+                os.environ, {'CARGO_TARGET_DIR': str(self.cache / 'job')}
+            ), patch.object(
                 helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=30 * gib)
             ):
                 self.assertEqual(helper.main(), 0)
-            with patch.object(sys, 'argv', args), patch.object(
+            with patch.object(sys, 'argv', args), patch.dict(
+                os.environ, {'CARGO_TARGET_DIR': str(self.cache / 'job')}
+            ), patch.object(
                 helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=29 * gib)
             ):
                 self.assertEqual(helper.main(), 1)
