@@ -11,6 +11,12 @@ it. Do not treat a capability gap as a release commitment.
 
 Check Project #3 for the live issue order and lane before starting work; issue bodies own acceptance. Reconcile open pull requests before taking the next eligible issue. The review findings below are candidates, not a priority order. Reproduce each report before changing behavior. Keep one lane-owned fix and one serialized Forgejo gate at a time.
 
+## Catalog cancellation
+
+| ID / issue | Gap | Lane | Acceptance focus |
+|---|---|---|---|
+| UI-45 / [#1734](https://github.com/cozyGarage/BookiE/issues/1734) | Database switching waits on an uncontrolled `list_databases` call | B3 | Pass the request deadline and cancellation token through `Connection` and `PolicyGuard`; preserve terminal audit outcomes and ignore superseded UI results. An in-flight timeout remains `OperationOutcomeUnknown` unless a driver confirms server cancellation. |
+
 ## Post-release acceptance follow-ups
 
 These rows remained open after the 0.2.0 delivery decision and are now part of the post-release backlog. They do not reopen the 0.2.0 milestone or define the final 0.2.1 scope. Project #3 and the linked issues own current status and acceptance.
