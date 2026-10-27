@@ -88,6 +88,7 @@ fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box,
         }
     });
 
+    crate::ui::leak_probe::track("structure_form", &dialog);
     (dialog, content, submit_btn)
 }
 

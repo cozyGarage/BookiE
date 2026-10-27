@@ -59,7 +59,7 @@ pub(super) fn present(parent: &impl IsA<gtk::Widget>, text: &str) {
         .content_height(420)
         .child(&toolbar)
         .build();
-    dialog.present(Some(parent));
+    crate::ui::leak_probe::present_tracked("pending_sql", &dialog, parent);
 }
 
 #[cfg(test)]

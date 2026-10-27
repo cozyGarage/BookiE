@@ -14,6 +14,7 @@ import time
 
 DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 BUNDLE_DIRECTORY = re.compile(r'[0-9a-f]{40}-(?:default|duckdb)\Z')
+DEFAULT_MIN_FREE_GIB = 30
 
 
 def open_directory(name, parent=None):
@@ -185,9 +186,9 @@ def main():
     run.add_argument('script')
     checkout = commands.add_parser('checkout')
     checkout.add_argument('script')
-    checkout.add_argument('--min-free-gib', type=int, default=45)
+    checkout.add_argument('--min-free-gib', type=int, default=DEFAULT_MIN_FREE_GIB)
     maintenance = commands.add_parser('cleanup')
-    maintenance.add_argument('--min-free-gib', type=int, default=45)
+    maintenance.add_argument('--min-free-gib', type=int, default=DEFAULT_MIN_FREE_GIB)
     args = parser.parse_args()
     root = Path(os.path.abspath(args.root))
     lock = os.open(args.lock, os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK)
