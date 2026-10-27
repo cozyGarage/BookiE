@@ -5,6 +5,7 @@ import re
 import json
 import io
 import sys
+import subprocess
 import tomllib
 from collections import Counter
 
@@ -81,7 +82,15 @@ output = io.StringIO()
 original_stdout = sys.stdout
 sys.stdout = output
 rows = []
-for path in sorted(p for d in ("crates", "apps", "tests") for p in (root / d).rglob("*.rs")):
+def rust_sources():
+    listed = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "crates/**.rs", "apps/**.rs", "tests/**.rs"],
+        cwd=root, capture_output=True, text=True, check=True,
+    ).stdout
+    return sorted(root / name for name in listed.split("\0") if name)
+
+
+for path in rust_sources():
     source = path.read_text()
     for match in re.finditer(r'#\[ignore(?:\s*=\s*"([^"\n]*)")?\]', source):
         function = re.search(r'\b(?:async\s+)?fn\s+(\w+)', source[match.end():])
