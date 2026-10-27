@@ -128,12 +128,11 @@ def cleanup(root, reserve):
 def run_script(script):
     child = subprocess.Popen(
         ['/bin/bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', script],
-        start_new_session=True,
     )
 
     def forward_signal(signum, _frame):
         try:
-            os.killpg(child.pid, signum)
+            child.send_signal(signum)
         except ProcessLookupError:
             pass
 
