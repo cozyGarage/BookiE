@@ -235,11 +235,12 @@ impl App {
         let secrets = pending.secrets;
         let replace = choice.replace_saved_passwords;
         let database = self.database.clone();
+        let workspace = self.workspace.clone();
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    match apply_import_with_audit(database, operation_id, plan, secrets, replace).await {
+                    match apply_import_with_audit(database, workspace, operation_id, plan, secrets, replace).await {
                         Ok((imported, planned)) => {
                             sender_clone.input(AppMsg::ImportBundleFinished(imported, planned));
                             sender_clone.input(AppMsg::ReloadConnections);
@@ -258,6 +259,7 @@ impl App {
 
 async fn apply_import_with_audit(
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+    workspace: crate::services::workspace_state::WorkspaceStore,
     operation_id: Uuid,
     plan: ImportPlan,
     secrets: Vec<tablepro_storage::BundleSecrets>,
@@ -280,7 +282,7 @@ async fn apply_import_with_audit(
     }
 
     let started = std::time::Instant::now();
-    let outcome = apply_plan(plan, secrets, replace).await;
+    let outcome = apply_plan(plan, secrets, replace, workspace).await;
     let (status, affected_count) = match &outcome {
         Ok((imported, planned)) if imported == planned => (tablepro_policy::AuditTerminalStatus::Succeeded, *imported),
         Ok((imported, _)) => (tablepro_policy::AuditTerminalStatus::Failed, *imported),
@@ -395,12 +397,14 @@ async fn apply_plan(
     plan: ImportPlan,
     secrets: Vec<tablepro_storage::BundleSecrets>,
     replace_saved_passwords: bool,
+    workspace: crate::services::workspace_state::WorkspaceStore,
 ) -> Result<(usize, usize), String> {
     let planned = plan.items.len();
     let (imported, failure) = apply_items(
         plan.items,
         secrets,
         replace_saved_passwords,
+        workspace,
         |item, carried, replace| async move {
             let single_item = ImportPlan {
                 items: vec![item.clone()],
@@ -441,6 +445,7 @@ async fn apply_items<F, Fut>(
     items: Vec<ImportItem>,
     secrets: Vec<tablepro_storage::BundleSecrets>,
     replace_saved_passwords: bool,
+    workspace: crate::services::workspace_state::WorkspaceStore,
     mut apply: F,
 ) -> (usize, Option<ItemApplyFailure>)
 where
@@ -454,8 +459,12 @@ where
             .find(|entry| entry.connection_id == item.source_id)
             .cloned();
         let _save_turn = crate::services::connection_save_turn::take().await;
+        let connection_id = item.connection.id;
         if let Err(failure) = apply(item, carried, replace_saved_passwords).await {
             return (imported, Some(failure));
+        }
+        if let Err(error) = workspace.allow_connection_saves(connection_id).await {
+            tracing::warn!(%connection_id, ?error, "workspace saves remain disabled after connection import");
         }
         imported += 1;
     }
@@ -569,7 +578,7 @@ mod tests {
     async fn an_import_failure_stops_before_saving_later_connections() {
         let items = vec![item("first"), item("failed"), item("later")];
         let attempted = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let imported = apply_items(items.clone(), Vec::new(), false, {
+        let imported = apply_items(items.clone(), Vec::new(), false, test_workspace(), {
             let attempted = attempted.clone();
             move |item, _, _| {
                 let attempted = attempted.clone();
@@ -592,7 +601,7 @@ mod tests {
     #[tokio::test]
     async fn an_import_holds_the_save_turn_while_each_connection_is_applied() {
         let held_during_apply = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let outcome = apply_items(vec![item("a"), item("b")], Vec::new(), false, {
+        let outcome = apply_items(vec![item("a"), item("b")], Vec::new(), false, test_workspace(), {
             let held = held_during_apply.clone();
             move |_, _, _| {
                 let held = held.clone();
@@ -619,6 +628,47 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_successful_reimport_reenables_workspace_saves_for_the_connection_id() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("workspace.json");
+        let drafts = directory.path().join("drafts");
+        let workspace = crate::services::workspace_state::WorkspaceStore::new(Some(path.clone()), drafts.clone());
+        let imported = item("restored");
+        let id = imported.connection.id;
+        workspace.forget_connection(id);
+
+        let outcome = apply_items(
+            vec![imported.clone()],
+            Vec::new(),
+            false,
+            workspace.clone(),
+            |_, _, _| async { Ok(()) },
+        )
+        .await;
+
+        assert_eq!(outcome, (1, None));
+        workspace.save_connection(
+            id,
+            tablepro_app_services::workspace_state::ConnectionWorkspaceState {
+                tabs: vec![tablepro_app_services::workspace_state::WorkspaceTabRecord::Editor {
+                    query: "SELECT after_reimport".into(),
+                    draft_id: None,
+                    file: None,
+                }],
+                ..Default::default()
+            },
+        );
+        assert_eq!(workspace.flush().recv().unwrap(), Ok(()));
+        let reopened = crate::services::workspace_state::WorkspaceStore::new(Some(path), drafts);
+        reopened.prefetch_connections(&[id]).unwrap();
+        assert!(matches!(
+            &reopened.load_connection(id).unwrap().tabs[0],
+            tablepro_app_services::workspace_state::WorkspaceTabRecord::Editor { query, .. }
+                if query == "SELECT after_reimport"
+        ));
+    }
+
     #[test]
     fn a_failed_record_restore_keeps_imported_credentials() {
         let mut item = item("new");
@@ -631,6 +681,10 @@ mod tests {
     #[test]
     fn a_file_that_is_not_a_bundle_is_reported_rather_than_parsed() {
         assert!(read_bundle_file(b"nonsense").is_err());
+    }
+
+    fn test_workspace() -> crate::services::workspace_state::WorkspaceStore {
+        crate::services::workspace_state::WorkspaceStore::new(None, std::path::PathBuf::new())
     }
 
     #[test]

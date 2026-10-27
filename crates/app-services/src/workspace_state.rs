@@ -470,6 +470,43 @@ impl WorkspaceStore {
         }
     }
 
+    pub async fn allow_connection_saves(&self, id: Uuid) -> Result<(), WorkspaceFlushError> {
+        let forgotten = self
+            .inner
+            .writer
+            .queue
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .forgotten
+            .contains(&id);
+        if !forgotten {
+            return Ok(());
+        }
+        let store = self.clone();
+        tokio::task::spawn_blocking(move || {
+            store
+                .flush()
+                .recv()
+                .map_err(|_| WorkspaceFlushError::WriterUnavailable)??;
+            let _guard = store
+                .inner
+                .file_lock
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            store
+                .inner
+                .writer
+                .queue
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .forgotten
+                .remove(&id);
+            Ok(())
+        })
+        .await
+        .map_err(|_| WorkspaceFlushError::WriterUnavailable)?
+    }
+
     pub fn flush(&self) -> mpsc::Receiver<Result<(), WorkspaceFlushError>> {
         let (sender, receiver) = mpsc::channel();
         self.inner
