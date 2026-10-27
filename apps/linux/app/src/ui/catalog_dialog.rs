@@ -83,9 +83,9 @@ pub fn present(
     let on_schema = reload.clone();
     schema.connect_activate(move |_| on_schema());
     reload();
-
     let in_flight = source.in_flight.clone();
     dialog.connect_closed(move |_| in_flight.borrow().cancel());
+    crate::ui::leak_probe::track("catalog", &dialog);
     dialog.present(Some(parent));
 }
 

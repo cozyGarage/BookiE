@@ -232,8 +232,9 @@ pub(super) fn install_grid_context_menus(
                 let Some(view) = view.upgrade() else { return };
                 let row = row_object_at(&view, position(slot));
                 if let Some(value) = pending_cell_value(&slot.widget) {
-                    let copy_text = copy_value_text(&slot.widget, row.as_ref(), slot.col_index);
-                    value_viewer::present(&view, &slot.column_name, &value, copy_text);
+                    let null_copy_text = matches!(&value, Value::Null)
+                        .then(|| copy_value_text(&slot.widget, row.as_ref(), slot.col_index));
+                    value_viewer::present(&view, &slot.column_name, value, null_copy_text);
                     return;
                 }
                 if row
@@ -251,8 +252,7 @@ pub(super) fn install_grid_context_menus(
                         else {
                             return;
                         };
-                        let copy_text = super::display::value_to_full_edit_text(&value);
-                        value_viewer::present(&view, &slot.column_name, &value, copy_text);
+                        value_viewer::present(&view, &slot.column_name, value, None);
                     } else {
                         sender
                             .send(GridMsg::FetchCellValue {
@@ -268,8 +268,7 @@ pub(super) fn install_grid_context_menus(
                 else {
                     return;
                 };
-                let copy_text = super::display::value_to_full_edit_text(&value);
-                value_viewer::present(&view, &slot.column_name, &value, copy_text);
+                value_viewer::present(&view, &slot.column_name, value, None);
             })
             .build()
     };

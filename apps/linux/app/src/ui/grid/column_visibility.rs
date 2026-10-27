@@ -96,7 +96,7 @@ fn present(
     toolbar.add_top_bar(&adw::HeaderBar::new());
     toolbar.set_content(Some(&page));
     dialog.set_child(Some(&toolbar));
-    dialog.present(Some(view));
+    crate::ui::leak_probe::present_tracked("column_visibility", &dialog, view);
 }
 
 fn reset_widths(columns: &[gtk::glib::WeakRef<gtk::ColumnViewColumn>], persist: &Option<Persist>) {
