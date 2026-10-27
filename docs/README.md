@@ -89,6 +89,7 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 - [Current Linux PostgreSQL streaming workload, October 24](evidence/postgres-stream-current-2026-10-24/README.md): exact-head ten-column query, repeated bounded-memory measurements, and cancellation/session-recovery outcomes.
 - [Native Wayland PostgreSQL streaming profile, October 25](evidence/postgres-stream-native-wayland-2026-10-25/README.md): source-built release run on Omarchy, memory samples, and the observed retained-row range.
 - [Multi-editor stream ownership profile, October 26](evidence/stream-retention-multi-owner-2026-10-26/README.md): synthetic two-editor and cancelled export-page sample, with the RSS/allocator limitation stated.
+- [File chooser action race, October 26](evidence/file-chooser-action-race-2026-10-26/README.md): bounded retry and keyboard fallback when a transient accessibility action disappears.
 - [Editor buffer and input-context teardown, October 26](evidence/editor-buffer-release-2026-10-26/README.md): object retention with the default input method, heap allocation reports and editor shutdown regressions.
 - [Editor lifetime acceptance, October 26](evidence/editor-lifetime-acceptance-2026-10-26/README.md): experimental-fix keyboard, scale-2 and repeated Vim editor-close checks, with source and binary identity.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
