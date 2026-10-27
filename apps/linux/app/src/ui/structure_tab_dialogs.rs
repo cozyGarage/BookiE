@@ -81,9 +81,11 @@ fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box,
     // Without this the Add button only responds to mouse / Tab+Space.
     dialog.set_default_widget(Some(&submit_btn));
 
-    let dialog_for_cancel = dialog.clone();
+    let dialog_for_cancel = dialog.downgrade();
     cancel_btn.connect_clicked(move |_| {
-        dialog_for_cancel.close();
+        if let Some(dialog) = dialog_for_cancel.upgrade() {
+            dialog.close();
+        }
     });
 
     (dialog, content, submit_btn)
@@ -147,8 +149,11 @@ pub(super) fn present_index_dialog(
 
     let column_checks_for_resp = column_checks.clone();
     let sender_for_resp = sender.clone();
-    let dialog_for_submit = dialog.clone();
+    let dialog_for_submit = dialog.downgrade();
     submit_btn.connect_clicked(move |_| {
+        let Some(dialog_for_submit) = dialog_for_submit.upgrade() else {
+            return;
+        };
         let name = name_row.text().to_string();
         if name.trim().is_empty() {
             // Toast instead of silent no-op so the user knows why
@@ -222,8 +227,11 @@ pub(super) fn present_fk_dialog(
 
     let column_checks_for_resp = column_checks.clone();
     let sender_for_resp = sender.clone();
-    let dialog_for_submit = dialog.clone();
+    let dialog_for_submit = dialog.downgrade();
     submit_btn.connect_clicked(move |_| {
+        let Some(dialog_for_submit) = dialog_for_submit.upgrade() else {
+            return;
+        };
         let name = name_row.text().to_string();
         let ref_table = ref_table_row.text().to_string();
         if name.trim().is_empty() {
@@ -294,3 +302,6 @@ pub(super) fn present_fk_dialog(
 
     dialog.present(Some(parent));
 }
+
+#[cfg(test)]
+mod lifetime_tests;
