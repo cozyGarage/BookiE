@@ -4,8 +4,8 @@ use sqlx::pool::PoolConnection;
 use sqlx::{Connection as SqlxConnection, Pool};
 use tablepro_core::sql_syntax::script::LexicalSettings;
 use tablepro_core::{
-    DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, Value, check_pre_dispatch, run_controlled_setup,
-    run_server_cancellable,
+    DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, Value, check_pre_dispatch,
+    run_controlled_setup, run_server_cancellable,
 };
 
 use crate::{
@@ -58,17 +58,27 @@ pub(crate) async fn query_with_text_fallback(
     sql: &str,
     params: &[Value],
     control: &OperationControl,
-) -> Result<QueryResult, DriverError> {
+) -> Result<QueryResultBatch, DriverError> {
+    if params.is_empty() && crate::is_call_statement(sql) {
+        return run_server_cancellable(
+            crate::text_protocol(connection, sql),
+            request_cancellation(cancellation_pool, connection_id),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+    }
     let mut result = run_server_cancellable(
         params_into_result(connection, sql, params, MAX_QUERY_ROWS),
         request_cancellation(cancellation_pool, connection_id),
         confirms_cancellation,
         control,
     )
-    .await;
+    .await
+    .map(QueryResultBatch::single);
     if params.is_empty() && result.as_ref().is_err_and(needs_text_protocol) {
         result = run_server_cancellable(
-            text_protocol(connection, sql),
+            crate::text_protocol(connection, sql),
             request_cancellation(cancellation_pool, connection_id),
             confirms_cancellation,
             control,
@@ -86,44 +96,16 @@ impl tablepro_core::Session for MysqlSession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        check_pre_dispatch(control)?;
-        let mut connection = self
-            .connection
-            .take()
-            .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
-        let timestamp_is_utc = match run_controlled_setup(timezone_is_utc(&mut *connection), control).await {
-            Ok(Ok(timestamp_is_utc)) => timestamp_is_utc,
-            Ok(Err(error)) | Err(error) => {
-                if matches!(error, DriverError::Disconnected) {
-                    let _ = connection.close().await;
-                } else {
-                    self.connection = Some(connection);
-                }
-                return Err(error);
-            }
-        };
-        let mut result = query_with_text_fallback(
-            &mut connection,
-            &self.cancellation_pool,
-            self.connection_id,
-            sql,
-            params,
-            control,
-        )
-        .await;
-        if !timestamp_is_utc && let Ok(result) = &mut result {
-            refuse_non_utc_timestamps(result);
-        }
-        if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
-            let _ = connection.detach().close_hard().await;
-        } else if matches!(result, Err(DriverError::Disconnected)) {
-            // Do not let the one-slot pool reconnect behind this session
-            // handle after its server-side state has disappeared.
-            let _ = connection.close().await;
-        } else {
-            self.connection = Some(connection);
-        }
-        result
+        self.run(sql, params, control).await.map(QueryResultBatch::into_first)
+    }
+
+    async fn query_result_sets_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        self.run(sql, params, control).await
     }
 
     async fn lexical_settings_controlled(
@@ -158,21 +140,59 @@ impl tablepro_core::Session for MysqlSession {
     }
 }
 
+impl MysqlSession {
+    async fn run(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        check_pre_dispatch(control)?;
+        let mut connection = self
+            .connection
+            .take()
+            .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
+        let timestamp_is_utc = match run_controlled_setup(timezone_is_utc(&mut *connection), control).await {
+            Ok(Ok(timestamp_is_utc)) => timestamp_is_utc,
+            Ok(Err(error)) | Err(error) => {
+                if matches!(error, DriverError::Disconnected) {
+                    let _ = connection.close().await;
+                } else {
+                    self.connection = Some(connection);
+                }
+                return Err(error);
+            }
+        };
+        let mut result = query_with_text_fallback(
+            &mut connection,
+            &self.cancellation_pool,
+            self.connection_id,
+            sql,
+            params,
+            control,
+        )
+        .await;
+        if !timestamp_is_utc && let Ok(result) = &mut result {
+            for result_set in &mut result.result_sets {
+                refuse_non_utc_timestamps(result_set);
+            }
+        }
+        if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
+            let _ = connection.detach().close_hard().await;
+        } else if matches!(result, Err(DriverError::Disconnected)) {
+            // Do not let the one-slot pool reconnect behind this session
+            // handle after its server-side state has disappeared.
+            let _ = connection.close().await;
+        } else {
+            self.connection = Some(connection);
+        }
+        result
+    }
+}
+
 // MySQL refuses some statements, START TRANSACTION among them, over the
 // prepared-statement protocol (ER_UNSUPPORTED_PS, 1295). Only those are
 // re-sent as plain text; everything else keeps typed result decoding.
 fn needs_text_protocol(error: &DriverError) -> bool {
     matches!(error, DriverError::Query { message, .. } if message.contains("prepared statement protocol"))
-}
-
-async fn text_protocol(connection: &mut PoolConnection<MySql>, sql: &str) -> Result<QueryResult, DriverError> {
-    sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string()))
-        .execute(&mut **connection)
-        .await
-        .map_err(map_sqlx_error)?;
-    Ok(QueryResult {
-        columns: Vec::new(),
-        rows: Vec::new(),
-        truncated: false,
-    })
 }
