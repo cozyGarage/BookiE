@@ -131,6 +131,7 @@ def fetch(directory, revision, group, url):
         index = bundle.verify(directory, revision)
         if index['build_group'] != group:
             raise ValueError('cached test bundle build group mismatch')
+        os.utime(directory, None)
         return
     with request(url + 'manifest.json') as response:
         manifest = json.loads(response.read(65537))
@@ -170,6 +171,7 @@ def fetch(directory, revision, group, url):
         if index['build_group'] != group:
             raise ValueError('registry bundle build group mismatch')
         shutil.move(staging, directory)
+        os.utime(directory, None)
     print('test bundle ready', flush=True)
 
 
