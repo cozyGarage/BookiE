@@ -454,7 +454,7 @@ fn present_export(
         );
     });
 
-    dialog.present(Some(parent));
+    crate::ui::leak_probe::present_tracked("export", &dialog, parent);
 }
 
 struct SaveRequest {

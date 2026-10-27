@@ -23,7 +23,11 @@ import gtk_active_edit
 import gtk_editor_panel
 import gtk_csv_refresh
 import gtk_catalog
+import gtk_reimport
+import gtk_deleted_drafts
+import gtk_unreadable_drafts
 import gtk_structure
+import gtk_sequences
 import gtk_input
 import gtk_runner
 import gtk_shard
@@ -925,6 +929,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
             "XDG_DATA_HOME": str(data),
             "XDG_CACHE_HOME": str(cache),
             "XDG_STATE_HOME": str(state),
+            "TABLEPRO_GTK_LEAK_REPORT": str(base / "leak-report.txt"),
             "XDG_RUNTIME_DIR": str(runtime),
             "GSETTINGS_BACKEND": "keyfile",
             "RUST_LOG": "tablepro_app=debug",
@@ -1130,6 +1135,7 @@ def mcp_client_disconnect_cancels_pending_approval(database, base):
             time.sleep(POLL_SECONDS)
     assert client is not None, "the installed app's MCP HTTP listener did not start"
     try:
+        owned_application().assert_owns_tcp_listener(MCP_HTTP_PORT)
         request = (
             b"POST /mcp HTTP/1.1\r\n"
             + f"Host: 127.0.0.1:{MCP_HTTP_PORT}\r\n".encode("ascii")
@@ -1944,10 +1950,14 @@ def a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile(dat
     passphrase = "two profile passphrase"
     config_path = base / "config" / storage_dir_name() / "connections.json"
     def without_usage(records):
-        return {
-            record["id"]: {key: value for key, value in record.items() if key != "last_opened_at"}
-            for record in records
-        }
+        normalized = {}
+        for record in records:
+            values = {key: value for key, value in record.items() if key != "last_opened_at"}
+            values.setdefault("tls_client_cert", None)
+            values.setdefault("tls_client_key", None)
+            values.setdefault("read_only", False)
+            normalized[record["id"]] = values
+        return normalized
 
     original = without_usage(json.loads(config_path.read_text(encoding="utf-8"))["connections"])
     invoke_accessible_action("win.disconnect")
@@ -2828,7 +2838,11 @@ def main():
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_reimport.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_deleted_drafts.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_unreadable_drafts.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_structure.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_sequences.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
     if selected:
         names = set(selected.split(","))
