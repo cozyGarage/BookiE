@@ -23,6 +23,7 @@ import gtk_active_edit
 import gtk_editor_panel
 import gtk_csv_refresh
 import gtk_catalog
+import gtk_deleted_drafts
 import gtk_structure
 import gtk_input
 import gtk_runner
@@ -2828,6 +2829,7 @@ def main():
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_deleted_drafts.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_structure.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
     if selected:
