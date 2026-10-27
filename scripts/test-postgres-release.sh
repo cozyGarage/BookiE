@@ -43,13 +43,22 @@ wait_for_port() {
 }
 
 bash "$FIXTURE/generate-materials.sh"
+chmod 0755 "$FIXTURE/seed"
+chmod 0644 "$FIXTURE/seed/01-seed.sql"
 
 mkdir -p "$STATE/config"
 rm -f "$STATE/config/tablepro/known_hosts"
 
 trap teardown EXIT
 compose down --volumes --remove-orphans >/dev/null 2>&1 || true
-compose up -d --build --wait
+if compose up -d --build --wait --wait-timeout 300; then
+  :
+else
+  startup_status=$?
+  compose ps --all || true
+  compose logs --no-color --tail 50 || true
+  exit "$startup_status"
+fi
 
 wait_for_port 127.0.0.1 8474 "toxiproxy api"
 wait_for_port 127.0.0.1 5433 "postgres path"
@@ -59,7 +68,7 @@ wait_for_port 127.0.0.1 2223 "bastion path"
 # 100 bytes, so the isolated runtime dir has to stay short -- the
 # fixture's own state directory, deep under the checked-out repo, is
 # already too long for that once a socket name is appended.
-secret_root="$(mktemp -d /tmp/tablepro.XXXXXX)"
+secret_root="$(mktemp -d "${TMPDIR:-/tmp}/tablepro.XXXXXX")"
 mkdir -p "$secret_root/home" "$secret_root/data" "$secret_root/cache" "$secret_root/state" "$secret_root/runtime"
 chmod 0700 "$secret_root/runtime"
 
@@ -80,11 +89,19 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   dbus-run-session -- bash -c '
     set -euo pipefail
     eval "$(printf "tablepro-test" | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
-    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo build --locked -p tablepro-ssh --bin tablepro-askpass
-    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo test --locked -p tablepro-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
-    cargo test --locked -p tablepro-agentd --test mtls -- --include-ignored --test-threads=1
-    cargo test --locked -p tablepro-release-tests --tests -- --include-ignored --test-threads=1
-    cargo build --locked -p tablepro-app --bin tablepro-app
+    if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then
+      export PATH="$BOOKIE_TEST_BUNDLE/bin:$PATH"
+      export TABLEPRO_GTK_BINARY="$BOOKIE_TEST_BUNDLE/bin/tablepro-app"
+    elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
+      echo "a source-matched prebuilt test bundle is required" >&2
+      exit 1
+    else
+      cargo build --locked -p tablepro-ssh --bin tablepro-askpass
+      cargo build --locked -p tablepro-app --bin tablepro-app
+    fi
+    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" bash scripts/run-rust-tests.sh --locked -p tablepro-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
+    bash scripts/run-rust-tests.sh --locked -p tablepro-agentd --test mtls -- --include-ignored --test-threads=1
+    bash scripts/run-rust-tests.sh --locked -p tablepro-release-tests --tests -- --include-ignored --test-threads=1
     TABLEPRO_GTK_DBUS_ACTIVE=0 \
       TABLEPRO_GTK_POSTGRES_DB=tablepro \
       TABLEPRO_GTK_POSTGRES_USER=tablepro \

@@ -182,6 +182,43 @@ jobs:
           path: target/quality/*-layers
           if-no-files-found: error
 
+  reusable-test-builds:
+    name: Reusable test builds
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    needs: [pin-revision, ensure-ci-gtk-image]
+    timeout-minutes: 60
+    container:
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_BUILD_JOBS: "4"
+      BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Build versioned executable test bundles
+        run: bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds"
+      - name: Upload source-pinned default bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-default
+          path: reusable-builds/default/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned DuckDB bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-duckdb
+          path: reusable-builds/duckdb/
+          if-no-files-found: error
+          retention-days: 14
+
   fast:
     name: Fast checks (GTK)
     timeout-minutes: 60

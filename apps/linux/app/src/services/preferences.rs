@@ -147,12 +147,19 @@ pub(super) fn settings() -> Option<gio::Settings> {
     open_settings().ok()
 }
 
+fn schema_directory() -> PathBuf {
+    std::env::var_os("GSETTINGS_SCHEMA_DIR")
+        .filter(|directory| !directory.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("TABLEPRO_GSETTINGS_SCHEMA_DIR")))
+}
+
 fn open_settings() -> Result<gio::Settings, String> {
     let parent = gio::SettingsSchemaSource::default()
         .ok_or_else(|| "default GSettings schema source is unavailable".to_string())?;
-    let local_source = Path::new(env!("TABLEPRO_GSETTINGS_SCHEMA_DIR"));
+    let local_source = schema_directory();
     let source = if local_source.is_dir() {
-        gio::SettingsSchemaSource::from_directory(local_source, Some(&parent), false)
+        gio::SettingsSchemaSource::from_directory(&local_source, Some(&parent), false)
             .map_err(|error| error.to_string())?
     } else {
         parent.clone()
@@ -311,6 +318,47 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
+    fn runtime_schema_directory_is_used_for_settings() {
+        if std::env::var_os("BOOKIE_RUNTIME_SCHEMA_TEST").is_some() {
+            assert_eq!(open_settings().unwrap().uint64("default-page-size"), 777);
+            assert_eq!(
+                make_test_settings("/com/tablepro/linux/runtime/")
+                    .0
+                    .uint64("default-page-size"),
+                777
+            );
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let xml = include_str!("../../../data/com.tablepro.linux.gschema.xml")
+            .replace("<default>1000</default>", "<default>777</default>");
+        std::fs::write(directory.path().join("com.tablepro.linux.gschema.xml"), xml).unwrap();
+        assert!(
+            std::process::Command::new("glib-compile-schemas")
+                .arg("--strict")
+                .arg(directory.path())
+                .status()
+                .unwrap()
+                .success()
+        );
+        let result = std::process::Command::new(std::env::current_exe().unwrap())
+            .arg("--exact")
+            .arg("services::preferences::tests::runtime_schema_directory_is_used_for_settings")
+            .env("BOOKIE_RUNTIME_SCHEMA_TEST", "1")
+            .env("GSETTINGS_SCHEMA_DIR", directory.path())
+            .env("GSETTINGS_BACKEND", "memory")
+            .env("XDG_CONFIG_HOME", directory.path())
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+
+    #[test]
     fn migrates_legacy_settings_and_keeps_rollback_copies() {
         if std::env::var_os("BOOKIE_SETTINGS_TEST_CHILD").is_some() {
             let path = xdg_config_path("preferences.json").unwrap();
@@ -388,11 +436,7 @@ mod tests {
         }
         let dir = tempfile::tempdir().unwrap();
         let schema = dir.path().join("com.tablepro.linux.gschema.xml");
-        std::fs::copy(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../data/com.tablepro.linux.gschema.xml"),
-            &schema,
-        )
-        .unwrap();
+        std::fs::write(&schema, include_str!("../../../data/com.tablepro.linux.gschema.xml")).unwrap();
         assert!(
             std::process::Command::new("glib-compile-schemas")
                 .arg("--strict")
@@ -414,7 +458,7 @@ mod tests {
 
     fn make_test_settings(_path: &str) -> (gio::Settings, gio::SettingsBackend) {
         let source = gio::SettingsSchemaSource::from_directory(
-            env!("TABLEPRO_GSETTINGS_SCHEMA_DIR"),
+            schema_directory(),
             gio::SettingsSchemaSource::default().as_ref(),
             false,
         )
@@ -607,7 +651,7 @@ mod tests {
 
     fn test_settings_with_backend(_path: &str, backend: gio::SettingsBackend) -> gio::Settings {
         let source = gio::SettingsSchemaSource::from_directory(
-            env!("TABLEPRO_GSETTINGS_SCHEMA_DIR"),
+            schema_directory(),
             gio::SettingsSchemaSource::default().as_ref(),
             false,
         )
