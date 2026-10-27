@@ -36,8 +36,8 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("CARGO_TARGET_DIR: /target", job)
                 self.assertIn("TMPDIR: /target", job)
         guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("CARGO_TARGET_DIR: /tmp/bookie-guards-${{ github.run_id }}/target", guards)
-        self.assertIn("TMPDIR: /tmp/bookie-guards-${{ github.run_id }}/tmp", guards)
+        self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/bookie-guards-${{ github.run_id }}", guards)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-guards-${{ github.run_id }}", guards)
         self.assertIn('RUSTC_WRAPPER: ""', guards)
         self.assertIn('mkdir -p "$TMPDIR"', guards)
 

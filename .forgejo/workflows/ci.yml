@@ -37,8 +37,8 @@ jobs:
         shell: bash
     env:
       TABLEPRO_TOOL_DIR: /var/cache/ci/tools
-      CARGO_TARGET_DIR: /tmp/bookie-guards-${{ github.run_id }}/target
-      TMPDIR: /tmp/bookie-guards-${{ github.run_id }}/tmp
+      CARGO_TARGET_DIR: /var/cache/ci/target/bookie-guards-${{ github.run_id }}
+      TMPDIR: /var/cache/ci/tmp/bookie-guards-${{ github.run_id }}
       RUSTC_WRAPPER: ""
     steps:
       - name: Check out
@@ -47,7 +47,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
-          mkdir -p "$TMPDIR"
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -58,7 +58,7 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Script harness and guards
         run: |
-          mkdir -p "$TMPDIR"
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           cd src
           cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
           bash scripts/test-harness.sh
@@ -70,7 +70,7 @@ jobs:
           cargo fmt --all -- --check
       - name: Clean pilot scratch
         if: always()
-        run: rm -rf -- "/tmp/bookie-guards-${{ github.run_id }}"
+        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
   gtk-build:
     runs-on: build-host
