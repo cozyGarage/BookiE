@@ -8,6 +8,12 @@
   },
   "negative_control": "all three regression tests failed on original implementation",
   "workspace_checks": "46 unit and 4 selected integration tests passed",
-  "preflight": "pending",
-  "forgejo": "deferred during infrastructure migration"
+  "preflight": "passed: 2211 unit, 291 sandbox, 1 Redis check",
+  "forgejo": "deferred during infrastructure migration",
+  "installed_e2e": {
+    "restart_restores_active_editor_and_connection": "passed",
+    "workspace_connection_removal_confirms_once_and_preserves_the_database": "passed"
+  },
+  "installed_binary_sha256": "355904b9a2e9de4273ec29ddd62117d44a276c7fe346951e9a7ce12233d050b6",
+  "merge_order": "1754 first; refresh and verify both regression sets"
 }

@@ -14,6 +14,8 @@ Tests use invalid UTF-8 to produce a deterministic read error without depending 
 
 Draft loads now propagate errors other than missing files. The existing missing-file fallback remains covered. Connection deletion edits metadata without reading or rewriting any remaining drafts. A cold-cache database save logs the failed read and preserves the durable workspace. It can be retried after repairing the draft; no new persistence format is introduced.
 
-Local workspace checks passed: 46 unit tests and four selected integration tests. Full preflight is pending. Forgejo acceptance is deferred during infrastructure migration. No GTK source changed, and installed UI behavior on a failed draft read is unverified. This change does not add a recovery dialog or claim that the rejected new database snapshot was saved.
+Local workspace checks passed: 46 unit tests and four selected integration tests. Full preflight passed: 2,211 unit tests, 291 sandbox tests and one Redis check. A rebuilt installed app passed `restart_restores_active_editor_and_connection` and `workspace_connection_removal_confirms_once_and_preserves_the_database` under isolated Xvfb. These installed scenarios cover healthy persistence and deletion, not read-error UI presentation. Forgejo acceptance is deferred during infrastructure migration. No GTK source changed, and installed UI behavior on a failed draft read is unverified. This change does not add a recovery dialog or claim that the rejected new database snapshot was saved.
+
+Merge order: #1754 first. Both fixes edit workspace deletion; refresh this branch and retain both regression sets after that merge.
 
 Release-Note: Fixed: Unreadable SQL drafts remain recoverable when connections are deleted or another database workspace is saved.
