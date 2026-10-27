@@ -63,6 +63,7 @@
 
 ### Fixed
 
+- A SQL Server result that exceeds the result size limit now keeps only the first rows, instead of skipping a large row and keeping later ones after it.
 - Workspace saves no longer rewrite other connections' editor drafts, preserving external edits and avoiding needless file I/O.
 - PostgreSQL CSV imports preserve the session time zone when a `timestamptz` value has no explicit offset.
 - Expanding a table in the sidebar now displays its field and type previews instead of remaining on “Loading fields…”.
