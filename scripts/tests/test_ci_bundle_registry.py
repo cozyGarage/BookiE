@@ -1,5 +1,7 @@
 import importlib.util
 import io
+import json
+from unittest.mock import patch
 from pathlib import Path
 import tarfile
 import tempfile
@@ -31,6 +33,14 @@ class RegistryExtractionTests(unittest.TestCase):
         redirected = registry.ArtifactRedirect().redirect_request(
             request, None, 302, 'Found', {}, 'https://storage.example/artifact.zip')
         self.assertIsNone(redirected.get_header('Authorization'))
+
+    def test_republishing_an_existing_source_bundle_does_not_overwrite_it(self):
+        manifest = {'schema_version': 1, 'source_commit': 'a' * 40, 'build_group': 'default',
+                    'sha256': 'b' * 64, 'size': 100, 'index_sha256': 'c' * 64}
+        with patch.object(registry.bundle, 'verify', return_value={'build_group': 'default'}), \
+                patch.object(registry, 'request', return_value=io.BytesIO(json.dumps(manifest).encode())) as request:
+            registry.publish(Path('/unused'), 'a' * 40, 'default', 'https://registry.example/bundle/')
+        request.assert_called_once_with('https://registry.example/bundle/manifest.json')
 
     def test_regular_payload_is_extracted(self):
         self.assertEqual(self.check_archive('tests/program'), b'test')

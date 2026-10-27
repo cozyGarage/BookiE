@@ -40,10 +40,30 @@ def extract(archive, destination):
         source.extractall(destination, members=members, filter='data')
 
 
+def existing_manifest(url, revision, group):
+    try:
+        with request(url + 'manifest.json') as response:
+            manifest = json.loads(response.read(65537))
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return None
+        raise
+    if (manifest.get('schema_version') != 1 or manifest.get('source_commit') != revision
+            or manifest.get('build_group') != group or not 0 < manifest['size'] <= MAX_ARCHIVE
+            or not re.fullmatch('[0-9a-f]{64}', manifest['sha256'])
+            or not re.fullmatch('[0-9a-f]{64}', manifest['index_sha256'])):
+        raise ValueError('existing registry bundle manifest is invalid')
+    return manifest
+
+
 def publish(directory, revision, group, url):
     index = bundle.verify(directory, revision)
     if index['build_group'] != group:
         raise ValueError('test bundle build group mismatch')
+    existing = existing_manifest(url, revision, group)
+    if existing:
+        print(json.dumps(existing, sort_keys=True))
+        return
     with tempfile.TemporaryDirectory() as temporary:
         archive = Path(temporary) / 'bundle.tar.gz'
         with tarfile.open(archive, 'w:gz', compresslevel=1) as output:
