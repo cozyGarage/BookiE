@@ -384,3 +384,19 @@ fn assert_unrelated_workspace_restores(unreadable_path: bool) {
     let restored = reader.load_connection(broken).unwrap();
     assert!(matches!(&restored.tabs[0], WorkspaceTabRecord::Editor { query, draft_id: None, .. } if query.is_empty()));
 }
+
+#[test]
+fn prefetch_refuses_invalid_connection_metadata_without_caching_requested_workspaces() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("workspace.json");
+    let id = Uuid::new_v4();
+    let bytes = serde_json::to_vec(&serde_json::json!({"connections": {
+        "invalid-uuid": {"tabs": []}, id.to_string(): {"tabs": []}
+    }}))
+    .unwrap();
+    std::fs::write(&path, &bytes).unwrap();
+    let store = WorkspaceStore::new(Some(path.clone()), directory.path().join("drafts"));
+    assert!(store.prefetch_connections(&[id]).is_err());
+    assert!(store.load_connection(id).is_none());
+    assert_eq!(std::fs::read(path).unwrap(), bytes);
+}

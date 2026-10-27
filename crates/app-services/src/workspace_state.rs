@@ -345,6 +345,9 @@ fn prefetch_locked(paths: &WorkspacePaths, ids: &[Uuid]) -> Result<WorkspacePref
         tracing::warn!(%error, "workspace could not be read; existing files will be preserved");
         WorkspaceFlushError::WriteFailed
     })?;
+    for id in state.connections.keys() {
+        Uuid::parse_str(id).map_err(|_| WorkspaceFlushError::WriteFailed)?;
+    }
     let mut unreadable = HashSet::new();
     state
         .connections
