@@ -1,0 +1,4 @@
+70f4b18f78948c8ca7615aadf9a85559ae457f6d2037c995f89c48b8ce7ef7f5  crates/app-services/src/catalog_changes.rs
+7ca82c550d99514ef02c8afa059acc673baeac2e2e7bdb61d4352c995d8fe022  apps/linux/app/src/ui/editor/session_mode.rs
+66798288bec2fdeb25c64d966916191b251ce3e3057f1b8563d61968171ead44  apps/linux/app/tests/gtk_catalog.py
+8655d7820927626b3e723e30edf08dfbe3cea9dad3c6df8422e9946e7260be17  apps/linux/app/tests/gtk_safety.py
