@@ -2,7 +2,7 @@ use gtk4::prelude::*;
 use gtk4::{self as gtk};
 
 use super::GridMsg;
-use super::display::{POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
+use super::display::POPOVER_SLOT;
 use crate::ui::cell_editor::CellEditor;
 
 pub(super) fn enum_commit_text(label: &str) -> String {
@@ -38,7 +38,7 @@ fn current_enum_choice_index(labels: &[String], current: &str) -> Option<usize> 
 
 #[derive(Clone)]
 struct Picker {
-    cell: CellEditor,
+    cell: gtk::glib::WeakRef<CellEditor>,
     col_index: usize,
     sender: relm4::Sender<GridMsg>,
     popover: gtk::glib::WeakRef<gtk::Popover>,
@@ -46,16 +46,10 @@ struct Picker {
 
 impl Picker {
     fn commit(&self, text: String) {
-        let row_position = POSITION_SLOT.get(&self.cell).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(&self.cell).unwrap_or_default();
-        self.sender
-            .send(GridMsg::CellEdited {
-                row_position,
-                col_index: self.col_index,
-                new_value: text,
-                row_key,
-            })
-            .ok();
+        let Some(cell) = self.cell.upgrade() else {
+            return;
+        };
+        super::editing::commit_popover_value(&cell, self.col_index, &self.sender, text);
         if let Some(popover) = self.popover.upgrade() {
             popover.popdown();
         }
@@ -153,7 +147,7 @@ pub(super) fn show_choice_popover(
     popover.set_parent(cell);
     POPOVER_SLOT.set(cell, popover.clone());
     let picker = Picker {
-        cell: cell.clone(),
+        cell: cell.downgrade(),
         col_index,
         sender: sender.clone(),
         popover: popover.downgrade(),
@@ -174,10 +168,12 @@ pub(super) fn show_choice_popover(
         .child(&content)
         .build();
     popover.set_child(Some(&scrolled));
-    let cell_for_close = cell.clone();
+    let cell_for_close = cell.downgrade();
     popover.connect_closed(move |p| {
         p.unparent();
-        POPOVER_SLOT.take(&cell_for_close);
+        if let Some(cell_for_close) = cell_for_close.upgrade() {
+            POPOVER_SLOT.take(&cell_for_close);
+        }
     });
     popover.popup();
 }
