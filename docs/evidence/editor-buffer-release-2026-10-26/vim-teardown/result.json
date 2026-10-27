@@ -1,0 +1,8 @@
+{
+  "scenario": "closing_a_vim_editor_releases_both_views_and_its_buffer",
+  "before": "SIGABRT under G_DEBUG=fatal-criticals: gtk_text_buffer_delete_mark received an already deleted mark",
+  "after": "one test passed with fatal criticals enabled",
+  "mechanism": "keyboard controller releases its Vim input context before the Vim client widget is detached and editor buffers are replaced",
+  "scope": "isolated GTK test, primary and split views; no user database or files",
+  "native_wayland": "not verified"
+}
