@@ -76,6 +76,7 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 - [Evidence directory index](archive/evidence-index-2026-10-10.md) (October 10 snapshot; current inventory and migration status are in the [evidence-branch proposal](proposals/evidence-branch.md))
 - [Archived evidence packets](archive/evidence/) (dated artifacts retained after reference triage; the separate-branch migration remains a [proposal](proposals/evidence-branch.md), and these files remain in Git)
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
+- [Code audit and client lifetime review, October 27](archive/client-lifetime-review-2026-10-27.md): audit issues by lane, peer fix classes, practices, testing styles and ranked recommendations.
 - [Performance review and first phases, October 22–23](archive/performance-review-2026-10-23.md): measured changes that landed, the remaining performance plan and follow-ups.
 - [Installed native Wayland run, October 23](evidence/installed-wayland-0.2.0-2026-10-23/README.md): oracle-checked end-to-end flows on Hyprland and the defects filed from them.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
