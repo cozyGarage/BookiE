@@ -70,7 +70,7 @@ Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`).
 | SQLite | Stable | yes | yes | SQL | yes | yes | yes | File-based |
 | SQL Server | Stable | yes | yes | SQL | yes | yes | no interactive begin | Tiberius; custom CA implemented; driver TLS fixture; Verify CA and Verify Full are identical; server cancellation unsupported |
 | ClickHouse | Stable | yes | yes | SQL | yes | yes | no | Waits for asynchronous mutations to finish; no row counts; driver TLS fixture |
-| Redis | Experimental | yes | DBs / SCAN | Redis CLI | via query | no | no | See [known limitations](known-limitations.md#editing-and-connections) for topology support; driver TLS fixture; Verify CA behaves as Verify Full |
+| Redis | Experimental | yes | DBs / SCAN | Redis CLI | via query | one bound key for the Value read | no | See [known limitations](known-limitations.md#editing-and-connections) for topology support; driver TLS fixture; Verify CA behaves as Verify Full |
 | MongoDB | Experimental | yes | collections | find / aggregate | insertOne / deleteMany / drop; keyed grid edits use bound values | no | no | TLS fixture coverage; Verify CA behaves as Verify Full; integration coverage includes browse, find, aggregate, stale-edit and stale-delete checks |
 | DuckDB | Experimental | yes | yes | SQL | yes | yes | no | Cargo feature `duckdb`; CSV/TSV/JSON/Parquet files; bundled JSON/Parquet; explicit optional CI |
 
