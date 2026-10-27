@@ -40,6 +40,31 @@ class CiCacheTests(unittest.TestCase):
     def cleanup(self, reserve=0):
         return subprocess.run(self.command + ['cleanup', '--min-free-gib', str(reserve)], capture_output=True, text=True)
 
+    def test_default_reserve_is_30_gib_for_checkout_and_cleanup(self):
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        checkout = self.directory / 'checkout.sh'
+        checkout.write_text(':\n')
+        gib = 1024**3
+
+        for command in ('cleanup', 'checkout'):
+            args = [str(SCRIPT), '--root', str(self.cache), '--lock', str(self.lock), command]
+            if command == 'checkout':
+                args.append(str(checkout))
+            with patch.object(sys, 'argv', args), patch.dict(
+                os.environ, {'CARGO_TARGET_DIR': str(self.cache / 'job')}
+            ), patch.object(
+                helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=30 * gib)
+            ):
+                self.assertEqual(helper.main(), 0)
+            with patch.object(sys, 'argv', args), patch.dict(
+                os.environ, {'CARGO_TARGET_DIR': str(self.cache / 'job')}
+            ), patch.object(
+                helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=29 * gib)
+            ):
+                self.assertEqual(helper.main(), 1)
+
     def test_old_generated_artifacts_removed_but_siblings_preserved(self):
         target = self.target('sandbox', 6)
         for profile in ('release', 'ci'):
@@ -101,12 +126,44 @@ class CiCacheTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
         helper = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(helper)
-        readings = [SimpleNamespace(free=value) for value in (0, 0, 0, 100, 100, 100)]
+        readings = [SimpleNamespace(free=value) for value in (0, 0, 0, 100, 100, 100, 100)]
         with patch.object(helper.shutil, 'disk_usage', side_effect=readings):
             result = helper.cleanup(self.cache, 50)
         self.assertTrue((second / 'debug/deps/artifact').exists())
         self.assertFalse((first / 'debug').exists())
         self.assertEqual(result, 0)
+
+    def test_pressure_cleanup_evicts_old_bundles_but_preserves_current_and_unrelated_data(self):
+        bundle_root = self.directory / 'bundles'
+        bundle_root.mkdir()
+        oldest = bundle_root / ('a' * 40 + '-default')
+        newest = bundle_root / ('b' * 40 + '-duckdb')
+        current = bundle_root / ('c' * 40 + '-default')
+        unrelated = bundle_root / 'notes'
+        for path in (oldest, newest, current, unrelated):
+            path.mkdir()
+            (path / 'payload').write_text('bundle bytes')
+        os.utime(oldest, (1, 1))
+        os.utime(newest, (2, 2))
+        os.utime(current, (3, 3))
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        def disk_usage(_):
+            recovered = not oldest.exists()
+            return SimpleNamespace(free=100 if recovered else 0)
+
+        with patch.object(helper.shutil, 'disk_usage', side_effect=disk_usage), patch.dict(
+            os.environ, {'GITHUB_SHA': 'c' * 40}
+        ):
+            result = helper.cleanup(self.cache, 50)
+
+        self.assertEqual(result, 0)
+        self.assertFalse(oldest.exists())
+        self.assertTrue(newest.exists())
+        self.assertTrue(current.exists())
+        self.assertTrue((unrelated / 'payload').is_file())
 
     def test_checkout_refuses_to_run_when_cleanup_cannot_restore_the_reserve(self):
         self.target('unit', 0)

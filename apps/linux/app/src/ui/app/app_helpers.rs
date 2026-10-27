@@ -70,6 +70,12 @@ impl App {
                     AppMsg::SavedQueriesChanged(saved)
                 }
             });
+        crate::ui::leak_probe::track("saved_queries", dialog.model().dialog());
+        let closed_sender = sender.clone();
+        dialog
+            .model()
+            .dialog()
+            .connect_closed(move |_| closed_sender.input(AppMsg::SavedQueriesDialogClosed));
         dialog.model().dialog().present(Some(&self.window));
         self.saved_queries_dialog = Some(dialog);
     }

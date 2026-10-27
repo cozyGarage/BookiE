@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
   "issue": 1728,
+  "base": "02198735f",
   "source_sha256": {
     "apps/linux/app/src/ui/history_dialog.rs": "030404fc81ea9b5c92a7bfdc7f7e18bee6430089bd59730545c3cd54e6f33078",
     "apps/linux/app/src/ui/history_dialog/lifetime_tests.rs": "68398655a4904bb993d629a058808d7124734873a1c19f526a4967bf2ec69d6d",
@@ -28,12 +28,5 @@
     "query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace"
   ],
   "installed_result": "2 passed",
-  "forgejo": "deferred by maintainer during infrastructure migration",
-  "source_commit": "b743190c724102b29c328605c2b779792db589c1",
-  "base_commit": "02198735fae33e6deaa02c7ed4c8540c94c3703b",
-  "source_commits": {
-    "apps/linux/app/src/ui/history_dialog.rs": "b743190c724102b29c328605c2b779792db589c1",
-    "apps/linux/app/src/ui/history_dialog/lifetime_tests.rs": "b743190c724102b29c328605c2b779792db589c1",
-    "scripts/isolated-tests.json": "b743190c724102b29c328605c2b779792db589c1"
-  }
+  "forgejo": "deferred by maintainer during infrastructure migration"
 }
