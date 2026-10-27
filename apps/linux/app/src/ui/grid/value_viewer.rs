@@ -13,17 +13,20 @@ const HEX_MAX_BYTES: usize = 16 * 1024;
 
 pub(super) fn body(value: &Value) -> String {
     let text = match value {
+        Value::Text(text) | Value::JsonText(text) => return capped(text),
         Value::Null => readonly_null_sentinel(),
-        Value::Bytes(bytes) if is_binary(bytes) => hex_dump(bytes),
+        Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
+            Ok(text) if !text.contains('\0') => return capped(text),
+            _ => hex_dump(bytes),
+        },
         Value::Json(json) => serde_json::to_string_pretty(json).unwrap_or_else(|_| json.to_string()),
-        Value::JsonText(json) => json.clone(),
         other => value_to_full_edit_text(other),
     };
-    capped(text)
-}
-
-fn is_binary(bytes: &[u8]) -> bool {
-    std::str::from_utf8(bytes).map_or(true, |text| text.contains('\0'))
+    if text.len() > MAX_VIEW_BYTES {
+        capped(&text)
+    } else {
+        text
+    }
 }
 
 fn hex_dump(bytes: &[u8]) -> String {
@@ -59,9 +62,9 @@ fn hex_dump(bytes: &[u8]) -> String {
     out
 }
 
-fn capped(text: String) -> String {
+fn capped(text: &str) -> String {
     if text.len() <= MAX_VIEW_BYTES {
-        return text;
+        return text.to_owned();
     }
     let mut end = MAX_VIEW_BYTES;
     while !text.is_char_boundary(end) {
@@ -123,6 +126,58 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: &Valu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn oversized_text_view_keeps_extra_memory_bounded() {
+        const CHILD_KIND: &str = "BOOKIE_VALUE_VIEW_MEMORY_KIND";
+        if let Ok(kind) = std::env::var(CHILD_KIND) {
+            let text = "é".repeat(32 * 1024 * 1024);
+            let value = match kind.as_str() {
+                "text" => Value::Text(text),
+                "json-text" => Value::JsonText(text),
+                "bytes" => Value::Bytes(text.into_bytes()),
+                _ => panic!("unknown synthetic value kind"),
+            };
+            let before = peak_memory_kib();
+            let shown = body(&value);
+            let extra = peak_memory_kib().saturating_sub(before);
+            eprintln!("viewer-memory kind={kind} input_bytes=67108864 extra_peak_kib={extra}");
+            assert!(shown.len() < MAX_VIEW_BYTES + 200);
+            assert!(shown.contains("67108864 bytes"));
+            assert!(
+                extra < 16 * 1024,
+                "capped value viewing allocated {extra} KiB beyond its input"
+            );
+            return;
+        }
+        for kind in ["text", "json-text", "bytes"] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "ui::grid::value_viewer::tests::oversized_text_view_keeps_extra_memory_bounded",
+                    "--nocapture",
+                    "--test-threads=1",
+                ])
+                .env(CHILD_KIND, kind)
+                .output()
+                .unwrap();
+            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stdout));
+        }
+    }
+
+    fn peak_memory_kib() -> u64 {
+        std::fs::read_to_string("/proc/self/status")
+            .unwrap()
+            .lines()
+            .find_map(|line| line.strip_prefix("VmHWM:"))
+            .unwrap()
+            .split_whitespace()
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap()
+    }
 
     #[test]
     fn json_looking_text_preserves_duplicate_keys_numbers_and_whitespace() {
