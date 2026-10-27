@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: bookie-lab
+  group: bookie-lab-${{ github.workflow }}-${{ github.run_id }}
   cancel-in-progress: false
 
 defaults:
@@ -26,14 +26,25 @@ env:
   SCCACHE_DIR: /var/cache/ci/sccache
   SCCACHE_CACHE_SIZE: 40G
   CARGO_TARGET_DIR: /var/cache/ci/target/${{ github.job }}
+  TMPDIR: /var/cache/ci/target
 
 jobs:
   guards:
-    runs-on: any-host
+    runs-on: build-host
     timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target
+      TMPDIR: /target
+      CARGO_HOME: /cargo
+      TABLEPRO_TOOL_DIR: /tools
+      RUSTC_WRAPPER: ""
+      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: bash
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -48,6 +59,7 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Script harness and guards
         run: |
+          mkdir -p "$TMPDIR"
           cd src
           cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
           bash scripts/test-harness.sh
@@ -59,16 +71,23 @@ jobs:
           cargo fmt --all -- --check
 
   gtk-build:
-    runs-on: any-host
+    runs-on: build-host
     needs: [guards]
     if: github.event_name != 'pull_request'
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
-      TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+      CARGO_HOME: /cargo
+      RUSTC_WRAPPER: ""
+      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      CARGO_TARGET_DIR: /target
+      TMPDIR: /target
+      TABLEPRO_TOOL_DIR: /tools
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: bash
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -84,6 +103,8 @@ jobs:
       - name: Prepare artifact runtime
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Build the shared GTK binary
+        env:
+          CARGO_BUILD_JOBS: "8"
         run: |
           cd src
           cargo build --profile ci --locked -p tablepro-app --bin tablepro-app
@@ -97,11 +118,21 @@ jobs:
           retention-days: 2
 
   clippy:
-    runs-on: any-host
+    runs-on: build-host
     timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target
+      CARGO_HOME: /cargo
+      TABLEPRO_TOOL_DIR: /tools
+      RUSTC_WRAPPER: ""
+      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      TMPDIR: /target
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: bash
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -118,8 +149,94 @@ jobs:
         run: |
           cd src && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 
+  test-build:
+    runs-on: build-host
+    needs: [guards, clippy]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target
+      TMPDIR: /target
+      CARGO_HOME: /cargo
+      TABLEPRO_TOOL_DIR: /tools
+      CARGO_BUILD_JOBS: "8"
+      RUSTC_WRAPPER: ""
+      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
+    steps:
+      - name: Check out
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Build the default test bundle
+        run: cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default
+      - name: Publish the default test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/default" "${{ github.sha }}" default
+
+  duckdb-build:
+    runs-on: build-host
+    needs: [test-build]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target
+      TMPDIR: /target
+      CARGO_HOME: /cargo
+      TABLEPRO_TOOL_DIR: /tools
+      CARGO_BUILD_JOBS: "8"
+      RUSTC_WRAPPER: ""
+      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
+    steps:
+      - name: Check out
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Build the DuckDB test bundle
+        run: cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" duckdb
+      - name: DuckDB analysis and documentation tests
+        run: |
+          cd src
+          cargo clippy --locked -p tablepro-driver-duckdb --all-targets -- -D warnings
+          cargo test --locked -p tablepro-driver-duckdb --doc
+      - name: Publish the DuckDB test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/duckdb" "${{ github.sha }}" duckdb
+
   unit:
     runs-on: any-host
+    needs: [test-build]
     timeout-minutes: 90
     steps:
       - name: Check out
@@ -136,16 +253,25 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Unit tests
         env:
           TABLEPRO_TOOL_DIR: /var/cache/ci/tools
         run: |
           cd src
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
-          "$NEXTEST" nextest run --workspace --exclude tablepro-driver-duckdb --lib --bins --profile ci --no-tests=fail
+          mkdir -p "$CARGO_TARGET_DIR"
+          export TMPDIR="$CARGO_TARGET_DIR"
+          "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
 
   sandbox:
     runs-on: any-host
+    needs: [test-build]
     timeout-minutes: 90
     steps:
       - name: Check out
@@ -162,6 +288,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Sandbox tier
         env:
           TABLEPRO_TOOL_DIR: /var/cache/ci/tools
@@ -171,6 +303,7 @@ jobs:
 
   widgets:
     runs-on: any-host
+    needs: [test-build]
     timeout-minutes: 90
     steps:
       - name: Check out
@@ -187,13 +320,69 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: GTK widget tests
         run: |
           cd src && bash scripts/test-gtk-widgets.sh
 
+  floor-build:
+    runs-on: build-host
+    needs: [guards, clippy]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target
+      TMPDIR: /target
+      CARGO_HOME: /cargo
+      TABLEPRO_TOOL_DIR: /tools
+      CARGO_BUILD_JOBS: "8"
+      RUSTC_WRAPPER: ""
+      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+    steps:
+      - name: Check out
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Install package validation tools
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends desktop-file-utils
+      - name: Build the shared release package
+        run: |
+          cd src
+          DEB_OUT="$GITHUB_WORKSPACE/floor-package" bash scripts/build-deb.sh
+          package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
+          python3 scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}"
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Upload the shared release package
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: floor-package-${{ github.run_id }}-${{ github.sha }}
+          path: floor-artifact/
+          if-no-files-found: error
+          retention-days: 2
+
   distro-floor:
     runs-on: any-host
-    needs: [guards, clippy]
+    needs: [guards, clippy, floor-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
@@ -226,24 +415,17 @@ jobs:
         run: bash src/scripts/docker-hub-login.sh
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
-      - name: Build or reuse the distro-floor package
-        run: |
-          cd src && bash scripts/distro-floor-package.sh "${{ github.sha }}" > "$GITHUB_WORKSPACE/floor-package-path"
       - name: Prepare artifact runtime
         env:
           TABLEPRO_TOOL_DIR: /var/cache/ci/tools
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Prepare the shared release package
-        run: |
-          package=$(cat "$GITHUB_WORKSPACE/floor-package-path")
-          python3 src/scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}"
-      - name: Upload the shared release package
-        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+      - name: Download the shared release package
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
         with:
           name: floor-package-${{ github.run_id }}-${{ github.sha }}
           path: floor-artifact/
-          if-no-files-found: error
-          retention-days: 2
+      - name: Verify the shared release package
+        run: python3 src/scripts/ci-gtk-artifact.py verify --package "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}" > "$GITHUB_WORKSPACE/floor-package-path"
       - name: Debian package build, install, upgrade from the released package and purge
         run: |
           released=/var/cache/ci/releases/tablepro_0.1.5-1_amd64.deb
@@ -305,7 +487,7 @@ jobs:
 
   driver:
     runs-on: any-host
-    needs: [guards, clippy]
+    needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
@@ -330,6 +512,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -346,11 +534,11 @@ jobs:
           trap cleanup_testcontainers EXIT
           trap 'cleanup_testcontainers; exit 143' TERM
           trap 'cleanup_testcontainers; exit 130' INT
-          cargo test --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
 
   e2e:
     runs-on: any-host
-    needs: [guards, clippy, gtk-build]
+    needs: [guards, clippy, gtk-build, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
@@ -378,6 +566,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Prepare artifact runtime
         env:
           TABLEPRO_TOOL_DIR: /var/cache/ci/tools
@@ -404,7 +598,7 @@ jobs:
 
   consumers:
     runs-on: any-host
-    needs: [guards, clippy]
+    needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
@@ -424,6 +618,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -432,17 +632,17 @@ jobs:
       - name: MCP, policy sessions
         run: |
           cd src
-          cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
-          cargo test --locked -p tablepro-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
-          cargo test --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
-          cargo test --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p tablepro-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
       - name: App server tests
         run: |
           cd src && python3 scripts/run-isolated-tests.py app-server
 
   gtk:
     runs-on: any-host
-    needs: [guards, clippy, gtk-build]
+    needs: [guards, clippy, gtk-build, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
@@ -466,6 +666,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Prepare artifact runtime
         env:
           TABLEPRO_TOOL_DIR: /var/cache/ci/tools
@@ -492,7 +698,7 @@ jobs:
 
   duckdb:
     runs-on: any-host
-    needs: [guards, clippy]
+    needs: [duckdb-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 90
     env:
@@ -512,6 +718,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" duckdb
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -520,16 +732,15 @@ jobs:
       - name: DuckDB driver and the app with DuckDB
         run: |
           cd src
-          cargo clippy --locked -p tablepro-driver-duckdb --all-targets -- -D warnings
-          cargo test --locked -p tablepro-driver-duckdb -- --include-ignored
-          cargo build --locked -p tablepro-app --features duckdb
+          bash scripts/run-rust-tests.sh --locked -p tablepro-driver-duckdb -- --include-ignored
   pg-release:
     runs-on: any-host
-    needs: [guards, clippy]
+    needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
+      TMPDIR: /var/cache/ci/t
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout {0}
@@ -545,6 +756,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -554,11 +771,12 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py 4
       - name: PostgreSQL release fixture
         run: |
+          mkdir -p "$TMPDIR"
           cd src && ./scripts/test-postgres-release.sh
 
   pg-dump:
     runs-on: any-host
-    needs: [guards, clippy]
+    needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
     env:
@@ -578,6 +796,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -588,7 +812,7 @@ jobs:
 
   socket-ssh:
     runs-on: any-host
-    needs: [guards, clippy]
+    needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
@@ -608,6 +832,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -621,7 +851,7 @@ jobs:
 
   gtk-server:
     runs-on: any-host
-    needs: [guards, clippy, gtk-build]
+    needs: [guards, clippy, gtk-build, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
@@ -651,6 +881,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Prepare artifact runtime
         env:
           TABLEPRO_TOOL_DIR: /var/cache/ci/tools
@@ -675,8 +911,8 @@ jobs:
         run: |
           cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
   driver-tls:
-    runs-on: ubuntu2604-canary
-    needs: [guards, clippy]
+    runs-on: any-host
+    needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
@@ -696,6 +932,12 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -709,7 +951,7 @@ jobs:
 
   keyring:
     runs-on: any-host
-    needs: [guards, clippy]
+    needs: [guards, clippy, test-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 30
     env:
@@ -729,20 +971,33 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Secret Service tier
         run: |
           cd src && ./scripts/test-secret-service.sh
 
   supply-chain:
-    runs-on: any-host
+    runs-on: build-host
     needs: [guards, clippy]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/supply-chain
+      CARGO_HOME: /cargo
+      RUSTC_WRAPPER: ""
+      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      CARGO_TARGET_DIR: /target
+      TMPDIR: /target
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: bash
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}

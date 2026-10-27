@@ -105,7 +105,10 @@ async fn start() -> TestResult<Fixture> {
     let context = OpenSshContext {
         runtime: OpenSshRuntime::acquire(&base)?,
         ssh_program: wrapper,
-        askpass_program: PathBuf::from(env!("CARGO_BIN_EXE_tablepro-askpass")),
+        askpass_program: PathBuf::from(
+            std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
+                .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+        ),
         timeouts: OpenSshTimeouts::default(),
     };
     Ok(Fixture {
@@ -333,7 +336,10 @@ async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResul
     let context = OpenSshContext {
         runtime: OpenSshRuntime::acquire(&base)?,
         ssh_program: wrapper,
-        askpass_program: PathBuf::from(env!("CARGO_BIN_EXE_tablepro-askpass")),
+        askpass_program: PathBuf::from(
+            std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
+                .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+        ),
         timeouts: OpenSshTimeouts::default(),
     };
     let config = OpenSshConfig {
@@ -425,7 +431,10 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
     let context = OpenSshContext {
         runtime: OpenSshRuntime::acquire(&base).unwrap(),
         ssh_program: wrapper,
-        askpass_program: PathBuf::from(env!("CARGO_BIN_EXE_tablepro-askpass")),
+        askpass_program: PathBuf::from(
+            std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
+                .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+        ),
         timeouts: OpenSshTimeouts::default(),
     };
 
@@ -588,7 +597,10 @@ async fn start_with_authorized_key(public_key: &str, agent_socket: Option<&Path>
     let context = OpenSshContext {
         runtime: OpenSshRuntime::acquire(&base)?,
         ssh_program: wrapper,
-        askpass_program: PathBuf::from(env!("CARGO_BIN_EXE_tablepro-askpass")),
+        askpass_program: PathBuf::from(
+            std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
+                .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+        ),
         timeouts: OpenSshTimeouts::default(),
     };
     Ok(KeyFixture {
