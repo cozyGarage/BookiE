@@ -8,22 +8,23 @@
   "negative_control": "new duplicate-key regression failed on original implementation",
   "focused_validation": "8 pure viewer tests passed; 64 MiB fixture extra peak KiB: Text 4444, JsonText 4360, UTF-8 Bytes 4636",
   "pending": [
-    "resolve local GTK initialization failure and repeat widgets and installed E2E for allocation follow-up"
+    "repeat the installed value scenario with a working BookiE AT-SPI application entry"
   ],
-  "forgejo": "deferred during infrastructure migration",
+  "forgejo": "pending; run the PR gate after GitHub readiness checks pass",
   "validation": {
     "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
     "app_clippy": "passed",
     "installed_e2e": "view_value_preserves_duplicate_json_keys_and_text_formatting passed using keyboard menu navigation",
     "gtk_widgets": "179 isolated tests passed"
   },
-  "installed_binary_sha256": "f961d264b7ef53ef5434cee008c362dfc3b5b2df7cda2be5dac4a5dc2df1df9f",
+  "installed_binary_sha256": "3979eae00a9d0e64130caf9d6d9ac178a789ceef4f414920bd6ff864a42b5acc",
   "allocation_negative_control": "baseline 9e415fdf5 failed: Text added 69968 KiB peak RSS",
   "allocation_follow_up": {
     "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
     "app_clippy": "passed",
-    "gtk_widgets": "blocked at GTK initialization in workspace overview; previous revision passed 179 tests",
-    "installed_e2e": "failed before scenario interaction: inaccessible X display; previous revision passed",
+    "gtk_widgets": "passed: 179 isolated tests on fixed Xvfb display 207, 1600x1200",
+    "viewer_widget": "passed: the_viewer_dialog_builds_and_shows_the_full_value",
+    "installed_e2e": "incomplete: app started and activated its main window, but AT-SPI exposed only xdg-desktop-portal-gtk",
     "status": "not acceptance-gated"
   }
 }
