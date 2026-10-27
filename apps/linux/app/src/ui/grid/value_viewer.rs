@@ -17,24 +17,13 @@ pub(super) fn body(value: &Value) -> String {
         Value::Bytes(bytes) if is_binary(bytes) => hex_dump(bytes),
         Value::Json(json) => serde_json::to_string_pretty(json).unwrap_or_else(|_| json.to_string()),
         Value::JsonText(json) => json.clone(),
-        other => pretty_if_json(value_to_full_edit_text(other)),
+        other => value_to_full_edit_text(other),
     };
     capped(text)
 }
 
 fn is_binary(bytes: &[u8]) -> bool {
     std::str::from_utf8(bytes).map_or(true, |text| text.contains('\0'))
-}
-
-fn pretty_if_json(text: String) -> String {
-    let trimmed = text.trim_start();
-    if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
-        return text;
-    }
-    serde_json::from_str::<serde_json::Value>(&text)
-        .ok()
-        .and_then(|json| serde_json::to_string_pretty(&json).ok())
-        .unwrap_or(text)
 }
 
 fn hex_dump(bytes: &[u8]) -> String {
@@ -136,8 +125,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn json_text_is_pretty_printed_and_plain_text_is_left_alone() {
-        assert_eq!(body(&Value::Text(r#"{"a":1}"#.into())), "{\n  \"a\": 1\n}");
+    fn json_looking_text_preserves_duplicate_keys_numbers_and_whitespace() {
+        for text in [
+            r#"{"a":1,"a":2}"#,
+            r#"  {"n":123456789012345678901234567890.000,"e":1e+004}  "#,
+            "\n[1, 2, 3]\t",
+            r#"{"escape":"\u0061","unicode":"é"}"#,
+        ] {
+            for value in [
+                Value::Text(text.into()),
+                Value::JsonText(text.into()),
+                Value::Bytes(text.as_bytes().to_vec()),
+            ] {
+                assert_eq!(body(&value), text);
+            }
+        }
+    }
+
+    #[test]
+    fn text_is_shown_without_reformatting() {
+        assert_eq!(body(&Value::Text(r#"{"a":1}"#.into())), r#"{"a":1}"#);
         assert_eq!(body(&Value::Text("{not json".into())), "{not json");
         assert_eq!(body(&Value::Text("hello".into())), "hello");
     }

@@ -967,22 +967,24 @@ GLib.MainLoop().run()
             time.sleep(ui.POLL_SECONDS)
         assert editor_text() == "select b, b from t where b = 1", editor_text()
 
-    def view_value_opens_the_whole_cell_with_pretty_json(database, base):
-        ui.run_sql("""SELECT '{"a":1}' AS payload""")
-        open_cell_menu('{"a":1}')
+    def view_value_preserves_duplicate_json_keys_and_text_formatting(database, base):
+        value = '  {"a":1,"a":2,"n":123456789012345678901234567890.000,"e":1e+004}  '
+        ui.run_sql("SELECT '" + value + "' AS payload")
+        open_cell_menu(value)
         choose_menu_item(4)
         wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
             if any(
-                ui.node_role(node) == pyatspi.ROLE_TEXT and '"a": 1' in text_of(node)
+                ui.node_role(node) == pyatspi.ROLE_TEXT and text_of(node) == value
                 for node in ui.descendants(ui.application_node())
             ):
                 break
             time.sleep(ui.POLL_SECONDS)
         else:
-            raise AssertionError(f"the viewer did not show pretty JSON:\n{ui.accessible_snapshot()}")
+            raise AssertionError(f"the viewer changed the stored text:\n{ui.accessible_snapshot()}")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
+
 
     def explain_plan_window_closes_on_escape(_database, _base):
         ui.run_sql("SELECT 1 AS value")
@@ -2275,7 +2277,7 @@ GLib.MainLoop().run()
         workspace_connection_removal_confirms_once_and_preserves_the_database,
         welcome_connection_removal_confirms_once_and_preserves_the_database,
         find_bar_replaces_every_match_in_the_editor,
-        view_value_opens_the_whole_cell_with_pretty_json,
+        view_value_preserves_duplicate_json_keys_and_text_formatting,
         explain_plan_window_closes_on_escape,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,

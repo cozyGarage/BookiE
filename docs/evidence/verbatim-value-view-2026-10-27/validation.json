@@ -1,0 +1,17 @@
+{
+  "issue": 1744,
+  "base": "887678414",
+  "source_sha256": {
+    "apps/linux/app/src/ui/grid/value_viewer.rs": "3b79261a73f0a0996c73b3f748c8bb291095768b911de063148db069c2fb9adc",
+    "apps/linux/app/tests/gtk_ux.py": "57a5cfd0622bc6fbb9315519c923b4d0aec651d706b98e01a24715cbde3703aa"
+  },
+  "negative_control": "new duplicate-key regression failed on original implementation",
+  "focused_validation": "7 pure viewer tests passed; isolated GTK test deferred to widget runner",
+  "pending": [
+    "preflight",
+    "app Clippy",
+    "widgets",
+    "installed exact-text viewer scenario"
+  ],
+  "forgejo": "deferred during infrastructure migration"
+}
