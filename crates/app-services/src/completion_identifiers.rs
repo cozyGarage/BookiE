@@ -15,6 +15,13 @@ pub(super) fn plan_with(text: &str, grammar: Option<SqlGrammar>, settings: Optio
     )
 }
 
+pub(super) fn normalized(text: &str) -> String {
+    text.chars()
+        .filter(|character| !matches!(character, '"' | '`' | '[' | ']'))
+        .collect::<String>()
+        .to_lowercase()
+}
+
 pub fn split_table_reference(text: &str, grammar: Option<SqlGrammar>) -> Option<(Option<String>, String)> {
     let plan = plan(text, grammar);
     if !plan.diagnostics().is_empty() {
