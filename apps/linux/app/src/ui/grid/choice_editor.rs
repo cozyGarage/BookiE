@@ -2,7 +2,7 @@ use gtk4::prelude::*;
 use gtk4::{self as gtk};
 
 use super::GridMsg;
-use super::display::{POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
+use super::display::POPOVER_SLOT;
 use crate::ui::cell_editor::CellEditor;
 
 pub(super) fn enum_commit_text(label: &str) -> String {
@@ -49,16 +49,7 @@ impl Picker {
         let Some(cell) = self.cell.upgrade() else {
             return;
         };
-        let row_position = POSITION_SLOT.get(&cell).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(&cell).unwrap_or_default();
-        self.sender
-            .send(GridMsg::CellEdited {
-                row_position,
-                col_index: self.col_index,
-                new_value: text,
-                row_key,
-            })
-            .ok();
+        super::editing::commit_popover_value(&cell, self.col_index, &self.sender, text);
         if let Some(popover) = self.popover.upgrade() {
             popover.popdown();
         }

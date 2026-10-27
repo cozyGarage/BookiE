@@ -311,17 +311,7 @@ fn show_calendar_popover(label: &CellEditor, col_index: usize, sender: &relm4::S
         };
         let dt = c.date();
         let formatted = format!("{:04}-{:02}-{:02}", dt.year(), dt.month(), dt.day_of_month());
-        let position = POSITION_SLOT.get(&label_for_cal).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(&label_for_cal).unwrap_or_default();
-        label_for_cal.set_text(&formatted);
-        sender_for_cal
-            .send(GridMsg::CellEdited {
-                row_position: position,
-                col_index,
-                new_value: formatted,
-                row_key,
-            })
-            .ok();
+        commit_popover_value(&label_for_cal, col_index, &sender_for_cal, formatted);
         if let Some(popover_for_cal) = popover_for_cal.upgrade() {
             popover_for_cal.popdown();
         }
@@ -377,17 +367,7 @@ fn show_exact_text_popover(label: &CellEditor, col_index: usize, sender: &relm4:
             return;
         };
         let formatted = e.text().to_string();
-        let position = POSITION_SLOT.get(&label_for_commit).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(&label_for_commit).unwrap_or_default();
-        label_for_commit.set_text(&formatted);
-        sender_for_commit
-            .send(GridMsg::CellEdited {
-                row_position: position,
-                col_index,
-                new_value: formatted,
-                row_key,
-            })
-            .ok();
+        commit_popover_value(&label_for_commit, col_index, &sender_for_commit, formatted);
         if let Some(popover_for_commit) = popover_for_commit.upgrade() {
             popover_for_commit.popdown();
         }
@@ -432,17 +412,7 @@ fn show_spin_button_popover(
         } else {
             format!("{}", s.value() as i64)
         };
-        let position = POSITION_SLOT.get(&label_for_commit).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(&label_for_commit).unwrap_or_default();
-        label_for_commit.set_text(&formatted);
-        sender_for_commit
-            .send(GridMsg::CellEdited {
-                row_position: position,
-                col_index,
-                new_value: formatted,
-                row_key,
-            })
-            .ok();
+        commit_popover_value(&label_for_commit, col_index, &sender_for_commit, formatted);
         if let Some(popover_for_commit) = popover_for_commit.upgrade() {
             popover_for_commit.popdown();
         }
@@ -524,18 +494,8 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
         let start = buffer_for_commit.start_iter();
         let end = buffer_for_commit.end_iter();
         let text = buffer_for_commit.text(&start, &end, true).to_string();
-        let position = POSITION_SLOT.get(&label_for_commit).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(&label_for_commit).unwrap_or_default();
-        label_for_commit.set_text(&text);
         FULL_EDIT_TEXT_SLOT.set(&label_for_commit, text.clone());
-        sender_for_commit
-            .send(GridMsg::CellEdited {
-                row_position: position,
-                col_index,
-                new_value: text,
-                row_key,
-            })
-            .ok();
+        commit_popover_value(&label_for_commit, col_index, &sender_for_commit, text);
         if let Some(popover_for_commit) = popover_for_commit.upgrade() {
             popover_for_commit.popdown();
         }
@@ -554,6 +514,25 @@ fn install_popover_close_cleanup(label: &CellEditor, popover: &gtk::Popover) {
             POPOVER_SLOT.take(&label_for_close);
         }
     });
+}
+
+pub(super) fn commit_popover_value(
+    label: &CellEditor,
+    col_index: usize,
+    sender: &relm4::Sender<GridMsg>,
+    new_value: String,
+) {
+    let row_position = POSITION_SLOT.get(label).unwrap_or(0);
+    let row_key = ROW_KEY_SLOT.cloned(label).unwrap_or_default();
+    label.set_text(&new_value);
+    sender
+        .send(GridMsg::CellEdited {
+            row_position,
+            col_index,
+            new_value,
+            row_key,
+        })
+        .ok();
 }
 
 fn install_edit_commit_handler(label: &CellEditor, col_index: usize, sender: relm4::Sender<GridMsg>) {
@@ -602,6 +581,7 @@ mod lifetime_tests {
     use std::time::{Duration, Instant};
 
     use super::*;
+    use futures::FutureExt;
 
     fn drain() {
         let context = gtk::glib::MainContext::default();
@@ -639,6 +619,20 @@ mod lifetime_tests {
     #[ignore = "requires an isolated GTK display"]
     fn every_grid_edit_popover_releases_its_cell_and_widget() {
         gtk::init().unwrap();
+        let cell = CellEditor::new();
+        POSITION_SLOT.set(&cell, 5);
+        ROW_KEY_SLOT.set(&cell, vec![tablepro_core::Value::Int(23)]);
+        let (sender, receiver) = relm4::channel();
+        commit_popover_value(&cell, 2, &sender, "committed".into());
+        assert!(matches!(
+            receiver.recv().now_or_never().flatten(),
+            Some(GridMsg::CellEdited {
+                row_position: 5,
+                col_index: 2,
+                new_value,
+                row_key,
+            }) if new_value == "committed" && row_key == vec![tablepro_core::Value::Int(23)]
+        ));
         assert_popover_released(|cell, sender| show_calendar_popover(cell, 0, sender));
         assert_popover_released(|cell, sender| show_exact_text_popover(cell, 0, sender));
         assert_popover_released(|cell, sender| show_spin_button_popover(cell, 0, sender, false, 1.0));
