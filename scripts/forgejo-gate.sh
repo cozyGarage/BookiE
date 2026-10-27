@@ -34,7 +34,8 @@ if docs_only; then
   exit 0
 fi
 
-exec 9>"${FORGEJO_GATE_LOCK:-/tmp/forgejo-gate.lock}"
+lock_key="$(printf '%s/%s' "$remote" "$target" | sha256sum | cut -c1-20)"
+exec 9>"${FORGEJO_GATE_LOCK:-${TMPDIR:-/tmp}/forgejo-gate-${lock_key}.lock}"
 if ! flock -n 9; then
   echo "another gate is running on this host; waiting for it to finish"
   flock 9
