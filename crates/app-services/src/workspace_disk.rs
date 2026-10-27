@@ -9,7 +9,7 @@ pub fn load(path: &Path, drafts: &Path) -> std::io::Result<WorkspaceState> {
     let mut state = load_metadata(path)?;
     for (connection, workspace) in &mut state.connections {
         let connection = Uuid::parse_str(connection).map_err(std::io::Error::other)?;
-        load_connection_drafts(connection, workspace, drafts);
+        load_connection_drafts(connection, workspace, drafts)?;
     }
     Ok(state)
 }
@@ -23,7 +23,7 @@ pub fn load_connection(
     let Some(mut workspace) = state.connections.remove(&connection.to_string()) else {
         return Ok(None);
     };
-    load_connection_drafts(connection, &mut workspace, drafts);
+    load_connection_drafts(connection, &mut workspace, drafts)?;
     Ok(Some(workspace))
 }
 
@@ -52,6 +52,14 @@ pub fn save(path: &Path, drafts: &Path, mut state: WorkspaceState) -> std::io::R
         save_connection_drafts(connection, workspace, drafts)?;
     }
     atomic_write_json(path, &state)
+}
+
+pub fn forget_connection(path: &Path, connection: Uuid) -> std::io::Result<()> {
+    let mut state = load_metadata(path)?;
+    if state.connections.remove(&connection.to_string()).is_some() {
+        atomic_write_json(path, &state)?;
+    }
+    Ok(())
 }
 
 pub fn save_connections(
@@ -98,14 +106,18 @@ fn has_legacy_draft(state: &WorkspaceState) -> bool {
     })
 }
 
-fn load_connection_drafts(connection: Uuid, workspace: &mut ConnectionWorkspaceState, drafts: &Path) {
+fn load_connection_drafts(
+    connection: Uuid,
+    workspace: &mut ConnectionWorkspaceState,
+    drafts: &Path,
+) -> std::io::Result<()> {
     for tab in workspace.all_tabs_mut() {
         if let WorkspaceTabRecord::Editor { query, draft_id, .. } = tab
             && let Some(id) = *draft_id
         {
             match std::fs::read_to_string(drafts.join(connection.to_string()).join(format!("{id}.sql"))) {
                 Ok(text) => *query = text,
-                Err(error) => {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                     tracing::warn!(
                         %connection,
                         %id,
@@ -115,9 +127,11 @@ fn load_connection_drafts(connection: Uuid, workspace: &mut ConnectionWorkspaceS
                     query.clear();
                     *draft_id = None;
                 }
+                Err(error) => return Err(error),
             }
         }
     }
+    Ok(())
 }
 
 fn save_connection_drafts(
@@ -142,6 +156,35 @@ fn save_connection_drafts(
 mod tests {
     use super::super::workspace_state::ConnectionWorkspaceState;
     use super::*;
+
+    #[test]
+    fn an_unreadable_draft_fails_both_load_paths_without_changing_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("workspace.json");
+        let drafts = dir.path().join("drafts");
+        let connection = Uuid::new_v4();
+        let draft = Uuid::new_v4();
+        let mut state = WorkspaceState::default();
+        state.connections.insert(
+            connection.to_string(),
+            ConnectionWorkspaceState {
+                tabs: vec![WorkspaceTabRecord::Editor {
+                    query: "SELECT 1".into(),
+                    draft_id: Some(draft),
+                    file: None,
+                }],
+                ..Default::default()
+            },
+        );
+        save(&path, &drafts, state).unwrap();
+        let draft_path = drafts.join(connection.to_string()).join(format!("{draft}.sql"));
+        std::fs::write(&draft_path, [0xff]).unwrap();
+        let metadata = std::fs::read(&path).unwrap();
+        assert!(load(&path, &drafts).is_err());
+        assert!(load_connection(&path, &drafts, connection).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), metadata);
+        assert_eq!(std::fs::read(&draft_path).unwrap(), [0xff]);
+    }
 
     #[test]
     fn large_legacy_drafts_migrate_without_truncation_and_keep_a_backup() {

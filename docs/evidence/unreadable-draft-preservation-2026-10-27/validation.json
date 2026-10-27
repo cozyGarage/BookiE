@@ -1,0 +1,13 @@
+{
+  "issue": 1737,
+  "base": "887678414",
+  "source_sha256": {
+    "crates/app-services/src/workspace_disk.rs": "a7abbc17e52fbf3d144124e6bc9c89cdd785f5f6b300fd33515ca42ae739f6c2",
+    "crates/app-services/src/workspace_state.rs": "7960603f3e0b81f5accde2b1fc37766963fdd683b318b107e4d1915bb3e409f5",
+    "crates/app-services/src/workspace_state/tests.rs": "3855e139ea693bb2062d55c61745950c97a05c894bd91e3f0fc7f279eb86ebdb"
+  },
+  "negative_control": "all three regression tests failed on original implementation",
+  "workspace_checks": "46 unit and 4 selected integration tests passed",
+  "preflight": "pending",
+  "forgejo": "deferred during infrastructure migration"
+}
