@@ -26,8 +26,12 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         self.assertIn("TMPDIR: /var/cache/ci/target\n", workflow)
+        for name in ("guards", "gtk-build", "clippy", "test-build", "duckdb-build", "floor-build", "supply-chain"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("CARGO_TARGET_DIR: /target", job)
+                self.assertIn("TMPDIR: /target", job)
         guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("TMPDIR: /target", guards)
         self.assertIn('mkdir -p "$TMPDIR"', guards)
 
     def test_actionlint_uses_a_read_only_go_module_lock(self):
