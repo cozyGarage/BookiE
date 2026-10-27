@@ -43,12 +43,12 @@ pub fn save(path: &Path, drafts: &Path, mut state: WorkspaceState) -> std::io::R
         .map(|bytes| serde_json::from_slice(bytes).map_err(std::io::Error::other))
         .transpose()?
         .unwrap_or_default();
-    if let Some(bytes) = &existing {
-        if has_legacy_draft(&previous) {
-            let backup = path.with_extension("before-drafts.json");
-            if !backup.try_exists()? {
-                atomic_write_bytes(&backup, bytes)?;
-            }
+    if let Some(bytes) = &existing
+        && has_legacy_draft(&previous)
+    {
+        let backup = path.with_extension("before-drafts.json");
+        if !backup.try_exists()? {
+            atomic_write_bytes(&backup, bytes)?;
         }
     }
     let mut batch = staged_drafts::DraftBatch::default();
