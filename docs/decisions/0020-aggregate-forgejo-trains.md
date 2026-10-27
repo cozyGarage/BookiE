@@ -5,7 +5,7 @@
 
 ## Context
 
-The lab serializes merge-tier workflows to avoid starving installed GTK and database fixtures. Repeating the full workflow for every ready pull request increases queue time. A combined preflight alone cannot certify the separate PR heads.
+The lab originally serialized merge-tier workflows to avoid starving installed GTK and database fixtures. The capacity-one VM pool now isolates each job on its assigned worker. Repeating the full workflow for every ready pull request increases queue time. A combined preflight alone cannot certify the separate PR heads.
 
 ## Decision
 
@@ -17,7 +17,7 @@ Before gating and immediately before merging, `scripts/check-forgejo-train.py` v
 
 The aggregate PR merges on GitHub with the existing squash method and `--match-head-commit`. Its resulting tree must match the gated aggregate tree. Constituent PRs close as included only after this comparison passes, with a link to the aggregate PR. Issues close only when their acceptance is satisfied; including a partial fix does not close a wider issue.
 
-Individual PR gates remain available for isolated fixes and failure diagnosis. Full runs stay serialized. A failed train is not approval for any subset; split it and gate the resulting heads if necessary. Existing native desktop, package, security and maintainer acceptance obligations remain required.
+Individual PR gates remain available for isolated fixes and failure diagnosis. The capacity-one VM pool permits distinct runs to interleave across idle workers; synchronization of the linux target remains serialized. A failed train is not approval for any subset; split it and gate the resulting heads if necessary. Existing native desktop, package, security and maintainer acceptance obligations remain required.
 
 ## Rationale
 
@@ -32,4 +32,4 @@ Constituent PRs are closed as included rather than marked individually merged. A
 - Per-PR Forgejo gates remain correct but repeat the expensive workflow.
 - Merging constituent PRs sequentially after testing only the final combination exposes intermediate trees that were not tested. The aggregate PR avoids that sequence.
 - Overlapping lab workflows can starve fixtures and are not an accepted shortcut.
-- Copying upstream's aggregate-check selector or nightly placement is rejected: it could remove required merge-tier coverage. The GitHub cheap tier and the serialized Forgejo gate stay; version selection and process isolation may be adopted inside those tiers ([upstream main analysis](../archive/upstream-main-analysis-2026-10-20.md)).
+- Copying upstream's aggregate-check selector or nightly placement is rejected: it could remove required merge-tier coverage. The GitHub cheap tier and the Forgejo acceptance gate stay; version selection and process isolation may be adopted inside those tiers ([upstream main analysis](../archive/upstream-main-analysis-2026-10-20.md)).

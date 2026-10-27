@@ -63,7 +63,10 @@ impl Fake {
         let context = OpenSshContext {
             runtime: OpenSshRuntime::acquire(&base).unwrap(),
             ssh_program: script,
-            askpass_program: PathBuf::from(env!("CARGO_BIN_EXE_tablepro-askpass")),
+            askpass_program: PathBuf::from(
+                std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
+                    .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+            ),
             timeouts: OpenSshTimeouts {
                 handshake: Duration::from_secs(10),
                 grace: Duration::from_millis(300),
