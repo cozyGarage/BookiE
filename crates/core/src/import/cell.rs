@@ -109,19 +109,13 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
     if let Some(kind) = temporal_kind(&base, &lowered) {
         return kind;
     }
-    // These catalog names contain the substring `int` but are not integer
-    // types. Keep them as exact text for native consumers such as DuckDB's
-    // INTERVAL insert and PostgreSQL's unsupported geometric point values.
-    if matches!(base.as_str(), "interval" | "point") {
-        return ColumnKind::Text;
-    }
     if base.contains("bool") || base == "bit" {
         return ColumnKind::Bool;
     }
     if base.contains("uuid") || base.contains("uniqueidentifier") {
         return ColumnKind::Uuid;
     }
-    if matches!(base.as_str(), "int128" | "uint128") {
+    if matches!(base.as_str(), "int128" | "uint128" | "int256" | "uint256") {
         return ColumnKind::Text;
     }
     if base.contains("json") {
@@ -133,13 +127,41 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
     if base.contains("decimal") || base.contains("numeric") || base.contains("money") {
         return ColumnKind::Decimal;
     }
-    if base.contains("int") || base.contains("serial") {
+    if base.split_whitespace().any(is_integer_type_name) {
         return ColumnKind::Int;
     }
     if base.contains("float") || base.contains("double") || base.contains("real") {
         return ColumnKind::Float;
     }
     ColumnKind::Text
+}
+
+fn is_integer_type_name(name: &str) -> bool {
+    matches!(
+        name,
+        "int"
+            | "integer"
+            | "tinyint"
+            | "smallint"
+            | "mediumint"
+            | "bigint"
+            | "int2"
+            | "int4"
+            | "int8"
+            | "int16"
+            | "int32"
+            | "int64"
+            | "uint8"
+            | "uint16"
+            | "uint32"
+            | "uint64"
+            | "serial"
+            | "serial2"
+            | "serial4"
+            | "serial8"
+            | "smallserial"
+            | "bigserial"
+    )
 }
 
 fn temporal_kind(base: &str, lowered: &str) -> Option<ColumnKind> {
