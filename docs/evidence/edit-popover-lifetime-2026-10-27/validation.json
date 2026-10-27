@@ -1,0 +1,29 @@
+{
+  "issue": 1733,
+  "fixed_commit": "ffca41a64",
+  "source_sha256": {
+    "apps/linux/app/src/ui/grid/choice_editor.rs": "a575912a23b1e57d4eb1d2508b81e6ba35cafc05846a9f1969a9c7abf9189ac4",
+    "apps/linux/app/src/ui/grid/editing.rs": "56511b0e91c4181b8373bd17cde098fbc26dedd40b1ab86df148baf77063274d",
+    "apps/linux/app/src/ui/grid/editing/lifetime_tests.rs": "e16c496dcf52565ea9f9428a0c9406b1aecd8526843a2b0586e27177564c5bfa",
+    "scripts/isolated-tests.json": "92d6a1d3b7d1bbe0a864a70969f5ace5a22677e16596c5a2d09eae51859b49b7"
+  },
+  "focused_regression": {
+    "before": "enum picker retained after popdown; test fails at first variant",
+    "after": "all six variants released; test passes"
+  },
+  "focused_environment": {
+    "display": "isolated Xvfb",
+    "input_method": "simple",
+    "G_DEBUG": "fatal-criticals"
+  },
+  "pending": [
+    "ordinary widget tier",
+    "preflight",
+    "app Clippy",
+    "installed SQLite edit scenarios"
+  ],
+  "unverified": [
+    "real-engine enum/set editing"
+  ],
+  "forgejo": "deferred during infrastructure migration"
+}
