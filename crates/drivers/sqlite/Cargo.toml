@@ -20,7 +20,6 @@ rust_decimal.workspace = true
 sqlx = { workspace = true, features = ["sqlite-unbundled"] }
 sqlparser.workspace = true
 tokio.workspace = true
-uuid.workspace = true
 
 [dev-dependencies]
 tablepro-policy = { path = "../../policy" }
@@ -29,6 +28,11 @@ async-trait.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 tokio-util.workspace = true
+uuid.workspace = true
+
+# The integration test includes core/tests/support/value_contract.rs by path, and that file uses serde_json.
+[package.metadata.cargo-shear]
+ignored = ["serde_json"]
 
 [lints]
 workspace = true

@@ -186,6 +186,123 @@ class EvidenceManifestTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(warnings, [])
 
+    def test_manifest_verifies_legacy_nested_source_and_regression_hashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+            source = repo / "source.rs"
+            source.write_text("recorded source")
+            self._commit(repo, "source.rs")
+            source_commit = self._revision(repo)
+            regression = repo / "regression.rs"
+            regression.write_text("recorded regression")
+            self._commit(repo, "regression.rs")
+            regression_commit = self._revision(repo)
+            manifest_path = repo / "evidence/manifest.json"
+            manifest_path.parent.mkdir()
+            manifest_path.write_text(json.dumps({
+                "schema_version": 1,
+                "source_commit": regression_commit,
+                "source": {
+                    "path": "source.rs",
+                    "sha256": hashlib.sha256(b"recorded source").hexdigest(),
+                },
+                "regression_test": {
+                    "path": "regression.rs",
+                    "selector": "case::regression",
+                    "sha256": hashlib.sha256(b"recorded regression").hexdigest(),
+                },
+                "source_commits": {
+                    "source.rs": source_commit,
+                    "regression.rs": regression_commit,
+                },
+            }))
+
+            with mock.patch.object(VALIDATOR, "ROOT", repo):
+                errors, warnings = VALIDATOR.validate_manifest(manifest_path, strict=True)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, [])
+
+    def test_manifest_verifies_legacy_nested_source_hash_map(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+            source = repo / "source.rs"
+            source.write_text("recorded source")
+            self._commit(repo, "source.rs")
+            commit = self._revision(repo)
+            manifest_path = repo / "evidence/manifest.json"
+            manifest_path.parent.mkdir()
+            manifest_path.write_text(json.dumps({
+                "schema_version": 1,
+                "source_commit": commit,
+                "source": {"source.rs": hashlib.sha256(b"recorded source").hexdigest()},
+                "source_commits": {"source.rs": commit},
+            }))
+
+            with mock.patch.object(VALIDATOR, "ROOT", repo):
+                errors, warnings = VALIDATOR.validate_manifest(manifest_path, strict=True)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, [])
+
+    def test_manifest_rejects_an_invalid_hash_in_a_nested_source_map(self):
+        path, manifest = self.fixture()
+        manifest["source"] = {"source.rs": "bad"}
+        path.write_text(json.dumps(manifest))
+
+        errors, _ = VALIDATOR.validate_manifest(path, strict=True)
+
+        self.assertTrue(any("invalid source digest for source.rs" in error for error in errors))
+
+    def test_manifest_rejects_a_nested_source_hash_that_differs_from_its_commit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+            source = repo / "source.rs"
+            source.write_text("recorded source")
+            self._commit(repo, "source.rs")
+            commit = self._revision(repo)
+            manifest_path = repo / "evidence/manifest.json"
+            manifest_path.parent.mkdir()
+            manifest_path.write_text(json.dumps({
+                "schema_version": 1,
+                "source_commit": commit,
+                "source": {
+                    "path": "source.rs",
+                    "sha256": hashlib.sha256(b"different source").hexdigest(),
+                },
+                "source_commits": {"source.rs": commit},
+            }))
+
+            with mock.patch.object(VALIDATOR, "ROOT", repo):
+                errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+
+        self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
+
+    def test_manifest_refuses_an_unmapped_source_path_outside_the_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            repo = parent / "repo"
+            repo.mkdir()
+            outside = parent / "outside.rs"
+            outside.write_text("outside source")
+            manifest_path = repo / "evidence/manifest.json"
+            manifest_path.parent.mkdir()
+            manifest_path.write_text(json.dumps({
+                "schema_version": 1,
+                "source_commit": "a" * 40,
+                "source_sha256": {
+                    "../outside.rs": hashlib.sha256(b"outside source").hexdigest(),
+                },
+            }))
+
+            with mock.patch.object(VALIDATOR, "ROOT", repo):
+                errors, _ = VALIDATOR.validate_manifest(manifest_path, strict=True)
+
+        self.assertTrue(any("unsafe source path" in error for error in errors))
+
     def test_manifest_rejects_a_per_source_commit_that_does_not_match_the_digest(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
