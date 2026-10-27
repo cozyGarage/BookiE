@@ -6,4 +6,6 @@ A deterministic regression loads the real disk snapshot, deletes one connection 
 
 Deletion now advances the existing mutation clock and records the deleted connection's generation. A preload started before deletion skips that connection. Unrelated connections still restore. Existing session-token and reimport handling remain unchanged.
 
-All 45 workspace unit tests passed, including the failing-before regression, concurrent-save/preload tests, deletion and reimport coverage. Full preflight, persistence integration and installed acceptance are pending. This focused race fix alone does not certify the broader native workspace-freeze issue.
+All 45 workspace unit tests passed, including the failing-before regression, concurrent-save/preload tests, deletion and reimport coverage. Full preflight and persistence integration are pending. This focused race fix alone does not certify the broader native workspace-freeze issue.
+
+Three installed scenarios passed without retries: restart after deletion, saving a reimported connection workspace, and healthy-workspace restoration beside an unreadable draft. [Results](installed-results.txt) and [identity](installed-identity.json) pin this run. The deterministic unit test establishes the forced preload/delete interleaving; the installed scenarios preserve neighboring behavior and do not claim to force that race through native input.
