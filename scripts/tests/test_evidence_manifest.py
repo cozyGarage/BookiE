@@ -728,6 +728,34 @@ class EvidenceManifestTests(unittest.TestCase):
             output.getvalue(),
         )
 
+    def test_default_scan_rejects_malformed_declared_evidence_under_another_filename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            packet = evidence / "validation.json"
+            packet.write_text(json.dumps({"source_sha256": {"source.rs": "invalid-digest"}}))
+            (evidence / "unrelated.json").write_text('[{"value": 1}]')
+            errors = io.StringIO()
+            with (
+                mock.patch.object(VALIDATOR, "EVIDENCE", evidence),
+                mock.patch.object(sys, "argv", ["validate-evidence"]),
+                contextlib.redirect_stderr(errors),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                result = VALIDATOR.main()
+            self.assertEqual(result, 1)
+            self.assertIn(str(packet), errors.getvalue())
+
+    def test_default_scan_discovers_declared_records_independently_of_filename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            packet = evidence / "source-proof.json"
+            packet.write_text(json.dumps({"source_sha256": {}}))
+            manifest = evidence / "manifest.json"
+            manifest.write_text("invalid json")
+            (evidence / "other.json").write_text('[{"schema_version": 1}]')
+            with mock.patch.object(VALIDATOR, "EVIDENCE", evidence):
+                self.assertEqual(VALIDATOR.manifests([]), sorted([manifest, packet]))
+
 
 if __name__ == "__main__":
     unittest.main()

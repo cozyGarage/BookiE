@@ -241,7 +241,18 @@ def manifests(paths):
                 path = ROOT / path
             resolved.append(path)
         return resolved
-    return sorted(EVIDENCE.rglob("manifest.json"))
+    discovered = []
+    for path in sorted(EVIDENCE.rglob("*.json")):
+        if path.name == "manifest.json":
+            discovered.append(path)
+            continue
+        try:
+            record = json.loads(path.read_text())
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if isinstance(record, dict) and ("source_sha256" in record or record.get("schema_version") == 1):
+            discovered.append(path)
+    return discovered
 
 
 def main():
