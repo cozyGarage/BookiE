@@ -1,6 +1,6 @@
 # 0025: Keep fetched result pages in a transient spool
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-10-27; implemented in [#1660](https://github.com/cozyGarage/BookiE/pull/1660))
 - **Date**: 2026-10-25
 
 ## Context
