@@ -105,6 +105,7 @@ impl App {
                 HistoryDialogOutput::ReplaceCurrentTabQuery(text) => AppMsg::ReplaceActiveTabQuery(text),
                 HistoryDialogOutput::Close => AppMsg::CloseHistory,
             });
+        crate::ui::leak_probe::track("history_panel", panel.widget());
         self.history_paned.set_end_child(Some(panel.widget()));
         self.history_paned.set_position(self.window.default_height() / 2);
         self.history_dialog = Some(panel);

@@ -21,8 +21,11 @@ DIALOGS = {
     "column_jump": ("table:win.jump-column", "Jump to Column"),
     "export": ("table:win.export-csv", "Export Results"),
     "value_viewer": ("grid-value:", "payload"),
-    "column_visibility": ("grid-columns:", "Columns"),
+    "column_visibility": ("grid-menu:9", "Columns"),
     "pending_sql": ("preview:", "Pending SQL"),
+    "import_csv": ("import-csv:", "Import CSV"),
+    "history_panel": ("win.show-history", "Close history"),
+    "full_value_editor": ("grid-menu:1", "note"),
 }
 # AdwAlertDialog is not tracked: libadwaita keeps a closed alert alive even with no handlers.
 # Typing into a field before dismissal exercises the edit-then-discard path.
@@ -65,6 +68,26 @@ def scenarios(ui):
             time.sleep(0.1)
         ui.press_x11_key("Return")
 
+    def open_import_dialog(base):
+        path = Path(base) / "home" / "leak-probe.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("id,note\n1,a\n", encoding="utf-8")
+        row = ui.wait_for_node(name="safety_items", role=ui.pyatspi.ROLE_LIST_ITEM)
+        actions = row.queryAction()
+        index = next(i for i in range(actions.nActions) if actions.getName(i) == "sidebar-row.import-csv")
+        actions.doAction(index)
+        chooser = ui.wait_for_node(name="Import CSV", role=ui.FILE_CHOOSER_ROLES)
+        ui.show_file_chooser_location(chooser)
+        location = ui.set_visible_editable_within("Import CSV", ui.FILE_CHOOSER_ROLES, str(path), action_name="Open")
+        ui.invoke(location)
+        open_button = ui.wait_within(chooser, name="Open", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while not open_button.getState().contains(ui.pyatspi.STATE_SENSITIVE):
+            assert time.monotonic() < deadline, "the file chooser did not resolve the CSV path"
+            time.sleep(ui.POLL_SECONDS)
+        ui.invoke(open_button)
+        ui.wait_for_node(name="Import", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+
     def open_pending_sql():
         if ui.find_node(name="1 unsaved change") is None:
             open_table()
@@ -72,14 +95,14 @@ def scenarios(ui):
             ui.wait_for_node(name="1 unsaved change")
         ui.invoke(ui.wait_for_node(name="Preview SQL", role=ui.pyatspi.ROLE_PUSH_BUTTON))
 
-    def open_grid_columns(database):
+    def open_grid_menu_item(database, presses):
         insert_row(database)
         open_table()
         cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
         extents = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
         ui.gtk_ux.x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         time.sleep(0.4)
-        for _ in range(9):
+        for _ in range(presses):
             ui.press_x11_key("Down")
             time.sleep(0.1)
         ui.press_x11_key("Return")
@@ -136,10 +159,12 @@ def scenarios(ui):
             for index in range(CYCLES):
                 if action == "grid-value:":
                     open_grid_value()
+                elif action == "import-csv:":
+                    open_import_dialog(base)
                 elif action == "preview:":
                     open_pending_sql()
-                elif action == "grid-columns:":
-                    open_grid_columns(_database)
+                elif action.startswith("grid-menu:"):
+                    open_grid_menu_item(_database, int(action[10:]))
                 elif action.startswith("table:"):
                     if key == "export":
                         insert_row(_database)
@@ -151,13 +176,18 @@ def scenarios(ui):
                     ui.invoke(ui.wait_for_node(name=action[7:], role=ui.pyatspi.ROLE_PUSH_BUTTON))
                 else:
                     ui.invoke_accessible_action(action)
-                ui.wait_for_node(name=title)
+                if key == "history_panel":
+                    ui.invoke(ui.wait_for_node(name=title, role=ui.pyatspi.ROLE_PUSH_BUTTON))
+                    ui.wait_for_node(name=title, present=False)
+                else:
+                    ui.wait_for_node(name=title, role=dialog_roles)
                 if key in EDITS:
                     name, text = EDITS[key]
                     shown = entry_text(name)
                     assert text not in shown, f"{key} reopened with the discarded edit {shown!r}"
                     set_entry(name, text)
-                dismiss(title)
+                if key != "history_panel":
+                    dismiss(title)
                 # Closing animations and idle callbacks release a dialog shortly after it hides.
                 deadline = time.monotonic() + ui.WAIT_SECONDS
                 while True:

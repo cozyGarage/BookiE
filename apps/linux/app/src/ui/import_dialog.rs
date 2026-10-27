@@ -75,15 +75,17 @@ pub(crate) fn present(
     let start_button = gtk::Button::builder().label(crate::tr!("Import")).build();
     start_button.add_css_class("suggested-action");
     let dialog = build_dialog(&page, &start_button);
-    let dialog_for_start = dialog.clone();
+    let dialog_for_start = dialog.downgrade();
     start_button.connect_clicked(move |_| {
         let Some(choice) = state.choice() else {
             return;
         };
-        dialog_for_start.close();
+        if let Some(dialog) = dialog_for_start.upgrade() {
+            dialog.close();
+        }
         on_start(choice);
     });
-    dialog.present(Some(parent));
+    crate::ui::leak_probe::present_tracked("import_csv", &dialog, parent);
 }
 
 struct State {
