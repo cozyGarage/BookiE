@@ -45,7 +45,7 @@ def create(bundle, messages, revision, group, archive=None):
     (bundle / 'schemas').mkdir()
     subprocess.run(['glib-compile-schemas', '--strict', '--targetdir', str(bundle / 'schemas'), str(ROOT / 'apps/linux/data')], check=True)
     index = {'schema_version': 1, 'source_commit': revision, 'build_group': group,
-             'build_image': os.environ.get('BOOKIE_BUILD_IMAGE', ''),
+             'build_image': os.environ.get('BOOKIE_BUILD_RUNTIME_ID') or os.environ.get('BOOKIE_BUILD_IMAGE', ''),
              'architecture': platform.machine(), 'rust_version': subprocess.check_output(['rustc', '--version'], text=True).strip(),
              'features': ['kerberos', 'duckdb'] if group == 'duckdb' else ['kerberos'],
              'application_source_commit': revision, 'test_suite_commit': revision, 'ci_recipe_commit': revision,
