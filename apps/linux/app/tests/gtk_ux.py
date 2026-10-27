@@ -1295,7 +1295,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
         saved_connection_action(ui.CONNECTION_NAME, "Group and tags")
-        chooser = ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON)
+        chooser = ui.wait_for_node(name="No colour", role=pyatspi.ROLE_TOGGLE_BUTTON)
         actions = chooser.queryAction()
         assert any(actions.getName(index) == "click" for index in range(actions.nActions)), (
             f"colour chooser has no accessible click action:\n{ui.accessible_snapshot()}"
@@ -1303,8 +1303,8 @@ GLib.MainLoop().run()
         ui.invoke(chooser)
         option = ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(option)
-        ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
-        ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.wait_for_node(name="No colour", role=pyatspi.ROLE_TOGGLE_BUTTON, present=False)
+        ui.wait_for_node(name="Blue", role=pyatspi.ROLE_TOGGLE_BUTTON)
 
     def sql_editor_clickables_all_have_a_keyboard_path(database, base):
         ui.run_sql("SELECT 1 AS alpha")

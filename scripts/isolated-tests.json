@@ -1146,6 +1146,11 @@
       "tablepro-app",
       "--lib",
       "ui::history_dialog::lifetime_tests::closing_history_releases_its_rows_and_popovers"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
     ]
   ],
   "keyring": [
