@@ -820,6 +820,7 @@ impl App {
         };
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Structure);
         let sender_for_cmd = sender.clone();
+        let capabilities = crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id());
         let connection_id = self.connection_id;
         let database = self.database.clone();
         let timeout_secs =
@@ -851,22 +852,16 @@ impl App {
                         fail(format!("{e}"));
                         return;
                     }
-                    let indexes = match conn.fetch_indexes_controlled(schema.as_deref(), &table, &control).await {
-                        Ok(indexes) => indexes,
-                        Err(e) => {
-                            fail(format!("{e}"));
-                            return;
-                        }
-                    };
-                    if let Err(e) = tablepro_core::check_pre_dispatch(&control) {
-                        fail(format!("{e}"));
-                        return;
-                    }
-                    let fks = match conn
-                        .fetch_foreign_keys_controlled(schema.as_deref(), &table, &control)
-                        .await
+                    let metadata = match tablepro_app_services::structure_metadata::load_structure_metadata(
+                        conn.as_ref(),
+                        schema.as_deref(),
+                        &table,
+                        capabilities,
+                        &control,
+                    )
+                    .await
                     {
-                        Ok(fks) => fks,
+                        Ok(metadata) => metadata,
                         Err(e) => {
                             fail(format!("{e}"));
                             return;
@@ -878,8 +873,7 @@ impl App {
                     sender_for_cmd.input(AppMsg::StructureDataLoaded {
                         tab_id,
                         columns,
-                        indexes,
-                        fks,
+                        metadata,
                     });
                 })
                 .drop_on_shutdown()
@@ -890,8 +884,7 @@ impl App {
         &self,
         tab_id: Uuid,
         columns: Vec<ColumnInfo>,
-        indexes: Vec<tablepro_core::IndexInfo>,
-        fks: Vec<tablepro_core::ForeignKeyInfo>,
+        metadata: tablepro_app_services::structure_metadata::StructureMetadata,
     ) {
         if let Some(controller) = self
             .workspace_tabs
@@ -901,7 +894,7 @@ impl App {
         {
             let _ = controller
                 .sender()
-                .send(StructureTabInput::StructureLoaded { columns, indexes, fks });
+                .send(StructureTabInput::StructureLoaded { columns, metadata });
         }
     }
 
