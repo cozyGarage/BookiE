@@ -19,11 +19,11 @@
   "pending": [
     "ordinary widget tier",
     "preflight",
-    "app Clippy",
     "installed SQLite edit scenarios"
   ],
   "unverified": [
     "real-engine enum/set editing"
   ],
-  "forgejo": "deferred during infrastructure migration"
+  "forgejo": "deferred during infrastructure migration",
+  "app_clippy": "passed with warnings denied"
 }
