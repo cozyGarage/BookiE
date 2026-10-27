@@ -62,7 +62,7 @@ def scenarios(ui):
         restart(seed)
         ui.open_saved_connection(ui.CONNECTION_B_NAME)
         ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} — BookiE")
-        ui.wait_for_node_containing("restored_healthy_workspace", role=pyatspi.ROLE_PAGE_TAB)
+        ui.wait_for_node_containing(query[:30], role=pyatspi.ROLE_PAGE_TAB)
         texts = [
             node.queryText().getText(0, -1)
             for node in ui.descendants(ui.application_node())
