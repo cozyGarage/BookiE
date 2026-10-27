@@ -1584,7 +1584,7 @@ Packages:
 - `aws-lc-sys 0.46.0`
 - `mongodb 3.9.1`
 - `mongodb-internal-macros 3.9.1`
-- `russh 0.64.1`
+- `russh 0.65.0`
 - `russh-cryptovec 0.62.0`
 - `russh-util 0.52.0`
 - `ryu 1.0.23`

@@ -1,6 +1,6 @@
 pub use tablepro_app_services::workspace_state::{
-    ConnectionWorkspaceState, PersistedTableMode, RestoredWorkspaceTab, WorkspaceStore, WorkspaceTabRecord,
-    restored_workspace_tab,
+    ConnectionWorkspaceState, PersistedTableMode, RestoredWorkspaceTab, WorkspaceSaveToken, WorkspaceStore,
+    WorkspaceTabRecord, restored_workspace_tab,
 };
 
 pub fn create_store() -> WorkspaceStore {

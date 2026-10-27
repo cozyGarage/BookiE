@@ -63,6 +63,24 @@ jobs:
         # Offline, so the verdict depends on these files alone. Low-confidence
         # findings are left out to keep the check free of false positives.
         run: zizmor --offline --format=github --min-severity=medium --min-confidence=medium .github/workflows
+  unused-dependencies:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: 1.98
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: cargo-shear@1.13.4
+      - name: No unused or misplaced dependencies
+        # A dependency kept only for a feature, or only for a test file included by path from another crate,
+        # is listed under [package.metadata.cargo-shear] ignored, with the reason beside it.
+        run: cargo shear
   harness:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
