@@ -204,7 +204,7 @@ pub(super) fn present(
     let (content, error) = create_content(&view, &actions.container);
     let dialog = create_dialog(column_name, &content);
     connect_actions(&dialog, &view.buffer(), &error, actions, &context);
-    dialog.present(Some(parent));
+    crate::ui::leak_probe::present_tracked("full_value_editor", &dialog, parent);
     dialog
 }
 
@@ -301,9 +301,11 @@ fn connect_actions(
 }
 
 fn connect_cancel(button: &gtk::Button, dialog: &adw::Dialog) {
-    let dialog = dialog.clone();
+    let dialog = dialog.downgrade();
     button.connect_clicked(move |_| {
-        dialog.close();
+        if let Some(dialog) = dialog.upgrade() {
+            dialog.close();
+        }
     });
 }
 
@@ -313,7 +315,7 @@ fn connect_set_null(button: Option<gtk::Button>, dialog: &adw::Dialog, context: 
     let row_key = context.row_key.clone();
     let row_position = context.row_position;
     let col_index = context.col_index;
-    let dialog = dialog.clone();
+    let dialog = dialog.downgrade();
     button.connect_clicked(move |_| {
         sender
             .send(super::GridMsg::SetCellNull {
@@ -322,7 +324,9 @@ fn connect_set_null(button: Option<gtk::Button>, dialog: &adw::Dialog, context: 
                 row_key: row_key.clone(),
             })
             .ok();
-        dialog.close();
+        if let Some(dialog) = dialog.upgrade() {
+            dialog.close();
+        }
     });
 }
 
@@ -346,7 +350,7 @@ fn connect_apply(
     error: &gtk::Label,
     context: &EditContext,
 ) {
-    let dialog = dialog.clone();
+    let dialog = dialog.downgrade();
     let buffer = buffer.clone();
     let error = error.clone();
     let context = EditContext {
@@ -375,7 +379,9 @@ fn connect_apply(
                 row_key: context.row_key.clone(),
             })
             .ok();
-        dialog.close();
+        if let Some(dialog) = dialog.upgrade() {
+            dialog.close();
+        }
     });
 }
 
