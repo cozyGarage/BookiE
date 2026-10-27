@@ -1,0 +1,19 @@
+preflight-final.log
+     Summary [  15.515s] 2197 tests run: 2197 passed, 16 skipped
+     Summary [  10.176s] 291 tests run: 291 passed, 50 skipped
+     Summary [   0.209s] 1 test run: 1 passed, 0 skipped
+Preflight passed. Next:
+
+gtk-widgets-final.log
+test ui::editor::dispatch_tests::dropping_an_editor_releases_its_source_view_and_buffer ... ok
+test ui::editor::dispatch_tests::closing_an_editor_releases_its_large_buffer_even_when_its_views_are_retained ... ok
+gtk: 176 tests executed successfully
+
+clippy.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.94s
+
+gtk-safety.log
+passed: restart_restores_active_editor_and_connection (duration: 7.994s)
+passed: closing_a_file_tab_with_save_writes_the_file_and_closes_the_tab (duration: 2.892s)
+passed: closing_a_dirty_file_with_discard_closes_without_writing (duration: 4.831s)
+passed: closing_a_clean_editor_tab_removes_it_and_keeps_the_other (duration: 2.357s)
