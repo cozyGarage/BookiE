@@ -185,3 +185,11 @@ When inline unit tests push a production module over the soft limit, move them t
 - [GTK tests](testing-gtk.md)
 - [CI tests and gates](testing-ci.md)
 - [Test quality and performance contracts](testing-quality-and-performance.md)
+
+## Reusable executable bundles
+
+Forgejo's desktop-build jobs compile source-pinned default and DuckDB variants, plus the native scenario app and release package. Test jobs on any-host workers fetch immutable bundles from the Forgejo generic package registry. Every bundle records application, test-suite and recipe revisions, build group, image, compiler and file digests. Missing or mismatched bundles fail the job; execution VMs do not compile a replacement.
+
+`bash scripts/build-test-bundles.sh OUTPUT_DIRECTORY [default|duckdb|both]` runs inside the qualified Debian build environment; `both` is the default for GitHub's reusable artifacts. Forgejo publishes the default bundle before building the DuckDB variant, so jobs using default executables can start while DuckDB compiles. The generic registry stores level-one gzip tar archives to reduce transfer time. `scripts/ci-bundle-registry.py publish` uploads the archive before its completion manifest. `scripts/prepare-test-bundle.sh` downloads and verifies the matching revision before exporting its location to the job environment. Unit and sandbox tiers use the bundled nextest archive. Driver integration binaries retain their existing single-process fixture lifetime. GTK/keyring registry entries still execute separately and require an exact observed test result.
+
+GitHub Build Linux publishes equivalent source-pinned test bundles on non-PR runs for 14 days. Import requires the Forgejo secret `BOOKIE_GITHUB_ARTIFACT_TOKEN` with GitHub Actions read access. Only successful runs at the exact requested source revision are eligible. Downloads verify GitHub's archive digest, the bundle index and each payload. An imported test bundle does not replace missing native app/package builds or desktop analysis jobs. Full unattended failover of those producer jobs is not implemented.
