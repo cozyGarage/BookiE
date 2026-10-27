@@ -10,9 +10,12 @@
   },
   "negative_control": "two cleanup tests failed before fix; failed metadata publication preservation pinned existing behavior",
   "workspace_checks": "53 unit and 4 selected integration tests passed",
-  "pending": [
-    "preflight",
-    "installed close/reopen scenario"
-  ],
-  "forgejo": "deferred during infrastructure migration"
+  "pending": [],
+  "forgejo": "deferred during infrastructure migration",
+  "validation": {
+    "preflight": "passed: 2218 unit, 291 sandbox, 1 Redis check",
+    "installed_e2e": "closing_editors_removes_their_drafts_and_reopening_restores_sql passed after final symlink safety change",
+    "gtk_widgets": "not repeated: no GTK implementation changed"
+  },
+  "installed_binary_sha256": "2c6cfdd810611e19a5bf244e855187645817601225ceed7609e7924c2980b2cb"
 }

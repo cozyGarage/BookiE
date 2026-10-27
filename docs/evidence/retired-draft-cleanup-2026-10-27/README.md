@@ -10,6 +10,6 @@ Cleanup does not follow symlinked connection directories or delete symlinked dra
 
 The tests use temporary directories and synthetic SQL. They check retained bytes, closed and orphaned drafts, other databases/connections, unrelated files, symlink boundaries and failure before metadata publication. No real user draft directories are scanned during validation. Disk unlinking removes the saved reference and file, and does not promise secure erasure or removal from external backups.
 
-Full preflight and the installed close/reopen scenario are pending. Forgejo acceptance is deferred during infrastructure migration.
+Full preflight passed: 2,218 unit tests, 291 sandbox tests and one Redis check. The optimized application was rebuilt after removing app-services artifacts from the ci profile. The installed `closing_editors_removes_their_drafts_and_reopening_restores_sql` scenario passed twice, including after the final symlink safety change: it closes three editors, waits for their draft files to disappear, then reopens the last editor and verifies its exact SQL and a recreated draft. No GTK implementation changed; the GTK widget suite was not repeated. Forgejo acceptance is deferred during infrastructure migration.
 
 Release-Note: Fixed: Closing SQL editors removes their saved draft files after the workspace is saved.
