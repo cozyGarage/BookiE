@@ -740,6 +740,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
+      TMPDIR: /var/cache/ci/t
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout {0}
@@ -770,6 +771,7 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py 4
       - name: PostgreSQL release fixture
         run: |
+          mkdir -p "$TMPDIR"
           cd src && ./scripts/test-postgres-release.sh
 
   pg-dump:
