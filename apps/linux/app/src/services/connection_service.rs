@@ -154,11 +154,11 @@ pub async fn open_saved(
     let tables = guarded
         .list_tables_controlled(&control)
         .await
-        .map_err(|e| format!("list_tables: {e}"))?;
+        .map_err(|error| crate::services::error_text::driver_message(&error))?;
     let views = guarded
         .list_views_controlled(&control)
         .await
-        .map_err(|e| format!("list_views: {e}"))?;
+        .map_err(|error| crate::services::error_text::driver_message(&error))?;
     let metadata = ConnectionMetadata {
         server_version,
         ..metadata
@@ -200,7 +200,7 @@ pub async fn establish_classified_with_cancellation(
         })
 }
 
-fn message(error: TransportError) -> String {
+pub(crate) fn message(error: TransportError) -> String {
     match error {
         TransportError::Driver(error) => crate::services::error_text::driver_message(&error),
         TransportError::Keyring(failure) => crate::services::error_text::keyring_message(&failure),
