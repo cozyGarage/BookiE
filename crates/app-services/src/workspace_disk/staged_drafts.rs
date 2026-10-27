@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{Read, Write};
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 
@@ -28,7 +28,7 @@ impl DraftBatch {
                     return Err(std::io::Error::other("draft path is not a regular file"));
                 }
                 Ok(_) => {
-                    if std::fs::read(&original)? == query.as_bytes() {
+                    if matches_contents(&original, query.as_bytes())? {
                         query.clear();
                         *draft_id = Some(id);
                         continue;
@@ -59,6 +59,40 @@ impl DraftBatch {
     pub(super) fn retain(mut self) {
         for file in &mut self.files {
             file.disable_cleanup(true);
+        }
+    }
+}
+
+fn matches_contents(path: &Path, expected: &[u8]) -> std::io::Result<bool> {
+    let mut file = std::fs::File::open(path)?;
+    let mut buffer = [0; 8192];
+    let mut offset = 0;
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            return Ok(offset == expected.len());
+        }
+        if expected.get(offset..offset + count) != Some(&buffer[..count]) {
+            return Ok(false);
+        }
+        offset += count;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn body_comparison_is_exact_across_buffer_boundaries_and_lengths() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("draft.sql");
+        for body in [String::new(), "é".repeat(9000)] {
+            std::fs::write(&path, body.as_bytes()).unwrap();
+            assert!(matches_contents(&path, body.as_bytes()).unwrap());
+            assert!(!matches_contents(&path, format!("{body}x").as_bytes()).unwrap());
+            std::fs::write(&path, format!("{body}x")).unwrap();
+            assert!(!matches_contents(&path, body.as_bytes()).unwrap());
         }
     }
 }
