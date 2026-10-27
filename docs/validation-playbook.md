@@ -99,7 +99,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `keyring` | Registered Secret Service contracts | Private D-Bus, gnome-keyring and libsecret tools |
 | `ui` | Real application actions and database postconditions via AT-SPI | GTK 4.24, Xvfb, PyAT-SPI; X11 automation, not Wayland acceptance |
 | `mssql-kerberos` | SQL Server integrated authentication, SPN refusal and verified TLS against an isolated test domain | Docker Compose with privileged-container support; opt-in local fixture |
-| `gtk-clickhouse` | Installed GTK Enum16 grid edit against ClickHouse | GTK 4.24, Docker, Xvfb, Secret Service and AT-SPI; local release layer |
+| `gtk-clickhouse` | Installed GTK Enum16 grid edit and Structure metadata notices against ClickHouse | GTK 4.24, Docker, Xvfb, Secret Service and AT-SPI; local release layer |
 | `gtk-mysql-approval` | Approval and dispatch behavior against MySQL | GTK 4.24, Docker, Xvfb, Secret Service and AT-SPI; local release layer |
 | `gtk-mongodb` | Installed GTK MongoDB cursor visibility and grid edits | GTK 4.24, Docker, Xvfb, Secret Service and AT-SPI; local release layer |
 

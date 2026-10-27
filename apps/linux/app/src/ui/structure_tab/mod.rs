@@ -36,9 +36,10 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{ComponentParts, ComponentSender, SimpleComponent, adw, gtk};
 
+use tablepro_app_services::structure_metadata::StructureMetadata;
 use tablepro_core::sql_ddl::ColumnCommentCapability;
 use tablepro_core::sql_ddl::{BuildDdlError, DraftColumn};
-use tablepro_core::{ColumnInfo, ForeignKeyInfo, IndexInfo};
+use tablepro_core::{ColumnInfo, DriverCapabilities, ForeignKeyInfo, IndexInfo};
 use uuid::Uuid;
 
 use crate::services::structure_tracker;
@@ -48,11 +49,13 @@ use tablepro_core::sql_ddl::{StructureOp, diff_to_ops, materialize_ops};
 mod columns;
 mod fks;
 mod indexes;
+mod metadata;
 mod validate;
 
 use columns::{build_column_expander_row, default_type_for};
 use fks::build_fk_row;
 use indexes::build_index_row;
+use metadata::{MetadataAvailability, metadata_availability, metadata_notice_row};
 use validate::{SaveDraft, validate_save};
 
 /// Whether the Structure tab is editing an existing table or
@@ -91,6 +94,13 @@ pub(super) fn comment_capability_for(
         .unwrap_or_default()
 }
 
+pub(super) fn driver_capabilities_for(registry: &tablepro_core::DriverRegistry, driver_id: &str) -> DriverCapabilities {
+    registry
+        .get(driver_id)
+        .map(|driver| driver.capabilities())
+        .unwrap_or_default()
+}
+
 pub struct StructureTab {
     tab_id: Uuid,
     schema: Option<String>,
@@ -98,6 +108,8 @@ pub struct StructureTab {
     mode: Rc<RefCell<StructureMode>>,
     driver_id: String,
     column_comment_capability: ColumnCommentCapability,
+    supports_index_metadata: bool,
+    supports_foreign_key_metadata: bool,
     columns: Rc<RefCell<Vec<DraftColumn>>>,
     indexes: Rc<RefCell<Vec<IndexInfo>>>,
     foreign_keys: Rc<RefCell<Vec<ForeignKeyInfo>>>,
@@ -175,8 +187,7 @@ pub struct StructureTab {
 pub enum StructureTabInput {
     StructureLoaded {
         columns: Vec<ColumnInfo>,
-        indexes: Vec<IndexInfo>,
-        fks: Vec<ForeignKeyInfo>,
+        metadata: StructureMetadata,
     },
     LoadFailed(String),
     Save,
@@ -386,6 +397,13 @@ impl StructureTab {
     fn rebuild_indexes_view(&self, sender: ComponentSender<Self>) {
         clear_box(&self.indexes_box);
         let list = boxed_list();
+        if metadata_availability(*self.mode.borrow(), self.supports_index_metadata) == MetadataAvailability::Unsupported
+        {
+            list.append(&metadata_notice_row(
+                &crate::tr!("Index metadata unavailable"),
+                &crate::tr!("This driver doesn't expose index metadata for existing tables."),
+            ));
+        }
         for (i, idx) in self.indexes.borrow().iter().enumerate() {
             list.append(&build_index_row(i, idx, sender.clone()));
         }
@@ -406,6 +424,14 @@ impl StructureTab {
         clear_box(&self.fks_box);
         let driver_id = self.driver_id.clone();
         let list = boxed_list();
+        if metadata_availability(*self.mode.borrow(), self.supports_foreign_key_metadata)
+            == MetadataAvailability::Unsupported
+        {
+            list.append(&metadata_notice_row(
+                &crate::tr!("Foreign-key metadata unavailable"),
+                &crate::tr!("This driver doesn't expose foreign-key metadata for existing tables."),
+            ));
+        }
         for (i, fk) in self.foreign_keys.borrow().iter().enumerate() {
             list.append(&build_fk_row(i, fk, &driver_id, sender.clone()));
         }
@@ -767,6 +793,8 @@ impl SimpleComponent for StructureTab {
             mode: Rc::new(RefCell::new(init.mode)),
             driver_id: init.driver_id,
             column_comment_capability: init.column_comment_capability,
+            supports_index_metadata: false,
+            supports_foreign_key_metadata: false,
             columns: Rc::new(RefCell::new(Vec::new())),
             indexes: Rc::new(RefCell::new(Vec::new())),
             foreign_keys: Rc::new(RefCell::new(Vec::new())),
@@ -800,7 +828,7 @@ impl SimpleComponent for StructureTab {
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
-            StructureTabInput::StructureLoaded { columns, indexes, fks } => {
+            StructureTabInput::StructureLoaded { columns, metadata } => {
                 // App coalesces the three fetches into one message.
                 // Snapshot all three lists into `original_*` slots so
                 // Discard restores the canonical loaded state without
@@ -809,10 +837,12 @@ impl SimpleComponent for StructureTab {
                 // when the row is dropped from `self.columns`).
                 *self.original_columns.borrow_mut() = columns.clone();
                 *self.columns.borrow_mut() = columns.into_iter().map(DraftColumn::from_info).collect();
-                *self.indexes.borrow_mut() = indexes.clone();
-                *self.original_indexes.borrow_mut() = indexes;
-                *self.foreign_keys.borrow_mut() = fks.clone();
-                *self.original_fks.borrow_mut() = fks;
+                *self.indexes.borrow_mut() = metadata.indexes.clone();
+                *self.original_indexes.borrow_mut() = metadata.indexes;
+                *self.foreign_keys.borrow_mut() = metadata.foreign_keys.clone();
+                *self.original_fks.borrow_mut() = metadata.foreign_keys;
+                self.supports_index_metadata = metadata.indexes_supported;
+                self.supports_foreign_key_metadata = metadata.foreign_keys_supported;
                 self.inner_stack.set_visible_child_name("editor");
                 // End of refetch window: snapshots are now authoritative,
                 // so resume diff-based dirty tracking. The recompute call
