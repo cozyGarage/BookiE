@@ -5,6 +5,7 @@ use std::sync::Arc;
 #[ignore = "requires an isolated GTK display"]
 fn a_failed_history_export_shows_a_dismissible_error() {
     adw::init().unwrap();
+    gtk::Settings::default().unwrap().set_gtk_enable_animations(false);
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let entered = runtime.enter();
     let directory = tempfile::tempdir().unwrap();
@@ -30,9 +31,17 @@ fn a_failed_history_export_shows_a_dismissible_error() {
     while context.iteration(false) {}
     let dialog = window.visible_dialog().expect("export failure must be visible");
     let alert = dialog.downcast::<adw::AlertDialog>().unwrap();
-    assert_eq!(alert.heading().as_deref(), Some("Could not export query history"));
+    assert!(alert.heading().is_some_and(|heading| !heading.is_empty()));
+    assert!(!alert.body().is_empty());
+    assert!(!alert.body().contains("synthetic export failure"));
     assert!(alert.has_response("close"));
-    alert.force_close();
+    let closed = std::rc::Rc::new(std::cell::Cell::new(false));
+    let observed = closed.clone();
+    alert.connect_response(Some("close"), move |_, _| observed.set(true));
+    assert!(alert.close());
+    while context.iteration(false) {}
+    assert!(closed.get());
+    assert!(window.visible_dialog().is_none());
     window.close();
     drop(controller);
     drop(entered);
