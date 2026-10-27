@@ -376,6 +376,7 @@ class CiCacheTests(unittest.TestCase):
                     self.assertNotIn('path: ${{ env.CARGO_TARGET_DIR }}', step)
 
     def test_every_forgejo_checkout_recovers_cache_before_writing_workspace(self):
+        pilot_scratch = '/tmp/bookie-guards-${{ github.run_id }}'
         for filename in ('ci.yml', 'nightly.yml'):
             workflow = (ROOT / '.forgejo/workflows' / filename).read_text()
             checkout_steps = workflow.split('      - name: Check out\n')[1:]
@@ -384,7 +385,14 @@ class CiCacheTests(unittest.TestCase):
                 step = block.split('\n      - name:', 1)[0]
                 if 'shell: bash' in step:
                     preceding = workflow[:workflow.index(step)].rsplit('    runs-on:', 1)[-1]
-                    self.assertIn('build-host', preceding, filename)
+                    if 'ci-pilot' in preceding:
+                        self.assertIn(f'CARGO_TARGET_DIR: {pilot_scratch}/target', preceding, filename)
+                        self.assertIn(f'TMPDIR: {pilot_scratch}/tmp', preceding, filename)
+                        self.assertNotIn('/var/cache/ci/target', preceding, filename)
+                        self.assertIn('mkdir -p "$TMPDIR"', step, filename)
+                        self.assertIn(f'rm -rf -- "{pilot_scratch}"', workflow, filename)
+                    else:
+                        self.assertIn('build-host', preceding, filename)
                 else:
                     self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout {0}', step, filename)
                 self.assertLess(step.index('shell:'), step.index('run:'), filename)

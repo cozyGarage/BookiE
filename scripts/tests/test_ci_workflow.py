@@ -36,8 +36,9 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("CARGO_TARGET_DIR: /target", job)
                 self.assertIn("TMPDIR: /target", job)
         guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertNotIn("CARGO_TARGET_DIR: /target", guards)
-        self.assertNotIn("TMPDIR: /target", guards)
+        self.assertIn("CARGO_TARGET_DIR: /tmp/bookie-guards-${{ github.run_id }}/target", guards)
+        self.assertIn("TMPDIR: /tmp/bookie-guards-${{ github.run_id }}/tmp", guards)
+        self.assertIn('RUSTC_WRAPPER: ""', guards)
         self.assertIn('mkdir -p "$TMPDIR"', guards)
 
     def test_postgres_release_uses_a_short_persistent_temp_directory(self):

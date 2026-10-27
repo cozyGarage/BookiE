@@ -37,6 +37,9 @@ jobs:
         shell: bash
     env:
       TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+      CARGO_TARGET_DIR: /tmp/bookie-guards-${{ github.run_id }}/target
+      TMPDIR: /tmp/bookie-guards-${{ github.run_id }}/tmp
+      RUSTC_WRAPPER: ""
     steps:
       - name: Check out
         shell: bash
@@ -44,6 +47,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$TMPDIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -64,6 +68,9 @@ jobs:
           python3 scripts/check-function-size.py
           python3 scripts/check-comment-lines.py
           cargo fmt --all -- --check
+      - name: Clean pilot scratch
+        if: always()
+        run: rm -rf -- "/tmp/bookie-guards-${{ github.run_id }}"
 
   gtk-build:
     runs-on: build-host
