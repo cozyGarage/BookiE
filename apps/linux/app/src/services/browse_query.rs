@@ -479,7 +479,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(native_type.rows, vec![vec![Value::Bytes(b"longblob".to_vec())]]);
+        assert_eq!(native_type.rows, vec![vec![Value::Text("longblob".into())]]);
         let native_value = connection
             .query_params_controlled(
                 "SELECT OCTET_LENGTH(payload), HEX(SUBSTRING(payload, 1, 8)) FROM value_preview_records WHERE tenant = ? AND id = ?",
