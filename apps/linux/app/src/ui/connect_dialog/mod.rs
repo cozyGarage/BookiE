@@ -91,6 +91,9 @@ mod identity;
 mod prefill;
 mod socket_endpoint;
 
+#[cfg(test)]
+mod error_tests;
+
 pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
 use form::{default_driver_row, test_result_text};
@@ -629,10 +632,10 @@ impl Component for ConnectDialog {
                                             );
                                             match guarded.list_tables_controlled(&control).await {
                                                 Ok(tables) => Ok(tables.len()),
-                                                Err(e) => Err(format!("list_tables: {e}")),
+                                                Err(error) => Err(crate::services::error_text::driver_message(&error)),
                                             }
                                         }
-                                        Err(e) => Err(e.to_string()),
+                                        Err(error) => Err(connection_service::message(error)),
                                     }
                                 }
                             };
@@ -960,7 +963,7 @@ async fn open_candidate(
     let (conn, tunnel) =
         tablepro_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(connection_service::message)?;
     let conn: Arc<dyn tablepro_core::Connection> = Arc::from(conn);
     let guarded = bootstrap.guard_factory.guard(
         conn.clone(),
@@ -976,11 +979,11 @@ async fn open_candidate(
     let tables = guarded
         .list_tables_controlled(&control)
         .await
-        .map_err(|e| format!("list_tables: {e}"))?;
+        .map_err(|error| crate::services::error_text::driver_message(&error))?;
     let views = guarded
         .list_views_controlled(&control)
         .await
-        .map_err(|e| format!("list_views: {e}"))?;
+        .map_err(|error| crate::services::error_text::driver_message(&error))?;
     Ok(OpenedCandidate {
         conn,
         tunnel,
