@@ -384,13 +384,43 @@ fn looks_like_data(field: &str) -> bool {
 /// matches its name, ignoring case and surrounding space. Columns the file
 /// has no match for are left unmapped.
 pub fn suggest_mapping(headers: &[String], columns: &[ColumnInfo]) -> Vec<Option<usize>> {
-    columns
+    let normalized_headers = headers
         .iter()
-        .map(|column| {
-            let wanted = column.name.trim().to_lowercase();
-            headers.iter().position(|header| header.trim().to_lowercase() == wanted)
-        })
-        .collect()
+        .map(|header| header.trim().to_lowercase())
+        .collect::<Vec<_>>();
+    let normalized_columns = columns
+        .iter()
+        .map(|column| column.name.trim().to_lowercase())
+        .collect::<Vec<_>>();
+    let mut mapping = vec![None; columns.len()];
+    let mut used_headers = vec![false; headers.len()];
+
+    for (column_index, column) in columns.iter().enumerate() {
+        let header_index = headers
+            .iter()
+            .enumerate()
+            .find_map(|(index, header)| (!used_headers[index] && header.trim() == column.name.trim()).then_some(index));
+        if let Some(header_index) = header_index {
+            used_headers[header_index] = true;
+            mapping[column_index] = Some(header_index);
+        }
+    }
+
+    for (column_index, wanted) in normalized_columns.iter().enumerate() {
+        if mapping[column_index].is_some() {
+            continue;
+        }
+        let header_index = normalized_headers
+            .iter()
+            .enumerate()
+            .find_map(|(index, header)| (!used_headers[index] && header == wanted).then_some(index));
+        if let Some(header_index) = header_index {
+            used_headers[header_index] = true;
+            mapping[column_index] = Some(header_index);
+        }
+    }
+
+    mapping
 }
 
 fn delimiter_byte(delimiter: CsvDelimiter) -> u8 {
@@ -707,6 +737,22 @@ mod tests {
         ];
 
         assert_eq!(suggest_mapping(&headers, &columns), vec![Some(1), Some(0), None]);
+    }
+
+    #[test]
+    fn exact_header_names_take_precedence_over_case_insensitive_matches() {
+        let headers = vec!["name".to_owned(), "Name".to_owned()];
+        let columns = vec![column("Name", "text"), column("name", "text")];
+
+        assert_eq!(suggest_mapping(&headers, &columns), vec![Some(1), Some(0)]);
+    }
+
+    #[test]
+    fn a_case_insensitive_match_does_not_consume_an_exact_match_header() {
+        let headers = vec!["Name".to_owned()];
+        let columns = vec![column("name", "text"), column("Name", "text")];
+
+        assert_eq!(suggest_mapping(&headers, &columns), vec![None, Some(0)]);
     }
 
     #[test]
