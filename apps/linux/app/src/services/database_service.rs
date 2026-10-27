@@ -8,7 +8,7 @@ use uuid::Uuid;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment};
 use tablepro_policy::{
     AuditAdministrativeAction, AuditEvent, AuditRecordPhase, AuditState, AuditTerminalStatus, DenyApprovalSink,
-    GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal, load_from_path,
+    GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal,
 };
 use tablepro_storage::AuditJournal;
 use tablepro_transport::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel};
@@ -16,17 +16,8 @@ use tablepro_transport::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel};
 use super::config_io::xdg_config_path;
 use super::connection_monitor;
 
-fn load_policy() -> Result<PolicyConfig, String> {
-    let path = xdg_config_path("policy.toml").ok_or("neither XDG_CONFIG_HOME nor HOME is set")?;
-    load_policy_file(&path)
-}
-
-fn load_policy_file(path: &std::path::Path) -> Result<PolicyConfig, String> {
-    if !path.exists() {
-        return Ok(PolicyConfig::default());
-    }
-    load_from_path(path)
-}
+mod policy_loading;
+use policy_loading::{load_policy, load_policy_file};
 
 pub use tablepro_app_services::connection_identity::ConnectionIdentity;
 
@@ -67,7 +58,7 @@ pub struct ReconnectParams {
 /// metadata reads still belong to the durable audit journal.
 #[derive(Clone)]
 pub struct CandidateGuardFactory {
-    policy: Arc<PolicyConfig>,
+    policy: Option<Arc<PolicyConfig>>,
     approval: Arc<dyn tablepro_policy::ApprovalSink>,
     audit: Arc<dyn tablepro_policy::AuditSink>,
     audit_state: Arc<AuditState>,
@@ -80,8 +71,11 @@ impl CandidateGuardFactory {
         connection: Arc<dyn Connection>,
         metadata: &ConnectionMetadata,
         principal: Principal,
-    ) -> PolicyGuard {
-        PolicyGuard::new(
+    ) -> Result<PolicyGuard, String> {
+        let policy = self.policy.clone().ok_or_else(|| {
+            crate::tr!("Policy unavailable. Fix policy.toml and reopen Preferences or restart BookiE.")
+        })?;
+        Ok(PolicyGuard::new(
             connection,
             GuardContext {
                 connection_id: metadata.id,
@@ -90,12 +84,12 @@ impl CandidateGuardFactory {
                 environment: metadata.environment,
                 read_only: metadata.read_only,
                 principal,
-                policy: self.policy.clone(),
+                policy,
                 approval: self.approval.clone(),
                 audit: self.audit.clone(),
                 audit_state: Arc::new(self.connection_audit_state(metadata.id)),
             },
-        )
+        ))
     }
 }
 
@@ -203,11 +197,10 @@ impl AuditRuntime {
 
 pub struct DatabaseService {
     connections: Mutex<HashMap<Uuid, Entry>>,
-    policy: Mutex<Arc<PolicyConfig>>,
+    policy: Mutex<Option<Arc<PolicyConfig>>>,
     audit: Arc<dyn tablepro_policy::AuditSink>,
     audit_journal: Option<Arc<AuditJournal>>,
     audit_available: bool,
-    policy_available: bool,
     audit_state: Arc<AuditState>,
     unresolved_connection_ids: Arc<HashSet<Uuid>>,
     approval: Mutex<Arc<dyn tablepro_policy::ApprovalSink>>,
@@ -243,14 +236,27 @@ impl DatabaseService {
     }
 
     fn with_audit(audit: AuditRuntime, #[cfg(test)] audit_temp_dir: Option<tempfile::TempDir>) -> Self {
-        let (policy, policy_available) = match load_policy() {
-            Ok(policy) => (Arc::new(policy), true),
+        Self::with_loaded_policy(
+            audit,
+            load_policy(),
+            #[cfg(test)]
+            audit_temp_dir,
+        )
+    }
+
+    fn with_loaded_policy(
+        audit: AuditRuntime,
+        loaded: Result<PolicyConfig, String>,
+        #[cfg(test)] audit_temp_dir: Option<tempfile::TempDir>,
+    ) -> Self {
+        let policy = match loaded {
+            Ok(policy) => Some(Arc::new(policy)),
             Err(error) => {
                 tracing::error!(
                     error = %error,
-                    "policy file could not be loaded; using defaults and disabling MCP"
+                    "policy file could not be loaded; database operations and MCP are disabled"
                 );
-                (Arc::new(PolicyConfig::default()), false)
+                None
             }
         };
         Self {
@@ -259,7 +265,6 @@ impl DatabaseService {
             audit: audit.sink,
             audit_journal: audit.journal,
             audit_available: audit.available,
-            policy_available,
             audit_state: audit.state,
             unresolved_connection_ids: audit.unresolved_connection_ids,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
@@ -279,7 +284,10 @@ impl DatabaseService {
     }
 
     pub fn policy_available(&self) -> bool {
-        self.policy_available
+        self.policy
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some()
     }
 
     pub async fn audit_administrative_action(
@@ -394,8 +402,13 @@ impl DatabaseService {
     }
 
     pub fn reload_policy(&self) -> Result<(), String> {
-        let next = load_policy()?;
-        *self.policy.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::new(next);
+        let path = xdg_config_path("policy.toml").ok_or("neither XDG_CONFIG_HOME nor HOME is set")?;
+        self.reload_policy_file(&path)
+    }
+
+    fn reload_policy_file(&self, path: &std::path::Path) -> Result<(), String> {
+        let next = load_policy_file(path)?;
+        *self.policy.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::new(next));
         tracing::info!("policy reloaded");
         Ok(())
     }
@@ -546,7 +559,7 @@ impl DatabaseService {
             .policy
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
+            .clone()?;
         let approval = self
             .approval
             .lock()
@@ -621,6 +634,7 @@ mod tests {
 
     #[path = "identity_tests.rs"]
     mod identity_tests;
+    mod policy_failure_tests;
 
     #[test]
     fn policy_file_is_read_from_the_build_profile_config_directory() {
@@ -635,6 +649,14 @@ mod tests {
         let path = dir.path().join("policy.toml");
         assert!(load_policy_file(&path).is_ok());
         std::fs::write(&path, "[environments.nowhere]\n").unwrap();
+        assert!(load_policy_file(&path).is_err());
+    }
+
+    #[test]
+    fn a_dangling_policy_link_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("policy.toml");
+        std::os::unix::fs::symlink(dir.path().join("missing.toml"), &path).unwrap();
         assert!(load_policy_file(&path).is_err());
     }
 
@@ -901,7 +923,8 @@ mod tests {
         };
         let guard = service
             .candidate_guard_factory()
-            .guard(connection, &metadata, Principal::human_gui());
+            .guard(connection, &metadata, Principal::human_gui())
+            .unwrap();
 
         guard.list_tables().await.expect("guarded table listing");
         guard.list_views().await.expect("guarded view listing");
@@ -1028,7 +1051,8 @@ mod tests {
         };
         let guard = service
             .candidate_guard_factory()
-            .guard(connection, &metadata, Principal::human_gui());
+            .guard(connection, &metadata, Principal::human_gui())
+            .unwrap();
 
         let result = guard.list_tables().await;
         assert!(matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))));

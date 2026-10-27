@@ -1,0 +1,18 @@
+test services::database_service::tests::a_dangling_policy_link_is_an_error ... ok
+test services::database_service::tests::a_missing_policy_file_uses_defaults_and_an_invalid_one_is_an_error ... ok
+test services::database_service::tests::policy_failure_tests::an_absent_policy_directory_uses_defaults_but_a_broken_parent_link_is_an_error ... ok
+test services::database_service::tests::policy_failure_tests::a_permission_denied_policy_path_is_not_treated_as_absent ... ok
+test services::database_service::tests::policy_failure_tests::a_readable_policy_link_preserves_its_restrictions ... ok
+test services::database_service::tests::policy_file_is_read_from_the_build_profile_config_directory ... ok
+test services::database_service::tests::policy_failure_tests::a_policy_load_failure_refuses_bootstrap_and_active_handles_until_recovery ... ok
+test services::database_service::tests::policy_failure_tests::a_failed_reload_keeps_the_last_loaded_restrictions_and_a_valid_reload_recovers ... ok
+test services::database_service::tests::candidate_catalog_reads_use_the_durable_policy_audit_journal ... ok
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1038 filtered out; finished in 0.02s
+passed: a_broken_policy_link_refuses_connections_and_recovers_after_repair (duration: 9.284s)
+passed: a_malformed_policy_refuses_connections_and_recovers_after_repair (duration: 8.221s)
+passed: malformed_sql_is_blocked_before_approval (duration: 6.772s)
+passed: dismissed_approval_denies (duration: 9.047s)
+passed: audit_journal_loss_after_connection_denies_mutation (duration: 7.124s)
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1050 filtered out; finished in 0.03s
+gtk: 191 tests executed successfully (fresh display; first display loss retained in README)

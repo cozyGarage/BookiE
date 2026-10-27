@@ -630,7 +630,11 @@ impl Component for ConnectDialog {
                                                 &metadata,
                                                 tablepro_policy::Principal::human_gui(),
                                             );
-                                            match guarded.list_tables_controlled(&control).await {
+                                            let listed = match guarded {
+                                                Ok(guarded) => guarded.list_tables_controlled(&control).await,
+                                                Err(error) => Err(tablepro_core::DriverError::PolicyDenied(error)),
+                                            };
+                                            match listed {
                                                 Ok(tables) => Ok(tables.len()),
                                                 Err(error) => Err(crate::services::error_text::driver_message(&error)),
                                             }
@@ -969,7 +973,7 @@ async fn open_candidate(
         conn.clone(),
         bootstrap.metadata,
         tablepro_policy::Principal::human_gui(),
-    );
+    )?;
     let server_version = match guarded.server_version().await {
         Ok(version) => version,
         Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),

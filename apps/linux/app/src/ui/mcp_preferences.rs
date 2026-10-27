@@ -30,11 +30,14 @@ pub fn build_page(
 
     if let Err(error) = policy_reload {
         tracing::warn!(error = %error, "policy reload failed; keeping the previous policy");
+        let advice = if database.policy_available() {
+            tr!("The previous policy is still in use. Fix the policy file and reopen Preferences.")
+        } else {
+            tr!("Database operations are disabled. Fix policy.toml and reopen Preferences or restart BookiE.")
+        };
         let row = adw::ActionRow::builder()
             .title(tr!("Policy file could not be reloaded"))
-            .subtitle(tr!(
-                "The previous policy is still in use. Fix the policy file and reopen Preferences."
-            ))
+            .subtitle(advice)
             .build();
         status_group.add(&row);
     }
