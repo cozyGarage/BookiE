@@ -10,6 +10,7 @@ import tarfile
 import tempfile
 import urllib.error
 import urllib.request
+import urllib.parse
 import zipfile
 
 MAX_ARCHIVE = 8 * 1024 ** 3
@@ -104,12 +105,20 @@ def fetch(directory, revision, group, url):
         shutil.move(staging, directory)
 
 
+class ArtifactRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, stream, code, message, headers, url):
+        result = super().redirect_request(request, stream, code, message, headers, url)
+        if result is not None and urllib.parse.urlsplit(url).netloc != urllib.parse.urlsplit(request.full_url).netloc:
+            result.remove_header('Authorization')
+        return result
+
+
 def github_fetch(directory, revision, group):
     token = os.environ['BOOKIE_GITHUB_ARTIFACT_TOKEN']
     def api(path):
         req = urllib.request.Request('https://api.github.com/repos/cozyGarage/BookiE/' + path,
                                      headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'})
-        return urllib.request.urlopen(req, timeout=180)
+        return urllib.request.build_opener(ArtifactRedirect()).open(req, timeout=180)
     with api('actions/runs?head_sha=' + revision + '&status=success&per_page=20') as response:
         runs = json.load(response)['workflow_runs']
     expected = 'bookie-tests-' + revision + '-' + group

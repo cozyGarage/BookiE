@@ -26,6 +26,12 @@ class RegistryExtractionTests(unittest.TestCase):
             registry.extract(archive, destination)
             return (destination / name).read_bytes()
 
+    def test_github_download_redirect_does_not_forward_the_access_token(self):
+        request = registry.urllib.request.Request('https://api.github.com/artifact', headers={'Authorization': 'Bearer private'})
+        redirected = registry.ArtifactRedirect().redirect_request(
+            request, None, 302, 'Found', {}, 'https://storage.example/artifact.zip')
+        self.assertIsNone(redirected.get_header('Authorization'))
+
     def test_regular_payload_is_extracted(self):
         self.assertEqual(self.check_archive('tests/program'), b'test')
 
