@@ -973,6 +973,7 @@ impl SimpleComponent for App {
             AppMsg::FavoriteSaveFailed(reason) => self.show_toast(&reason),
             AppMsg::SaveQueryAsFavorite => self.on_save_query_as_favorite(sender),
             AppMsg::ShowSavedQueries => self.on_show_saved_queries(sender),
+            AppMsg::SavedQueriesDialogClosed => self.saved_queries_dialog = None,
             AppMsg::SavedQueriesChanged(saved) => {
                 let ticket = self.favorites_order.begin();
                 self.on_favorites_loaded(ticket, saved);
