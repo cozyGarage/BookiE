@@ -448,7 +448,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout {0}
@@ -486,7 +486,7 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"
       - name: Distro-floor scenario shard
         run: |
-          cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-distro-floor.sh debian:testing
+          cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6 bash scripts/test-distro-floor.sh debian:testing
 
   driver:
     runs-on: ci-pilot

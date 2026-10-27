@@ -211,10 +211,10 @@ class CiWorkflowTests(unittest.TestCase):
             'scripts/ci-mcp-port.py "${{ matrix.run }}"',
         ]:
             self.assertIn(call, ci + nightly)
-        ports = [port_helper.port_for_run(137, slot) for slot in range(1, 14)]
+        ports = [port_helper.port_for_run(137, slot) for slot in range(1, 17)]
         self.assertEqual(len(ports), len(set(ports)))
         self.assertTrue(all(20000 <= port <= 59999 for port in ports))
-        for slot in (0, 14, 16):
+        for slot in (0, 17):
             with self.assertRaises(ValueError):
                 port_helper.port_for_run(137, slot)
 
@@ -689,7 +689,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('docker build -q -t "$image"', builder)
         self.assertIn('"$image" bash -ceu', builder)
 
-    def test_distro_scenarios_share_the_package_and_partition_all_three_shards(self):
+    def test_distro_scenarios_share_the_package_and_partition_all_six_shards(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         producer = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
@@ -699,9 +699,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ci-gtk-artifact.py create --package", builder)
         self.assertIn("ci-gtk-artifact.py verify --package", producer)
         self.assertIn("needs: [distro-floor]", scenarios)
-        self.assertIn("shard: [1, 2, 3]", scenarios)
+        self.assertIn("shard: [1, 2, 3, 4, 5, 6]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
-        self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3", scenarios)
+        self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6", scenarios)
         self.assertIn('scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"', scenarios)
         self.assertNotIn("scripts/distro-floor-package.sh", scenarios)
         self.assertIn("scripts/test-distro-floor.sh debian:testing", scenarios)
