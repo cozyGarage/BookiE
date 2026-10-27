@@ -63,7 +63,6 @@
 
 ### Fixed
 
-- Exporting query history as SQL keeps connection names and error text inside comments, so a name containing a line break can no longer add a statement to the exported script.
 - Workspace saves no longer rewrite other connections' editor drafts, preserving external edits and avoiding needless file I/O.
 - PostgreSQL CSV imports preserve the session time zone when a `timestamptz` value has no explicit offset.
 - Expanding a table in the sidebar now displays its field and type previews instead of remaining on “Loading fields…”.
