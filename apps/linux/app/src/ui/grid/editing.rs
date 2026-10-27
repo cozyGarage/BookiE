@@ -303,7 +303,7 @@ fn show_calendar_popover(label: &CellEditor, col_index: usize, sender: &relm4::S
     POPOVER_SLOT.set(label, popover.clone());
 
     let label_for_cal = label.clone();
-    let popover_for_cal = popover.clone();
+    let popover_for_cal = popover.downgrade();
     let sender_for_cal = sender.clone();
     calendar.connect_day_selected(move |c| {
         let dt = c.date();
@@ -319,7 +319,7 @@ fn show_calendar_popover(label: &CellEditor, col_index: usize, sender: &relm4::S
                 row_key,
             })
             .ok();
-        popover_for_cal.popdown();
+        popdown_if_alive(&popover_for_cal);
     });
 
     install_popover_close_cleanup(label, &popover);
@@ -365,7 +365,7 @@ fn show_exact_text_popover(label: &CellEditor, col_index: usize, sender: &relm4:
     POPOVER_SLOT.set(label, popover.clone());
 
     let label_for_commit = label.clone();
-    let popover_for_commit = popover.clone();
+    let popover_for_commit = popover.downgrade();
     let sender_for_commit = sender.clone();
     entry.connect_activate(move |e| {
         let formatted = e.text().to_string();
@@ -380,7 +380,7 @@ fn show_exact_text_popover(label: &CellEditor, col_index: usize, sender: &relm4:
                 row_key,
             })
             .ok();
-        popover_for_commit.popdown();
+        popdown_if_alive(&popover_for_commit);
     });
 
     install_popover_close_cleanup(label, &popover);
@@ -411,7 +411,7 @@ fn show_spin_button_popover(
     POPOVER_SLOT.set(label, popover.clone());
 
     let label_for_commit = label.clone();
-    let popover_for_commit = popover.clone();
+    let popover_for_commit = popover.downgrade();
     let sender_for_commit = sender.clone();
     spin.connect_activate(move |s| {
         let formatted = if is_float {
@@ -430,7 +430,7 @@ fn show_spin_button_popover(
                 row_key,
             })
             .ok();
-        popover_for_commit.popdown();
+        popdown_if_alive(&popover_for_commit);
     });
 
     install_popover_close_cleanup(label, &popover);
@@ -491,11 +491,11 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
     popover.set_parent(label);
     POPOVER_SLOT.set(label, popover.clone());
 
-    let popover_for_cancel = popover.clone();
-    cancel_button.connect_clicked(move |_| popover_for_cancel.popdown());
+    let popover_for_cancel = popover.downgrade();
+    cancel_button.connect_clicked(move |_| popdown_if_alive(&popover_for_cancel));
 
     let label_for_commit = label.clone();
-    let popover_for_commit = popover.clone();
+    let popover_for_commit = popover.downgrade();
     let sender_for_commit = sender.clone();
     let buffer_for_commit = buffer.clone();
     save_button.connect_clicked(move |_| {
@@ -514,7 +514,7 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
                 row_key,
             })
             .ok();
-        popover_for_commit.popdown();
+        popdown_if_alive(&popover_for_commit);
     });
 
     install_popover_close_cleanup(label, &popover);
@@ -528,6 +528,12 @@ fn install_popover_close_cleanup(label: &CellEditor, popover: &gtk::Popover) {
         p.unparent();
         POPOVER_SLOT.take(&label_for_close);
     });
+}
+
+fn popdown_if_alive(popover: &glib::WeakRef<gtk::Popover>) {
+    if let Some(popover) = popover.upgrade() {
+        popover.popdown();
+    }
 }
 
 fn install_edit_commit_handler(label: &CellEditor, col_index: usize, sender: relm4::Sender<GridMsg>) {
@@ -658,3 +664,6 @@ mod tests {
         assert_eq!(numeric_editor("-0.25", true), NumericEditor::Spin(-0.25));
     }
 }
+
+#[cfg(test)]
+mod lifetime_tests;

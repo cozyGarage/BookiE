@@ -1121,6 +1121,11 @@
       "tablepro-app",
       "--lib",
       "ui::export_dialog::lifetime_tests::dismissing_export_setup_releases_its_dialog"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::editing::lifetime_tests::closed_edit_popovers_release_their_widgets"
     ]
   ],
   "keyring": [
