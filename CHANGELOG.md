@@ -63,7 +63,6 @@
 
 ### Fixed
 
-- The case-insensitive text filter now ignores case on DuckDB and ClickHouse tables instead of matching case-sensitively.
 - Workspace saves no longer rewrite other connections' editor drafts, preserving external edits and avoiding needless file I/O.
 - PostgreSQL CSV imports preserve the session time zone when a `timestamptz` value has no explicit offset.
 - Expanding a table in the sidebar now displays its field and type previews instead of remaining on “Loading fields…”.
