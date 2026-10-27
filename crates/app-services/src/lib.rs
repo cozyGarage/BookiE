@@ -1,4 +1,5 @@
 pub mod approval_wait;
+pub mod catalog_changes;
 pub mod column_widths;
 pub mod completion;
 pub mod completion_identifiers;
