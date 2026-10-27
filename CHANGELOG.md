@@ -63,7 +63,6 @@
 
 ### Fixed
 
-- Running a script that creates a SQLite or MySQL trigger together with other statements no longer fails with a transaction-control error on a shared connection.
 - Workspace saves no longer rewrite other connections' editor drafts, preserving external edits and avoiding needless file I/O.
 - PostgreSQL CSV imports preserve the session time zone when a `timestamptz` value has no explicit offset.
 - Expanding a table in the sidebar now displays its field and type previews instead of remaining on “Loading fields…”.
