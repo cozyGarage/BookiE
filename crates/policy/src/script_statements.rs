@@ -60,6 +60,30 @@ mod tests {
     }
 
     #[test]
+    fn transaction_control_after_a_trigger_is_still_refused_on_a_shared_connection() {
+        let trigger = "CREATE TRIGGER t AFTER INSERT ON a BEGIN UPDATE b SET n = n + 1; END";
+        for sql in [
+            format!("{trigger}; BEGIN; UPDATE x SET a = 1"),
+            format!("{trigger}; COMMIT"),
+            format!("{trigger}; BEGIN; BEGIN"),
+        ] {
+            let decision = shared_connection_decision(&sql, "sqlite", &classify(&sql, "sqlite"));
+            assert_eq!(
+                decision.map(|decision| decision.rule_name().to_string()).as_deref(),
+                Some("transaction_control_needs_session"),
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_whole_transaction_around_a_trigger_is_accepted_as_one_batch() {
+        let sql = "BEGIN; CREATE TRIGGER t AFTER INSERT ON a BEGIN SELECT 1; END; COMMIT";
+
+        assert!(shared_connection_decision(sql, "sqlite", &classify(sql, "sqlite")).is_none());
+    }
+
+    #[test]
     fn the_other_drivers_keep_the_plain_splitter() {
         for driver in ["postgres", "mysql", "mssql", "clickhouse", "duckdb", "redis"] {
             assert_eq!(
