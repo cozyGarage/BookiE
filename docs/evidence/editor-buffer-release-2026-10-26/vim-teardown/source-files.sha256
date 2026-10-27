@@ -1,0 +1,4 @@
+5fbb30d0d1148845de04f9d43ec3a8638f58a8bacd3ba4ae0d3b185a752b0062  apps/linux/app/src/ui/editor/mod.rs
+30f91799d7c89d3260c6e0546b5c3334371203e7d95493782963a1a6f9127ee4  apps/linux/app/src/ui/editor/schema.rs
+ece3b46203c65a9c02d46d8e269425cff20317152c01be493555a7ea8ce83f17  apps/linux/app/src/ui/editor/split_view.rs
+a5418d740acd7958021feffdfc38b614c8db8f1d88beaf1079e9458629459ed4  apps/linux/app/src/ui/editor/dispatch_tests.rs
