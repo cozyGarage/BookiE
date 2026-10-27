@@ -800,9 +800,17 @@ fn clearing_connection_metadata_removes_cached_candidates_and_retires_requests()
     index.set_columns("public.safety_items", vec!["note".into()]);
     let request = index.request("public.safety_items".into());
     assert!(
-        super::candidates("SELECT * FROM ", 14, &index, None, false, str::to_string)
-            .iter()
-            .any(|candidate| candidate == "public.safety_items")
+        super::candidates(
+            "SELECT * FROM ",
+            14,
+            &index,
+            None,
+            false,
+            Narrowing::default(),
+            str::to_string
+        )
+        .iter()
+        .any(|candidate| candidate == "public.safety_items")
     );
 
     index.clear();
@@ -819,9 +827,17 @@ fn clearing_connection_metadata_removes_cached_candidates_and_retires_requests()
             .any(|(label, value)| label == "SELECT" && value == "SELECT")
     );
     assert!(
-        !super::candidates("SELECT * FROM ", 14, &index, None, false, str::to_string)
-            .iter()
-            .any(|candidate| candidate == "public.safety_items")
+        !super::candidates(
+            "SELECT * FROM ",
+            14,
+            &index,
+            None,
+            false,
+            Narrowing::default(),
+            str::to_string
+        )
+        .iter()
+        .any(|candidate| candidate == "public.safety_items")
     );
 }
 
