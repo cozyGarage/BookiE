@@ -1,0 +1,12 @@
+docs/evidence/build-manifest-2026-10-23/validation.json: manifest must be an object
+docs/evidence/colour-chooser-lifetime-2026-10-27/validation.json: source_commit or base_commit is required
+docs/evidence/connection-error-guidance-2026-10-27/validation.json: source_commit or base_commit is required
+docs/evidence/deleted-connection-drafts-2026-10-27/validation.json: source_commit or base_commit is required
+docs/evidence/edit-popover-lifetime-2026-10-27/validation.json: source_commit or base_commit is required
+docs/evidence/history-row-lifetime-2026-10-27/validation.json: source_commit or base_commit is required
+docs/evidence/import-setup-lifetime-2026-10-26/validation.json: source_commit or base_commit is required
+docs/evidence/retired-draft-cleanup-2026-10-27/validation.json: source_commit or base_commit is required
+docs/evidence/structure-form-lifetime-2026-10-26/validation.json: source_commit or base_commit is required
+docs/evidence/structure-tab-lifetime-2026-10-26/validation.json: source_commit or base_commit is required
+docs/evidence/unreadable-draft-preservation-2026-10-27/validation.json: source_commit or base_commit is required
+docs/evidence/verbatim-value-view-2026-10-27/validation.json: source_commit or base_commit is required

@@ -1,0 +1,16 @@
+running 1 test
+test workspace_state::tests::audit_prefetch_does_not_restore_a_deleted_cache_entry ... FAILED
+
+failures:
+
+---- workspace_state::tests::audit_prefetch_does_not_restore_a_deleted_cache_entry stdout ----
+
+thread 'workspace_state::tests::audit_prefetch_does_not_restore_a_deleted_cache_entry' (4107623) panicked at crates/app-services/src/workspace_state/tests.rs:946:5:
+deleted workspace was recached by the late preload
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    workspace_state::tests::audit_prefetch_does_not_restore_a_deleted_cache_entry
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 398 filtered out; finished in 0.00s
