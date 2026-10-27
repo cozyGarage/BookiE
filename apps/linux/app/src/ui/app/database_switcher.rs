@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 use uuid::Uuid;
@@ -114,24 +112,21 @@ impl App {
         };
         clear(&self.databases_list);
         self.databases_list.append(&message_row(&crate::tr!("Loading…"), ""));
-        let timeout = Duration::from_secs(
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id)
-                .into(),
-        );
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let cancel = crate::services::request_generation::replace_in_flight(&self.database_list_cancel);
         let reply = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let listing = tokio::select! {
-                        listing = tokio::time::timeout(timeout, connection.list_databases()) => listing,
-                        () = cancel.cancelled() => return,
-                    };
-                    let result = match listing {
-                        Ok(Ok(names)) => Ok(names),
-                        Ok(Err(error)) => Err(crate::services::error_text::driver_message(&error)),
-                        Err(_) => Err(crate::tr!("Listing databases timed out.")),
-                    };
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, cancel.clone());
+                    let result = connection
+                        .list_databases_controlled(&control)
+                        .await
+                        .map_err(|error| crate::services::error_text::driver_message(&error));
+                    if cancel.is_cancelled() {
+                        return;
+                    }
                     reply.input(AppMsg::DatabasesLoaded { origin, result });
                 })
                 .drop_on_shutdown()
