@@ -54,6 +54,23 @@ class OwnedApplication:
         self._verify()
         return {"application_pid": self.process.pid, "application_start_ticks": self.started}
 
+    def assert_owns_tcp_listener(self, port):
+        self._verify()
+        try:
+            sockets = {entry.readlink().name for entry in (self.proc / "fd").iterdir()}
+            endpoint = f"0100007F:{port:04X}"
+            listeners = [line.split() for line in (self.proc / "net/tcp").read_text().splitlines()[1:]]
+            owned = any(
+                len(fields) > 9 and fields[1] == endpoint and fields[3] == "0A"
+                and f"socket:[{fields[9]}]" in sockets
+                for fields in listeners
+            )
+        except OSError:
+            raise AssertionError("the owned application's TCP listener cannot be verified") from None
+        self._verify()
+        if not owned:
+            raise AssertionError("the MCP test port is not listening in the owned application")
+
     def launch_again(self):
         self._verify()
         result = subprocess.run(

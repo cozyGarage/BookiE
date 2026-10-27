@@ -8,6 +8,10 @@
     "path": "crates/drivers/duckdb/src/lib.rs",
     "sha256": "18b6031626d02272e65ed1ff5bf660ae8daa9c1a58e7a4de999bf1cf453aacbd"
   },
+  "source_commits": {
+    "crates/drivers/duckdb/src/lib.rs": "94c9c4b88c7ecbe8f9bf6b8f2b1f84b4a87cb424",
+    "crates/app/tests/support/duckdb_enum_contract.rs": "94c9c4b88c7ecbe8f9bf6b8f2b1f84b4a87cb424"
+  },
   "regression_test": {
     "path": "crates/app/tests/support/duckdb_enum_contract.rs",
     "sha256": "eb0a70951826b860bfe100f49a76bb0a6ef2c50b2aa4c3a0137edf2708c2cfd8",

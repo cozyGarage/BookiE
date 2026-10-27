@@ -1,0 +1,21 @@
+{
+  "issue": 1731,
+  "linux_base": "887678414",
+  "dependency": "1757 at f3e5f20e3, includes 1754",
+  "source_sha256": {
+    "crates/app-services/src/workspace_disk.rs": "d9ec75f2bf5950d087c528caeae2ecd317f0c17b57bc1f6e8803133a7dfc9e07",
+    "crates/app-services/src/workspace_disk/retired_drafts.rs": "bb9db5d50e6b1b50d212b859432bf0cbfa8c5a13349e772cd18c27fb5ed8c4fa",
+    "crates/app-services/src/workspace_disk/cleanup_tests.rs": "a5a49d1bd34e679581cf0765a9643e538d22d1977a76230608fdb05b5645699d",
+    "apps/linux/app/tests/gtk_ux.py": "ae2430ccd08af9a73999b324756fc9ca015d21d80350e9f73e0dbd2fb542ebe7"
+  },
+  "negative_control": "two cleanup tests failed before fix; failed metadata publication preservation pinned existing behavior",
+  "workspace_checks": "53 unit and 4 selected integration tests passed",
+  "pending": [],
+  "forgejo": "deferred during infrastructure migration",
+  "validation": {
+    "preflight": "passed: 2218 unit, 291 sandbox, 1 Redis check",
+    "installed_e2e": "closing_editors_removes_their_drafts_and_reopening_restores_sql passed after final symlink safety change",
+    "gtk_widgets": "not repeated: no GTK implementation changed"
+  },
+  "installed_binary_sha256": "2c6cfdd810611e19a5bf244e855187645817601225ceed7609e7924c2980b2cb"
+}
