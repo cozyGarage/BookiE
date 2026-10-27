@@ -24,12 +24,6 @@ The [October 27 code audit](archive/current-code-correctness-audit-2026-10-27.md
 | A dangling policy symlink silently enables default policy | [#1823](https://github.com/cozyGarage/BookiE/issues/1823) | UX, B4 consultation |
 | Supported evidence packets are omitted from default discovery | [#1824](https://github.com/cozyGarage/BookiE/issues/1824) | UX |
 
-## Catalog cancellation
-
-| ID / issue | Gap | Lane | Acceptance focus |
-|---|---|---|---|
-| UI-46 / [#1734](https://github.com/cozyGarage/BookiE/issues/1734) | Database switching waits on an uncontrolled `list_databases` call | B3 | Pass the request deadline and cancellation token through `Connection` and `PolicyGuard`; preserve terminal audit outcomes and ignore superseded UI results. An in-flight timeout remains `OperationOutcomeUnknown` unless a driver confirms server cancellation. |
-
 ## Post-release acceptance follow-ups
 
 These rows remained open after the 0.2.0 delivery decision and are now part of the post-release backlog. They do not reopen the 0.2.0 milestone or define the final 0.2.1 scope. Project #3 and the linked issues own current status and acceptance.
@@ -40,7 +34,6 @@ These rows remained open after the 0.2.0 delivery decision and are now part of t
 | AUD-9 | [#600](https://github.com/cozyGarage/BookiE/issues/600) | B4 | Prevent agent masking leaks through hidden SQL lineage |
 | TEST-15 | [#593](https://github.com/cozyGarage/BookiE/issues/593) | B4 | Verify lost-ack writes are not replayed after reconnect |
 | TEST-25 | [#1545](https://github.com/cozyGarage/BookiE/issues/1545) | B3 | Decide SQLite runtime policy and verify SQL-NULL-key JSON aggregates on affected and fixed versions |
-| AppStream 0.2.0 metadata | [#1585](https://github.com/cozyGarage/BookiE/issues/1585) | UX | Reconcile the development classification and date with the published release; decide how post-release source metadata is labeled without pre-approving a 0.2.1 scope |
 | UI-35 | [#579](https://github.com/cozyGarage/BookiE/issues/579) | UX | Complete native Linux acceptance against a local MySQL or MariaDB service and record the app build and socket path |
 | B4-7, B4-16, B4-22 | [#566](https://github.com/cozyGarage/BookiE/issues/566) | B4 | Finish installed acceptance for tunnel audit, session invalidation, and bundle audit |
 | TEST-31 | [#556](https://github.com/cozyGarage/BookiE/issues/556) | UX | Triage intermittent installed GTK runs and gather the required full-run evidence |
@@ -76,7 +69,6 @@ From the 2026-10-22 dbflux review and the audit of closed issues. Each is an iss
 |---|---|---|
 | PERF-11 / [#580](https://github.com/cozyGarage/BookiE/issues/580) | Reopened: catalog scoping, many-schema performance, restricted-role metadata | UX |
 | DBF-2 to DBF-4 / [#1356](https://github.com/cozyGarage/BookiE/issues/1356), [#1357](https://github.com/cozyGarage/BookiE/issues/1357), [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | Measure PostgreSQL row-cap drain, SQLite early cancel, verify-ca hostname per engine | B3 / B4 |
-| DBF-5 / [#1668](https://github.com/cozyGarage/BookiE/issues/1668) | Return request-scoped audit receipts from guarded query results | B4 |
 | B4-24 / [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Decide the TLS fingerprint pin | B4 |
 | UI-43 / [#1366](https://github.com/cozyGarage/BookiE/issues/1366) | Completion through the session search_path | B4 |
 
