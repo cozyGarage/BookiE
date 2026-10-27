@@ -90,9 +90,9 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
     set -euo pipefail
     eval "$(printf "tablepro-test" | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
     PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo build --locked -p tablepro-ssh --bin tablepro-askpass
-    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo test --locked -p tablepro-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
-    cargo test --locked -p tablepro-agentd --test mtls -- --include-ignored --test-threads=1
-    cargo test --locked -p tablepro-release-tests --tests -- --include-ignored --test-threads=1
+    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" bash scripts/run-rust-tests.sh --locked -p tablepro-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
+    bash scripts/run-rust-tests.sh --locked -p tablepro-agentd --test mtls -- --include-ignored --test-threads=1
+    bash scripts/run-rust-tests.sh --locked -p tablepro-release-tests --tests -- --include-ignored --test-threads=1
     cargo build --locked -p tablepro-app --bin tablepro-app
     TABLEPRO_GTK_DBUS_ACTIVE=0 \
       TABLEPRO_GTK_POSTGRES_DB=tablepro \

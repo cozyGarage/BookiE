@@ -38,7 +38,7 @@ if [[ ! -S "$socket_root/.s.PGSQL.5432" ]]; then
 fi
 
 TABLEPRO_PG_SOCKET_DIR="$socket_root" \
-  cargo test -p tablepro-driver-postgres --test socket_local -- --include-ignored --test-threads=1
+  bash scripts/run-rust-tests.sh -p tablepro-driver-postgres --test socket_local -- --include-ignored --test-threads=1
 
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
 rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
@@ -54,5 +54,5 @@ CARGO_HOME="$cargo_home" \
   dbus-run-session -- bash -c '
     set -euo pipefail
     eval "$(printf "tablepro-test" | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
-    cargo test -p tablepro-agentd --test socket_local -- --include-ignored --test-threads=1
+    bash scripts/run-rust-tests.sh -p tablepro-agentd --test socket_local -- --include-ignored --test-threads=1
   '
