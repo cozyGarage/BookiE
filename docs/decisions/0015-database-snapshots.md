@@ -2,10 +2,7 @@
 
 - **Status**: Accepted design; implementation is post-0.2.0 with no release target
 - **Date**: 2026-10-08
-
-### Clarification (2026-10-20)
-
-This ADR records a design, not a release commitment. Snapshot implementation is post-0.2.0 backlog work tracked by [#547](https://github.com/cozyGarage/BookiE/issues/547); no release target is set. The context predates PostgreSQL logical backup and restore in ADR 0019. Those portable dump tools do not implement this snapshot design or provide the same database-state semantics.
+- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0015-database-snapshots-and-restore)
 
 ## Context
 

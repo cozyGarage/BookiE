@@ -2,12 +2,7 @@
 
 - **Status**: Accepted; PostgreSQL backup and restore are wired into the app. Their cancellation and unknown-outcome review was tracked in the now-closed [#1043](https://github.com/cozyGarage/BookiE/issues/1043). An unknown restore outcome still blocks governed writes until reconciled; the app has no in-app reconciliation action yet ([#947](https://github.com/cozyGarage/BookiE/issues/947)). File conversion, schema migrations and backup/restore for other engines remain post-0.2.0 work.
 - **Date**: 2026-10-16
-
-### Clarification (2026-10-20)
-
-The accepted decision does not set a release target for the remaining tools. PostgreSQL backup and restore are implemented; follow-up work remains subject to post-0.2.0 selection and acceptance.
-
-The implementation uses the shared transport and SSH route to create the client-tool endpoint, then supervises the vendor process in `crates/dump`; it is not specific to the system OpenSSH backend. The current process does not apply Landlock, so the conditional filesystem restriction in Decision 3 is not implemented and must not be treated as a shipped security boundary.
+- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0019-database-tooling-without-sidecars); the Landlock restriction in Decision 3 is not implemented and is not a shipped security boundary
 
 ## Context
 

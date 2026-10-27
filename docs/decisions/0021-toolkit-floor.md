@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-23
+- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0021-support-only-the-newest-gtk-toolkit)
 
 ## Context
 
@@ -36,10 +37,6 @@ The floor is enforced in three places:
 The current gtk-rs features match the toolkit floor: GTK compiles at `gnome_50` plus `v4_24`, libadwaita at `v1_10`, GtkSourceView at `v5_22`, and GLib at `v2_88`. The shortcuts window now uses `AdwShortcutsDialog`.
 
 The distro-floor CI job builds and tests on `debian:testing` only. No job tests an older toolkit, and fixes are not backported to older toolkits.
-
-## Implementation clarification, October 23
-
-The accepted decision initially held GTK at `gnome_47` because the shortcuts window still used `GtkShortcutsWindow`. Replacing it with `AdwShortcutsDialog` allowed the GTK Rust features to advance to `gnome_50` plus `v4_24`, and GLib to `v2_88`, matching the runtime floor. Toolkit requirements and distribution support did not change.
 
 ## Rationale
 

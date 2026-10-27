@@ -47,25 +47,25 @@ Other options and why they were rejected.
 | [0008](0008-connection-and-session-ownership.md) | Connection/session ownership and trust | Accepted | Distinct live identities, no pool/replay/security fallback, and scoped uncertainty with durable audit obligations. |
 | [0009](0009-persistence-and-identity-compatibility.md) | Durable identity and recoverable state | Accepted | Stable identifiers, compatible adapters, recoverable migrations and distinct persistence writer contracts. |
 | [0010](0010-administrative-action-audit.md) | Audit confirmed bundle administration | Accepted | Bundle import/export use durable, paired aggregate audit records and fail closed before side effects. |
-| [0011](0011-paged-query-results.md) | Page large editor results through a cursor | Accepted | Supported single-statement PostgreSQL editor SELECTs stream within an estimated 64 MiB row-storage budget; other paths keep their caps, and broader memory acceptance remains open. |
-| [0012](0012-sidebar-object-tree.md) | Show database objects in a collapsible sidebar tree | Accepted | Collapsible Tables and Views groups use the existing `GtkListBox`; `GtkTreeListModel` migration and lazy catalog groups remain open. |
+| [0011](0011-paged-query-results.md) | Page large editor results through a cursor | Accepted | Supported single-statement PostgreSQL editor SELECTs stream within an estimated 64 MiB row-storage budget; other paths keep their caps. |
+| [0012](0012-sidebar-object-tree.md) | Show database objects in a collapsible sidebar tree | Accepted | Collapsible Tables and Views groups use the existing `GtkListBox`. |
 | [0013](0013-multiple-query-result-sets.md) | Preserve every result set from a query | Accepted | Ordered result batches keep SQL Server's later sets under one shared budget; the editor uses a result-set dropdown, MCP preserves sets, and GUI export handles one set |
 | [0014](0014-full-table-export-snapshot.md) | Full table exports use one read snapshot | Accepted | Paged exports must read one guarded database snapshot or refuse before publishing a file |
-| [0015](0015-database-snapshots.md) | Database snapshots and restore | Accepted design; implementation has no release target | Per-engine native snapshots behind a capability flag, generated names, one guarded and audited operation per action, a safety copy on restore |
+| [0015](0015-database-snapshots.md) | Database snapshots and restore | Accepted | Per-engine native snapshots behind a capability flag, generated names, one guarded and audited operation per action, a safety copy on restore |
 | [0016](0016-governed-consumer-seam.md) | PolicyGuard is the only consumer connection | Accepted | Composition roots wrap consumer connections in `PolicyGuard`; the `Arc<dyn Connection>` interface does not encode that invariant as a distinct type |
-| [0017](0017-mcp-sdk-behind-the-governed-seam.md) | Official Rust MCP SDK behind the governed seam | Accepted direction; migration incomplete | Target: replace the hand-written protocol and transport layer while keeping tokens, allowlists, approval and audit in BookiE's code. The production server remains hand-written; the SDK is an optional stdio prototype. |
+| [0017](0017-mcp-sdk-behind-the-governed-seam.md) | Official Rust MCP SDK behind the governed seam | Accepted | Target: replace the hand-written protocol and transport layer while keeping tokens, allowlists, approval and audit in BookiE's code. |
 | [0018](0018-headless-app-services-crate.md) | Headless application-services crate | Accepted | GTK-free services, the tab model and workspace persistence have moved; GTK controllers and page handling remain in the app. |
-| [0019](0019-database-tooling-without-sidecars.md) | Database tooling without sidecars | Accepted; partial implementation | DuckDB for file conversion, `refinery` behind `PolicyGuard` for migrations, supervised vendor dump tools for backup; no sidecar binaries |
+| [0019](0019-database-tooling-without-sidecars.md) | Database tooling without sidecars | Accepted | DuckDB for file conversion, `refinery` behind `PolicyGuard` for migrations, supervised vendor dump tools for backup; no sidecar binaries |
 | [0020](0020-aggregate-forgejo-trains.md) | Aggregate pull requests are the Forgejo gate unit | Accepted | Gate one immutable aggregate head, verify its merge tree and close constituent PRs as included |
 | [0021](0021-toolkit-floor.md) | Support only the newest GTK toolkit | Accepted | GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 at startup, build, package and CI; older distributions are unsupported |
-| [0022](0022-release-notes-from-merge-commits.md) | Release notes come from merge commits | Accepted; workflow wiring pending | A `Release-Note:` trailer on each squash commit replaces edits to `CHANGELOG.md`; notes are assembled at release. |
+| [0022](0022-release-notes-from-merge-commits.md) | Release notes come from merge commits | Accepted | A `Release-Note:` trailer on each squash commit replaces edits to `CHANGELOG.md`; notes are assembled at release. |
 | [0023](0023-system-openssh-transport-boundaries.md) | System OpenSSH transport boundaries | Accepted | Askpass answers only exact prompts, forced client options, no global state, and no `core` dependency in the ssh crate. |
 | [0024](0024-keyed-grid-writes-check-what-they-overwrite.md) | Keyed grid writes check what they overwrite | Accepted | Relational updates compare edited columns' original values and must affect exactly one row; MongoDB guards by field and row; deletes and ABA are limits. |
 | [0025](0025-transient-result-page-spool.md) | Keep fetched result pages in a transient spool | Accepted | A private, bounded, encrypted spool makes every fetched PostgreSQL page revisitable without retaining all rows in RAM or rerunning SQL. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 
-Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted means the architecture choice is recorded; implementation and runtime acceptance remain on the relevant milestone records and owning boards.
+Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted means the architecture choice is recorded. What has been built, and runtime acceptance, are tracked in [implementation status](implementation-status.md) and on the owning issues, never inside an ADR.
 
 ## Adding a decision
 
@@ -76,4 +76,5 @@ Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepte
 5. Update the [checklist](checklist.md) row for that fork (Decided with a link, or leave Open).
 6. Submit it through the normal review process.
 7. Record every rejected alternative with its reason under **Alternatives considered**, including options a review or comparison document turned down. A dated review that declines something is not a decision record until it is here.
-8. A limitation entry never overrides an accepted ADR. If shipped behaviour differs from an ADR, amend the ADR or fix the behaviour.
+8. A limitation entry never overrides an accepted ADR. If shipped behaviour differs from an ADR, fix the behaviour or record a new ADR that supersedes it.
+9. After acceptance, edit an ADR only to clarify its wording. Progress, partial implementation, measurements and acceptance results go in [implementation status](implementation-status.md) or on the owning issue. Do not add an "Implementation status" section to an ADR.
