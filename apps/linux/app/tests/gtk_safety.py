@@ -23,6 +23,7 @@ import gtk_active_edit
 import gtk_editor_panel
 import gtk_csv_refresh
 import gtk_catalog
+import gtk_reimport
 import gtk_structure
 import gtk_sequences
 import gtk_input
@@ -2834,6 +2835,7 @@ def main():
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_reimport.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_structure.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_sequences.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
