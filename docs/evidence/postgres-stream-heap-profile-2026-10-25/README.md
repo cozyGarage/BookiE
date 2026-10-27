@@ -18,6 +18,12 @@ The largest attributable peak allocation group was 74.24 MiB across 4,000,000 al
 
 Both runs received 2,000,000 rows across 400 pages and retained rows `1,855,001–2,000,000` (145,000 rows). The earlier rows were unavailable. The probe navigated four adjacent retained pages in both directions; it did not traverse the full retained interval.
 
+## Current Linux-source spot check (2026-10-27)
+
+The release binary built from Linux commit `8876784146f08d380cbc5c68205b010ab09c624b` completed one two-million-row, ten-column PostgreSQL 16 query in 11.735 seconds and used 16.01 process CPU seconds through completion. The [raw profile](profile-current-linux-887678.json) records 400 delivered pages and successful backward and forward navigation across four adjacent pages. The current PostgreSQL spool notice says earlier pages can be loaded from temporary storage; the probe now verifies page navigation directly instead of requiring the obsolete “Retained rows” notice.
+
+RSS was 181.1 MiB before the query and peaked at 375.4 MiB in the samples taken during fetching. After the page-navigation round trip and a three-second settle, RSS was 505.6 MiB; three seconds after closing the editor it was 507.4 MiB. This single sample ended below the multi-gigabyte growth reported in the original issue, while memory remained elevated after closing the editor. It does not establish a stable long-session ceiling. This was one Xvfb/Cairo run on Omarchy, not a multi-cycle, installed-package or native-Wayland acceptance run. The [build and environment identity](build-current-linux-887678.json) records the executable hash and profiling conditions.
+
 ## Scope and limits
 
 - The application was a source-built release binary running under Xvfb/Cairo with a private D-Bus session and temporary Secret Service keyring. This was not an installed Arch package or native Wayland run.
