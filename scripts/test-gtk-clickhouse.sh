@@ -80,5 +80,5 @@ TABLEPRO_GTK_KEYRING_READY=1 \
   TABLEPRO_GTK_CLICKHOUSE_CONTAINER="$container" \
   TABLEPRO_GTK_CLICKHOUSE_HOST=127.0.0.1 \
   TABLEPRO_GTK_CLICKHOUSE_PORT="$port" \
-  TABLEPRO_GTK_SCENARIO=clickhouse_enum_grid_edit_preserves_native_label_and_siblings \
+  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-clickhouse_enum_grid_edit_preserves_native_label_and_siblings,clickhouse_structure_distinguishes_unavailable_foreign_keys}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"
