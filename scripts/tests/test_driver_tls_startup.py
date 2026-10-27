@@ -14,6 +14,7 @@ class TlsStartupTests(unittest.TestCase):
         fixture = root / "tests/fixtures/driver-tls"
         fixture.mkdir(parents=True)
         shutil.copy(ROOT / "scripts/test-driver-tls.sh", root / "scripts")
+        shutil.copy(ROOT / "scripts/run-rust-tests.sh", root / "scripts")
         (fixture / "generate-materials.sh").write_text("#!/bin/bash\nexit 0\n")
         seed = fixture / "seed"
         seed.mkdir(mode=0o700)
