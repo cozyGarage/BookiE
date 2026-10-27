@@ -9,6 +9,8 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
+import json
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -30,6 +32,34 @@ def ux_function(name, ui):
 
 
 class GtkOwnedBoundaryTests(unittest.TestCase):
+    def test_foreign_mcp_listener_receives_no_fixture_request(self):
+        source = ROOT / "apps/linux/app/tests/gtk_safety.py"
+        tree = ast.parse(source.read_text())
+        node = next(item for item in tree.body if isinstance(item, ast.FunctionDef)
+                    and item.name == "mcp_client_disconnect_cancels_pending_approval")
+        sent = []
+        closed = []
+        client = SimpleNamespace(sendall=sent.append, close=lambda: closed.append(True))
+
+        def refuse(_port):
+            raise AssertionError("foreign listener")
+
+        namespace = dict(json=json, time=time, WAIT_SECONDS=1, POLL_SECONDS=0.01,
+                         MCP_HTTP_PORT=17432, MCP_DISCONNECT_TEST_TOKEN="fixture-only",
+                         storage_dir_name=lambda: "fixture", owned_application=lambda: SimpleNamespace(
+                             assert_owns_tcp_listener=refuse), socket=SimpleNamespace(
+                                 create_connection=lambda *args, **kwargs: client))
+        exec(compile(ast.Module(body=[node], type_ignores=[]), str(source), "exec"), namespace)
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            journal = base / "data/fixture/audit.jsonl"
+            journal.parent.mkdir(parents=True)
+            journal.write_text("")
+            with self.assertRaisesRegex(AssertionError, "foreign listener"):
+                namespace[node.name](None, base)
+        self.assertEqual(sent, [])
+        self.assertEqual(closed, [True])
+
     def fake_file(self, path, mode="r", *args, **kwargs):
         pid = str(path).split("/")[2]
         if str(path).endswith("environ"):
