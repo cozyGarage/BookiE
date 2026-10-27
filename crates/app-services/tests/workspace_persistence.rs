@@ -137,6 +137,66 @@ fn forgetting_a_connection_only_removes_its_own_workspace_and_drafts() {
         WorkspaceTabRecord::Editor { query, .. } if query == &second.to_string()));
 }
 
+#[tokio::test]
+async fn reimporting_a_deleted_connection_rejects_its_old_session_and_allows_a_new_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("workspace.json");
+    let drafts = dir.path().join("drafts");
+    let id = Uuid::new_v4();
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    let old_session = store.connection_save_token(id);
+    store.save_connection(
+        id,
+        ConnectionWorkspaceState {
+            tabs: vec![WorkspaceTabRecord::Editor {
+                query: "SELECT before_delete".into(),
+                draft_id: None,
+                file: None,
+            }],
+            ..Default::default()
+        },
+    );
+    assert_eq!(flush(&store), Ok(()));
+
+    store.forget_connection(id);
+    store.allow_connection_saves(id).await.unwrap();
+    store.save_database_for_session(
+        id,
+        "main",
+        &old_session,
+        ConnectionWorkspaceState {
+            tabs: vec![WorkspaceTabRecord::Editor {
+                query: "SELECT stale_session".into(),
+                draft_id: None,
+                file: None,
+            }],
+            ..Default::default()
+        },
+    );
+    assert_eq!(flush(&store), Ok(()));
+
+    let new_session = store.connection_save_token(id);
+    store.save_database_for_session(
+        id,
+        "main",
+        &new_session,
+        ConnectionWorkspaceState {
+            tabs: vec![WorkspaceTabRecord::Editor {
+                query: "SELECT after_reimport".into(),
+                draft_id: None,
+                file: None,
+            }],
+            ..Default::default()
+        },
+    );
+    assert_eq!(flush(&store), Ok(()));
+
+    let restored = WorkspaceStore::new(Some(path), drafts);
+    restored.prefetch_connections(&[id]).unwrap();
+    let state = restored.load_database(id, "main").unwrap();
+    assert!(matches!(&state.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT after_reimport"));
+}
+
 #[test]
 fn startup_preview_cleanup_preserves_the_selected_kept_tab_on_disk() {
     let dir = tempfile::tempdir().unwrap();

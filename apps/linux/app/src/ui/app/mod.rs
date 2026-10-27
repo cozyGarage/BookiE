@@ -130,6 +130,7 @@ pub struct App {
     databases_list: gtk::ListBox,
     pending_database_switch: Option<(Uuid, String)>,
     connected_database: Option<String>,
+    workspace_save_token: Option<crate::services::workspace_state::WorkspaceSaveToken>,
     health_state: Option<ConnectionHealth>,
     row_op_spinner: gtk::Spinner,
     read_only_badge: gtk::Label,
@@ -565,6 +566,7 @@ impl SimpleComponent for App {
             databases_list: database_switcher::build_database_popover(&widgets.databases_popover, &sender),
             pending_database_switch: None,
             connected_database: None,
+            workspace_save_token: None,
             health_state: None,
             row_op_spinner: widgets.row_op_spinner.clone(),
             read_only_badge: widgets.read_only_badge.clone(),
@@ -973,6 +975,7 @@ impl SimpleComponent for App {
             AppMsg::FavoriteSaveFailed(reason) => self.show_toast(&reason),
             AppMsg::SaveQueryAsFavorite => self.on_save_query_as_favorite(sender),
             AppMsg::ShowSavedQueries => self.on_show_saved_queries(sender),
+            AppMsg::SavedQueriesDialogClosed => self.saved_queries_dialog = None,
             AppMsg::SavedQueriesChanged(saved) => {
                 let ticket = self.favorites_order.begin();
                 self.on_favorites_loaded(ticket, saved);

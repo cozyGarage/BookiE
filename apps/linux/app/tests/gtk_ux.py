@@ -379,6 +379,38 @@ def scenarios(ui):
         assert stored_notes(database) == [(1, "gamma"), (2, "beta")], stored_notes(database)
         ui.wait_for_node(name="1 unsaved change", present=False)
 
+    def closing_editors_removes_their_drafts_and_reopening_restores_sql(database, base):
+        drafts = base / "data" / ui.storage_dir_name() / "drafts"
+        for iteration in range(3):
+            query = f"SELECT 'retired draft é {iteration}'"
+            ui.invoke_accessible_action("win.open-editor")
+            ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+            ui.set_editor_text(query)
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            matches = []
+            while time.monotonic() < deadline:
+                matches = [path for path in drafts.glob("*/*.sql") if path.read_text(encoding="utf-8") == query]
+                if matches:
+                    break
+                time.sleep(ui.POLL_SECONDS)
+            assert len(matches) == 1, "the editor SQL was not saved as one draft"
+            path = matches[0]
+            ui.invoke_accessible_action("win.close-current")
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while path.exists() and time.monotonic() < deadline:
+                time.sleep(ui.POLL_SECONDS)
+            assert not path.exists(), "closing the editor left its SQL draft on disk"
+            if iteration == 2:
+                ui.press_x11_key("t", ("Control_L", "Shift_L"))
+                wait_for_editor_text(query)
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while time.monotonic() < deadline:
+                    matches = [item for item in drafts.glob("*/*.sql") if item.read_text(encoding="utf-8") == query]
+                    if matches:
+                        break
+                    time.sleep(ui.POLL_SECONDS)
+                assert len(matches) == 1, "reopened editor SQL was not saved again"
+
     def closing_and_reopening_an_editor_keeps_its_query(database, base):
         query = "SELECT 'reopened editor query'"
         ui.invoke_accessible_action("win.open-editor")
@@ -967,22 +999,32 @@ GLib.MainLoop().run()
             time.sleep(ui.POLL_SECONDS)
         assert editor_text() == "select b, b from t where b = 1", editor_text()
 
-    def view_value_opens_the_whole_cell_with_pretty_json(database, base):
-        ui.run_sql("""SELECT '{"a":1}' AS payload""")
-        open_cell_menu('{"a":1}')
+    def view_value_preserves_duplicate_json_keys_and_text_formatting(database, base):
+        value = '  {"a":1,"a":2,"n":123456789012345678901234567890.000,"e":1e+004}  '
+        ui.run_sql("SELECT '" + value + "' AS payload")
+        wait_for_result_column("payload")
+        ui.press_x11_key("j", ("Control_L", "Shift_L"))
+        search = ui.wait_for_node(name="Search columns")
+        search.queryEditableText().setTextContents("payload")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Search columns", present=False)
+        wait_for_focused_grid_row(ui, pyatspi, value)
+        ui.press_x11_key("Menu")
+        ui.wait_for_node(role=pyatspi.ROLE_MENU)
         choose_menu_item(4)
         wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
             if any(
-                ui.node_role(node) == pyatspi.ROLE_TEXT and '"a": 1' in text_of(node)
+                ui.node_role(node) == pyatspi.ROLE_TEXT and text_of(node) == value
                 for node in ui.descendants(ui.application_node())
             ):
                 break
             time.sleep(ui.POLL_SECONDS)
         else:
-            raise AssertionError(f"the viewer did not show pretty JSON:\n{ui.accessible_snapshot()}")
+            raise AssertionError(f"the viewer changed the stored text:\n{ui.accessible_snapshot()}")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
+
 
     def explain_plan_window_closes_on_escape(_database, _base):
         ui.run_sql("SELECT 1 AS value")
@@ -1253,7 +1295,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
         saved_connection_action(ui.CONNECTION_NAME, "Group and tags")
-        chooser = ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON)
+        chooser = ui.wait_for_node(name="No colour", role=pyatspi.ROLE_TOGGLE_BUTTON)
         actions = chooser.queryAction()
         assert any(actions.getName(index) == "click" for index in range(actions.nActions)), (
             f"colour chooser has no accessible click action:\n{ui.accessible_snapshot()}"
@@ -1261,8 +1303,8 @@ GLib.MainLoop().run()
         ui.invoke(chooser)
         option = ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(option)
-        ui.wait_for_node(name="No colour", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
-        ui.wait_for_node(name="Blue", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.wait_for_node(name="No colour", role=pyatspi.ROLE_TOGGLE_BUTTON, present=False)
+        ui.wait_for_node(name="Blue", role=pyatspi.ROLE_TOGGLE_BUTTON)
 
     def sql_editor_clickables_all_have_a_keyboard_path(database, base):
         ui.run_sql("SELECT 1 AS alpha")
@@ -2275,12 +2317,13 @@ GLib.MainLoop().run()
         workspace_connection_removal_confirms_once_and_preserves_the_database,
         welcome_connection_removal_confirms_once_and_preserves_the_database,
         find_bar_replaces_every_match_in_the_editor,
-        view_value_opens_the_whole_cell_with_pretty_json,
+        view_value_preserves_duplicate_json_keys_and_text_formatting,
         explain_plan_window_closes_on_escape,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
         browse_edit_cell_and_save_persists_to_the_database,
         closing_and_reopening_a_browse_tab_keeps_it_editable,
+        closing_editors_removes_their_drafts_and_reopening_restores_sql,
         closing_and_reopening_an_editor_keeps_its_query,
         grid_paste_preserves_multiline_text_and_sibling_rows,
         test_connection_reports_success_in_the_dialog,
