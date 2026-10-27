@@ -58,5 +58,7 @@
     "issue_additions_checked": 7,
     "problems": [],
     "additional_direct_node_checks": 2
-  }
+  },
+  "publication_base_commit": "3d236be3d60cdb451efae9f914222c660df28c20",
+  "production_diff_since_source_empty": true
 }

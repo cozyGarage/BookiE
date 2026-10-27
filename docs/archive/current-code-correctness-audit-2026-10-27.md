@@ -2,7 +2,7 @@
 
 ## Source and method
 
-Reviewed GitHub `linux` at `644c74dd34afb35f01c62254b458c12304890573`. The repository had 830 Rust files and 247,731 Rust lines under `crates/` and `apps/`. This is a source-pinned review of the paths below, supported by focused executions. It is not a line-by-line verification of every file or a release qualification.
+Reviewed GitHub `linux` at `644c74dd34afb35f01c62254b458c12304890573`. Before publication, Linux documentation update `3d236be3d` was merged; it changes no production code reviewed here. The repository had 830 Rust files and 247,731 Rust lines under `crates/` and `apps/`. This is a source-pinned review of the paths below, supported by focused executions. It is not a line-by-line verification of every file or a release qualification.
 
 The review compared production call paths, accepted decisions, active documentation, 161 open issues, 18 open PRs and 1,250 Project items captured at the start. It checked competing work before filing findings. Open-PR implementations and the paused SQL Server mask worktree were excluded from claims about merged Linux.
 
