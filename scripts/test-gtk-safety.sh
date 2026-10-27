@@ -16,13 +16,16 @@ if ! python3 -c "import pyatspi" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Always isolate from the desktop bus. A pre-existing session is not a test
-# fixture, and its AT-SPI/portal processes may be tied to another display.
+if [[ "${TABLEPRO_GTK_XVFB_ACTIVE:-0}" != "1" ]]; then
+  exec env TABLEPRO_GTK_XVFB_ACTIVE=1 \
+    xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24 -nolisten tcp" "$ROOT/scripts/test-gtk-safety.sh" "$@"
+fi
+
+# Start the private bus after Xvfb so D-Bus activated accessibility services
+# inherit the test display instead of the desktop systemd user's display.
 if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
   gtk_runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk.XXXXXX")"
   cleanup_gtk_runtime() {
-    # Portal/GVFS services may leave FUSE mounts until their bus-loss handler
-    # runs. Detach only mounts inside this test's private runtime directory.
     if command -v fusermount3 >/dev/null 2>&1; then
       for gtk_mount in "$gtk_runtime/doc" "$gtk_runtime/gvfs"; do
         fusermount3 -uz -- "$gtk_mount" >/dev/null 2>&1 || true
@@ -31,23 +34,21 @@ if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
     rm -rf -- "$gtk_runtime"
   }
   trap cleanup_gtk_runtime EXIT
-  env -u NO_AT_BRIDGE TABLEPRO_GTK_DBUS_ACTIVE=1 XDG_RUNTIME_DIR="$gtk_runtime" \
+  mkdir -p "$gtk_runtime/data/dbus-1/services"
+  printf '[D-BUS Service]\nName=org.a11y.Bus\nExec=/usr/lib/at-spi-bus-launcher\n' \
+    > "$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"
+  env -u NO_AT_BRIDGE TABLEPRO_GTK_DBUS_ACTIVE=1 XDG_DATA_HOME="$gtk_runtime/data" XDG_RUNTIME_DIR="$gtk_runtime" \
     ATSPI_DBUS_IMPLEMENTATION=dbus-daemon XDG_CURRENT_DESKTOP=GNOME \
     dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh" "$@"
   exit $?
-fi
-
-if [[ "${TABLEPRO_GTK_XVFB_ACTIVE:-0}" != "1" ]]; then
-  exec env TABLEPRO_GTK_XVFB_ACTIVE=1 \
-    xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24 -nolisten tcp" "$ROOT/scripts/test-gtk-safety.sh" "$@"
 fi
 
 export GDK_BACKEND=x11
 export GSK_RENDERER=cairo
 export GTK_A11Y=atspi
 unset NO_AT_BRIDGE
-# D-Bus was started before Xvfb assigned DISPLAY/XAUTHORITY. Portal and
-# accessibility activation must inherit the fixture display, not the desktop.
+# Portal and accessibility activation inherit the fixture display from the
+# private bus started after Xvfb.
 dbus-update-activation-environment DISPLAY XAUTHORITY GDK_BACKEND GTK_A11Y
 
 # A bare dbus-run-session does not run a desktop autostart phase. Explicitly
