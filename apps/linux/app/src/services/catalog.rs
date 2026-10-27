@@ -12,42 +12,7 @@ pub struct CatalogOrigin {
     pub identity: ConnectionIdentity,
 }
 
-#[derive(Default)]
-pub struct CatalogChanges {
-    transaction: bool,
-    pending: bool,
-}
-
-impl CatalogChanges {
-    pub fn succeeded(&mut self, sql: &str, driver: &str) -> bool {
-        use tablepro_policy::{CatalogEffect, catalog_effect};
-        match catalog_effect(sql, driver) {
-            CatalogEffect::Begin => {
-                self.transaction = true;
-                false
-            }
-            CatalogEffect::Rollback { chain } => {
-                self.transaction = chain;
-                self.pending = false;
-                false
-            }
-            CatalogEffect::Commit { chain } => {
-                self.transaction = chain;
-                std::mem::take(&mut self.pending)
-            }
-            CatalogEffect::Ddl if self.transaction && !matches!(driver, "mysql" | "clickhouse") => {
-                self.pending = true;
-                false
-            }
-            CatalogEffect::Ddl => {
-                self.transaction = false;
-                self.pending = false;
-                true
-            }
-            CatalogEffect::None => false,
-        }
-    }
-}
+pub use tablepro_app_services::catalog_changes::CatalogChanges;
 
 impl CatalogOrigin {
     pub fn capture(id: Option<Uuid>, database: &DatabaseService) -> Option<Self> {

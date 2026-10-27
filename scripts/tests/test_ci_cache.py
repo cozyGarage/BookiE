@@ -236,6 +236,37 @@ class CiCacheTests(unittest.TestCase):
             if child_pid.exists():
                 os.kill(int(child_pid.read_text()), 15)
 
+    def test_runner_group_cancellation_stops_the_step_and_its_descendants(self):
+        child_pid = self.directory / 'child.pid'
+        shell_pid = self.directory / 'shell.pid'
+        shell = self.directory / 'step.sh'
+        shell.write_text('echo "$$" > "$SHELL_PID"\nsleep 30 &\necho "$!" > "$CHILD_PID"\nwait\n')
+        env = dict(os.environ, CARGO_TARGET_DIR=str(self.cache / 'unit'),
+                   CHILD_PID=str(child_pid), SHELL_PID=str(shell_pid))
+        process = subprocess.Popen(self.command + ['run', str(shell)], env=env,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        try:
+            deadline = time.monotonic() + 5
+            while not child_pid.exists() and process.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.02)
+            self.assertTrue(child_pid.exists(), 'step descendant did not start')
+            os.killpg(process.pid, signal.SIGKILL)
+            process.communicate(timeout=2)
+            with self.lock.open('r+') as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            status = Path(f'/proc/{int(child_pid.read_text())}/stat')
+            self.assertTrue(not status.exists() or status.read_text().split()[2] == 'Z')
+        finally:
+            for pid_file in (child_pid, shell_pid):
+                if pid_file.exists():
+                    try:
+                        os.kill(int(pid_file.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+            if process.poll() is None:
+                process.kill()
+            process.communicate(timeout=5)
+
     def test_termination_reaches_the_shell_and_releases_the_shared_lock(self):
         child_pid = self.directory / 'child.pid'
         shell = self.directory / 'step.sh'
@@ -294,7 +325,11 @@ class CiCacheTests(unittest.TestCase):
             self.assertTrue(checkout_steps, filename)
             for block in checkout_steps:
                 step = block.split('\n      - name:', 1)[0]
-                self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout {0}', step, filename)
+                if 'shell: bash' in step:
+                    preceding = workflow[:workflow.index(step)].rsplit('    runs-on:', 1)[-1]
+                    self.assertIn('build-host', preceding, filename)
+                else:
+                    self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout {0}', step, filename)
                 self.assertLess(step.index('shell:'), step.index('run:'), filename)
 
     def test_missing_or_symlink_lock_fails_closed(self):
