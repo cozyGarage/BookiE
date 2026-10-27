@@ -76,6 +76,7 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 - [Evidence directory index](archive/evidence-index-2026-10-10.md) (October 10 snapshot; current inventory and migration status are in the [evidence-branch proposal](proposals/evidence-branch.md))
 - [Archived evidence packets](archive/evidence/) (dated artifacts retained after reference triage; the separate-branch migration remains a [proposal](proposals/evidence-branch.md), and these files remain in Git)
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
+- [Code audit and client lifetime review, October 27](archive/client-lifetime-review-2026-10-27.md): audit issues by lane, peer fix classes, practices, testing styles and ranked recommendations.
 - [Performance review and first phases, October 22–23](archive/performance-review-2026-10-23.md): measured changes that landed, the remaining performance plan and follow-ups.
 - [Installed native Wayland run, October 23](evidence/installed-wayland-0.2.0-2026-10-23/README.md): oracle-checked end-to-end flows on Hyprland and the defects filed from them.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
@@ -88,6 +89,8 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 - [Current Linux PostgreSQL streaming workload, October 24](evidence/postgres-stream-current-2026-10-24/README.md): exact-head ten-column query, repeated bounded-memory measurements, and cancellation/session-recovery outcomes.
 - [Native Wayland PostgreSQL streaming profile, October 25](evidence/postgres-stream-native-wayland-2026-10-25/README.md): source-built release run on Omarchy, memory samples, and the observed retained-row range.
 - [Multi-editor stream ownership profile, October 26](evidence/stream-retention-multi-owner-2026-10-26/README.md): synthetic two-editor and cancelled export-page sample, with the RSS/allocator limitation stated.
+- [File chooser action race, October 26](evidence/file-chooser-action-race-2026-10-26/README.md): bounded retry and keyboard fallback when a transient accessibility action disappears.
+- [Editor buffer and input-context teardown, October 26](evidence/editor-buffer-release-2026-10-26/README.md): object retention with the default input method, heap allocation reports and editor shutdown regressions.
 - [Editor lifetime acceptance, October 26](evidence/editor-lifetime-acceptance-2026-10-26/README.md): experimental-fix keyboard, scale-2 and repeated Vim editor-close checks, with source and binary identity.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
 - [GitHub merge-order screening, October 25](evidence/merge-order-audit-2026-10-25/README.md): a dated 190-PR screen for merge-before-check completion, with exact observed candidate timestamps and limitations; it does not establish Forgejo outcomes.

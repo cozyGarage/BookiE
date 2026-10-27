@@ -13,7 +13,7 @@ The only path a consumer may hold to a live database. Token scopes and connectio
 - Wrapping a driver `Connection` in `PolicyGuard` before the GUI, MCP or `bookie-agentd` issues a handle to a consumer.
 - Per-statement order: classify, evaluate rules, request approval when required, write required audit intent, execute, mask eligible consumer results, then write the terminal audit outcome.
 - Optional session query cursors for one read statement in a read-only snapshot. `PolicyGuard` authorizes once, masks each page, and records page and terminal outcomes under one operation. PostgreSQL is the only driver that supports cursors; the SQL editor uses this path for supported single-statement PostgreSQL `SELECT`s.
-- MCP token scopes (`tools:read` / `tools:write` via `TokenPermissions`), per-token rate limits and connection allowlists.
+- MCP token scopes (`tools_read` / `tools_write`; stored tokens hold `read_only` / `read_write` permissions), per-token rate limits and connection allowlists.
 - MCP tool safety annotations and structured operation/transaction outcomes for tool errors.
 - Preview, transaction, retry and batch paths using the same rule, approval, intent and audit pipeline as direct execution. Session mode skips the shared-connection short-circuit.
 - Backup and restore through explicit guarded administrative operations, with restore approval and unknown-outcome handling after dispatch.
@@ -141,7 +141,7 @@ Terminal audit states: `succeeded`, `failed`, `denied`, `cancelled`, `timed_out`
 
 - The system MUST wrap every issued consumer-facing database handle in `PolicyGuard`.
 - MCP and `bookie-agentd` MUST NOT expose a raw driver connection through `ConnectionProvider`.
-- Preview, transaction, retry and batch paths MUST use the same rule, approval, intent and audit pipeline as direct execution. Session statements MAY skip `shared_connection_decision`.
+- Preview, transaction, retry and batch paths MUST use the same rule, approval, intent and audit pipeline as direct execution. Session statements MAY skip `shared_connection_decision`. Known gap: inside a session or transaction the blast-radius count runs on the shared pool, not the session ([#1726](https://github.com/cozyGarage/BookiE/issues/1726)).
 - `PolicyGuard::begin` and `begin_controlled` are transaction setup calls. They are allowed for read-only connections and agent principals, do not create a standalone audit event, and do not grant SQL authority. Each statement inside the transaction MUST pass the same policy and audit checks as a direct statement. Commit and rollback retain their transaction audit outcomes.
 
 ### MCP checks
@@ -153,7 +153,7 @@ Terminal audit states: `succeeded`, `failed`, `denied`, `cancelled`, `timed_out`
 ### Audit
 
 - Denied, failed, cancelled and timed-out operations MUST produce the matching terminal audit state.
-- Operations with uncertain post-dispatch outcomes MUST be recorded as `unknown`; the client MUST NOT imply safe retry or replay.
+- Operations with uncertain post-dispatch outcomes MUST be recorded as `unknown`; the client MUST NOT imply safe retry or replay. Known gap: CSV bulk import records an ambiguous batch failure as `failed` ([#1720](https://github.com/cozyGarage/BookiE/issues/1720)).
 - Audit failure MUST NOT open a path around policy.
 
 ## Invariants

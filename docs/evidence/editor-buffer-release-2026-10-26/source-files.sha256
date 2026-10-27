@@ -1,0 +1,4 @@
+5fbb30d0d1148845de04f9d43ec3a8638f58a8bacd3ba4ae0d3b185a752b0062  apps/linux/app/src/ui/editor/mod.rs
+e9994bfcba18338b539263299b26032ad81e03bb36b1b71757bd55d31cf22ec0  apps/linux/app/src/ui/editor/split_view.rs
+91c1dab129930f2e45b3b834986d7d90b1665d27404e73f1dc487e87aadcc4f4  apps/linux/app/src/ui/editor/dispatch_tests.rs
+0e1a0594e9796872c30f70dc1846c5b44c3a8328d138d677966dc5401dd13f12  scripts/isolated-tests.json
