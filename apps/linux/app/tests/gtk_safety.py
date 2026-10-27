@@ -22,6 +22,7 @@ import gtk_ux
 import gtk_active_edit
 import gtk_editor_panel
 import gtk_csv_refresh
+import gtk_structure
 import gtk_input
 import gtk_runner
 import gtk_shard
@@ -566,11 +567,11 @@ def show_file_chooser_location(chooser):
         for node in descendants(chooser):
             try:
                 actions = node.queryAction()
+                for index in range(actions.nActions):
+                    if actions.getName(index) == "show_location" and actions.doAction(index):
+                        return
             except Exception:
                 continue
-            for index in range(actions.nActions):
-                if actions.getName(index) == "show_location" and actions.doAction(index):
-                    return
         time.sleep(POLL_SECONDS)
     press_x11_key("l", ("Control_L",))
 
@@ -2825,6 +2826,7 @@ def main():
     scenarios.extend(gtk_active_edit.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_structure.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
     if selected:
         names = set(selected.split(","))

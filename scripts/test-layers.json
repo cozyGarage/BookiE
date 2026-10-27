@@ -296,7 +296,7 @@
       ]
     },
     "gtk-clickhouse": {
-      "purpose": "Installed GTK Enum16 grid edit against a native ClickHouse fixture",
+      "purpose": "Installed GTK Enum16 grid edit and Structure metadata notices against ClickHouse",
       "prerequisites": "GTK 4.24; Docker with clickhouse/clickhouse-server:24.8; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
       "hosted_gate": "Local release gate",
       "steps": [

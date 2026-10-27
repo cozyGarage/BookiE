@@ -1,0 +1,89 @@
+[
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "initial",
+    "monotonic": 525989.92823256,
+    "rss_kib": 177604,
+    "peak_rss_kib": 177604,
+    "cpu_ticks": 97
+  },
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "batch-1-complete",
+    "monotonic": 526012.270184171,
+    "rss_kib": 204220,
+    "peak_rss_kib": 204220,
+    "cpu_ticks": 1044
+  },
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "batch-2-complete",
+    "monotonic": 526038.322678217,
+    "rss_kib": 238524,
+    "peak_rss_kib": 238524,
+    "cpu_ticks": 2154
+  },
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "batch-3-complete",
+    "monotonic": 526062.960333033,
+    "rss_kib": 271804,
+    "peak_rss_kib": 271804,
+    "cpu_ticks": 3124
+  },
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "batch-4-complete",
+    "monotonic": 526088.29838419,
+    "rss_kib": 284064,
+    "peak_rss_kib": 284064,
+    "cpu_ticks": 4155
+  },
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "batch-5-complete",
+    "monotonic": 526115.130940915,
+    "rss_kib": 296256,
+    "peak_rss_kib": 296256,
+    "cpu_ticks": 5355
+  },
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "batch-6-complete",
+    "monotonic": 526142.077390338,
+    "rss_kib": 309612,
+    "peak_rss_kib": 309612,
+    "cpu_ticks": 6492
+  },
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "idle-start",
+    "monotonic": 526142.077739381,
+    "rss_kib": 309612,
+    "peak_rss_kib": 309612,
+    "cpu_ticks": 6492
+  },
+  {
+    "application_pid": 3892770,
+    "application_start_ticks": 52598811,
+    "phase": "idle-end",
+    "monotonic": 526157.078162345,
+    "rss_kib": 309540,
+    "peak_rss_kib": 309540,
+    "cpu_ticks": 6512
+  },
+  {
+    "phase": "idle-summary",
+    "seconds": 15.000422963988967,
+    "cpu_seconds": 0.2,
+    "one_core_percent": 1.3332957375944237
+  }
+]

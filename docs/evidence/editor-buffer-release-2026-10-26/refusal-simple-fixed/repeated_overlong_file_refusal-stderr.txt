@@ -1,0 +1,308 @@
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-26T18:23:10.316897Z  INFO starting tablepro-app drivers=7
+2026-10-26T18:23:10.316967Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+2026-10-26T18:23:10.317218Z  INFO system OpenSSH connections are unavailable error=ssh: the tablepro-askpass helper is not installed
+
+(com.tablepro.linux:3892770): Gdk-WARNING **: 19:23:10.670: Cannot get portal org.freedesktop.portal.Inhibit version: GDBus.Error:org.freedesktop.DBus.Error.InvalidArgs: No such interface “org.freedesktop.portal.Inhibit”
+2026-10-26T18:23:10.684070Z  INFO registered win.disconnect enabled=false
+2026-10-26T18:23:10.694558Z  INFO main window activated
+2026-10-26T18:23:11.177704Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:12.709: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:12.710: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): Gdk-WARNING **: 19:23:12.721: Cannot get portal org.freedesktop.portal.FileChooser version: GDBus.Error:org.freedesktop.DBus.Error.InvalidArgs: No such interface “org.freedesktop.portal.FileChooser”
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:12.756: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:12.774: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:12.775: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:12.775: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:12.775: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:12.777: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:13.645: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:21.070: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:21.071: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:21.104: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:21.104: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:21.104: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:21.105: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:21.106: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:21.106: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:29.788: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:29.788: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:29.819: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:29.819: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:29.819: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:29.821: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:29.821: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:29.823: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+2026-10-26T18:23:34.246073Z  INFO script run complete n_ok=1 n_err=0 total_ms=0
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:38.483: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:38.483: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:38.518: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:38.518: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:38.518: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:38.520: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:38.521: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:38.521: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:47.241: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:47.241: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:47.270: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:47.270: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:47.271: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:47.271: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:47.271: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:47.272: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:56.074: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:56.076: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:56.106: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:56.106: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:56.106: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:56.108: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:56.109: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:23:56.109: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+2026-10-26T18:24:00.503083Z  INFO script run complete n_ok=1 n_err=0 total_ms=0
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:04.754: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:04.754: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:04.769: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:04.770: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:04.770: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:04.770: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:04.770: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:04.770: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:13.262: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:13.263: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:13.277: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:13.277: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:13.277: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:13.278: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:13.279: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:13.279: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:21.604: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:21.604: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:21.620: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:21.620: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:21.620: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:21.621: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:21.621: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:21.621: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+2026-10-26T18:24:25.222995Z  INFO script run complete n_ok=1 n_err=0 total_ms=0
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:29.954: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:29.954: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:29.972: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:29.972: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:29.972: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:29.972: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:29.972: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:29.973: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:38.332: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:38.332: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:38.347: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:38.347: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:38.347: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:38.348: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:38.348: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:38.348: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:46.822: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:46.822: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:46.853: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:46.853: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:46.853: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:46.855: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:46.855: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:46.855: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+2026-10-26T18:24:50.549733Z  INFO script run complete n_ok=1 n_err=0 total_ms=0
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:55.231: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:55.232: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:55.264: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:55.264: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:55.264: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:55.266: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:55.266: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:24:55.267: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:04.023: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:04.024: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:04.055: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:04.055: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:04.055: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:04.057: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:04.057: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:04.058: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:12.849: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:12.850: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:12.884: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:12.884: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:12.884: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:12.886: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:12.886: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:12.887: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+2026-10-26T18:25:17.369916Z  INFO script run complete n_ok=1 n_err=0 total_ms=0
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:21.816: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:21.817: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:21.849: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:21.849: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:21.849: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:21.852: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:21.852: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:21.852: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:30.688: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:30.689: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:30.718: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:30.718: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:30.718: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:30.720: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:30.720: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:30.720: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:39.279: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:39.280: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:39.324: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:39.324: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:39.325: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:39.331: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:39.332: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:3892770): GVFS-WARNING **: 19:25:39.332: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-repeated_overlong_file_refusal-9tfsftto/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+2026-10-26T18:25:44.267925Z  INFO script run complete n_ok=1 n_err=0 total_ms=4
