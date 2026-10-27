@@ -2,30 +2,41 @@
   "issue": 1744,
   "base": "887678414",
   "source_sha256": {
-    "apps/linux/app/src/ui/grid/value_viewer.rs": "db1222fbef9270d7c272683d622194a8b82d9da64471fca7b021a6784e610d68",
+    "apps/linux/app/src/ui/grid/value_viewer.rs": "fe1f99054552712867ca6e0d0c64315dc64a5a62a636e66c0d2654a43863eac6",
+    "apps/linux/app/src/ui/grid/context_menu.rs": "f4f0c1b47b58a81df727da1bf331052909abd55279d6e5efbc0b96a23526907a",
+    "apps/linux/app/src/ui/grid/mod.rs": "d5a88eb16c6dfed31ee62613fdbf8346addbcea14e1505ec1b3499695708d5a1",
+    "apps/linux/app/src/ui/browse_tab/value_view.rs": "67e09433d6ffcdc81a6b3460f90c57bcce94b4cff80f38fb221a2cae427bb007",
     "apps/linux/app/tests/gtk_ux.py": "845b94131ac9ca844e106c9c514e57da1293e76fd0174408e457c5e36d9e51b4"
   },
-  "negative_control": "new duplicate-key regression failed on original implementation",
-  "focused_validation": "8 pure viewer tests passed; 64 MiB fixture extra peak KiB: Text 4444, JsonText 4360, UTF-8 Bytes 4636",
+  "negative_control": "duplicate-key regression failed on the original text-to-JSON parsing implementation",
+  "focused_validation": "9 pure value-viewer tests passed; 64 MiB fixture extra peak KiB: Text 4172, JsonText 4300, UTF-8 Bytes 4628, typed JSON 7380",
   "pending": [
-    "repeat the installed value scenario with a working BookiE AT-SPI application entry"
+    "Forgejo acceptance gate after active gates drain"
   ],
-  "forgejo": "pending; run the PR gate after GitHub readiness checks pass",
+  "forgejo": "pending; other Forgejo gate processes are active, so this branch has not been queued yet",
   "validation": {
-    "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
-    "app_clippy": "passed",
-    "installed_e2e": "view_value_preserves_duplicate_json_keys_and_text_formatting passed using keyboard menu navigation",
-    "gtk_widgets": "179 isolated tests passed"
-  },
-  "installed_binary_sha256": "3979eae00a9d0e64130caf9d6d9ac178a789ceef4f414920bd6ff864a42b5acc",
-  "allocation_negative_control": "baseline 9e415fdf5 failed: Text added 69968 KiB peak RSS",
-  "allocation_follow_up": {
-    "preflight": "passed: 2208 unit, 291 sandbox, 1 Redis check",
-    "app_clippy": "passed",
-    "gtk_widgets": "passed: 179 isolated tests on fixed Xvfb display 207, 1600x1200",
+    "preflight": "passed: 2208 unit tests, 291 sandbox tests, 1 Redis check; all preflight guards and non-GTK Clippy passed",
+    "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings",
+    "gtk_widgets": "passed: 179 isolated widget tests on fixed Xvfb display :207 at 1600x1200",
     "viewer_widget": "passed: the_viewer_dialog_builds_and_shows_the_full_value",
-    "installed_e2e": "incomplete: app started and activated its main window, but AT-SPI exposed only xdg-desktop-portal-gtk",
-    "status": "not acceptance-gated",
-    "local_full_ci": "passed: 3012 workspace unit, 291 sandbox, 1 Redis check"
-  }
+    "installed_e2e": "passed: view_value_preserves_duplicate_json_keys_and_text_formatting on rebuilt CI-profile app under private D-Bus/Xvfb"
+  },
+  "installed_binary_sha256": "e6275e72749be1279b7564f9b1ecad0d9e3f05ab253e5f7547b2455527b761e6",
+  "allocation_negative_control": "baseline 9e415fdf5: 64 MiB Text fixture added 69968 KiB peak RSS before the preview cap",
+  "allocation_follow_up": {
+    "preflight": "passed: 2208 unit tests, 291 sandbox tests, 1 Redis check; all preflight guards and non-GTK Clippy passed",
+    "app_clippy": "passed: cargo clippy -p tablepro-app --all-targets -- -D warnings",
+    "gtk_widgets": "passed: 179 isolated widget tests on fixed Xvfb display :207 at 1600x1200",
+    "viewer_widget": "passed: the_viewer_dialog_builds_and_shows_the_full_value",
+    "installed_e2e": "passed: view_value_preserves_duplicate_json_keys_and_text_formatting on rebuilt CI-profile app under private D-Bus/Xvfb",
+    "measured_extra_peak_kib": {
+      "Text": 4172,
+      "JsonText": 4300,
+      "UTF-8 Bytes": 4628,
+      "typed JSON": 7380
+    },
+    "allocation_limit_kib": 16384,
+    "status": "local validation passed; Forgejo acceptance pending"
+  },
+  "typed_json_negative_control": "before bounded serialization: 64 MiB typed JSON fixture added 70924 KiB peak RSS; the added regression failed"
 }
