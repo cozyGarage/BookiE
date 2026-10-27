@@ -1,0 +1,23 @@
+{
+  "issue": 1730,
+  "fixed_commit": "dc43afe42",
+  "source_sha256": {
+    "crates/app-services/src/workspace_state.rs": "828017087c355ae471dcd0ca3fd4a4fc67a795223c03e324438a439cf3babad7",
+    "crates/app-services/src/workspace_state/tests.rs": "9add581744c691586bcd342e3ffa833ad15416cb9223d7736bd5172825c51b9a"
+  },
+  "public_late_save_regression": {
+    "before": "failed: deleted workspace was recreated",
+    "after": "passed"
+  },
+  "workspace_state_tests": {
+    "passed": 38,
+    "failed": 0
+  },
+  "writer_batch_test": "passed: batch taken before deletion marker, then resumed under file lock",
+  "pending": [
+    "full preflight",
+    "unrelated-connection preservation regression",
+    "writer-filter negative control"
+  ],
+  "forgejo": "deferred by maintainer during infrastructure migration"
+}
