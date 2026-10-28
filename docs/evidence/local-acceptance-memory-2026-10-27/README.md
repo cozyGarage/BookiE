@@ -35,3 +35,13 @@ All fifteen failed scenarios subsequently passed in one fresh private Xvfb/D-Bus
 A retry-free installed-app run on source `0beff380a3069de3324071d0f0dfa96f6624a4a9` passed all 24 selected file-close and active-cell-edit scenarios in one private Xvfb/D-Bus session. Coverage includes Save, Discard, Cancel, closing an inactive tab, closing other tabs or tabs to the right, disconnect, window close and save-before-quit. File and database assertions verified persisted or preserved contents, and the dirty-file Discard case verified a usable empty workspace through an actual click and subsequent query.
 
 [Scenario results](close-sequence-results.txt) retain durations; [run identity](close-sequence-results.json) records the source and executable hash. The save-before-quit case passed in 3.073 seconds. This selected run does not certify the complete acceptance suite, native Wayland interaction or absence of the intermittent failure. Issue #1333 remains open, and the earlier failed full run remains failed.
+
+## Installed security follow-up
+
+Eight selected approval and audit scenarios passed without retries on the same installed executable recorded in [security run identity](security-results.json). [Results](security-results.txt) cover malformed SQL refusal before approval, human approval for an unparseable routine, dismissal denial, MCP disconnect cancellation, audit-failure denial, denial after audit-journal loss, and sanitized bundle import/export audit outcomes. This selected local run does not replace driver, package or Forgejo acceptance.
+
+## SQL Server consumer startup failure
+
+Forgejo run #1076 (API 1083), Linux source `daa99fbadc3157d7b8a5c67f6e65cf3d50703a14`, failed consumers job 29967 before policy assertions: `sql_server_batches_with_mutations_are_classified_and_denied_before_dispatch` received `WaitContainer(StartupTimeout)` at `crates/policy/tests/session_mssql.rs:116`. The sibling SQL Server test passed. The two unchanged policy integration tests then passed locally without retries, 2/2 in 21.25 seconds. Policy and driver source files match the failed source; the local checkout was `0beff380a3069de3324071d0f0dfa96f6624a4a9`.
+
+The policy fixtures use the default 60-second startup log wait. The driver fixture uses 180 seconds and an authenticated readiness query. This inconsistency does not prove that the failed runner was merely slow. The failed-container state and logs are needed to distinguish recovery delays, resource exhaustion and an exited server. [Issue #1825](https://github.com/cozyGarage/BookiE/issues/1825) owns diagnosis and acceptance. No timeout or policy assertion was changed; the failed Forgejo job remains unaccepted.

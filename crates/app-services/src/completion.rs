@@ -4,11 +4,11 @@ use std::{
     time::Duration,
 };
 
-use tablepro_core::sql_syntax::script::LexicalSettings;
+use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
 use tablepro_core::{Connection, OperationControl, Session, sql_syntax::SqlGrammar};
 use tokio_util::sync::CancellationToken;
 
-use super::completion_identifiers::{bare_reference, split_table_reference, table_key, words};
+use super::completion_identifiers::{bare_reference, normalized, split_table_reference, table_key, words};
 
 pub const SQL_KEYWORDS: &str = "\
 SELECT FROM WHERE INSERT INTO VALUES UPDATE SET DELETE \
@@ -25,11 +25,28 @@ pub struct SchemaIndex {
     tables: Vec<String>,
     table_keys: HashSet<String>,
     table_grammar: Option<SqlGrammar>,
+    filter_keys: std::cell::RefCell<Option<FilterKeys>>,
     pub columns: HashMap<String, Vec<String>>,
     pub grammar: Option<SqlGrammar>,
     connection: Option<crate::connection_identity::ConnectionIdentity>,
     generation: u64,
     requests: ColumnRequests,
+}
+
+#[derive(Clone, Copy, Default)]
+struct Narrowing<'a> {
+    table_prefix: Option<&'a str>,
+    plan: Option<&'a ScriptPlan>,
+}
+
+struct FilterKeys {
+    grammar: Option<SqlGrammar>,
+    entries: Vec<FilterKey>,
+}
+
+struct FilterKey {
+    full: String,
+    unqualified: Option<String>,
 }
 
 #[derive(Default)]
@@ -97,6 +114,37 @@ impl SchemaIndex {
             }
         }
         self.tables = tables;
+        self.filter_keys.replace(None);
+    }
+
+    fn tables_matching(&self, prefix: Option<&str>) -> Vec<String> {
+        let Some(prefix) = prefix else {
+            return self.tables.clone();
+        };
+        let mut cache = self.filter_keys.borrow_mut();
+        if cache.as_ref().is_some_and(|keys| keys.grammar != self.grammar) {
+            *cache = None;
+        }
+        let keys = cache.get_or_insert_with(|| FilterKeys {
+            grammar: self.grammar,
+            entries: self
+                .tables
+                .iter()
+                .map(|table| FilterKey {
+                    full: normalized(table),
+                    unqualified: split_table_reference(table, self.grammar).map(|(_, name)| normalized(&name)),
+                })
+                .collect(),
+        });
+        let entries = &keys.entries;
+        self.tables
+            .iter()
+            .zip(entries)
+            .filter(|(_, key)| {
+                key.full.starts_with(prefix) || key.unqualified.as_deref().is_some_and(|name| name.starts_with(prefix))
+            })
+            .map(|(table, _)| table.clone())
+            .collect()
     }
 
     pub fn invalidate_columns(&mut self) {
@@ -109,6 +157,7 @@ impl SchemaIndex {
         self.generation = self.generation.wrapping_add(1);
         self.tables.clear();
         self.table_keys = HashSet::new();
+        self.filter_keys.replace(None);
         self.columns.clear();
         self.grammar = None;
         self.connection = None;
@@ -124,6 +173,7 @@ impl SchemaIndex {
         self.connection = Some(connection.clone());
         self.tables.clear();
         self.table_keys = HashSet::new();
+        self.filter_keys.replace(None);
         self.columns.clear();
         self.retire_column_requests();
         true
@@ -307,7 +357,15 @@ fn bare_name(key: &str) -> &str {
 
 #[cfg(test)]
 fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Vec<String> {
-    candidates(sql, cursor_byte, index, None, true, str::to_string)
+    candidates(
+        sql,
+        cursor_byte,
+        index,
+        None,
+        true,
+        Narrowing::default(),
+        str::to_string,
+    )
 }
 
 pub(super) fn candidate_sql(
@@ -315,6 +373,8 @@ pub(super) fn candidate_sql(
     cursor_byte: usize,
     index: &SchemaIndex,
     settings: Option<LexicalSettings>,
+    table_prefix: Option<&str>,
+    plan: Option<&ScriptPlan>,
 ) -> Vec<String> {
     let driver = match index.grammar {
         Some(SqlGrammar::MySql) => "mysql",
@@ -322,13 +382,20 @@ pub(super) fn candidate_sql(
         Some(SqlGrammar::ClickHouse) => "clickhouse",
         _ => "postgres",
     };
-    candidates(sql, cursor_byte, index, settings, false, |column| {
+    let narrowing = Narrowing { table_prefix, plan };
+    candidates(sql, cursor_byte, index, settings, false, narrowing, |column| {
         tablepro_core::sql_dialect::quote_ident(driver, column)
     })
 }
 
-pub(super) fn scope_at(sql: &str, cursor: usize, index: &SchemaIndex, settings: Option<LexicalSettings>) -> Scope {
-    let statement = statement_around(sql, cursor, index.grammar, settings);
+pub(super) fn scope_at(
+    sql: &str,
+    cursor: usize,
+    index: &SchemaIndex,
+    settings: Option<LexicalSettings>,
+    plan: Option<&ScriptPlan>,
+) -> Scope {
+    let statement = statement_around(sql, cursor, index.grammar, settings, plan);
     scope_for(&statement.text[..statement.cursor], statement.text, index, settings)
 }
 
@@ -338,9 +405,11 @@ fn candidates(
     index: &SchemaIndex,
     settings: Option<LexicalSettings>,
     bare_tables: bool,
+    narrowing: Narrowing,
     column_sql: impl Fn(&str) -> String,
 ) -> Vec<String> {
-    let statement = statement_around(sql, cursor_byte, index.grammar, settings);
+    let Narrowing { table_prefix, plan } = narrowing;
+    let statement = statement_around(sql, cursor_byte, index.grammar, settings, plan);
     let prefix = &statement.text[..statement.cursor];
     let scope = scope_for(prefix, statement.text, index, settings);
     let mut out: Vec<String> = Vec::new();
@@ -352,7 +421,7 @@ fn candidates(
             }
         }
         Scope::Tables => {
-            out.extend(index.tables.iter().cloned());
+            out.extend(index.tables_matching(table_prefix));
             if bare_tables {
                 out.extend(bare_table_names(&index.tables, index.grammar));
             }
@@ -368,7 +437,7 @@ fn candidates(
                     out.extend(columns.iter().map(|column| column_sql(column)));
                 }
             }
-            out.extend(index.tables.iter().cloned());
+            out.extend(index.tables_matching(table_prefix));
             if bare_tables {
                 out.extend(bare_table_names(&index.tables, index.grammar));
             }
@@ -390,7 +459,7 @@ pub fn referenced_tables_with(
     grammar: Option<SqlGrammar>,
     settings: Option<LexicalSettings>,
 ) -> Vec<String> {
-    let statement = statement_around(sql, cursor_byte, grammar, settings);
+    let statement = statement_around(sql, cursor_byte, grammar, settings, None);
     table_references(statement.text, grammar, settings)
         .into_iter()
         .map(|(table, _)| table)
@@ -409,14 +478,17 @@ struct StatementSpan<'a> {
     cursor: usize,
 }
 
-fn statement_around(
-    sql: &str,
+fn statement_around<'a>(
+    sql: &'a str,
     cursor_byte: usize,
     grammar: Option<SqlGrammar>,
     settings: Option<LexicalSettings>,
-) -> StatementSpan<'_> {
+    plan: Option<&ScriptPlan>,
+) -> StatementSpan<'a> {
     let cursor = floor_char_boundary(sql, cursor_byte.min(sql.len()));
-    let range = grammar.map_or(0..sql.len(), |grammar| statement_range(sql, cursor, grammar, settings));
+    let range = grammar.map_or(0..sql.len(), |grammar| {
+        statement_range(sql, cursor, grammar, settings, plan)
+    });
     StatementSpan {
         text: &sql[range.start..range.end],
         cursor: cursor - range.start,
@@ -428,8 +500,16 @@ fn statement_range(
     cursor: usize,
     grammar: SqlGrammar,
     settings: Option<LexicalSettings>,
+    plan: Option<&ScriptPlan>,
 ) -> std::ops::Range<usize> {
-    let plan = super::completion_identifiers::plan_with(sql, Some(grammar), settings);
+    let built;
+    let plan = match plan {
+        Some(plan) => plan,
+        None => {
+            built = super::completion_identifiers::plan_with(sql, Some(grammar), settings);
+            &built
+        }
+    };
     let statements = plan.statements();
     let following = statements.partition_point(|statement| statement.range.start <= cursor);
     let next_end = statements
@@ -449,7 +529,7 @@ fn statement_range(
     current.range.start..current.range.end.max(cursor)
 }
 
-fn floor_char_boundary(text: &str, mut index: usize) -> usize {
+pub(super) fn floor_char_boundary(text: &str, mut index: usize) -> usize {
     while index > 0 && !text.is_char_boundary(index) {
         index -= 1;
     }

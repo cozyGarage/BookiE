@@ -1,4 +1,5 @@
 import importlib.util
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -95,6 +96,40 @@ class DocLinkTests(unittest.TestCase):
             files = checker.markdown_files(root)
             self.assertIn(source, files)
             self.assertNotIn(generated, files)
+
+    def test_ignored_arch_vendor_markdown_is_excluded_but_new_docs_are_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".gitignore").write_text("apps/linux/packaging/arch/src/\n")
+            tracked = root / "docs/tracked.md"
+            tracked.parent.mkdir(parents=True)
+            tracked.write_text("[target](target.md)\n")
+            (root / "docs/target.md").write_text("target\n")
+            for args in [
+                ["init", "-q"],
+                ["config", "user.name", "Fixture"],
+                ["config", "user.email", "fixture@example.invalid"],
+                ["add", ".gitignore", "docs/tracked.md", "docs/target.md"],
+                ["commit", "-qm", "fixture"],
+            ]:
+                subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+            new_doc = root / "docs/new.md"
+            new_doc.write_text("[missing](missing.md)\n")
+            vendor_doc = root / "apps/linux/packaging/arch/src/TablePro/cargo-vendor/crate/README.md"
+            vendor_doc.parent.mkdir(parents=True)
+            vendor_doc.write_text("[third party link](missing-vendor.md)\n")
+
+            files = checker.markdown_files(root)
+            self.assertEqual(set(files), {tracked, root / "docs/target.md", new_doc})
+            self.assertEqual(checker.broken_links(root, files), [(new_doc, "missing.md")])
+
+    def test_markdown_files_remain_discoverable_without_git_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "docs/source.md"
+            source.parent.mkdir(parents=True)
+            source.write_text("[missing](missing.md)\n")
+            self.assertEqual(checker.markdown_files(root), [source])
 
     def test_flatpak_cache_links_are_skipped_while_source_errors_are_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
