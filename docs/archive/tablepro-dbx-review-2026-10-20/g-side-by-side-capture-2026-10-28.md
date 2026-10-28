@@ -11,7 +11,7 @@ Dated capture. It records what four database clients showed on the same PostgreS
 | Beekeeper Studio | 6.1.6 (installed package) | `--user-data-dir` in a scratch directory, Wayland |
 | dbx | 0.6.58 AppImage, SHA-256 matched the digest GitHub lists for the release asset | Isolated `HOME`/`XDG_*`, `--appimage-extract-and-run` |
 
-Not captured: **DBeaver 26.2.3** (Community tarball, SHA-256 matched). The first launch ignored the isolated `HOME` and opened the maintainer's real workspace, then failed because no X server answered on `DISPLAY=:0`; it changed only that workspace's metadata and log files. A second, isolated launch showed no window within about 55 seconds and was stopped. Also not run: the macOS TablePro app (macOS only); see [c-tablepro-macos-ux.md](c-tablepro-macos-ux.md) for its source-based review.
+DBeaver was not captured in this first run (its launch problems and the later successful run are in the addendum). Not run: the macOS TablePro app (macOS only); see [c-tablepro-macos-ux.md](c-tablepro-macos-ux.md) for its source-based review.
 
 Data was a PostgreSQL 18 container with `shop.customers` (50 rows), `shop.orders`, a table with 34 PostgreSQL types including edge values, and `public.big` (1,000,000 rows, five columns). All windows were about 920 px wide, so wide-window behaviour is not covered. Screenshots were taken with `grim` and stay in the maintainer's scratch directory; none are committed.
 
@@ -74,4 +74,38 @@ This is input for the issues, not a decision.
 
 ## Not covered
 
-DBeaver; wide windows; light theme; keyboard and screen-reader behaviour of the other clients; editing, import and export flows; MySQL, SQLite and the other engines in the other clients.
+Wide windows (the addendum adds 1,400 px); light theme; keyboard and screen-reader behaviour of the other clients; editing, import and export flows; MySQL, SQLite and the other engines in the other clients.
+
+## Addendum: DBeaver, DbGate, Antares and BookiE at 1400 × 900
+
+A second run on the same database, later the same day. Clients were driven in an isolated Xvfb display with private `HOME` and `XDG_*` directories and a throwaway fixture login; downloads were checked against published digests. Screenshots and scroll GIFs (BookiE's stream GIF included) stay in the maintainer's scratch directory (`~/Projects/.scratch/peer-ui/shots/`); none are committed. The host was heavily loaded (load 11 to 26 on 16 CPUs), so times below are indicative only.
+
+| Client | Version and source |
+|---|---|
+| DBeaver Community | 26.2.3 tarball, SHA-256 matched. The earlier launch that opened the real workspace was repeated with the profile isolated |
+| DbGate Community | 7.3.3 AppImage |
+| Antares SQL | 0.7.35 AppImage |
+| BookiE | `linux` at the time of the run, debug build, keyring provided by `gnome-keyring-daemon` inside `dbus-run-session` |
+
+### Which is better, by screen
+
+Row pitch is read off the 1,400 px screenshots and approximate.
+
+| Screen | Best here | Why | BookiE gap |
+|---|---|---|---|
+| Connect | DbGate, Antares | Pick an engine, fill one form, Test, Save. DBeaver's wizard has four pages and downloads a driver on first use. | BookiE's first run needs a keyring; with none, Import failed silently and the later connect failed because the password was not kept. A visible message is missing |
+| Sidebar | DBeaver for depth, DbGate for scan | DBeaver shows Tables, Foreign Tables, Views, Materialized Views, Indexes, Functions, Sequences and Data types with sizes. DbGate shows a size next to each table, a schema filter and a search box. Antares shows size pies | BookiE rows are about 48 px tall against 18 (DBeaver), 25 (DbGate) and 23 (Antares), so about a third as many tables fit; names truncate (`custom...`); no sizes |
+| Table data | DbGate | A filter box under every column header, a column checklist, Structure / SQL / Export / Switch to form in one row | The filter panel takes about 230 px of height before the first row; the grid row is about 35 px. 13 rows are visible against 30 or more elsewhere |
+| SQL editor | DbGate, DBeaver | A single toolbar of labelled actions; result tabs below. DBeaver has a Diagram tab per table | Two toolbar rows with five text buttons on the second; the result summary, "Export all rows…", the guarded-cursor sentence and the pager use four lines before the first row, leaving about 6 visible rows |
+| Million rows | Antares, DbGate | Antares showed 1,000,000 and 1.53 s with the grid scrolling at once; DbGate showed "Finished", 3 s and 1,000,000 rows in the status bar; DBeaver fetched 200 and showed "200+" | BookiE streams every row, the grid was blank for most of the stream, and the default 60 s timeout replaced the result (850,000 rows, 170 pages) with "Query timed out" |
+
+### What the addendum adds to the first run
+
+- Row density is a separate, large gap that the 920 px run missed. It affects every screen, not one.
+- DBeaver (an expression bar) and DbGate (a header row) keep the filter visible in place; Antares puts it behind a search button. None stacks four rows of saved-filter controls above the grid.
+- Size next to a table name appears in three clients (DBeaver, DbGate, Antares) and nowhere in BookiE.
+- DBeaver is the only client with a per-table diagram tab in this set; this supports slice 6 of the layout proposal.
+
+### Not verified
+
+Timings under a quiet host; dark and light themes; keyboard use of the new clients; DBeaver's and DbGate's editing and export flows; whether Antares' 1.53 s counted or streamed all rows (its grid appears virtualised).
