@@ -47,6 +47,11 @@ class GtkPostgresToolchainHomeTests(unittest.TestCase):
         self.assertEqual(seen["cargo"], "/opt/cargo")
         self.assertEqual(seen["rustup"], "/opt/rustup")
 
+    def test_accessibility_runner_uses_the_system_python_for_system_pyatspi(self) -> None:
+        script = (SOURCE / "scripts/test-gtk-safety.sh").read_text()
+        self.assertIn('system_python="/usr/bin/python3"', script)
+        self.assertIn('"$system_python" -c "import pyatspi"', script)
+        self.assertIn('timeout 1500s "$system_python" -u', script)
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ mod input_refusal;
 mod mask;
 mod principal;
 mod rules;
+mod script_statements;
 mod select_writes;
 mod sensitive_projection;
 mod single_read;

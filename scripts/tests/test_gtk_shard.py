@@ -14,12 +14,12 @@ class GtkShardTests(unittest.TestCase):
 
     def test_the_shards_cover_every_scenario_exactly_once(self):
         items = list("abcdefghij")
-        seen = [name for index in (1, 2, 3) for name in shard.select(items, f"{index}/3")]
+        seen = [name for index in range(1, 7) for name in shard.select(items, f"{index}/6")]
         self.assertEqual(sorted(seen), items)
         self.assertEqual(len(seen), len(items))
 
     def test_shards_are_balanced_to_within_one(self):
-        sizes = [len(shard.select(list(range(10)), f"{index}/3")) for index in (1, 2, 3)]
+        sizes = [len(shard.select(list(range(10)), f"{index}/6")) for index in range(1, 7)]
         self.assertLessEqual(max(sizes) - min(sizes), 1)
 
     def test_a_bad_spec_is_refused(self):
