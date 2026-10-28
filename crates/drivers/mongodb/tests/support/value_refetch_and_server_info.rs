@@ -55,3 +55,31 @@ async fn the_full_value_of_one_field_is_refetched_by_its_native_id() {
         "a document without the field is reported, not read as NULL"
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_bare_json_filter_is_refused_instead_of_searching_an_arbitrary_collection() {
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    let database = client.database("appdb");
+    database
+        .collection::<Document>("audit")
+        .insert_one(doc! { "email": "a@b" })
+        .await
+        .unwrap();
+    database
+        .collection::<Document>("users")
+        .insert_one(doc! { "email": "a@b" })
+        .await
+        .unwrap();
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+
+    let outcome = connection.query(r#"{"email":"a@b"}"#).await;
+
+    assert!(
+        outcome.is_err(),
+        "a filter with no collection must not pick one: {outcome:?}"
+    );
+}

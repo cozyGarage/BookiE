@@ -29,8 +29,8 @@ pub(super) fn parse_find_shell(input: &str) -> Option<FindQuery> {
     let mut skip = 0u64;
     let mut limit = MAX_QUERY_ROWS as i64;
     let mut remaining = after_filter;
-    while let Some(pos) = remaining.find('.') {
-        remaining = &remaining[pos + 1..];
+    while let Some(chained) = remaining.trim_start().strip_prefix('.') {
+        remaining = chained;
         if let Some(rest) = remaining.strip_prefix("skip") {
             let (n, after) = extract_balanced(rest.trim_start(), '(', ')')?;
             skip = n.trim().parse().ok()?;
@@ -237,6 +237,9 @@ mod tests {
     fn shell_commands_reject_trailing_text_instead_of_executing_a_prefix() {
         assert!(parse_find_shell(r#"db.users.find({}).limit(1) unexpected"#).is_none());
         assert!(parse_find_shell(r#"db.users.find({}).unknown()"#).is_none());
+        assert!(parse_find_shell(r#"db.users.find({})x.limit(1)"#).is_none());
+        assert!(parse_find_shell(r#"db.users.find({}) garbage .limit(5)"#).is_none());
+        assert!(parse_find_shell(r#"db.users.find({}) .skip(1).limit(5)"#).is_some());
         assert!(parse_aggregate_shell(r#"db.users.aggregate([]) unexpected"#).is_none());
         assert!(parse_insert_one(r#"db.users.insertOne({"name":"Ada"}) unexpected"#).is_none());
         assert!(parse_delete_many(r#"db.users.deleteMany({}) unexpected"#).is_none());

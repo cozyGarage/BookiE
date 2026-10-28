@@ -313,17 +313,16 @@ impl Connection for MongodbConnection {
                     sqlstate: None,
                     position: None,
                 })?;
-            let coll_name = self
-                .list_tables()
-                .await?
-                .into_iter()
-                .next()
-                .map(|t| t.name)
-                .ok_or_else(|| DriverError::Query {
-                    message: "no collections available for filter query".into(),
+            let mut collections = self.list_tables().await?.into_iter();
+            let (Some(only), None) = (collections.next(), collections.next()) else {
+                return Err(DriverError::Query {
+                    message: "a bare JSON filter needs a database with exactly one collection; write db.<collection>.find({...})"
+                        .into(),
                     sqlstate: None,
                     position: None,
-                })?;
+                });
+            };
+            let coll_name = only.name;
             return self
                 .run_find(FindQuery {
                     collection: coll_name,
