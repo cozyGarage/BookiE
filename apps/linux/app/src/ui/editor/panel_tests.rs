@@ -117,6 +117,36 @@ fn the_switcher_shows_the_error_count_only_when_there_are_errors_and_marks_the_a
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn the_results_button_shows_results_after_hiding_errors() {
+    let fixture = EditorFixture::new();
+    let toggle = |label: &str| {
+        descendants(fixture.controller.widget().upcast_ref())
+            .into_iter()
+            .filter_map(|widget| widget.downcast::<gtk::ToggleButton>().ok())
+            .find(|toggle| toggle.label().as_deref() == Some(label))
+    };
+    let errors = toggle("Errors").unwrap();
+    let results = toggle("Results").unwrap();
+    fixture.controller.model().run_button.emit_clicked();
+    let query = fixture.next_query();
+    fixture.finish(query, Err(DriverError::Unsupported("fixture failure".into())));
+    errors.emit_clicked();
+    fixture.process_inputs();
+    assert!(errors.is_active());
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Panel(PanelAction::Toggle))
+        .unwrap();
+    fixture.process_inputs();
+    results.emit_clicked();
+    fixture.process_inputs();
+    assert!(results.is_active());
+    assert!(!errors.is_active());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn the_error_view_retains_results_and_clears_failures_after_success() {
     let fixture = EditorFixture::new();
     fixture.controller.model().run_button.emit_clicked();

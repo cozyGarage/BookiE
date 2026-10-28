@@ -1160,6 +1160,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::dispatch_tests::panel_tests::the_results_button_shows_results_after_hiding_errors"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::dispatch_tests::panel_tests::the_switcher_shows_the_error_count_only_when_there_are_errors_and_marks_the_active_view"
     ],
     [

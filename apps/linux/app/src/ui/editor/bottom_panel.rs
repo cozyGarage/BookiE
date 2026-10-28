@@ -111,7 +111,12 @@ impl BottomPanel {
             PanelAction::ResultsButton if self.showing_errors(state) => {
                 self.stack.set_visible_child_name("results");
             }
-            PanelAction::ResultsButton => state.toggle(),
+            PanelAction::ResultsButton => {
+                if state.mode() == PanelMode::Hidden {
+                    self.stack.set_visible_child_name("results");
+                }
+                state.toggle();
+            }
             PanelAction::Errors => {
                 if state.mode() == PanelMode::Hidden {
                     state.show(true);
