@@ -42,8 +42,8 @@ if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
   }
   trap cleanup_gtk_runtime EXIT
   mkdir -p "$gtk_runtime/data/dbus-1/services"
-  printf '[D-BUS Service]\nName=org.a11y.Bus\nExec=/usr/lib/at-spi-bus-launcher\n' \
-    > "$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"
+  cp "/usr/share/dbus-1/services/org.a11y.Bus.service" \
+    "$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"
   env -u NO_AT_BRIDGE TABLEPRO_GTK_DBUS_ACTIVE=1 XDG_DATA_HOME="$gtk_runtime/data" XDG_RUNTIME_DIR="$gtk_runtime" \
     ATSPI_DBUS_IMPLEMENTATION=dbus-daemon XDG_CURRENT_DESKTOP=GNOME \
     dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh" "$@"
