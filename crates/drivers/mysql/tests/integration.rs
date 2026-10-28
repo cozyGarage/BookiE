@@ -18,8 +18,6 @@ mod server_restart;
 #[path = "support/disconnection.rs"]
 mod disconnection;
 
-#[path = "support/hostile_server.rs"]
-mod hostile_server;
 #[path = "support/pooled_database.rs"]
 mod pooled_database;
 #[path = "support/read_only_session.rs"]
