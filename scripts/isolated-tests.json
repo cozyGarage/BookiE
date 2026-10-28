@@ -1156,6 +1156,11 @@
       "tablepro-app",
       "--lib",
       "ui::structure_tab::columns::tests::a_comment_row_is_shown_only_for_engines_that_can_store_one"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
     ]
   ],
   "keyring": [
