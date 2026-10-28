@@ -5,7 +5,7 @@ mod contract;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn exact_grid_original_detects_concurrent_text_changes() {
-    let (_fixture, options) = super::shared_container::start_mysql().await;
+    let (_fixture, options) = crate::shared_container::start_mysql().await;
     let connection = drivers_mysql::MysqlDriver.connect(options).await.unwrap();
     assert_mysql_collations(connection.as_ref()).await;
 }
@@ -13,7 +13,7 @@ async fn exact_grid_original_detects_concurrent_text_changes() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn exact_grid_original_detects_concurrent_mariadb_text_changes() {
-    let (_fixture, options) = super::shared_container::start_mariadb().await;
+    let (_fixture, options) = crate::shared_container::start_mariadb().await;
     let connection = drivers_mysql::MysqlDriver.connect(options).await.unwrap();
     assert_mysql_collations(connection.as_ref()).await;
 }

@@ -5,7 +5,7 @@ mod contract;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn exact_grid_original_detects_concurrent_text_changes() {
-    let (_fixture, options) = super::shared_container::start_mssql().await;
+    let (_fixture, options) = crate::shared_container::start_mssql().await;
     let connection = drivers_mssql::MssqlDriver.connect(options).await.unwrap();
     for (kind, old, concurrent, search_matches) in [
         ("nvarchar(40) COLLATE Latin1_General_CI_AI", "Ada", "ADA", Some(2)),

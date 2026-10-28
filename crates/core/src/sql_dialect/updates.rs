@@ -1,6 +1,11 @@
+#[path = "exact_original.rs"]
+mod exact_original;
+
+use exact_original::exact_original_predicate;
+
 use super::{
-    BuildSqlError, build_update, checked_pk_indexes, exact_original::exact_original_predicate, keyed_where_clause,
-    placeholder_for, postgres_text_cast_type, qualified_table, quote_ident, text_cast_placeholder,
+    BuildSqlError, build_update, checked_pk_indexes, keyed_where_clause, placeholder_for, postgres_text_cast_type,
+    qualified_table, quote_ident, text_cast_placeholder,
 };
 use crate::{ColumnInfo, Value};
 
