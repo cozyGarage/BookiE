@@ -13,7 +13,7 @@ This record covers a driven run of the app built from source. It is not an insta
 
 ## Results
 
-The per-item results are recorded beside each item in the [checklists](manual-verification-0.2-features.md#areas). In short:
+The run was done in two sessions on the same build, one for the first six rows and one for the rest. The per-item results are recorded beside each item in the [checklists](manual-verification-0.2-features.md#areas). In short:
 
 | Area | Result |
 |---|---|
@@ -24,6 +24,10 @@ The per-item results are recorded beside each item in the [checklists](manual-ve
 | Editor Session | Temp table persisted, transaction label and server state matched, Roll back & close left no open transaction |
 | Explain tree | Passed: nested steps, cost bars, filter and condition lines |
 | Export dialog | CSV options hide for JSON; SQL options appear only for SQL; Excel absent for an unknown total, as already recorded |
+| Editor files | Passed: Ctrl+O, Ctrl+S with and without a file, Ctrl+Shift+S, changed-on-disk dialog (Cancel, Overwrite), close prompt (Save), restart restore with unsaved text, deleted-file restore with its toast |
+| PostgreSQL backup and restore | Passed: a 31 MB dump, restore after approval returned a changed row, restore refused on a read-only connection before any chooser |
+| CSV import | Passed on SQLite: semicolon and header detected, prefill, three rows written to the right columns |
+| Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
 
@@ -37,7 +41,7 @@ The per-item results are recorded beside each item in the [checklists](manual-ve
 
 ## Not run
 
-Connections and SSH items other than the Production marker and the 2-second timeout, MySQL, MongoDB, ClickHouse and SQL Server items, light mode and high contrast, input-method editing, file save and restore flows, CSV import, backup and restore, and anything needing a file chooser.
+Connections and SSH items other than the Production marker and the 2-second timeout, MySQL, MongoDB, ClickHouse and SQL Server items, high contrast, input-method editing, Save As… in the changed-on-disk dialog, the Discard and Cancel paths of the close prompt, comma and headerless CSV files, changing a CSV mapping, the backup progress window and browse-tab refresh after a restore, and an installed package: this run used a debug build started from the build directory, not an installed app.
 
 ## Cleanup
 
