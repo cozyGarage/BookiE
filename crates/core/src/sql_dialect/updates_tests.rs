@@ -277,4 +277,3 @@ fn original_postgres_json_text_keeps_source_identity() {
     assert!(!sql.contains("jsonb"));
     assert_eq!(params.last(), Some(&original));
 }
-

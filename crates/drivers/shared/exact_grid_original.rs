@@ -30,7 +30,7 @@ pub async fn assert_conflict(
     let draft = match &old {
         Value::Bytes(_) => Value::Bytes(vec![0x73, 0x61, 0x76, 0x65]),
         Value::JsonText(_) => Value::JsonText("{\"saved\":true}".into()),
-        Value::Text(_) if columns[1].data_type.ends_with("[]") => Value::Text("{saved}".into()),
+        Value::Text(_) if columns[1].data_type.ends_with("[]") => Value::Text("{\"saved\"}".into()),
         _ => Value::Text("saved".into()),
     };
     tracker.track_cell_edit(row.clone(), 1, old.clone(), draft.clone());
@@ -49,7 +49,9 @@ pub async fn assert_conflict(
     assert_search_behavior(connection, driver, &columns, &old, search_matches).await;
     let result = connection.execute_in_transaction_checked(&before, &[0]).await;
     assert!(
-        matches!(result, Err(DriverError::Transaction { source, .. }) if matches!(*source, DriverError::ConcurrentModification))
+        matches!(&result, Err(DriverError::Transaction { source, .. }) if matches!(source.as_ref(), DriverError::ConcurrentModification)),
+        "{driver} {}: {result:?}",
+        columns[1].data_type,
     );
     assert_eq!(native_values(connection, driver).await, native_before);
     let after = tracker.materialize(driver, None, "exact_grid", &columns).unwrap().0;
@@ -132,7 +134,7 @@ pub async fn assert_key_conflict(connection: &dyn Connection, driver: &str, kind
         .await
         .unwrap();
     let columns = connection.fetch_columns(None, "exact_key").await.unwrap();
-    for edit_key in [false, true] {
+    for (edit_key, concurrent_key) in [(false, "ADA"), (true, "ADA"), (false, "Ada "), (true, "Ada ")] {
         connection.execute("DELETE FROM exact_key").await.unwrap();
         connection
             .execute("INSERT INTO exact_key VALUES ('Ada', 1), ('Zoe', 2)")
@@ -148,10 +150,16 @@ pub async fn assert_key_conflict(connection: &dyn Connection, driver: &str, kind
         };
         tracker.track_cell_edit(row, index, original, draft);
         let statements = tracker.materialize(driver, None, "exact_key", &columns).unwrap().0;
-        connection
-            .execute("UPDATE exact_key SET id = 'ADA' WHERE id = 'Ada'")
-            .await
-            .unwrap();
+        let external = build_keyed_update(
+            driver,
+            None,
+            "exact_key",
+            &columns,
+            &[(0, Value::Text(concurrent_key.into()))],
+            std::slice::from_ref(&original_key),
+        )
+        .unwrap();
+        connection.execute_params(&external.0, &external.1).await.unwrap();
         let before = connection
             .query("SELECT id, v FROM exact_key ORDER BY v")
             .await

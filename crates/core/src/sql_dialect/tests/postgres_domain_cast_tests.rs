@@ -80,7 +80,7 @@ fn postgres_domain_text_updates_cast_to_the_qualified_type() {
     .unwrap();
     assert_eq!(
         sql,
-        r#"UPDATE "domain_over_array"."rows" SET "items" = $1::text::"domain_over_array"."small_ints" WHERE "id" = $2 AND "items"::text COLLATE "C" IS NOT DISTINCT FROM $3::text::"domain_over_array"."small_ints"::text COLLATE "C""#
+        r#"UPDATE "domain_over_array"."rows" SET "items" = $1::text::"domain_over_array"."small_ints" WHERE "id" = $2 AND ("items" IS NOT NULL AND pg_catalog.format('%s', "items") COLLATE pg_catalog."C" = pg_catalog.format('%s', $3::text::"domain_over_array"."small_ints") COLLATE pg_catalog."C")"#
     );
     assert_eq!(
         params,

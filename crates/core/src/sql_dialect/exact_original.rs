@@ -1,4 +1,4 @@
-use super::{placeholder_for, text_cast_placeholder};
+use super::{placeholder_for, postgres_text_cast_type};
 use crate::{ColumnInfo, Value};
 
 pub(super) fn exact_original_predicate(
@@ -10,12 +10,22 @@ pub(super) fn exact_original_predicate(
 ) -> Option<String> {
     let placeholder = placeholder_for(driver_id, params.len());
     let predicate = match (driver_id, old_value) {
-        ("postgres", Value::Text(_)) if is_character(column) => {
-            let value = text_cast_placeholder(column, old_value, placeholder);
-            format!("{name}::text COLLATE \"C\" IS NOT DISTINCT FROM {value}::text COLLATE \"C\"")
+        ("postgres", Value::Text(_)) if postgres_character_output(column, old_value) => {
+            let value = match postgres_text_cast_type(column, old_value) {
+                Some(kind) => format!("{placeholder}::text::{kind}"),
+                None if column.data_type.trim().ends_with("[]") => {
+                    format!("CASE WHEN FALSE THEN {name} ELSE {placeholder} END")
+                }
+                None => format!("{placeholder}::text"),
+            };
+            format!(
+                "({name} IS NOT NULL AND pg_catalog.format('%s', {name}) COLLATE pg_catalog.\"C\" = pg_catalog.format('%s', {value}) COLLATE pg_catalog.\"C\")"
+            )
         }
         ("postgres", Value::JsonText(_)) => {
-            format!("{name}::text COLLATE \"C\" IS NOT DISTINCT FROM {placeholder}::text COLLATE \"C\"")
+            format!(
+                "{name}::text COLLATE pg_catalog.\"C\" IS NOT DISTINCT FROM {placeholder}::text COLLATE pg_catalog.\"C\""
+            )
         }
         ("sqlite", Value::Text(_)) => format!("{name} COLLATE BINARY IS NOT DISTINCT FROM {placeholder}"),
         ("mysql", Value::Text(_)) if is_character(column) => format!(
@@ -60,4 +70,10 @@ fn is_character(column: &ColumnInfo) -> bool {
                 | "enum"
                 | "set"
         )
+}
+
+fn postgres_character_output(column: &ColumnInfo, old_value: &Value) -> bool {
+    is_character(column)
+        || column.domain_type.is_some()
+        || (column.data_type.trim().ends_with("[]") && postgres_text_cast_type(column, old_value).is_none())
 }
