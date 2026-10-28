@@ -1,0 +1,255 @@
+{
+  "before_commit": "401672b86cc279f495623591378a5914a8d4d235",
+  "after_commit": "a75a47ce52dde963a6eb0ddd179de47b837b3427",
+  "host": {
+    "cpu": "11th Gen Intel(R) Core(TM) i7-11700K @ 3.60GHz",
+    "logical_cpus": 16,
+    "frequency_scaling_percent": 81,
+    "kernel": "7.2.8-9-omarchy",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "profile": "release with debuginfo",
+    "load_average_at_start": "11.49, 9.85, 7.87",
+    "note": "other builds were running; treat the figures as noisy samples, not quiet-machine numbers"
+  },
+  "method": {
+    "processes_per_side": 5,
+    "order": "alternating before, after",
+    "warmup_iterations": {
+      "catalog": 2,
+      "script": 1
+    },
+    "measured_iterations": {
+      "catalog": 20,
+      "script": 5
+    },
+    "grammar": "PostgreSQL",
+    "statistic": "median of the per-process means"
+  },
+  "cases": [
+    {
+      "axis": "catalog",
+      "tables": 1000,
+      "prefix": "selective",
+      "script_bytes": null,
+      "matches": 1,
+      "before_ms_per_process": [
+        0.3851,
+        0.3673,
+        0.3694,
+        0.5885,
+        0.425
+      ],
+      "after_ms_per_process": [
+        0.0225,
+        0.0209,
+        0.0263,
+        0.0263,
+        0.0394
+      ],
+      "before_median_ms": 0.3851,
+      "after_median_ms": 0.0263,
+      "median_speedup": 14.6,
+      "matches_equal_before_after": true
+    },
+    {
+      "axis": "catalog",
+      "tables": 1000,
+      "prefix": "no_match",
+      "script_bytes": null,
+      "matches": 0,
+      "before_ms_per_process": [
+        0.4189,
+        0.3919,
+        0.3821,
+        0.555,
+        0.4387
+      ],
+      "after_ms_per_process": [
+        0.0218,
+        0.0187,
+        0.0252,
+        0.0263,
+        0.0483
+      ],
+      "before_median_ms": 0.4189,
+      "after_median_ms": 0.0252,
+      "median_speedup": 16.6,
+      "matches_equal_before_after": true
+    },
+    {
+      "axis": "catalog",
+      "tables": 10000,
+      "prefix": "selective",
+      "script_bytes": null,
+      "matches": 1,
+      "before_ms_per_process": [
+        3.7101,
+        3.694,
+        5.1403,
+        4.5249,
+        4.0751
+      ],
+      "after_ms_per_process": [
+        0.0474,
+        0.0413,
+        0.0427,
+        0.0426,
+        0.0472
+      ],
+      "before_median_ms": 4.0751,
+      "after_median_ms": 0.0427,
+      "median_speedup": 95.4,
+      "matches_equal_before_after": true
+    },
+    {
+      "axis": "catalog",
+      "tables": 10000,
+      "prefix": "no_match",
+      "script_bytes": null,
+      "matches": 0,
+      "before_ms_per_process": [
+        3.9756,
+        4.011,
+        4.8382,
+        4.4219,
+        4.5541
+      ],
+      "after_ms_per_process": [
+        0.0544,
+        0.0525,
+        0.0561,
+        0.0572,
+        0.0568
+      ],
+      "before_median_ms": 4.4219,
+      "after_median_ms": 0.0561,
+      "median_speedup": 78.8,
+      "matches_equal_before_after": true
+    },
+    {
+      "axis": "catalog",
+      "tables": 100000,
+      "prefix": "selective",
+      "script_bytes": null,
+      "matches": 1,
+      "before_ms_per_process": [
+        39.7913,
+        39.1489,
+        54.4055,
+        57.1345,
+        45.0415
+      ],
+      "after_ms_per_process": [
+        0.2838,
+        0.2602,
+        0.9445,
+        0.6436,
+        0.6866
+      ],
+      "before_median_ms": 45.0415,
+      "after_median_ms": 0.6436,
+      "median_speedup": 70.0,
+      "matches_equal_before_after": true
+    },
+    {
+      "axis": "catalog",
+      "tables": 100000,
+      "prefix": "no_match",
+      "script_bytes": null,
+      "matches": 0,
+      "before_ms_per_process": [
+        39.7088,
+        38.8892,
+        57.3407,
+        58.8205,
+        45.0074
+      ],
+      "after_ms_per_process": [
+        0.3487,
+        0.3616,
+        0.9108,
+        0.6515,
+        0.8533
+      ],
+      "before_median_ms": 45.0074,
+      "after_median_ms": 0.6515,
+      "median_speedup": 69.1,
+      "matches_equal_before_after": true
+    },
+    {
+      "axis": "script",
+      "tables": 50,
+      "prefix": null,
+      "script_bytes": 16455,
+      "matches": 1,
+      "before_ms_per_process": [
+        0.2975,
+        0.3112,
+        0.3707,
+        0.3624,
+        0.5293
+      ],
+      "after_ms_per_process": [
+        0.0893,
+        0.0929,
+        0.1201,
+        0.1108,
+        0.1153
+      ],
+      "before_median_ms": 0.3624,
+      "after_median_ms": 0.1108,
+      "median_speedup": 3.3,
+      "matches_equal_before_after": true
+    },
+    {
+      "axis": "script",
+      "tables": 50,
+      "prefix": null,
+      "script_bytes": 346975,
+      "matches": 1,
+      "before_ms_per_process": [
+        5.7858,
+        5.3225,
+        7.3166,
+        8.7226,
+        9.27
+      ],
+      "after_ms_per_process": [
+        1.5753,
+        1.5469,
+        3.1155,
+        1.9744,
+        2.348
+      ],
+      "before_median_ms": 7.3166,
+      "after_median_ms": 1.9744,
+      "median_speedup": 3.7,
+      "matches_equal_before_after": true
+    },
+    {
+      "axis": "script",
+      "tables": 50,
+      "prefix": null,
+      "script_bytes": 3589375,
+      "matches": 1,
+      "before_ms_per_process": [
+        77.6097,
+        86.3975,
+        120.3944,
+        128.0191,
+        133.9431
+      ],
+      "after_ms_per_process": [
+        23.1392,
+        23.3775,
+        40.0231,
+        32.497,
+        34.1755
+      ],
+      "before_median_ms": 120.3944,
+      "after_median_ms": 32.497,
+      "median_speedup": 3.7,
+      "matches_equal_before_after": true
+    }
+  ]
+}

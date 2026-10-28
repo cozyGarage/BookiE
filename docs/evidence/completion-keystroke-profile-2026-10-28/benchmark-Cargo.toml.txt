@@ -1,0 +1,11 @@
+[package]
+name = "completion-ev"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+tablepro-core = { path = "<checkout>/crates/core" }
+tablepro-app-services = { path = "<checkout>/crates/app-services" }
+
+[profile.release]
+debug = true
