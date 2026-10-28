@@ -12,7 +12,7 @@ Open a result, then Export Results.
 - [x] A SQL options group with an editable Table name shows only for SQL. **2026-10-12 Hyprland dark:** passed. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** passed for CSV, JSON and SQL: only SQL showed a Table name.
 - [ ] For a browse tab the Table name is prefilled `schema.table`; for an editor tab it is the tab label, and editing it changes the emitted statements. **2026-10-12 Hyprland dark:** browse tab passed (prefilled `public.customers`, edited name reached the INSERT statements); editor tab not run. Export after a column rename used the old name; fixed by [#676](https://github.com/cozyGarage/BookiE/pull/676); no installed retest is recorded here. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** editor tab prefilled `select-from-shop-customers` (the query text, not a tab label); editing not run.
 - [ ] The written `.xlsx` opens in LibreOffice and the `.html` in a browser.
-- [ ] Cancelling a large export leaves any existing destination file untouched.
+- [ ] Cancelling a large export leaves any existing destination file untouched. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6, a 4,000,000-row table:** not verified: exporting all rows to an existing `exp.csv` (content `keep`) asked "A file named … already exists. Do you want to replace it?"; after Replace the progress dialog counted rows and at 1,036,600 rows written the destination still held `keep`, so the file is replaced only at the end; my Cancel click came after the export had finished (the file then held the full 4,000,001 lines), so the cancel path itself was not exercised. A larger result or a slower disk is needed.
 - [ ] An Excel export above the sheet row limit is refused, and the message names the limit.
 
 ## CSV import
@@ -69,17 +69,17 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Go to Referenced Row
 
-- [ ] In a table with a foreign key, right-click a non-empty value in the key column: Go to Referenced Row opens the referenced table with one filter rule on the referenced column. **2026-10-12 Hyprland dark:** failed because foreign keys arrived after the grid was drawn; fixed by [#664](https://github.com/cozyGarage/BookiE/pull/664); no installed retest is recorded here.
-- [ ] On a cell of a column that is not a foreign key, or on a NULL key, the item is greyed out.
-- [ ] With the referenced table already open, the same action switches to that tab and replaces its filter.
+- [x] In a table with a foreign key, right-click a non-empty value in the key column: Go to Referenced Row opens the referenced table with one filter rule on the referenced column. **2026-10-12 Hyprland dark:** failed because foreign keys arrived after the grid was drawn; fixed by [#664](https://github.com/cozyGarage/BookiE/pull/664); no installed retest is recorded here. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** `shop.orders.customer_id` value 2: Go to Referenced Row opened `shop.customers` with one row (`Customer 2`) and a `Filter 1` badge; the filter strip held one rule `id = 4` after the later jump (below).
+- [ ] On a cell of a column that is not a foreign key, or on a NULL key, the item is greyed out. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** on SQLite `customers.name` and a BLOB cell the item was greyed out; a NULL foreign key cell was not tried.
+- [x] With the referenced table already open, the same action switches to that tab and replaces its filter. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** from another `orders` row (customer_id 4) the action returned to the existing `shop.customers` tab (tab count stayed 8) and its filter changed from id 2 to `id = 4`.
 - [ ] A composite key filters every referenced column from the same row; with one of its columns hidden, a toast says so.
 
 ## Filter by This Value
 
-- [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; no installed retest of the expanded editor is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
-- [ ] On a NULL cell it filters with IS NULL.
-- [ ] Doing it again on another value of the same column replaces that rule.
-- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run.
+- [x] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; no installed retest of the expanded editor is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)). **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** on `customers`, Filter by This Value on `Ada` left one row, "Rows 1 – 1 of 1", a `Filter 1` badge, and a rule `name equals Ada` in the rule editor (the strip shows Saved filters, WHERE and rule editor as separate rows, which is the layout [#1864](https://github.com/cozyGarage/BookiE/issues/1864) reviews).
+- [x] On a NULL cell it filters with IS NULL. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** the NULL `note` cell produced the rule `note is empty` and returned only that row; an empty-text cell produced `note equals` with an empty value and returned only that row.
+- [ ] Doing it again on another value of the same column replaces that rule. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** not run: the filtered view held a single row.
+- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** a SQLite BLOB cell showed "Values of this type can't be used as a filter" on choosing the item; JSON was not run.
 - [ ] The item is absent from SQL editor result grids.
 
 ## Named browse filters
@@ -103,10 +103,10 @@ In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a ty
 
 - [ ] A value below the threshold displays in full and remains editable where that type supports grid edits.
 - [ ] Values over the threshold show a prefix and `… (N bytes total)`; SQL result cells and binary/unsupported browse values do not offer inline editing. Editable browse text opens with the full value.
-- [ ] View Value shows up to 1 MiB of rendered text or JSON and indicates when longer content is truncated.
-- [ ] A long unbroken value wraps without display-only hyphens; the GTK widget regression covers this rendering property ([#791](https://github.com/cozyGarage/BookiE/pull/791)); no installed retest is recorded here.
-- [ ] Copy Value copies the complete text or JSON rather than the displayed preview.
-- [ ] Repeat with a binary value over the threshold; the preview reports the original byte count and View Value shows at most the first 16 KiB of source bytes as hex with the total byte count.
+- [ ] View Value shows up to 1 MiB of rendered text or JSON and indicates when longer content is truncated. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs` table (a 20,000-character text and a 20,480-byte BLOB):** for the 20,000-character text cell, View Value showed a wrapped monospace view with a Copy value button; the 1 MiB truncation notice was not exercised.
+- [ ] A long unbroken value wraps without display-only hyphens; the GTK widget regression covers this rendering property ([#791](https://github.com/cozyGarage/BookiE/pull/791)); no installed retest is recorded here. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs` table (a 20,000-character text and a 20,480-byte BLOB):** the 20,000-character run of `a` in View Value wrapped at the dialog width with no hyphens.
+- [x] Copy Value copies the complete text or JSON rather than the displayed preview. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs` table (a 20,000-character text and a 20,480-byte BLOB):** Copy value on the 20,000-character text cell put 20,000 characters (20,001 bytes with the newline `wl-paste` adds) on the clipboard, not the shortened preview.
+- [x] Repeat with a binary value over the threshold; the preview reports the original byte count and View Value shows at most the first 16 KiB of source bytes as hex with the total byte count. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs` table (a 20,000-character text and a 20,480-byte BLOB):** the BLOB cell showed `00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f… (2…` in the grid; View Value showed a hex dump with an ASCII column and ended at offset `0x3ff0` with "Showing the first 16384 of 20480 bytes."
 
 Binary Copy Value currently copies only the byte-count placeholder; full binary copying is tracked in [#1587](https://github.com/cozyGarage/BookiE/issues/1587).
 
@@ -114,9 +114,9 @@ Binary Copy Value currently copies only the byte-count placeholder; full binary 
 
 Use a keyed table with a nullable text column and values above 8 KiB. Include CRLF, Unicode, trailing spaces and a value near 1 MiB.
 
-- [ ] The cell shows a shortened preview and byte count. Right-click it and choose **Edit Full Value…**; the dialog contains the complete value.
-- [ ] Cancel stages no change. Reopen the dialog, change the final character and choose **Apply**; save and reload to confirm the exact text.
-- [ ] Apply empty text and confirm it remains empty. Use **Set to NULL** separately and confirm the stored value is SQL NULL.
+- [x] The cell shows a shortened preview and byte count. Right-click it and choose **Edit Full Value…**; the dialog contains the complete value. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs.body` (20,000 characters):** the text cell showed a shortened line and the BLOB cell showed `… (20480 bytes total)`; Edit Full Value opened a dialog with the text and the buttons Set to NULL, Cancel and Apply, and editing its final character kept the other 19,999 characters, so the dialog held the complete value.
+- [x] Cancel stages no change. Reopen the dialog, change the final character and choose **Apply**; save and reload to confirm the exact text. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs.body` (20,000 characters):** Cancel left no unsaved indicator; changing the last character and Apply staged "1 unsaved change" with a dirty tab marker; Ctrl+S stored a 20,000-character value ending in `Z` with every earlier character unchanged (checked in the database, not by reloading the tab).
+- [ ] Apply empty text and confirm it remains empty. Use **Set to NULL** separately and confirm the stored value is SQL NULL. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs.body` (20,000 characters):** Set to NULL stored a real SQL NULL (`typeof` = null). Empty text was not verified: my attempt opened the inline cell editor instead of the dialog on the NULL cell.
 - [ ] Edit a draft text row, save it, and discard a separate pending edit.
 - [ ] A value over 1 MiB is refused. Non-text, generated, key and read-only cells do not offer the action.
 - [ ] Edit JSON and JSONB values with reordered keys, duplicate source-text keys, large integer lexemes, JSON `null`, and SQL NULL. Apply valid input and reload to confirm the correct stored carrier; invalid input leaves the dialog open and stages no change.
@@ -128,6 +128,6 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 
 ## Result headers, selection statistics, error copy and connection strip
 
-- [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the exact engine type spelling beneath it, in light and dark. **2026-10-12 Hyprland dark:** name and type passed; key markers were missing before [#664](https://github.com/cozyGarage/BookiE/pull/664); no installed retest is recorded here.
+- [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the exact engine type spelling beneath it, in light and dark. **2026-10-12 Hyprland dark:** name and type passed; key markers were missing before [#664](https://github.com/cozyGarage/BookiE/pull/664); no installed retest is recorded here. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** `shop.orders` header: `id` with a key icon and `INT4`, `customer_id` with a link icon and `INT4`, `total NUMERIC`, `status mood`; light mode only.
 - [ ] Select several rows of a numeric column: the selection badge popover lists the column's count, sum, average, min and max, and Copy summary copies them. A text column is not listed. **2026-10-12 Hyprland dark:** passed; also covered by the installed GTK scenario `selection_statistics_summarise_the_selected_rows`.
 - [ ] Run a failing statement in the editor: Copy error places the exact error text on the clipboard. **2026-10-12 Hyprland dark:** passed.

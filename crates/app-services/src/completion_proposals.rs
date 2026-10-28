@@ -5,7 +5,7 @@ use tablepro_core::sql_syntax::script::{
     LexicalSettings, OpenConstruct, ScriptDiagnostic, ScriptPlan, ScriptTokenKind,
 };
 
-use super::completion::{SchemaIndex, Scope, candidate_sql, scope_at};
+use super::completion::{SchemaIndex, Scope, candidate_sql, floor_char_boundary, scope_at};
 use super::completion_identifiers::{normalized, plan_with, split_table_reference};
 
 pub struct Candidates {
@@ -18,6 +18,7 @@ pub fn candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Candidates {
 }
 
 pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: Option<LexicalSettings>) -> Candidates {
+    let cursor = floor_char_boundary(sql, cursor.min(sql.len()));
     let grammar = index.grammar.unwrap_or(SqlGrammar::PostgreSql);
     let settings_for_grammar = settings.unwrap_or_else(|| LexicalSettings::default_for(grammar));
     let plan = plan_with(sql, Some(grammar), Some(settings_for_grammar));
@@ -421,5 +422,20 @@ mod tests {
             "a {} byte script was lexed as {lexed} bytes",
             sql.len()
         );
+    }
+
+    #[test]
+    fn a_cursor_inside_a_multi_byte_character_completes_as_if_at_its_start() {
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_tables(vec!["users".into(), "日本".into()]);
+        let sql = "SELECT é FROM 日本, 😀 WHERE us";
+        for cursor in 0..=sql.len() + 3 {
+            let floored = floor_char_boundary(sql, cursor.min(sql.len()));
+            let inside = candidates(sql, cursor, &index);
+            let at_start = candidates(sql, floored, &index);
+            assert_eq!(inside.range, at_start.range, "range at {cursor}");
+            assert_eq!(inside.values, at_start.values, "values at {cursor}");
+        }
     }
 }
