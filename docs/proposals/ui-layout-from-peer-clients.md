@@ -1,6 +1,6 @@
 # UI layout changes drawn from peer clients
 
-Proposed; nothing here is accepted or scheduled. It turns the [October 28 side-by-side capture](../archive/tablepro-dbx-review-2026-10-20/g-side-by-side-capture-2026-10-28.md) and the maintainer's preferences into small slices for [#1862](https://github.com/cozyGarage/BookiE/issues/1862), [#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1864](https://github.com/cozyGarage/BookiE/issues/1864) and [#1867](https://github.com/cozyGarage/BookiE/issues/1867). The maintainer picks the order and what to drop.
+Proposed; nothing here is accepted or scheduled. It turns the [October 28 side-by-side capture and its 1,400 px addendum](../archive/tablepro-dbx-review-2026-10-20/g-side-by-side-capture-2026-10-28.md) and the maintainer's preferences into small slices for [#1862](https://github.com/cozyGarage/BookiE/issues/1862), [#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1864](https://github.com/cozyGarage/BookiE/issues/1864) and [#1867](https://github.com/cozyGarage/BookiE/issues/1867). The maintainer picks the order and what to drop.
 
 ## What was checked first
 
@@ -24,6 +24,8 @@ Each slice is independent and keeps shortcuts and AT-SPI names unless the slice 
 4. **Large results ([#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1867](https://github.com/cozyGarage/BookiE/issues/1867)).** Keep the rows already received on screen while later pages stream; show the total as it is learned; at the end or after a timeout keep the last good page and its row range and show the timeout as a notice. Whether to load a first page and count on demand (dbx, Beekeeper) is a decision for ADR 0011 and 0025, not for this slice. Medium, UX.
 5. **Sidebar tree.** Add Collapse all and Expand all buttons to the sidebar header. Add Materialized Views, Routines, Sequences and Types groups, and a Users & Privileges node, for engines whose `capabilities()` profile says the catalog kind exists. Reuse the catalog queries behind the Catalog dialog; do not add new queries per group until measured against [#580](https://github.com/cozyGarage/BookiE/issues/580). Medium, UX with B3.
 6. **ER diagram.** Adapt the upstream TablePro Linux diagram read-only first, with provenance and attribution, as the [earlier review](../archive/tablepro-dbx-review-2026-10-20/d-dbx-features.md) already proposed. It needs foreign-key metadata per engine (`supports_foreign_key_metadata`), a bound on tables read at once, and the keyboard and screen-reader access the upstream roadmap describes. Large, UX with B3.
+
+7. **Row density.** Measured at 1,400 px against DBeaver, DbGate and Antares: BookiE's sidebar rows are about 48 px tall (peers 18 to 25) and grid rows about 35 px (peers 18 to 25). Reduce the sidebar and grid row heights (a compact density), widen the sidebar so names do not truncate to `custom...`, and show table size next to each name where the catalog already provides it. Small to medium, UX. Slice 1 and 4 free more height; this slice makes it usable.
 
 ## Constraints
 
