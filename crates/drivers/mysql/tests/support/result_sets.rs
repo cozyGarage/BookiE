@@ -1,3 +1,5 @@
+#[path = "column_on_update.rs"]
+mod column_on_update;
 pub(crate) use super::{connect, start_mariadb, start_mysql};
 
 #[path = "mysql_call_results.rs"]

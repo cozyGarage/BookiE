@@ -902,8 +902,17 @@ async fn index_key_expression(
 // literal and is quoted back so restating the column keeps its default.
 // MariaDB 10.2.7+ already reports the DEFAULT clause itself and reports a
 // column without a default as the text NULL.
+fn with_on_update(default: String, column_type: &str, extra: &str) -> String {
+    let lower_type = column_type.to_ascii_lowercase();
+    let temporal = lower_type.starts_with("timestamp") || lower_type.starts_with("datetime");
+    let Some((_, action)) = extra.split_once("on update ").filter(|_| temporal) else {
+        return default;
+    };
+    format!("{default} ON UPDATE {}", action.trim().to_ascii_uppercase())
+}
+
 fn default_expression(raw: Option<String>, column_type: &str, extra: &str, mariadb: bool) -> Option<String> {
-    let raw = raw?;
+    let raw = with_on_update(raw?, column_type, extra);
     if mariadb {
         return (!raw.eq_ignore_ascii_case("null")).then_some(raw);
     }
