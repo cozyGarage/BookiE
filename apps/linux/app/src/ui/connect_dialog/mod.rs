@@ -42,6 +42,7 @@ pub struct ConnectDialog {
     tls_client_cert: adw::EntryRow,
     tls_client_key: adw::EntryRow,
     read_only: adw::SwitchRow,
+    connect_timeout_row: adw::ActionRow,
     connect_timeout: gtk::SpinButton,
     query_timeout: gtk::SpinButton,
     environment: AccessibleChoice,
@@ -389,6 +390,7 @@ impl Component for ConnectDialog {
             tls_client_cert,
             tls_client_key,
             read_only,
+            connect_timeout_row,
             connect_timeout,
             query_timeout,
             environment,
@@ -815,6 +817,7 @@ impl ConnectDialog {
         self.apply_socket_visibility(endpoint);
         self.tls_row.set_visible(network);
         self.auth_group.set_visible(!self.form.file_based);
+        self.connect_timeout_row.set_visible(!self.form.file_based);
         self.ssh.set_visible(network);
         if socket {
             self.tls_mode.set_selected(TlsMode::Disabled.index());
