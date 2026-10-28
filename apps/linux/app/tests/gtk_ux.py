@@ -1456,7 +1456,7 @@ GLib.MainLoop().run()
             text = entry.queryText()
             assert text.getText(0, text.characterCount) == str(path), "the chooser did not accept the export path"
             assert entry.queryComponent().grabFocus(), "the export path cannot receive focus"
-            ui.press_x11_key("Return")
+            ui.invoke(ui.wait_for_node(name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES, present=False)
             deadline = time.monotonic() + ui.WAIT_SECONDS
             while time.monotonic() < deadline and not path.exists():
