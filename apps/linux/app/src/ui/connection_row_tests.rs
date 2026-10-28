@@ -45,7 +45,11 @@ fn connection_actions_leave_room_for_text_in_a_narrow_row() {
         .launch(list.clone())
         .detach();
     let mut connection = saved("analyst", AuthMode::Password);
-    connection.name = "Production analytics — Billing & audit 東京".into();
+    let title = format!(
+        "Production analytics — Billing & audit 東京 {}",
+        "Quarterly warehouse metric ".repeat(8)
+    );
+    connection.name = title.clone();
     connection.host = "primary-warehouse-east-with-a-long-hostname.example".into();
     factory.guard().push_back(ConnectionRowInit {
         saved: connection,
@@ -75,11 +79,17 @@ fn connection_actions_leave_room_for_text_in_a_narrow_row() {
     let row = guard.get(0).unwrap();
     let mut pending = vec![list.clone().upcast::<gtk::Widget>()];
     let mut title_width = None;
+    let mut title_lines = None;
+    let mut subtitle_lines = None;
     while let Some(widget) = pending.pop() {
-        if let Some(label) = widget.downcast_ref::<gtk::Label>()
-            && label.text() == "Production analytics — Billing & audit 東京"
-        {
-            title_width = Some(label.width());
+        if let Some(label) = widget.downcast_ref::<gtk::Label>() {
+            if label.text() == title {
+                title_width = Some(label.width());
+                title_lines = Some(label.layout().lines().len());
+            }
+            if label.css_classes().iter().any(|class| class == "subtitle") {
+                subtitle_lines = Some(label.layout().lines().len());
+            }
         }
         let mut child = widget.first_child();
         while let Some(widget) = child {
@@ -98,6 +108,14 @@ fn connection_actions_leave_room_for_text_in_a_narrow_row() {
     assert!(
         title_width.unwrap() >= 120,
         "connection name only receives {title_width:?} pixels"
+    );
+    assert!(
+        title_lines.unwrap() > 1,
+        "long connection names should wrap at larger text sizes"
+    );
+    assert!(
+        title_lines.unwrap() <= 2 && subtitle_lines.unwrap() <= 2,
+        "connection names and endpoints should stay within two lines"
     );
     assert!(row.favorite_button.width() > 0, "favorite action is not reachable");
     assert!(row.actions_button.width() > 0, "connection menu is not reachable");

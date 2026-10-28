@@ -76,8 +76,8 @@ impl FactoryComponent for ConnectionRow {
         adw::ActionRow {
             set_use_markup: false,
             set_title: &self.saved.name,
-            set_title_lines: 1,
-            set_subtitle_lines: 1,
+            set_title_lines: 2,
+            set_subtitle_lines: 2,
             set_tooltip_text: Some(format!("{}\n{}", self.saved.name, subtitle_for(&self.saved, &self.organization, &self.driver_name)).as_str()),
             set_subtitle: &subtitle_for(&self.saved, &self.organization, &self.driver_name),
             set_activatable: true,
