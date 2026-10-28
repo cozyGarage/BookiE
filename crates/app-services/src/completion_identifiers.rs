@@ -7,6 +7,8 @@ pub(super) fn plan(text: &str, grammar: Option<SqlGrammar>) -> ScriptPlan {
 }
 
 pub(super) fn plan_with(text: &str, grammar: Option<SqlGrammar>, settings: Option<LexicalSettings>) -> ScriptPlan {
+    #[cfg(test)]
+    LEXED_BYTES.set(LEXED_BYTES.get() + text.len());
     let grammar = grammar.unwrap_or(SqlGrammar::Sqlite);
     ScriptPlan::build(
         text,
@@ -16,6 +18,8 @@ pub(super) fn plan_with(text: &str, grammar: Option<SqlGrammar>, settings: Optio
 }
 
 pub(super) fn normalized(text: &str) -> String {
+    #[cfg(test)]
+    NORMALIZED_CALLS.set(NORMALIZED_CALLS.get() + 1);
     text.chars()
         .filter(|character| !matches!(character, '"' | '`' | '[' | ']'))
         .collect::<String>()
@@ -23,6 +27,8 @@ pub(super) fn normalized(text: &str) -> String {
 }
 
 pub fn split_table_reference(text: &str, grammar: Option<SqlGrammar>) -> Option<(Option<String>, String)> {
+    #[cfg(test)]
+    SPLIT_CALLS.set(SPLIT_CALLS.get() + 1);
     let plan = plan(text, grammar);
     if !plan.diagnostics().is_empty() {
         return None;
@@ -75,6 +81,24 @@ fn quoted_name(raw: &str, grammar: Option<SqlGrammar>) -> Option<String> {
 #[cfg(test)]
 std::thread_local! {
     static TABLE_KEY_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static NORMALIZED_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static SPLIT_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static LEXED_BYTES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(super) fn normalized_calls() -> usize {
+    NORMALIZED_CALLS.get()
+}
+
+#[cfg(test)]
+pub(super) fn split_calls() -> usize {
+    SPLIT_CALLS.get()
+}
+
+#[cfg(test)]
+pub(super) fn lexed_bytes() -> usize {
+    LEXED_BYTES.get()
 }
 
 #[cfg(test)]

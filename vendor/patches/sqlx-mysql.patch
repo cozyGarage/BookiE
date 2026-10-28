@@ -1,50 +1,38 @@
 diff --git a/src/protocol/text/column.rs b/src/protocol/text/column.rs
-index b7c9c7e..eacdbb8 100755
+index b7c9c7e..cb74dc3 100755
 --- a/src/protocol/text/column.rs
 +++ b/src/protocol/text/column.rs
-@@ -175,6 +175,7 @@ impl ColumnType {
-         let is_binary = flags.contains(ColumnFlags::BINARY);
-         let is_unsigned = flags.contains(ColumnFlags::UNSIGNED);
-         let is_enum = flags.contains(ColumnFlags::ENUM);
+@@ -174,2 +174,2 @@ impl ColumnType {
+-    pub(crate) fn name(self, flags: ColumnFlags, max_size: Option<u32>) -> &'static str {
+-        let is_binary = flags.contains(ColumnFlags::BINARY);
++    pub(crate) fn name(self, flags: ColumnFlags, collation: Collation, max_size: Option<u32>) -> &'static str {
++        let is_binary = collation == Collation::BINARY;
+@@ -177,0 +178 @@ impl ColumnType {
 +        let is_set = flags.contains(ColumnFlags::SET);
- 
-         match self {
-             ColumnType::Tiny if max_size == Some(1) => "BOOLEAN",
-@@ -203,8 +204,10 @@ impl ColumnType {
-             ColumnType::Geometry => "GEOMETRY",
-             ColumnType::Json => "JSON",
- 
+@@ -206 +207 @@ impl ColumnType {
 -            ColumnType::String if is_binary => "BINARY",
 +            // ENUM and SET remain text when a character collation sets the binary flag.
-             ColumnType::String if is_enum => "ENUM",
+@@ -207,0 +209,2 @@ impl ColumnType {
 +            ColumnType::String if is_set => "SET",
 +            ColumnType::String if is_binary => "BINARY",
-             ColumnType::VarChar | ColumnType::VarString if is_binary => "VARBINARY",
- 
-             ColumnType::String => "CHAR",
 diff --git a/src/testing/mod.rs b/src/testing/mod.rs
 index f509f9d..2a24dd4 100755
 --- a/src/testing/mod.rs
 +++ b/src/testing/mod.rs
-@@ -144,7 +144,7 @@ async fn test_context(args: &TestArgs) -> Result<TestContext<MySql>, Error> {
-             -- BLOB/TEXT columns can only be used as index keys with a prefix length:
-             -- https://dev.mysql.com/doc/refman/8.4/en/column-indexes.html#column-indexes-prefix
-             primary key(db_name(63))
+@@ -147 +147 @@ async fn test_context(args: &TestArgs) -> Result<TestContext<MySql>, Error> {
 -        );        
 +        );
-     "#,
-     )
-     .await?;
+diff --git a/src/type_info.rs b/src/type_info.rs
+index d37997b..ca417d6 100755
+--- a/src/type_info.rs
++++ b/src/type_info.rs
+@@ -84 +84 @@ impl TypeInfo for MySqlTypeInfo {
+-        self.r#type.name(self.flags, self.max_size)
++        self.r#type.name(self.flags, self.collation, self.max_size)
 diff --git a/src/types/str.rs b/src/types/str.rs
 index 64bc926..02e51aa 100755
 --- a/src/types/str.rs
 +++ b/src/types/str.rs
-@@ -36,7 +36,7 @@ impl Type<MySql> for str {
-                 | ColumnType::Enum
-         )
-             // Any collation that *isn't* `binary` generally indicates string data.
+@@ -39 +39 @@ impl Type<MySql> for str {
 -            // The actual collation used for storage doesn't matter, 
 +            // The actual collation used for storage doesn't matter,
-             // because the server will transcode to the charset we specify.
-             //
-             // See comment in `src/collation.rs` for details.
