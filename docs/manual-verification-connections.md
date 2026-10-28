@@ -47,11 +47,11 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Connection bundles
 
-- [ ] Export without a passphrase, then read the file: it contains hosts and usernames and **no** password, passphrase or token.
-- [ ] Export with a passphrase, then import it on a second profile (`TABLEPRO_PROFILE=development`) and confirm the connections and their credentials arrive.
-- [ ] A wrong passphrase and a file edited after export give the **same** message.
-- [ ] Importing a bundle whose id already exists locally against a different server creates a new connection and leaves the local one untouched.
-- [ ] The import plan lists every connection with its disposition and can be unticked before anything is written.
+- [x] Export without a passphrase, then read the file: it contains hosts and usernames and **no** password, passphrase or token. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** the 8 KB file had hosts, usernames and database names and no password, passphrase or token values; the only passphrase-like fields were `has_passphrase: false` flags, and an SSH key was referenced by path, not content.
+- [ ] Export with a passphrase, then import it on a second profile (`TABLEPRO_PROFILE=development`) and confirm the connections and their credentials arrive. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** the passphrase export was encrypted (Argon2id, AES-256-GCM; no host or connection name readable); a second profile (a private XDG directory set, not `TABLEPRO_PROFILE`) imported 13 connections after one was unticked; their credentials arriving was not checked. A profile with no connections has no import entry ([#1949](https://github.com/cozyGarage/BookiE/issues/1949)).
+- [x] A wrong passphrase and a file edited after export give the **same** message. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** both gave "The passphrase is wrong, or the file was changed after it was exported." (a flipped byte in the ciphertext, and a wrong passphrase).
+- [ ] Importing a bundle whose id already exists locally against a different server creates a new connection and leaves the local one untouched. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** an existing connection with the same id was listed as "Update … Read-only, environment and TLS are never relaxed"; the different-server case was not run.
+- [x] The import plan lists every connection with its disposition and can be unticked before anything is written. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** the plan listed each connection as Add or Update with a tick box and said "These changes have not been made yet"; unticking `pg-prod` left it out of the result.
 
 ## Built-in SSH host keys and tunnel loss
 
