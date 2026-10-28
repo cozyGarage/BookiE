@@ -429,7 +429,7 @@ class CiWorkflowTests(unittest.TestCase):
         for name in checker.REQUIRED:
             for state in ["failure", "skipped", "cancelled", "missing"]:
                 results = success | {name: {"result": state}}
-                deferred = name in checker.MERGE_ONLY and state == "skipped"
+                deferred = (name in checker.MERGE_ONLY or name in checker.PULL_REQUEST_ONLY) and state == "skipped"
                 expected = [] if deferred else [name]
                 self.assertEqual(checker.assess(results, "push")[0], expected, (name, state))
         self.assertEqual(set(checker.assess({}, "push")[0]), checker.REQUIRED | {checker.SCHEDULED})
@@ -443,12 +443,16 @@ class CiWorkflowTests(unittest.TestCase):
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
         for name in checker.REQUIRED:
             results = success | {name: {"result": "skipped"}}
-            expected = [] if name in checker.MERGE_ONLY else [name]
-            self.assertEqual(checker.assess(results, "pull_request")[0], expected, name)
-            self.assertEqual(checker.assess(results, "push")[0], expected, name)
+            pr_expected = [] if name in checker.MERGE_ONLY else [name]
+            push_expected = [] if name in checker.MERGE_ONLY or name in checker.PULL_REQUEST_ONLY else [name]
+            self.assertEqual(checker.assess(results, "pull_request")[0], pr_expected, name)
+            self.assertEqual(checker.assess(results, "push")[0], push_expected, name)
         for name in checker.MERGE_ONLY:
             results = success | {name: {"result": "skipped"}}
             self.assertEqual(checker.assess(results, "schedule")[0], [name], name)
+        results = success | {"driver-tls": {"result": "skipped"}}
+        self.assertEqual(checker.assess(results, "pull_request")[0], ["driver-tls"])
+        self.assertEqual(checker.assess(results, "push")[0], [])
 
     def test_the_workflow_runs_merge_tier_jobs_only_on_schedule_or_dispatch(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
