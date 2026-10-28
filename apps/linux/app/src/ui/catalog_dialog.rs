@@ -26,6 +26,7 @@ pub fn present(
     database: &std::sync::Arc<DatabaseService>,
     preferences: &PreferencesStore,
     connection_scope: CancellationToken,
+    initial_kind: Option<CatalogObjectKind>,
 ) {
     let Some(connection) = connection_id.filter(|id| database.metadata(*id).is_some()) else {
         let alert = adw::AlertDialog::new(
@@ -48,8 +49,7 @@ pub fn present(
     dialog.set_content_height(560);
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&adw::HeaderBar::new());
-    let labels: Vec<String> = CatalogObjectKind::ALL.iter().map(|kind| kind_label(*kind)).collect();
-    let kinds = steady_width_dropdown(&labels);
+    let kinds = kind_dropdown(initial_kind);
     let schema = gtk::SearchEntry::builder()
         .placeholder_text(tr!("All schemas"))
         .hexpand(true)
@@ -87,6 +87,16 @@ pub fn present(
     dialog.connect_closed(move |_| in_flight.borrow().cancel());
     crate::ui::leak_probe::track("catalog", &dialog);
     dialog.present(Some(parent));
+}
+
+fn kind_dropdown(initial: Option<CatalogObjectKind>) -> gtk::DropDown {
+    let labels: Vec<String> = CatalogObjectKind::ALL.iter().map(|kind| kind_label(*kind)).collect();
+    let kinds = steady_width_dropdown(&labels);
+    let position = initial.and_then(|kind| CatalogObjectKind::ALL.iter().position(|candidate| *candidate == kind));
+    if let Some(index) = position {
+        kinds.set_selected(index as u32);
+    }
+    kinds
 }
 
 fn steady_width_dropdown(labels: &[String]) -> gtk::DropDown {
@@ -180,7 +190,7 @@ fn object_row(object: &CatalogObject) -> adw::ActionRow {
         .build()
 }
 
-fn kind_label(kind: CatalogObjectKind) -> String {
+pub(crate) fn kind_label(kind: CatalogObjectKind) -> String {
     match kind {
         CatalogObjectKind::Routine => tr!("Functions and procedures"),
         CatalogObjectKind::Trigger => tr!("Triggers"),

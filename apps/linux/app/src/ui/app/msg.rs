@@ -139,6 +139,8 @@ pub enum AppMsg {
     ShowAuditLog,
     ShowAuditOperation(Uuid),
     ShowCatalog,
+    ShowCatalogKind(tablepro_core::CatalogObjectKind),
+    ToggleAllSidebarGroups,
     ExplainActiveQuery,
     ShowPreferences,
     NewWindow,
