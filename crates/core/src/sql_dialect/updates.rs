@@ -1,6 +1,6 @@
 use super::{
-    BuildSqlError, build_update, checked_pk_indexes, keyed_where_clause, placeholder_for, postgres_text_cast_type,
-    qualified_table, quote_ident, text_cast_placeholder,
+    BuildSqlError, build_update, checked_pk_indexes, exact_original::exact_original_predicate, keyed_where_clause,
+    placeholder_for, postgres_text_cast_type, qualified_table, quote_ident, text_cast_placeholder,
 };
 use crate::{ColumnInfo, Value};
 
@@ -144,6 +144,13 @@ pub fn build_optimistic_keyed_update(
         pk_values,
         &mut params,
     )];
+    for (&index, original) in pk_indexes.iter().zip(pk_values) {
+        let column = &columns[index];
+        let name = quote_ident(driver_id, &column.name);
+        if let Some(predicate) = exact_original_predicate(driver_id, &name, column, original, &mut params) {
+            predicates.push(predicate);
+        }
+    }
     for (col_idx, old_value, _) in edits {
         if columns[*col_idx].primary_key {
             continue;
@@ -183,6 +190,9 @@ fn optimistic_predicate(
     old_value: &Value,
     params: &mut Vec<Value>,
 ) -> Result<String, BuildSqlError> {
+    if let Some(predicate) = exact_original_predicate(driver_id, name, column, old_value, params) {
+        return Ok(predicate);
+    }
     let placeholder = placeholder_for(driver_id, params.len());
     let predicate = match driver_id {
         "postgres" if matches!(column.data_type.trim().to_ascii_lowercase().as_str(), "real" | "float4") => {
@@ -350,6 +360,43 @@ mod tests {
             enum_type: None,
             domain_type: None,
         }
+    }
+
+    #[test]
+    fn original_text_keys_are_guarded_without_changing_the_key_lookup() {
+        let columns = [column("id", true), column("payload", false)];
+        for driver in ["postgres", "sqlite", "mysql", "mssql"] {
+            let (sql, params) = build_optimistic_keyed_update(
+                driver,
+                None,
+                "records",
+                &columns,
+                &[(1, Value::Null, Value::Text("edited".into()))],
+                &[Value::Text("Ada".into())],
+            )
+            .unwrap();
+            assert_eq!(params[1], Value::Text("Ada".into()));
+            assert_eq!(params[2], Value::Text("Ada".into()));
+            assert!(!sql.contains("Ada"));
+        }
+    }
+
+    #[test]
+    fn original_postgres_json_text_keeps_source_identity() {
+        let mut columns = [column("id", true), column("payload", false)];
+        columns[1].data_type = "json".into();
+        let original = Value::JsonText("{\"a\":1,\"a\":2}".into());
+        let (sql, params) = build_optimistic_keyed_update(
+            "postgres",
+            None,
+            "records",
+            &columns,
+            &[(1, original.clone(), Value::JsonText("{}".into()))],
+            &[Value::Int(7)],
+        )
+        .unwrap();
+        assert!(!sql.contains("jsonb"));
+        assert_eq!(params.last(), Some(&original));
     }
 
     #[test]

@@ -25,6 +25,7 @@ tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+tablepro-app-services = { path = "../../app-services" }
 csv.workspace = true
 secrecy.workspace = true
 tempfile.workspace = true

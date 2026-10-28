@@ -7,6 +7,7 @@ use crate::{ColumnInfo, Value};
 mod postgres_enum_tests;
 
 mod error;
+mod exact_original;
 mod inserts;
 mod pg_native_text;
 #[path = "sql_dialect/updates.rs"]

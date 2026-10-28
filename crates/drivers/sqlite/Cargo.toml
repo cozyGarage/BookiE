@@ -22,6 +22,7 @@ sqlparser.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+tablepro-app-services = { path = "../../app-services" }
 tablepro-policy = { path = "../../policy" }
 serde_json.workspace = true
 async-trait.workspace = true
