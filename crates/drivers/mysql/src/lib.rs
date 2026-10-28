@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use async_trait::async_trait;
 use secrecy::ExposeSecret;
 use sqlparser::ast::Statement as SqlStatement;
@@ -103,9 +101,10 @@ impl DatabaseDriver for MysqlDriver {
         let session_options = mysql_opts.clone();
         let read_only = opts.read_only;
         let database: std::sync::Arc<str> = opts.database.as_str().into();
+        let acquire_timeout = opts.pool_acquire_timeout();
         let pool = MySqlPoolOptions::new()
             .max_connections(4)
-            .acquire_timeout(Duration::from_secs(5))
+            .acquire_timeout(acquire_timeout)
             .after_connect(move |connection, _| Box::pin(prepare_session(connection, read_only)))
             .before_acquire(move |connection, _| {
                 let database = std::sync::Arc::clone(&database);
@@ -124,7 +123,7 @@ impl DatabaseDriver for MysqlDriver {
         // requested.
         let cancellation_pool = MySqlPoolOptions::new()
             .max_connections(1)
-            .acquire_timeout(Duration::from_secs(5))
+            .acquire_timeout(acquire_timeout)
             .connect_lazy_with(cancellation_options);
         Ok(Box::new(MysqlConnection {
             pool,

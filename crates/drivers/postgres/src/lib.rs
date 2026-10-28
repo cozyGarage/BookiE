@@ -130,7 +130,7 @@ impl DatabaseDriver for PgDriver {
         }
         pg_opts = pg_opts.statement_cache_capacity(0);
         let session_options = pg_opts.clone();
-        let pool = pool::options()
+        let pool = pool::options(opts.pool_acquire_timeout())
             .connect_with(pg_opts)
             .await
             .map_err(map_sqlx_connect_error)?;

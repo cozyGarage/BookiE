@@ -53,6 +53,11 @@ pub fn bare_host(host: &str) -> &str {
 }
 
 impl ConnectOptions {
+    pub fn pool_acquire_timeout(&self) -> std::time::Duration {
+        let configured = self.connect_timeout_secs.unwrap_or(0).max(5);
+        std::time::Duration::from_secs(u64::from(configured))
+    }
+
     pub fn service_address(&self) -> (&str, u16) {
         self.service_endpoint
             .as_ref()
@@ -868,5 +873,17 @@ mod tests {
         };
 
         assert_eq!(options.service_address(), ("sql.corp.example", 1433));
+    }
+
+    #[test]
+    fn a_pool_checkout_waits_at_least_as_long_as_the_saved_connect_timeout() {
+        let mut opts = ConnectOptions::default();
+        assert_eq!(opts.pool_acquire_timeout(), std::time::Duration::from_secs(5));
+        opts.connect_timeout_secs = Some(0);
+        assert_eq!(opts.pool_acquire_timeout(), std::time::Duration::from_secs(5));
+        opts.connect_timeout_secs = Some(2);
+        assert_eq!(opts.pool_acquire_timeout(), std::time::Duration::from_secs(5));
+        opts.connect_timeout_secs = Some(45);
+        assert_eq!(opts.pool_acquire_timeout(), std::time::Duration::from_secs(45));
     }
 }
