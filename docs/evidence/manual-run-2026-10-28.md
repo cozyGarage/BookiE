@@ -50,6 +50,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Editor, second pass (installed package) | Lone BEGIN refusal, empty Explain message, close with an open transaction and Roll Back and Close, dimmed result while a query runs, tick and cross gutter marks |
 | Editor files and saved queries (installed package) | A symlinked file saves through to its target; an oversized file is refused; Escape closes Explain; Ctrl+Shift+D is claimed by GTK's inspector prompt (#1948) |
 | Connection bundles (installed package) | Plain export carries no secrets; passphrase export is encrypted; wrong passphrase and tampered file give one message; import plan lists dispositions and honours unticking; an empty profile has no import entry (#1949) |
+| Connection list (installed package) | 3 s connect timeout fails in 3 s with a clear message; Duplicate gives a distinct name and an empty-password form; Group and tags and the colour swatch work |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
