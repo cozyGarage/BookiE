@@ -31,7 +31,7 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 
 - [x] Each kind in the dropdown lists its objects with schema and detail. **2026-10-12 Hyprland dark:** functions, triggers and sequences passed; other kinds not run. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** all seven kinds listed objects; triggers 1, sequences 7, extensions 1, roles 1 and types 2 matched `psql`; Privileges listed 13, not cross-checked.
 - [ ] Typing a schema name and pressing Enter narrows the list; clearing it lists all. **2026-10-12 Hyprland dark:** passed.
-- [ ] On SQLite or MySQL the status says the engine does not list that kind, not "Nothing of this kind was found". **2026-10-28 native Wayland, dark, `bb9202644` debug build:** SQLite passed for Functions and procedures ("This engine does not list functions and procedures."); MySQL not run.
+- [ ] On SQLite or MySQL the status says the engine does not list that kind, not "Nothing of this kind was found". **2026-10-28 native Wayland, dark, `bb9202644` debug build:** SQLite passed for Functions and procedures ("This engine does not list functions and procedures."); MySQL not run. **2026-10-28 native Wayland, `bb9202644` debug build:** MySQL 8.4 also said "This engine does not list functions and procedures."
 - [ ] Switching kind quickly never shows the previous kind's rows under the new one.
 - [ ] Closing the window mid-load leaves no error toast behind.
 
