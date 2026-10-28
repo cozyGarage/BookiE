@@ -11,6 +11,17 @@ use sourceview5::subclass::prelude::*;
 use super::completion::{SchemaIndex, SchemaRequest};
 use super::completion_proposals::candidates_with;
 
+pub(super) fn dismiss_on_focus_loss(view: &sourceview5::View) {
+    let focus = gtk::EventControllerFocus::new();
+    let weak_view = view.downgrade();
+    focus.connect_leave(move |_| {
+        if let Some(view) = weak_view.upgrade() {
+            view.completion().hide();
+        }
+    });
+    view.add_controller(focus);
+}
+
 struct Insertion {
     label: String,
     sql: String,

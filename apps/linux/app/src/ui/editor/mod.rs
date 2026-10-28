@@ -556,16 +556,8 @@ impl SimpleComponent for SqlEditor {
         let completion = widgets.source_view.completion();
         completion.add_provider(&provider);
         split_view.secondary_view().completion().add_provider(&provider);
-        for view in [&widgets.source_view, split_view.secondary_view()] {
-            let focus = gtk::EventControllerFocus::new();
-            let weak_view = view.downgrade();
-            focus.connect_leave(move |_| {
-                if let Some(view) = weak_view.upgrade() {
-                    view.completion().hide();
-                }
-            });
-            view.add_controller(focus);
-        }
+        completion_provider::dismiss_on_focus_loss(&widgets.source_view);
+        completion_provider::dismiss_on_focus_loss(split_view.secondary_view());
 
         let cursor_info = widgets.cursor_info.clone();
         let update_cursor = move |buffer: &gtk::TextBuffer| {
