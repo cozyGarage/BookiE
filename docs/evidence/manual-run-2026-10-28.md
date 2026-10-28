@@ -96,8 +96,8 @@ Counted from the four checklists at the head of this run. "With a 2026-10-28 res
 | Catalog, sidebar and application shell | 38 | 7 | 20 | 18 |
 | Connections and SSH | 44 | 15 | 29 | 15 |
 | SQL editor and sessions | 62 | 30 | 34 | 28 |
-| Grid, filters and data transfer | 76 | 10 | 34 | 42 |
-| **All four** | 220 | 62 | 117 | 103 |
+| Grid, filters and data transfer | 76 | 12 | 38 | 38 |
+| **All four** | 220 | 64 | 121 | 99 |
 
 Why the rest are open:
 
