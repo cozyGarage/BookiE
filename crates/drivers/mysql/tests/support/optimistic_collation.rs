@@ -82,7 +82,10 @@ async fn a_single_precision_float_cell_can_be_edited_after_it_was_read() {
         .execute("CREATE TABLE readings (id INT PRIMARY KEY, f FLOAT)")
         .await
         .unwrap();
-    connection.execute("INSERT INTO readings VALUES (1, 0.1)").await.unwrap();
+    connection
+        .execute("INSERT INTO readings VALUES (1, 0.1)")
+        .await
+        .unwrap();
     let read = connection.query("SELECT f FROM readings").await.unwrap();
     let original = read.rows[0][0].clone();
     assert_eq!(original, Value::Float(0.1));
