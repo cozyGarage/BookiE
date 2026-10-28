@@ -25,8 +25,8 @@ trap cleanup EXIT
 
 mkdir -p "$RUNTIME/home" "$RUNTIME/config" "$RUNTIME/data" "$RUNTIME/cache" "$RUNTIME/state" "$RUNTIME/runtime"
 mkdir -p "$RUNTIME/data/dbus-1/services"
-printf '[D-BUS Service]\nName=org.a11y.Bus\nExec=/usr/lib/at-spi-bus-launcher\n' \
-  > "$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"
+cp "/usr/share/dbus-1/services/org.a11y.Bus.service" \
+  "$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"
 chmod 0700 "$RUNTIME/runtime"
 test -x "$REAL_BINARY"
 

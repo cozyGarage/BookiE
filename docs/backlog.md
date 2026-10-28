@@ -24,12 +24,6 @@ The [October 27 code audit](archive/current-code-correctness-audit-2026-10-27.md
 | A dangling policy symlink silently enables default policy | [#1823](https://github.com/cozyGarage/BookiE/issues/1823) | UX, B4 consultation |
 | Supported evidence packets are omitted from default discovery | [#1824](https://github.com/cozyGarage/BookiE/issues/1824) | UX |
 
-## Catalog cancellation
-
-| ID / issue | Gap | Lane | Acceptance focus |
-|---|---|---|---|
-| UI-46 / [#1734](https://github.com/cozyGarage/BookiE/issues/1734) | Database switching waits on an uncontrolled `list_databases` call | B3 | Pass the request deadline and cancellation token through `Connection` and `PolicyGuard`; preserve terminal audit outcomes and ignore superseded UI results. An in-flight timeout remains `OperationOutcomeUnknown` unless a driver confirms server cancellation. |
-
 ## Post-release acceptance follow-ups
 
 These rows remained open after the 0.2.0 delivery decision and are now part of the post-release backlog. They do not reopen the 0.2.0 milestone or define the final 0.2.1 scope. Project #3 and the linked issues own current status and acceptance.
@@ -40,7 +34,6 @@ These rows remained open after the 0.2.0 delivery decision and are now part of t
 | AUD-9 | [#600](https://github.com/cozyGarage/BookiE/issues/600) | B4 | Prevent agent masking leaks through hidden SQL lineage |
 | TEST-15 | [#593](https://github.com/cozyGarage/BookiE/issues/593) | B4 | Verify lost-ack writes are not replayed after reconnect |
 | TEST-25 | [#1545](https://github.com/cozyGarage/BookiE/issues/1545) | B3 | Decide SQLite runtime policy and verify SQL-NULL-key JSON aggregates on affected and fixed versions |
-| AppStream 0.2.0 metadata | [#1585](https://github.com/cozyGarage/BookiE/issues/1585) | UX | Reconcile the development classification and date with the published release; decide how post-release source metadata is labeled without pre-approving a 0.2.1 scope |
 | UI-35 | [#579](https://github.com/cozyGarage/BookiE/issues/579) | UX | Complete native Linux acceptance against a local MySQL or MariaDB service and record the app build and socket path |
 | B4-7, B4-16, B4-22 | [#566](https://github.com/cozyGarage/BookiE/issues/566) | B4 | Finish installed acceptance for tunnel audit, session invalidation, and bundle audit |
 | TEST-31 | [#556](https://github.com/cozyGarage/BookiE/issues/556) | UX | Triage intermittent installed GTK runs and gather the required full-run evidence |
@@ -76,17 +69,9 @@ From the 2026-10-22 dbflux review and the audit of closed issues. Each is an iss
 |---|---|---|
 | PERF-11 / [#580](https://github.com/cozyGarage/BookiE/issues/580) | Reopened: catalog scoping, many-schema performance, restricted-role metadata | UX |
 | DBF-2 to DBF-4 / [#1356](https://github.com/cozyGarage/BookiE/issues/1356), [#1357](https://github.com/cozyGarage/BookiE/issues/1357), [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | Measure PostgreSQL row-cap drain, SQLite early cancel, verify-ca hostname per engine | B3 / B4 |
-| DBF-5 / [#1668](https://github.com/cozyGarage/BookiE/issues/1668) | Return request-scoped audit receipts from guarded query results | B4 |
 | B4-24 / [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Decide the TLS fingerprint pin | B4 |
-| UI-43 / [#1366](https://github.com/cozyGarage/BookiE/issues/1366) | Completion through the session search_path | B4 |
 
 The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain related dbflux design notes in their comments. Vendored dependency patches: see [upstream patches](proposals/upstream-patches.md); `mongodb` SCRAM hunk can be dropped after the release containing [mongo-rust-driver#1833](https://github.com/mongodb/mongo-rust-driver/pull/1833).
-
-## UI resource-lifetime follow-ups
-
-| Issue | Item | Lane |
-|---|---|---|
-| [#1733](https://github.com/cozyGarage/BookiE/issues/1733) | Release grid editor popovers and their cells after closing enum/set, calendar, numeric, text and JSON editors | UX |
 
 ## Feature candidates
 
@@ -107,7 +92,7 @@ The native workflow improvements are tracked by [UI-44 / #1349](https://github.c
 
 | Row | What |
 |---|---|
-| PERF-2, PERF-7, PERF-8 | Merged PR #1660 adds a process-local encrypted spool for fetched PostgreSQL pages, so the same execution can revisit pages beyond the 64 MiB RAM cache without rerunning SQL. The spool has a shared 1 GiB quota and a 4,096-page per-result cap; storage, quota or page-cap refusal stops the stream as incomplete while stored pages remain available to their owners. The installed 100,000-row GTK scenario and refreshed local preflight pass; #554 is closed for this fetched-page navigation gap, and all 17 GitHub checks passed after merge. The maintainer accepted [ADR 0025](decisions/0025-transient-result-page-spool.md) on 2026-10-27; Forgejo acceptance of the spool is not recorded. Candidate-specific profiles are in [ADR 0011](decisions/0011-paged-query-results.md#implementation-status) and [the spool acceptance report](evidence/stream-result-spool-2026-10-25.md). Issue #1032 remains open for GUI stream ownership, aggregate retention and export/cancellation acceptance; it does not claim a completed process-memory bound. Issue #1272 separately tracks large-query CPU/RSS. Other engines and unsupported statement shapes remain materialized. |
+| PERF-2, PERF-7, PERF-8 | Merged PR #1660 adds a process-local encrypted spool for fetched PostgreSQL pages, so the same execution can revisit pages beyond the 64 MiB RAM cache without rerunning SQL. The spool has a shared 1 GiB quota and a 4,096-page per-result cap; storage, quota or page-cap refusal stops the stream as incomplete while stored pages remain available to their owners. The installed 100,000-row GTK scenario and refreshed local preflight pass; #554 is closed for this fetched-page navigation gap, and all 17 GitHub checks passed after merge. The maintainer accepted [ADR 0025](decisions/0025-transient-result-page-spool.md) on 2026-10-27; Forgejo acceptance of the spool is not recorded. Candidate-specific profiles are in [ADR 0011](decisions/implementation-status.md#adr-0011-page-large-editor-results-through-a-cursor) and [the spool acceptance report](evidence/stream-result-spool-2026-10-25.md). Issue #1032 remains open for GUI stream ownership, aggregate retention and export/cancellation acceptance; it does not claim a completed process-memory bound. Issue #1272 separately tracks large-query CPU/RSS. Other engines and unsupported statement shapes remain materialized. |
 | PERF-3 | MongoDB browse on large collections | Compatible `_id` forward keyset seek landed in #493; supported server-side sorting landed in #837. Reverse and last-page navigation, explicitly sorted pages, and keyless deep pages still use offset pagination; installed and representative-network acceptance remain |
 | PERF-4 | Server time next to elapsed time |
 

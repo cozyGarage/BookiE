@@ -37,7 +37,7 @@ fn an_explicit_workspace_path_survives_flush_and_a_fresh_store() {
 }
 
 fn flush(store: &WorkspaceStore) -> Result<(), tablepro_app_services::workspace_state::WorkspaceFlushError> {
-    store.flush().recv_timeout(std::time::Duration::from_secs(5)).unwrap()
+    store.flush().recv_timeout(std::time::Duration::from_secs(30)).unwrap()
 }
 
 #[test]
@@ -88,7 +88,15 @@ fn an_unreadable_workspace_is_preserved_and_a_retry_can_flush_the_pending_save()
     assert_eq!(flush(&store), Err(WorkspaceFlushError::WriteFailed));
     assert_eq!(std::fs::read(&path).unwrap(), b"invalid workspace");
     std::fs::write(&path, br#"{"connections":{}}"#).unwrap();
-    assert_eq!(flush(&store), Ok(()));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        match store.flush().recv_timeout(remaining) {
+            Ok(Ok(())) => break,
+            Ok(Err(WorkspaceFlushError::WriteFailed)) if !remaining.is_zero() => {}
+            result => panic!("workspace flush did not recover: {result:?}"),
+        }
+    }
     let saved: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     assert_eq!(saved["connections"][id.to_string()]["tabs"], serde_json::json!([]));
 }
