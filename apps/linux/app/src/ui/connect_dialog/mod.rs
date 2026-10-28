@@ -1,3 +1,6 @@
+mod candidate;
+
+use candidate::open_candidate;
 use std::sync::Arc;
 
 use relm4::adw::prelude::*;
@@ -630,8 +633,14 @@ impl Component for ConnectDialog {
                                                 &metadata,
                                                 tablepro_policy::Principal::human_gui(),
                                             );
-                                            match guarded.list_tables_controlled(&control).await {
-                                                Ok(tables) => Ok(tables.len()),
+                                            match guarded {
+                                                Ok(guarded) => guarded
+                                                    .list_tables_controlled(&control)
+                                                    .await
+                                                    .map(|tables| tables.len())
+                                                    .map_err(|error| {
+                                                        crate::services::error_text::driver_message(&error)
+                                                    }),
                                                 Err(error) => Err(crate::services::error_text::driver_message(&error)),
                                             }
                                         }
@@ -949,48 +958,6 @@ struct OpenedCandidate {
 struct CandidateBootstrap<'a> {
     guard_factory: &'a crate::services::database_service::CandidateGuardFactory,
     metadata: &'a crate::services::database_service::ConnectionMetadata,
-}
-
-async fn open_candidate(
-    driver: &dyn tablepro_core::DatabaseDriver,
-    opts: ConnectOptions,
-    ssh: Option<tablepro_transport::SshRoute>,
-    ssh_environment: &tablepro_transport::SshEnvironment,
-    timeout_secs: u32,
-    cancellation: tokio_util::sync::CancellationToken,
-    bootstrap: CandidateBootstrap<'_>,
-) -> Result<OpenedCandidate, String> {
-    let (conn, tunnel) =
-        tablepro_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
-            .await
-            .map_err(connection_service::message)?;
-    let conn: Arc<dyn tablepro_core::Connection> = Arc::from(conn);
-    let guarded = bootstrap.guard_factory.guard(
-        conn.clone(),
-        bootstrap.metadata,
-        tablepro_policy::Principal::human_gui(),
-    );
-    let server_version = match guarded.server_version().await {
-        Ok(version) => version,
-        Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
-        Err(_) => None,
-    };
-    let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = guarded
-        .list_tables_controlled(&control)
-        .await
-        .map_err(|error| crate::services::error_text::driver_message(&error))?;
-    let views = guarded
-        .list_views_controlled(&control)
-        .await
-        .map_err(|error| crate::services::error_text::driver_message(&error))?;
-    Ok(OpenedCandidate {
-        conn,
-        tunnel,
-        server_version,
-        tables,
-        views,
-    })
 }
 
 async fn run_connect(request: ConnectRequest) -> Result<Option<connection_service::PreparedConnection>, String> {

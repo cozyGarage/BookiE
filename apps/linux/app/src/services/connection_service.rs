@@ -144,7 +144,9 @@ pub async fn open_saved(
         server_version: None,
         query_timeout_secs: saved.query_timeout_secs,
     };
-    let guarded = guard_factory.guard(connection.clone(), &metadata, tablepro_policy::Principal::human_gui());
+    let guarded = guard_factory
+        .guard(connection.clone(), &metadata, tablepro_policy::Principal::human_gui())
+        .map_err(|error| crate::services::error_text::driver_message(&error))?;
     let server_version = match guarded.server_version().await {
         Ok(version) => version,
         Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),

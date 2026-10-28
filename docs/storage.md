@@ -54,7 +54,7 @@ History export from the GUI writes through a temporary sibling file and a rename
 
 ## Policy
 
-The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A missing file uses the built-in defaults. The GUI currently uses `Path::exists` for this decision, so a dangling policy symlink is also treated as missing and policy remains marked available ([#1823](https://github.com/cozyGarage/BookiE/issues/1823)). If a present file cannot be read or parsed, the GUI marks policy unavailable and the local guard receives the built-in defaults; CSV imports and MCP are disabled. Other local SQL operations still use those defaults, so restrictions in the unreadable file are not enforced. A later reload failure keeps the policy already in memory. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
+The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. An absent optional file uses the built-in defaults. An existing file or symlink that cannot be read or parsed leaves policy unavailable: MCP, CSV imports, connection bootstrap and local database handles are refused. Connection attempts report that the policy must be repaired and reloaded. Fix the policy file and reopen Preferences to reload it, then reconnect; restart the application to start MCP. A failed reload retains the last valid policy, if one was loaded. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
 
 ## Audit journal
 

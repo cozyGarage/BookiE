@@ -22,10 +22,31 @@ fn load_policy() -> Result<PolicyConfig, String> {
 }
 
 fn load_policy_file(path: &std::path::Path) -> Result<PolicyConfig, String> {
-    if !path.exists() {
-        return Ok(PolicyConfig::default());
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => load_from_path(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            validate_missing_policy_parent(path)?;
+            Ok(PolicyConfig::default())
+        }
+        Err(error) => Err(error.to_string()),
     }
-    load_from_path(path)
+}
+
+fn validate_missing_policy_parent(path: &std::path::Path) -> Result<(), String> {
+    for ancestor in path.ancestors().skip(1) {
+        match std::fs::symlink_metadata(ancestor) {
+            Ok(_) => {
+                let metadata = std::fs::metadata(ancestor).map_err(|error| error.to_string())?;
+                if !metadata.is_dir() {
+                    return Err("the policy directory is not a directory".into());
+                }
+                return Ok(());
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Ok(())
 }
 
 pub use tablepro_app_services::connection_identity::ConnectionIdentity;
@@ -67,7 +88,7 @@ pub struct ReconnectParams {
 /// metadata reads still belong to the durable audit journal.
 #[derive(Clone)]
 pub struct CandidateGuardFactory {
-    policy: Arc<PolicyConfig>,
+    policy: Option<Arc<PolicyConfig>>,
     approval: Arc<dyn tablepro_policy::ApprovalSink>,
     audit: Arc<dyn tablepro_policy::AuditSink>,
     audit_state: Arc<AuditState>,
@@ -80,8 +101,13 @@ impl CandidateGuardFactory {
         connection: Arc<dyn Connection>,
         metadata: &ConnectionMetadata,
         principal: Principal,
-    ) -> PolicyGuard {
-        PolicyGuard::new(
+    ) -> Result<PolicyGuard, tablepro_core::DriverError> {
+        let policy = self.policy.clone().ok_or_else(|| {
+            tablepro_core::DriverError::PolicyDenied(
+                "Policy file unavailable. Fix policy.toml and reopen Preferences, then reconnect.".into(),
+            )
+        })?;
+        Ok(PolicyGuard::new(
             connection,
             GuardContext {
                 connection_id: metadata.id,
@@ -90,12 +116,12 @@ impl CandidateGuardFactory {
                 environment: metadata.environment,
                 read_only: metadata.read_only,
                 principal,
-                policy: self.policy.clone(),
+                policy,
                 approval: self.approval.clone(),
                 audit: self.audit.clone(),
                 audit_state: Arc::new(self.connection_audit_state(metadata.id)),
             },
-        )
+        ))
     }
 }
 
@@ -203,11 +229,10 @@ impl AuditRuntime {
 
 pub struct DatabaseService {
     connections: Mutex<HashMap<Uuid, Entry>>,
-    policy: Mutex<Arc<PolicyConfig>>,
+    policy: Mutex<Option<Arc<PolicyConfig>>>,
     audit: Arc<dyn tablepro_policy::AuditSink>,
     audit_journal: Option<Arc<AuditJournal>>,
     audit_available: bool,
-    policy_available: bool,
     audit_state: Arc<AuditState>,
     unresolved_connection_ids: Arc<HashSet<Uuid>>,
     approval: Mutex<Arc<dyn tablepro_policy::ApprovalSink>>,
@@ -239,18 +264,28 @@ impl DatabaseService {
     pub(crate) fn new_isolated() -> Self {
         let audit_temp_dir = tempfile::tempdir().expect("temporary audit directory");
         let audit = AuditRuntime::open_path(audit_temp_dir.path().join("audit.jsonl"));
-        Self::with_audit(audit, Some(audit_temp_dir))
+        Self::with_audit_policy(audit, Ok(PolicyConfig::default()), Some(audit_temp_dir))
     }
 
     fn with_audit(audit: AuditRuntime, #[cfg(test)] audit_temp_dir: Option<tempfile::TempDir>) -> Self {
-        let (policy, policy_available) = match load_policy() {
-            Ok(policy) => (Arc::new(policy), true),
+        Self::with_audit_policy(
+            audit,
+            load_policy(),
+            #[cfg(test)]
+            audit_temp_dir,
+        )
+    }
+
+    fn with_audit_policy(
+        audit: AuditRuntime,
+        loaded: Result<PolicyConfig, String>,
+        #[cfg(test)] audit_temp_dir: Option<tempfile::TempDir>,
+    ) -> Self {
+        let policy = match loaded {
+            Ok(policy) => Some(Arc::new(policy)),
             Err(error) => {
-                tracing::error!(
-                    error = %error,
-                    "policy file could not be loaded; using defaults and disabling MCP"
-                );
-                (Arc::new(PolicyConfig::default()), false)
+                tracing::error!(error = %error, "policy file unavailable; database access and MCP are disabled");
+                None
             }
         };
         Self {
@@ -259,7 +294,6 @@ impl DatabaseService {
             audit: audit.sink,
             audit_journal: audit.journal,
             audit_available: audit.available,
-            policy_available,
             audit_state: audit.state,
             unresolved_connection_ids: audit.unresolved_connection_ids,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
@@ -279,7 +313,10 @@ impl DatabaseService {
     }
 
     pub fn policy_available(&self) -> bool {
-        self.policy_available
+        self.policy
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some()
     }
 
     pub async fn audit_administrative_action(
@@ -394,8 +431,12 @@ impl DatabaseService {
     }
 
     pub fn reload_policy(&self) -> Result<(), String> {
-        let next = load_policy()?;
-        *self.policy.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::new(next);
+        self.apply_policy_reload(load_policy())
+    }
+
+    fn apply_policy_reload(&self, loaded: Result<PolicyConfig, String>) -> Result<(), String> {
+        let next = loaded?;
+        *self.policy.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::new(next));
         tracing::info!("policy reloaded");
         Ok(())
     }
@@ -546,7 +587,7 @@ impl DatabaseService {
             .policy
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
+            .clone()?;
         let approval = self
             .approval
             .lock()
@@ -622,21 +663,8 @@ mod tests {
     #[path = "identity_tests.rs"]
     mod identity_tests;
 
-    #[test]
-    fn policy_file_is_read_from_the_build_profile_config_directory() {
-        let path = xdg_config_path("policy.toml").unwrap();
-        let expected = std::path::Path::new(crate::config::storage_dir_name()).join("policy.toml");
-        assert!(path.ends_with(expected));
-    }
-
-    #[test]
-    fn a_missing_policy_file_uses_defaults_and_an_invalid_one_is_an_error() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("policy.toml");
-        assert!(load_policy_file(&path).is_ok());
-        std::fs::write(&path, "[environments.nowhere]\n").unwrap();
-        assert!(load_policy_file(&path).is_err());
-    }
+    #[path = "policy_tests.rs"]
+    mod policy_tests;
 
     #[test]
     fn separate_instances_do_not_share_connections() {
@@ -901,7 +929,8 @@ mod tests {
         };
         let guard = service
             .candidate_guard_factory()
-            .guard(connection, &metadata, Principal::human_gui());
+            .guard(connection, &metadata, Principal::human_gui())
+            .unwrap();
 
         guard.list_tables().await.expect("guarded table listing");
         guard.list_views().await.expect("guarded view listing");
@@ -1028,7 +1057,8 @@ mod tests {
         };
         let guard = service
             .candidate_guard_factory()
-            .guard(connection, &metadata, Principal::human_gui());
+            .guard(connection, &metadata, Principal::human_gui())
+            .unwrap();
 
         let result = guard.list_tables().await;
         assert!(matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))));
