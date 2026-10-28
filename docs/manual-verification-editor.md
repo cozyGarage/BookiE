@@ -32,7 +32,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Turn Session off while idle: after close completes, the transient closing status disappears and Run is enabled.
 - [ ] Closing the tab with a transaction open asks first; Roll Back and Close leaves the table unchanged. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** closing a Session tab with an open transaction asked "Close with an open transaction? The transaction is rolled back when the tab closes."; Roll Back and Close left the created table absent and no idle-in-transaction backend; Cancel was not run.
 - [x] Without Session, a lone `BEGIN` is refused and the message mentions Session. **2026-10-12 Hyprland dark:** passed. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** "Blocked by policy: BEGIN, COMMIT and ROLLBACK cannot run on a shared connection … Turn on Session for this editor tab".
-- [ ] On ClickHouse or an in-memory SQLite database, turning Session on explains that the engine does not offer it yet and the button turns back off.
+- [x] On ClickHouse or an in-memory SQLite database, turning Session on explains that the engine does not offer it yet and the button turns back off. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`):** ClickHouse 24.8: pressing Session showed "This engine does not offer dedicated sessions yet" beside the button and Session stayed off; in-memory SQLite was not run.
 - [ ] The audit journal shows the session's COMMIT or ROLLBACK against the same batch as the statements inside it. **2026-10-12 Hyprland dark:** COMMIT passed (same `batch_id` as the UPDATE).
 
 ## Session failure and shutdown paths (B4 I4)
@@ -44,7 +44,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] With an editor Session open, stop the database host (or block its port) and close the window. After the cleanup timeout, **Could not close database sessions** offers **Keep Open** (default) and **Close Anyway**; Close Anyway closes the window, Keep Open leaves it usable.
 - [ ] A retired session turns its toggle off; late state messages cannot relabel a replacement session. Automatic reconnect retires the previous tab sessions.
 - [ ] An unknown write outcome blocks only its owning connection; another connection stays usable. Restart/reconnect recovery follows the durable audit rules.
-- [ ] `SET autocommit=0`, `SET IMPLICIT_TRANSACTIONS ON`, `XA START` and an unterminated transaction batch are refused on applicable shared connections.
+- [ ] `SET autocommit=0`, `SET IMPLICIT_TRANSACTIONS ON`, `XA START` and an unterminated transaction batch are refused on applicable shared connections. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`):** MySQL 8.4 with Session off: `SET autocommit=0` and `XA START 'x1'` were both refused with "Blocked by policy … cannot run on a shared connection … Turn on Session", but the message talks about BEGIN, COMMIT and ROLLBACK ([#1952](https://github.com/cozyGarage/BookiE/issues/1952)). With Session on, `SET autocommit=0` asked for approval and ran after Approve once. `SET IMPLICIT_TRANSACTIONS ON` (SQL Server) and an unterminated batch were not run.
 
 ## Explain tree
 
