@@ -49,6 +49,9 @@ pub enum SshAuth {
         passphrase: Option<SecretString>,
     },
     Agent,
+    AgentIdentity {
+        public_key: PathBuf,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -599,7 +602,10 @@ async fn connect_and_auth(
                     .await
                     .map_err(SshError::Ssh)
             }
-            SshAuth::Agent => authenticate_with_agent(&mut session, &cfg.username).await,
+            SshAuth::Agent => authenticate_with_agent(&mut session, &cfg.username, None).await,
+            SshAuth::AgentIdentity { public_key } => {
+                authenticate_with_agent(&mut session, &cfg.username, Some(public_key)).await
+            }
         }
     };
     let auth = match tokio::time::timeout(AUTH_TIMEOUT, authenticating).await {
@@ -632,6 +638,7 @@ fn requires_keyboard_interactive_only(remaining_methods: &russh::MethodSet) -> b
 async fn authenticate_with_agent(
     session: &mut Handle<ClientHandler>,
     username: &str,
+    only: Option<&Path>,
 ) -> Result<client::AuthResult, SshError> {
     let agent_error = |error: &dyn std::fmt::Display| SshError::Agent(error.to_string());
     let mut agent = russh::keys::agent::client::AgentClient::connect_env()
@@ -650,6 +657,24 @@ async fn authenticate_with_agent(
     if keys.is_empty() {
         return Err(SshError::Agent("the agent holds no keys".into()));
     }
+    let keys = match only {
+        Some(path) => {
+            let wanted = PublicKey::read_openssh_file(path)
+                .map_err(|error| SshError::Agent(format!("cannot read the public key {}: {error}", path.display())))?;
+            let chosen: Vec<PublicKey> = keys
+                .into_iter()
+                .filter(|key| key.key_data() == wanted.key_data())
+                .collect();
+            if chosen.is_empty() {
+                return Err(SshError::Agent(format!(
+                    "the agent does not hold the key in {}",
+                    path.display()
+                )));
+            }
+            chosen
+        }
+        None => keys,
+    };
     let hash = session.best_supported_rsa_hash().await?.flatten();
     let total = keys.len();
     for (refused, key) in keys.into_iter().enumerate() {

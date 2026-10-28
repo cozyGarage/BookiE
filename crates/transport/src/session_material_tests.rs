@@ -46,6 +46,7 @@ fn key_hop(path: PathBuf) -> SavedSshConfig {
         jump: None,
         client: Default::default(),
         agent: false,
+        agent_identity: None,
     }
 }
 

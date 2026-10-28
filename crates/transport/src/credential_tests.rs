@@ -16,6 +16,7 @@ pub(crate) fn key_hop(host: &str) -> SavedSshConfig {
         jump: None,
         client: Default::default(),
         agent: false,
+        agent_identity: None,
     }
 }
 
@@ -255,4 +256,26 @@ async fn an_absent_or_legacy_jump_passphrase_is_decided_without_the_keyring() {
 fn the_crypto_provider_is_installed_for_rustls() {
     install_crypto_provider();
     assert!(rustls::crypto::CryptoProvider::get_default().is_some());
+}
+
+#[tokio::test]
+async fn a_saved_agent_hop_offers_only_the_chosen_key_when_one_is_named() {
+    let id = Uuid::new_v4();
+    let mut hop = key_hop("jump.example");
+    hop.agent = true;
+
+    let any_key = resolve_saved_ssh_hop(id, &hop, 0).await.unwrap();
+    assert!(
+        matches!(any_key.auth, tablepro_ssh::SshAuth::Agent),
+        "{:?}",
+        any_key.auth
+    );
+
+    hop.agent_identity = Some(PathBuf::from("/home/me/.ssh/deploy.pub"));
+    let chosen = resolve_saved_ssh_hop(id, &hop, 0).await.unwrap();
+    assert!(
+        matches!(&chosen.auth, tablepro_ssh::SshAuth::AgentIdentity { public_key } if public_key == &PathBuf::from("/home/me/.ssh/deploy.pub")),
+        "{:?}",
+        chosen.auth
+    );
 }

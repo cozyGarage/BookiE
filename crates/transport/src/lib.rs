@@ -452,7 +452,12 @@ pub(crate) async fn resolve_saved_ssh_hop(
     hop_index: usize,
 ) -> Result<SshConfig, TransportError> {
     let auth = match &saved.auth {
-        _ if saved.agent => SshAuth::Agent,
+        _ if saved.agent => match &saved.agent_identity {
+            Some(public_key) => SshAuth::AgentIdentity {
+                public_key: public_key.clone(),
+            },
+            None => SshAuth::Agent,
+        },
         SavedSshAuth::Password if saved.credential_revision == 0 && hop_index > 0 => {
             return Err(jump_hop_password_refused(hop_index));
         }

@@ -49,6 +49,7 @@ fn saved_connection(fixture: &Fixture, id: Uuid) -> SavedConnection {
             jump: None,
             client: SshClient::OpenSsh,
             agent: false,
+            agent_identity: None,
         }),
         last_opened_at: None,
         connect_timeout_secs: None,

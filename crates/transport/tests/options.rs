@@ -48,6 +48,7 @@ fn hop(host: &str, port: u16, username: &str, jump: Option<SavedSshConfig>) -> S
         jump: jump.map(Box::new),
         client: Default::default(),
         agent: false,
+        agent_identity: None,
     }
 }
 
