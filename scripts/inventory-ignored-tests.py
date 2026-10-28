@@ -4,8 +4,8 @@ from pathlib import Path
 import re
 import json
 import io
-import sys
 import subprocess
+import sys
 import tomllib
 from collections import Counter
 
@@ -82,15 +82,24 @@ output = io.StringIO()
 original_stdout = sys.stdout
 sys.stdout = output
 rows = []
-def rust_sources():
+try:
     listed = subprocess.run(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "crates/**.rs", "apps/**.rs", "tests/**.rs"],
-        cwd=root, capture_output=True, text=True, check=True,
-    ).stdout
-    return sorted(root / name for name in listed.split("\0") if name)
-
-
-for path in rust_sources():
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "crates", "apps", "tests"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+    source_paths = (root / path for path in listed.stdout.decode().split("\0") if path)
+except (OSError, subprocess.CalledProcessError):
+    source_paths = (path for directory in ("crates", "apps", "tests") for path in (root / directory).rglob("*.rs"))
+for path in sorted(
+    source
+    for source in source_paths
+    if source.suffix == ".rs"
+    and source.is_file()
+    and source.relative_to(root).parts[0] in ("crates", "apps", "tests")
+    and not source.relative_to(root).as_posix().startswith("apps/linux/packaging/arch/src/")
+):
     source = path.read_text()
     for match in re.finditer(r'#\[ignore(?:\s*=\s*"([^"\n]*)")?\]', source):
         function = re.search(r'\b(?:async\s+)?fn\s+(\w+)', source[match.end():])

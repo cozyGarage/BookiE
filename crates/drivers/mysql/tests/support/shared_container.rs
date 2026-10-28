@@ -1,4 +1,4 @@
-use std::sync::{LazyLock, Mutex as StdMutex};
+use std::sync::{Arc, LazyLock, Mutex as StdMutex};
 
 use drivers_mysql::MysqlDriver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
@@ -19,8 +19,49 @@ pub(crate) struct TestDatabase {
     _test_lock: Option<MutexGuard<'static, ()>>,
 }
 
+impl TestDatabase {
+    pub(crate) async fn create_multi_result_procedure(&self) {
+        if let Some(container) = self._container.as_ref() {
+            create_multi_result_procedure(container).await;
+            return;
+        }
+        let container = CONTAINER
+            .lock()
+            .expect("MySQL container lock")
+            .as_ref()
+            .map(Arc::clone)
+            .expect("shared MySQL container");
+        create_multi_result_procedure(&container).await;
+    }
+}
+
+async fn create_multi_result_procedure(container: &ContainerAsync<Mysql>) {
+    let sql = "DELIMITER //\nCREATE PROCEDURE two_selects() BEGIN SELECT 11 AS first_result; SELECT 'second' AS second_result; END//";
+    let mut result = container
+        .exec(ExecCommand::new([
+            "mysql",
+            "-uroot",
+            "-ptablepro_test",
+            "test",
+            "-e",
+            sql,
+        ]))
+        .await
+        .expect("execute stored procedure setup");
+    let stdout = result.stdout_to_vec().await.expect("setup output");
+    let stderr = result.stderr_to_vec().await.expect("setup errors");
+    let exit_code = result.exit_code().await.expect("setup exit code");
+    assert_eq!(
+        exit_code,
+        Some(0),
+        "stored procedure setup failed: {}",
+        String::from_utf8_lossy(&stderr)
+    );
+    assert!(stdout.is_empty());
+}
+
 static SERVER: OnceCell<Server> = OnceCell::const_new();
-static CONTAINER: StdMutex<Option<ContainerAsync<Mysql>>> = StdMutex::new(None);
+static CONTAINER: StdMutex<Option<Arc<ContainerAsync<Mysql>>>> = StdMutex::new(None);
 static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static MARIADB_SERVER: OnceCell<Server> = OnceCell::const_new();
 static MARIADB_CONTAINER: StdMutex<Option<ContainerAsync<GenericImage>>> = StdMutex::new(None);
@@ -120,7 +161,7 @@ fn can_reuse_server(args: &[String], runner_cleans_container: bool) -> bool {
 
 async fn start_shared_server() -> Server {
     let (container, server) = create_server(false).await;
-    *CONTAINER.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(container);
+    *CONTAINER.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::new(container));
     server
 }
 
