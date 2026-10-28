@@ -596,7 +596,9 @@ fn track_operation_state(
             pending.insert(event.operation_id, event.clone());
         }
         AuditRecordPhase::Outcome => {
-            pending.remove(&event.operation_id);
+            if event.terminal_status != AuditTerminalStatus::Pending {
+                pending.remove(&event.operation_id);
+            }
             if event.operation_class.is_write() && event.terminal_status == AuditTerminalStatus::Unknown {
                 unresolved.insert(event.operation_id, event.connection_id);
             } else {

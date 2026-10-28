@@ -412,6 +412,33 @@ async fn validated_open_preserves_complete_record_without_newline() {
     assert_eq!(std::fs::read(path).unwrap().last(), Some(&b'\n'));
 }
 
+#[tokio::test]
+async fn a_cursor_whose_first_page_reported_pending_recovers_as_unknown() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("audit.jsonl");
+    let journal = AuditJournal::open_validated(path.clone()).unwrap();
+    let operation_id = Uuid::from_u128(0xC0DE);
+    journal
+        .append_durable(intent_event(operation_id, AuditOperationClass::Read))
+        .await
+        .unwrap();
+    let mut first_page = intent_event(operation_id, AuditOperationClass::Read);
+    first_page.phase = AuditRecordPhase::Outcome;
+    journal.append_durable(first_page).await.unwrap();
+    drop(journal);
+
+    let recovered = AuditJournal::open_validated(path).unwrap();
+
+    let last = recovered
+        .recent(10)
+        .await
+        .unwrap()
+        .into_iter()
+        .rfind(|event| event.operation_id == operation_id)
+        .unwrap();
+    assert_eq!(last.terminal_status, AuditTerminalStatus::Unknown);
+}
+
 fn intent_event(operation_id: Uuid, operation_class: AuditOperationClass) -> tablepro_policy::AuditEvent {
     let mut event = sample_event(Principal::human_gui());
     event.operation_id = operation_id;
