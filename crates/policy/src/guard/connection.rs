@@ -831,7 +831,7 @@ where
 #[async_trait]
 impl Transaction for PolicyTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -844,7 +844,10 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -857,7 +860,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn query_params(&mut self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -875,7 +878,10 @@ impl Transaction for PolicyTransaction {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -888,7 +894,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -912,7 +918,10 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -939,7 +948,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute_params(&mut self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -971,7 +980,10 @@ impl Transaction for PolicyTransaction {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,

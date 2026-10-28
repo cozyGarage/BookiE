@@ -6,6 +6,8 @@ mod blast_radius;
 mod completion_metadata;
 #[path = "guard_tests_session/savepoint_recovery.rs"]
 mod savepoint_recovery;
+#[path = "guard_tests_session/transaction_blast_radius.rs"]
+mod transaction_blast_radius;
 
 #[derive(Default)]
 struct SessionScript {
