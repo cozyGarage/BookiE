@@ -15,9 +15,9 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Production marker
 
-- [ ] Connect to a connection marked Production: the header bar is tinted red, a red **Production** badge shows beside Read-only, and the window title starts with `[Production]` in the taskbar or Alt-Tab. Open a table and change a cell: the title reads `• [Production] …`. The badge text and the tinted bar are readable in light and dark.
-- [ ] Disconnect, or connect to a Dev, Staging or Local connection: the badge, the tint and the title prefix are gone.
-- [ ] A Production connection that is also Read-only shows both badges.
+- [ ] Connect to a connection marked Production: the header bar is tinted red, a red **Production** badge shows beside Read-only, and the window title starts with `[Production]` in the taskbar or Alt-Tab. Open a table and change a cell: the title reads `• [Production] …`. The badge text and the tinted bar are readable in light and dark. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** red bar, red **Production** badge and the title `[Production] pg-prod — BookiE` passed; editing a cell and light mode not run. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** light mode: the pink bar, **Read-only** and **Production** text were readable.
+- [ ] Disconnect, or connect to a Dev, Staging or Local connection: the badge, the tint and the title prefix are gone. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** a Local connection showed no badge, tint or prefix (`pg-2s-timeout — BookiE`); Dev and Staging not run.
+- [x] A Production connection that is also Read-only shows both badges. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** passed: the header showed **Read-only** and **Production** together.
 
 ## Connection list
 
@@ -39,7 +39,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 ## Per-connection timeouts
 
 - [ ] The connect dialog shows Connect timeout and Query timeout rows; 0 means default. **2026-10-12 Hyprland dark:** passed.
-- [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after about 2 seconds, while another connection still uses the Preferences timeout. **2026-10-12 Hyprland dark:** stopped after 2.007 s, passed; the wording was fixed by [#668](https://github.com/cozyGarage/BookiE/pull/668). No result for the second connection or installed retest is recorded here.
+- [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after about 2 seconds, while another connection still uses the Preferences timeout. **2026-10-12 Hyprland dark:** stopped after 2.007 s, passed; the wording was fixed by [#668](https://github.com/cozyGarage/BookiE/pull/668). No result for the second connection or installed retest is recorded here. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** the 2-second connection ended with "Query exceeded the 2s query timeout" and offered "Run again with a 8s timeout"; query history recorded the failed run at 2015 ms; the second connection was not run. The connection list popover was clipped at the window's left edge ([#1905](https://github.com/cozyGarage/BookiE/issues/1905)).
 - [ ] A connect timeout of 3 seconds to an unreachable host fails after about 3 seconds.
 
 - [ ] With a 2-second query timeout, run `SELECT pg_sleep(5)` on PostgreSQL (streamed) and `SELECT SLEEP(5)` on MySQL (materialized): after each, the toolbar shows **Run again with an 8s timeout**. Click it: the same query runs and completes. Running any other query removes the button, and the saved timeout is still 2 seconds.
