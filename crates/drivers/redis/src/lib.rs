@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use redis::aio::ConnectionManager;
-use redis::{AsyncCommands, Client, RedisError, TlsCertificates, Value as RedisValue};
+use redis::{AsyncCommands, Client, IntoConnectionInfo, RedisError, TlsCertificates, Value as RedisValue};
 use secrecy::ExposeSecret;
 use tokio::sync::Mutex;
 
@@ -63,11 +63,15 @@ impl DatabaseDriver for RedisDriver {
             ""
         };
         let url = format!("{scheme}://{auth}{}:{}/{}{suffix}", opts.host, opts.port, db_index);
+        let info = url
+            .into_connection_info()
+            .map_err(|err| map_redis_connect_error(err, verifies))?
+            .set_tcp_settings(tcp_settings());
         let client = if opts.tls.mode.encrypts() {
-            Client::build_with_tls(url, tls_certificates_for(&opts, verifies)?)
+            Client::build_with_tls(info, tls_certificates_for(&opts, verifies)?)
                 .map_err(|err| map_redis_connect_error(err, verifies))?
         } else {
-            Client::open(url).map_err(|err| map_redis_connect_error(err, verifies))?
+            Client::open(info).map_err(|err| map_redis_connect_error(err, verifies))?
         };
         let manager = match tokio::time::timeout(CONNECT_TIMEOUT, establish_connection_manager(client.clone())).await {
             Ok(result) => result.map_err(|err| map_redis_connect_error(err, verifies))?,
@@ -748,6 +752,15 @@ fn urlencoding_lite(s: &str) -> String {
         }
     }
     out
+}
+
+fn tcp_settings() -> redis::io::tcp::TcpSettings {
+    use redis::io::tcp::socket2::TcpKeepalive;
+    redis::io::tcp::TcpSettings::default().set_keepalive(
+        TcpKeepalive::new()
+            .with_time(std::time::Duration::from_secs(30))
+            .with_interval(std::time::Duration::from_secs(10)),
+    )
 }
 
 async fn establish_connection_manager(client: Client) -> Result<ConnectionManager, RedisError> {

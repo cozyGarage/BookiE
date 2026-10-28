@@ -204,6 +204,13 @@ async fn open_client(target: MssqlTarget) -> Result<MssqlClient, DriverError> {
         .await
         .map_err(map_io_error)?;
     tcp.set_nodelay(true).map_err(map_io_error)?;
+    socket2::SockRef::from(&tcp)
+        .set_tcp_keepalive(
+            &socket2::TcpKeepalive::new()
+                .with_time(std::time::Duration::from_secs(30))
+                .with_interval(std::time::Duration::from_secs(10)),
+        )
+        .map_err(map_io_error)?;
     Client::connect(target.config, tcp.compat_write())
         .await
         .map_err(map_tiberius_error)
