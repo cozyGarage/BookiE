@@ -572,10 +572,16 @@ async fn postgres_value_query_refetches_by_enum_and_domain_composite_key() {
 #[ignore = "requires docker"]
 async fn mssql_value_query_refetches_the_exact_blob_for_a_composite_key() {
     use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+    use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mssql_server::MssqlServer;
 
-    let container = MssqlServer::default().with_accept_eula().start().await.unwrap();
+    let container = MssqlServer::default()
+        .with_accept_eula()
+        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
     let connection = drivers_mssql::MssqlDriver
         .connect(ConnectOptions {
             host: container.get_host().await.unwrap().to_string(),
