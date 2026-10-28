@@ -19,6 +19,11 @@ app-server mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04
 app-server clickhouse/clickhouse-server:24.8
 app-server redis:5.0
 app-server mongo:7
+pg-release postgres:16-alpine
+pg-release alpine:3.21
+pg-release ghcr.io/shopify/toxiproxy:2.12.0
+pg-dump postgres:18-alpine
+socket-ssh postgres:16-alpine
 driver-tls clickhouse/clickhouse-server:24.8-alpine
 driver-tls mongo:7
 driver-tls mysql:8.4
