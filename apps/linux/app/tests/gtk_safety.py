@@ -1612,6 +1612,10 @@ def sidebar_search_reveals_groups_as_expanded(_database, _base):
     wait_for_node_showing("safety_items", True)
     group = wait_for_node(name="Tables", role=pyatspi.ROLE_LIST_ITEM)
     assert group.getState().contains(pyatspi.STATE_EXPANDED), "search opened group but it remains collapsed"
+    run_sql("CREATE TABLE safety_search_new (id INTEGER PRIMARY KEY)")
+    wait_for_node_showing("safety_search_new", True)
+    group = wait_for_node(name="Tables", role=pyatspi.ROLE_LIST_ITEM)
+    assert group.getState().contains(pyatspi.STATE_EXPANDED), "rebuilt search group must stay expanded"
     search.queryEditableText().setTextContents("")
     wait_for_node_showing("safety_items", False)
     assert not group.getState().contains(pyatspi.STATE_EXPANDED)
