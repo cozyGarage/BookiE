@@ -587,6 +587,62 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertNotIn("--auto-display", script)
                 self.assertNotIn("xvfb-run -a", script)
 
+    def test_widget_wrapper_reports_xvfb_failure_and_preserves_test_status(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            xdpyinfo_log = directory / "xdpyinfo.log"
+            commands = {
+                "dbus-run-session": "while [ \"$1\" != -- ]; do shift; done\nshift\nexec \"$@\"\n",
+                "xvfb-run": (
+                    "error_file=/dev/null\n"
+                    "while [ $# -gt 0 ]; do\n"
+                    "  case \"$1\" in\n"
+                    "    -e) error_file=$2; shift 2 ;;\n"
+                    "    -s|--server-num) shift 2 ;;\n"
+                    "    --server-num=*) display=${1#*=}; shift ;;\n"
+                    "    --auto-servernum) shift ;;\n"
+                    "    *) break ;;\n"
+                    "  esac\n"
+                    "done\n"
+                    "printf 'simulated Xvfb startup failure\\n' > \"$error_file\"\n"
+                    "DISPLAY=:\"${display:-1234}\" exec \"$@\"\n"
+                ),
+                "python3": "printf 'simulated GTK initialization failure\\n' >&2\nexit 23\n",
+                "xdpyinfo": "printf '%s\\n' \"$*\" >> \"$XDPYINFO_LOG\"\nexit 1\n",
+            }
+            for name, contents in commands.items():
+                executable = binaries / name
+                executable.write_text("#!/bin/sh\n" + contents)
+                executable.chmod(0o755)
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{binaries}{os.pathsep}{environment['PATH']}",
+                    "XDPYINFO_LOG": str(xdpyinfo_log),
+                    "GITHUB_RUN_ID": "unit-run",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "GITHUB_JOB": "widgets",
+                }
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/test-gtk-widgets.sh")],
+                cwd=ROOT,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 23, result.stderr)
+            self.assertIn("simulated Xvfb startup failure", result.stderr)
+            self.assertIn("unit-run", result.stderr)
+            self.assertIn("attempt=2", result.stderr)
+            self.assertIn("widgets", result.stderr)
+            self.assertIn("exit=23", result.stderr)
+            self.assertIn("display_alive=unavailable", result.stderr)
+            self.assertIn("-display :", xdpyinfo_log.read_text())
+
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
         default_scenarios = next(
