@@ -34,10 +34,12 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             col_index,
             column_name,
             row_key,
+            edit_row_position,
         } => BrowseTabInput::GridFetchCellValue {
             col_index,
             column_name,
             row_key,
+            edit_row_position,
         },
         GridMsg::IncompleteRowData => BrowseTabInput::IncompleteRowData,
         GridMsg::ProjectionFailure => BrowseTabInput::ProjectionFailure,

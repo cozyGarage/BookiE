@@ -104,6 +104,7 @@ pub struct BrowseTab {
     page_requests: PageRequestTracker,
     row_count_requests: RowCountRequestTracker,
     cell_value_requests: CellValueRequestTracker,
+    pending_cell_edit: std::cell::RefCell<Option<(BrowseCellValueRequest, u32, Vec<Value>)>>,
 
     inner_stack: gtk::Stack,
     grid_holder: gtk::Box,
@@ -643,6 +644,7 @@ impl SimpleComponent for BrowseTab {
             page_requests: PageRequestTracker::default(),
             row_count_requests: RowCountRequestTracker::default(),
             cell_value_requests: CellValueRequestTracker::default(),
+            pending_cell_edit: std::cell::RefCell::new(None),
             inner_stack,
             grid_holder,
             current_column_view: None,
@@ -999,7 +1001,8 @@ impl SimpleComponent for BrowseTab {
                 col_index,
                 column_name,
                 row_key,
-            } => self.request_cell_value(col_index, column_name, row_key, sender),
+                edit_row_position,
+            } => self.request_cell_value(col_index, column_name, row_key, edit_row_position, sender),
             BrowseTabInput::CellValueLoaded {
                 request,
                 col_index,

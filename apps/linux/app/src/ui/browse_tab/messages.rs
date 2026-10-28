@@ -70,6 +70,7 @@ pub enum BrowseTabInput {
         col_index: usize,
         column_name: String,
         row_key: Vec<Value>,
+        edit_row_position: Option<u32>,
     },
     CellValueLoaded {
         request: BrowseCellValueRequest,

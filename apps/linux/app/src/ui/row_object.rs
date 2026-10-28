@@ -468,6 +468,15 @@ mod tests {
         assert!(!row.cells_are_complete());
         assert_eq!(row.complete_cells(), None);
         assert_eq!(row.loaded_cells(), vec![Some(Value::Int(7)), None]);
+
+        row.set_cell(1, Value::Text("the whole value".into()));
+        assert!(!row.cell_is_partial(1));
+        assert!(row.cell_is_loaded(1));
+        assert!(row.cell_preview(1).is_none());
+        assert_eq!(
+            row.complete_cells(),
+            Some(vec![Value::Int(7), Value::Text("the whole value".into())])
+        );
     }
 
     #[test]

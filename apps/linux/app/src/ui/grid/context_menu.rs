@@ -95,6 +95,17 @@ pub(super) fn install_grid_context_menus(
             if row.draft_id().is_none() && !has_persisted_row_key(&row_key) {
                 return;
             }
+            if row.cell_is_partial(slot.col_index) {
+                sender
+                    .send(GridMsg::FetchCellValue {
+                        col_index: slot.col_index,
+                        column_name: slot.column_name.clone(),
+                        row_key,
+                        edit_row_position: Some(position(slot)),
+                    })
+                    .ok();
+                return;
+            }
             let (initial_text, kind) = match full_value_seed(&slot.widget, &row, slot.col_index, &column.data_type) {
                 TextSeed::Value(text, kind) => (text, kind),
                 TextSeed::TooLarge => {
@@ -134,6 +145,7 @@ pub(super) fn install_grid_context_menus(
                                     col_index: slot.col_index,
                                     column_name: slot.column_name.clone(),
                                     row_key,
+                                    edit_row_position: None,
                                 })
                                 .ok();
                         }
@@ -272,6 +284,7 @@ pub(super) fn install_grid_context_menus(
                                 col_index: slot.col_index,
                                 column_name: slot.column_name.clone(),
                                 row_key,
+                                edit_row_position: None,
                             })
                             .ok();
                     }
@@ -783,14 +796,15 @@ fn row_has_full_text_value(view: &gtk::ColumnView, widget: &gtk::Widget, positio
     };
     let (_, row_key) = cell_row_identity(widget);
     (row.draft_id().is_some() || has_persisted_row_key(&row_key))
-        && row
-            .with_cell_value(column, |value| {
-                matches!(
-                    value,
-                    Value::Text(_) | Value::Json(_) | Value::JsonText(_) | Value::Null
-                )
-            })
-            .unwrap_or(false)
+        && (row.cell_is_partial(column)
+            || row
+                .with_cell_value(column, |value| {
+                    matches!(
+                        value,
+                        Value::Text(_) | Value::Json(_) | Value::JsonText(_) | Value::Null
+                    )
+                })
+                .unwrap_or(false))
 }
 
 fn has_persisted_row_key(row_key: &[Value]) -> bool {
@@ -901,3 +915,41 @@ fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bo
 #[cfg(test)]
 #[path = "context_menu_tests.rs"]
 mod tests;
+
+pub(crate) struct LoadedCellEdit<'a> {
+    pub(crate) column_name: &'a str,
+    pub(crate) col_index: usize,
+    pub(crate) row_position: u32,
+    pub(crate) row_key: Vec<Value>,
+    pub(crate) column: &'a tablepro_core::ColumnInfo,
+    pub(crate) value: Value,
+    pub(crate) sender: relm4::Sender<GridMsg>,
+}
+
+pub(crate) fn present_loaded_cell_editor(view: &gtk::ColumnView, edit: LoadedCellEdit<'_>) {
+    let Some(row) = row_object_at(view, edit.row_position) else {
+        return;
+    };
+    let Some(kind) = super::full_value_editor::edit_kind(&edit.column.data_type, &edit.value) else {
+        return;
+    };
+    let text = super::display::value_to_full_edit_text(&edit.value);
+    if !super::full_value_editor::within_edit_budget(text.len()) {
+        super::full_value_editor::present_too_large(view);
+        return;
+    }
+    row.set_cell(edit.col_index, edit.value);
+    super::full_value_editor::present(
+        view,
+        edit.column_name,
+        &text,
+        super::full_value_editor::EditContext {
+            row_position: edit.row_position,
+            col_index: edit.col_index,
+            row_key: edit.row_key,
+            nullable: edit.column.nullable,
+            kind,
+            sender: edit.sender,
+        },
+    );
+}
