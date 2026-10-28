@@ -148,7 +148,7 @@ fn changed_bodies_survive_a_failed_metadata_publish_and_retry_without_orphan_gro
         assert!(save_update(&path, &drafts, id, changed.clone(), incremental).is_err());
         assert_eq!(std::fs::read(&original).unwrap(), previous);
         assert_eq!(std::fs::read(&old_body).unwrap(), old_text);
-        assert_eq!(std::fs::read_dir(drafts.join(id.to_string())).unwrap().count(), 2);
+        assert_eq!(std::fs::read_dir(drafts.join(id.to_string())).unwrap().count(), 1);
         std::fs::remove_file(&path).unwrap();
         std::fs::rename(&original, &path).unwrap();
         save_update(&path, &drafts, id, changed, incremental).unwrap();

@@ -37,6 +37,7 @@ pub fn load_metadata(path: &Path) -> std::io::Result<WorkspaceState> {
 }
 
 pub fn save(path: &Path, drafts: &Path, mut state: WorkspaceState) -> std::io::Result<()> {
+    super::config_io::prepare_private_file(path)?;
     let existing = read_existing(path)?;
     let mut previous: WorkspaceState = existing
         .as_ref()
@@ -51,14 +52,13 @@ pub fn save(path: &Path, drafts: &Path, mut state: WorkspaceState) -> std::io::R
             atomic_write_bytes(&backup, bytes)?;
         }
     }
-    let mut batch = staged_drafts::DraftBatch::default();
+    let mut batch = staged_drafts::DraftBatch::new(drafts, &mut previous);
     for (connection, workspace) in &mut state.connections {
         let connection = Uuid::parse_str(connection).map_err(std::io::Error::other)?;
         clean_previous_drafts(drafts, connection, &mut previous)?;
         batch.stage(connection, workspace, drafts)?;
     }
-    batch.retain();
-    atomic_write_json(path, &state)?;
+    batch.publish(|| atomic_write_json(path, &state))?;
     for (connection, workspace) in &mut state.connections {
         retired_drafts::remove(
             drafts,
@@ -82,6 +82,7 @@ pub fn save_connections(
     drafts: &Path,
     updates: Vec<(Uuid, ConnectionWorkspaceState)>,
 ) -> std::io::Result<()> {
+    super::config_io::prepare_private_file(path)?;
     let existing = read_existing(path)?;
     let mut state = match &existing {
         Some(bytes) => serde_json::from_slice(bytes).map_err(std::io::Error::other)?,
@@ -98,15 +99,14 @@ pub fn save_connections(
     let mut previous = state.clone();
     super::workspace_state::clamp(&mut state);
     let updated: Vec<Uuid> = updates.iter().map(|(connection, _)| *connection).collect();
-    let mut batch = staged_drafts::DraftBatch::default();
+    let mut batch = staged_drafts::DraftBatch::new(drafts, &mut previous);
     for (connection, mut workspace) in updates {
         super::workspace_state::clamp_connection(&mut workspace);
         clean_previous_drafts(drafts, connection, &mut previous)?;
         batch.stage(connection, &mut workspace, drafts)?;
         state.connections.insert(connection.to_string(), workspace);
     }
-    batch.retain();
-    atomic_write_json(path, &state)?;
+    batch.publish(|| atomic_write_json(path, &state))?;
     for connection in updated {
         if let Some(workspace) = state.connections.get_mut(&connection.to_string()) {
             retired_drafts::remove(drafts, connection, workspace)?;

@@ -37,6 +37,11 @@ pub fn atomic_write_json<T: Serialize>(path: &Path, value: &T) -> std::io::Resul
 }
 
 pub fn atomic_write_bytes(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    prepare_private_file(path)?;
+    write_durably(path, bytes)
+}
+
+pub(super) fn prepare_private_file(path: &Path) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
         std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))?;
@@ -49,7 +54,7 @@ pub fn atomic_write_bytes(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(error),
     }
-    write_durably(path, bytes)
+    Ok(())
 }
 
 fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
