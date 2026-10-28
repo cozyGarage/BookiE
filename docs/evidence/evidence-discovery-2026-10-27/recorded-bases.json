@@ -1,0 +1,79 @@
+[
+  {
+    "record": "docs/evidence/colour-chooser-lifetime-2026-10-27/validation.json",
+    "recorded_base": null,
+    "resolved_base_commit": null,
+    "status": "unresolved",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/connection-error-guidance-2026-10-27/validation.json",
+    "recorded_base": "887678414",
+    "resolved_base_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
+    "status": "base-only",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/deleted-connection-drafts-2026-10-27/validation.json",
+    "recorded_base": null,
+    "resolved_base_commit": null,
+    "status": "unresolved",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/edit-popover-lifetime-2026-10-27/validation.json",
+    "recorded_base": null,
+    "resolved_base_commit": null,
+    "status": "unresolved",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/history-row-lifetime-2026-10-27/validation.json",
+    "recorded_base": "02198735f",
+    "resolved_base_commit": "02198735fae33e6deaa02c7ed4c8540c94c3703b",
+    "status": "base-only",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/import-setup-lifetime-2026-10-26/validation.json",
+    "recorded_base": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+    "resolved_base_commit": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+    "status": "base-only",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/retired-draft-cleanup-2026-10-27/validation.json",
+    "recorded_base": null,
+    "resolved_base_commit": null,
+    "status": "unresolved",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/structure-form-lifetime-2026-10-26/validation.json",
+    "recorded_base": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+    "resolved_base_commit": "ac190e9b2676f51694a7f82fa36a1689a1afb7b8",
+    "status": "base-only",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/structure-tab-lifetime-2026-10-26/validation.json",
+    "recorded_base": null,
+    "resolved_base_commit": null,
+    "status": "unresolved",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/unreadable-draft-preservation-2026-10-27/validation.json",
+    "recorded_base": "887678414",
+    "resolved_base_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
+    "status": "base-only",
+    "source_digests_changed": false
+  },
+  {
+    "record": "docs/evidence/verbatim-value-view-2026-10-27/validation.json",
+    "recorded_base": "887678414",
+    "resolved_base_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
+    "status": "base-only",
+    "source_digests_changed": false
+  }
+]

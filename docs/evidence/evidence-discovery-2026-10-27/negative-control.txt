@@ -1,0 +1,117 @@
+test_bad_legacy_source_digest_under_validation_name_fails_the_default_scan (discovery_tests.EvidenceDiscoveryTests.test_bad_legacy_source_digest_under_validation_name_fails_the_default_scan) ... FAIL
+test_bad_source_record_under_an_arbitrary_name_warns_or_fails_strictly (discovery_tests.EvidenceDiscoveryTests.test_bad_source_record_under_an_arbitrary_name_warns_or_fails_strictly) ... FAIL
+test_invalid_run_report_under_an_arbitrary_name_fails_the_default_scan (discovery_tests.EvidenceDiscoveryTests.test_invalid_run_report_under_an_arbitrary_name_fails_the_default_scan) ... FAIL
+test_malformed_named_evidence_is_reported (discovery_tests.EvidenceDiscoveryTests.test_malformed_named_evidence_is_reported) ... FAIL
+test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) ... 
+  test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='commit') ... FAIL
+  test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='working_tree') ... FAIL
+  test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='tracked_diff_sha256') ... FAIL
+  test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='status') ... FAIL
+  test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='layers') ... FAIL
+test_provenance_review_does_not_certify_an_unrecorded_run_snapshot (discovery_tests.EvidenceDiscoveryTests.test_provenance_review_does_not_certify_an_unrecorded_run_snapshot) ... FAIL
+test_unrelated_json_and_unsupported_versions_do_not_become_evidence (discovery_tests.EvidenceDiscoveryTests.test_unrelated_json_and_unsupported_versions_do_not_become_evidence) ... ok
+test_valid_execution_report_is_counted_without_filename_requirements (discovery_tests.EvidenceDiscoveryTests.test_valid_execution_report_is_counted_without_filename_requirements) ... FAIL
+
+======================================================================
+FAIL: test_bad_legacy_source_digest_under_validation_name_fails_the_default_scan (discovery_tests.EvidenceDiscoveryTests.test_bad_legacy_source_digest_under_validation_name_fails_the_default_scan)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 37, in test_bad_legacy_source_digest_under_validation_name_fails_the_default_scan
+    self.assertEqual(status, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_bad_source_record_under_an_arbitrary_name_warns_or_fails_strictly (discovery_tests.EvidenceDiscoveryTests.test_bad_source_record_under_an_arbitrary_name_warns_or_fails_strictly)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 43, in test_bad_source_record_under_an_arbitrary_name_warns_or_fails_strictly
+    self.assertIn("result.json", output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'result.json' not found in 'Validated 0 schema-v1 evidence manifests; checked source provenance in 0 legacy packets; 0 historical/source-drift checks need review.\n'
+
+======================================================================
+FAIL: test_invalid_run_report_under_an_arbitrary_name_fails_the_default_scan (discovery_tests.EvidenceDiscoveryTests.test_invalid_run_report_under_an_arbitrary_name_fails_the_default_scan)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 50, in test_invalid_run_report_under_an_arbitrary_name_fails_the_default_scan
+    self.assertEqual(status, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_malformed_named_evidence_is_reported (discovery_tests.EvidenceDiscoveryTests.test_malformed_named_evidence_is_reported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 62, in test_malformed_named_evidence_is_reported
+    self.assertEqual(self.scan({"case/validation.json": "{"})[0], 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='commit')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 59, in test_missing_required_run_report_field_is_not_treated_as_generic_evidence
+    self.assertEqual(status, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='working_tree')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 59, in test_missing_required_run_report_field_is_not_treated_as_generic_evidence
+    self.assertEqual(status, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='tracked_diff_sha256')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 59, in test_missing_required_run_report_field_is_not_treated_as_generic_evidence
+    self.assertEqual(status, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='status')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 59, in test_missing_required_run_report_field_is_not_treated_as_generic_evidence
+    self.assertEqual(status, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_missing_required_run_report_field_is_not_treated_as_generic_evidence (discovery_tests.EvidenceDiscoveryTests.test_missing_required_run_report_field_is_not_treated_as_generic_evidence) (field='layers')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 59, in test_missing_required_run_report_field_is_not_treated_as_generic_evidence
+    self.assertEqual(status, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_provenance_review_does_not_certify_an_unrecorded_run_snapshot (discovery_tests.EvidenceDiscoveryTests.test_provenance_review_does_not_certify_an_unrecorded_run_snapshot)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 84, in test_provenance_review_does_not_certify_an_unrecorded_run_snapshot
+    self.assertEqual(status, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_valid_execution_report_is_counted_without_filename_requirements (discovery_tests.EvidenceDiscoveryTests.test_valid_execution_report_is_counted_without_filename_requirements)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/trung/Projects/bookie-ux-evidence-discovery/scripts/tests/test_evidence_discovery.py", line 78, in test_valid_execution_report_is_counted_without_filename_requirements
+    self.assertIn("Validated 1 schema-v1", output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Validated 1 schema-v1' not found in 'Validated 0 schema-v1 evidence manifests; checked source provenance in 0 legacy packets; 0 historical/source-drift checks need review.\n'
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.037s
+
+FAILED (failures=11)

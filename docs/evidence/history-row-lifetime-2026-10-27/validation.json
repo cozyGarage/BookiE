@@ -30,5 +30,17 @@
   "installed_result": "2 passed",
   "forgejo": "deferred by maintainer during infrastructure migration",
   "base_commit": "02198735fae33e6deaa02c7ed4c8540c94c3703b",
-  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot."
+  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot.",
+  "source_commits": {
+    "apps/linux/app/src/ui/history_dialog.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "apps/linux/app/src/ui/history_dialog/lifetime_tests.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "scripts/isolated-tests.json": "c848c5a605712894a3b7f39b48c00dddd25e16a7"
+  },
+  "provenance_review": {
+    "status": "run_snapshot_unrecorded",
+    "review_source": "d7f9273be1002766f621f876630369231a432e50",
+    "file_mappings": "Matched recorded file hashes to Git blobs reachable from BookiE GitHub remote refs; these mappings do not establish the complete executed run tree.",
+    "unmapped_source_paths": [],
+    "limitation": "The recorded base or matching file blobs do not establish the exact executed run snapshot. Existing result claims are retained as historical reports, not current-source acceptance."
+  }
 }

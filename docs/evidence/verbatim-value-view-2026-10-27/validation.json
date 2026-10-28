@@ -40,5 +40,19 @@
   },
   "typed_json_negative_control": "before bounded serialization: 64 MiB typed JSON fixture added 70924 KiB peak RSS; the added regression failed",
   "base_commit": "8876784146f08d380cbc5c68205b010ab09c624b",
-  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot."
+  "provenance_limit": "Recorded base only; source_sha256 describes tested file bytes and does not establish a clean complete run snapshot.",
+  "source_commits": {
+    "apps/linux/app/src/ui/grid/value_viewer.rs": "2f1b52456c6316b5b3f206c895528af1d2bb7c42",
+    "apps/linux/app/src/ui/grid/context_menu.rs": "daa99fbadc3157d7b8a5c67f6e65cf3d50703a14",
+    "apps/linux/app/src/ui/grid/mod.rs": "daa99fbadc3157d7b8a5c67f6e65cf3d50703a14",
+    "apps/linux/app/src/ui/browse_tab/value_view.rs": "daa99fbadc3157d7b8a5c67f6e65cf3d50703a14",
+    "apps/linux/app/tests/gtk_ux.py": "9e415fdf57e66f020998e478e538a6ff355706f9"
+  },
+  "provenance_review": {
+    "status": "run_snapshot_unrecorded",
+    "review_source": "d7f9273be1002766f621f876630369231a432e50",
+    "file_mappings": "Matched recorded file hashes to Git blobs reachable from BookiE GitHub remote refs; these mappings do not establish the complete executed run tree.",
+    "unmapped_source_paths": [],
+    "limitation": "The recorded base or matching file blobs do not establish the exact executed run snapshot. Existing result claims are retained as historical reports, not current-source acceptance."
+  }
 }

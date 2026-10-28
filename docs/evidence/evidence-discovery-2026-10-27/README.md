@@ -1,9 +1,17 @@
-# Declared evidence discovery
+# Evidence discovery and provenance review, October 27, 2026
 
-Discovery portion of [#1824](https://github.com/cozyGarage/BookiE/issues/1824). Historical provenance recovery remains open.
+Fix for [#1824](https://github.com/cozyGarage/BookiE/issues/1824), Linux base `d7f9273be1002766f621f876630369231a432e50`.
 
-The default scan previously inspected only `manifest.json`. Two failing-before regressions prove that a supported record under another filename was omitted and an invalid digest in `validation.json` did not fail the default scan. Discovery now inspects declared schema-version-one and source-digest records across JSON filenames. Named manifests remain included even when invalid; unrelated arrays are ignored.
+The default validator previously discovered only `manifest.json`. Eight focused discovery tests run against the previous validator produce eleven assertion/subtest failures ([negative control](negative-control.txt)); malformed legacy packets, invalid or incomplete execution reports, and valid reports under other names were omitted. The fixed discovery scans JSON records for supported source/report declarations, preserves explicit-path behavior, skips unrelated data and unsupported schemas, and still reports malformed conventional evidence names.
 
-All 48 manifest harness tests passed after the fix. The default repository scan passed while reporting 187 schema-version-one records, 19 legacy provenance packets and 136 historical/source-drift warnings. This larger count is discovery, not repaired provenance. No historical source digest or claim was modified. Full preflight remains pending.
+The focused evidence suite passes 54 tests. Baseline non-strict validation discovers 185 schema-v1 records and 19 legacy source-provenance packets on this source; warnings remain for historical limitations. Discovery includes records, not acceptance of every claim inside them. Strict mode remains available for complete provenance checks.
 
-Provenance review recovered six already-recorded base identifiers as full Git commit IDs. Original `base` fields and all source fingerprints remain unchanged. Each record explicitly states that a base and file hashes do not establish a clean complete run snapshot. Five validation packets have no recoverable recorded base and remain unresolved in [the review ledger](provenance-review.json); no tested snapshot is inferred from matching file bytes or a later merge. The wider scan also finds other historical records outside this initial validation-packet review. Issue #1824 remains open for that provenance work.
+## Historical packet disposition
+
+The omitted recent `validation.json` packets are unversioned legacy source records, correcting their original schema-v1 classification in the audit. Eleven lack an exact source/base commit for the executed run. Their 37 recorded file hashes were matched to Git blobs reachable through BookiE GitHub remote refs. These mappings are appended as `source_commits`; original hashes, counts, results and gate claims are unchanged.
+
+[The disposition](provenance-review.json) lists every packet. Each now explicitly states that its complete run snapshot was not recorded. A per-file mapping does not prove all those files were executed together. Missing run identity continues to be reported and to fail strict validation; the provenance note is not a waiver. No replacement run identity was invented.
+
+Validation and hosted-gate state are recorded on the PR. This change does not rerun the historical product/GTK claims or certify a release.
+
+The [recorded bases](recorded-bases.json) resolve six existing base identifiers. These are not proof of complete run snapshots.
