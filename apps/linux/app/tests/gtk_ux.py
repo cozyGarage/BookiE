@@ -244,6 +244,7 @@ def scenarios(ui):
         wait_for_adw_dialog("Columns", present=False)
 
     def choose_menu_item(position):
+        ui.wait_for_node(role=pyatspi.ROLE_MENU)
         for _ in range(position):
             ui.press_x11_key("Down")
             time.sleep(0.1)
