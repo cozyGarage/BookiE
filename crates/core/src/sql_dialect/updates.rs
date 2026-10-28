@@ -197,6 +197,12 @@ fn widened_single_precision(driver_id: &str, column: &crate::ColumnInfo, value: 
     }
 }
 
+fn is_mssql_character_type(data_type: &str) -> bool {
+    let base = data_type.trim().to_ascii_lowercase();
+    let base = base.split('(').next().unwrap_or_default().trim();
+    matches!(base, "char" | "varchar" | "nchar" | "nvarchar")
+}
+
 fn optimistic_predicate(
     driver_id: &str,
     name: &str,
@@ -242,8 +248,13 @@ fn optimistic_predicate(
             let next = placeholder_for(driver_id, params.len() + 1);
             params.push(old_value.clone());
             params.push(old_value.clone());
+            let compared = if matches!(old_value, Value::Text(_)) && is_mssql_character_type(&column.data_type) {
+                format!("{name} COLLATE Latin1_General_100_BIN2")
+            } else {
+                name.to_string()
+            };
             return Ok(format!(
-                "({name} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
+                "({compared} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
             ));
         }
         _ => return Err(BuildSqlError::UnsupportedDriver(driver_id.into())),
