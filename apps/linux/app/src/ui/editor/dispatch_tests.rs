@@ -1028,5 +1028,15 @@ fn running_a_query_dismisses_the_visible_completion_popup() {
     let query = fixture.next_query();
     fixture.finish(query, success());
     spin_until(|| popup().is_none_or(|p| !p.is_visible()));
+    view.grab_focus();
+    spin_until(|| view.has_focus());
+    view.completion().show();
+    spin_until(|| popup().is_some_and(|p| p.is_visible()));
+    let dialog = adw::AlertDialog::builder().heading("Export results").build();
+    dialog.add_response("close", "Close");
+    dialog.present(Some(&window));
+    spin_until(|| dialog.is_visible());
+    spin_until(|| popup().is_none_or(|p| !p.is_visible()));
+    dialog.force_close();
     window.destroy();
 }
