@@ -1150,6 +1150,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::history_dialog::lifetime_tests::history_filter_popover_stays_inside_narrow_windows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
     ],
     [

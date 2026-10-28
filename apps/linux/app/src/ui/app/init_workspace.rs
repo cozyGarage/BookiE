@@ -4,6 +4,7 @@ use relm4::prelude::*;
 use relm4::{adw, gtk};
 
 use crate::ui::connection_row::{ConnectionRow, ConnectionRowOutput};
+use crate::ui::popover::keep_inside_window;
 
 use super::types::StatusKind;
 use super::{App, AppMsg, AppWidgets};
@@ -14,25 +15,6 @@ use super::{App, AppMsg, AppWidgets};
 pub(super) struct WorkspaceChromeParts {
     pub(super) connections_factory: FactoryVecDeque<ConnectionRow>,
     pub(super) outer_stack: gtk::Stack,
-}
-
-fn position_connections_popover(popover: &gtk::Popover, button: &gtk::MenuButton) {
-    let button = button.downgrade();
-    popover.connect_show(move |popover| {
-        let Some(button) = button.upgrade() else { return };
-        let Some(window) = button.root().and_downcast::<gtk::Window>() else {
-            return;
-        };
-        let Some(bounds) = button.compute_bounds(&window) else {
-            return;
-        };
-        let (_, width, _, _) = popover.measure(gtk::Orientation::Horizontal, -1);
-        let center = bounds.x() + bounds.width() / 2.0;
-        let natural_left = center - width as f32 / 2.0;
-        let max_left = (window.width() - width).max(0) as f32;
-        let offset = (natural_left.clamp(0.0, max_left) - natural_left).round() as i32;
-        popover.set_offset(offset, 0);
-    });
 }
 
 pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSender<App>) -> WorkspaceChromeParts {
@@ -77,7 +59,7 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
         .build();
     popover_content.append(&scroll);
     widgets.connections_popover.set_child(Some(&popover_content));
-    position_connections_popover(&widgets.connections_popover, &widgets.saved_connections_button);
+    keep_inside_window(&widgets.connections_popover, &widgets.saved_connections_button);
 
     // Workspace outer stack: swaps between an empty StatusPage
     // ("Select a table") when no tabs are open and the unified
@@ -157,7 +139,7 @@ mod tests {
         let popover = gtk::Popover::new();
         let popover_content = gtk::Box::builder().width_request(320).height_request(120).build();
         popover.set_child(Some(&popover_content));
-        position_connections_popover(&popover, &button);
+        keep_inside_window(&popover, &button);
         button.set_popover(Some(&popover));
         header.pack_start(&button);
         let content = adw::ToolbarView::new();

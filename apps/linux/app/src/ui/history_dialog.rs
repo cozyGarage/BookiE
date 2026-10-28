@@ -9,6 +9,7 @@ use relm4::{adw, gtk};
 use tablepro_storage::query_history::{Entry, HistoryStore, SearchFilter, Source};
 
 use crate::services::database_service::ConnectionMetadata;
+use crate::ui::popover::keep_inside_window;
 
 pub struct HistoryDialog {
     history: HistoryStore,
@@ -122,6 +123,7 @@ impl Component for HistoryDialog {
             .tooltip_text(crate::tr!("Filter history"))
             .popover(&filter_popover)
             .build();
+        keep_inside_window(&filter_popover, &filter_button);
 
         let connections = init.database.all_connections();
 

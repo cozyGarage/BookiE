@@ -21,6 +21,7 @@ mod import_dialog;
 mod leak_probe;
 mod mcp_preferences;
 mod parameters_dialog;
+mod popover;
 mod preferences;
 mod progress_dialog;
 mod quick_switcher_dialog;
