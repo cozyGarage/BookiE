@@ -1151,6 +1151,11 @@
       "tablepro-app",
       "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
+    ],
+    [
+      "tablepro-app",
+      "--test=cli_info",
+      "information_flags_exit_without_display_or_profile_access"
     ]
   ],
   "keyring": [
