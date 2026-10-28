@@ -68,6 +68,7 @@ fi
 
 output_dir="${TABLEPRO_RC_OUTPUT_DIR:-$root/target/arch-release-inputs}"
 mkdir -p "$output_dir"
+output_dir="$(cd "$output_dir" && pwd)"
 archive_dir="$(mktemp -d "$output_dir/.build.XXXXXX")"
 trap 'rm -rf -- "$archive_dir"' EXIT
 archive="$output_dir/bookie-$version-$commit.tar.gz"
@@ -142,6 +143,7 @@ PY
 metadata_checksum="$(sha256sum "$metadata" | awk '{print $1}')"
 
 cd "$root/apps/linux/packaging/arch"
+export TABLEPRO_RC_PKGREL="${TABLEPRO_RC_PKGREL:-1}"
 export TABLEPRO_RC_COMMIT="$commit"
 export TABLEPRO_RC_SHA256="$checksum"
 export TABLEPRO_RC_VERSION="$version"
@@ -152,20 +154,8 @@ export TABLEPRO_RC_METADATA="$metadata"
 export TABLEPRO_RC_METADATA_SHA256="$metadata_checksum"
 export TABLEPRO_RC_DATE="$release_date"
 export SRCDEST="$output_dir"
-makepkg --cleanbuild --clean ${TABLEPRO_RC_MAKEPKG_DEPS:---syncdeps} --noconfirm
-mapfile -t package_files < <(makepkg --packagelist)
-namcap PKGBUILD "${package_files[@]}"
-validated=0
-for package_file in "${package_files[@]}"; do
-  # Arch may emit a separate debug package; only the application package
-  # contains desktop metadata and executables required by our validator.
-  if [[ "$(basename "$package_file")" == bookie-"$version"-* ]]; then
-    "$root/scripts/validate-arch-package.sh" "$package_file"
-    sha256sum "$package_file"
-    validated=$((validated + 1))
-  fi
-done
-if [[ "$validated" != 1 ]]; then
-  echo "expected exactly one BookiE application package, found $validated" >&2
-  exit 1
-fi
+makepkg --cleanbuild --clean "${TABLEPRO_RC_MAKEPKG_DEPS:---syncdeps}" --noconfirm
+package_list="$archive_dir/package-files"
+makepkg --packagelist > "$package_list"
+mapfile -t package_files < "$package_list"
+bash "$root/scripts/validate-arch-rc-packages.sh" "$output_dir" "${package_files[@]}"

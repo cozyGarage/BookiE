@@ -263,6 +263,35 @@ fn opts(host: &str, port: u16, database: &str) -> ConnectOptions {
     }
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn redis_cli_quoted_escapes_keep_their_argument_bytes() {
+    let (_container, host, port) = start_redis().await;
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+
+    connection.query(r#"SET binary "line1\nline2\x41\xff""#).await.unwrap();
+    assert_eq!(
+        connection.query("GET binary").await.unwrap().rows,
+        vec![vec![Value::Bytes(b"line1\nline2A\xff".to_vec())]]
+    );
+
+    connection.query(r#"SET literal 'line1\nline2'"#).await.unwrap();
+    assert_eq!(
+        connection.query("GET literal").await.unwrap().rows,
+        vec![vec![Value::Text(r"line1\nline2".into())]]
+    );
+
+    let error = connection
+        .query(r#"SET untouched "unterminated"#)
+        .await
+        .expect_err("malformed quoted input must be rejected before dispatch");
+    assert!(matches!(error, DriverError::Query { .. }));
+    assert_eq!(
+        connection.query("EXISTS untouched").await.unwrap().rows,
+        vec![vec![Value::Int(0)]]
+    );
+}
+
 /// fetch_rows() browses a table named after a database other than the
 /// connection's own -- it must restore the connection's own database
 /// before returning, or the next call on this shared connection lands
