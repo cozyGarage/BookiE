@@ -994,3 +994,39 @@ fn confirmed_session_rollbacks_retire_gutter_marks_and_stale_callbacks_do_not() 
         );
     }
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn running_a_query_dismisses_the_visible_completion_popup() {
+    let fixture = EditorFixture::new();
+    let window = gtk::Window::builder()
+        .default_width(1000)
+        .default_height(700)
+        .child(fixture.controller.widget())
+        .build();
+    window.present();
+    let model = fixture.controller.model();
+    let mut index = model.schema_index.borrow_mut();
+    index.grammar = Some(tablepro_core::sql_syntax::SqlGrammar::Sqlite);
+    index.set_tables(vec!["customers".into()]);
+    drop(index);
+    let view = model.source_view.clone();
+    drop(model);
+    spin_until(|| view.is_mapped());
+    view.grab_focus();
+    spin_until(|| view.has_focus());
+    view.buffer().set_text("SELECT * FROM cust");
+    view.buffer().place_cursor(&view.buffer().end_iter());
+    view.completion().show();
+    let popup = || {
+        descendants(view.upcast_ref())
+            .into_iter()
+            .find(|w| w.is::<gtk::Popover>() && w.has_css_class("completion"))
+    };
+    spin_until(|| popup().is_some_and(|p| p.is_visible()));
+    fixture.controller.sender().send(SqlEditorInput::Run).unwrap();
+    let query = fixture.next_query();
+    fixture.finish(query, success());
+    spin_until(|| popup().is_none_or(|p| !p.is_visible()));
+    window.destroy();
+}
