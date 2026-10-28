@@ -58,6 +58,9 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Large export to an existing file (installed package) | Replace prompt shown; the destination was untouched while 1M rows were written; the cancel path was not exercised because the 4M-row export finished first; a 4M-row editor result stops with "could not keep the complete result in temporary storage" while the guarded-cursor export still completed |
 | Filter by This Value (installed package) | Text value, NULL, empty text and a BLOB behave as the checklist says |
 | Long values (installed package) | Copy value copies the full text; BLOB View Value is capped at 16 KiB with the total shown; long unbroken text wraps without hyphens |
+| Pending cell edit, tab close (workspace 4, debug `1af200e38`) | Typing into a SQLite cell without Enter staged "1 unsaved change". The tab close button prompted Save, Discard and Cancel, and Cancel kept the draft. Ctrl+W then Save stored the value; Ctrl+W then Discard left the database unchanged. The other button and shortcut pairings were not each run |
+| Paste with no cell focused (workspace 4, debug `1af200e38`) | With focus in the sidebar, Ctrl+V did nothing. After a click in the grid area it showed "Click a cell first, then paste to fill cells from that one" |
+| PostgreSQL sort, filter and paging (workspace 4, debug `1af200e38`) | On a 250,000-row table without a key, ascending and descending sort reached the last page (rows 249,001 to 250,000 ended on the highest value). A `bucket < 10` filter showed 25,779 rows, equal to `psql`, kept the descending sort across pages and ended on bucket 0. This is not the MongoDB sorted-browse check, which was not run |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -83,6 +86,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1949](https://github.com/cozyGarage/BookiE/issues/1949): a profile with no saved connections has no way to import a bundle.
 - [#1952](https://github.com/cozyGarage/BookiE/issues/1952): refusing `SET autocommit=0` or `XA START` shows the BEGIN/COMMIT/ROLLBACK message.
 - [#1953](https://github.com/cozyGarage/BookiE/issues/1953): closing the window with an open session transaction while the database is down leaves the confirmation dialog stuck.
+- [#1966](https://github.com/cozyGarage/BookiE/issues/1966): creating a connection with the same endpoint, database and user as a saved one silently overwrites that saved connection.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
@@ -92,11 +96,11 @@ Counted from the four checklists at the head of this run. "With a 2026-10-28 res
 
 | Checklist | Items | Ticked | With a 2026-10-28 result | Without one |
 |---|---|---|---|---|
-| Catalog, sidebar and application shell | 38 | 6 | 16 | 22 |
-| Connections and SSH | 44 | 13 | 25 | 19 |
+| Catalog, sidebar and application shell | 38 | 7 | 20 | 18 |
+| Connections and SSH | 44 | 15 | 29 | 15 |
 | SQL editor and sessions | 62 | 30 | 34 | 28 |
-| Grid, filters and data transfer | 76 | 10 | 34 | 42 |
-| **All four** | 220 | 59 | 109 | 111 |
+| Grid, filters and data transfer | 76 | 17 | 45 | 31 |
+| **All four** | 220 | 69 | 128 | 92 |
 
 Why the rest are open:
 
@@ -109,6 +113,10 @@ Why the rest are open:
 ## Not run
 
 Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; ProxyJump and saved-password cases for system OpenSSH; the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, composition with a language input method (only fcitx5's Unicode addon was available), and the other distribution formats: no `.deb`, Flatpak or AppImage was built. The Arch package was installed with `pacman -U` by the user. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
+
+## Workspace 4 session, `1af200e38`
+
+Debug build of `1af200e38`, native Wayland on Hyprland workspace 4, a 1896 by 1150 window, dark, private profile. The session ended when `systemd-oomd` killed the whole `app-Hyprland-gtk-launch` scope (211 processes, 5.9 GB, memory pressure average 52 percent) at 23:29:36. The app log ends with no panic, there is no core dump for BookiE, and the machine has 13 GiB with about 7 GiB in use before the run. This was not a BookiE crash. An earlier `cargo build` with 16 jobs was killed the same way and finished with `-j4`.
 
 ## Cleanup
 
