@@ -75,26 +75,7 @@ impl SimpleComponent for WelcomeView {
     }
 
     fn init(init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
-        // Empty page — no saved connections yet. GNOME convention is
-        // state / instruction / action — title states the situation,
-        // description tells the user what to do, the button restates
-        // the action with verb-first phrasing (matches Settings's
-        // "No printers found" / "Add a printer to begin." / "Add
-        // Printer" pattern).
-        let empty_page = adw::StatusPage::builder()
-            .icon_name("network-server-symbolic")
-            .title(crate::tr!("No connections yet"))
-            .description(crate::tr!("Add a database connection to get started."))
-            .build();
-        let empty_btn = gtk::Button::builder()
-            .label(crate::tr!("Add Connection"))
-            .halign(gtk::Align::Center)
-            .build();
-        empty_btn.add_css_class("suggested-action");
-        empty_btn.add_css_class("pill");
-        let s_empty = sender.clone();
-        empty_btn.connect_clicked(move |_| s_empty.input(WelcomeViewInput::OpenConnect));
-        empty_page.set_child(Some(&empty_btn));
+        let empty_page = empty_page(&sender);
         root.add_named(&empty_page, Some("empty"));
 
         // Populated page — saved connections list. AdwClamp is the
@@ -365,6 +346,45 @@ fn group_sections(
         }
     }
     sections
+}
+
+fn empty_page(sender: &ComponentSender<WelcomeView>) -> adw::StatusPage {
+    let page = adw::StatusPage::builder()
+        .icon_name("network-server-symbolic")
+        .title(crate::tr!("No connections yet"))
+        .description(crate::tr!("Add a database connection to get started."))
+        .build();
+    let add = gtk::Button::builder()
+        .label(crate::tr!("Add Connection"))
+        .halign(gtk::Align::Center)
+        .build();
+    add.add_css_class("suggested-action");
+    add.add_css_class("pill");
+    let s_add = sender.clone();
+    add.connect_clicked(move |_| s_add.input(WelcomeViewInput::OpenConnect));
+    let import_bundle = gtk::Button::builder().label(crate::tr!("Import connections…")).build();
+    let s_bundle = sender.clone();
+    import_bundle.connect_clicked(move |_| s_bundle.input(WelcomeViewInput::ImportBundle));
+    let import_url = gtk::Button::builder().label(crate::tr!("Import from URL…")).build();
+    let s_url = sender.clone();
+    import_url.connect_clicked(move |_| s_url.input(WelcomeViewInput::ImportUrl));
+    let imports = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(6)
+        .halign(gtk::Align::Center)
+        .build();
+    for button in [&import_bundle, &import_url] {
+        button.add_css_class("flat");
+        imports.append(button);
+    }
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(12)
+        .build();
+    content.append(&add);
+    content.append(&imports);
+    page.set_child(Some(&content));
+    page
 }
 
 #[cfg(test)]
