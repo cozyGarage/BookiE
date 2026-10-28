@@ -1156,6 +1156,11 @@
       "tablepro-app",
       "--test=cli_info",
       "information_flags_exit_without_display_or_profile_access"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
     ]
   ],
   "keyring": [
