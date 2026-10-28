@@ -35,6 +35,7 @@ def _stage_package(
         stage / "DEBIAN",
     ):
         directory.mkdir(parents=True)
+    os.chmod(stage / "DEBIAN", 0o755)
     _write_executable(stage / "usr/bin/bookie", "#!/bin/sh\nexit 0\n")
     _write_executable(
         stage / "usr/bin/bookie-agentd",
@@ -137,7 +138,11 @@ def main() -> None:
     validator = source / "scripts/validate-deb-package.sh"
     with tempfile.TemporaryDirectory(prefix="bookie-deb-test-") as temporary:
         root = Path(temporary)
-        valid = _stage_package(source, root / "valid", include_aliases=True)
+        old_umask = os.umask(0o077)
+        try:
+            valid = _stage_package(source, root / "valid", include_aliases=True)
+        finally:
+            os.umask(old_umask)
         last_fields = _listing_last_fields(valid)
         assert "./usr/bin/tablepro" not in last_fields
         assert "bookie" in last_fields
