@@ -147,6 +147,24 @@ async fn a_checked_batch_of_keyed_writes_needs_no_count_query_and_no_approval() 
     assert_eq!(fixture.executed.load(Ordering::SeqCst), 2);
 }
 
+#[tokio::test]
+async fn a_statement_ending_in_a_line_comment_does_not_swallow_the_next_one() {
+    let fixture = fixture(10_000);
+    let statements = vec![
+        ("UPDATE people SET name = 'a' WHERE id = 1 -- why".to_string(), vec![]),
+        ("UPDATE people SET name = 'b' WHERE id = 2".to_string(), vec![]),
+    ];
+
+    fixture
+        .guard
+        .execute_in_transaction_checked(&statements, &[0, 1])
+        .await
+        .expect("two single-row writes are within the blast radius");
+
+    assert_eq!(fixture.approvals.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.executed.load(Ordering::SeqCst), 2);
+}
+
 fn controlled_approval_guard(
     started: Arc<tokio::sync::Notify>,
     cancellation: Arc<std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>>,
