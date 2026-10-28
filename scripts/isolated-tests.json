@@ -1191,6 +1191,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::stream_view::tests::a_timed_out_stream_keeps_its_last_data_page_and_shows_a_notice"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
     ]
   ],
   "keyring": [
