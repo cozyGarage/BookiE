@@ -314,8 +314,18 @@ fn localized_browse_key(key: &str) -> String {
 const GTK_INSPECTOR_CHORDS: &[&str] = &["<Primary><Shift>d", "<Primary><Shift>i"];
 
 #[cfg(test)]
+fn assert_no_inspector_chords<'a>(chords: impl IntoIterator<Item = (&'a str, &'a str)>) {
+    for (chord, source) in chords {
+        assert!(
+            !GTK_INSPECTOR_CHORDS.contains(&chord),
+            "{chord} is reserved for GTK's inspector ({source})"
+        );
+    }
+}
+
+#[cfg(test)]
 mod window_shortcut_tests {
-    use super::{GTK_INSPECTOR_CHORDS, WINDOW_SHORTCUTS};
+    use super::{WINDOW_SHORTCUTS, assert_no_inspector_chords};
     use std::collections::HashSet;
 
     const EDITOR_OWNED: &[&str] = &[
@@ -340,12 +350,7 @@ mod window_shortcut_tests {
 
     #[test]
     fn no_window_trigger_is_a_chord_gtk_reserves_for_its_inspector() {
-        for (trigger, action) in WINDOW_SHORTCUTS {
-            assert!(
-                !GTK_INSPECTOR_CHORDS.contains(trigger),
-                "{trigger} ({action}) opens the GTK Inspector prompt instead of the action"
-            );
-        }
+        assert_no_inspector_chords(WINDOW_SHORTCUTS.iter().map(|(trigger, action)| (*trigger, *action)));
     }
 
     fn registered(action: &str) -> bool {
@@ -398,7 +403,7 @@ mod window_shortcut_tests {
 
 #[cfg(test)]
 mod dialog_tests {
-    use super::{GTK_INSPECTOR_CHORDS, build_shortcuts_dialog};
+    use super::{assert_no_inspector_chords, build_shortcuts_dialog};
     use adw::prelude::*;
     use relm4::{adw, gtk};
 
@@ -461,12 +466,7 @@ mod dialog_tests {
             );
         }
         assert!(accelerators.len() > 40);
-        for reserved in GTK_INSPECTOR_CHORDS {
-            assert!(
-                !accelerators.iter().any(|value| value == reserved),
-                "the shortcuts window lists {reserved}, which GTK reserves for its inspector"
-            );
-        }
+        assert_no_inspector_chords(accelerators.iter().map(|value| (value.as_str(), "shortcuts window")));
         for accelerator in ["<Primary>q", "Up", "Down"] {
             assert!(accelerators.iter().any(|value| value == accelerator), "{accelerator}");
         }
