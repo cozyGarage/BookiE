@@ -11,6 +11,7 @@ PATH_KINDS = ("shortcut:", "menu:", "tab-stop", "gap:")
 SQL_EDITOR = {
     "Run": "shortcut: Ctrl+Enter",
     "Explain": "menu: Main menu > Explain query",
+    "Fold SQL blocks": "tab-stop",
     "Fold block": "shortcut: Ctrl+Shift+[",
     "Unfold all": "shortcut: Ctrl+Shift+]",
     "Session": "tab-stop",
@@ -26,8 +27,7 @@ SQL_EDITOR = {
     "Run options": "tab-stop",
     "Show columns": "tab-stop",
     "Results": "shortcut: Ctrl+J",
-    "Show result sets": "tab-stop",
-    "Errors (0)": "tab-stop",
+    "Errors": "tab-stop",
     "Maximize results": "tab-stop",
     "New Table\u2026": "tab-stop",
     "Table from CSV\u2026": "tab-stop",

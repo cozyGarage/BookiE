@@ -1151,6 +1151,41 @@
       "tablepro-app",
       "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::panel_tests::the_result_switcher_groups_results_and_errors_in_one_linked_strip"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::panel_tests::the_switcher_shows_the_error_count_only_when_there_are_errors_and_marks_the_active_view"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::panel_tests::the_editor_toolbar_is_one_wrapping_bar_with_folding_in_a_menu"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::filter_strip::tests::the_where_field_apply_and_clear_share_one_row"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::filter_strip::tests::saved_filter_controls_live_in_one_menu_on_the_where_row"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::tests::the_page_being_read_is_not_evicted_while_the_stream_keeps_loading"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::tests::a_timed_out_stream_keeps_its_last_data_page_and_shows_a_notice"
     ]
   ],
   "keyring": [

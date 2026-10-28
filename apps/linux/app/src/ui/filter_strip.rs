@@ -13,14 +13,12 @@
 //! UI shape (single-level combinator, no nested groups):
 //!
 //! ```text
-//! ┌─ Filter rows ──────────────────── Clear all │ Apply │ ✕ ─┐
-//! │  Combine rules with: [ All  ▾ ]   <— AND or OR DropDown   │
-//! │  ┌─ boxed-list ListBox ─────────────────────────────────┐ │
-//! │  │ [Column ▾] [Op ▾] [Value …]                  [✕]      │ │
-//! │  │ [Column ▾] [Op ▾] [Value …]                  [✕]      │ │
-//! │  │ [+ Add rule]                                          │ │
-//! │  └─────────────────────────────────────────────────────┘ │
-//! │  ▸ Advanced (raw SQL)   <— AdwExpanderRow                 │
+//! ┌────────────────────────────────────────────────────────────┐
+//! │ WHERE [ raw SQL … ] [Saved filters ▾] Clear all │ Apply │ ✕ │
+//! │ ▸ Or use the rule editor   <— GtkExpander                  │
+//! │    Match [ all ▾ ] of these rules   <— two or more clauses │
+//! │    [Column ▾] [Op ▾] [Value …]                       [✕]   │
+//! │    [+ Add rule]                                            │
 //! └────────────────────────────────────────────────────────────┘
 //! ```
 //!
@@ -356,16 +354,10 @@ pub fn build(
         .orientation(gtk::Orientation::Horizontal)
         .spacing(6)
         .margin_top(8)
-        .margin_bottom(0)
+        .margin_bottom(4)
         .margin_start(12)
         .margin_end(12)
         .build();
-    // Header reads as a single concise row: small "Match … of these
-    // rules:" label on the left with the combinator dropdown inline
-    // (only revealed once 2+ rules exist, since AND/OR is meaningless
-    // with 0–1 rules), spacer, action buttons on the right. Drops the
-    // earlier "Filter rows" title — Apply / Clear / × already mark
-    // this as the filter editor.
     let match_label = gtk::Label::builder().label(crate::tr!("Match")).build();
     match_label.add_css_class("dim-label");
     let combinator_dropdown = gtk::DropDown::from_strings(&[&crate::tr!("all"), &crate::tr!("any")]);
@@ -388,7 +380,6 @@ pub fn build(
         .reveal_child(state.borrow().rules.len() >= 2)
         .child(&match_row_box)
         .build();
-    let spacer = gtk::Box::builder().hexpand(true).build();
     let clear_btn = gtk::Button::with_label(&crate::tr!("Clear all"));
     clear_btn.add_css_class("flat");
     let apply_btn = gtk::Button::with_label(&crate::tr!("Apply"));
@@ -398,17 +389,7 @@ pub fn build(
         .tooltip_text(crate::tr!("Close (Esc)"))
         .build();
     close_btn.add_css_class("flat");
-    header.append(&match_revealer);
-    header.append(&spacer);
-    header.append(&clear_btn);
-    header.append(&apply_btn);
-    header.append(&close_btn);
     outer.append(&header);
-    if let Some(context) = preset_context {
-        outer.append(
-            &crate::ui::filter_presets::build(context, state.clone(), columns.clone(), on_apply.clone()).widget,
-        );
-    }
 
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
@@ -440,10 +421,6 @@ pub fn build(
     // at developers who already think in WHERE clauses; making them
     // expand a section to type SQL would be backwards. Structured
     // rules become the secondary affordance below.
-    let raw_row = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .spacing(8)
-        .build();
     let where_label = gtk::Label::builder().label("WHERE").build();
     where_label.add_css_class("monospace");
     where_label.add_css_class("dim-label");
@@ -469,9 +446,22 @@ pub fn build(
     raw_entry.connect_activate(move |_| {
         apply_btn_for_enter.activate();
     });
-    raw_row.append(&where_label);
-    raw_row.append(&raw_entry);
-    content.append(&raw_row);
+    header.append(&where_label);
+    header.append(&raw_entry);
+    if let Some(context) = preset_context {
+        let presets = crate::ui::filter_presets::build(context, state.clone(), columns.clone(), on_apply.clone());
+        let popover = gtk::Popover::new();
+        popover.set_child(Some(&presets.widget));
+        let saved = gtk::MenuButton::builder()
+            .label(crate::tr!("Saved filters"))
+            .popover(&popover)
+            .build();
+        saved.add_css_class("flat");
+        header.append(&saved);
+    }
+    header.append(&clear_btn);
+    header.append(&apply_btn);
+    header.append(&close_btn);
 
     // Structured rules — secondary, collapsed by default. Power
     // users who think in raw SQL never need to expand this; users
@@ -487,6 +477,7 @@ pub fn build(
         .spacing(8)
         .margin_top(8)
         .build();
+    rules_body.append(&match_revealer);
     rules_expander.set_child(Some(&rules_body));
     content.append(&rules_expander);
 
@@ -958,6 +949,76 @@ mod tests {
         });
 
         assert!(expander.is_expanded());
+    }
+
+    fn find_all<T: IsA<gtk::Widget>>(widget: &gtk::Widget, found: &mut Vec<T>) {
+        if let Ok(typed) = widget.clone().downcast::<T>() {
+            found.push(typed);
+        }
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            find_all(&current, found);
+            child = current.next_sibling();
+        }
+    }
+
+    fn button_labelled(widget: &gtk::Widget, label: &str) -> gtk::Button {
+        let mut buttons = Vec::new();
+        find_all::<gtk::Button>(widget, &mut buttons);
+        buttons
+            .into_iter()
+            .find(|button| button.label().as_deref() == Some(label))
+            .unwrap_or_else(|| panic!("no button labelled {label}"))
+    }
+
+    #[test]
+    #[ignore = "requires isolated GTK display"]
+    fn the_where_field_apply_and_clear_share_one_row() {
+        gtk::init().unwrap();
+        let strip = build(Vec::new(), FilterSet::default(), Rc::new(|_| {}), None);
+        let widget: gtk::Widget = strip.widget.clone().upcast();
+        let mut entries = Vec::new();
+        find_all::<gtk::Entry>(&widget, &mut entries);
+        let raw = entries.into_iter().next().expect("the raw WHERE entry");
+        let apply = button_labelled(&widget, "Apply");
+        let clear = button_labelled(&widget, "Clear all");
+        assert_eq!(raw.parent(), apply.parent());
+        assert_eq!(raw.parent(), clear.parent());
+    }
+
+    #[test]
+    #[ignore = "requires isolated GTK display"]
+    fn saved_filter_controls_live_in_one_menu_on_the_where_row() {
+        gtk::init().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let context = crate::ui::filter_presets::FilterPresetContext {
+            store: crate::services::named_filter_presets::NamedFilterPresetsStore::load_at(
+                directory.path().join("presets.json"),
+            ),
+            connection: uuid::Uuid::new_v4(),
+            schema: None,
+            table: "jobs".into(),
+            driver_id: "postgres".into(),
+        };
+        let strip = build(Vec::new(), FilterSet::default(), Rc::new(|_| {}), Some(context));
+        let widget: gtk::Widget = strip.widget.clone().upcast();
+        let mut menus = Vec::new();
+        find_all::<gtk::MenuButton>(&widget, &mut menus);
+        let saved = menus
+            .into_iter()
+            .find(|menu| menu.label().as_deref() == Some("Saved filters"))
+            .expect("a Saved filters menu");
+        let content = saved.popover().and_then(|popover| popover.child()).unwrap();
+        for label in ["Apply saved", "Delete", "Save as", "Rename"] {
+            button_labelled(&content, label);
+        }
+        let mut entries = Vec::new();
+        find_all::<gtk::Entry>(&widget, &mut entries);
+        let raw = entries
+            .iter()
+            .find(|entry| entry.placeholder_text().is_some_and(|text| text.starts_with("e.g.")))
+            .unwrap();
+        assert_eq!(saved.parent(), raw.parent());
     }
 
     fn find_expander(widget: &gtk::Widget) -> Option<gtk::Expander> {

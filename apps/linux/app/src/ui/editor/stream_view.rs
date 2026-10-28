@@ -75,6 +75,9 @@ pub(super) fn update_live_stream(
         if index >= first_resident {
             break;
         }
+        if pages.visible_child().as_ref() == Some(&page) {
+            continue;
+        }
         if let Some(current) = page.first_child()
             && !current.has_css_class("tp-stream-page-placeholder")
             && !current.has_css_class("tp-stream-page-loading")

@@ -16,8 +16,8 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   results stop at 1 million rows, 10 million cells or 64 MiB estimated size.
   Single-statement PostgreSQL `SELECT`s in the SQL editor stream cursor pages
   through Core and PolicyGuard, retaining them while estimated row storage stays
-  within 64 MiB and always keeping the newest page, even if it alone exceeds the
-  estimate. A process-local encrypted spool ([#1660](https://github.com/cozyGarage/BookiE/pull/1660)) with a shared 1 GiB
+  within 64 MiB and always keeping the newest page and the page being read, even if
+  either alone exceeds the estimate. A process-local encrypted spool ([#1660](https://github.com/cozyGarage/BookiE/pull/1660)) with a shared 1 GiB
   quota and a 4,096-page per-result cap keeps fetched pages revisitable
   after leaving the RAM cache without rerunning SQL. A storage, quota or page-cap
   refusal stops the stream as incomplete; pages already stored remain available

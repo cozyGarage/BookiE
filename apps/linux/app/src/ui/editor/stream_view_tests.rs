@@ -132,6 +132,7 @@ fn a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown() {
     let progress = named::<gtk::Label>(&root, LIVE_PROGRESS).unwrap();
     assert_eq!(progress.text(), stream_progress_text(&result));
 
+    pages.set_visible_child(&pages.last_child().unwrap());
     let (third, evicted) = streamed(&[1, 2], vec![page(&[3]), page(&[4])], 4);
     assert!(update_live_stream(&holder, &third, &evicted, &target));
     assert_eq!(pages.pages().n_items(), 3);
@@ -291,7 +292,7 @@ fn a_terminal_status_keeps_retained_grids_unbuilt_until_selected() {
     relm4::adw::init().unwrap();
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let (mut outcome, mut result) = streamed(&[0], vec![page(&[1, 2])], 2);
-    result.terminal = StreamTerminal::Cancelled;
+    result.terminal = StreamTerminal::Failed("fixture failure".into());
     outcome.kind = StatementOutcomeKind::Streamed(Box::new(result));
     let (sender, _receiver) = relm4::channel::<GridMsg>();
     super::super::outcomes::render_outcomes(
@@ -321,4 +322,97 @@ fn a_terminal_status_keeps_retained_grids_unbuilt_until_selected() {
     let grid = wait_for_grid(&data);
     assert_eq!(named::<gtk::ColumnView>(&data, "GtkColumnView"), Some(grid));
     window.destroy();
+}
+
+fn find_widgets<T: IsA<gtk::Widget>>(root: &gtk::Widget) -> Vec<T> {
+    let mut found = Vec::new();
+    let mut pending = vec![root.clone()];
+    while let Some(widget) = pending.pop() {
+        if let Ok(typed) = widget.clone().downcast::<T>() {
+            found.push(typed);
+        }
+        let mut child = widget.first_child();
+        while let Some(next) = child {
+            child = next.next_sibling();
+            pending.push(next);
+        }
+    }
+    found
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
+    relm4::adw::init().unwrap();
+    let (grid_sender, _) = relm4::channel::<GridMsg>();
+    let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());
+    let target = LiveStreamTarget {
+        grid_sender: &grid_sender,
+        connection_id: None,
+        database: database.clone(),
+        settings_store: LocalResultSettingsStore::default(),
+    };
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let (first, _) = streamed(&[0], vec![page(&[1, 2])], 2);
+    super::super::outcomes::render_outcomes(
+        &holder,
+        std::slice::from_ref(&first),
+        &grid_sender,
+        None,
+        database,
+        LocalResultSettingsStore::default(),
+        None,
+    );
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let pages = named::<gtk::Stack>(&root, LIVE_PAGES).unwrap();
+    let first_page = pages.first_child().unwrap();
+    pages.set_visible_child(&first_page);
+    let (second, result) = streamed(&[0, 1], vec![page(&[1, 2]), page(&[3])], 3);
+    assert!(update_live_stream(&holder, &second, &result, &target));
+    let (third, evicted) = streamed(&[1, 2], vec![page(&[3]), page(&[4])], 4);
+    assert!(update_live_stream(&holder, &third, &evicted, &target));
+    assert_eq!(pages.visible_child().as_ref(), Some(&first_page));
+    assert!(
+        first_page
+            .first_child()
+            .is_some_and(|child| !child.has_css_class("tp-stream-page-placeholder")),
+        "the page the user is reading must not be swapped for a placeholder"
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_timed_out_stream_keeps_its_last_data_page_and_shows_a_notice() {
+    relm4::adw::init().unwrap();
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let (mut outcome, mut result) = streamed(&[0, 1], vec![page(&[1, 2]), page(&[3])], 3);
+    result.terminal = StreamTerminal::TimedOut;
+    outcome.kind = StatementOutcomeKind::Streamed(Box::new(result));
+    let (sender, _receiver) = relm4::channel::<GridMsg>();
+    super::super::outcomes::render_outcomes(
+        &holder,
+        &[outcome],
+        &sender,
+        None,
+        Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        LocalResultSettingsStore::default(),
+        None,
+    );
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let pages = named::<gtk::Stack>(&root, "GtkStack").unwrap();
+    assert_eq!(pages.pages().n_items(), 2, "the timeout is not a third page");
+    assert_eq!(pages.visible_child(), pages.last_child());
+    let title = pages.page(&pages.visible_child().unwrap()).title();
+    assert_eq!(title.as_deref(), Some("Rows 3-3"));
+    let banners = find_widgets::<relm4::adw::Banner>(&root);
+    assert_eq!(banners.len(), 1);
+    assert_eq!(
+        banners[0].title(),
+        "Query timed out. All received pages remain available."
+    );
+    let next = find_widgets::<gtk::Button>(&root)
+        .into_iter()
+        .find(|button| button.label().as_deref() == Some("Next page"))
+        .unwrap();
+    assert!(!next.is_sensitive());
 }

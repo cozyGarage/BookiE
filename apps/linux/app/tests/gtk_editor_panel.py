@@ -40,9 +40,9 @@ def scenarios(ui):
         ui.wait_for_node(name="Restore editor", role=ui.pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(ui.wait_for_node(name="Restore editor", role=ui.pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Maximize results", role=ui.pyatspi.ROLE_PUSH_BUTTON)
-        ui.invoke(ui.wait_for_node(name="Errors (0)", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        ui.invoke(ui.wait_for_node(name="Errors", role=ui.pyatspi.ROLE_TOGGLE_BUTTON))
         ui.wait_for_node(name="No errors in the latest query run")
-        ui.invoke(ui.wait_for_node(name="Show result sets", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        ui.invoke(ui.wait_for_node(name="Results", role=ui.pyatspi.ROLE_TOGGLE_BUTTON))
         ui.wait_for_node(name="842")
         time.sleep(ui.POLL_SECONDS)
         assert ui.database_ids(database) == [842], "panel actions must never rerun the INSERT"

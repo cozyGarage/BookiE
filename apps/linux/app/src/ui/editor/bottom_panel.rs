@@ -11,7 +11,7 @@ use super::{SqlEditor, SqlEditorInput, StatementOutcome, StatementOutcomeKind};
 pub(crate) enum PanelAction {
     Toggle,
     Maximize,
-    Results,
+    ResultsButton,
     Errors,
 }
 
@@ -20,8 +20,8 @@ pub(super) struct BottomPanel {
     editor: gtk::Box,
     stack: gtk::Stack,
     errors: gtk::Box,
-    toggle: gtk::ToggleButton,
-    error_button: gtk::Button,
+    results_button: gtk::ToggleButton,
+    error_button: gtk::ToggleButton,
     maximize: gtk::Button,
     state: Rc<Cell<EditorPanel>>,
     applying: Rc<Cell<bool>>,
@@ -54,7 +54,7 @@ impl BottomPanel {
         paned.set_resize_end_child(false);
         paned.set_shrink_start_child(true);
         paned.set_shrink_end_child(true);
-        let (bar, toggle, error_button, maximize) = controls(sender);
+        let (bar, results_button, error_button, maximize) = controls(sender);
         toolbar.add_bottom_bar(&bar);
         let state = Rc::new(Cell::new(EditorPanel::default()));
         let applying = Rc::new(Cell::new(false));
@@ -64,7 +64,7 @@ impl BottomPanel {
             editor: editor.clone(),
             stack,
             errors,
-            toggle,
+            results_button,
             error_button,
             maximize,
             state,
@@ -108,16 +108,15 @@ impl BottomPanel {
         match action {
             PanelAction::Toggle => state.toggle(),
             PanelAction::Maximize => state.toggle_maximized(),
-            PanelAction::Results | PanelAction::Errors => {
+            PanelAction::ResultsButton if self.showing_errors(state) => {
+                self.stack.set_visible_child_name("results");
+            }
+            PanelAction::ResultsButton => state.toggle(),
+            PanelAction::Errors => {
                 if state.mode() == PanelMode::Hidden {
                     state.show(true);
                 }
-                self.stack
-                    .set_visible_child_name(if matches!(action, PanelAction::Errors) {
-                        "errors"
-                    } else {
-                        "results"
-                    });
+                self.stack.set_visible_child_name("errors");
             }
         }
         self.remember_focus();
@@ -139,6 +138,10 @@ impl BottomPanel {
         if self.state.get().mode() == PanelMode::Maximized {
             self.apply(PanelAction::Maximize);
         }
+    }
+
+    fn showing_errors(&self, state: EditorPanel) -> bool {
+        state.mode() != PanelMode::Hidden && self.stack.visible_child_name().as_deref() == Some("errors")
     }
 
     fn remember_focus(&self) {
@@ -165,7 +168,10 @@ impl BottomPanel {
         let state = self.state.get();
         self.editor.set_visible(state.mode() != PanelMode::Maximized);
         self.stack.set_visible(state.mode() != PanelMode::Hidden);
-        self.toggle.set_active(state.mode() != PanelMode::Hidden);
+        let visible = state.mode() != PanelMode::Hidden;
+        let errors = self.showing_errors(state);
+        self.results_button.set_active(visible && !errors);
+        self.error_button.set_active(errors);
         self.maximize.set_sensitive(state.mode() != PanelMode::Hidden);
         self.maximize.set_icon_name(if state.mode() == PanelMode::Maximized {
             "view-restore-symbolic"
@@ -193,8 +199,7 @@ impl BottomPanel {
             .xalign(0.0)
             .build();
         self.errors.append(&label);
-        self.error_button
-            .set_label(&crate::tr!("Errors ({n})").replace("{n}", "1"));
+        self.error_button.set_label(&errors_label(1));
     }
 
     pub(super) fn refresh_errors(&self, outcomes: &[StatementOutcome]) {
@@ -219,8 +224,7 @@ impl BottomPanel {
                 }
             }
         }
-        self.error_button
-            .set_label(&crate::tr!("Errors ({n})").replace("{n}", &count.to_string()));
+        self.error_button.set_label(&errors_label(count));
         if count == 0 {
             self.errors
                 .append(&gtk::Label::new(Some(&crate::tr!("No errors in the latest query run"))));
@@ -228,25 +232,34 @@ impl BottomPanel {
     }
 }
 
-fn controls(sender: &ComponentSender<SqlEditor>) -> (gtk::Box, gtk::ToggleButton, gtk::Button, gtk::Button) {
+fn errors_label(count: usize) -> String {
+    if count == 0 {
+        crate::tr!("Errors")
+    } else {
+        crate::tr!("Errors ({n})").replace("{n}", &count.to_string())
+    }
+}
+
+fn controls(sender: &ComponentSender<SqlEditor>) -> (gtk::Box, gtk::ToggleButton, gtk::ToggleButton, gtk::Button) {
     let bar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     bar.add_css_class("toolbar");
-    let toggle = gtk::ToggleButton::builder()
+    let results = gtk::ToggleButton::builder()
         .label(crate::tr!("Results"))
         .active(true)
         .tooltip_text(crate::tr!("Show or hide query results (Ctrl+J)"))
         .build();
-    let sender_toggle = sender.clone();
-    toggle.connect_clicked(move |_| sender_toggle.input(SqlEditorInput::Panel(PanelAction::Toggle)));
-    let results = gtk::Button::builder()
-        .icon_name("view-list-symbolic")
-        .tooltip_text(crate::tr!("Show result sets"))
-        .build();
     let sender_results = sender.clone();
-    results.connect_clicked(move |_| sender_results.input(SqlEditorInput::Panel(PanelAction::Results)));
-    let errors = gtk::Button::with_label(&crate::tr!("Errors (0)"));
+    results.connect_clicked(move |_| sender_results.input(SqlEditorInput::Panel(PanelAction::ResultsButton)));
+    let errors = gtk::ToggleButton::builder()
+        .label(errors_label(0))
+        .tooltip_text(crate::tr!("Show the errors of the latest run"))
+        .build();
     let sender_errors = sender.clone();
     errors.connect_clicked(move |_| sender_errors.input(SqlEditorInput::Panel(PanelAction::Errors)));
+    let switcher = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    switcher.add_css_class("linked");
+    switcher.append(&results);
+    switcher.append(&errors);
     let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     spacer.set_hexpand(true);
     let maximize = gtk::Button::builder()
@@ -255,16 +268,10 @@ fn controls(sender: &ComponentSender<SqlEditor>) -> (gtk::Box, gtk::ToggleButton
         .build();
     let sender_max = sender.clone();
     maximize.connect_clicked(move |_| sender_max.input(SqlEditorInput::Panel(PanelAction::Maximize)));
-    for child in [
-        toggle.upcast_ref::<gtk::Widget>(),
-        results.upcast_ref(),
-        errors.upcast_ref(),
-        spacer.upcast_ref(),
-        maximize.upcast_ref(),
-    ] {
-        bar.append(child);
-    }
-    (bar, toggle, errors, maximize)
+    bar.append(&switcher);
+    bar.append(&spacer);
+    bar.append(&maximize);
+    (bar, results, errors, maximize)
 }
 
 fn track_divider(paned: &gtk::Paned, state: &Rc<Cell<EditorPanel>>, applying: &Rc<Cell<bool>>) {
