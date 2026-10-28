@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-07
+- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0011-page-large-editor-results-through-a-cursor)
 - **Clarified**: 2026-10-16, 2026-10-22 and 2026-10-24 for implementation status, retained-byte limits and shipped cache behavior.
 
 ## Context
@@ -34,12 +35,6 @@ Add an optional driver capability that opens a forward-only cursor over a single
 - Every page is a guarded, audited call. The audit journal grows with the number of pages, so the page size is fixed and a long scroll writes bounded events.
 - A forward-only cursor cannot show earlier pages without keeping them. The retained-page budget decides what the user can scroll back to.
 - Engines without a cursor keep the current caps and the truncated banner.
-
-## Implementation status
-
-Core and PostgreSQL cursor support and PostgreSQL read-only snapshot sessions have landed. `PolicyGuard` authorizes one read statement in a read-only snapshot, masks each fetched page, and records page and terminal audit outcomes. PostgreSQL is the only driver with cursor support; other drivers return `Unsupported`. The SQL editor uses this path for supported single-statement PostgreSQL `SELECT`s, retaining pages within the 64 MiB estimated-row budget and keeping the newest page even if it alone exceeds that estimate. PR #1660 adds a process-local encrypted spool, so pages accepted into the spool remain revisitable without rerunning the query. The spool has a shared 1 GiB quota and a 4,096-page per-result cap; when storage, quota or page limits prevent writing a page, the stream stops as incomplete and previously stored pages stay available while their owners remain open. The installed 100,000-row PostgreSQL GTK scenario traversed every page and reloaded earlier pages while keeping a transaction marker unchanged ([spool evidence](../evidence/stream-result-spool-2026-10-25.md)).
-
-Historical Omarchy captures predate this spool: the installed package at source `d9b5aaca` retained rows 70,001–100,000 for a wide 100,000-row result ([installed profile](../evidence/native-wayland-profile-2026-10-24/README.md)), and the source-built profile at `58805ca17fcf4e450a43cde9207287741bbaa53d` retained rows 1,855,001–2,000,000 from a two-million-row result ([profile](../evidence/postgres-stream-native-wayland-2026-10-25/README.md)). A separate PR #1568 candidate capture is recorded [here](../evidence/built-head-2026-10-24/README.md#native-result-cache-capture-from-pr-commit-748c75c). These dated runs establish neither a process-memory ceiling nor general release acceptance. Other engines and unsupported query shapes keep the capped materialized path. Driver decoding also applies the result byte/cell budget per page. A historical synthetic profile reached 1,325 MiB RSS with four pinned results and one active stream ([evidence](../evidence/stream-retention-synthetic-2026-10-16/README.md)); it predates the current cache behavior and does not qualify current performance. Broader real-query memory profiling and lifecycle acceptance remain under [#1032](https://github.com/cozyGarage/BookiE/issues/1032).
 
 ## Open questions
 

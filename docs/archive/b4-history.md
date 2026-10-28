@@ -2,7 +2,7 @@
 
 Archived from `aeac107a4` on 2026-10-03. All status, ownership, worktree and
 next-task wording below belongs to its recorded checkpoint. Current tasks and
-acceptance are owned by [the B4 board](../b4-task-board.md); use the shared checkout
+acceptance are owned by [the B4 board](../lane-boards.md#b4-transport-and-sessions); use the shared checkout
 and cache for the current single-agent session. Historical results are retained
 as evidence, including reports that are unavailable locally.
 
@@ -696,7 +696,7 @@ one regression and the existing tier ownership for every confirmed fix.
 
 # Archived B4 dated checkpoints (2026-10-09 consolidation)
 
-Moved from [b4-task-board.md](../b4-task-board.md). These snapshots are source-pinned evidence. Failed or incomplete hosted runs remain retest indicators; open rows stay on the live board and ledger.
+Moved from [b4-task-board.md](../lane-boards.md#b4-transport-and-sessions). These snapshots are source-pinned evidence. Failed or incomplete hosted runs remain retest indicators; open rows stay on the live board and ledger.
 
 ## B4 continuation checkpoint (October 3; historical integration snapshot)
 
@@ -904,7 +904,7 @@ not qualify 0.2.0.
 
 # Archived completed local slices (2026-10-10 consolidation)
 
-Moved from [b4-task-board.md](../b4-task-board.md). Source-pinned local evidence
+Moved from [b4-task-board.md](../lane-boards.md#b4-transport-and-sessions). Source-pinned local evidence
 and matrices only. Open acceptance rows stay on the live board and ledger.
 Retest indicators on the live board are unchanged.
 
@@ -982,7 +982,7 @@ behavior stays in the dedicated keyring tier.
 
 # Archived remaining-task prose (2026-10-10 pass 4)
 
-Moved from the live [B4 board](../b4-task-board.md) Remaining tasks table.
+Moved from the live [B4 board](../lane-boards.md#b4-transport-and-sessions) Remaining tasks table.
 These rows were already implemented and locally tested; the live board keeps
 only open packaging work (I1) plus acceptance bounds above. Do not treat this
 archive as package-installed or native Wayland acceptance.

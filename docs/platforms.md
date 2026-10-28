@@ -54,6 +54,7 @@ The published Arch package installs `bookie` and `bookie-agentd`, with `tablepro
 
 - Build from a clean 0.2.0 tree with `TABLEPRO_RC_VERSION=0.2.0` and an explicit `TABLEPRO_RC_DATE=YYYY-MM-DD`.
 - `scripts/build-arch-rc.sh` requires the full `HEAD` SHA or a remotely verified tag. It retains checksummed source and Cargo vendor archives plus a build-input manifest, then runs Cargo build and tests offline through `makepkg --cleanbuild`, `namcap` and package-content checks. Native Arch packages stay external inputs, and this command does not create a release tag.
+- Rerun namcap and package-content validation against retained candidate inputs without rebuilding Rust with `bash scripts/validate-arch-rc-packages.sh <input-directory> <application-package> [debug-package]`.
 - Saved connections, drafts, favorites and the audit journal live in `~/.config/tablepro` and `~/.local/share/tablepro`. Stop the app before an upgrade or rollback and never delete those directories or the keyring records.
 - The package replaces and conflicts with `tablepro`. Install, upgrade and removal must keep user XDG data (PKG-6).
 - The 0.1.4 package report is historical evidence only.

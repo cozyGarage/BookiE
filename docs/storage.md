@@ -12,14 +12,21 @@ BookiE uses XDG files for local state, SQLite for query history, a JSONL audit j
 | Workspace tabs | JSON | `$XDG_CONFIG_HOME/tablepro/workspace_state.json` |
 | Column widths | JSON | `$XDG_CONFIG_HOME/tablepro/column_widths.json` |
 | Table filters | JSON | `$XDG_CONFIG_HOME/tablepro/filter_settings.json` |
+| Hidden columns, column order | JSON | `$XDG_CONFIG_HOME/tablepro/hidden_columns.json`, `$XDG_CONFIG_HOME/tablepro/column_order.json` |
+| Named filter presets | JSON | `$XDG_CONFIG_HOME/tablepro/named_filter_presets.json` |
+| CSV import column mappings | JSON | `$XDG_CONFIG_HOME/tablepro/csv_import_mappings.json` |
+| Connection organization (groups, tags, favorite flag) | JSON, beside `connections.json` | `$XDG_CONFIG_HOME/tablepro/connection-organization.json` |
+| Query favorites | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/favorites.json` |
 | Query history | SQLite with FTS5 | `$XDG_CONFIG_HOME/tablepro/history.db` |
 | Policy | TOML | `$XDG_CONFIG_HOME/tablepro/policy.toml` |
 | Audit journal | Hash-chained JSONL | `$XDG_DATA_HOME/tablepro/audit.jsonl` |
+| MCP token registry (token hashes only) | JSON | `$XDG_CONFIG_HOME/tablepro/mcp-tokens.json` |
+| Built-in SSH known hosts | OpenSSH `known_hosts` format | `$XDG_CONFIG_HOME/tablepro/known_hosts` |
 | Database passwords, SSH passwords, SSH key passphrases | Secret Service through `oo7` | Desktop keyring |
 | GUI-issued MCP token plaintext | Returned once; storage is attempted through Secret Service | Desktop keyring, when the save succeeds |
 | `bookie-agentd` MCP token plaintext | Printed once to stdout, or written to the explicitly selected token file with owner-only permissions | Issuance output; the token registry stores only its hash |
 
-If `XDG_CONFIG_HOME` is unset, config storage falls back to `~/.config/tablepro/`. If `XDG_DATA_HOME` is unset, the audit journal falls back to `~/.local/share/tablepro/`. A development build uses `tablepro-devel` in place of `tablepro` for every path above, the policy file included.
+If `XDG_CONFIG_HOME` is unset, config storage falls back to `~/.config/tablepro/`. If `XDG_DATA_HOME` is unset, the audit journal falls back to `~/.local/share/tablepro/`. A development build uses `tablepro-devel` in place of `tablepro` for every path above that goes through the storage crate, the policy file included. The MCP token registry and the built-in SSH `known_hosts` file are the exceptions: their code builds the path itself and always uses `tablepro`, so a development build shares them with an installed release.
 
 The current history database is under XDG config because that is what `query_history::db_path()` implements. Do not document or migrate it to XDG data without a code change and a tested migration.
 

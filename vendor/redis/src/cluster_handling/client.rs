@@ -12,7 +12,7 @@ use crate::errors::{ErrorKind, RedisError};
 #[cfg(feature = "cluster-async")]
 use crate::io::AsyncDNSResolver;
 use crate::io::tcp::TcpSettings;
-use crate::types::{ProtocolVersion, RedisResult};
+use crate::types::{ProtocolVersion, RedisResult, redacted_if_set, set_or_unset};
 use crate::{TlsMode, cluster};
 use arcstr::ArcStr;
 use rand::RngExt;
@@ -80,7 +80,83 @@ struct BuilderParams {
     max_connection_attempts: Option<NonZeroUsize>,
 }
 
-#[derive(Clone)]
+impl std::fmt::Debug for BuilderParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            password,
+            username,
+            read_routing_factory,
+            tls,
+            #[cfg(feature = "tls-rustls")]
+            certs,
+            #[cfg(any(feature = "tls-rustls-insecure", feature = "tls-native-tls"))]
+            danger_accept_invalid_hostnames,
+            retries_configuration,
+            connection_timeout,
+            response_timeout,
+            protocol,
+            database_id,
+            #[cfg(feature = "cluster-async")]
+            async_push_sender,
+            tcp_settings,
+            #[cfg(feature = "cluster-async")]
+            async_dns_resolver,
+            #[cfg(feature = "cache-aio")]
+            cache_config,
+            #[cfg(all(feature = "token-based-authentication", feature = "cluster-async"))]
+            credentials_provider,
+            #[cfg(feature = "cluster-async")]
+            overall_response_timeout,
+            #[cfg(feature = "cluster-async")]
+            connection_concurrency_limit,
+            #[cfg(feature = "cluster-async")]
+            write_backpressure_boundary,
+            node_address_map,
+            #[cfg(feature = "cluster-async")]
+            max_connection_attempts,
+        } = self;
+
+        let mut str = f.debug_struct("BuilderParams");
+        str.field("password", &redacted_if_set(password))
+            .field("username", username)
+            .field("tls", tls)
+            .field("retries_configuration", retries_configuration)
+            .field("connection_timeout", connection_timeout)
+            .field("response_timeout", response_timeout)
+            .field("protocol", protocol)
+            .field("database_id", database_id)
+            .field("tcp_settings", tcp_settings)
+            .field("node_address_map", node_address_map)
+            .field("read_routing_factory", &set_or_unset(read_routing_factory));
+
+        #[cfg(feature = "tls-rustls")]
+        str.field("certs", &redacted_if_set(certs));
+
+        #[cfg(any(feature = "tls-rustls-insecure", feature = "tls-native-tls"))]
+        str.field(
+            "danger_accept_invalid_hostnames",
+            danger_accept_invalid_hostnames,
+        );
+
+        #[cfg(feature = "cache-aio")]
+        str.field("cache_config", cache_config);
+
+        #[cfg(feature = "cluster-async")]
+        str.field("overall_response_timeout", overall_response_timeout)
+            .field("connection_concurrency_limit", connection_concurrency_limit)
+            .field("write_backpressure_boundary", write_backpressure_boundary)
+            .field("max_connection_attempts", max_connection_attempts)
+            .field("async_push_sender", &set_or_unset(async_push_sender))
+            .field("async_dns_resolver", &set_or_unset(async_dns_resolver));
+
+        #[cfg(all(feature = "token-based-authentication", feature = "cluster-async"))]
+        str.field("credentials_provider", &set_or_unset(credentials_provider));
+
+        str.finish()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct RetryParams {
     pub(crate) number_of_retries: u32,
     max_wait_time: u64,
@@ -171,6 +247,71 @@ pub(crate) struct ClusterParams {
     pub(crate) max_connection_attempts: Option<NonZeroUsize>,
 }
 
+impl std::fmt::Debug for ClusterParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            password,
+            username,
+            read_routing_factory,
+            tls,
+            retry_params,
+            tls_params,
+            connection_timeout,
+            response_timeout,
+            protocol,
+            database_id,
+            #[cfg(feature = "cluster-async")]
+            async_push_sender,
+            tcp_settings,
+            #[cfg(feature = "cluster-async")]
+            async_dns_resolver,
+            #[cfg(all(feature = "cache-aio", feature = "cluster-async"))]
+            cache_manager,
+            #[cfg(all(feature = "token-based-authentication", feature = "cluster-async"))]
+            credentials_provider,
+            #[cfg(feature = "cluster-async")]
+            overall_response_timeout,
+            #[cfg(feature = "cluster-async")]
+            connection_concurrency_limit,
+            #[cfg(feature = "cluster-async")]
+            write_backpressure_boundary,
+            node_address_map,
+            #[cfg(feature = "cluster-async")]
+            max_connection_attempts,
+        } = self;
+
+        let mut str = f.debug_struct("ClusterParams");
+        str.field("password", &redacted_if_set(password))
+            .field("username", username)
+            .field("tls", tls)
+            .field("retry_params", retry_params)
+            .field("tls_params", tls_params)
+            .field("connection_timeout", connection_timeout)
+            .field("response_timeout", response_timeout)
+            .field("protocol", protocol)
+            .field("database_id", database_id)
+            .field("tcp_settings", tcp_settings)
+            .field("node_address_map", node_address_map)
+            .field("read_routing_factory", &set_or_unset(read_routing_factory));
+
+        #[cfg(feature = "cluster-async")]
+        str.field("overall_response_timeout", overall_response_timeout)
+            .field("connection_concurrency_limit", connection_concurrency_limit)
+            .field("write_backpressure_boundary", write_backpressure_boundary)
+            .field("max_connection_attempts", max_connection_attempts)
+            .field("async_push_sender", &set_or_unset(async_push_sender))
+            .field("async_dns_resolver", &set_or_unset(async_dns_resolver));
+
+        #[cfg(all(feature = "cache-aio", feature = "cluster-async"))]
+        str.field("cache_manager", &set_or_unset(cache_manager));
+
+        #[cfg(all(feature = "token-based-authentication", feature = "cluster-async"))]
+        str.field("credentials_provider", &set_or_unset(credentials_provider));
+
+        str.finish()
+    }
+}
+
 impl ClusterParams {
     fn from(value: BuilderParams) -> RedisResult<Self> {
         #[cfg(not(feature = "tls-rustls"))]
@@ -190,6 +331,12 @@ impl ClusterParams {
                 client_tls_params: None,
                 #[cfg(feature = "tls-rustls")]
                 root_cert_store: None,
+                #[cfg(any(
+                    all(feature = "tls-native-tls", not(feature = "tls-rustls")),
+                    all(feature = "tokio-native-tls-comp", not(feature = "tokio-rustls-comp")),
+                    all(feature = "smol-native-tls-comp", not(feature = "smol-rustls-comp"))
+                ))]
+                native_tls_params: None,
                 danger_accept_invalid_hostnames: false,
                 verify_host: None,
             });
@@ -268,6 +415,20 @@ pub struct ClusterClientBuilder {
     builder_params: BuilderParams,
 }
 
+impl std::fmt::Debug for ClusterClientBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            initial_nodes,
+            builder_params,
+        } = self;
+
+        f.debug_struct("ClusterClientBuilder")
+            .field("initial_nodes", initial_nodes)
+            .field("builder_params", builder_params)
+            .finish()
+    }
+}
+
 impl ClusterClientBuilder {
     /// Creates a new `ClusterClientBuilder` with the provided initial_nodes.
     ///
@@ -324,12 +485,11 @@ impl ClusterClientBuilder {
         } else {
             &None
         };
-        let tls = if cluster_params.tls.is_none() {
+        // `None` here is a valid mode (plain TCP), so track whether it came from the first node.
+        let tls = cluster_params.tls.is_none().then(|| {
             cluster_params.tls = first_node.addr.tls_mode();
             cluster_params.tls
-        } else {
-            None
-        };
+        });
         let protocol = if cluster_params.protocol.is_none() {
             cluster_params.protocol = Some(first_node.redis.protocol);
             cluster_params.protocol
@@ -377,7 +537,7 @@ impl ClusterClientBuilder {
                 )));
             }
 
-            if tls.is_some() && node.addr.tls_mode() != tls {
+            if tls.is_some_and(|tls| node.addr.tls_mode() != tls) {
                 return Err(RedisError::from((
                     ErrorKind::InvalidClientConfig,
                     "Cannot use different TLS modes among initial nodes.",
@@ -542,6 +702,8 @@ impl ClusterClientBuilder {
     ///     .build()
     ///     .unwrap();
     /// ```
+    ///
+    /// Don't set this if you're using a managed cluster, such as Azure Managed Redis, as they don't support read routing.
     pub fn read_routing_strategy(
         mut self,
         strategy: impl ReadRoutingStrategyFactory + 'static,
@@ -749,6 +911,20 @@ pub struct ClusterClient {
     cluster_params: ClusterParams,
 }
 
+impl std::fmt::Debug for ClusterClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            initial_nodes,
+            cluster_params,
+        } = self;
+
+        f.debug_struct("ClusterClient")
+            .field("initial_nodes", initial_nodes)
+            .field("cluster_params", cluster_params)
+            .finish()
+    }
+}
+
 impl ClusterClient {
     /// Creates a `ClusterClient` with the default parameters.
     ///
@@ -872,7 +1048,17 @@ impl ClusterClient {
 #[cfg(test)]
 mod tests {
     use super::{ClusterClient, ClusterClientBuilder, ConnectionInfo, IntoConnectionInfo};
+    use crate::{ErrorKind, RedisError};
+    #[cfg(feature = "cluster-async")]
     use std::time::Duration;
+
+    fn assert_invalid_client_config_error(error: RedisError, expected_message: &str) {
+        assert_eq!(error.kind(), ErrorKind::InvalidClientConfig);
+        assert!(
+            error.to_string().contains(expected_message),
+            "unexpected error: {error}"
+        );
+    }
 
     fn get_connection_data() -> Vec<ConnectionInfo> {
         vec![
@@ -936,7 +1122,10 @@ mod tests {
             "redis://:password2@127.0.0.1:6378",
             "redis://:password3@127.0.0.1:6377",
         ]);
-        assert!(result.is_err());
+        assert_invalid_client_config_error(
+            result.unwrap_err(),
+            "Cannot use different password among initial nodes.",
+        );
     }
 
     #[test]
@@ -946,7 +1135,10 @@ mod tests {
             "redis://user2:password@127.0.0.1:6378",
             "redis://user1:password@127.0.0.1:6377",
         ]);
-        assert!(result.is_err());
+        assert_invalid_client_config_error(
+            result.unwrap_err(),
+            "Cannot use different username among initial nodes.",
+        );
     }
 
     #[test]
@@ -956,7 +1148,10 @@ mod tests {
             "redis://127.0.0.1:6378",
             "redis://127.0.0.1:6377",
         ]);
-        assert!(result.is_err());
+        assert_invalid_client_config_error(
+            result.unwrap_err(),
+            "Cannot use different protocol among initial nodes.",
+        );
     }
 
     #[test]
@@ -966,7 +1161,23 @@ mod tests {
             "redis://127.0.0.1:6378",
             "redis://127.0.0.1:6377",
         ]);
-        assert!(result.is_err());
+        assert_invalid_client_config_error(
+            result.unwrap_err(),
+            "Cannot use different TLS modes among initial nodes.",
+        );
+    }
+
+    #[test]
+    fn fail_if_received_different_tls_after_plain_initial_node() {
+        let result = ClusterClient::new(vec![
+            "redis://127.0.0.1:6379",
+            "rediss://127.0.0.1:6378/",
+            "redis://127.0.0.1:6377",
+        ]);
+        assert_invalid_client_config_error(
+            result.unwrap_err(),
+            "Cannot use different TLS modes among initial nodes.",
+        );
     }
 
     #[test]
@@ -983,7 +1194,7 @@ mod tests {
     #[test]
     fn give_empty_initial_nodes() {
         let client = ClusterClient::new(Vec::<String>::new());
-        assert!(client.is_err());
+        assert_invalid_client_config_error(client.unwrap_err(), "Initial nodes can't be empty.");
     }
 
     #[test]
@@ -1021,7 +1232,10 @@ mod tests {
         ])
         .database_id(7)
         .build();
-        assert!(result.is_err());
+        assert_invalid_client_config_error(
+            result.unwrap_err(),
+            "Cannot use different database among initial nodes.",
+        );
     }
 
     #[test]
@@ -1033,7 +1247,10 @@ mod tests {
         ])
         .database_id(0)
         .build();
-        assert!(result.is_err());
+        assert_invalid_client_config_error(
+            result.unwrap_err(),
+            "Cannot use different database among initial nodes.",
+        );
     }
 
     #[test]
@@ -1069,7 +1286,10 @@ mod tests {
             "redis://127.0.0.1:6378/5",
             "redis://127.0.0.1:6377/4",
         ]);
-        assert!(result.is_err());
+        assert_invalid_client_config_error(
+            result.unwrap_err(),
+            "Cannot use different database among initial nodes.",
+        );
     }
 
     #[cfg(feature = "cluster-async")]
