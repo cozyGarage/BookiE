@@ -96,6 +96,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
                     open_mode: OpenMode::SwitchOrAppend,
                 });
             }
+            NodeKind::Catalog(kind) => activate_sender.input(AppMsg::ShowCatalogKind(*kind)),
             NodeKind::Schema | NodeKind::Group(_) => {
                 activate_sender.input(AppMsg::ToggleSidebarGroup(node.key.clone()));
             }
