@@ -47,6 +47,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | ENUM and SET pickers (installed package) | MySQL 8.4 ENUM and SET pickers write declared order, the empty member and the empty set correctly; PostgreSQL enum labels come in declared order; the SET popover clips its labels and Apply (#1945) |
 | SQLite Structure and tab menu (installed package) | Add Foreign Key is greyed with the right reason on an existing table; a disabled Comment row is shown on SQLite (#1946); the tab context menu entries are greyed and inert (#1947) |
 | Pending-edit teardown and MySQL comments (installed package) | Disconnect, Discard and disconnect, Ctrl+Q and window close all prompt with a pending cell edit and Cancel keeps the draft; MySQL column comments edit and clear correctly |
+| Editor, second pass (installed package) | Lone BEGIN refusal, empty Explain message, close with an open transaction and Roll Back and Close, dimmed result while a query runs, tick and cross gutter marks |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
