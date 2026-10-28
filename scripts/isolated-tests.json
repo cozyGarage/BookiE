@@ -1156,6 +1156,11 @@
       "tablepro-app",
       "--lib",
       "ui::history_dialog::export_tests::a_failed_history_export_shows_a_dismissible_error"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
     ]
   ],
   "keyring": [

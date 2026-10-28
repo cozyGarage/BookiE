@@ -96,7 +96,9 @@ else:
         echo "forgejo run $run_number (API id $run_id) $status for $sha"
         while IFS=$'\t' read -r job_status job_id job_name; do
           [ -n "$job_id" ] || continue
-          echo "$job_status $job_name (job $job_id); last 80 log lines:"
+          echo "$job_status $job_name (job $job_id)"
+          [ "$job_status" = "failure" ] || continue
+          echo "last 80 log lines:"
           if ! api_get "$api/actions/jobs/$job_id/logs" | tail -n 80; then
             echo "could not retrieve the job log"
           fi
