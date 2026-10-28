@@ -1619,6 +1619,13 @@ def sidebar_search_reveals_groups_as_expanded(_database, _base):
     search.queryEditableText().setTextContents("")
     wait_for_node_showing("safety_items", False)
     assert not group.getState().contains(pyatspi.STATE_EXPANDED)
+    search.queryEditableText().setTextContents("   ")
+    time.sleep(SETTLE_SECONDS)
+    group = wait_for_node(name="Tables", role=pyatspi.ROLE_LIST_ITEM)
+    bounds = group.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+    assert search.queryText().getText(0, -1) == "   ", "search must retain whitespace"
+    wait_for_node_showing("safety_items", True, timeout=8)
 
 
 sidebar_search_reveals_groups_as_expanded.environment = "local"

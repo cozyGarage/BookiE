@@ -112,7 +112,7 @@ impl App {
     }
 
     pub(super) fn toggle_sidebar_group(&mut self, key: &str) {
-        if !self.table_search.text().is_empty() {
+        if !self.table_search.text().trim().is_empty() {
             return;
         }
         self.sidebar_collapsed.borrow_mut().toggle(key);
