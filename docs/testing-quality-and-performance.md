@@ -37,6 +37,8 @@ Resource regressions belong in the existing unit and gtk-widgets tiers. Prefer r
 | The retained-byte budget drifts | The exact 64 MiB boundary retains two half-budget pages; one additional row evicts an old page. Existing coverage keeps an oversized newest page explicitly. |
 | Snapshots duplicate payloads or retain retired data | Snapshot payload identity, external-owner release, terminal-state ownership and rejected-page release tests. |
 | Catalog checks return to a full scan | Four lookups against 10,000 names perform at most 16 identifier normalizations, counted only in test builds. Prefix eligibility and cached columns remain covered. |
+| Completion filters the whole catalog on every keystroke | Four selective lookups perform the same 560 identifier normalizations and 292 name splits on a 1,000-name and a 10,000-name catalog, counted only in test builds. Filtering every name before the prefix is applied performed 8,552 and 80,552 normalizations. |
+| Completion lexes the script more than once | One lookup lexes a 64 KB script at most 1.1 times its length in bytes (1.03 measured). Unshared lex plans lexed it 3.0 times. |
 | Completion caches retain objects after closing | A discarded model releases cached proposals across 1,000, 10,000 and 50,000 candidates; a held proposal lives only until its final owner drops. |
 | Closed editors continue delayed metadata work | A discarded refresh cancels its callback and releases captured state after a 128-trigger burst. The existing debounce test requires one callback for a typing burst. |
 | Replacing grids accumulates cells, menus or selections | Repeated alternation between editable and read-only rendered grids requires every retired widget and result to be released. |
@@ -55,6 +57,10 @@ Run the non-display application checks locally with:
 Run display-dependent contracts with bash scripts/test-gtk-widgets.sh. Fast preflight excludes application library tests; a preflight pass alone is not evidence that these application contracts passed. Forgejo's existing unit job includes application library tests, and widgets runs registered display tests. No new CI job or nightly-only dependency is needed.
 
 These structural guards do not bound total process RSS, allocator caches, driver buffers, GPU resources or arbitrarily long sessions. Measure those separately on the changed workload and display backend. A watchdog around an asynchronous lifecycle test is not a throughput target.
+
+## Completion host profile
+
+`cargo run --release -p tablepro-app-services --example completion_benchmark` prints one JSON array with the minimum, median and mean time of one completion lookup over catalogs of 1,000 to 100,000 names and scripts of 16 KB to 3.6 MB. It is a host sample, not a gate: the work contracts above are what fail a build. The [2026-10-28 profile](evidence/completion-keystroke-profile-2026-10-28/README.md) records a before and after run and the host it ran on.
 
 ## Browse performance
 
