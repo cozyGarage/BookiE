@@ -219,7 +219,11 @@ pub fn load_from_path(path: &Path) -> Result<PolicyConfig, String> {
         let id: uuid::Uuid = key
             .parse()
             .map_err(|e| format!("[connection_overrides.{key}] is not a connection id: {e}"))?;
-        canonical_overrides.insert(id.to_string(), value);
+        if canonical_overrides.insert(id.to_string(), value).is_some() {
+            return Err(format!(
+                "[connection_overrides.{key}] names a connection that another override already names"
+            ));
+        }
     }
     policy.connection_overrides = canonical_overrides;
     Ok(policy)
@@ -411,6 +415,28 @@ mod tests {
                 [connection_overrides.not-a-uuid]
                 human_approve_ddl = false
             "#,
+        )
+        .unwrap();
+        assert!(load_from_path(&path).is_err());
+    }
+
+    #[test]
+    fn two_override_keys_naming_the_same_connection_are_refused_at_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("policy.toml");
+        let id = uuid::Uuid::new_v4();
+        std::fs::write(
+            &path,
+            format!(
+                r#"
+                [connection_overrides."{upper}"]
+                human_approve_ddl = false
+                [connection_overrides."{lower}"]
+                human_approve_ddl = true
+                "#,
+                upper = id.to_string().to_uppercase(),
+                lower = id,
+            ),
         )
         .unwrap();
         assert!(load_from_path(&path).is_err());
