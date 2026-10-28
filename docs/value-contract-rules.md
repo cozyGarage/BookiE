@@ -35,6 +35,7 @@ The choices behind [ADR 0007](decisions/0007-type-and-value-preservation.md), gr
 
 ## SQLite
 
+- **Declared temporal affinity does not determine the stored value.** Decode SQLite `DATE`, `TIME`, `DATETIME` and `TIMESTAMP` according to the runtime storage class. Preserve INTEGER, REAL and BLOB as their native `Value` kinds; preserve offset-bearing temporal TEXT exactly because the shared naive temporal variants cannot retain its offset. Plain supported temporal TEXT may use the existing typed variants.
 - **A STRICT `ANY` edit keeps the cell's runtime kind.** The grid parses an edit with the existing cell's kind: INTEGER stays integer, REAL stays real, TEXT stays text. A new or NULL cell stores nonempty input as TEXT, even when numeric-looking, because there is nothing to preserve and the grid must not guess a conversion. Clearing existing TEXT stores empty TEXT, not NULL.
 
 ## MongoDB
