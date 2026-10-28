@@ -53,6 +53,8 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Connection list (installed package) | 3 s connect timeout fails in 3 s with a clear message; Duplicate gives a distinct name and an empty-password form; Group and tags and the colour swatch work |
 | Session refusals (installed package) | MySQL `SET autocommit=0` and `XA START` refused on a shared connection with a wrong-looking message (#1952); ClickHouse Session explains it is unavailable |
 | Hide schema and failed structure save (installed package) | Hiding a PostgreSQL schema removes it from the tree and search, and it is restorable from the Hidden schemas menu; a NOT NULL column added to a populated table fails with a clear rollback message |
+| Host down with an open session (installed package) | Ctrl+Q with an open Session transaction and the database stopped leaves the confirmation dialog stuck with no cleanup-timeout dialog (#1953); an idle session closes the window normally |
+| Session cancel and timeout (installed package) | Cancel stops a server query inside a Session; a timeout inside a Session transaction leaves the transaction open and says so |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -77,6 +79,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1948](https://github.com/cozyGarage/BookiE/issues/1948): Ctrl+Shift+D opens the GTK Inspector prompt instead of the saved-queries list.
 - [#1949](https://github.com/cozyGarage/BookiE/issues/1949): a profile with no saved connections has no way to import a bundle.
 - [#1952](https://github.com/cozyGarage/BookiE/issues/1952): refusing `SET autocommit=0` or `XA START` shows the BEGIN/COMMIT/ROLLBACK message.
+- [#1953](https://github.com/cozyGarage/BookiE/issues/1953): closing the window with an open session transaction while the database is down leaves the confirmation dialog stuck.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
