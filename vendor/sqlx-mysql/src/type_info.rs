@@ -81,7 +81,7 @@ impl TypeInfo for MySqlTypeInfo {
     }
 
     fn name(&self) -> &str {
-        self.r#type.name(self.flags, self.max_size)
+        self.r#type.name(self.flags, self.collation, self.max_size)
     }
 }
 
