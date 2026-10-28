@@ -34,6 +34,8 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Redis 7.4 | Keys, type, TTL and value shown for db0; SQL export absent; the sidebar lists db0 to db15 under a Tables group with a New Table button |
 | ClickHouse 24.8 | Connected; Structure showed the comment greyed out |
 | SQL Server 2022 | A missing password gave "Username or password is wrong."; after entering it the connection worked and a column comment save wrote `MS_Description` after approval |
+| Editor files, second pass | Close prompt Cancel and Discard and Save As in the changed-on-disk dialog passed |
+| Restore refresh | A browse tab open on a changed table refreshed to the restored value |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -47,12 +49,13 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1917](https://github.com/cozyGarage/BookiE/issues/1917): MongoDB fields a document lacks show `<undecodable missing BSON field>`.
 - Reproduced on an existing issue: a passwordless MySQL root is refused with "using password: YES" ([#1861](https://github.com/cozyGarage/BookiE/issues/1861)); MySQL lists views under Tables while PostgreSQL has a Views group and SQLite omits them ([#1908](https://github.com/cozyGarage/BookiE/issues/1908)).
 - [#1919](https://github.com/cozyGarage/BookiE/issues/1919): the approval prompt shows an empty `tables:` line when no targets were detected.
+- [#1921](https://github.com/cozyGarage/BookiE/issues/1921): the sidebar cannot be refreshed after tables are created outside BookiE.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
 ## Not run
 
-Connections and SSH items other than the Production marker and the 2-second timeout, the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, high contrast, input-method editing, Save As… in the changed-on-disk dialog, the Discard and Cancel paths of the close prompt, the backup progress window and browse-tab refresh after a restore, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
+Connections and SSH items other than the Production marker and the 2-second timeout, the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, high contrast, input-method editing, the backup progress window, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
 
 ## Cleanup
 
