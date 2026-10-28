@@ -91,7 +91,7 @@ def scenarios(ui):
     def open_pending_sql():
         if ui.find_node(name="1 unsaved change") is None:
             open_table()
-            ui.invoke(ui.wait_for_node(name="Insert row", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+            ui.invoke_named_action(ui.application_node, "application", "Insert row")
             ui.wait_for_node(name="1 unsaved change")
         ui.invoke(ui.wait_for_node(name="Preview SQL", role=ui.pyatspi.ROLE_PUSH_BUTTON))
 
