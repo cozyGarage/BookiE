@@ -35,7 +35,11 @@ pub fn relation_items(
     table_label: &str,
     view_label: &str,
 ) -> Vec<QuickItem> {
-    let tables = tables.iter().map(|table| (table, table_label.to_owned()));
+    let view_keys: std::collections::HashSet<_> = views.iter().map(|view| (&view.schema, &view.name)).collect();
+    let tables = tables
+        .iter()
+        .filter(|table| !view_keys.contains(&(&table.schema, &table.name)))
+        .map(|table| (table, table_label.to_owned()));
     let views = views.iter().map(|view| (view, view_label.to_owned()));
     tables
         .chain(views)
@@ -223,6 +227,14 @@ mod tests {
                 name: "orders".into()
             }
         );
+    }
+
+    #[test]
+    fn a_view_also_in_tables_appears_once_as_a_view() {
+        let view = relation(Some("sales"), "recent");
+        let items = relation_items(std::slice::from_ref(&view), &[view.clone()]);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].subtitle, "View");
     }
 
     #[test]
