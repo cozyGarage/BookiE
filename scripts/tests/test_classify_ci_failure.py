@@ -22,6 +22,10 @@ class ClassifyCiFailureTests(unittest.TestCase):
         text = 'start MongoDB fixture: Client(PullImage { descriptor: "mongo:7", err: RequestTimeoutError })'
         self.assertEqual(self.tag(text), "infra")
 
+    def test_a_docker_hub_http_429_is_infrastructure(self):
+        text = "unexpected status from HEAD request to registry-1.docker.io: 429 Too Many Requests\nJob failed"
+        self.assertEqual(self.tag(text), "infra")
+
     def test_a_fixture_that_never_became_ready_is_infrastructure(self):
         self.assertEqual(self.tag("MySQL fixture did not become ready\nJob failed"), "infra")
 

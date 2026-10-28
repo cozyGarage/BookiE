@@ -24,7 +24,21 @@ for base in "${images[@]}"; do
     build_mounts=(-v "${tag}-target:/target" -v "${tag}-cargo:/opt/cargo/registry" -v "${tag}-git:/opt/cargo/git")
     build_environment=(-e CARGO_TARGET_DIR=/target)
   fi
-  docker build -t "$tag" --build-arg "BASE=$base" -f "$dockerfile" scripts/distro-floor
+  build_log="$(mktemp "$PWD/.docker-build.XXXXXX")"
+  trap 'rm -f "$build_log"' EXIT
+  for attempt in 1 2 3; do
+    if docker build -t "$tag" --build-arg "BASE=$base" -f "$dockerfile" scripts/distro-floor 2>&1 | tee "$build_log"; then
+      break
+    else
+      build_status=$?
+    fi
+    if [ "$attempt" -eq 3 ] || ! grep -Eqi '429[[:space:]]+Too Many Requests|toomanyrequests' "$build_log"; then
+      exit "$build_status"
+    fi
+    echo "Docker Hub rate limit; retrying image build (attempt $((attempt + 1))/3)"
+    sleep "$((attempt * 20 + RANDOM % 15))"
+  done
+  rm -f "$build_log"
   docker run --rm ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} "${package_mount[@]}" "${package_env[@]}" -e TABLEPRO_GTK_SHARD="${TABLEPRO_GTK_SHARD:-}" -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" ${TABLEPRO_GTK_Y_OFFSET:+-e TABLEPRO_GTK_Y_OFFSET="$TABLEPRO_GTK_Y_OFFSET"} ${TABLEPRO_GTK_WAIT_SECONDS:+-e TABLEPRO_GTK_WAIT_SECONDS="$TABLEPRO_GTK_WAIT_SECONDS"} ${TABLEPRO_GTK_SCENARIO_RETRIES:+-e TABLEPRO_GTK_SCENARIO_RETRIES="$TABLEPRO_GTK_SCENARIO_RETRIES"} -v "$PWD:/src:ro" "${build_mounts[@]}" "${build_environment[@]}" "$tag" bash -ceu -o pipefail '
     if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]; then
       apt-get update
