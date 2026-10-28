@@ -36,6 +36,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | SQL Server 2022 | A missing password gave "Username or password is wrong."; after entering it the connection worked and a column comment save wrote `MS_Description` after approval |
 | Editor files, second pass | Close prompt Cancel and Discard and Save As in the changed-on-disk dialog passed |
 | Restore refresh | A browse tab open on a changed table refreshed to the restored value |
+| High contrast and icon | With libadwaita's high-contrast debug switch the editor and grid stayed readable; with the shipped icon on the data path About showed the BookiE artwork |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -55,7 +56,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 
 ## Not run
 
-Connections and SSH items other than the Production marker and the 2-second timeout, the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, high contrast, input-method editing, the backup progress window, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
+Connections and SSH items other than the Production marker and the 2-second timeout, the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, input-method editing, the backup progress window, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
 
 ## Cleanup
 
