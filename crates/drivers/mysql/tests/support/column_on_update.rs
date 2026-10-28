@@ -65,3 +65,34 @@ async fn a_structure_alter_keeps_the_srid_of_a_spatial_column() {
         .rows;
     assert_eq!(srid, vec![vec![Value::Int(4326)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_structure_alter_keeps_a_column_invisible() {
+    let (_container, options) = start_mysql().await;
+    let connection = connect(options).await;
+    connection
+        .execute("CREATE TABLE hidden (id INT PRIMARY KEY, secret INT INVISIBLE)")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "hidden").await.unwrap();
+    let mut draft = DraftColumn::from_info(columns.into_iter().find(|column| column.name == "secret").unwrap());
+    draft.comment = Some("internal".into());
+
+    for statement in build_alter_column("mysql", None, "hidden", &draft).unwrap() {
+        connection.execute(&statement).await.unwrap();
+    }
+
+    let extra = connection
+        .query(
+            "SELECT LOWER(extra) FROM information_schema.columns \
+             WHERE table_schema = DATABASE() AND table_name = 'hidden' AND column_name = 'secret'",
+        )
+        .await
+        .unwrap()
+        .rows;
+    let Value::Text(extra) = &extra[0][0] else {
+        panic!("extra is text: {extra:?}")
+    };
+    assert!(extra.contains("invisible"), "{extra}");
+}

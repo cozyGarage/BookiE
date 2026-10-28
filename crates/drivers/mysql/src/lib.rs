@@ -11,6 +11,7 @@ use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statem
 
 use futures::stream::StreamExt;
 
+mod attributes;
 mod decode;
 mod spatial;
 use decode::extract_value;
@@ -907,17 +908,8 @@ async fn index_key_expression(
 // literal and is quoted back so restating the column keeps its default.
 // MariaDB 10.2.7+ already reports the DEFAULT clause itself and reports a
 // column without a default as the text NULL.
-fn with_on_update(default: String, column_type: &str, extra: &str) -> String {
-    let lower_type = column_type.to_ascii_lowercase();
-    let temporal = lower_type.starts_with("timestamp") || lower_type.starts_with("datetime");
-    let Some((_, action)) = extra.split_once("on update ").filter(|_| temporal) else {
-        return default;
-    };
-    format!("{default} ON UPDATE {}", action.trim().to_ascii_uppercase())
-}
-
 fn default_expression(raw: Option<String>, column_type: &str, extra: &str, mariadb: bool) -> Option<String> {
-    let raw = with_on_update(raw?, column_type, extra);
+    let raw = attributes::with_on_update(raw?, column_type, extra);
     if mariadb {
         return (!raw.eq_ignore_ascii_case("null")).then_some(raw);
     }
@@ -935,7 +927,7 @@ fn default_expression(raw: Option<String>, column_type: &str, extra: &str, maria
 
 fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
     let extra = r.try_get::<String, _>(4).unwrap_or_default().to_ascii_lowercase();
-    let column_type = r.get::<String, _>(1);
+    let column_type = attributes::with_invisible(r.get::<String, _>(1), &extra);
     let mariadb = r.try_get::<i64, _>(9).unwrap_or(0) == 1;
     let default_value = default_expression(
         r.try_get::<Option<String>, _>(5).unwrap_or(None),
