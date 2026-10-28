@@ -1422,16 +1422,26 @@ GLib.MainLoop().run()
         ui.invoke_accessible_action("win.show-history")
         ui.wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(ui.wait_for_node(name="Select", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        row = ui.wait_for_node(name=query, role=pyatspi.ROLE_LABEL)
-        while row is not None and ui.node_role(row) != pyatspi.ROLE_LIST_ITEM:
-            row = row.parent
-        assert row is not None, "the recorded query has no history row"
-        checkbox = ui.wait_within(row, role=pyatspi.ROLE_CHECK_BOX)
         deadline = time.monotonic() + ui.WAIT_SECONDS
-        while not checkbox.getState().contains(pyatspi.STATE_SHOWING) and time.monotonic() < deadline:
-            time.sleep(ui.POLL_SECONDS)
-        extents = checkbox.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
-        assert extents.width > 0 and extents.height > 0, "the history selection checkbox has no visible bounds"
+        extents = None
+        last_error = None
+        while time.monotonic() < deadline and extents is None:
+            try:
+                row = ui.find_node(name=query, role=pyatspi.ROLE_LABEL)
+                while row is not None and ui.node_role(row) != pyatspi.ROLE_LIST_ITEM:
+                    row = row.parent
+                checkbox = ui.find_within(row, role=pyatspi.ROLE_CHECK_BOX) if row is not None else None
+                if checkbox is not None and checkbox.getState().contains(pyatspi.STATE_SHOWING):
+                    candidate = checkbox.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+                    if candidate.width > 0 and candidate.height > 0:
+                        extents = candidate
+            except Exception as error:
+                last_error = error
+            if extents is None:
+                time.sleep(ui.POLL_SECONDS)
+        assert extents is not None, (
+            f"the history selection checkbox did not become visible: {last_error or 'no accessible checkbox'}"
+        )
         x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
         ui.wait_for_node(name="1 selected")
         for position, extension in [(0, "sql"), (1, "csv")]:
