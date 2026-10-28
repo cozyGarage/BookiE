@@ -939,6 +939,8 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull PostgreSQL release fixture images
+        run: bash src/scripts/prepull-test-images.sh pg-release
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py 4
       - name: PostgreSQL release fixture
@@ -988,6 +990,8 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull pg_dump image
+        run: bash src/scripts/prepull-test-images.sh pg-dump
       - name: pg_dump against PostgreSQL
         run: cd src && ./scripts/test-pg-dump.sh
 
@@ -1034,6 +1038,8 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull PostgreSQL socket fixture image
+        run: bash src/scripts/prepull-test-images.sh socket-ssh
       - name: PostgreSQL socket and SSH fixtures
         run: |
           cd src
