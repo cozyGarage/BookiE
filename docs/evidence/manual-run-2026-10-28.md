@@ -38,6 +38,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Restore refresh | A browse tab open on a changed table refreshed to the restored value |
 | High contrast and icon | With libadwaita's high-contrast debug switch the editor and grid stayed readable; with the shipped icon on the data path About showed the BookiE artwork |
 | Built-in SSH tunnel | MySQL 8.4 behind a bastion container (the repository's driver-tls fixture): host-key trust prompt, tunnel with TLS Verify Full (`TLS_AES_256_GCM_SHA384`), "Connection lost — reconnecting" when the bastion stopped, changed host key refused |
+| SSH agent and system OpenSSH | Run with a scratch `HOME` and a private agent so the real `~/.ssh` was untouched: agent authentication works, a stopped agent gives a clear error, system OpenSSH shows the trust dialog, Cancel writes nothing and Trust connects |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -58,7 +59,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 
 ## Not run
 
-Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; SSH agent and system OpenSSH tunnels (OpenSSH would write the user's real `~/.ssh/known_hosts`); the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, input-method editing, the backup progress window, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
+Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; ProxyJump and saved-password cases for system OpenSSH; the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, input-method editing, the backup progress window, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
 
 ## Cleanup
 
