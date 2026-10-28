@@ -6,7 +6,10 @@ fn main() {
             let _ = writeln!(std::io::stdout().lock(), "BookiE {}", env!("CARGO_PKG_VERSION"));
         }
         Some("--help" | "-h") => {
-            let _ = writeln!(std::io::stdout().lock(), "Usage: bookie [--help] [--version] [FILE|URI...]");
+            let _ = writeln!(
+                std::io::stdout().lock(),
+                "Usage: bookie [--help] [--version] [FILE|URI...]"
+            );
         }
         _ => tablepro_app::run(),
     }
