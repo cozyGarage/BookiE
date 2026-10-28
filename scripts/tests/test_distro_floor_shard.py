@@ -11,6 +11,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class DistroFloorShardTests(unittest.TestCase):
+    def test_distro_floor_scenarios_use_six_shards_and_unique_mcp_slots(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        scenarios = workflow.split("  distro-floor-scenarios:\n", 1)[1].split("  driver:\n", 1)[0]
+        self.assertIn("shard: [1, 2, 3, 4, 5, 6]", scenarios)
+        self.assertIn('scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"', scenarios)
+        self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6", scenarios)
+
     def test_package_test_containers_receive_the_worker_compiler_limit(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
@@ -86,7 +93,7 @@ class DistroFloorShardTests(unittest.TestCase):
                     environment.update(
                         PATH=f"{directory}{os.pathsep}{environment['PATH']}",
                         DOCKER_ARGUMENTS=str(log),
-                        TABLEPRO_GTK_SHARD="2/3",
+                        TABLEPRO_GTK_SHARD="2/6",
                         CARGO_BUILD_JOBS="2",
                     )
                     if packaged:
@@ -100,8 +107,8 @@ class DistroFloorShardTests(unittest.TestCase):
                     runs = [call for call in calls if call[0] == "run"]
                     self.assertEqual(len(runs), 1)
                     arguments = runs[0]
-                    self.assertIn("TABLEPRO_GTK_SHARD=2/3", arguments)
-                    position = arguments.index("TABLEPRO_GTK_SHARD=2/3")
+                    self.assertIn("TABLEPRO_GTK_SHARD=2/6", arguments)
+                    position = arguments.index("TABLEPRO_GTK_SHARD=2/6")
                     self.assertEqual(arguments[position - 1], "-e")
                     self.assertLess(position, arguments.index("bash"))
                     self.assertIn("CARGO_BUILD_JOBS=2", arguments)

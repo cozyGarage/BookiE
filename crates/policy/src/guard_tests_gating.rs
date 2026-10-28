@@ -530,9 +530,26 @@ async fn list_databases_is_a_governed_read_with_its_own_audit_record() {
         .await
         .expect_err("the stub driver lists no databases");
     assert!(matches!(error, DriverError::Unsupported(_)), "{error}");
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let controlled_error = guard
+        .list_databases_controlled(&control)
+        .await
+        .expect_err("the stub driver still lists no databases through the controlled path");
+    assert!(
+        matches!(controlled_error, DriverError::Unsupported(_)),
+        "{controlled_error}"
+    );
 
     let events = audit.events.lock().expect("event lock");
     let expected_hash = hex::encode(sha2::Sha256::digest(b"LIST DATABASES"));
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.decision_rule == "metadata_read" && event.sql_hash == expected_hash)
+            .count(),
+        2,
+        "plain and controlled database listings must both be audited"
+    );
     assert!(
         events
             .iter()

@@ -163,6 +163,23 @@ class PrepullTestImagesTests(unittest.TestCase):
     def test_the_tls_group_pulls_all_fixture_and_compose_images(self):
         self.assertEqual(listed_groups().get("driver-tls", set()), fixture_images())
 
+    def test_forgejo_fixture_jobs_pre_pull_their_container_images(self):
+        ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for job, group, command in (
+            ("pg-release", "pg-release", "./scripts/test-postgres-release.sh"),
+            ("pg-dump", "pg-dump", "./scripts/test-pg-dump.sh"),
+            ("socket-ssh", "socket-ssh", "./scripts/test-postgres-socket.sh"),
+        ):
+            body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", ci).group(1)
+            prepull = body.index(f"bash src/scripts/prepull-test-images.sh {group}")
+            self.assertLess(prepull, body.index(command))
+
+    def test_pg_dump_reuses_the_pre_pulled_image(self):
+        script = (ROOT / "scripts/test-pg-dump.sh").read_text()
+        inspect = script.index('if ! docker image inspect "$IMAGE"')
+        pull = script.index('docker pull --quiet "$IMAGE"')
+        self.assertLess(inspect, pull)
+
     def test_a_tag_given_by_constant_resolves_to_that_tag(self):
         text = 'const DB_TAG: &str = "7";\nlet c = Mongo::default().with_tag(DB_TAG).start();'
         match = MODULE_START.search(text)

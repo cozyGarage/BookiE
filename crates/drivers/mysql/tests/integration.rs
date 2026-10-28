@@ -27,8 +27,8 @@ mod read_only_session;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
-#[path = "support/result_charset.rs"]
-mod result_charset;
+#[path = "support/result_sets.rs"]
+mod result_sets;
 
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;

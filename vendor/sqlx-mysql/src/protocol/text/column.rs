@@ -171,8 +171,8 @@ impl ProtocolDecode<'_, Capabilities> for ColumnDefinition {
 }
 
 impl ColumnType {
-    pub(crate) fn name(self, flags: ColumnFlags, max_size: Option<u32>) -> &'static str {
-        let is_binary = flags.contains(ColumnFlags::BINARY);
+    pub(crate) fn name(self, flags: ColumnFlags, collation: Collation, max_size: Option<u32>) -> &'static str {
+        let is_binary = collation == Collation::BINARY;
         let is_unsigned = flags.contains(ColumnFlags::UNSIGNED);
         let is_enum = flags.contains(ColumnFlags::ENUM);
         let is_set = flags.contains(ColumnFlags::SET);

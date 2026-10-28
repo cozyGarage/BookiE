@@ -34,7 +34,7 @@ tokio-util.workspace = true
 testcontainers-modules = { workspace = true, features = ["postgres"] }
 tracing-subscriber.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-zip = { version = "8.3", default-features = false, features = ["deflate"] }
+zip = { version = "9.1", default-features = false, features = ["deflate"] }
 
 # Nothing imports sqlx-core. It is declared to switch on its `rustls-native-certs` feature, which is how a verifying
 # PostgreSQL connection reaches the operating system trust store.
