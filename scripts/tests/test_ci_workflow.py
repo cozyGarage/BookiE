@@ -29,7 +29,7 @@ class CiWorkflowTests(unittest.TestCase):
         container = fast.split("    container:\n", 1)[1].split("\n    env:\n", 1)[0]
         action = (ROOT / ".github/actions/dockerhub-login/action.yml").read_text()
         self.assertIn("DOCKER_CONFIG: /github/home/.docker", container)
-        self.assertIn('config_dir="${DOCKER_CONFIG:-${HOME}/.docker}"', action)
+        self.assertIn('docker login --username "${DOCKERHUB_USERNAME}" --password-stdin', action)
 
     def test_ci_build_artifacts_strip_symbols(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
@@ -491,6 +491,8 @@ class CiWorkflowTests(unittest.TestCase):
         soak = (ROOT / ".github/workflows/gtk-soak.yml").read_text()
         action = (ROOT / ".github/actions/dockerhub-login/action.yml").read_text()
         self.assertIn("if: inputs.username != ''", action)
+        self.assertIn('docker login --username "${DOCKERHUB_USERNAME}" --password-stdin', action)
+        self.assertNotIn('auth="$(printf', action)
         self.assertNotIn("echo \"$DOCKERHUB_TOKEN\"", action)
         self.assertNotIn("echo '${{ inputs.password }}'", action)
         fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
