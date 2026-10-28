@@ -1,5 +1,7 @@
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
+#[path = "passwordless_login.rs"]
+mod passwordless_login;
 
 #[derive(Default)]
 struct MysqlProxyState {

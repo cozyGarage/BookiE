@@ -822,7 +822,6 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
     mysql_opts = mysql_opts
         .database(&opts.database)
         .username(&opts.username)
-        .password(opts.password.expose_secret())
         .ssl_mode(match opts.tls.mode {
             TlsMode::Disabled => sqlx::mysql::MySqlSslMode::Disabled,
             TlsMode::Prefer => sqlx::mysql::MySqlSslMode::Preferred,
@@ -830,6 +829,9 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
             TlsMode::VerifyCa => sqlx::mysql::MySqlSslMode::VerifyCa,
             TlsMode::VerifyFull => sqlx::mysql::MySqlSslMode::VerifyIdentity,
         });
+    if !opts.password.expose_secret().is_empty() {
+        mysql_opts = mysql_opts.password(opts.password.expose_secret());
+    }
     if let Some(path) = &opts.tls.root_cert {
         mysql_opts = mysql_opts.ssl_ca(path);
     }
