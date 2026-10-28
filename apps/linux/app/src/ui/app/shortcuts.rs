@@ -135,7 +135,7 @@ pub(super) const WINDOW_SHORTCUTS: &[(&str, &str)] = &[
     ("<Primary><Shift>j", "win.jump-column"),
     ("<Primary><Shift>l", "win.reveal-in-sidebar"),
     ("<Primary>d", "win.save-favorite"),
-    ("<Primary><Shift>d", "win.show-saved-queries"),
+    ("<Primary><Shift>b", "win.show-saved-queries"),
     ("<Primary>s", "win.save-changes"),
     ("<Primary><Shift>s", "win.save-file-as"),
     ("<Primary>z", "win.undo-change"),
@@ -200,7 +200,7 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary>p", crate::tr!("Open Quickly: favorites and open tabs")),
             ("<Primary><Shift>l", crate::tr!("Reveal the open table in the sidebar")),
             ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
-            ("<Primary><Shift>d", crate::tr!("Manage saved queries")),
+            ("<Primary><Shift>b", crate::tr!("Manage saved queries")),
             ("<Primary>question", crate::tr!("Show keyboard shortcuts")),
             ("<Primary>q", crate::tr!("Quit")),
         ],
@@ -311,8 +311,11 @@ fn localized_browse_key(key: &str) -> String {
 }
 
 #[cfg(test)]
+const GTK_INSPECTOR_CHORDS: &[&str] = &["<Primary><Shift>d", "<Primary><Shift>i"];
+
+#[cfg(test)]
 mod window_shortcut_tests {
-    use super::WINDOW_SHORTCUTS;
+    use super::{GTK_INSPECTOR_CHORDS, WINDOW_SHORTCUTS};
     use std::collections::HashSet;
 
     const EDITOR_OWNED: &[&str] = &[
@@ -331,6 +334,16 @@ mod window_shortcut_tests {
             assert!(
                 seen.insert(*trigger),
                 "{trigger} is bound twice (second action {action})"
+            );
+        }
+    }
+
+    #[test]
+    fn no_window_trigger_is_a_chord_gtk_reserves_for_its_inspector() {
+        for (trigger, action) in WINDOW_SHORTCUTS {
+            assert!(
+                !GTK_INSPECTOR_CHORDS.contains(trigger),
+                "{trigger} ({action}) opens the GTK Inspector prompt instead of the action"
             );
         }
     }
@@ -385,7 +398,7 @@ mod window_shortcut_tests {
 
 #[cfg(test)]
 mod dialog_tests {
-    use super::build_shortcuts_dialog;
+    use super::{GTK_INSPECTOR_CHORDS, build_shortcuts_dialog};
     use adw::prelude::*;
     use relm4::{adw, gtk};
 
@@ -448,6 +461,12 @@ mod dialog_tests {
             );
         }
         assert!(accelerators.len() > 40);
+        for reserved in GTK_INSPECTOR_CHORDS {
+            assert!(
+                !accelerators.iter().any(|value| value == reserved),
+                "the shortcuts window lists {reserved}, which GTK reserves for its inspector"
+            );
+        }
         for accelerator in ["<Primary>q", "Up", "Down"] {
             assert!(accelerators.iter().any(|value| value == accelerator), "{accelerator}");
         }
