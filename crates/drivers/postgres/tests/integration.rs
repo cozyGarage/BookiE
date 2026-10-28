@@ -26,6 +26,8 @@ mod catalog_lookups;
 mod connection_contracts;
 #[path = "support/connection_paths.rs"]
 mod connection_paths;
+#[path = "support/pool_saturation.rs"]
+mod pool_saturation;
 #[path = "support/pool_session_reset.rs"]
 mod pool_session_reset;
 #[path = "support/read_only_session.rs"]

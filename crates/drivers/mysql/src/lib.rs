@@ -14,6 +14,7 @@ use futures::stream::StreamExt;
 mod decode;
 use decode::extract_value;
 mod packed;
+mod pool_saturation;
 mod session;
 mod text_protocol;
 pub(crate) use text_protocol::{is_call_statement, text_protocol};
@@ -456,11 +457,14 @@ impl Connection for MysqlConnection {
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
-        sqlx::query("SELECT 1")
-            .execute(&self.pool)
-            .await
-            .map_err(map_sqlx_error)?;
-        Ok(())
+        if pool_saturation::is_saturated(&self.pool) {
+            return Ok(());
+        }
+        match sqlx::query("SELECT 1").execute(&self.pool).await {
+            Ok(_) => Ok(()),
+            Err(sqlx::Error::PoolTimedOut) if pool_saturation::is_saturated(&self.pool) => Ok(()),
+            Err(error) => Err(map_sqlx_error(error)),
+        }
     }
 
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
