@@ -307,12 +307,7 @@ fn build_rule_sql(
             let ph = placeholder_for(driver_id, *placeholder_idx);
             *placeholder_idx += 1;
             params.push(Value::Text(raw.clone()));
-            // PG has native ILIKE. MySQL's default `utf8mb4_general_ci`
-            // collation already lowercases ASCII for LIKE; SQLite's
-            // LIKE is ASCII-case-insensitive by default. Mapping
-            // ILIKE→LIKE on the latter two is the closest equivalent
-            // without a dialect-specific function call.
-            let op_sql = if driver_id == "postgres" { "ILIKE" } else { "LIKE" };
+            let op_sql = if has_native_ilike(driver_id) { "ILIKE" } else { "LIKE" };
             Ok(format!("{pattern_sql} {op_sql} {ph}"))
         }
 
@@ -349,6 +344,10 @@ fn build_rule_sql(
             Ok(format!("{col_sql} {kw} ({})", placeholders.join(", ")))
         }
     }
+}
+
+fn has_native_ilike(driver_id: &str) -> bool {
+    matches!(driver_id, "postgres" | "duckdb" | "clickhouse")
 }
 
 fn filter_placeholder(driver_id: &str, col: &ColumnInfo, index: usize) -> String {
