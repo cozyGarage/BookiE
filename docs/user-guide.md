@@ -6,7 +6,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 
 ![Saved connections with environment markers and quick actions](images/connections-light.png)
 
-1. Click **New connection** (the `+` in the window header).
+1. Click **New connection** (the `+` in the window header), or use **Add Connection**, **Import from URL…**, or **Import connections…** on a fresh profile.
 2. Pick the database type, then fill in host, port, database and user. For SQLite and DuckDB, choose the file.
 3. Click **Test** to check the details, then **Connect**.
 
@@ -203,6 +203,8 @@ Press Ctrl+? for the full list. The most used:
 | Ctrl+Alt+F | Find in loaded rows |
 | Ctrl+Shift+J | Jump to a column |
 | Ctrl+Shift+L | Reveal the open table in the sidebar |
+| Ctrl+D | Save query as favorite |
+| Ctrl+Shift+B | Open saved queries (favorites) |
 | Ctrl+P | Open Quickly |
 | Ctrl+H | Query history |
 | Ctrl+Tab | Most recently used tab |

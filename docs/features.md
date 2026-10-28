@@ -40,7 +40,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Tables are read in bounded pages. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
 - Edit a cell with a double-click, F2 or Enter. Edits stay pending, with a dot on the tab, until Ctrl+S. Undo and redo apply to pending edits.
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.
-- NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL.
+- NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL. Sparse document fields that an object lacks show as (missing) and remain distinct from NULL.
 - The header shows each column's type. Primary key columns have a key mark, foreign key columns a link mark, and a column comment appears under the name.
 - Filter with the filter bar, and save filters by name per table. Sort by clicking a header.
 - Hide and reorder columns, and reset dragged column widths. The choice is remembered per table.
