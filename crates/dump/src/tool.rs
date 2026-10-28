@@ -8,7 +8,8 @@ use tokio::process::Command;
 use crate::DumpError;
 
 const SEARCH_DIRS: [&str; 2] = ["/usr/bin", "/usr/local/bin"];
-const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
+const VERSION_TIMEOUT: Duration = Duration::from_secs(30);
+const SNIPPET_CHARS: usize = 120;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientTool {
@@ -69,19 +70,38 @@ fn executable(path: &Path) -> bool {
 }
 
 async fn read_major(name: &str, path: &Path) -> Result<u32, DumpError> {
-    let unknown = || DumpError::ToolVersionUnknown { tool: name.to_owned() };
+    read_major_within(name, path, VERSION_TIMEOUT).await
+}
+
+async fn read_major_within(name: &str, path: &Path, limit: Duration) -> Result<u32, DumpError> {
+    let unknown = |reason: String| DumpError::ToolVersionUnknown {
+        tool: name.to_owned(),
+        reason,
+    };
     let output = Command::new(path)
         .arg("--version")
         .env_clear()
         .env("LC_ALL", "C")
         .stdin(Stdio::null())
-        .stderr(Stdio::null())
         .kill_on_drop(true)
         .output();
-    let output = tokio::time::timeout(VERSION_TIMEOUT, output)
+    let output = tokio::time::timeout(limit, output)
         .await
-        .map_err(|_| unknown())??;
-    parse_major(&String::from_utf8_lossy(&output.stdout)).ok_or_else(unknown)
+        .map_err(|_| unknown(format!("it did not answer within {} s", limit.as_secs())))??;
+    let printed = String::from_utf8_lossy(&output.stdout);
+    parse_major(&printed).ok_or_else(|| {
+        let errors = String::from_utf8_lossy(&output.stderr);
+        unknown(format!(
+            "{}, printed {:?}, error output {:?}",
+            output.status,
+            snippet(&printed),
+            snippet(&errors)
+        ))
+    })
+}
+
+fn snippet(text: &str) -> String {
+    text.trim().chars().take(SNIPPET_CHARS).collect()
 }
 
 fn parse_major(version: &str) -> Option<u32> {
@@ -119,5 +139,48 @@ mod tests {
         assert!(matches!(tool.require_at_least(17), Err(DumpError::ToolTooOld { .. })));
         assert!(tool.require_at_most(16).is_ok());
         assert!(matches!(tool.require_at_most(15), Err(DumpError::ToolTooNew { .. })));
+    }
+
+    async fn probe(script: &str, limit: Duration) -> Result<u32, DumpError> {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tool");
+        std::fs::write(&path, script).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        for _ in 0..40 {
+            match read_major_within("pg_dump", &path, limit).await {
+                Err(DumpError::Io(error)) if error.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                    tokio::time::sleep(Duration::from_millis(25)).await;
+                }
+                other => return other,
+            }
+        }
+        panic!("the probe executable stayed busy");
+    }
+
+    #[tokio::test]
+    async fn a_probe_that_answers_in_time_gives_its_major_version() {
+        let major = probe("#!/bin/sh\necho 'pg_dump (PostgreSQL) 17.2'\n", Duration::from_secs(5)).await;
+        assert_eq!(major.unwrap(), 17);
+    }
+
+    #[tokio::test]
+    async fn a_probe_that_never_answers_says_it_timed_out() {
+        let error = probe("#!/bin/sh\nexec sleep 5\n", Duration::from_millis(100))
+            .await
+            .unwrap_err();
+        assert!(matches!(&error, DumpError::ToolVersionUnknown { reason, .. } if reason.contains("did not answer")));
+    }
+
+    #[tokio::test]
+    async fn a_probe_with_unreadable_output_reports_what_it_printed() {
+        let error = probe(
+            "#!/bin/sh\necho 'wrapper: no such library' >&2\necho 'hello'\nexit 3\n",
+            Duration::from_secs(5),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("exit status: 3"), "{error}");
+        assert!(error.contains("hello") && error.contains("no such library"), "{error}");
     }
 }
