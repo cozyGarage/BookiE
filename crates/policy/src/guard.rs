@@ -147,7 +147,8 @@ impl PolicyGuard {
         if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &analysis.facts) {
             return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
-        self.authorize_with_bound(sql, analysis, enforced_rows, control).await
+        self.authorize_with_bound(sql, analysis, enforced_rows, control, None)
+            .await
     }
 
     async fn authorize_in_transaction(
@@ -160,7 +161,7 @@ impl PolicyGuard {
             return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
         if self.ctx.driver_id == "mysql" {
-            return self.authorize_with_bound(sql, analysis, None, control).await;
+            return self.authorize_with_bound(sql, analysis, None, control, None).await;
         }
         self.authorize_analysis(sql, analysis, None, control).await
     }
@@ -170,8 +171,9 @@ impl PolicyGuard {
         sql: &str,
         analysis: StatementAnalysis,
         control: Option<&OperationControl>,
+        counter: Option<&mut dyn tablepro_core::Session>,
     ) -> Result<Authorization, DriverError> {
-        self.authorize_with_bound(sql, analysis, None, control).await
+        self.authorize_with_bound(sql, analysis, None, control, counter).await
     }
 
     async fn authorize_with_bound(
@@ -180,6 +182,7 @@ impl PolicyGuard {
         analysis: StatementAnalysis,
         enforced_rows: Option<u64>,
         control: Option<&OperationControl>,
+        counter: Option<&mut dyn tablepro_core::Session>,
     ) -> Result<Authorization, DriverError> {
         let facts = &analysis.facts;
         let effects = facts.effects;
@@ -218,7 +221,7 @@ impl PolicyGuard {
         {
             match enforced_rows {
                 Some(rows) => Some(rows),
-                None => self.estimate_blast_radius(&analysis, control).await?,
+                None => self.estimate_blast_radius(&analysis, control, counter).await?,
             }
         } else {
             None
@@ -383,6 +386,7 @@ impl PolicyGuard {
         &self,
         analysis: &StatementAnalysis,
         control: Option<&OperationControl>,
+        counter: Option<&mut dyn tablepro_core::Session>,
     ) -> Result<Option<u64>, DriverError> {
         let rewrite = match &analysis.blast_radius {
             None => return Ok(None),
@@ -404,12 +408,13 @@ impl PolicyGuard {
                 &owned_control
             }
         };
-        let result = self
-            .caught_read(
-                "BLAST RADIUS COUNT",
-                self.inner.query_controlled(&rewrite.count_sql, control),
-            )
-            .await;
+        let count = async {
+            match counter {
+                Some(session) => session.query_params_controlled(&rewrite.count_sql, &[], control).await,
+                None => self.inner.query_controlled(&rewrite.count_sql, control).await,
+            }
+        };
+        let result = self.caught_read("BLAST RADIUS COUNT", count).await;
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
         let audit_result = match &result {
             Ok(_) => {
