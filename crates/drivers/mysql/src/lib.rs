@@ -936,6 +936,7 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
         mariadb,
     );
     let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
+    let column_type = attributes::with_generation(column_type, generation_expr.as_deref(), &extra);
     ColumnInfo {
         name: r.get::<String, _>(0),
         data_type: column_type,
