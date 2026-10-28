@@ -6,10 +6,12 @@ Proposals record designs that have not become accepted decisions. They do not se
 |---|---|
 | [CI hardening ideas from upstream](ci-hardening-from-upstream.md) | Proposed; the low-risk items and the release-cache question are done; three questions are open. |
 | [CI build speed](ci-build-speed.md) | UX-owned, measurement-gated; no workflow split is selected. |
+| [Documentation lifecycle and decision lessons](doc-lifecycle.md) | Proposed; three rules and a deletion test, none adopted. |
 | [Evidence branch migration](evidence-branch.md) | Proposed; no branch or packet has been migrated. Retrieval and restore must pass the pilot first. |
 | [Import into existing rows](import-existing-rows.md) | Unscheduled candidate; no behavior is implemented. |
 | [Statement effects and joined verdict](policy-effects-and-verdict.md) | Behavioral defects are closed; only the post-0.2.0 single-AST-walk consolidation remains in #571. |
 | [Runner maintenance and isolation](runner-maintenance-and-isolation.md) | Repository safeguards exist; deployment and isolated-runner acceptance remain unverified under #573. |
+| [UI layout changes drawn from peer clients](ui-layout-from-peer-clients.md) | Proposed; seven slices for the result strip, filter row, editor toolbar, large results, sidebar tree, ER diagram and row density; none selected. |
 | [SSH jump-chain editor](ui-1b-ssh-jump-chain-editor.md) | Backend support is merged; form editing and installed acceptance remain under #548. |
 | [Local dependency patches](upstream-patches.md) | Removal criteria and patch provenance; verify current upstream releases before changing vendored code. |
 

@@ -57,10 +57,13 @@ fn an_encrypt_only_connection_does_not_verify_a_hostname() {
 
 #[test]
 fn value_contract_empty_quoted_arguments_are_not_dropped() {
-    assert_eq!(split_redis_cli(r#"SET key """#), vec!["SET", "key", ""]);
     assert_eq!(
-        split_redis_cli(r#"MSET "" "" key "" "#),
-        vec!["MSET", "", "", "key", ""]
+        split_redis_cli(r#"SET key """#).unwrap(),
+        redis_args(&["SET", "key", ""])
+    );
+    assert_eq!(
+        split_redis_cli(r#"MSET "" "" key "" "#).unwrap(),
+        redis_args(&["MSET", "", "", "key", ""])
     );
 }
 
@@ -107,17 +110,74 @@ fn driver_metadata() {
 
 #[test]
 fn split_redis_cli_handles_quotes() {
-    assert_eq!(split_redis_cli("GET foo"), vec!["GET", "foo"]);
+    assert_eq!(split_redis_cli("GET foo").unwrap(), redis_args(&["GET", "foo"]));
     assert_eq!(
-        split_redis_cli(r#"SET key "hello world""#),
-        vec!["SET", "key", "hello world"]
+        split_redis_cli(r#"SET key "hello world""#).unwrap(),
+        redis_args(&["SET", "key", "hello world"])
     );
-    assert_eq!(split_redis_cli(r#"SET k "a\"b""#), vec!["SET", "k", "a\"b"]);
+    assert_eq!(
+        split_redis_cli(r#"SET k "a\"b""#).unwrap(),
+        redis_args(&["SET", "k", "a\"b"])
+    );
 }
 
 #[test]
 fn split_redis_cli_keeps_a_backslash_literal_outside_quotes() {
-    assert_eq!(split_redis_cli(r"SET k a\b"), vec!["SET", "k", r"a\b"]);
+    assert_eq!(
+        split_redis_cli(r"SET k a\b").unwrap(),
+        redis_args(&["SET", "k", r"a\b"])
+    );
+}
+
+#[test]
+fn split_redis_cli_decodes_double_quoted_escapes() {
+    assert_eq!(
+        split_redis_cli(r#"SET k "line1\nline2\x41""#).unwrap(),
+        redis_args(&["SET", "k", "line1\nline2A"])
+    );
+    assert_eq!(
+        split_redis_cli(r#"SET k "\a\b\n\r\t\\\"""#).unwrap(),
+        vec![b"SET".to_vec(), b"k".to_vec(), b"\x07\x08\n\r\t\\\"".to_vec()]
+    );
+}
+
+#[test]
+fn split_redis_cli_supports_single_quoted_strings() {
+    assert_eq!(
+        split_redis_cli(r#"SET k 'two words'"#).unwrap(),
+        redis_args(&["SET", "k", "two words"])
+    );
+    assert_eq!(
+        split_redis_cli(r#"SET k 'a\'b\\c'"#).unwrap(),
+        redis_args(&["SET", "k", "a'b\\c"])
+    );
+}
+
+#[test]
+fn split_redis_cli_preserves_binary_hex_escapes() {
+    assert_eq!(
+        split_redis_cli(r#"SET k "\xff\x00""#).unwrap(),
+        vec![b"SET".to_vec(), b"k".to_vec(), vec![0xff, 0x00]]
+    );
+}
+
+#[test]
+fn split_redis_cli_refuses_unterminated_quotes_and_invalid_escapes() {
+    for input in [r#"SET k "unfinished"#, r#"SET k "\x0""#, r#"SET k "\q""#] {
+        assert!(split_redis_cli(input).is_err(), "{input}");
+    }
+}
+
+#[test]
+fn split_redis_cli_keeps_unsupported_escapes_literal_in_single_quotes() {
+    assert_eq!(
+        split_redis_cli(r#"SET k 'line1\nline2'"#).unwrap(),
+        redis_args(&["SET", "k", r"line1\nline2"])
+    );
+}
+
+fn redis_args(values: &[&str]) -> Vec<Vec<u8>> {
+    values.iter().map(|value| value.as_bytes().to_vec()).collect()
 }
 
 #[test]
@@ -439,7 +499,10 @@ fn redis_stream_commands_are_refused() {
         vec!["CLIENT", "TRACKING", "ON"],
         vec!["client", "tracking", "on", "bcast"],
     ] {
-        let args = command.into_iter().map(str::to_owned).collect::<Vec<_>>();
+        let args = command
+            .into_iter()
+            .map(|arg| arg.as_bytes().to_vec())
+            .collect::<Vec<_>>();
         assert!(is_redis_stream_command(&args), "{args:?}");
     }
     for command in [
@@ -451,7 +514,10 @@ fn redis_stream_commands_are_refused() {
         vec!["CLIENT", "LIST"],
         vec![],
     ] {
-        let args = command.into_iter().map(str::to_owned).collect::<Vec<_>>();
+        let args = command
+            .into_iter()
+            .map(|arg| arg.as_bytes().to_vec())
+            .collect::<Vec<_>>();
         assert!(!is_redis_stream_command(&args), "{args:?}");
     }
 }
