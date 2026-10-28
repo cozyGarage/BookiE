@@ -84,7 +84,7 @@ sys.stdout = output
 rows = []
 try:
     listed = subprocess.run(
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "crates", "apps", "tests"],
         cwd=root,
         check=True,
         capture_output=True,
