@@ -9,7 +9,9 @@ SHARED_TMP="${TMPDIR:-/tmp}"
 work_root="$(mktemp -d)"
 trap 'rm -rf -- "$work_root"' EXIT
 
-docker pull --quiet "$IMAGE" >/dev/null
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  docker pull --quiet "$IMAGE" >/dev/null
+fi
 
 for tool in pg_dump pg_restore; do
   cat >"$work_root/$tool" <<EOF

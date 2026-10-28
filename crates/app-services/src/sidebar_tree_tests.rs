@@ -1,4 +1,5 @@
 use super::*;
+use tablepro_core::CatalogObjectKind;
 
 fn info(schema: Option<&str>, name: &str) -> TableInfo {
     TableInfo {
@@ -19,6 +20,8 @@ fn label(node: &TreeNode) -> String {
         NodeKind::Schema => node.schema.clone().unwrap_or_default(),
         NodeKind::Group(GroupKind::Tables) => "Tables".into(),
         NodeKind::Group(GroupKind::Views) => "Views".into(),
+        NodeKind::Group(GroupKind::Catalog) => "Catalog".into(),
+        NodeKind::Catalog(kind) => kind.as_str().into(),
         NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
     }
 }
@@ -353,4 +356,55 @@ fn a_view_and_an_unqualified_table_are_found_too() {
         matches!(plan, Reveal::Show { index, .. } if label(&single[index]) == "orders"),
         "{plan:?}"
     );
+}
+
+#[test]
+fn collapse_all_folds_every_schema_and_group_and_expand_all_reopens_them() {
+    let nodes = build_nodes(
+        &[info(Some("a"), "t1"), info(Some("b"), "t2")],
+        &[info(Some("a"), "v1")],
+    );
+    let mut collapsed = CollapseState::default();
+    assert!(!collapsed.is_all_collapsed(&nodes));
+
+    collapsed.collapse_all(&nodes);
+
+    assert!(collapsed.is_all_collapsed(&nodes));
+    assert_eq!(labels(&nodes, &visible_nodes(&nodes, &collapsed, "")), ["a", "b"]);
+    collapsed.expand_all();
+    assert!(!collapsed.is_all_collapsed(&nodes));
+    assert_eq!(visible_nodes(&nodes, &collapsed, ""), all(&nodes));
+}
+
+#[test]
+fn catalog_entries_form_one_group_after_the_objects_and_hide_when_it_is_collapsed() {
+    let mut nodes = build_nodes(&[info(None, "users")], &[]);
+    append_catalog_entries(&mut nodes, &[CatalogObjectKind::Role, CatalogObjectKind::Grant]);
+
+    assert_eq!(
+        labels(&nodes, &all(&nodes)),
+        ["Tables", "  users", "Catalog", "  role", "  grant"]
+    );
+    let group = nodes
+        .iter()
+        .find(|node| node.kind == NodeKind::Group(GroupKind::Catalog))
+        .unwrap();
+    assert_eq!(group.count, 2);
+    let collapsed = CollapseState::from_keys([group.key.clone()]);
+    assert_eq!(
+        labels(&nodes, &visible_nodes(&nodes, &collapsed, "")),
+        ["Tables", "  users", "Catalog"]
+    );
+    assert_eq!(
+        labels(&nodes, &visible_nodes(&nodes, &CollapseState::default(), "us")),
+        ["Tables", "  users"],
+        "a table search hides the catalog entries"
+    );
+}
+
+#[test]
+fn an_engine_without_catalog_kinds_gets_no_catalog_group() {
+    let mut nodes = build_nodes(&[info(None, "users")], &[]);
+    append_catalog_entries(&mut nodes, &[]);
+    assert_eq!(labels(&nodes, &all(&nodes)), ["Tables", "  users"]);
 }

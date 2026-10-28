@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, HashSet};
 
-use tablepro_core::TableInfo;
+use tablepro_core::{CatalogObjectKind, TableInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupKind {
     Tables,
     Views,
+    Catalog,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,6 +15,7 @@ pub enum NodeKind {
     Group(GroupKind),
     Table { schema: Option<String>, name: String },
     View { schema: Option<String>, name: String },
+    Catalog(CatalogObjectKind),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,6 +29,10 @@ pub struct TreeNode {
 }
 
 impl TreeNode {
+    fn is_branch(&self) -> bool {
+        matches!(self.kind, NodeKind::Schema | NodeKind::Group(_))
+    }
+
     fn qualified_name(&self) -> Option<String> {
         match &self.kind {
             NodeKind::Table { schema, name } | NodeKind::View { schema, name } => Some(match schema {
@@ -50,6 +56,24 @@ impl CollapseState {
 
     pub fn is_collapsed(&self, key: &str) -> bool {
         self.0.contains(key)
+    }
+
+    pub fn collapse_all(&mut self, nodes: &[TreeNode]) {
+        self.0.extend(
+            nodes
+                .iter()
+                .filter(|node| node.is_branch())
+                .map(|node| node.key.clone()),
+        );
+    }
+
+    pub fn expand_all(&mut self) {
+        self.0.clear();
+    }
+
+    pub fn is_all_collapsed(&self, nodes: &[TreeNode]) -> bool {
+        let mut branches = nodes.iter().filter(|node| node.is_branch()).peekable();
+        branches.peek().is_some() && branches.all(|node| self.is_collapsed(&node.key))
     }
 
     pub fn keys(&self) -> Vec<String> {
@@ -97,6 +121,31 @@ pub fn build_nodes(tables: &[TableInfo], views: &[TableInfo]) -> Vec<TreeNode> {
     nodes
 }
 
+pub fn append_catalog_entries(nodes: &mut Vec<TreeNode>, kinds: &[CatalogObjectKind]) {
+    if kinds.is_empty() {
+        return;
+    }
+    let group_index = nodes.len();
+    nodes.push(TreeNode {
+        depth: 0,
+        key: "catalog".to_string(),
+        kind: NodeKind::Group(GroupKind::Catalog),
+        schema: None,
+        count: kinds.len(),
+        parent: None,
+    });
+    for kind in kinds {
+        nodes.push(TreeNode {
+            depth: 1,
+            key: format!("catalog/{}", kind.as_str()),
+            kind: NodeKind::Catalog(*kind),
+            schema: None,
+            count: 0,
+            parent: Some(group_index),
+        });
+    }
+}
+
 fn push_group(
     nodes: &mut Vec<TreeNode>,
     depth: u8,
@@ -111,6 +160,7 @@ fn push_group(
     let suffix = match group {
         GroupKind::Tables => "tables",
         GroupKind::Views => "views",
+        GroupKind::Catalog => "catalog",
     };
     let group_index = nodes.len();
     nodes.push(TreeNode {
@@ -127,7 +177,7 @@ fn push_group(
             depth: depth + 1,
             key: format!("{prefix}/{suffix}/{}", key_part(&name)),
             kind: match group {
-                GroupKind::Tables => NodeKind::Table { schema, name },
+                GroupKind::Tables | GroupKind::Catalog => NodeKind::Table { schema, name },
                 GroupKind::Views => NodeKind::View { schema, name },
             },
             schema: object.schema.clone(),
