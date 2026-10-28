@@ -16,6 +16,25 @@ pub(super) struct WorkspaceChromeParts {
     pub(super) outer_stack: gtk::Stack,
 }
 
+fn position_connections_popover(popover: &gtk::Popover, button: &gtk::MenuButton) {
+    let button = button.downgrade();
+    popover.connect_show(move |popover| {
+        let Some(button) = button.upgrade() else { return };
+        let Some(window) = button.root().and_downcast::<gtk::Window>() else {
+            return;
+        };
+        let Some(bounds) = button.compute_bounds(&window) else {
+            return;
+        };
+        let (_, width, _, _) = popover.measure(gtk::Orientation::Horizontal, -1);
+        let center = bounds.x() + bounds.width() / 2.0;
+        let natural_left = center - width as f32 / 2.0;
+        let max_left = (window.width() - width).max(0) as f32;
+        let offset = (natural_left.clamp(0.0, max_left) - natural_left).round() as i32;
+        popover.set_offset(offset, 0);
+    });
+}
+
 pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSender<App>) -> WorkspaceChromeParts {
     let connections_factory: FactoryVecDeque<ConnectionRow> = FactoryVecDeque::builder()
         .launch(
@@ -58,6 +77,7 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
         .build();
     popover_content.append(&scroll);
     widgets.connections_popover.set_child(Some(&popover_content));
+    position_connections_popover(&widgets.connections_popover, &widgets.saved_connections_button);
 
     // Workspace outer stack: swaps between an empty StatusPage
     // ("Select a table") when no tabs are open and the unified
@@ -91,5 +111,85 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
     WorkspaceChromeParts {
         connections_factory,
         outer_stack: workspace_outer_stack,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        cell::Cell,
+        rc::Rc,
+        time::{Duration, Instant},
+    };
+
+    fn settle(window: &adw::ApplicationWindow) {
+        let ready = Rc::new(Cell::new(false));
+        let seen = ready.clone();
+        let frames = Cell::new(0);
+        window.add_tick_callback(move |_, _| {
+            frames.set(frames.get() + 1);
+            if frames.get() < 2 {
+                return gtk::glib::ControlFlow::Continue;
+            }
+            seen.set(true);
+            gtk::glib::ControlFlow::Break
+        });
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !ready.get() {
+            assert!(Instant::now() < deadline);
+            gtk::glib::MainContext::default().iteration(false);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn saved_connections_popover_stays_inside_narrow_windows() {
+        adw::init().unwrap();
+        let app = adw::Application::builder()
+            .application_id("com.tablepro.linux.popover-test")
+            .build();
+        app.register(None::<&gtk::gio::Cancellable>).unwrap();
+        let header = adw::HeaderBar::new();
+        header.pack_start(&gtk::Button::builder().icon_name("list-add-symbolic").build());
+        let button = gtk::MenuButton::builder().icon_name("document-open-symbolic").build();
+        let popover = gtk::Popover::new();
+        let popover_content = gtk::Box::builder().width_request(320).height_request(120).build();
+        popover.set_child(Some(&popover_content));
+        position_connections_popover(&popover, &button);
+        button.set_popover(Some(&popover));
+        header.pack_start(&button);
+        let content = adw::ToolbarView::new();
+        content.add_top_bar(&header);
+        let window = adw::ApplicationWindow::builder()
+            .application(&app)
+            .default_width(922)
+            .default_height(600)
+            .content(&content)
+            .build();
+        window.present();
+        settle(&window);
+        for width in [922, 847, 802] {
+            window.set_default_size(width, 600);
+            settle(&window);
+            assert!(window.width() >= 500);
+            for popover_width in [320, 480] {
+                popover_content.set_width_request(popover_width);
+                button.popup();
+                settle(&window);
+                let bounds = popover.compute_bounds(&window).unwrap();
+                assert!(
+                    bounds.x() >= 0.0 && bounds.x() + bounds.width() <= window.width() as f32,
+                    "popover x={} width={} window width={}",
+                    bounds.x(),
+                    bounds.width(),
+                    window.width()
+                );
+                popover.popdown();
+                settle(&window);
+            }
+        }
+        window.close();
     }
 }
