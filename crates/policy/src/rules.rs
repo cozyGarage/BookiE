@@ -98,7 +98,7 @@ fn has_unclosed_shared_transaction(sql: &str, driver_id: &str) -> bool {
     if leaves_tsql_transaction_unclosed(sql, driver_id) {
         return true;
     }
-    let statements = tablepro_core::sql_lex::split_statements(sql, driver_id);
+    let statements = crate::script_statements::script_statements(sql, driver_id);
     if statements.len() < 2 {
         return false;
     }

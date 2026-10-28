@@ -820,6 +820,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
+      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout {0}
@@ -849,6 +850,12 @@ jobs:
       - name: PostgreSQL socket and SSH fixtures
         run: |
           cd src
+          cleanup_testcontainers() {
+            python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
+          }
+          trap cleanup_testcontainers EXIT
+          trap 'cleanup_testcontainers; exit 143' TERM
+          trap 'cleanup_testcontainers; exit 130' INT
           ./scripts/test-postgres-socket.sh
           bash ./scripts/test-ssh.sh
 
