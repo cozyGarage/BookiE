@@ -56,6 +56,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Host down with an open session (installed package) | Ctrl+Q with an open Session transaction and the database stopped leaves the confirmation dialog stuck with no cleanup-timeout dialog (#1953); an idle session closes the window normally |
 | Session cancel and timeout (installed package) | Cancel stops a server query inside a Session; a timeout inside a Session transaction leaves the transaction open and says so |
 | Large export to an existing file (installed package) | Replace prompt shown; the destination was untouched while 1M rows were written; the cancel path was not exercised because the 4M-row export finished first; a 4M-row editor result stops with "could not keep the complete result in temporary storage" while the guarded-cursor export still completed |
+| Filter by This Value (installed package) | Text value, NULL, empty text and a BLOB behave as the checklist says |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
