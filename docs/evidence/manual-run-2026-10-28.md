@@ -51,6 +51,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Editor files and saved queries (installed package) | A symlinked file saves through to its target; an oversized file is refused; Escape closes Explain; Ctrl+Shift+D is claimed by GTK's inspector prompt (#1948) |
 | Connection bundles (installed package) | Plain export carries no secrets; passphrase export is encrypted; wrong passphrase and tampered file give one message; import plan lists dispositions and honours unticking; an empty profile has no import entry (#1949) |
 | Connection list (installed package) | 3 s connect timeout fails in 3 s with a clear message; Duplicate gives a distinct name and an empty-password form; Group and tags and the colour swatch work |
+| Session refusals (installed package) | MySQL `SET autocommit=0` and `XA START` refused on a shared connection with a wrong-looking message (#1952); ClickHouse Session explains it is unavailable |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -74,6 +75,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1947](https://github.com/cozyGarage/BookiE/issues/1947): the tab context menu entries are greyed out and do nothing.
 - [#1948](https://github.com/cozyGarage/BookiE/issues/1948): Ctrl+Shift+D opens the GTK Inspector prompt instead of the saved-queries list.
 - [#1949](https://github.com/cozyGarage/BookiE/issues/1949): a profile with no saved connections has no way to import a bundle.
+- [#1952](https://github.com/cozyGarage/BookiE/issues/1952): refusing `SET autocommit=0` or `XA START` shows the BEGIN/COMMIT/ROLLBACK message.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
