@@ -45,3 +45,43 @@ async fn every_key_type_lists_with_its_type_and_a_preview() {
     assert_eq!(find("k_stream")[3], Value::Text("<stream>".into()));
     assert_eq!(find("k_string")[2], Value::Int(-1), "no expiry is reported as -1");
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_browse_preview_of_a_large_value_stays_small() {
+    let (_container, host, port) = start_redis().await;
+    let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
+    let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
+    redis::cmd("SET")
+        .arg("big_string")
+        .arg("x".repeat(1_048_576))
+        .query_async::<()>(&mut native_connection)
+        .await
+        .unwrap();
+    for index in 0..5_000 {
+        redis::cmd("SADD")
+            .arg("big_set")
+            .arg(format!("member-{index}"))
+            .query_async::<()>(&mut native_connection)
+            .await
+            .unwrap();
+        redis::cmd("HSET")
+            .arg("big_hash")
+            .arg(format!("field-{index}"))
+            .arg("value")
+            .query_async::<()>(&mut native_connection)
+            .await
+            .unwrap();
+    }
+
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    let rows = connection.fetch_rows(None, "db0", 0, 50).await.unwrap().rows;
+    let preview = |key: &str| match &rows.iter().find(|row| row[0] == Value::Text(key.into())).unwrap()[3] {
+        Value::Text(text) => text.clone(),
+        other => panic!("{key} previews as text, got {other:?}"),
+    };
+
+    assert!(preview("big_string").len() < 8_192, "{}", preview("big_string").len());
+    assert!(preview("big_set").matches("member-").count() <= 100);
+    assert!(preview("big_hash").matches("field-").count() <= 100);
+}

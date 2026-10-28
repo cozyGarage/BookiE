@@ -358,16 +358,29 @@ async fn scan_keys(
     Ok(keys)
 }
 
+const PREVIEW_BYTES: isize = 4096;
+const PREVIEW_ITEMS: usize = 20;
+
 async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Result<Vec<Value>, DriverError> {
     let key_type: String = conn.key_type(key).await.map_err(map_redis_error)?;
     let ttl: i64 = conn.ttl(key).await.map_err(map_redis_error)?;
     let preview = match key_type.as_str() {
         "string" => {
-            let v: Vec<u8> = conn.get(key).await.map_err(map_redis_error)?;
+            let v: Vec<u8> = conn
+                .getrange(key, 0, PREVIEW_BYTES - 1)
+                .await
+                .map_err(map_redis_error)?;
             bytes_to_value(v)
         }
         "hash" => {
-            let v: Vec<(String, String)> = conn.hgetall(key).await.map_err(map_redis_error)?;
+            let (_, v): (u64, Vec<(String, String)>) = redis::cmd("HSCAN")
+                .arg(key)
+                .arg(0)
+                .arg("COUNT")
+                .arg(PREVIEW_ITEMS)
+                .query_async(conn)
+                .await
+                .map_err(map_redis_error)?;
             Value::Text(format!("{v:?}"))
         }
         "list" => {
@@ -375,7 +388,14 @@ async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Re
             Value::Text(format!("{v:?}"))
         }
         "set" => {
-            let v: Vec<String> = conn.smembers(key).await.map_err(map_redis_error)?;
+            let (_, v): (u64, Vec<String>) = redis::cmd("SSCAN")
+                .arg(key)
+                .arg(0)
+                .arg("COUNT")
+                .arg(PREVIEW_ITEMS)
+                .query_async(conn)
+                .await
+                .map_err(map_redis_error)?;
             Value::Text(format!("{v:?}"))
         }
         "zset" => {
