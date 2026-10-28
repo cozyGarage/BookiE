@@ -1,14 +1,27 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-
+use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tablepro_core::{Connection, DriverError};
+use tablepro_core::{ConnectOptions, Connection, DriverError};
 
-pub async fn a_ping_does_not_report_a_disconnect_while_every_pooled_connection_is_busy(
-    connection: Arc<dyn Connection>,
+pub async fn a_ping_does_not_report_a_disconnect_while_every_pooled_connection_is_busy<
+    Guard,
+    Start,
+    Started,
+    Connect,
+    Connected,
+>(
+    start: Start,
+    connect: Connect,
     long_read: &'static str,
-) {
+) where
+    Start: FnOnce() -> Started,
+    Started: Future<Output = (Guard, ConnectOptions)>,
+    Connect: FnOnce(ConnectOptions) -> Connected,
+    Connected: Future<Output = Box<dyn Connection>>,
+{
+    let (_server, options) = start().await;
+    let connection: Arc<dyn Connection> = Arc::from(connect(options).await);
     let long_reads: Vec<_> = (0..4)
         .map(|_| {
             let connection = Arc::clone(&connection);
@@ -31,12 +44,23 @@ pub async fn a_ping_does_not_report_a_disconnect_while_every_pooled_connection_i
     }
 }
 
-pub async fn a_ping_still_reports_a_server_that_cannot_be_reached(
-    connection: Box<dyn Connection>,
-    stop_server: impl FnOnce(),
-) {
-    connection.ping().await.unwrap();
-    stop_server();
+pub async fn a_ping_still_reports_a_server_that_cannot_be_reached<Guard, Start, Started, Connect, Connected>(
+    start: Start,
+    connect: Connect,
+) where
+    Start: FnOnce() -> Started,
+    Started: Future<Output = (Guard, ConnectOptions)>,
+    Connect: FnOnce(ConnectOptions) -> Connected,
+    Connected: Future<Output = Box<dyn Connection>>,
+{
+    let (server, options) = start().await;
+    let connection = connect(options).await;
+    let before = connection.ping().await;
+    assert!(
+        before.is_ok(),
+        "the server was not reachable before it was stopped: {before:?}"
+    );
+    drop(server);
 
     let outcome = tokio::time::timeout(Duration::from_secs(20), connection.ping()).await;
 
@@ -47,25 +71,4 @@ pub async fn a_ping_still_reports_a_server_that_cannot_be_reached(
         ),
         "an unreachable server was reported as {outcome:?}"
     );
-}
-
-macro_rules! pool_saturation_tests {
-    ($start:ident, $long_read:expr) => {
-        #[tokio::test]
-        #[ignore = "requires docker"]
-        async fn a_health_ping_does_not_report_a_disconnect_while_every_pooled_connection_is_busy() {
-            let (_container, opts) = $start().await;
-            let connection = std::sync::Arc::from(connect(opts).await);
-            contract::a_ping_does_not_report_a_disconnect_while_every_pooled_connection_is_busy(connection, $long_read)
-                .await;
-        }
-
-        #[tokio::test]
-        #[ignore = "requires docker"]
-        async fn a_health_ping_still_reports_a_pool_that_cannot_reach_its_server() {
-            let (container, opts) = $start().await;
-            let connection = connect(opts).await;
-            contract::a_ping_still_reports_a_server_that_cannot_be_reached(connection, || drop(container)).await;
-        }
-    };
 }
