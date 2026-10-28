@@ -55,7 +55,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Results load in pages. PostgreSQL single-statement `SELECT` queries stream within an estimated 64 MiB row-storage budget. When retained pages exceed the budget, earlier pages move to an encrypted on-disk spool and stay reachable; the newest page remains in memory even if it alone exceeds the estimate. Each statement in a script has its own result view. Pin results to keep them above the next run.
 - Sorting and filtering a result are local and do not run the SQL again.
 - Session keeps one connection for the tab, so settings, temporary tables and transactions carry over. While a transaction is open the button says so and, after a minute, how long it has been open.
-- Explain shows the plan. PostgreSQL and SQLite plans open as a tree with the share of estimated cost per step.
+- Explain shows the plan. PostgreSQL plans open as a tree with the share of estimated cost per step; SQLite plans open as a tree without costs.
 - A query that hits the timeout offers Run again with a longer timeout, once, without changing the saved timeout.
 - Query history opens in a panel under the workspace. Statements that set a password or key are not saved in history; editor drafts keep their text on disk.
 - Favorites: Ctrl+D saves the current query under a name in `$XDG_CONFIG_HOME/tablepro/favorites.json`. Saving an existing name replaces its statement.
