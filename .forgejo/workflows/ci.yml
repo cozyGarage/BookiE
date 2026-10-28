@@ -72,6 +72,15 @@ jobs:
         if: always()
         run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   gtk-build:
     runs-on: build-host
     needs: [guards]
@@ -125,6 +134,15 @@ jobs:
         run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   clippy:
     runs-on: build-host
     timeout-minutes: 90
@@ -162,6 +180,15 @@ jobs:
         run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   test-build:
     runs-on: build-host
     needs: [guards, clippy]
@@ -207,6 +234,15 @@ jobs:
         run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   duckdb-build:
     runs-on: build-host
     needs: [test-build]
@@ -257,13 +293,22 @@ jobs:
         run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   unit:
     runs-on: any-host
     needs: [test-build]
     timeout-minutes: 90
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -292,13 +337,22 @@ jobs:
           export TMPDIR="$CARGO_TARGET_DIR"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   sandbox:
     runs-on: any-host
     needs: [test-build]
     timeout-minutes: 90
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -324,13 +378,22 @@ jobs:
         run: |
           cd src && bash scripts/test-sandbox.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   widgets:
     runs-on: any-host
     needs: [test-build]
     timeout-minutes: 90
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -353,6 +416,15 @@ jobs:
         run: |
           cd src && bash scripts/test-gtk-widgets.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   floor-build:
     runs-on: build-host
     needs: [guards, clippy]
@@ -408,13 +480,23 @@ jobs:
         run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   distro-floor:
     runs-on: any-host
     needs: [guards, clippy, floor-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/floor-${{ matrix.base }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -423,7 +505,6 @@ jobs:
             mcp_port_slot: 10
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -463,6 +544,15 @@ jobs:
             mv "$released.part" "$released"
           fi
           cd src && package=$(cat "$GITHUB_WORKSPACE/floor-package-path") && PREVIOUS_DEB="$released" PREBUILT_DEB="$package" bash scripts/test-deb-package.sh ${{ matrix.base }}
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   distro-floor-scenarios:
     runs-on: any-host
     needs: [distro-floor]
@@ -476,7 +566,7 @@ jobs:
         shard: [1, 2, 3, 4, 5, 6]
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -513,6 +603,15 @@ jobs:
         run: |
           cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6 bash scripts/test-distro-floor.sh debian:testing
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   driver:
     runs-on: any-host
     needs: [guards, clippy, test-build]
@@ -527,7 +626,7 @@ jobs:
         driver: [postgres, mysql, mssql, clickhouse, redis, mongodb]
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -564,6 +663,15 @@ jobs:
           trap 'cleanup_testcontainers; exit 130' INT
           bash scripts/run-rust-tests.sh --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   e2e:
     runs-on: any-host
     needs: [guards, clippy, gtk-build, test-build]
@@ -582,7 +690,7 @@ jobs:
             mcp_port_slot: 6
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -625,6 +733,15 @@ jobs:
         run: |
           cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   consumers:
     runs-on: any-host
     needs: [guards, clippy, test-build]
@@ -634,7 +751,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/consumers
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -669,6 +786,15 @@ jobs:
         run: |
           cd src && python3 scripts/run-isolated-tests.py app-server
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   gtk:
     runs-on: any-host
     needs: [guards, clippy, gtk-build, test-build]
@@ -682,7 +808,7 @@ jobs:
         shard: [1, 2, 3]
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -725,6 +851,15 @@ jobs:
         run: |
           cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   duckdb:
     runs-on: any-host
     needs: [duckdb-build]
@@ -734,7 +869,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/duckdb
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -762,6 +897,15 @@ jobs:
         run: |
           cd src
           bash scripts/run-rust-tests.sh --locked -p tablepro-driver-duckdb -- --include-ignored
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   pg-release:
     runs-on: any-host
     needs: [guards, clippy, test-build]
@@ -772,7 +916,7 @@ jobs:
       TMPDIR: /var/cache/ci/t
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -805,6 +949,15 @@ jobs:
           mkdir -p "$TMPDIR"
           cd src && ./scripts/test-postgres-release.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   pg-dump:
     runs-on: any-host
     needs: [guards, clippy, test-build]
@@ -814,7 +967,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-dump
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -843,6 +996,15 @@ jobs:
       - name: pg_dump against PostgreSQL
         run: cd src && ./scripts/test-pg-dump.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   socket-ssh:
     runs-on: any-host
     needs: [guards, clippy, test-build]
@@ -853,7 +1015,7 @@ jobs:
       TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -891,6 +1053,15 @@ jobs:
           ./scripts/test-postgres-socket.sh
           bash ./scripts/test-ssh.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   gtk-server:
     runs-on: any-host
     needs: [guards, clippy, gtk-build, test-build]
@@ -911,7 +1082,7 @@ jobs:
             mcp_port_slot: 9
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -953,6 +1124,15 @@ jobs:
       - name: Installed GTK scenarios against a real server
         run: |
           cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   driver-tls:
     runs-on: any-host
     needs: [guards, clippy, test-build]
@@ -962,7 +1142,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -992,6 +1172,15 @@ jobs:
         run: |
           cd src && ./scripts/test-driver-tls.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   keyring:
     runs-on: any-host
     needs: [guards, clippy, test-build]
@@ -1001,7 +1190,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/keyring
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -1024,6 +1213,15 @@ jobs:
         run: |
           cd src && ./scripts/test-secret-service.sh
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   supply-chain:
     runs-on: build-host
     needs: [guards, clippy]
@@ -1067,3 +1265,13 @@ jobs:
       - name: Clean builder scratch
         if: always()
         run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
