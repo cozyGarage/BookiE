@@ -99,6 +99,10 @@ Per-tab editing state is the deliberate exception. The headless `change_tracker`
 | On failure | settles waiters with a write error | restores the pending entries for the next attempt |
 | Errors | `String` | typed `WorkspaceFlushError` |
 
+Draft files referenced by published workspace metadata are immutable during a save. Changed editor text receives a new draft UUID; unchanged bytes reuse the existing file. Metadata publishes the new references only after all draft writes succeed. Cleanup follows publication and removes retired draft files. Failed attempts remove only files they created that are absent from the current published metadata. If metadata cannot be checked, those files remain recoverable for a later successful cleanup. Failed batches remain pending for retry, and the previous metadata and its draft bodies stay readable until publication.
+
+Prefetch reads draft bodies only for requested connections. An unreadable requested draft returns an error while independently readable requested connections enter the cache. Unreadable files remain untouched; a missing draft retains its existing empty-editor recovery behavior. Malformed global metadata still refuses restoration. A deletion advances the cache clock and retains a marker so an earlier preload cannot restore the deleted connection, including across reimport.
+
 The read-modify-write under a file lock is the point: two windows save different connections at the same time, and a whole-value write would drop whichever landed first. `StateFile` is correct for a single owned document such as preferences; `WorkspaceStore` is correct for a map many windows write into. Use `StateFile` for new whole-document state, and do not port `WorkspaceStore` onto it.
 
 ## Anti-patterns to flag in review

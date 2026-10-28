@@ -253,7 +253,7 @@ fn prefetch_cannot_replace_a_save_started_while_snapshot_is_loading() {
             || {
                 load_started_sender.send(()).unwrap();
                 continue_load_receiver.recv().unwrap();
-                Ok(disk_state)
+                Ok((disk_state, HashSet::new()))
             },
         )
         .unwrap();
@@ -289,7 +289,7 @@ fn a_save_does_not_wait_for_a_slow_prefetch() {
             || {
                 load_started_sender.send(()).unwrap();
                 continue_load_receiver.recv().unwrap();
-                Ok(WorkspaceState::default())
+                Ok((WorkspaceState::default(), HashSet::new()))
             },
         )
         .unwrap();
@@ -929,4 +929,37 @@ fn forgetting_one_connection_preserves_another_connections_drafts() {
         matches!(&restored.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT updated_retained")
     );
     assert!(!drafts.join(deleted.to_string()).exists());
+}
+
+#[test]
+fn a_late_prefetch_cannot_restore_a_deleted_cache_entry() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    for reimport in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let connection = Uuid::new_v4();
+        let store = WorkspaceStore::new(Some(root.path().join("workspace.json")), root.path().join("drafts"));
+        store.save_connection(connection, ConnectionWorkspaceState::default());
+        assert_eq!(
+            store.flush().recv_timeout(std::time::Duration::from_secs(20)).unwrap(),
+            Ok(())
+        );
+        prefetch_connections_coordinated(
+            &store.inner.memory,
+            &[connection],
+            || {},
+            || {
+                let snapshot = load_locked(&store.inner.paths)?;
+                store.forget_connection(connection);
+                if reimport {
+                    runtime.block_on(store.allow_connection_saves(connection)).unwrap();
+                }
+                Ok((snapshot, HashSet::new()))
+            },
+        )
+        .unwrap();
+        assert!(
+            store.load_connection(connection).is_none(),
+            "deleted workspace was recached by the late preload"
+        );
+    }
 }

@@ -378,7 +378,15 @@ impl WorkspaceStore {
                     .file_lock
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
-                load_locked(&self.inner.paths)
+                let paths = &self.inner.paths;
+                let path = paths.state.as_deref().ok_or(WorkspaceFlushError::WriteFailed)?;
+                let (mut state, unreadable) =
+                    workspace_disk::load_connections(path, &paths.drafts, ids).map_err(|error| {
+                        tracing::warn!(%error, "workspace could not be read; existing files will be preserved");
+                        WorkspaceFlushError::WriteFailed
+                    })?;
+                clamp(&mut state);
+                Ok((state, unreadable))
             },
         )
     }
@@ -498,7 +506,9 @@ impl WorkspaceStore {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             memory.cache.remove(&id);
-            memory.saved_at.remove(&id);
+            memory.clock += 1;
+            let clock = memory.clock;
+            memory.saved_at.insert(id, clock);
             let mut queue = self
                 .inner
                 .writer
@@ -586,19 +596,22 @@ fn prefetch_connections_coordinated(
     memory: &Mutex<Memory>,
     ids: &[Uuid],
     flush: impl FnOnce(),
-    load: impl FnOnce() -> Result<WorkspaceState, WorkspaceFlushError>,
+    load: impl FnOnce() -> Result<(WorkspaceState, HashSet<Uuid>), WorkspaceFlushError>,
 ) -> Result<(), WorkspaceFlushError> {
     let started = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clock;
     flush();
-    let state = load()?;
+    let (state, unreadable) = load()?;
     let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for id in ids {
-        if memory.saved_at.get(id).is_some_and(|saved| *saved > started) {
+        if unreadable.contains(id) || memory.saved_at.get(id).is_some_and(|saved| *saved > started) {
             continue;
         }
         memory
             .cache
             .insert(*id, state.connections.get(&id.to_string()).cloned());
+    }
+    if !unreadable.is_empty() {
+        return Err(WorkspaceFlushError::WriteFailed);
     }
     Ok(())
 }

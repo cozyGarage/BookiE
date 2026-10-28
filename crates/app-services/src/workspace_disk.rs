@@ -14,6 +14,30 @@ pub fn load(path: &Path, drafts: &Path) -> std::io::Result<WorkspaceState> {
     Ok(state)
 }
 
+pub fn load_connections(
+    path: &Path,
+    drafts: &Path,
+    ids: &[Uuid],
+) -> std::io::Result<(WorkspaceState, std::collections::HashSet<Uuid>)> {
+    let mut state = load_metadata(path)?;
+    for connection in state.connections.keys() {
+        Uuid::parse_str(connection).map_err(std::io::Error::other)?;
+    }
+    let requested: std::collections::HashSet<_> = ids.iter().map(Uuid::to_string).collect();
+    state.connections.retain(|id, _| requested.contains(id));
+    let mut unreadable = std::collections::HashSet::new();
+    for id in ids {
+        let Some(workspace) = state.connections.get_mut(&id.to_string()) else {
+            continue;
+        };
+        if let Err(error) = load_connection_drafts(*id, workspace, drafts) {
+            tracing::warn!(%id, %error, "workspace draft could not be read; existing files will be preserved");
+            unreadable.insert(*id);
+        }
+    }
+    Ok((state, unreadable))
+}
+
 pub fn load_connection(
     path: &Path,
     drafts: &Path,
@@ -47,9 +71,10 @@ pub fn save(path: &Path, drafts: &Path, mut state: WorkspaceState) -> std::io::R
             }
         }
     }
+    let mut batch = draft_batch::DraftBatch::new(path, drafts)?;
     for (connection, workspace) in &mut state.connections {
         let connection = Uuid::parse_str(connection).map_err(std::io::Error::other)?;
-        save_connection_drafts(connection, workspace, drafts)?;
+        save_connection_drafts(connection, workspace, &mut batch)?;
     }
     atomic_write_json(path, &state)?;
     for (connection, workspace) in &mut state.connections {
@@ -89,10 +114,11 @@ pub fn save_connections(
         }
     }
     super::workspace_state::clamp(&mut state);
+    let mut batch = draft_batch::DraftBatch::new(path, drafts)?;
     let updated: Vec<Uuid> = updates.iter().map(|(connection, _)| *connection).collect();
     for (connection, mut workspace) in updates {
         super::workspace_state::clamp_connection(&mut workspace);
-        save_connection_drafts(connection, &mut workspace, drafts)?;
+        save_connection_drafts(connection, &mut workspace, &mut batch)?;
         state.connections.insert(connection.to_string(), workspace);
     }
     atomic_write_json(path, &state)?;
@@ -152,15 +178,11 @@ fn load_connection_drafts(
 fn save_connection_drafts(
     connection: Uuid,
     workspace: &mut ConnectionWorkspaceState,
-    drafts: &Path,
+    batch: &mut draft_batch::DraftBatch<'_>,
 ) -> std::io::Result<()> {
     for tab in workspace.all_tabs_mut() {
         if let WorkspaceTabRecord::Editor { query, draft_id, .. } = tab {
-            let id = *draft_id.get_or_insert_with(Uuid::new_v4);
-            atomic_write_bytes(
-                &drafts.join(connection.to_string()).join(format!("{id}.sql")),
-                query.as_bytes(),
-            )?;
+            *draft_id = Some(batch.save(connection, *draft_id, query.as_bytes())?);
             query.clear();
         }
     }
@@ -363,3 +385,5 @@ mod tests {
 mod cleanup_tests;
 
 mod retired_drafts;
+
+mod draft_batch;
