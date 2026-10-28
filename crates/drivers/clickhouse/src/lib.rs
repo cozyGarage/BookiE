@@ -85,13 +85,7 @@ impl DatabaseDriver for ClickhouseDriver {
             HyperClient::builder(TokioExecutor::new()).build(https_connector(&opts.tls, opts.service_address().0)?);
         let mut client = clickhouse::Client::with_http_client(http)
             .with_url(url)
-            .with_product_info("tablepro-linux", env!("CARGO_PKG_VERSION"))
-            // `ALTER TABLE … UPDATE` and `DELETE FROM` are queued as
-            // asynchronous mutations by default, so a save would return
-            // before the rows changed and the grid would refetch stale
-            // values. Wait for the mutation to finish on the server we
-            // are talking to.
-            .with_setting("mutations_sync", "1");
+            .with_product_info("tablepro-linux", env!("CARGO_PKG_VERSION"));
         if !opts.username.is_empty() {
             client = client.with_user(opts.username);
         }
@@ -167,6 +161,7 @@ impl ClickhouseConnection {
             // The summary header is sent before the body, so its counts
             // are only complete once the server has finished the query.
             .with_setting("wait_end_of_query", "1")
+            .with_setting("mutations_sync", "1")
             .fetch_bytes(ROW_FORMAT)
             .map_err(map_clickhouse_error)?;
         while cursor.next().await.map_err(map_clickhouse_error)?.is_some() {}
