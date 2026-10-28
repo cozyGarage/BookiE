@@ -14,6 +14,26 @@ BookiE is a free, open-source database client for Linux, built for data analysts
   </picture>
 </p>
 
+<p align="center">
+  <img src="docs/brand/badges/badge-gtk4.svg" alt="Linux Native">
+  <img src="docs/brand/badges/badge-policy.svg" alt="PolicyGuard Safety">
+  <img src="docs/brand/badges/badge-keyring.svg" alt="Secret Service">
+  <img src="docs/brand/badges/badge-mcp.svg" alt="Model Context Protocol">
+</p>
+
+## Supported engines
+
+<p align="center">
+  <img src="docs/brand/badges/postgres.svg" alt="PostgreSQL">
+  <img src="docs/brand/badges/mysql.svg" alt="MySQL / MariaDB">
+  <img src="docs/brand/badges/sqlite.svg" alt="SQLite">
+  <img src="docs/brand/badges/mssql.svg" alt="SQL Server">
+  <img src="docs/brand/badges/clickhouse.svg" alt="ClickHouse">
+  <img src="docs/brand/badges/duckdb.svg" alt="DuckDB">
+  <img src="docs/brand/badges/redis.svg" alt="Redis">
+  <img src="docs/brand/badges/mongodb.svg" alt="MongoDB">
+</p>
+
 ## At a glance
 
 | | |
@@ -35,6 +55,8 @@ The AppImage is for trying BookiE without installing it. The published 0.2.0 ima
 To build from source, see [Build and run](#build-and-run).
 
 ## First steps
+
+![BookiE Quickstart Workflow](docs/images/quickstart-flow.svg)
 
 1. Click the `+` in the window header, choose the database type and fill in the connection.
 2. Click **Test**, then **Connect**.

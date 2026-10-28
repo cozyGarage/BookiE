@@ -31,7 +31,10 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 ## Browse and edit tables
 
-![Browsing a table in the light theme](images/browse-light.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/browse-dark.png">
+  <img alt="Browsing a table in BookiE with column types and key marks" src="images/browse-light.png" width="100%">
+</picture>
 
 - Click a table to open it in a preview tab. Edit or keep the tab to make it permanent.
 - Tables are read in bounded pages. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
@@ -44,9 +47,18 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Long cells in query results and keyed browse rows show a preview and byte count. View Value shows a bounded rendering of the current value. Copy Value copies the complete text or JSON value, including pending edits and drafts; binary cells currently copy only a byte-count placeholder ([#1587](https://github.com/cozyGarage/BookiE/issues/1587)). Eligible text/JSON cells can be edited in the full-value dialog up to 1 MiB. See [known limitations](known-limitations.md#data-and-values) for keyless-table behavior.
 - The row inspector lists every column and its type. Values omitted from the fetched page show as Not fetched. Selection statistics show count, sum, average, minimum and maximum.
 
+### Filters and search
+
+![Structured filter rule editor](images/filter-builder.png)
+
+![Filter applied in the data grid](images/filter-applied.png)
+
 ## Write SQL
 
-![The SQL editor in the dark theme, with a result below](images/sql-editor-dark.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/sql-editor-dark.png">
+  <img alt="The SQL editor in BookiE, with query result below" src="images/sql-editor-light.png" width="100%">
+</picture>
 
 - Ctrl+E opens an editor tab. Ctrl+Enter runs the selected text, or the whole script when nothing is selected. Ctrl+Shift+Enter runs the statement at the cursor. Escape cancels a running query when the server supports it.
 - Syntax highlighting, code folding and a side-by-side split of the same query.
@@ -61,7 +73,14 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Favorites: Ctrl+D saves the current query under a name in `$XDG_CONFIG_HOME/tablepro/favorites.json`. Saving an existing name replaces its statement.
 - Open Quickly: Ctrl+P searches favorites, open tabs and saved connections.
 
-![The same editor in the light theme](images/sql-editor-light.png)
+### Split editor and streaming
+
+![Split SQL query editor with side-by-side execution](images/sql-split-editor.png)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/stream-pager-dark.png">
+  <img alt="Stream result pager showing retained row range" src="images/stream-pager-light.png" width="100%">
+</picture>
 
 ## Tables and structure
 
@@ -75,7 +94,11 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Import CSV, Rename
 
 ![The structure view of a table](images/structure-light.png)
 
+![Structure view with foreign keys and metadata](images/structure-foreign-keys.png)
+
 ## Import and export
+
+![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
 - Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook.
 - CSV export can protect cells that start like formulas, and can keep plain numbers unprotected so they import back into numeric columns.
@@ -84,6 +107,8 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Import CSV, Rename
 - Mappings can be remembered per connection and table.
 
 ## Safety and records
+
+![Application preferences and connection safety configuration](images/preferences.png)
 
 - Every statement is checked before it runs. Writes on a read-only connection are refused.
 - Depending on the environment and policy, risky statements ask for approval first.

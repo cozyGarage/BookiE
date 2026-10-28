@@ -4,6 +4,8 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 
 ## Connect
 
+![Saved connections with environment markers and quick actions](images/connections-light.png)
+
 1. Click **New connection** (the `+` in the window header).
 2. Pick the database type, then fill in host, port, database and user. For SQLite and DuckDB, choose the file.
 3. Click **Test** to check the details, then **Connect**.
@@ -23,9 +25,16 @@ Saved connection passwords live in your desktop keyring; the saved connection fi
 
 ## Browse a table
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/browse-dark.png">
+  <img alt="BookiE browsing a table with column types, keys, and cell editors" src="images/browse-light.png" width="100%">
+</picture>
+
 Click a table in the sidebar. It opens as a preview tab, marked with an icon, and the next table click reuses that preview. Edit the table or choose **Keep Tab** from the tab menu to keep it open. Tabs with pending edits are kept automatically. Ctrl+click or the sidebar's **Open in new tab** action always creates a durable tab. Turn off **Reuse one tab when opening tables** in Preferences to give every table its own tab; a table that is already open is still selected instead of duplicated. The sidebar groups tables and views under each schema; click a group to collapse it, and type in the search to find a table.
 
 Use First, Previous, Next and Last to move through table pages. Unsorted tables with primary keys use keyset seeks for deep Previous navigation and Last. Each page is a separate read, so concurrent database changes can alter which rows appear between page requests; browsing does not hold a snapshot across pages.
+
+![Structured filter presets and condition builder](images/filter-builder.png)
 
 - **Edit**: double-click a cell, or move to it with Tab and press F2 or Enter (a single click selects the row; F2 and Enter act on the focused cell). Changes stay pending (shown with a dot on the tab) until you press Ctrl+S. **Preview SQL** in the bar below the grid shows the statements and values that Save would run, without running them. Ctrl+Z and Ctrl+Y undo and redo pending changes.
 - **Insert and delete**: Ctrl+N inserts a row, Delete removes the selected rows. Ctrl+Shift+N sets the focused cell to NULL.
@@ -38,9 +47,21 @@ Use First, Previous, Next and Last to move through table pages. Unsorted tables 
 
 ## Run SQL
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/sql-editor-dark.png">
+  <img alt="BookiE SQL editor with query results in the light theme" src="images/sql-editor-light.png" width="100%">
+</picture>
+
 In a focused result grid, **Ctrl+Shift+J** opens **Jump to Column** and **Ctrl+Alt+F** opens **Find in Loaded Rows**. Selecting a match or dismissing either dialog returns focus to row navigation. **Ctrl+Home** and **Ctrl+End** move to the first and last loaded row; they do not fetch additional rows.
 
 Ctrl+E opens a SQL editor tab for the current connection.
+
+![Split SQL editor with side-by-side execution](images/sql-split-editor.png)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/stream-pager-dark.png">
+  <img alt="Stream result pager showing retained row range" src="images/stream-pager-light.png" width="100%">
+</picture>
 
 Supported single-statement PostgreSQL `SELECT`s load progressively. Each streamed result keeps pages within its own 64 MiB estimated row cache, always keeping the newest page; use **Previous page** and **Next page** to navigate retained pages. The row summary states which rows remain when older pages leave the forward-only window. Pages that leave the in-memory budget move to a process-local encrypted spool (1 GiB shared, up to 4,096 pages per result), so earlier pages stay reachable without rerunning the query while the result is open. If the spool refuses a page, the stream stops and is marked incomplete. Other engines and unsupported query shapes load a capped result. A truncated, failed or cancelled result is incomplete; see [result limits](known-limitations.md#data-and-values).
 
@@ -80,6 +101,8 @@ Grid headers show the column name and exact engine type spelling on separate lin
 
 ## Import and export
 
+![Export scope dialog choosing data scope before format](images/export-wizard.png)
+
 - **Export** opens one dialog with **Scope** before **Format**. A table uses its current page and active server-side filter; **All matching table rows** explains the snapshot requirement and cannot start an export. A query exports its loaded result columns, including joins and aliases, without running SQL again. A streamed result's all-row export explicitly runs the guarded query again and can observe changed data. Choose CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook after reviewing the scope. Full-table export remains refused until a consistent snapshot path is supported.
   SQL row export and Copy as INSERT are not database backups; see the
   [identity and generated-column limitations](known-limitations.md#data-and-values).
@@ -98,6 +121,21 @@ Grid headers show the column name and exact engine type spelling on separate lin
 
 BookiE checks every statement before it runs:
 
+```mermaid
+flowchart TD
+    Statement[SQL Statement / Query] --> Guard[PolicyGuard]
+    Guard --> Classify[Classify Statement Kind]
+    Classify --> PolicyCheck{Rules Evaluation}
+    PolicyCheck -->|Needs Approval| AskUser[Request Human Approval]
+    AskUser -->|Approved| Intent[Write Audit Intent to Journal]
+    PolicyCheck -->|Allowed| Intent
+    PolicyCheck -->|Denied| AuditDeny[Audit Terminal Denied]
+    Intent --> Driver[Database Driver Execution]
+    Driver --> Mask[Mask Sensitive Data]
+    Mask --> AuditSuccess[Write Terminal Audit Succeeded]
+    AuditSuccess --> Result[Return Result to UI / MCP]
+```
+
 - Writes on a read-only connection are refused.
 - Depending on the connection's environment and your policy, risky statements (for example a `DELETE` without `WHERE`, or schema changes in production) ask for your approval first. The time spent waiting for approval is not counted in the statement's elapsed time.
 - BookiE records governed operation outcomes in a local audit journal when it is available. MCP and operations that require audit persistence are refused if the journal is unavailable. A Local or Dev policy may allow a human write to continue after audit-intent failure; that write may succeed without being recorded.
@@ -112,7 +150,31 @@ Database snapshots are not available. [ADR 0015](decisions/0015-database-snapsho
 
 ## AI agents (MCP)
 
-BookiE can let an AI assistant use your saved connections through the Model Context Protocol. Open **Preferences → MCP** to create a token, choose which connections it may use and which tools it may call. The token appears once; the dialog reports whether it was saved in the system keyring. If saving fails, copy it into your MCP client configuration before closing the dialog. Every agent statement goes through the same safety checks, and agent changes follow the approval rules of the connection's environment. `bookie-agentd` runs the same server without the window, for headless use.
+BookiE can let an AI assistant use your saved connections through the Model Context Protocol. Open **Preferences → MCP** to create a token, choose which connections it may use and which tools it may call.
+
+```mermaid
+flowchart LR
+    subgraph Client ["AI Agent / IDE"]
+        MCP[MCP Tool Call]
+    end
+    subgraph Daemon ["bookie-agentd / GUI"]
+        ScopeCheck{Token Scopes Valid?}
+        AllowCheck{Connection Allowlisted?}
+        Guard[PolicyGuard Engine]
+    end
+    subgraph Target ["Database"]
+        DB[(Database Engine)]
+    end
+
+    MCP --> ScopeCheck
+    ScopeCheck -->|No| Deny1[Deny Access]
+    ScopeCheck -->|Yes| AllowCheck
+    AllowCheck -->|No| Deny2[Deny Access]
+    AllowCheck -->|Yes| Guard
+    Guard --> DB
+```
+
+The token appears once; the dialog reports whether it was saved in the system keyring. If saving fails, copy it into your MCP client configuration before closing the dialog. Every agent statement goes through the same safety checks, and agent changes follow the approval rules of the connection's environment. `bookie-agentd` runs the same server without the window, for headless use.
 
 Open **Audit Log** from the main menu to review persisted operation records. Each record shows its connection, principal, kind, outcome, row count and duration, and expands to its operation id, policy rule, stored statement and error. Statement text appears in the redacted form the journal keeps. A Local or Dev policy may allow a human write to continue after audit-intent failure without a persisted record; see [Safety](#safety).
 

@@ -4,6 +4,32 @@ BookiE uses XDG files for local state, SQLite for query history, a JSONL audit j
 
 ## Locations
 
+```mermaid
+graph TD
+    subgraph XDG_CONFIG ["$XDG_CONFIG_HOME/tablepro/ (or tablepro-devel)"]
+        Conn["connections.json<br/>(No Credentials)"]
+        Prefs["preferences.json<br/>+ GSettings"]
+        History["history.db<br/>(SQLite + FTS5)"]
+        Favs["favorites.json"]
+        Policy["policy.toml"]
+        Tokens["mcp-tokens.json<br/>(Hashes only)"]
+        KnownHosts["known_hosts<br/>(SSH keys)"]
+    end
+
+    subgraph XDG_DATA ["$XDG_DATA_HOME/tablepro/"]
+        Audit["audit.jsonl<br/>(Hash-chained journal)"]
+    end
+
+    subgraph SECRETS ["Secret Service (Desktop Keyring)"]
+        DBPass["DB Passwords"]
+        SSHPass["SSH Secrets"]
+        MCPToken["MCP Token Plaintext"]
+    end
+
+    Conn -.->|Resolved at runtime via UUID| DBPass
+    Conn -.->|Resolved at runtime| SSHPass
+```
+
 | Data | Format | Default path |
 |---|---|---|
 | Saved connections | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/connections.json` |
