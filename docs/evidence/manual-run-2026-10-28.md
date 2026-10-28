@@ -54,6 +54,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Session refusals (installed package) | MySQL `SET autocommit=0` and `XA START` refused on a shared connection with a wrong-looking message (#1952); ClickHouse Session explains it is unavailable |
 | Hide schema and failed structure save (installed package) | Hiding a PostgreSQL schema removes it from the tree and search, and it is restorable from the Hidden schemas menu; a NOT NULL column added to a populated table fails with a clear rollback message |
 | Host down with an open session (installed package) | Ctrl+Q with an open Session transaction and the database stopped leaves the confirmation dialog stuck with no cleanup-timeout dialog (#1953); an idle session closes the window normally |
+| Session cancel and timeout (installed package) | Cancel stops a server query inside a Session; a timeout inside a Session transaction leaves the transaction open and says so |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
