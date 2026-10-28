@@ -160,7 +160,7 @@ impl Connection for MysqlConnection {
         let rows = sqlx::query(
             "SELECT CAST(table_schema AS CHAR), CAST(table_name AS CHAR)
              FROM information_schema.tables
-             WHERE table_schema = DATABASE()
+             WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
              ORDER BY table_name",
         )
         .fetch_all(&self.pool)
@@ -171,6 +171,25 @@ impl Connection for MysqlConnection {
             .map(|r| TableInfo {
                 schema: Some(r.get::<String, _>(0)),
                 name: r.get::<String, _>(1),
+            })
+            .collect())
+    }
+
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT CAST(table_schema AS CHAR), CAST(table_name AS CHAR)
+             FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_type = 'VIEW'
+             ORDER BY table_name",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| TableInfo {
+                schema: Some(row.get::<String, _>(0)),
+                name: row.get::<String, _>(1),
             })
             .collect())
     }

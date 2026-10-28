@@ -145,6 +145,20 @@ impl Connection for SqliteConnection {
             .collect())
     }
 
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        let rows = sqlx::query("SELECT name FROM sqlite_master WHERE type = 'view' ORDER BY name")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| TableInfo {
+                schema: None,
+                name: row.get::<String, _>(0),
+            })
+            .collect())
+    }
+
     async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         // PRAGMA table_xinfo includes the `hidden` column which we use
         // to detect virtual / generated columns. Falls back to
