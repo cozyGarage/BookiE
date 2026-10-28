@@ -39,6 +39,8 @@ The run was done in two sessions on the same build, one for the first six rows a
 | High contrast and icon | With libadwaita's high-contrast debug switch the editor and grid stayed readable; with the shipped icon on the data path About showed the BookiE artwork |
 | Built-in SSH tunnel | MySQL 8.4 behind a bastion container (the repository's driver-tls fixture): host-key trust prompt, tunnel with TLS Verify Full (`TLS_AES_256_GCM_SHA384`), "Connection lost — reconnecting" when the bastion stopped, changed host key refused |
 | SSH agent and system OpenSSH | Run with a scratch `HOME` and a private agent so the real `~/.ssh` was untouched: agent authentication works, a stopped agent gives a clear error, system OpenSSH shows the trust dialog, Cancel writes nothing and Trust connects |
+| Backup progress and Cancel | A 1.3 GB database kept `pg_dump` running long enough to see the progress window (spinner and Cancel only); Cancel stopped it and left no file |
+| Arch package, unpacked | `scripts/build-arch-rc.sh` (release profile, `--nodeps`) built `bookie-0.2.0-1-x86_64.pkg.tar.zst` (SHA-256 `1a9aebe7…169f8`, 35 MB) from `893e83a1f`. `desktop-file-validate` and `appstreamcli validate --no-net` passed, the GSettings schema compiled, and the unpacked binary started, loaded its schema, connected to SQLite and showed the packaged icon in About. It was not installed with `pacman` |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -54,12 +56,14 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1919](https://github.com/cozyGarage/BookiE/issues/1919): the approval prompt shows an empty `tables:` line when no targets were detected.
 - [#1921](https://github.com/cozyGarage/BookiE/issues/1921): the sidebar cannot be refreshed after tables are created outside BookiE.
 - [#1925](https://github.com/cozyGarage/BookiE/issues/1925): MySQL `SHOW STATUS LIKE …` is held for approval as an unknown write.
+- [#1932](https://github.com/cozyGarage/BookiE/issues/1932): the backup progress window shows only a spinner and Cancel, with no text.
+- [#1938](https://github.com/cozyGarage/BookiE/issues/1938): `bookie --version` starts the app instead of printing the version. A first attempt to read the version this way started the app against the real profile for under a second; no real file was modified.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
 ## Not run
 
-Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; ProxyJump and saved-password cases for system OpenSSH; the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, input-method editing, the backup progress window, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
+Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; ProxyJump and saved-password cases for system OpenSSH; the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, input-method editing, and an installed distribution package: the Arch package was built and unpacked into a private root but not installed with `pacman`, and no `.deb`, Flatpak or AppImage was built. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
 
 ## Cleanup
 
