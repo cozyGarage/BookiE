@@ -104,3 +104,76 @@ async fn a_failed_reload_keeps_the_last_loaded_restrictions_and_a_valid_reload_r
     );
     service.close(id);
 }
+
+#[test]
+fn permission_denied_policy_targets_are_errors_when_permissions_are_enforced() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("target.toml");
+    let path = dir.path().join("policy.toml");
+    std::fs::write(&target, "").unwrap();
+    std::os::unix::fs::symlink(&target, &path).unwrap();
+    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let enforced = std::fs::read_to_string(&target).is_err();
+    let result = load_policy_file(&path);
+    let available = service_for_policy(&path).policy_available();
+    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+    if !enforced {
+        eprintln!("permission-denied coverage unavailable: this process can read a mode-000 target");
+        return;
+    }
+    assert!(result.is_err());
+    assert!(!available);
+}
+
+#[test]
+fn a_policy_directory_and_non_directory_parent_are_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("policy.toml");
+    std::fs::create_dir(&path).unwrap();
+    assert!(load_policy_file(&path).is_err());
+    assert!(!service_for_policy(&path).policy_available());
+    std::fs::remove_dir(&path).unwrap();
+    std::fs::write(&path, "").unwrap();
+    assert!(load_policy_file(&path.join("policy.toml")).is_err());
+}
+
+#[test]
+fn inaccessible_policy_parents_are_errors_when_permissions_are_enforced() {
+    let dir = tempfile::tempdir().unwrap();
+    let parent = dir.path().join("locked");
+    std::fs::create_dir(&parent).unwrap();
+    let target = parent.join("policy.toml");
+    std::fs::write(&target, "").unwrap();
+    let link = dir.path().join("policy.toml");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let enforced = std::fs::symlink_metadata(&target).is_err();
+    let direct = load_policy_file(&target);
+    let linked = load_policy_file(&link);
+    let available = service_for_policy(&link).policy_available();
+    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o700)).unwrap();
+    if !enforced {
+        eprintln!("permission-denied metadata coverage unavailable: this process can traverse a mode-000 directory");
+        return;
+    }
+    assert!(direct.is_err());
+    assert!(linked.is_err());
+    assert!(!available);
+}
+
+#[tokio::test]
+async fn unavailable_policy_refuses_agent_handles_on_active_connections() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("policy.toml");
+    std::fs::write(&path, "[environments.nowhere]\n").unwrap();
+    let service = service_for_policy(&path);
+    let id = open_memory_connection(&service, "agent refusal").await;
+    let principal = Principal::Agent {
+        token: "test".into(),
+        client: None,
+        model: None,
+    };
+    assert!(!service.policy_available());
+    assert!(service.handle(id, principal).is_none());
+    service.close(id);
+}
