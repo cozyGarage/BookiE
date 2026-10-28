@@ -72,6 +72,8 @@ class CiJobCleanupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
             workspace.mkdir()
+            job_tmp = Path(temporary) / "job-tmp"
+            job_tmp.mkdir()
             directories = {"src", "gtk-artifact", "floor-artifact", "floor-package", "test-bundles", "mutants-core-1"}
             for name in (
                 "src",
@@ -97,8 +99,10 @@ class CiJobCleanupTests(unittest.TestCase):
                 cwd=workspace,
                 env={
                     **os.environ,
+                    "GITHUB_RUN_ID": "123",
                     "GITHUB_WORKSPACE": str(workspace),
                     "CARGO_TARGET_DIR": str(target),
+                    "TMPDIR": str(job_tmp),
                 },
                 capture_output=True,
                 text=True,
@@ -126,6 +130,8 @@ class CiJobCleanupTests(unittest.TestCase):
             workspace = Path(temporary) / "workspace"
             scripts = workspace / "src/scripts"
             scripts.mkdir(parents=True)
+            job_tmp = Path(temporary) / "job-tmp"
+            job_tmp.mkdir()
             (scripts / "cleanup-testcontainers.py").touch()
             (scripts / "ci-cache.py").touch()
             bin_dir = Path(temporary) / "bin"
@@ -143,8 +149,10 @@ class CiJobCleanupTests(unittest.TestCase):
                 env={
                     **os.environ,
                     "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_RUN_ID": "123",
                     "GITHUB_WORKSPACE": str(workspace),
                     "CARGO_TARGET_DIR": "/var/cache/ci/target/unit",
+                    "TMPDIR": str(job_tmp),
                     "TABLEPRO_TEST_RUN_ID": "forgejo-123-1-postgres",
                     "CLEANUP_CALLS": str(calls),
                 },
