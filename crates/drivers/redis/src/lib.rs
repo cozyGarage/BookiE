@@ -331,6 +331,10 @@ async fn fetch_page(
     })
 }
 
+fn extend_unique(keys: &mut Vec<Vec<u8>>, seen: &mut std::collections::HashSet<Vec<u8>>, batch: Vec<Vec<u8>>) {
+    keys.extend(batch.into_iter().filter(|key| seen.insert(key.clone())));
+}
+
 async fn scan_keys(
     conn: &mut redis::aio::MultiplexedConnection,
     pattern: &str,
@@ -338,6 +342,7 @@ async fn scan_keys(
 ) -> Result<Vec<Vec<u8>>, DriverError> {
     let mut cursor: u64 = 0;
     let mut keys = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     loop {
         let (next, batch): (u64, Vec<Vec<u8>>) = redis::cmd("SCAN")
             .arg(cursor)
@@ -348,7 +353,7 @@ async fn scan_keys(
             .query_async(conn)
             .await
             .map_err(map_redis_error)?;
-        keys.extend(batch);
+        extend_unique(&mut keys, &mut seen, batch);
         cursor = next;
         if cursor == 0 || keys.len() >= limit {
             break;

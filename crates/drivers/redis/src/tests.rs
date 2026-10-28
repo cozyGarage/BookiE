@@ -664,3 +664,14 @@ fn only_connection_level_failures_can_hide_a_tls_problem() {
     let wrong_type = RedisError::from((redis::ErrorKind::UnexpectedReturnType, "wrong type"));
     assert!(!redis_error_can_hide_tls(&wrong_type));
 }
+
+#[test]
+fn a_key_that_scan_returns_twice_is_kept_once_in_first_seen_order() {
+    let mut keys = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+
+    extend_unique(&mut keys, &mut seen, vec![b"a".to_vec(), b"b".to_vec(), b"a".to_vec()]);
+    extend_unique(&mut keys, &mut seen, vec![b"b".to_vec(), b"c".to_vec()]);
+
+    assert_eq!(keys, vec![b"a".to_vec(), b"b".to_vec(), b"c".to_vec()]);
+}
