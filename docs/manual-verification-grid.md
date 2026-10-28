@@ -124,7 +124,7 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 
 ## Server activity view: binary values
 
-- [ ] Open a connection's activity/session view while a query on a `bytea` or `varbinary` column is visible. A binary value shows as `<N bytes>`, not as a value that reads like a hexadecimal escape (for example not `\x10 bytes`).
+- [ ] Open a connection's activity/session view while a query on a `bytea` or `varbinary` column is visible. A binary value shows as `<N bytes>`, not as a value that reads like a hexadecimal escape (for example not `\x10 bytes`). **2026-10-28 native Wayland, dark, debug `1af200e38`, PostgreSQL 17.11, workspace 4:** not applicable as written: Server Activity (Sessions) listed `pid`, `usename`, `datname`, `state`, wait columns, `duration` and `query` text only, so no binary value could be shown while a `bytea` query ran from `psql`. Separately, the row for the app's own active session showed a negative duration (`-00:00:00.000888`).
 
 ## Result headers, selection statistics, error copy and connection strip
 
