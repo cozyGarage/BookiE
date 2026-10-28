@@ -95,6 +95,32 @@ async fn declared_boolean_and_temporal_values_keep_their_core_types() {
 }
 
 #[tokio::test]
+async fn a_declared_boolean_keeps_integers_other_than_zero_and_one_exact() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    connection
+        .execute("CREATE TABLE flags (id INTEGER PRIMARY KEY, enabled BOOLEAN)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO flags VALUES (1, 0), (2, 1), (3, 2), (4, -1), (5, 9223372036854775807)")
+        .await
+        .unwrap();
+
+    let result = connection.query("SELECT enabled FROM flags ORDER BY id").await.unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Bool(false)],
+            vec![Value::Bool(true)],
+            vec![Value::Int(2)],
+            vec![Value::Int(-1)],
+            vec![Value::Int(i64::MAX)],
+        ]
+    );
+}
+
+#[tokio::test]
 async fn blob_affinity_values_are_decoded_by_their_runtime_storage_class() {
     let connection = SqliteDriver.connect(memory_options()).await.unwrap();
     connection

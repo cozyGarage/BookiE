@@ -760,7 +760,7 @@ fn extract_value(row: &SqliteRow, idx: usize) -> Value {
         },
         "BOOLEAN" => row
             .try_get::<bool, _>(idx)
-            .map(Value::Bool)
+            .map(|flag| boolean_value(flag, row.try_get_unchecked::<i64, _>(idx).ok()))
             .unwrap_or_else(|_| decode_fallback(row, idx)),
         "DATE" | "TIME" | "DATETIME" | "TIMESTAMP" => {
             decode_declared_temporal(row, idx, type_name.as_str(), runtime_type.as_str())
@@ -869,6 +869,13 @@ fn sqlite_row_payload_bytes(row: &SqliteRow) -> usize {
 /// type's own decode fails, this is reached to find out whether the
 /// value is genuinely NULL or just stored as text/bytes instead, so a
 /// real value is never silently shown as an empty cell.
+fn boolean_value(flag: bool, stored: Option<i64>) -> Value {
+    match (flag, stored) {
+        (true, Some(other)) if other != 1 => Value::Int(other),
+        _ => Value::Bool(flag),
+    }
+}
+
 fn decode_fallback(row: &SqliteRow, idx: usize) -> Value {
     untyped_value(row, idx)
 }
