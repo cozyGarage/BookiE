@@ -48,6 +48,16 @@ The run was done in two sessions on the same build, one for the first six rows a
 | SQLite Structure and tab menu (installed package) | Add Foreign Key is greyed with the right reason on an existing table; a disabled Comment row is shown on SQLite (#1946); the tab context menu entries are greyed and inert (#1947) |
 | Pending-edit teardown and MySQL comments (installed package) | Disconnect, Discard and disconnect, Ctrl+Q and window close all prompt with a pending cell edit and Cancel keeps the draft; MySQL column comments edit and clear correctly |
 | Editor, second pass (installed package) | Lone BEGIN refusal, empty Explain message, close with an open transaction and Roll Back and Close, dimmed result while a query runs, tick and cross gutter marks |
+| Editor files and saved queries (installed package) | A symlinked file saves through to its target; an oversized file is refused; Escape closes Explain; Ctrl+Shift+D is claimed by GTK's inspector prompt (#1948) |
+| Connection bundles (installed package) | Plain export carries no secrets; passphrase export is encrypted; wrong passphrase and tampered file give one message; import plan lists dispositions and honours unticking; an empty profile has no import entry (#1949) |
+| Connection list (installed package) | 3 s connect timeout fails in 3 s with a clear message; Duplicate gives a distinct name and an empty-password form; Group and tags and the colour swatch work |
+| Session refusals (installed package) | MySQL `SET autocommit=0` and `XA START` refused on a shared connection with a wrong-looking message (#1952); ClickHouse Session explains it is unavailable |
+| Hide schema and failed structure save (installed package) | Hiding a PostgreSQL schema removes it from the tree and search, and it is restorable from the Hidden schemas menu; a NOT NULL column added to a populated table fails with a clear rollback message |
+| Host down with an open session (installed package) | Ctrl+Q with an open Session transaction and the database stopped leaves the confirmation dialog stuck with no cleanup-timeout dialog (#1953); an idle session closes the window normally |
+| Session cancel and timeout (installed package) | Cancel stops a server query inside a Session; a timeout inside a Session transaction leaves the transaction open and says so |
+| Large export to an existing file (installed package) | Replace prompt shown; the destination was untouched while 1M rows were written; the cancel path was not exercised because the 4M-row export finished first; a 4M-row editor result stops with "could not keep the complete result in temporary storage" while the guarded-cursor export still completed |
+| Filter by This Value (installed package) | Text value, NULL, empty text and a BLOB behave as the checklist says |
+| Long values (installed package) | Copy value copies the full text; BLOB View Value is capped at 16 KiB with the total shown; long unbroken text wraps without hyphens |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -69,8 +79,32 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1945](https://github.com/cozyGarage/BookiE/issues/1945): the SET picker popover clips its labels and Apply (regression of #657).
 - [#1946](https://github.com/cozyGarage/BookiE/issues/1946): SQLite Structure shows a disabled Comment row.
 - [#1947](https://github.com/cozyGarage/BookiE/issues/1947): the tab context menu entries are greyed out and do nothing.
+- [#1948](https://github.com/cozyGarage/BookiE/issues/1948): Ctrl+Shift+D opens the GTK Inspector prompt instead of the saved-queries list.
+- [#1949](https://github.com/cozyGarage/BookiE/issues/1949): a profile with no saved connections has no way to import a bundle.
+- [#1952](https://github.com/cozyGarage/BookiE/issues/1952): refusing `SET autocommit=0` or `XA START` shows the BEGIN/COMMIT/ROLLBACK message.
+- [#1953](https://github.com/cozyGarage/BookiE/issues/1953): closing the window with an open session transaction while the database is down leaves the confirmation dialog stuck.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
+
+## Coverage
+
+Counted from the four checklists at the head of this run. "With a 2026-10-28 result" means the item carries a note from this run, whether it passed, failed or was inconclusive. "Ticked" means the item was fully verified and is ticked.
+
+| Checklist | Items | Ticked | With a 2026-10-28 result | Without one |
+|---|---|---|---|---|
+| Catalog, sidebar and application shell | 38 | 6 | 16 | 22 |
+| Connections and SSH | 44 | 13 | 25 | 19 |
+| SQL editor and sessions | 62 | 27 | 30 | 32 |
+| Grid, filters and data transfer | 76 | 6 | 26 | 50 |
+| **All four** | 220 | 52 | 97 | 123 |
+
+Why the rest are open:
+
+- Visual audits that need a measured or manual pass (contrast ratios, keyboard-only walks, large fonts, wide and narrow widths, light and dark side by side).
+- Per-engine variants of checks already run on another engine (MySQL, SQL Server, ClickHouse, MongoDB, Redis).
+- Fixtures not built: a Session query that outlives its cancel, a language input method, DuckDB, a MariaDB server, a Kerberos realm.
+- Blocked by a filed defect: the tab context menu ([#1947](https://github.com/cozyGarage/BookiE/issues/1947)).
+- Package formats other than the installed Arch package: `.deb`, Flatpak and AppImage were not built.
 
 ## Not run
 
