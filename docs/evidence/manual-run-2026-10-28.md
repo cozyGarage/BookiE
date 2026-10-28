@@ -30,6 +30,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | MySQL 8.4 | Both backup actions explain they are PostgreSQL only; Catalog says the engine does not list the kind; Session kept a user variable; a passwordless root was refused ([#1861](https://github.com/cozyGarage/BookiE/issues/1861) reproduced); the view is listed under Tables |
 | MongoDB 7 | Collection browse works; SQL export absent; Excel offered for a known total |
 | Installed release build | Started, connected, browsed, ran a query and showed version 0.2.0 in About; no icon files, so the launcher icon is unchecked |
+| Connection form | Driver list and per-driver defaults correct; MySQL Unix socket mode shows the socket path and hides host and port; Escape dismisses without saving |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
