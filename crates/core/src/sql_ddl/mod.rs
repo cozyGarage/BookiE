@@ -29,6 +29,8 @@ mod default_tests;
 #[cfg(test)]
 mod diff_replacement_tests;
 #[cfg(test)]
+mod rename_order_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod truncate_tests;

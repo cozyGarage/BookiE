@@ -97,15 +97,27 @@ pub fn diff_to_ops(
 
     // Rename columns before altering them: the alter builders address
     // the column by its drafted name, so the rename has to land first.
-    for col in current_columns {
-        if let Some(orig) = col.original.as_ref().filter(|_| col.renamed()) {
-            ops.push(StructureOp::RenameColumn {
-                schema: schema_owned.clone(),
-                table: table.clone(),
-                old_name: orig.name.clone(),
-                new_name: col.name.clone(),
-            });
-        }
+    let used_names: Vec<&str> = original_columns
+        .iter()
+        .map(|column| column.name.as_str())
+        .chain(current_columns.iter().map(|column| column.name.as_str()))
+        .collect();
+    let renames = current_columns
+        .iter()
+        .filter_map(|col| {
+            col.original
+                .as_ref()
+                .filter(|_| col.renamed())
+                .map(|orig| (orig.name.clone(), col.name.clone()))
+        })
+        .collect();
+    for (old_name, new_name) in ordered_renames(renames, &used_names) {
+        ops.push(StructureOp::RenameColumn {
+            schema: schema_owned.clone(),
+            table: table.clone(),
+            old_name,
+            new_name,
+        });
     }
 
     // Alter columns: drafts whose original is Some and something other
@@ -282,4 +294,29 @@ pub fn materialize_ops(ops: &[StructureOp], driver_id: &str) -> Result<Vec<Strin
     }
 
     Ok(out)
+}
+
+fn ordered_renames(mut pending: Vec<(String, String)>, used_names: &[&str]) -> Vec<(String, String)> {
+    let mut ordered = Vec::with_capacity(pending.len() + 1);
+    let mut temporaries = 0;
+    while !pending.is_empty() {
+        let free = pending
+            .iter()
+            .position(|(_, target)| !pending.iter().any(|(held, _)| held == target));
+        if let Some(index) = free {
+            ordered.push(pending.remove(index));
+            continue;
+        }
+        let temporary = loop {
+            temporaries += 1;
+            let candidate = format!("bookie_tmp_{temporaries}");
+            if !used_names.contains(&candidate.as_str()) {
+                break candidate;
+            }
+        };
+        let (old_name, target) = pending.remove(0);
+        ordered.push((old_name, temporary.clone()));
+        pending.push((temporary, target));
+    }
+    ordered
 }
