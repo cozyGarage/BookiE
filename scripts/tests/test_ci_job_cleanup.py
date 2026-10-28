@@ -130,6 +130,8 @@ class CiJobCleanupTests(unittest.TestCase):
             workspace = Path(temporary) / "workspace"
             scripts = workspace / "src/scripts"
             scripts.mkdir(parents=True)
+            job_tmp = Path(temporary) / "job-tmp"
+            job_tmp.mkdir()
             (scripts / "cleanup-testcontainers.py").touch()
             (scripts / "ci-cache.py").touch()
             bin_dir = Path(temporary) / "bin"
@@ -147,8 +149,10 @@ class CiJobCleanupTests(unittest.TestCase):
                 env={
                     **os.environ,
                     "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_RUN_ID": "123",
                     "GITHUB_WORKSPACE": str(workspace),
                     "CARGO_TARGET_DIR": "/var/cache/ci/target/unit",
+                    "TMPDIR": str(job_tmp),
                     "TABLEPRO_TEST_RUN_ID": "forgejo-123-1-postgres",
                     "CLEANUP_CALLS": str(calls),
                 },
