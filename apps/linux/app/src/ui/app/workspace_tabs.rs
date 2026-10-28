@@ -124,7 +124,7 @@ impl App {
         add_bulk_close_actions(&action_group, menu_target, move |message| {
             sender_for_bulk_close.input(message);
         });
-        tab_view.insert_action_group("tab", Some(&action_group));
+        tab_bar.insert_action_group("tab", Some(&action_group));
 
         let bulk_menu = bulk_close_menu_model();
         tab_view.set_menu_model(Some(&bulk_menu));

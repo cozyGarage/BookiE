@@ -50,6 +50,7 @@ mod tests {
     fn bulk_close_actions_dispatch_the_selected_page_id() {
         relm4::adw::init().unwrap();
         let view = adw::TabView::new();
+        let bar = adw::TabBar::builder().view(&view).build();
         let menu = bulk_close_menu_model();
         assert_eq!(menu.n_items(), 4);
         assert_eq!(
@@ -72,17 +73,20 @@ mod tests {
         add_bulk_close_actions(&group, target, move |message| {
             sender.send(message).unwrap();
         });
-        view.insert_action_group("tab", Some(&group));
+        bar.insert_action_group("tab", Some(&group));
+        let popover = gtk::PopoverMenu::from_model(Some(&menu));
+        popover.set_parent(&bar);
 
-        assert!(view.activate_action("tab.close-others", None).is_ok());
+        assert!(popover.activate_action("tab.close-others", None).is_ok());
         assert!(matches!(
             receiver.recv().unwrap(),
             AppMsg::CloseOtherWorkspaceTabs(target_id) if target_id == id
         ));
-        assert!(view.activate_action("tab.close-right", None).is_ok());
+        assert!(popover.activate_action("tab.close-right", None).is_ok());
         assert!(matches!(
             receiver.recv().unwrap(),
             AppMsg::CloseWorkspaceTabsToRight(target_id) if target_id == id
         ));
+        popover.unparent();
     }
 }
