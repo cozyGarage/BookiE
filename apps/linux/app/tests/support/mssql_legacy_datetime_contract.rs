@@ -1,5 +1,6 @@
 use super::parse_input_for_driver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
+use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mssql_server::MssqlServer;
 
