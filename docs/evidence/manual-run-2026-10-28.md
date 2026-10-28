@@ -45,6 +45,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Input method | fcitx5 5.1.23 was running with only `keyboard-us` configured; its built-in Unicode addon gave a real preedit and candidate popup. Cell editor and editor tabs accepted commits; closing was refused during a preedit; the first commit after a restore landed in a hidden tab (#1943). No language engine (Pinyin, Anthy, Unikey) is installed, so composition of real language text was not run |
 | CSV import, second pass (installed package) | A duplicate-key row stopped and rolled back the import with a row count; duplicate headers shown as `a` and `a [1]`; a headerless file refuses a saved mapping; Table from CSV inferred editable types and created the table; import refused on a read-only connection |
 | ENUM and SET pickers (installed package) | MySQL 8.4 ENUM and SET pickers write declared order, the empty member and the empty set correctly; PostgreSQL enum labels come in declared order; the SET popover clips its labels and Apply (#1945) |
+| SQLite Structure and tab menu (installed package) | Add Foreign Key is greyed with the right reason on an existing table; a disabled Comment row is shown on SQLite (#1946); the tab context menu entries are greyed and inert (#1947) |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -64,6 +65,8 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1938](https://github.com/cozyGarage/BookiE/issues/1938): `bookie --version` starts the app instead of printing the version. A first attempt to read the version this way started the app against the real profile for under a second; no real file was modified.
 - [#1943](https://github.com/cozyGarage/BookiE/issues/1943): the first IME commit after restoring a multi-tab workspace landed in a background tab (observed once).
 - [#1945](https://github.com/cozyGarage/BookiE/issues/1945): the SET picker popover clips its labels and Apply (regression of #657).
+- [#1946](https://github.com/cozyGarage/BookiE/issues/1946): SQLite Structure shows a disabled Comment row.
+- [#1947](https://github.com/cozyGarage/BookiE/issues/1947): the tab context menu entries are greyed out and do nothing.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
