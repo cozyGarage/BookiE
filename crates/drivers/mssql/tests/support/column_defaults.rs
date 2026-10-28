@@ -4,6 +4,9 @@ use super::{connect, start_mssql};
 use tablepro_core::Value;
 use tablepro_core::sql_ddl::{DraftColumn, diff_to_ops, materialize_ops};
 
+#[path = "masked_column_alter.rs"]
+mod masked_column_alter;
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_column_with_a_default_changes_type_and_drops() {

@@ -61,12 +61,12 @@ fn a_mssql_nullability_change_keeps_the_column_collation() {
 
     let statements = build_alter_column("mssql", None, "people", &column).unwrap();
 
-    assert_eq!(
-        statements,
-        vec![
-            "ALTER TABLE [people] ALTER COLUMN [label] nvarchar(40) COLLATE Latin1_General_100_BIN2 NOT NULL"
-                .to_string()
-        ]
+    assert_eq!(statements.len(), 1);
+    assert!(
+        statements[0].contains(
+            "ALTER TABLE [people] ALTER COLUMN [label] nvarchar(40) COLLATE Latin1_General_100_BIN2 NOT NULL;"
+        ),
+        "{statements:#?}"
     );
     column.collation = Some("bad;DROP TABLE people".into());
     assert!(matches!(

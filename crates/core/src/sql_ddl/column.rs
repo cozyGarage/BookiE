@@ -2,8 +2,8 @@ use crate::sql_dialect::quote_ident;
 
 use super::types::{
     BuildDdlError, DraftColumn, collation_clause, column_comment_statement, comment_changed,
-    mssql_drop_default_constraint, qualified_table, render_column_definition, sql_literal, validate_column_name,
-    validate_safe_type, validate_table, validated_default,
+    mssql_alter_column_keeping_mask, mssql_drop_default_constraint, qualified_table, render_column_definition,
+    sql_literal, validate_column_name, validate_safe_type, validate_table, validated_default,
 };
 
 /// Add a column. Returns more than one statement on a dialect that
@@ -302,9 +302,16 @@ fn alter_column_mssql(
         let collation = collation_clause(driver_id, column)?
             .map(|clause| format!(" {clause}"))
             .unwrap_or_default();
-        stmts.push(format!(
+        let alter = format!(
             "ALTER TABLE {} ALTER COLUMN {} {}{} {}",
             qualified, name, column.data_type, collation, nullability
+        );
+        stmts.push(mssql_alter_column_keeping_mask(
+            driver_id,
+            schema,
+            table,
+            &column.name,
+            &alter,
         ));
     }
     if rebinds_default && let Some(default) = validated_default(column.default_value.as_deref())? {

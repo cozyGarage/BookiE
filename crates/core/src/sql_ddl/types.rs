@@ -475,6 +475,29 @@ EXEC('ALTER TABLE {table_literal} DROP CONSTRAINT [' + @default_constraint + ']'
     )
 }
 
+pub(crate) fn mssql_alter_column_keeping_mask(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    column: &str,
+    alter: &str,
+) -> String {
+    let qualified = qualified_table(driver_id, schema, table);
+    let table_literal = sql_literal(&qualified);
+    let column_literal = sql_literal(column.trim());
+    let quoted_column = sql_literal(&quote_ident(driver_id, column.trim()));
+    format!(
+        "DECLARE @bookie_mask nvarchar(4000) = (\
+SELECT masking_function FROM sys.masked_columns \
+WHERE object_id = OBJECT_ID('{table_literal}') AND name = '{column_literal}'); \
+{alter}; \
+IF @bookie_mask IS NOT NULL BEGIN \
+DECLARE @bookie_restore nvarchar(max) = N'ALTER TABLE {table_literal} ALTER COLUMN {quoted_column} ADD MASKED WITH (FUNCTION = ''' + REPLACE(@bookie_mask, '''', '''''') + ''')'; \
+EXEC(@bookie_restore); \
+END"
+    )
+}
+
 /// Statement that writes or clears a column comment on a dialect that
 /// keeps it outside the column definition.
 pub(crate) fn column_comment_statement(
