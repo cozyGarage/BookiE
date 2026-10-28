@@ -424,6 +424,25 @@ fn sample_entry() -> Entry {
 }
 
 #[test]
+fn exported_sql_keeps_untrusted_text_inside_comments() {
+    let mut entry = sample_entry();
+    entry.connection_name = "prod\nDROP TABLE users;\r\n-- ".into();
+    entry.driver_id = "sqlite\r\u{2028}DROP TABLE a;".into();
+    entry.error = Some("boom\rDROP TABLE b;\nDROP TABLE c;\u{85}DROP TABLE d;".into());
+
+    let exported = sql_export_entry(&entry);
+
+    for line in exported.split(['\n', '\r', '\u{85}', '\u{2028}', '\u{2029}']) {
+        assert!(
+            line.is_empty() || line.starts_with("-- ") || line == "SELECT 1;",
+            "a line escaped its comment: {line:?}"
+        );
+    }
+    assert!(exported.contains("prod"));
+    assert!(exported.ends_with("SELECT 1;\n\n"));
+}
+
+#[test]
 fn outcome_summary_reports_cancelled_before_checking_success() {
     let mut entry = sample_entry();
     entry.cancelled = true;

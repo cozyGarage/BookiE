@@ -14,6 +14,7 @@ REQUIRED_CODE_CHECKS = (
     "Ensure CI debian-testing GTK image",
     "Preflight and sandbox tier (no GTK app)",
     "Fast checks (GTK)",
+    "Driver TLS fixture (docker)",
     "flatpak-builder (default)",
     "resolve-ref",
     "Security (security-policy)",
