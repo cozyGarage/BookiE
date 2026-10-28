@@ -16,7 +16,8 @@ REQUIRED = {
     "duckdb",
 }
 SCHEDULED = "current-stable-clippy"
-MERGE_ONLY = {"gtk-safety", "integration", "b4-rollback", "driver-tls", "postgres-release", "duckdb"}
+MERGE_ONLY = {"gtk-safety", "integration", "b4-rollback", "postgres-release", "duckdb"}
+PULL_REQUEST_ONLY = {"driver-tls"}
 
 
 def assess(results, event):
@@ -27,13 +28,16 @@ def assess(results, event):
         status = results.get(name, {}).get("result", "missing")
         allowed_skip = name == SCHEDULED and event in {"push", "pull_request"} and status == "skipped"
         deferred = name in MERGE_ONLY and event in {"push", "pull_request"} and status == "skipped"
-        accepted = name in expected and (status == "success" or allowed_skip or deferred)
+        push_skip = name in PULL_REQUEST_ONLY and event == "push" and status == "skipped"
+        accepted = name in expected and (status == "success" or allowed_skip or deferred or push_skip)
         if not accepted:
             failures.append(name)
         if allowed_skip:
             detail = "scheduled/manual only"
         elif deferred:
             detail = "Forgejo merge gate; GitHub schedule/manual only"
+        elif push_skip:
+            detail = "pull request tier; not run on branch pushes"
         else:
             detail = status
         rows.append(f"| {name} | {detail} | {'accepted' if accepted else 'FAILED'} |")
