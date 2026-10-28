@@ -48,6 +48,9 @@ The run was done in two sessions on the same build, one for the first six rows a
 | SQLite Structure and tab menu (installed package) | Add Foreign Key is greyed with the right reason on an existing table; a disabled Comment row is shown on SQLite (#1946); the tab context menu entries are greyed and inert (#1947) |
 | Pending-edit teardown and MySQL comments (installed package) | Disconnect, Discard and disconnect, Ctrl+Q and window close all prompt with a pending cell edit and Cancel keeps the draft; MySQL column comments edit and clear correctly |
 | Editor, second pass (installed package) | Lone BEGIN refusal, empty Explain message, close with an open transaction and Roll Back and Close, dimmed result while a query runs, tick and cross gutter marks |
+| Editor files and saved queries (installed package) | A symlinked file saves through to its target; an oversized file is refused; Escape closes Explain; Ctrl+Shift+D is claimed by GTK's inspector prompt (#1948) |
+| Connection bundles (installed package) | Plain export carries no secrets; passphrase export is encrypted; wrong passphrase and tampered file give one message; import plan lists dispositions and honours unticking; an empty profile has no import entry (#1949) |
+| Connection list (installed package) | 3 s connect timeout fails in 3 s with a clear message; Duplicate gives a distinct name and an empty-password form; Group and tags and the colour swatch work |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -69,6 +72,8 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1945](https://github.com/cozyGarage/BookiE/issues/1945): the SET picker popover clips its labels and Apply (regression of #657).
 - [#1946](https://github.com/cozyGarage/BookiE/issues/1946): SQLite Structure shows a disabled Comment row.
 - [#1947](https://github.com/cozyGarage/BookiE/issues/1947): the tab context menu entries are greyed out and do nothing.
+- [#1948](https://github.com/cozyGarage/BookiE/issues/1948): Ctrl+Shift+D opens the GTK Inspector prompt instead of the saved-queries list.
+- [#1949](https://github.com/cozyGarage/BookiE/issues/1949): a profile with no saved connections has no way to import a bundle.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
