@@ -51,6 +51,17 @@ class CiJobCleanupTests(unittest.TestCase):
                         step_headers = re.findall(r"(?m)^      - (?:name:|uses:|run:)", block)
                         self.assertEqual(step_headers[-1], "      - name:")
 
+    def test_checkout_uses_the_documented_disk_reserve(self):
+        for workflow in WORKFLOWS:
+            with self.subTest(workflow=workflow.name):
+                for name, block in runner_jobs(workflow).items():
+                    if "/usr/local/libexec/bookie-ci-cache checkout" in block:
+                        with self.subTest(job=name):
+                            self.assertIn(
+                                "shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}",
+                                block,
+                            )
+
     def test_finalizer_removes_job_files_and_keeps_shared_targets(self):
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"

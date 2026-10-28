@@ -30,7 +30,7 @@ jobs:
       RUSTC_WRAPPER: ""
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -78,7 +78,7 @@ jobs:
         driver: [postgres, mysql, sqlite, mongodb, redis, clickhouse]
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -146,7 +146,7 @@ jobs:
           - {label: app-services, package: tablepro-app-services, shard: 0/1}
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -202,7 +202,7 @@ jobs:
         run: [1, 2, 3]
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -247,7 +247,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -281,7 +281,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-values
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}

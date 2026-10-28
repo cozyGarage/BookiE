@@ -288,7 +288,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -332,7 +332,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -373,7 +373,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -479,7 +479,7 @@ jobs:
             mcp_port_slot: 10
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -541,7 +541,7 @@ jobs:
         shard: [1, 2, 3, 4, 5, 6]
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -601,7 +601,7 @@ jobs:
         driver: [postgres, mysql, mssql, clickhouse, redis, mongodb]
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -664,7 +664,7 @@ jobs:
             mcp_port_slot: 6
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -725,7 +725,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/consumers
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -782,7 +782,7 @@ jobs:
         shard: [1, 2, 3]
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -843,7 +843,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/duckdb
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -890,7 +890,7 @@ jobs:
       TMPDIR: /var/cache/ci/t
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -939,7 +939,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-dump
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -985,7 +985,7 @@ jobs:
       TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -1049,7 +1049,7 @@ jobs:
             mcp_port_slot: 9
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -1109,7 +1109,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
@@ -1157,7 +1157,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/keyring
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
