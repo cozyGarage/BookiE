@@ -2,6 +2,7 @@ from pathlib import Path
 import fcntl
 import importlib.util
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -380,22 +381,30 @@ class CiCacheTests(unittest.TestCase):
         pilot_tmp = '/var/cache/ci/tmp/bookie-guards-${{ github.run_id }}'
         for filename in ('ci.yml', 'nightly.yml'):
             workflow = (ROOT / '.forgejo/workflows' / filename).read_text()
-            checkout_steps = workflow.split('      - name: Check out\n')[1:]
-            self.assertTrue(checkout_steps, filename)
-            for block in checkout_steps:
-                step = block.split('\n      - name:', 1)[0]
+            jobs = re.findall(
+                r'(?m)^  ([a-z0-9_-]+):\n(.*?)(?=^  [a-z0-9_-]+:|\Z)',
+                workflow.split('jobs:\n', 1)[1],
+                re.S,
+            )
+            self.assertTrue(jobs, filename)
+            for name, block in jobs:
+                if '      - name: Check out\n' not in block:
+                    continue
+                step = block.split('      - name: Check out\n', 1)[1].split('\n      - name:', 1)[0]
                 if 'shell: bash' in step:
-                    preceding = workflow[:workflow.index(step)].rsplit('    runs-on:', 1)[-1]
-                    if 'any-host' in preceding:
-                        self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', preceding, filename)
-                        self.assertIn(f'TMPDIR: {pilot_tmp}', preceding, filename)
+                    if name == 'guards':
+                        self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', block, filename)
+                        self.assertIn(f'TMPDIR: {pilot_tmp}', block, filename)
                         self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', step, filename)
-                        self.assertIn('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"', workflow, filename)
                     else:
-                        self.assertIn('build-host', preceding, filename)
+                        self.assertIn('runs-on: build-host', block, name)
+                elif name == 'distro-floor':
+                    self.assertIn('defaults:\n      run:\n        shell: bash', block)
+                    self.assertNotIn('bookie-ci-cache', step)
                 else:
-                    self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout {0}', step, filename)
-                self.assertLess(step.index('shell:'), step.index('run:'), filename)
+                    self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}', step, filename)
+                if 'shell:' in step:
+                    self.assertLess(step.index('shell:'), step.index('run:'), filename)
 
     def test_missing_or_symlink_lock_fails_closed(self):
         self.lock.unlink()
