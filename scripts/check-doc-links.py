@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re
+import subprocess
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
@@ -141,13 +142,27 @@ def broken_links(root, files):
 def markdown_files(root):
     skipped = {"target", ".git", ".cargo", ".rustup", ".flatpak-builder", "node_modules", "evidence", "vendor"}
     generated = "apps/linux/packaging/out/"
-    files = [
-        p
-        for p in root.rglob("*.md")
-        if not skipped.intersection(p.relative_to(root).parts)
-        and not p.relative_to(root).as_posix().startswith(generated)
+    if (root / ".git").exists():
+        try:
+            result = subprocess.run(
+                ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
+            candidates = (root / path for path in result.stdout.decode().split("\0") if path)
+        except (OSError, subprocess.CalledProcessError):
+            candidates = root.rglob("*.md")
+    else:
+        candidates = root.rglob("*.md")
+    return [
+        path
+        for path in candidates
+        if path.suffix.lower() == ".md"
+        and path.is_file()
+        and not skipped.intersection(path.relative_to(root).parts)
+        and not path.relative_to(root).as_posix().startswith(generated)
     ]
-    return files
 
 
 def main():
