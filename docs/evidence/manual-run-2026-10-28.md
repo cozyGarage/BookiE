@@ -42,6 +42,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Backup progress and Cancel | A 1.3 GB database kept `pg_dump` running long enough to see the progress window (spinner and Cancel only); Cancel stopped it and left no file |
 | Arch package, unpacked | `scripts/build-arch-rc.sh` (release profile, `--nodeps`) built `bookie-0.2.0-1-x86_64.pkg.tar.zst` (SHA-256 `1a9aebe7…169f8`, 35 MB) from `893e83a1f`. `desktop-file-validate` and `appstreamcli validate --no-net` passed, the GSettings schema compiled, and the unpacked binary started, loaded its schema, connected to SQLite and showed the packaged icon in About. It was not installed with `pacman` |
 | Installed Arch package | The package rebuilt from `cbe0a5816` (`bookie-0.2.0-1-x86_64.pkg.tar.zst`, SHA-256 `909ffbc0…efe2`) was installed with `pacman -U` and `/usr/bin/bookie` was driven with a private profile: it started, connected to SQLite, and About showed the installed icon and version 0.2.0. The desktop entry resolved to `BookiE`, `bookie %U`, icon `com.tablepro.linux`, and the launcher listed it under Apps |
+| Input method | fcitx5 5.1.23 was running with only `keyboard-us` configured; its built-in Unicode addon gave a real preedit and candidate popup. Cell editor and editor tabs accepted commits; closing was refused during a preedit; the first commit after a restore landed in a hidden tab (#1943). No language engine (Pinyin, Anthy, Unikey) is installed, so composition of real language text was not run |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -59,12 +60,13 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1925](https://github.com/cozyGarage/BookiE/issues/1925): MySQL `SHOW STATUS LIKE …` is held for approval as an unknown write.
 - [#1932](https://github.com/cozyGarage/BookiE/issues/1932): the backup progress window shows only a spinner and Cancel, with no text.
 - [#1938](https://github.com/cozyGarage/BookiE/issues/1938): `bookie --version` starts the app instead of printing the version. A first attempt to read the version this way started the app against the real profile for under a second; no real file was modified.
+- [#1943](https://github.com/cozyGarage/BookiE/issues/1943): the first IME commit after restoring a multi-tab workspace landed in a background tab (observed once).
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
 ## Not run
 
-Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; ProxyJump and saved-password cases for system OpenSSH; the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, input-method editing, and the other distribution formats: no `.deb`, Flatpak or AppImage was built. The Arch package was installed with `pacman -U` by the user. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
+Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; ProxyJump and saved-password cases for system OpenSSH; the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, composition with a language input method (only fcitx5's Unicode addon was available), and the other distribution formats: no `.deb`, Flatpak or AppImage was built. The Arch package was installed with `pacman -U` by the user. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
 
 ## Cleanup
 
