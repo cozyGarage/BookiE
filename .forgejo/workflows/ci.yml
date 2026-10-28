@@ -562,6 +562,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
     steps:

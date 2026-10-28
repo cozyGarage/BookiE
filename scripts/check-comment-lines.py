@@ -9,7 +9,10 @@ COMMENT = re.compile(r"\s*//")
 
 
 def source_files(root):
+    generated_arch_src = root / "apps/linux/packaging/arch/src"
     for crate in sorted(c for d in ("crates", "apps", "tests") for c in (root / d).glob("**/src")):
+        if crate == generated_arch_src or generated_arch_src in crate.parents:
+            continue
         yield from sorted(crate.rglob("*.rs"))
 
 
