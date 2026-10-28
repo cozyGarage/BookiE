@@ -7,7 +7,7 @@ use std::process::Command;
 fn information_flags_exit_without_display_or_profile_access() {
     for (flag, expected) in [
         ("--version", format!("BookiE {}", env!("CARGO_PKG_VERSION"))),
-        ("--help", "Usage: bookie [--help] [--version]".to_owned()),
+        ("--help", "Usage: bookie [--help] [--version] [FILE|URI...]".to_owned()),
     ] {
         let home = tempfile::tempdir().unwrap();
         let output = Command::new(
