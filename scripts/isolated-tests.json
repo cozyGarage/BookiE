@@ -1156,6 +1156,11 @@
       "tablepro-app",
       "--lib",
       "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
     ]
   ],
   "keyring": [
