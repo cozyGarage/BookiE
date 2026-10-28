@@ -60,5 +60,15 @@
     "additional_direct_node_checks": 2
   },
   "publication_base_commit": "3d236be3d60cdb451efae9f914222c660df28c20",
-  "production_diff_since_source_empty": true
+  "production_diff_since_source_empty": true,
+  "source_commits": {
+    "crates/core/src/sql_dialect/updates.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "crates/app-services/src/workspace_state.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "crates/app-services/src/workspace_disk.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "crates/policy/src/guard/bulk.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "crates/policy/src/mask.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "apps/linux/app/src/services/database_service.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "apps/linux/app/src/services/connection_monitor.rs": "644c74dd34afb35f01c62254b458c12304890573",
+    "scripts/validate-evidence.py": "644c74dd34afb35f01c62254b458c12304890573"
+  }
 }

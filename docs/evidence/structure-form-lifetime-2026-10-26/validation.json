@@ -124,5 +124,17 @@
       "repeat": 3,
       "result": "passed"
     }
-  ]
+  ],
+  "source_commits": {
+    "apps/linux/app/src/ui/structure_tab_dialogs.rs": "e74729eb02fa3fc9af36d1b12026c03847f8b456",
+    "apps/linux/app/src/ui/structure_tab_dialogs/lifetime_tests.rs": "7325a5a0b77e3aa52b55d83fe56e7c7498eb476f",
+    "scripts/isolated-tests.json": "f232e418bb7eda86a40eac1c9e46c707c99db6ae"
+  },
+  "provenance_review": {
+    "status": "run_snapshot_unrecorded",
+    "review_source": "d7f9273be1002766f621f876630369231a432e50",
+    "file_mappings": "Matched recorded file hashes to Git blobs reachable from BookiE GitHub remote refs; these mappings do not establish the complete executed run tree.",
+    "unmapped_source_paths": [],
+    "limitation": "The original record has no exact source_commit/base_commit for the executed run. Existing result claims are retained as historical reports, not current-source acceptance."
+  }
 }

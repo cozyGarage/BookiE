@@ -15,5 +15,17 @@
     "workspace_connection_removal_confirms_once_and_preserves_the_database": "passed"
   },
   "installed_binary_sha256": "355904b9a2e9de4273ec29ddd62117d44a276c7fe346951e9a7ce12233d050b6",
-  "merge_order": "1754 first; refresh and verify both regression sets"
+  "merge_order": "1754 first; refresh and verify both regression sets",
+  "source_commits": {
+    "crates/app-services/src/workspace_disk.rs": "7ae3d82f49ec40c3d8d3daf1845ca0058e4e7029",
+    "crates/app-services/src/workspace_state.rs": "cdc74d4123a972660561568285e52eee12e0c35b",
+    "crates/app-services/src/workspace_state/tests.rs": "cdc74d4123a972660561568285e52eee12e0c35b"
+  },
+  "provenance_review": {
+    "status": "run_snapshot_unrecorded",
+    "review_source": "d7f9273be1002766f621f876630369231a432e50",
+    "file_mappings": "Matched recorded file hashes to Git blobs reachable from BookiE GitHub remote refs; these mappings do not establish the complete executed run tree.",
+    "unmapped_source_paths": [],
+    "limitation": "The original record has no exact source_commit/base_commit for the executed run. Existing result claims are retained as historical reports, not current-source acceptance."
+  }
 }

@@ -1,0 +1,68 @@
+[
+  {
+    "packet": "docs/evidence/colour-chooser-lifetime-2026-10-27/validation.json",
+    "mapped_files": 4,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/connection-error-guidance-2026-10-27/validation.json",
+    "mapped_files": 3,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/deleted-connection-drafts-2026-10-27/validation.json",
+    "mapped_files": 2,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/edit-popover-lifetime-2026-10-27/validation.json",
+    "mapped_files": 4,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/history-row-lifetime-2026-10-27/validation.json",
+    "mapped_files": 3,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/import-setup-lifetime-2026-10-26/validation.json",
+    "mapped_files": 3,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/retired-draft-cleanup-2026-10-27/validation.json",
+    "mapped_files": 4,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/structure-form-lifetime-2026-10-26/validation.json",
+    "mapped_files": 3,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/structure-tab-lifetime-2026-10-26/validation.json",
+    "mapped_files": 3,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/unreadable-draft-preservation-2026-10-27/validation.json",
+    "mapped_files": 3,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  },
+  {
+    "packet": "docs/evidence/verbatim-value-view-2026-10-27/validation.json",
+    "mapped_files": 5,
+    "unmapped_files": [],
+    "run_snapshot": "unrecorded"
+  }
+]

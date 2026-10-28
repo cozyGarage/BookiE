@@ -30,7 +30,7 @@ The diagnostic source was removed from active test targets after execution. To r
 
 After removing the active probes, `bash scripts/preflight.sh` passed: 2,225 non-GTK unit tests, 292 sandbox tests and one Redis cancellation test. Script harness, source guards, formatting and non-GTK Clippy passed. Production Rust matched the pinned source. Documentation and audit artifacts were being edited during this run; this is not a clean-tree acceptance claim for a new release commit. Full preflight output is not archived in this packet; counts and process exit were observed from the live invocation. Final document checks are recorded in the manifest.
 
-The [default evidence scan](evidence-default.log) succeeded but reported 87 review warnings and inspected only `manifest.json` files. The [explicit strict probe](evidence-explicit.log) found missing source identity in 11 schema-v1 `validation.json` packets. It also reports an unrelated array reached by the broad glob; that array is not counted as a supported evidence packet. Discovery is tracked by #1824.
+The [default evidence scan](evidence-default.log) succeeded but reported 87 review warnings and inspected only `manifest.json` files. The [explicit strict probe](evidence-explicit.log) found missing source identity in 11 unversioned legacy `validation.json` source-provenance packets. It also reports an unrelated array reached by the broad glob; that array is not counted as a supported evidence packet. Discovery is tracked by #1824.
 
 A temporary filesystem probe for #1823 reported `exists=False` and `is_symlink=True` for a dangling policy symlink. The policy loader's interpretation and downstream availability flag were traced in source. No installed GUI/MCP run of that condition was performed.
 

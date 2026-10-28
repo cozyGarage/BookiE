@@ -40,10 +40,9 @@ def test_selector(command):
 
 
 def is_test_layer_report(manifest):
-    return all(
-        key in manifest
-        for key in ("commit", "working_tree", "tracked_diff_sha256", "status", "layers")
-    )
+    if "layers" in manifest:
+        return any(key in manifest for key in ("commit", "working_tree", "tracked_diff_sha256"))
+    return "working_tree" in manifest and "tracked_diff_sha256" in manifest
 
 
 def validate_test_layer_report(path, report):
@@ -232,6 +231,27 @@ def validate_manifest(path, strict=False):
     return errors, warnings
 
 
+def declared_evidence_record(manifest, named_validation=False):
+    if not isinstance(manifest, dict):
+        return False
+    if "schema_version" not in manifest:
+        return "source_sha256" in manifest
+    if manifest.get("schema_version") != 1:
+        return False
+    fields = ("source_commit", "base_commit", "source_sha256", "source_commits", "source_file")
+    return named_validation or is_test_layer_report(manifest) or any(key in manifest for key in fields)
+
+
+def discovered_manifest(path):
+    if path.name == "manifest.json":
+        return True
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return path.name == "validation.json"
+    return declared_evidence_record(manifest, named_validation=path.name == "validation.json")
+
+
 def manifests(paths):
     if paths:
         resolved = []
@@ -241,7 +261,7 @@ def manifests(paths):
                 path = ROOT / path
             resolved.append(path)
         return resolved
-    return sorted(EVIDENCE.rglob("manifest.json"))
+    return sorted(path for path in EVIDENCE.rglob("*.json") if discovered_manifest(path))
 
 
 def main():
