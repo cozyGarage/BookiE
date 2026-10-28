@@ -84,6 +84,26 @@ The run was done in two sessions on the same build, one for the first six rows a
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
+## Coverage
+
+Counted from the four checklists at the head of this run. "With a 2026-10-28 result" means the item carries a note from this run, whether it passed, failed or was inconclusive. "Ticked" means the item was fully verified and is ticked.
+
+| Checklist | Items | Ticked | With a 2026-10-28 result | Without one |
+|---|---|---|---|---|
+| Catalog, sidebar and application shell | 38 | 6 | 16 | 22 |
+| Connections and SSH | 44 | 13 | 25 | 19 |
+| SQL editor and sessions | 62 | 27 | 30 | 32 |
+| Grid, filters and data transfer | 76 | 6 | 26 | 50 |
+| **All four** | 220 | 52 | 97 | 123 |
+
+Why the rest are open:
+
+- Visual audits that need a measured or manual pass (contrast ratios, keyboard-only walks, large fonts, wide and narrow widths, light and dark side by side).
+- Per-engine variants of checks already run on another engine (MySQL, SQL Server, ClickHouse, MongoDB, Redis).
+- Fixtures not built: a Session query that outlives its cancel, a language input method, DuckDB, a MariaDB server, a Kerberos realm.
+- Blocked by a filed defect: the tab context menu ([#1947](https://github.com/cozyGarage/BookiE/issues/1947)).
+- Package formats other than the installed Arch package: `.deb`, Flatpak and AppImage were not built.
+
 ## Not run
 
 Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; ProxyJump and saved-password cases for system OpenSSH; the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, composition with a language input method (only fcitx5's Unicode addon was available), and the other distribution formats: no `.deb`, Flatpak or AppImage was built. The Arch package was installed with `pacman -U` by the user. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
