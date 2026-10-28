@@ -730,7 +730,7 @@ fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Resul
                 ));
             };
             let raw_value = take_placeholder_value(right, params, index)?;
-            if matches!(&raw_value, Value::Undecodable(kind) if kind == "missing BSON field") {
+            if raw_value.is_missing_field() {
                 return Ok(doc! { field: { "$exists": false } });
             }
             let value = value_to_bson(&raw_value)?;

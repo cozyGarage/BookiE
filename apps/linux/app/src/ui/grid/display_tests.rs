@@ -82,6 +82,20 @@ fn an_undecodable_cell_is_shown_distinctly_from_null_and_is_not_editable() {
 }
 
 #[test]
+fn a_field_a_document_lacks_is_shown_as_missing_and_not_as_a_decoding_failure() {
+    let missing = Value::Undecodable(Value::MISSING_FIELD.into());
+    let shown = value_to_display_text(&missing);
+    assert_eq!(shown, "(missing)");
+    assert!(!shown.contains("undecodable"));
+    assert_ne!(shown, value_to_display_text(&Value::Null));
+    assert_ne!(
+        cell_view(&missing, &metadata("mixed")).text_for_bind(true),
+        editable_null_sentinel()
+    );
+    assert!(!value_is_inline_editable(&missing));
+}
+
+#[test]
 fn bind_text_for_an_undecodable_cell_in_an_editable_column_stays_display_text() {
     let value = Value::Undecodable("NUMERIC".into());
     let view = cell_view(&value, &metadata("NUMERIC"));

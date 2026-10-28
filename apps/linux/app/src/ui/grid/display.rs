@@ -115,6 +115,7 @@ fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
         Value::Uuid(u) => u.to_string(),
         Value::Json(j) => cap(&j.to_string()),
         Value::JsonText(j) => cap(j),
+        Value::Undecodable(_) if value.is_missing_field() => crate::tr!("(missing)"),
         Value::Undecodable(type_name) => format!("<undecodable {type_name}>"),
     }
 }

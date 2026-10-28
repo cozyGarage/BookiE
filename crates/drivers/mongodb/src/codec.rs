@@ -118,7 +118,7 @@ pub(super) fn document_to_row(doc: &Document, columns: &[ColumnInfo]) -> Vec<Val
         .map(|c| match doc.get(&c.name) {
             Some(b) if c.data_type == "mixed" => Value::Json(Box::new(b.clone().into_canonical_extjson())),
             Some(b) => bson_to_value(b),
-            None => Value::Undecodable("missing BSON field".into()),
+            None => Value::Undecodable(Value::MISSING_FIELD.into()),
         })
         .collect()
 }

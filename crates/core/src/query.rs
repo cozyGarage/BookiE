@@ -107,6 +107,14 @@ pub enum Value {
     Undecodable(String),
 }
 
+impl Value {
+    pub const MISSING_FIELD: &'static str = "missing BSON field";
+
+    pub fn is_missing_field(&self) -> bool {
+        matches!(self, Self::Undecodable(kind) if kind == Self::MISSING_FIELD)
+    }
+}
+
 /// Soft upper bound on rows materialized by an arbitrary SQL `query` call.
 /// When a result hits this limit, drivers set `QueryResult::truncated = true`.
 /// Browse pagination via `fetch_rows` uses its caller-supplied `limit` and

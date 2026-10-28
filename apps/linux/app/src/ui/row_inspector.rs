@@ -29,6 +29,7 @@ fn inspector_field(column: &ColumnInfo, value: Option<&Value>) -> InspectorField
         text: match value {
             None => crate::tr!("Not fetched"),
             Some(Value::Undecodable(kind)) if kind == "not fetched" => crate::tr!("Not fetched"),
+            Some(value) if value.is_missing_field() => crate::tr!("Absent from this document"),
             Some(value) => value_to_display_text(value),
         },
         is_null: matches!(value, Some(Value::Null)),
@@ -199,6 +200,14 @@ mod tests {
             enum_type: None,
             domain_type: None,
         }
+    }
+
+    #[test]
+    fn the_inspector_says_a_field_the_document_lacks_is_absent() {
+        let columns = [column("nested", "mixed")];
+        let fields = inspector_fields(&columns, &[Value::Undecodable(Value::MISSING_FIELD.into())]);
+        assert_eq!(fields[0].text, "Absent from this document");
+        assert!(!fields[0].is_null);
     }
 
     #[test]
