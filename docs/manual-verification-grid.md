@@ -76,10 +76,10 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Filter by This Value
 
-- [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; no installed retest of the expanded editor is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
-- [ ] On a NULL cell it filters with IS NULL.
-- [ ] Doing it again on another value of the same column replaces that rule.
-- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run.
+- [x] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; no installed retest of the expanded editor is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)). **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** on `customers`, Filter by This Value on `Ada` left one row, "Rows 1 – 1 of 1", a `Filter 1` badge, and a rule `name equals Ada` in the rule editor (the strip shows Saved filters, WHERE and rule editor as separate rows, which is the layout [#1864](https://github.com/cozyGarage/BookiE/issues/1864) reviews).
+- [x] On a NULL cell it filters with IS NULL. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** the NULL `note` cell produced the rule `note is empty` and returned only that row; an empty-text cell produced `note equals` with an empty value and returned only that row.
+- [ ] Doing it again on another value of the same column replaces that rule. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** not run: the filtered view held a single row.
+- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** a SQLite BLOB cell showed "Values of this type can't be used as a filter" on choosing the item; JSON was not run.
 - [ ] The item is absent from SQL editor result grids.
 
 ## Named browse filters
@@ -103,10 +103,10 @@ In browse and SQL result grids, text, JSON and binary cells over 8 KiB show a ty
 
 - [ ] A value below the threshold displays in full and remains editable where that type supports grid edits.
 - [ ] Values over the threshold show a prefix and `… (N bytes total)`; SQL result cells and binary/unsupported browse values do not offer inline editing. Editable browse text opens with the full value.
-- [ ] View Value shows up to 1 MiB of rendered text or JSON and indicates when longer content is truncated.
-- [ ] A long unbroken value wraps without display-only hyphens; the GTK widget regression covers this rendering property ([#791](https://github.com/cozyGarage/BookiE/pull/791)); no installed retest is recorded here.
-- [ ] Copy Value copies the complete text or JSON rather than the displayed preview.
-- [ ] Repeat with a binary value over the threshold; the preview reports the original byte count and View Value shows at most the first 16 KiB of source bytes as hex with the total byte count.
+- [ ] View Value shows up to 1 MiB of rendered text or JSON and indicates when longer content is truncated. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs` table (a 20,000-character text and a 20,480-byte BLOB):** for the 20,000-character text cell, View Value showed a wrapped monospace view with a Copy value button; the 1 MiB truncation notice was not exercised.
+- [ ] A long unbroken value wraps without display-only hyphens; the GTK widget regression covers this rendering property ([#791](https://github.com/cozyGarage/BookiE/pull/791)); no installed retest is recorded here. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs` table (a 20,000-character text and a 20,480-byte BLOB):** the 20,000-character run of `a` in View Value wrapped at the dialog width with no hyphens.
+- [x] Copy Value copies the complete text or JSON rather than the displayed preview. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs` table (a 20,000-character text and a 20,480-byte BLOB):** Copy value on the 20,000-character text cell put 20,000 characters (20,001 bytes with the newline `wl-paste` adds) on the clipboard, not the shortened preview.
+- [x] Repeat with a binary value over the threshold; the preview reports the original byte count and View Value shows at most the first 16 KiB of source bytes as hex with the total byte count. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite `blobs` table (a 20,000-character text and a 20,480-byte BLOB):** the BLOB cell showed `00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f… (2…` in the grid; View Value showed a hex dump with an ASCII column and ended at offset `0x3ff0` with "Showing the first 16384 of 20480 bytes."
 
 Binary Copy Value currently copies only the byte-count placeholder; full binary copying is tracked in [#1587](https://github.com/cozyGarage/BookiE/issues/1587).
 
