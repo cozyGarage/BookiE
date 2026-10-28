@@ -126,6 +126,10 @@ pub fn build_optimistic_keyed_update(
     let mut params = Vec::with_capacity(edits.len() * 3 + pk_values.len());
     for (col_idx, _, new_value) in edits {
         let name = quote_ident(driver_id, &columns[*col_idx].name);
+        if is_mysql_empty_text(driver_id, new_value) {
+            assignments.push(format!("{name} = SPACE(0)"));
+            continue;
+        }
         let placeholder = placeholder_for(driver_id, params.len());
         let value_sql = if driver_id == "postgres" {
             postgres_text_cast_type(&columns[*col_idx], new_value)
@@ -176,6 +180,10 @@ fn is_geometric(data_type: &str) -> bool {
     )
 }
 
+fn is_mysql_empty_text(driver_id: &str, value: &Value) -> bool {
+    driver_id == "mysql" && matches!(value, Value::Text(text) if text.is_empty())
+}
+
 fn widened_single_precision(driver_id: &str, column: &crate::ColumnInfo, value: &Value) -> Value {
     let data_type = column.data_type.trim().to_ascii_lowercase();
     let single = match driver_id {
@@ -196,6 +204,11 @@ fn optimistic_predicate(
     old_value: &Value,
     params: &mut Vec<Value>,
 ) -> Result<String, BuildSqlError> {
+    if is_mysql_empty_text(driver_id, old_value) {
+        return Ok(format!(
+            "CONVERT({name} USING utf8mb4) COLLATE utf8mb4_bin <=> SPACE(0)"
+        ));
+    }
     let placeholder = placeholder_for(driver_id, params.len());
     let old_value = &widened_single_precision(driver_id, column, old_value);
     let predicate = match driver_id {
@@ -624,5 +637,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(params.last(), Some(&Value::Float(0.1)));
+    }
+
+    #[test]
+    fn mysql_empty_text_is_written_and_compared_as_a_server_expression() {
+        let columns = [column("id", true), column("note", false)];
+        let (sql, params) = build_optimistic_keyed_update(
+            "mysql",
+            None,
+            "records",
+            &columns,
+            &[(1, Value::Text(String::new()), Value::Text(String::new()))],
+            &[Value::Int(7)],
+        )
+        .unwrap();
+        assert_eq!(
+            sql,
+            "UPDATE `records` SET `note` = SPACE(0) WHERE `id` = ? AND CONVERT(`note` USING utf8mb4) COLLATE utf8mb4_bin <=> SPACE(0)"
+        );
+        assert_eq!(params, vec![Value::Int(7)]);
     }
 }
