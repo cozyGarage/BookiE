@@ -73,7 +73,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Closing a window during a save
 
-- [ ] Start a structure save that fails on the server (for example, add a NOT NULL column without a default to a table that has rows), then close the window while it runs. The "Saving in progress" dialog closes when the save ends, and only the unsaved-changes prompt remains.
+- [ ] Start a structure save that fails on the server (for example, add a NOT NULL column without a default to a table that has rows), then close the window while it runs. The "Saving in progress" dialog closes when the save ends, and only the unsaved-changes prompt remains. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** adding a NOT NULL `text` column with no default to `shop.customers` (50 rows) and pressing Save gave a "Save failed" dialog: "Save failed at statement 1: Query failed (SQLSTATE 23502): column \"column_1\" of relation \"customers\" contains null values. The rollback request succeeded; session state and other non-transactional side effects may remain." The save finished too fast to close the window while it ran, so the "Saving in progress" dialog was not observed.
 
 ## Exact SQL completion
 
