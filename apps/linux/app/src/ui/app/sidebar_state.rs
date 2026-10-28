@@ -78,6 +78,7 @@ impl App {
             guard.push_back(row_for(
                 node,
                 &self.sidebar_collapsed.borrow(),
+                !self.table_search.text().trim().is_empty(),
                 schema_filter_enabled,
                 source.clone(),
             ));
@@ -94,6 +95,20 @@ impl App {
         self.sidebar_factory.widget().invalidate_filter();
         self.schema_filter_button.set_visible(schema_filter_enabled);
         self.sync_sidebar_selection();
+    }
+
+    pub(super) fn sync_sidebar_expansion(&self) {
+        use crate::services::sidebar_tree::NodeKind;
+        let searching = !self.table_search.text().trim().is_empty();
+        let collapsed = self.sidebar_collapsed.borrow();
+        for (index, node) in self.sidebar_nodes.borrow().iter().enumerate() {
+            if matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)) {
+                self.sidebar_factory.send(
+                    index,
+                    SidebarRowMsg::SetCollapsed(!searching && collapsed.is_collapsed(&node.key)),
+                );
+            }
+        }
     }
 
     pub(super) fn toggle_sidebar_group(&mut self, key: &str) {
@@ -274,6 +289,7 @@ fn sidebar_group_label(node: &crate::services::sidebar_tree::TreeNode) -> String
 fn row_for(
     node: &crate::services::sidebar_tree::TreeNode,
     collapsed: &crate::services::sidebar_tree::CollapseState,
+    searching: bool,
     schema_filter_enabled: bool,
     column_source: Option<crate::ui::sidebar_columns::ColumnSource>,
 ) -> SidebarRowInit {
@@ -290,7 +306,7 @@ fn row_for(
             Some(GroupInit {
                 label: sidebar_group_label(node),
                 count: node.count,
-                collapsed: collapsed.is_collapsed(&node.key),
+                collapsed: !searching && collapsed.is_collapsed(&node.key),
                 actions: matches!(node.kind, NodeKind::Group(GroupKind::Tables)),
             }),
         ),

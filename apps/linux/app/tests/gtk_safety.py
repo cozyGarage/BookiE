@@ -1602,6 +1602,24 @@ def set_sidebar_group_state(group, child, showing):
     wait_for_node_showing(child, showing)
 
 
+def sidebar_search_reveals_groups_as_expanded(_database, _base):
+    wait_for_node_showing("safety_items", True)
+    set_sidebar_group_state("Tables", "safety_items", False)
+    group = wait_for_node(name="Tables", role=pyatspi.ROLE_LIST_ITEM)
+    assert not group.getState().contains(pyatspi.STATE_EXPANDED)
+    search = wait_for_node(name="Search tables", role=pyatspi.ROLE_ENTRY)
+    search.queryEditableText().setTextContents("safety")
+    wait_for_node_showing("safety_items", True)
+    group = wait_for_node(name="Tables", role=pyatspi.ROLE_LIST_ITEM)
+    assert group.getState().contains(pyatspi.STATE_EXPANDED), "search opened group but it remains collapsed"
+    search.queryEditableText().setTextContents("")
+    wait_for_node_showing("safety_items", False)
+    assert not group.getState().contains(pyatspi.STATE_EXPANDED)
+
+
+sidebar_search_reveals_groups_as_expanded.environment = "local"
+
+
 def sidebar_tables_group_collapses_and_expands(database, _base):
     wait_for_node_showing("safety_items", True)
     set_sidebar_group_state("Tables", "safety_items", False)
@@ -2822,6 +2840,7 @@ def main():
         oversized_restored_sql_is_not_loaded_and_remains_saved,
         switching_one_window_leaves_the_other_windows_edits,
         sidebar_tables_group_collapses_and_expands,
+        sidebar_search_reveals_groups_as_expanded,
         expanding_a_sidebar_table_loads_its_columns,
         restart_with_a_deleted_connection_opens_the_welcome_list,
         a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile,
