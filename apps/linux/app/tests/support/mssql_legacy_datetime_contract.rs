@@ -6,7 +6,12 @@ use testcontainers_modules::mssql_server::MssqlServer;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings() {
-    let container = MssqlServer::default().with_accept_eula().start().await.unwrap();
+    let container = MssqlServer::default()
+        .with_accept_eula()
+        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
     let connection = drivers_mssql::MssqlDriver
         .connect(ConnectOptions {
             host: container.get_host().await.unwrap().to_string(),
