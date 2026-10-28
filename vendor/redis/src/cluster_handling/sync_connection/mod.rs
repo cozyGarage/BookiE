@@ -88,6 +88,8 @@ use crate::cmd::{Cmd, cmd};
 use crate::connection::{Connection, ConnectionInfo, ConnectionLike, connect};
 use crate::errors::{ErrorKind, RedisError, RetryMethod};
 use crate::parser::parse_redis_value;
+#[cfg(feature = "cluster-async")]
+use crate::types::set_or_unset;
 use crate::types::{HashMap, RedisResult, Value};
 use pipeline::UNROUTABLE_ERROR;
 use rand::{rng, seq::IteratorRandom};
@@ -235,6 +237,29 @@ pub struct ClusterConfig {
     pub(crate) async_push_sender: Option<std::sync::Arc<dyn crate::aio::AsyncPushSender>>,
     #[cfg(feature = "cluster-async")]
     pub(crate) async_dns_resolver: Option<std::sync::Arc<dyn crate::io::AsyncDNSResolver>>,
+}
+
+impl std::fmt::Debug for ClusterConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            connection_timeout,
+            response_timeout,
+            #[cfg(feature = "cluster-async")]
+            async_push_sender,
+            #[cfg(feature = "cluster-async")]
+            async_dns_resolver,
+        } = self;
+
+        let mut str = f.debug_struct("ClusterConfig");
+        str.field("connection_timeout", connection_timeout)
+            .field("response_timeout", response_timeout);
+
+        #[cfg(feature = "cluster-async")]
+        str.field("async_push_sender", &set_or_unset(async_push_sender))
+            .field("async_dns_resolver", &set_or_unset(async_dns_resolver));
+
+        str.finish()
+    }
 }
 
 impl ClusterConfig {
@@ -527,10 +552,17 @@ where
         let info = get_connection_info(node, &self.cluster_params);
 
         let mut conn = C::connect(info, Some(self.cluster_params.connection_timeout))?;
-        // If READONLY is sent to primary nodes, it will have no effect.
-        // We set this unconditionally, because we don't know whether we'll be making read calls
-        // to replicas. (We allow overriding routing per-call)
-        cmd("READONLY").exec(&mut conn)?;
+        if self.cluster_params.read_routing_factory.is_some() {
+            // If READONLY is sent to primary nodes, it will have no effect.
+            // We set this conditionally, because we don't know whether we'll be making read calls
+            // to replicas. (We allow overriding routing per-call)
+            cmd("READONLY")
+        } else {
+            // if readonly reading isn't set, we don't want to send READONLY, since some Redis providers don't support this command
+            // (for example, azure managed redis - https://redis.io/docs/latest/operate/rs/references/compatibility/commands/cluster/)
+            cmd("PING")
+        }
+        .exec(&mut conn)?;
         conn.set_read_timeout(*self.read_timeout.borrow())?;
         conn.set_write_timeout(*self.write_timeout.borrow())?;
         Ok(conn)

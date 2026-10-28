@@ -32,6 +32,7 @@ SIGNATURES = [
     ("infra", "Docker Hub rate limit", r"toomanyrequests"),
     ("infra", "compiler crashed", r"Compiler killed by signal|rustc.*SIGSEGV|signal: 11"),
     ("infra", "runner volume path missing on the Docker host", r"bind source path does not exist"),
+    ("infra", "the accessibility service could not start", r"Failed to execute program org\.a11y\.Bus"),
     ("infra", "network failure", r"Temporary failure in name resolution|Network is unreachable|Could not resolve host"),
     ("infra", "disk full", r"No space left on device|Out of diskspace"),
     ("infra", "the linker died on a bus error (cache or target volume problem)", r"ld terminated with signal 7|\[Bus error\]"),
