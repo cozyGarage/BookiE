@@ -21,15 +21,15 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Connection list
 
-- [ ] Connections are grouped, with one section per group and an ungrouped section.
+- [x] Connections are grouped, with one section per group and an ungrouped section. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`):** after setting Group `Dev servers`, tags `mysql, demo` and colour Blue on one connection, the list showed a `Dev servers` section holding it and an `Ungrouped` section for the rest, with the tags in the row subtitle; the organisation file stored `group`, `tags` and `color`.
 - [ ] A group that appears twice in the ordering still renders one section.
-- [ ] The colour swatch shows on a tagged row and the picker sets it. **2026-10-12 Hyprland dark:** the picker saved the colour; the swatch was not checked.
+- [ ] The colour swatch shows on a tagged row and the picker sets it. **2026-10-12 Hyprland dark:** the picker saved the colour; the swatch was not checked. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`):** the picker offered No colour, Blue, Teal and more; Blue set a blue dot beside the row's green environment bar.
 - [ ] After connecting to a tagged connection, the workspace tab strip shows its colour. Changing or clearing the tag updates the strip, and disconnecting clears it. The GTK regression passes; no installed retest after [#768](https://github.com/cozyGarage/BookiE/pull/768) is recorded here.
 - [ ] With Orca, open Group and tags, navigate to Colour, open the named button, choose a palette colour, and confirm the selected colour is announced and saved. Sidebar table search and the saved-filter name field announce their purpose. No native Wayland screen-reader result is recorded here.
-- [ ] Duplicate produces a new row with a distinct name. When the source has a saved database password, the copy's credential form opens with an empty password field; save a new password and verify both connections work independently. **2026-10-12 historical run:** distinct name passed ("(copy)"); the copy did not reuse the password but did not ask for one either, it failed and offered Edit Connection. Fixed in [#823](https://github.com/cozyGarage/BookiE/pull/823); no installed retest is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
+- [x] Duplicate produces a new row with a distinct name. When the source has a saved database password, the copy's credential form opens with an empty password field; save a new password and verify both connections work independently. **2026-10-12 historical run:** distinct name passed ("(copy)"); the copy did not reuse the password but did not ask for one either, it failed and offered Edit Connection. Fixed in [#823](https://github.com/cozyGarage/BookiE/pull/823); no installed retest is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)). **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`):** Duplicate connection created `mysql-local (copy)` and opened a form titled "Enter password for mysql-local (copy)" with an empty password field and the toast "Created … Enter its password the first time you connect."
 - [ ] The Name field in the connect dialog is used when set, and the derived `user@host` label still appears when it is blank.
 - [ ] Two connections to the same endpoint stay separate after reconnecting to each. This is the regression the id-first identity change fixed.
-- [ ] For MongoDB, the connect dialog shows Authentication database; save `admin` for a user defined there while Database is `appdb`, reconnect, and confirm connections with different authentication databases stay separate. **Not run.**
+- [x] For MongoDB, the connect dialog shows Authentication database; save `admin` for a user defined there while Database is `appdb`, reconnect, and confirm connections with different authentication databases stay separate. **Not run.** **2026-10-28 native Wayland, light, `bb9202644` debug build:** the MongoDB form showed an "Authentication database (optional)" row between Database and Username; with the user defined in `admin` and Database `appdb` on MongoDB 7, a connection without it failed with "Username or password is wrong."; after saving `admin` in that row it connected, `auth_source` was stored as `admin`, and it reconnected after an app restart.
 - [ ] On PostgreSQL, right-click a schema and hide it. Confirm its tables and views disappear, search cannot reveal them, the filter menu can restore one or all schemas, and each connection retains its own hidden-schema list after reconnecting. **2026-10-12 Hyprland dark:** hide, search and restore one schema passed; per-connection retention after reconnect not run.
 
 ## Long-query notice
@@ -40,18 +40,18 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 - [ ] The connect dialog shows Connect timeout and Query timeout rows; 0 means default. **2026-10-12 Hyprland dark:** passed.
 - [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after about 2 seconds, while another connection still uses the Preferences timeout. **2026-10-12 Hyprland dark:** stopped after 2.007 s, passed; the wording was fixed by [#668](https://github.com/cozyGarage/BookiE/pull/668). No result for the second connection or installed retest is recorded here. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** the 2-second connection ended with "Query exceeded the 2s query timeout" and offered "Run again with a 8s timeout"; query history recorded the failed run at 2015 ms; the second connection was not run. The connection list popover was clipped at the window's left edge ([#1905](https://github.com/cozyGarage/BookiE/issues/1905)).
-- [ ] A connect timeout of 3 seconds to an unreachable host fails after about 3 seconds.
+- [x] A connect timeout of 3 seconds to an unreachable host fails after about 3 seconds. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`):** a PostgreSQL connection to `10.255.255.1` with a 3 s connect timeout failed with "database connection timed out after 3 seconds"; the app log shows the failure about 3 s after the attempt.
 
 - [ ] With a 2-second query timeout, run `SELECT pg_sleep(5)` on PostgreSQL (streamed) and `SELECT SLEEP(5)` on MySQL (materialized): after each, the toolbar shows **Run again with an 8s timeout**. Click it: the same query runs and completes. Running any other query removes the button, and the saved timeout is still 2 seconds.
 - [ ] Edit the editor text after a timeout, then click the button: the query that timed out runs, not the new text.
 
 ## Connection bundles
 
-- [ ] Export without a passphrase, then read the file: it contains hosts and usernames and **no** password, passphrase or token.
-- [ ] Export with a passphrase, then import it on a second profile (`TABLEPRO_PROFILE=development`) and confirm the connections and their credentials arrive.
-- [ ] A wrong passphrase and a file edited after export give the **same** message.
-- [ ] Importing a bundle whose id already exists locally against a different server creates a new connection and leaves the local one untouched.
-- [ ] The import plan lists every connection with its disposition and can be unticked before anything is written.
+- [x] Export without a passphrase, then read the file: it contains hosts and usernames and **no** password, passphrase or token. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** the 8 KB file had hosts, usernames and database names and no password, passphrase or token values; the only passphrase-like fields were `has_passphrase: false` flags, and an SSH key was referenced by path, not content.
+- [ ] Export with a passphrase, then import it on a second profile (`TABLEPRO_PROFILE=development`) and confirm the connections and their credentials arrive. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** the passphrase export was encrypted (Argon2id, AES-256-GCM; no host or connection name readable); a second profile (a private XDG directory set, not `TABLEPRO_PROFILE`) imported 13 connections after one was unticked; their credentials arriving was not checked. A profile with no connections has no import entry ([#1949](https://github.com/cozyGarage/BookiE/issues/1949)).
+- [x] A wrong passphrase and a file edited after export give the **same** message. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** both gave "The passphrase is wrong, or the file was changed after it was exported." (a flipped byte in the ciphertext, and a wrong passphrase).
+- [ ] Importing a bundle whose id already exists locally against a different server creates a new connection and leaves the local one untouched. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** an existing connection with the same id was listed as "Update … Read-only, environment and TLS are never relaxed"; the different-server case was not run.
+- [x] The import plan lists every connection with its disposition and can be unticked before anything is written. **2026-10-28 native Wayland, installed `bookie 0.2.0-1` (from `cbe0a5816`), a second empty profile:** the plan listed each connection as Add or Update with a tick box and said "These changes have not been made yet"; unticking `pg-prod` left it out of the result.
 
 ## Built-in SSH host keys and tunnel loss
 
@@ -61,15 +61,15 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## SSH agent (built-in client)
 
-- [ ] Choose "SSH agent" in the SSH section with a key loaded in ssh-agent: the connection authenticates without a password or key file prompt.
-- [ ] With the agent stopped, the error says the agent could not be reached.
+- [x] Choose "SSH agent" in the SSH section with a key loaded in ssh-agent: the connection authenticates without a password or key file prompt. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container, scratch `HOME` and a private ssh-agent:** with "SSH agent" chosen and the fixture key loaded in a private agent, the tunnel authenticated with no key-file or password prompt and the database was reached; the first attempt failed with "ssh: authentication failed" only because the bastion image still held an older authorized key.
+- [x] With the agent stopped, the error says the agent could not be reached. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container, scratch `HOME` and a private ssh-agent:** with the agent stopped, the error read "ssh: ssh-agent: Unable to connect to ssh-agent. The environment variable 'SSH_AUTH_SOCK' was …".
 
 ## System OpenSSH tunnel
 
 Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-askpass` beside the app binary, or an installed package).
 
-- [ ] Turn on "Use system OpenSSH" in the SSH section and connect to a host already in `~/.ssh/known_hosts`: no prompt, the connection works.
-- [ ] Connect to a new host: a "Trust this SSH host?" dialog shows the fingerprint; Cancel fails the connection and writes nothing.
+- [ ] Turn on "Use system OpenSSH" in the SSH section and connect to a host already in `~/.ssh/known_hosts`: no prompt, the connection works. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container, scratch `HOME` and a private ssh-agent:** a host already in `known_hosts` was not run; see the next item for a new host.
+- [x] Connect to a new host: a "Trust this SSH host?" dialog shows the fingerprint; Cancel fails the connection and writes nothing. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container, scratch `HOME` and a private ssh-agent:** with "Use system OpenSSH" and the `tablepro-askpass` helper beside the binary, a new host showed the fingerprint dialog; Cancel failed the connection with "ssh host-key trust was refused" and wrote no key; Trust then reached the database, and the key was stored in BookiE's own `known_hosts` while the scratch `~/.ssh/known_hosts` stayed empty.
 - [ ] A host reached through a `ProxyJump` line in `~/.ssh/config` connects.
 - [ ] A new key at a `ProxyJump` hop requires the same explicit approval as a new destination key; declining does not add the jump key to `known_hosts`.
 - [ ] A saved password is used for the target host; a jump host asking for a password gets a dialog instead of the saved one.
