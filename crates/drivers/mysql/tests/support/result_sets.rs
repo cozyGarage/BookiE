@@ -1,3 +1,5 @@
+#[path = "like_escape.rs"]
+mod like_escape;
 pub(crate) use super::{connect, start_mariadb, start_mysql};
 
 #[path = "mysql_call_results.rs"]

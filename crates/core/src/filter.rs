@@ -281,10 +281,10 @@ fn build_rule_sql(
             params.push(Value::Text(pattern));
             // Case-sensitive on all drivers. The user picks Ilike
             // explicitly when they want case-insensitive matching.
-            let escape = if like_needs_escape_clause(driver_id) {
-                " ESCAPE '\\'"
-            } else {
-                ""
+            let escape = match driver_id {
+                "mysql" => " ESCAPE '|'",
+                _ if like_needs_escape_clause(driver_id) => " ESCAPE '\\'",
+                _ => "",
             };
             Ok(format!("{pattern_sql} LIKE {ph}{escape}"))
         }
@@ -424,6 +424,9 @@ fn like_needs_escape_clause(driver_id: &str) -> bool {
 }
 
 fn escape_like(driver_id: &str, s: &str) -> String {
+    if driver_id == "mysql" {
+        return s.replace('|', "||").replace('%', "|%").replace('_', "|_");
+    }
     let escaped = s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
     if driver_id == "mssql" {
         escaped.replace('[', "\\[")

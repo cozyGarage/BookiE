@@ -930,19 +930,22 @@ fn engines_without_a_default_escape_get_an_escape_clause() {
 
 #[test]
 fn engines_with_a_default_escape_keep_the_plain_like() {
-    for (driver_id, expected) in [
-        ("postgres", "\"note\" LIKE $1"),
-        ("mysql", "`note` LIKE ?"),
-        ("clickhouse", "`note` LIKE ?"),
-    ] {
+    for (driver_id, expected) in [("postgres", "\"note\" LIKE $1"), ("clickhouse", "`note` LIKE ?")] {
         let (sql, _) = like_where(driver_id, FilterOp::Contains, "x");
         assert_eq!(sql, expected, "{driver_id}");
     }
 }
 
 #[test]
+fn mysql_names_its_escape_character_because_no_backslash_escapes_removes_the_default() {
+    let (sql, params) = like_where("mysql", FilterOp::Contains, "50%_|x");
+    assert_eq!(sql, "`note` LIKE ? ESCAPE '|'");
+    assert_eq!(params, vec![Value::Text("%50|%|_||x%".into())]);
+}
+
+#[test]
 fn like_metacharacters_are_escaped_per_driver() {
-    for driver_id in ["postgres", "mysql", "clickhouse", "sqlite", "duckdb", "mssql"] {
+    for driver_id in ["postgres", "clickhouse", "sqlite", "duckdb", "mssql"] {
         let (_, params) = like_where(driver_id, FilterOp::Contains, "50%_a\\b");
         assert_eq!(params, vec![Value::Text("%50\\%\\_a\\\\b%".into())], "{driver_id}");
     }
