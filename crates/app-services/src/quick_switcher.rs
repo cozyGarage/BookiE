@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn a_view_also_in_tables_appears_once_as_a_view() {
         let view = relation(Some("sales"), "recent");
-        let items = relation_items(std::slice::from_ref(&view), &[view.clone()]);
+        let items = relation_items(std::slice::from_ref(&view), std::slice::from_ref(&view));
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].subtitle, "View");
     }

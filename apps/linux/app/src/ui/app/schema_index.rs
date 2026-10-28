@@ -73,7 +73,7 @@ mod tests {
             schema: Some("db".into()),
             name: "recent".into(),
         };
-        let result = super::completion_names("mysql", std::slice::from_ref(&view), &[view.clone()]);
+        let result = super::completion_names("mysql", std::slice::from_ref(&view), std::slice::from_ref(&view));
         assert_eq!(result.len(), 1);
     }
 
