@@ -92,11 +92,11 @@ Counted from the four checklists at the head of this run. "With a 2026-10-28 res
 
 | Checklist | Items | Ticked | With a 2026-10-28 result | Without one |
 |---|---|---|---|---|
-| Catalog, sidebar and application shell | 38 | 6 | 16 | 22 |
+| Catalog, sidebar and application shell | 38 | 7 | 20 | 18 |
 | Connections and SSH | 44 | 13 | 25 | 19 |
 | SQL editor and sessions | 62 | 30 | 34 | 28 |
 | Grid, filters and data transfer | 76 | 10 | 34 | 42 |
-| **All four** | 220 | 59 | 109 | 111 |
+| **All four** | 220 | 60 | 113 | 107 |
 
 Why the rest are open:
 
