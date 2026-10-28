@@ -327,6 +327,43 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("tablepro-driver-tests", ledger)
         self.assertNotIn("tablepro-driver-src", ledger)
 
+    def test_ignored_arch_source_does_not_hide_new_nonignored_inventory_tests(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".gitignore").write_text("apps/linux/packaging/arch/src/\n")
+            (root / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/core"]\nresolver = "3"\n')
+            crate = root / "crates/core"
+            (crate / "src").mkdir(parents=True)
+            (crate / "Cargo.toml").write_text(
+                '[package]\nname = "tablepro-core"\nversion = "0.1.0"\nedition = "2024"\n'
+            )
+            (crate / "src/lib.rs").write_text(
+                '#[ignore = "requires Docker"]\nfn tracked_ignored_test() {}\n'
+            )
+            untracked = crate / "src/new_test.rs"
+            untracked.write_text('#[ignore = "requires Docker"]\nfn untracked_ignored_test() {}\n')
+            generated = root / "apps/linux/packaging/arch/src/TablePro/apps/linux/app/src/copied.rs"
+            generated.parent.mkdir(parents=True)
+            generated.write_text('#[ignore = "requires Docker"]\nfn copied_ignored_test() {}\n')
+            (root / "scripts").mkdir()
+            inventory = root / "scripts/inventory-ignored-tests.py"
+            inventory.write_text((ROOT / "scripts/inventory-ignored-tests.py").read_text())
+            (root / "scripts/isolated-tests.json").write_text("{}\n")
+            subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "add", ".gitignore", "Cargo.toml", "crates", "scripts"],
+                check=True,
+            )
+
+            result = subprocess.run(
+                ["python3", str(inventory)], capture_output=True, text=True, check=False
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("tracked_ignored_test", result.stdout)
+            self.assertIn("untracked_ignored_test", result.stdout)
+            self.assertNotIn("copied_ignored_test", result.stdout)
+
     def test_full_gate_enforces_function_size_like_preflight(self):
         script = (ROOT / "scripts/ci-local.sh").read_text()
         full = script.split("run_full() {", 1)[1].split("run_integration()", 1)[0]
@@ -681,7 +718,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertLess(floor_script.index('if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]'), floor_script.index("pkg-config --modversion"))
         self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
         gtk_safety_script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
-        self.assertIn('timeout 1500s python3 -u "$ROOT/apps/linux/app/tests/gtk_safety.py"', gtk_safety_script)
+        self.assertIn('timeout 1500s "$system_python" -u "$ROOT/apps/linux/app/tests/gtk_safety.py"', gtk_safety_script)
         runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
         self.assertIn("python3-pyatspi", runtime_image)
         self.assertIn("gir1.2-gtk-4.0", runtime_image)
@@ -691,10 +728,11 @@ class CiWorkflowTests(unittest.TestCase):
         script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
         self.assertIn('XDG_DATA_HOME="$gtk_runtime/data"', script)
         self.assertIn("org.a11y.Bus.service", script)
-        self.assertIn("Name=org.a11y.Bus", script)
-        self.assertIn("Exec=/usr/lib/at-spi-bus-launcher", script)
+        self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', script)
+        self.assertIn('"$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"', script)
         self.assertLess(script.index("xvfb-run --auto-servernum"), script.index('dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh"'))
         profile = (ROOT / "docs/evidence/postgres-stream-heap-profile-2026-10-25/run.sh").read_text()
+        self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', profile)
         self.assertIn('"$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"', profile)
         self.assertLess(profile.index("xvfb-run --auto-servernum"), profile.index('dbus-run-session -- bash "$RUNTIME/run-inner.sh"'))
 

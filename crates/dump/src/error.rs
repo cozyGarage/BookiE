@@ -2,8 +2,8 @@
 pub enum DumpError {
     #[error("{tool} was not found in /usr/bin or /usr/local/bin; install the PostgreSQL client tools")]
     ToolMissing { tool: String },
-    #[error("{tool} reported a version BookiE cannot read")]
-    ToolVersionUnknown { tool: String },
+    #[error("{tool} reported a version BookiE cannot read: {reason}")]
+    ToolVersionUnknown { tool: String, reason: String },
     #[error("{tool} {tool_major} is older than the server ({server_major}); install a newer client")]
     ToolTooOld {
         tool: String,

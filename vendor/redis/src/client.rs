@@ -6,6 +6,8 @@ use crate::aio::{AsyncPushSender, DefaultAsyncDNSResolver};
 use crate::auth::StreamingCredentialsProvider;
 #[cfg(feature = "aio")]
 use crate::io::AsyncDNSResolver;
+#[cfg(feature = "aio")]
+use crate::types::set_or_unset;
 use crate::{
     connection::{Connection, ConnectionInfo, ConnectionLike, IntoConnectionInfo, connect},
     types::{RedisResult, Value},
@@ -13,7 +15,7 @@ use crate::{
 #[cfg(feature = "aio")]
 use std::pin::Pin;
 
-#[cfg(feature = "tls-rustls")]
+#[cfg(any(feature = "tls-rustls", feature = "tls-native-tls"))]
 use crate::tls::{TlsCertificates, inner_build_with_tls};
 
 #[cfg(feature = "cache-aio")]
@@ -157,7 +159,7 @@ impl Client {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(feature = "tls-rustls")]
+    #[cfg(any(feature = "tls-rustls", feature = "tls-native-tls"))]
     pub fn build_with_tls<C: IntoConnectionInfo>(
         conn_info: C,
         tls_certs: TlsCertificates,
@@ -197,9 +199,50 @@ pub struct AsyncConnectionConfig {
     pub(crate) concurrency_limit: Option<usize>,
     /// Flush threshold for the outbound write buffer; see [`AsyncConnectionConfig::set_write_backpressure_boundary`].
     pub(crate) write_backpressure_boundary: Option<usize>,
+    /// A tracker of the connection's confirmed subscriptions, shared with the connection.
+    pub(crate) subscription_tracker:
+        Option<std::sync::Arc<std::sync::Mutex<crate::subscription_tracker::SubscriptionTracker>>>,
     /// Optional credentials provider for dynamic authentication (e.g., token-based authentication)
     #[cfg(feature = "token-based-authentication")]
     pub(crate) credentials_provider: Option<std::sync::Arc<dyn StreamingCredentialsProvider>>,
+}
+
+#[cfg(feature = "aio")]
+impl std::fmt::Debug for AsyncConnectionConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            response_timeout,
+            connection_timeout,
+            push_sender,
+            #[cfg(feature = "cache-aio")]
+            cache,
+            dns_resolver,
+            pipeline_buffer_size,
+            concurrency_limit,
+            write_backpressure_boundary,
+            subscription_tracker,
+            #[cfg(feature = "token-based-authentication")]
+            credentials_provider,
+        } = self;
+
+        let mut str = f.debug_struct("AsyncConnectionConfig");
+        str.field("response_timeout", response_timeout)
+            .field("connection_timeout", connection_timeout)
+            .field("pipeline_buffer_size", pipeline_buffer_size)
+            .field("concurrency_limit", concurrency_limit)
+            .field("write_backpressure_boundary", write_backpressure_boundary)
+            .field("push_sender", &set_or_unset(push_sender))
+            .field("subscription_tracker", &set_or_unset(subscription_tracker))
+            .field("dns_resolver", &set_or_unset(dns_resolver));
+
+        #[cfg(feature = "cache-aio")]
+        str.field("cache", &set_or_unset(cache));
+
+        #[cfg(feature = "token-based-authentication")]
+        str.field("credentials_provider", &set_or_unset(credentials_provider));
+
+        str.finish()
+    }
 }
 
 #[cfg(feature = "aio")]
@@ -215,6 +258,7 @@ impl Default for AsyncConnectionConfig {
             pipeline_buffer_size: None,
             concurrency_limit: None,
             write_backpressure_boundary: None,
+            subscription_tracker: None,
             #[cfg(feature = "token-based-authentication")]
             credentials_provider: None,
         }
@@ -278,6 +322,17 @@ impl AsyncConnectionConfig {
         sender: std::sync::Arc<dyn AsyncPushSender>,
     ) -> Self {
         self.push_sender = Some(sender);
+        self
+    }
+
+    #[cfg(any(feature = "connection-manager", feature = "cluster-async"))]
+    pub(crate) fn set_subscription_tracker_internal(
+        mut self,
+        subscription_tracker: std::sync::Arc<
+            std::sync::Mutex<crate::subscription_tracker::SubscriptionTracker>,
+        >,
+    ) -> Self {
+        self.subscription_tracker = Some(subscription_tracker);
         self
     }
 
