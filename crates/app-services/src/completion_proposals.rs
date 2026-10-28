@@ -6,7 +6,7 @@ use tablepro_core::sql_syntax::script::{
 };
 
 use super::completion::{SchemaIndex, Scope, candidate_sql, scope_at};
-use super::completion_identifiers::split_table_reference;
+use super::completion_identifiers::{normalized, split_table_reference};
 
 pub struct Candidates {
     pub range: Range<usize>,
@@ -20,22 +20,24 @@ pub fn candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Candidates {
 pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: Option<LexicalSettings>) -> Candidates {
     let grammar = index.grammar.unwrap_or(SqlGrammar::PostgreSql);
     let settings_for_grammar = settings.unwrap_or_else(|| LexicalSettings::default_for(grammar));
-    let Some(mut range) = replacement_range(sql, cursor, grammar, settings_for_grammar) else {
+    let plan = ScriptPlan::build(sql, grammar, settings_for_grammar);
+    let Some(mut range) = replacement_range(sql, cursor, &plan) else {
         return Candidates {
             range: cursor..cursor,
             values: Vec::new(),
         };
     };
     let quoted = sql[range.start..].starts_with(['"', '`', '[']);
-    let scope = scope_at(sql, range.start, index, settings);
+    let shared_plan = index.grammar.map(|_| &plan);
+    let scope = scope_at(sql, range.start, index, settings, shared_plan);
     if scope == Scope::Tables {
-        range.start = qualified_start(sql, range.start, grammar, settings_for_grammar);
+        range.start = qualified_start(sql, range.start, &plan);
     }
-    let mut values = candidate_sql(sql, range.start, index, settings);
+    let prefix = normalized(&sql[range.start..cursor]);
+    let mut values = candidate_sql(sql, range.start, index, settings, Some(&prefix), shared_plan);
     if !quoted && !matches!(scope, Scope::ColumnsOf(_)) {
         values.extend(super::completion::SQL_KEYWORDS.split_whitespace().map(str::to_string));
     }
-    let prefix = normalized(&sql[range.start..cursor]);
     let values = values
         .into_iter()
         .filter(|value| {
@@ -54,15 +56,7 @@ pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: 
     Candidates { range, values }
 }
 
-fn normalized(text: &str) -> String {
-    text.chars()
-        .filter(|character| !matches!(character, '\"' | '`' | '[' | ']'))
-        .collect::<String>()
-        .to_lowercase()
-}
-
-fn replacement_range(sql: &str, cursor: usize, grammar: SqlGrammar, settings: LexicalSettings) -> Option<Range<usize>> {
-    let plan = ScriptPlan::build(sql, grammar, settings);
+fn replacement_range(sql: &str, cursor: usize, plan: &ScriptPlan) -> Option<Range<usize>> {
     let token = plan
         .tokens(0..sql.len())
         .find(|token| {
@@ -102,8 +96,7 @@ fn replacement_range(sql: &str, cursor: usize, grammar: SqlGrammar, settings: Le
     }
 }
 
-fn qualified_start(sql: &str, start: usize, grammar: SqlGrammar, settings: LexicalSettings) -> usize {
-    let plan = ScriptPlan::build(sql, grammar, settings);
+fn qualified_start(sql: &str, start: usize, plan: &ScriptPlan) -> usize {
     let tokens: Vec<_> = plan.tokens(0..start).filter(|token| !token.kind.is_trivia()).collect();
     let mut start = start;
     for pair in tokens.rchunks_exact(2) {
@@ -244,5 +237,140 @@ mod tests {
         ] {
             assert!(candidates(sql, sql.len(), &index).values.is_empty(), "{sql}");
         }
+    }
+
+    fn reference_candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Candidates {
+        let grammar = index.grammar.unwrap_or(SqlGrammar::PostgreSql);
+        let settings = LexicalSettings::default_for(grammar);
+        let Some(mut range) = replacement_range(sql, cursor, &ScriptPlan::build(sql, grammar, settings)) else {
+            return Candidates {
+                range: cursor..cursor,
+                values: Vec::new(),
+            };
+        };
+        let quoted = sql[range.start..].starts_with(['"', '`', '[']);
+        let scope = scope_at(sql, range.start, index, None, None);
+        if scope == Scope::Tables {
+            range.start = qualified_start(sql, range.start, &ScriptPlan::build(sql, grammar, settings));
+        }
+        let mut values = candidate_sql(sql, range.start, index, None, None, None);
+        if !quoted && !matches!(scope, Scope::ColumnsOf(_)) {
+            values.extend(
+                super::super::completion::SQL_KEYWORDS
+                    .split_whitespace()
+                    .map(str::to_string),
+            );
+        }
+        let prefix = normalized(&sql[range.start..cursor]);
+        let values = values
+            .into_iter()
+            .filter(|value| {
+                normalized(value).starts_with(&prefix)
+                    || split_table_reference(value, index.grammar)
+                        .is_some_and(|(_, name)| normalized(&name).starts_with(&prefix))
+            })
+            .map(|value| {
+                let label = split_table_reference(&value, index.grammar)
+                    .filter(|(schema, _)| schema.is_none() && value.starts_with(['"', '`', '[']))
+                    .map(|(_, name)| name)
+                    .unwrap_or_else(|| value.clone());
+                (label, value)
+            })
+            .collect();
+        Candidates { range, values }
+    }
+
+    #[test]
+    fn the_indexed_catalog_gives_the_same_candidates_as_filtering_every_name() {
+        let tables: Vec<String> = [
+            "users",
+            "Users",
+            "orders",
+            "public.users",
+            "public.Orders",
+            "public.order_items",
+            "audit.user_log",
+            "\"odd.schema\".\"Users\"",
+            "\"Mixed\"",
+            "\"a\"\"b\"",
+            "`shop`.`items`",
+            "`shop`.`Orders`",
+            "[dbo].[Orders]",
+            "[dbo].[users]",
+            "[Weird Name]",
+            "",
+            "schema.",
+            ".name",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let queries = [
+            "SELECT * FROM ",
+            "SELECT * FROM us",
+            "SELECT * FROM Us",
+            "SELECT * FROM public.o",
+            "SELECT * FROM \"odd.schema\".\"Us",
+            "SELECT * FROM \"Mi",
+            "SELECT * FROM `shop`.`i",
+            "SELECT * FROM [dbo].[O",
+            "SELECT u. FROM users u",
+            "SELECT us FROM users u WHERE u.id = 1",
+            "SELECT 1; SELECT * FROM public.o; SELECT 2",
+            "UPDATE o",
+            "INSERT INTO a",
+            "SELECT * FROM users JOIN or",
+            "-- comment\nSELECT * FROM au",
+            "SELECT 'it''s; FROM us' FROM us",
+            "SELECT $$ FROM x; $$, 1 FROM us",
+            "SEL",
+            "",
+        ];
+        let mut compared = 0;
+        for grammar in [
+            Some(SqlGrammar::PostgreSql),
+            Some(SqlGrammar::MySql),
+            Some(SqlGrammar::MsSql),
+            Some(SqlGrammar::Sqlite),
+            None,
+        ] {
+            let mut index = SchemaIndex::default();
+            index.grammar = grammar;
+            index.set_tables(tables.clone());
+            for sql in queries {
+                for cursor in (0..=sql.len()).filter(|cursor| sql.is_char_boundary(*cursor)) {
+                    let fast = candidates(sql, cursor, &index);
+                    let slow = reference_candidates(sql, cursor, &index);
+                    assert_eq!(fast.range, slow.range, "range for {sql:?} at {cursor} ({grammar:?})");
+                    assert_eq!(fast.values, slow.values, "values for {sql:?} at {cursor} ({grammar:?})");
+                    compared += 1;
+                }
+            }
+        }
+        assert!(compared > 1000, "the comparison covered {compared} cases");
+    }
+
+    #[test]
+    fn a_catalog_replaced_after_the_keys_were_built_is_matched_against_its_new_tables() {
+        let sql = "SELECT * FROM al";
+        let offered = |index: &SchemaIndex| -> Vec<String> {
+            candidates(sql, sql.len(), index)
+                .values
+                .into_iter()
+                .map(|(_, value)| value)
+                .collect()
+        };
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_tables(vec!["alpha".into(), "beta".into()]);
+        assert!(offered(&index).contains(&"alpha".to_string()));
+        index.set_tables(vec!["alpine".into(), "alps".into(), "beta".into()]);
+        let after = offered(&index);
+        assert!(after.contains(&"alpine".to_string()) && after.contains(&"alps".to_string()));
+        assert!(!after.contains(&"alpha".to_string()) && !after.contains(&"beta".to_string()));
+        index.grammar = Some(SqlGrammar::MySql);
+        assert!(offered(&index).contains(&"alpine".to_string()));
+        index.clear();
+        assert!(!offered(&index).contains(&"alpine".to_string()));
     }
 }

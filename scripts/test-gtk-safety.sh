@@ -3,38 +3,23 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+system_python="/usr/bin/python3"
 
-for command_name in dbus-run-session dbus-update-activation-environment gdbus xvfb-run python3; do
+for command_name in dbus-run-session dbus-update-activation-environment gdbus xvfb-run; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "missing required command: $command_name" >&2
     exit 1
   fi
 done
 
-if ! python3 -c "import pyatspi" >/dev/null 2>&1; then
-  echo "missing Python module: pyatspi" >&2
+if [[ ! -x "$system_python" ]]; then
+  echo "missing required command: $system_python" >&2
   exit 1
 fi
 
-# Always isolate from the desktop bus. A pre-existing session is not a test
-# fixture, and its AT-SPI/portal processes may be tied to another display.
-if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
-  gtk_runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk.XXXXXX")"
-  cleanup_gtk_runtime() {
-    # Portal/GVFS services may leave FUSE mounts until their bus-loss handler
-    # runs. Detach only mounts inside this test's private runtime directory.
-    if command -v fusermount3 >/dev/null 2>&1; then
-      for gtk_mount in "$gtk_runtime/doc" "$gtk_runtime/gvfs"; do
-        fusermount3 -uz -- "$gtk_mount" >/dev/null 2>&1 || true
-      done
-    fi
-    rm -rf -- "$gtk_runtime"
-  }
-  trap cleanup_gtk_runtime EXIT
-  env -u NO_AT_BRIDGE TABLEPRO_GTK_DBUS_ACTIVE=1 XDG_RUNTIME_DIR="$gtk_runtime" \
-    ATSPI_DBUS_IMPLEMENTATION=dbus-daemon XDG_CURRENT_DESKTOP=GNOME \
-    dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh" "$@"
-  exit $?
+if ! "$system_python" -c "import pyatspi" >/dev/null 2>&1; then
+  echo "missing Python module: pyatspi" >&2
+  exit 1
 fi
 
 if [[ "${TABLEPRO_GTK_XVFB_ACTIVE:-0}" != "1" ]]; then
@@ -43,12 +28,34 @@ if [[ "${TABLEPRO_GTK_XVFB_ACTIVE:-0}" != "1" ]]; then
     xvfb-run --auto-servernum --server-num="$xvfb_server_num" --server-args="-screen 0 1280x1024x24 -nolisten tcp" "$ROOT/scripts/test-gtk-safety.sh" "$@"
 fi
 
+# Start the private bus after Xvfb so D-Bus activated accessibility services
+# inherit the test display instead of the desktop systemd user's display.
+if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
+  gtk_runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk.XXXXXX")"
+  cleanup_gtk_runtime() {
+    if command -v fusermount3 >/dev/null 2>&1; then
+      for gtk_mount in "$gtk_runtime/doc" "$gtk_runtime/gvfs"; do
+        fusermount3 -uz -- "$gtk_mount" >/dev/null 2>&1 || true
+      done
+    fi
+    rm -rf -- "$gtk_runtime"
+  }
+  trap cleanup_gtk_runtime EXIT
+  mkdir -p "$gtk_runtime/data/dbus-1/services"
+  cp "/usr/share/dbus-1/services/org.a11y.Bus.service" \
+    "$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"
+  env -u NO_AT_BRIDGE TABLEPRO_GTK_DBUS_ACTIVE=1 XDG_DATA_HOME="$gtk_runtime/data" XDG_RUNTIME_DIR="$gtk_runtime" \
+    ATSPI_DBUS_IMPLEMENTATION=dbus-daemon XDG_CURRENT_DESKTOP=GNOME \
+    dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh" "$@"
+  exit $?
+fi
+
 export GDK_BACKEND=x11
 export GSK_RENDERER=cairo
 export GTK_A11Y=atspi
 unset NO_AT_BRIDGE
-# D-Bus was started before Xvfb assigned DISPLAY/XAUTHORITY. Portal and
-# accessibility activation must inherit the fixture display, not the desktop.
+# Portal and accessibility activation inherit the fixture display from the
+# private bus started after Xvfb.
 dbus-update-activation-environment DISPLAY XAUTHORITY GDK_BACKEND GTK_A11Y
 
 # A bare dbus-run-session does not run a desktop autostart phase. Explicitly
@@ -71,4 +78,4 @@ if [[ ! -x "$test_binary" ]]; then
   echo "installed GTK test binary is not executable: $test_binary" >&2
   exit 1
 fi
-timeout 1500s python3 -u "$ROOT/apps/linux/app/tests/gtk_safety.py" "$test_binary"
+timeout 1500s "$system_python" -u "$ROOT/apps/linux/app/tests/gtk_safety.py" "$test_binary"

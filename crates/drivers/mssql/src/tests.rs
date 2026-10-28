@@ -308,3 +308,39 @@ fn a_server_that_declines_encryption_is_reported_as_a_tls_failure() {
         "{error:?}"
     );
 }
+
+fn empty_result_set() -> QueryResult {
+    QueryResult {
+        columns: Vec::new(),
+        rows: Vec::new(),
+        truncated: false,
+    }
+}
+
+#[test]
+fn a_row_refused_by_the_byte_budget_ends_the_retained_prefix() {
+    let mut admission = RowAdmission::new(MAX_QUERY_ROWS);
+    let mut result_set = empty_result_set();
+    let big = |megabytes: usize| vec![Value::Text("x".repeat(megabytes * 1024 * 1024))];
+
+    assert!(admission.admit(big(63), &mut result_set));
+    assert!(!admission.admit(big(2), &mut result_set));
+    assert!(
+        !admission.admit(vec![Value::Int(3)], &mut result_set),
+        "a small row after a refusal must not leave a gap in the result"
+    );
+    assert_eq!(result_set.rows.len(), 1);
+    assert!(admission.is_closed());
+}
+
+#[test]
+fn the_row_limit_closes_admission() {
+    let mut admission = RowAdmission::new(2);
+    let mut result_set = empty_result_set();
+
+    assert!(admission.admit(vec![Value::Int(1)], &mut result_set));
+    assert!(admission.admit(vec![Value::Int(2)], &mut result_set));
+    assert!(admission.is_closed());
+    assert!(!admission.admit(vec![Value::Int(3)], &mut result_set));
+    assert_eq!(result_set.rows.len(), 2);
+}

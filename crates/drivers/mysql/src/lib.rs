@@ -7,7 +7,7 @@ use sqlparser::dialect::MySqlDialect;
 use sqlparser::parser::Parser;
 use sqlx::mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions, MySqlRow};
 use sqlx::pool::PoolConnection;
-use sqlx::{Column, Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statement, TypeInfo, ValueRef};
+use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statement};
 
 use futures::stream::StreamExt;
 
@@ -15,13 +15,16 @@ mod decode;
 use decode::extract_value;
 mod packed;
 mod session;
+mod text_protocol;
+pub(crate) use text_protocol::{is_call_statement, text_protocol};
+use text_protocol::{mysql_row_payload_bytes, statement_columns};
 mod temporal;
 
 use tablepro_core::sql_syntax::script::LexicalSettings;
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Transport, Value,
-    check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo,
+    Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 /// Name of the SSH-forwarded rendezvous socket inside the private directory
@@ -236,6 +239,27 @@ impl Connection for MysqlConnection {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
+        let mut connection = acquire_controlled(&self.pool, control).await?;
+        let connection_id = connection_id_controlled(&mut connection, control).await?;
+        let result = session::query_with_text_fallback(
+            &mut connection,
+            &self.cancellation_pool,
+            connection_id,
+            sql,
+            params,
+            control,
+        )
+        .await;
+        release_connection(connection, &result).await;
+        result.map(QueryResultBatch::into_first)
+    }
+
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let connection_id = connection_id_controlled(&mut connection, control).await?;
         let result = session::query_with_text_fallback(
@@ -624,25 +648,6 @@ fn refuse_non_utc_timestamps(result: &mut QueryResult) {
     }
 }
 
-fn statement_columns(columns: &[sqlx::mysql::MySqlColumn]) -> Vec<ColumnInfo> {
-    columns
-        .iter()
-        .map(|c| ColumnInfo {
-            name: c.name().to_string(),
-            data_type: c.type_info().name().to_string(),
-            nullable: true,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-            enum_type: None,
-            domain_type: None,
-        })
-        .collect()
-}
-
 async fn params_into_result(
     connection: &mut sqlx::MySqlConnection,
     sql: &str,
@@ -678,17 +683,6 @@ async fn params_into_result(
         columns,
         rows,
         truncated,
-    })
-}
-
-fn mysql_row_payload_bytes(row: &MySqlRow) -> usize {
-    (0..row.len()).fold(0usize, |total, index| {
-        let length = match row.try_get_raw(index) {
-            Ok(value) if value.is_null() => 0,
-            Ok(value) => <&[u8] as sqlx::Decode<MySql>>::decode(value).map_or(usize::MAX, <[u8]>::len),
-            Err(_) => usize::MAX,
-        };
-        total.saturating_add(length)
     })
 }
 

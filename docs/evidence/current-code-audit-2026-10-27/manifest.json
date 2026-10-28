@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "source_commit": "644c74dd34afb35f01c62254b458c12304890573",
+  "source_sha256": {
+    "crates/core/src/sql_dialect/updates.rs": "f48f8d214a0ade0304b5c81e9f604f9cb8ca869c0ee20b5e6e636ac7d49e450e",
+    "crates/app-services/src/workspace_state.rs": "eb5fa297f47bd462e1f1cec48df705616e0a14db3a3b0f22e455e4ad43fc8b65",
+    "crates/app-services/src/workspace_disk.rs": "d9ec75f2bf5950d087c528caeae2ecd317f0c17b57bc1f6e8803133a7dfc9e07",
+    "crates/policy/src/guard/bulk.rs": "7746367d54023b44e8efa5aeb24ffafd0ade3eb3262094fc2affc63ddbf470fe",
+    "crates/policy/src/mask.rs": "242da52cf9505e203b8a19328823ef8d5e1b248b9f59ecd26030bbdf61b4414c",
+    "apps/linux/app/src/services/database_service.rs": "0fdd59e321a6ab71c90b72995f6e105ae5a635cd8b93805a93ac5c9356842d41",
+    "apps/linux/app/src/services/connection_monitor.rs": "8954ce4ca44633e16d6ba3051bf0c90cd72fadd85917ad54984d28b5b40df20a",
+    "scripts/validate-evidence.py": "2b11242960e22d6a8aa3d309a3ccc3ba5b3233fc8eaf7006fd901b11a096df75"
+  },
+  "log_sha256": {
+    "integration-probes.log": "f5bd70a01148b5bd629caea71e1f52ecb7d8fd16b27b204a918337113d0b11fc",
+    "preload-race-probe.log": "809175d777b5392f602bcd2f0d95bddb1031777b9cba673092b52ceb0b69023c",
+    "evidence-default.log": "6f7421d9f1c81b049b3ea37bef2122a5b8a6aa09e68117c51be9ba2129326466",
+    "evidence-explicit.log": "9c44623cefe041acae5cc84008fba2cd91a378b9fa585173cc4496f29f8a59e6"
+  },
+  "diagnostic_artifact_sha256": {
+    "integration-probes.rs": "6e39af540faebc63cc21baee186015cf727469bbf90c19d4d4f6d02b0f8c4055",
+    "preload-race-probe.rs": "b988aef917853e191ea4aecb81423c43db7d6442e74359dbb88b90d79f9b4fcb"
+  },
+  "diagnostics": {
+    "integration_probe_exit": 101,
+    "integration_tests_failed": 3,
+    "preload_probe_exit": 101,
+    "preload_tests_failed": 1,
+    "meaning": "desired-behavior assertions failed; these are defect reproductions, not passing acceptance"
+  },
+  "baseline_preflight": {
+    "exit": 0,
+    "unit_passed": 2225,
+    "sandbox_passed": 292,
+    "redis_cancellation_passed": 1,
+    "full_log_retained": false,
+    "working_tree": "documentation and evidence edits; production Rust matches source_commit"
+  },
+  "document_checks": {
+    "doc_links": "passed",
+    "known_issue_index": "passed",
+    "ignored_inventory": "passed",
+    "audit_manifest_strict": "passed: zero warnings",
+    "diff_whitespace": "passed"
+  },
+  "not_run": [
+    "GTK suite",
+    "complete driver integrations",
+    "driver TLS",
+    "installed package",
+    "native Wayland",
+    "Forgejo"
+  ],
+  "recorded_at_utc": "2026-10-27T17:51:04.618227+00:00",
+  "project_verification": {
+    "verified_at_utc": "2026-10-27T17:51:50.599130+00:00",
+    "field_updates_checked": 45,
+    "issue_additions_checked": 7,
+    "problems": [],
+    "additional_direct_node_checks": 2
+  },
+  "publication_base_commit": "3d236be3d60cdb451efae9f914222c660df28c20",
+  "production_diff_since_source_empty": true
+}

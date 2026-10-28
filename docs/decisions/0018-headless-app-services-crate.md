@@ -2,10 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-12
-
-### Implementation status (2026-10-26)
-
-Several GTK-free service modules have moved to `crates/app-services`; the crate has no GTK, libadwaita, glib or Relm4 dependencies. The headless tab model and workspace persistence live in `crates/app-services/src/workspace.rs` and `workspace_state.rs`. Completion metadata cache, request deduplication, connection-aware result application and cancellation state live in `crates/app-services/src/completion.rs`, which also performs the controlled column read. Named-parameter binding and local database-file classification/saved-record construction were added in aggregate [#1663](https://github.com/cozyGarage/BookiE/pull/1663). Driver-error classification now lives in GTK-free app-services through [#1683](https://github.com/cozyGarage/BookiE/pull/1683); the GTK app retains Relm4 task dispatch and localized error rendering. The connection dialog's auth/endpoint visibility state and typed local-socket path selection are in `crates/app-services/src/connection_form.rs` on [#1686](https://github.com/cozyGarage/BookiE/pull/1686), with widget updates and path display remaining in GTK. SQL editor text budgets, UTF-8 boundary checks and dropped-text validation are being moved to `crates/app-services/src/sql_text.rs` under [#1299](https://github.com/cozyGarage/BookiE/issues/1299); the GTK adapter retains buffer-position extraction and localized refusal messages. File-open signals/dialogs/toasts, driver lookup, and routing results to the shared index also remain in the GTK app. GTK page handling remains in `apps/linux/app/src/ui/app/workspace_tabs.rs`. The staged migration remains active under APP-MOD in the [post-0.2.0 backlog](../backlog.md).
+- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0018-headless-application-services-crate)
 
 ## Context
 
