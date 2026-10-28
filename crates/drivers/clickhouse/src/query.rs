@@ -1,5 +1,5 @@
 use super::{ROW_FORMAT, map_clickhouse_error};
-use tablepro_core::DriverError;
+use tablepro_core::{DriverError, MAX_QUERY_RESULT_BYTES};
 
 /// Reads a `ROW_FORMAT` response one line at a time so the caller can
 /// stop at `max_rows` without materialising the rest of the result.
@@ -38,11 +38,21 @@ impl LineReader {
                     self.buf.drain(..self.consumed);
                     self.consumed = 0;
                     self.buf.extend_from_slice(&chunk);
+                    check_line_cap(self.buf.len())?;
                 }
                 None => self.eof = true,
             }
         }
     }
+}
+
+pub(super) fn check_line_cap(pending_bytes: usize) -> Result<(), DriverError> {
+    if pending_bytes > MAX_QUERY_RESULT_BYTES {
+        return Err(DriverError::Unsupported(
+            "the server sent more than 64 MiB without ending a row; use a row-per-line output format".into(),
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn parse_line<T: serde::de::DeserializeOwned>(line: &[u8]) -> Result<T, DriverError> {

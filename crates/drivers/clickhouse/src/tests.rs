@@ -471,3 +471,12 @@ fn other_statements_are_not_probed() {
         assert!(row_probe::single_row_probe(sql).is_none(), "{sql}");
     }
 }
+
+#[test]
+fn a_pending_line_beyond_the_result_budget_is_refused() {
+    assert!(query::check_line_cap(tablepro_core::MAX_QUERY_RESULT_BYTES).is_ok());
+    assert!(matches!(
+        query::check_line_cap(tablepro_core::MAX_QUERY_RESULT_BYTES + 1),
+        Err(DriverError::Unsupported(_))
+    ));
+}
