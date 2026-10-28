@@ -29,7 +29,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Duplicate produces a new row with a distinct name. When the source has a saved database password, the copy's credential form opens with an empty password field; save a new password and verify both connections work independently. **2026-10-12 historical run:** distinct name passed ("(copy)"); the copy did not reuse the password but did not ask for one either, it failed and offered Edit Connection. Fixed in [#823](https://github.com/cozyGarage/BookiE/pull/823); no installed retest is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
 - [ ] The Name field in the connect dialog is used when set, and the derived `user@host` label still appears when it is blank.
 - [ ] Two connections to the same endpoint stay separate after reconnecting to each. This is the regression the id-first identity change fixed.
-- [ ] For MongoDB, the connect dialog shows Authentication database; save `admin` for a user defined there while Database is `appdb`, reconnect, and confirm connections with different authentication databases stay separate. **Not run.**
+- [x] For MongoDB, the connect dialog shows Authentication database; save `admin` for a user defined there while Database is `appdb`, reconnect, and confirm connections with different authentication databases stay separate. **Not run.** **2026-10-28 native Wayland, light, `bb9202644` debug build:** the MongoDB form showed an "Authentication database (optional)" row between Database and Username; with the user defined in `admin` and Database `appdb` on MongoDB 7, a connection without it failed with "Username or password is wrong."; after saving `admin` in that row it connected, `auth_source` was stored as `admin`, and it reconnected after an app restart.
 - [ ] On PostgreSQL, right-click a schema and hide it. Confirm its tables and views disappear, search cannot reveal them, the filter menu can restore one or all schemas, and each connection retains its own hidden-schema list after reconnecting. **2026-10-12 Hyprland dark:** hide, search and restore one schema passed; per-connection retention after reconnect not run.
 
 ## Long-query notice
@@ -55,21 +55,21 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Built-in SSH host keys and tunnel loss
 
-- [ ] A new host shows its fingerprint before trust; decline/cancel writes no key and opens no database connection. Explicit acceptance persists only that key.
-- [ ] A changed key is refused. Reconnect never silently learns an unknown key.
-- [ ] Bastion loss retires affected editor sessions and starts reconnect promptly; a result from the old session cannot replace current state.
+- [ ] A new host shows its fingerprint before trust; decline/cancel writes no key and opens no database connection. Explicit acceptance persists only that key. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container:** "Trust this SSH host?" showed the ssh-ed25519 fingerprint before any database connection; after Trust the tunnel opened and the database was reached. The Cancel path and the check that only that key is persisted were not run. The dialog opened as a separate window centred on the screen, not on the app window.
+- [x] A changed key is refused. Reconnect never silently learns an unknown key. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container:** after the bastion was recreated with new host keys, the reconnect was refused with "ssh host key changed … stored fingerprint differs (line 2)" and no new key was learned.
+- [ ] Bastion loss retires affected editor sessions and starts reconnect promptly; a result from the old session cannot replace current state. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container:** stopping the bastion during an open session showed "Connection lost — reconnecting (attempt 2, will keep retrying)" with a Retry button; session retirement and stale-result handling were not checked.
 
 ## SSH agent (built-in client)
 
-- [ ] Choose "SSH agent" in the SSH section with a key loaded in ssh-agent: the connection authenticates without a password or key file prompt.
-- [ ] With the agent stopped, the error says the agent could not be reached.
+- [x] Choose "SSH agent" in the SSH section with a key loaded in ssh-agent: the connection authenticates without a password or key file prompt. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container, scratch `HOME` and a private ssh-agent:** with "SSH agent" chosen and the fixture key loaded in a private agent, the tunnel authenticated with no key-file or password prompt and the database was reached; the first attempt failed with "ssh: authentication failed" only because the bastion image still held an older authorized key.
+- [x] With the agent stopped, the error says the agent could not be reached. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container, scratch `HOME` and a private ssh-agent:** with the agent stopped, the error read "ssh: ssh-agent: Unable to connect to ssh-agent. The environment variable 'SSH_AUTH_SOCK' was …".
 
 ## System OpenSSH tunnel
 
 Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-askpass` beside the app binary, or an installed package).
 
-- [ ] Turn on "Use system OpenSSH" in the SSH section and connect to a host already in `~/.ssh/known_hosts`: no prompt, the connection works.
-- [ ] Connect to a new host: a "Trust this SSH host?" dialog shows the fingerprint; Cancel fails the connection and writes nothing.
+- [ ] Turn on "Use system OpenSSH" in the SSH section and connect to a host already in `~/.ssh/known_hosts`: no prompt, the connection works. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container, scratch `HOME` and a private ssh-agent:** a host already in `known_hosts` was not run; see the next item for a new host.
+- [x] Connect to a new host: a "Trust this SSH host?" dialog shows the fingerprint; Cancel fails the connection and writes nothing. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container, scratch `HOME` and a private ssh-agent:** with "Use system OpenSSH" and the `tablepro-askpass` helper beside the binary, a new host showed the fingerprint dialog; Cancel failed the connection with "ssh host-key trust was refused" and wrote no key; Trust then reached the database, and the key was stored in BookiE's own `known_hosts` while the scratch `~/.ssh/known_hosts` stayed empty.
 - [ ] A host reached through a `ProxyJump` line in `~/.ssh/config` connects.
 - [ ] A new key at a `ProxyJump` hop requires the same explicit approval as a new destination key; declining does not add the jump key to `known_hosts`.
 - [ ] A saved password is used for the target host; a jump host asking for a password gets a dialog instead of the saved one.
