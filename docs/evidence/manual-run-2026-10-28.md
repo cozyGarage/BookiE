@@ -4,7 +4,7 @@ This record covers a driven run of the app built from source. It is not an insta
 
 ## Identity
 
-- Source: `bb9202644` on `linux` (clean checkout, debug build with `cargo build -p tablepro-app`).
+- Source: `bb9202644` on `linux` (clean checkout, debug build with `cargo build -p tablepro-app`) for most checks. A last smoke run used a release build of `9b3dff901`, installed with `cargo install --locked --path apps/linux/app` into a private prefix (78 MB binary).
 - Session: native Wayland on Hyprland 0.56.2, display scale 1, dark appearance, window tiled to 922 px wide.
 - Toolkit: GTK 4.24.1, libadwaita 1.10.0, GtkSourceView 5.22.0, Linux 7.2.8.
 - Profile: private `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME`, `GSETTINGS_BACKEND=memory`, so the user's saved connections and settings were not touched.
@@ -26,9 +26,10 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Export dialog | CSV options hide for JSON; SQL options appear only for SQL; Excel absent for an unknown total, as already recorded |
 | Editor files | Passed: Ctrl+O, Ctrl+S with and without a file, Ctrl+Shift+S, changed-on-disk dialog (Cancel, Overwrite), close prompt (Save), restart restore with unsaved text, deleted-file restore with its toast |
 | PostgreSQL backup and restore | Passed: a 31 MB dump, restore after approval returned a changed row, restore refused on a read-only connection before any chooser |
-| CSV import | Passed on SQLite: semicolon and header detected, prefill, three rows written to the right columns |
+| CSV import | Passed on SQLite: semicolon and comma files detected, prefill, a changed mapping, a headerless file, rows written to the right columns |
 | MySQL 8.4 | Both backup actions explain they are PostgreSQL only; Catalog says the engine does not list the kind; Session kept a user variable; a passwordless root was refused ([#1861](https://github.com/cozyGarage/BookiE/issues/1861) reproduced); the view is listed under Tables |
 | MongoDB 7 | Collection browse works; SQL export absent; Excel offered for a known total |
+| Installed release build | Started, connected, browsed, ran a query and showed version 0.2.0 in About; no icon files, so the launcher icon is unchecked |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -46,7 +47,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 
 ## Not run
 
-Connections and SSH items other than the Production marker and the 2-second timeout, ClickHouse, SQL Server and Redis items, the remaining MySQL and MongoDB items, high contrast, input-method editing, Save As… in the changed-on-disk dialog, the Discard and Cancel paths of the close prompt, comma and headerless CSV files, changing a CSV mapping, the backup progress window and browse-tab refresh after a restore, and an installed package: this run used a debug build started from the build directory, not an installed app.
+Connections and SSH items other than the Production marker and the 2-second timeout, ClickHouse, SQL Server and Redis items, the remaining MySQL and MongoDB items, high contrast, input-method editing, Save As… in the changed-on-disk dialog, the Discard and Cancel paths of the close prompt, the backup progress window and browse-tab refresh after a restore, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
 
 ## Cleanup
 
