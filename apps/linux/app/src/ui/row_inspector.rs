@@ -173,6 +173,7 @@ fn field_row(field: &InspectorField) -> adw::ActionRow {
         .subtitle(&field.text)
         .subtitle_lines(0)
         .subtitle_selectable(true)
+        .use_markup(false)
         .build();
     row.add_css_class("property");
     if field.is_null {
@@ -286,5 +287,20 @@ mod tests {
         assert!(inspector.showing_placeholder());
         inspector.set_visible(true);
         assert!(inspector.is_visible());
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn markup_like_values_and_names_are_shown_as_typed() {
+        use relm4::adw::prelude::*;
+        relm4::adw::init().unwrap();
+        let columns = [column("a<b&c", "date")];
+        let fields = inspector_fields(&columns, &[Value::Undecodable("DATE".into())]);
+
+        let row = field_row(&fields[0]);
+
+        assert!(!row.uses_markup());
+        assert_eq!(row.subtitle().as_deref(), Some("<undecodable DATE>"));
+        assert!(row.title().contains("a<b&c"));
     }
 }

@@ -1151,6 +1151,11 @@
       "tablepro-app",
       "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::row_inspector::tests::markup_like_values_and_names_are_shown_as_typed"
     ]
   ],
   "keyring": [
