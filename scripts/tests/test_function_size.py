@@ -21,6 +21,15 @@ def measure_source(checker, source):
 
 
 class FunctionSizeTests(unittest.TestCase):
+    def test_generated_arch_vendor_source_is_not_scanned(self):
+        checker = load_checker()
+        with tempfile.TemporaryDirectory(prefix="bookie-function-size-") as temporary:
+            root = Path(temporary)
+            source = root / "apps/linux/packaging/arch/src/TablePro/cargo-vendor/x/src/lib.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text("fn f() {}\n", encoding="utf8")
+            assert checker.source_files(root) == []
+
     def test_a_brace_in_a_literal_does_not_swallow_the_rest_of_the_file(self):
         checker = load_checker()
         source = (

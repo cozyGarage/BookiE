@@ -104,6 +104,7 @@ async fn value_contract_mysql_unparseable_procedure_uses_human_approval_before_e
     let container = Mysql::default()
         .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
         .expect("start MySQL");
