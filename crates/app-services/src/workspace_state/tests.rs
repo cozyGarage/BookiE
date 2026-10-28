@@ -249,7 +249,7 @@ fn prefetch_cannot_replace_a_save_started_while_snapshot_is_loading() {
         prefetch_connections_coordinated(
             &prefetch_memory,
             &[id],
-            || {},
+            || Ok(()),
             || {
                 load_started_sender.send(()).unwrap();
                 continue_load_receiver.recv().unwrap();
@@ -273,6 +273,32 @@ fn prefetch_cannot_replace_a_save_started_while_snapshot_is_loading() {
 }
 
 #[test]
+fn a_failed_prefetch_flush_keeps_the_cached_draft_and_skips_the_disk_snapshot() {
+    let memory = Mutex::new(Memory::default());
+    let queue = Mutex::new(WorkspaceQueue::default());
+    let id = Uuid::new_v4();
+    save_connection_coordinated(&memory, &queue, id, connection("SELECT new"), None);
+    let mut loaded = false;
+    let mut disk_state = WorkspaceState::default();
+    disk_state.connections.insert(id.to_string(), connection("SELECT old"));
+
+    let result = prefetch_connections_coordinated(
+        &memory,
+        &[id],
+        || Err(WorkspaceFlushError::WriteFailed),
+        || {
+            loaded = true;
+            Ok((disk_state, HashSet::new()))
+        },
+    );
+
+    assert_eq!(result, Err(WorkspaceFlushError::WriteFailed));
+    assert!(!loaded, "a failed flush must not cache a stale disk snapshot");
+    let cached = memory.lock().unwrap().cache.get(&id).cloned().flatten().unwrap();
+    assert!(matches!(&cached.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT new"));
+}
+
+#[test]
 fn a_save_does_not_wait_for_a_slow_prefetch() {
     let memory = Arc::new(Mutex::new(Memory::default()));
     let queue = Arc::new(Mutex::new(WorkspaceQueue::default()));
@@ -285,7 +311,7 @@ fn a_save_does_not_wait_for_a_slow_prefetch() {
         prefetch_connections_coordinated(
             &prefetch_memory,
             &[id],
-            || {},
+            || Ok(()),
             || {
                 load_started_sender.send(()).unwrap();
                 continue_load_receiver.recv().unwrap();
@@ -946,7 +972,7 @@ fn a_late_prefetch_cannot_restore_a_deleted_cache_entry() {
         prefetch_connections_coordinated(
             &store.inner.memory,
             &[connection],
-            || {},
+            || Ok(()),
             || {
                 let snapshot = load_locked(&store.inner.paths)?;
                 store.forget_connection(connection);
