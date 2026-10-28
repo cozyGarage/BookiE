@@ -84,8 +84,8 @@ jobs:
       CARGO_HOME: /cargo
       RUSTC_WRAPPER: ""
       PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      CARGO_TARGET_DIR: /target
-      TMPDIR: /target
+      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
+      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
       TABLEPRO_TOOL_DIR: /tools
       CARGO_PROFILE_CI_STRIP: symbols
     steps:
@@ -95,6 +95,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -119,6 +120,10 @@ jobs:
           path: gtk-artifact/
           if-no-files-found: error
           retention-days: 2
+      - name: Clean builder scratch
+        if: always()
+        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+
 
   clippy:
     runs-on: build-host
@@ -127,12 +132,12 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target
+      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
       TABLEPRO_TOOL_DIR: /tools
       RUSTC_WRAPPER: ""
       PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      TMPDIR: /target
+      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
       - name: Check out
         shell: bash
@@ -140,6 +145,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -151,6 +157,10 @@ jobs:
       - name: Clippy
         run: |
           cd src && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
+      - name: Clean builder scratch
+        if: always()
+        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+
 
   test-build:
     runs-on: build-host
@@ -160,8 +170,8 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target
-      TMPDIR: /target
+      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
+      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
       TABLEPRO_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
@@ -175,6 +185,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -191,6 +202,10 @@ jobs:
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/default" "${{ github.sha }}" default
+      - name: Clean builder scratch
+        if: always()
+        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+
 
   duckdb-build:
     runs-on: build-host
@@ -200,8 +215,8 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target
-      TMPDIR: /target
+      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
+      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
       TABLEPRO_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
@@ -215,6 +230,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -236,6 +252,10 @@ jobs:
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/duckdb" "${{ github.sha }}" duckdb
+      - name: Clean builder scratch
+        if: always()
+        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+
 
   unit:
     runs-on: any-host
@@ -341,8 +361,8 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target
-      TMPDIR: /target
+      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
+      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
       TABLEPRO_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
@@ -355,6 +375,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -382,6 +403,10 @@ jobs:
           path: floor-artifact/
           if-no-files-found: error
           retention-days: 2
+      - name: Clean builder scratch
+        if: always()
+        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+
 
   distro-floor:
     runs-on: any-host
@@ -1003,8 +1028,8 @@ jobs:
       CARGO_HOME: /cargo
       RUSTC_WRAPPER: ""
       PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      CARGO_TARGET_DIR: /target
-      TMPDIR: /target
+      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
+      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
       - name: Check out
         shell: bash
@@ -1012,6 +1037,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -1030,3 +1056,6 @@ jobs:
       - name: Vendored crates equal upstream plus their patches
         run: |
           cd src && python3 scripts/vendor-patches.py check
+      - name: Clean builder scratch
+        if: always()
+        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
