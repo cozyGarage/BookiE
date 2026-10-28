@@ -606,11 +606,11 @@ impl Connection for PgConnection {
         if pool_saturation::is_saturated(&self.pool) {
             return Ok(());
         }
-        match sqlx::query("SELECT 1").execute(&self.pool).await {
-            Ok(_) => Ok(()),
-            Err(sqlx::Error::PoolTimedOut) if pool_saturation::is_saturated(&self.pool) => Ok(()),
-            Err(error) => Err(map_sqlx_error(error)),
-        }
+        sqlx::query("SELECT 1")
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
+        Ok(())
     }
 
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
