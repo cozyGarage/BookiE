@@ -32,8 +32,9 @@ permissions:
   contents: read
   packages: read
 
-# A newer pull request push supersedes its in-flight run. Push runs on
-# linux or main keep the cheap tier only; Forgejo is the merge gate.
+# A newer pull request push supersedes its in-flight run. Pull requests run
+# the driver TLS tier; linux or main pushes keep the cheap tier. Forgejo
+# remains the acceptance gate while the remaining tiers migrate.
 # Scheduled and dispatched runs keep their own group so a manual full
 # Build Linux is never cancelled by ordinary branch traffic.
 concurrency:
@@ -539,7 +540,7 @@ jobs:
           if-no-files-found: error
 
   driver-tls:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Driver TLS fixture (docker)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
