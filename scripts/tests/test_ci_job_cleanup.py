@@ -62,6 +62,12 @@ class CiJobCleanupTests(unittest.TestCase):
                                 block,
                             )
 
+    def test_distro_floor_uses_container_shell_without_host_cache_wrapper(self):
+        job = runner_jobs(WORKFLOWS[0])["distro-floor"]
+        self.assertIn("    defaults:\n      run:\n        shell: bash", job)
+        self.assertNotIn("bookie-ci-cache", job)
+        self.assertNotIn("CARGO_TARGET_DIR:", job)
+
     def test_finalizer_removes_job_files_and_keeps_shared_targets(self):
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"

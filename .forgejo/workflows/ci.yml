@@ -469,8 +469,9 @@ jobs:
     needs: [guards, clippy, floor-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/floor-${{ matrix.base }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -479,7 +480,6 @@ jobs:
             mcp_port_slot: 10
     steps:
       - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
