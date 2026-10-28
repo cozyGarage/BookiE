@@ -375,14 +375,17 @@ pub(super) fn comment_editability(capability: ColumnCommentCapability, is_existi
 fn configure_comment_row(row: &adw::EntryRow, capability: ColumnCommentCapability, is_existing: bool) {
     match comment_editability(capability, is_existing) {
         CommentEditability::Unsupported => {
+            row.set_visible(false);
             row.set_sensitive(false);
             row.set_tooltip_text(Some(&crate::tr!("This database has no column comments.")));
         }
         CommentEditability::CreateOnly => {
+            row.set_visible(true);
             row.set_sensitive(false);
             row.set_tooltip_text(Some(&crate::tr!("This driver only supports comments on new columns.")));
         }
         CommentEditability::Editable => {
+            row.set_visible(true);
             row.set_sensitive(true);
             row.set_tooltip_text(None);
         }
@@ -390,9 +393,9 @@ fn configure_comment_row(row: &adw::EntryRow, capability: ColumnCommentCapabilit
 }
 
 /// Comment (AdwEntryRow). Empty input means no comment, matching the
-/// default-value row. The field stays visible but insensitive where
-/// the engine cannot store one, or where it can only store one at
-/// CREATE time.
+/// default-value row. The field is hidden where the engine cannot store
+/// one, and stays visible but insensitive where it can only store one
+/// at CREATE time.
 fn add_comment_row(
     row: &adw::ExpanderRow,
     index: usize,
@@ -567,6 +570,29 @@ mod tests {
             assert_eq!(row.is_sensitive(), expected_sensitive);
             assert_eq!(row.text(), "preserved comment");
             assert_eq!(row.tooltip_text().is_some(), !expected_sensitive);
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_comment_row_is_shown_only_for_engines_that_can_store_one() {
+        adw::init().unwrap();
+        for (capability, is_existing, expected_visible) in [
+            (ColumnCommentCapability::ExistingAndNewInline, true, true),
+            (ColumnCommentCapability::ExistingAndNewSeparate, true, true),
+            (ColumnCommentCapability::NewColumnOnlyInline, true, true),
+            (ColumnCommentCapability::Unsupported, false, false),
+            (ColumnCommentCapability::Unsupported, true, false),
+        ] {
+            let row = adw::EntryRow::new();
+
+            configure_comment_row(&row, capability, is_existing);
+
+            assert_eq!(
+                row.is_visible(),
+                expected_visible,
+                "{capability:?}, existing: {is_existing}"
+            );
         }
     }
 }
