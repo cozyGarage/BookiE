@@ -73,6 +73,7 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   missing daylight-saving hour is shown as undecodable and is never turned into a
   literal, because the instant cannot be known.
 - **SQLite real numbers:** negative zero and NaN cannot be bound as parameters.
+- **SQLite views are not listed.** The sidebar lists tables only; a view exists and can be queried in the SQL editor, but it does not appear for browsing.
 - **SQLite JSON aggregates can return malformed text on older system libraries** (TEST-25 /
   [#1545](https://github.com/cozyGarage/BookiE/issues/1545)). With a SQL NULL
   key, `json_group_object(key, value ORDER BY ...)` emits a malformed `:2`
@@ -108,7 +109,7 @@ This page records current branch behavior, including changes made after 0.2.0 wa
 - Multi-cursor editing is not available (UI-22 / [#552](https://github.com/cozyGarage/BookiE/issues/552)). Split panes and SQL code folding are available. Vim keys are an opt-in preference; typed vim commands in a running editor are not yet covered by an installed scenario. Preview tabs are temporary and are not restored after restart; tabs you keep are restored (UI-17b). Query history now opens in a docked panel (UI-18).
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles; a typed activity console is deferred and the activity dialog stays a plain result grid (UI-23).
 - No server messages (NOTICE, PRINT) and no timing breakdown; timing shows elapsed time only (UI-20, PERF-4 / [#550](https://github.com/cozyGarage/BookiE/issues/550)).
-- No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Enum and set pickers and tab-separated row paste are implemented.
+- No foreign-key value picker or estimated row counts (UI-19 / [#549](https://github.com/cozyGarage/BookiE/issues/549)). Go to Referenced Row from a foreign-key cell, enum and set pickers and tab-separated row paste are implemented.
 - PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)); this display filter does not reduce catalog query work. Many-schema performance and restricted-role metadata acceptance remain with [#580](https://github.com/cozyGarage/BookiE/issues/580), reopened on 2026-10-22.
 - Database snapshots and one-click rollback remain unavailable. ADR 0015 records the design; implementation is post-0.2.0 backlog work tracked by SNAP-2 to SNAP-4 / [#547](https://github.com/cozyGarage/BookiE/issues/547). PostgreSQL logical backup and restore are available through the installed `pg_dump` and `pg_restore` tools; see the [user guide](user-guide.md#back-up-and-restore-postgresql). They are not point-in-time snapshots.
 - Accessibility is not fully verified with Orca, keyboard-only navigation or high contrast (DOC-3). The sidebar and filter-name labels from [#658](https://github.com/cozyGarage/BookiE/issues/658) were fixed in [#751](https://github.com/cozyGarage/BookiE/pull/751); the Environment and Method controls were fixed in [#920](https://github.com/cozyGarage/BookiE/pull/920). The remaining reported controls were rechecked on current `linux` before #658 was closed. Broader acceptance remains under DOC-3.

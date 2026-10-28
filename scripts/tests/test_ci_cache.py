@@ -386,7 +386,7 @@ class CiCacheTests(unittest.TestCase):
                 step = block.split('\n      - name:', 1)[0]
                 if 'shell: bash' in step:
                     preceding = workflow[:workflow.index(step)].rsplit('    runs-on:', 1)[-1]
-                    if 'ci-pilot' in preceding:
+                    if 'any-host' in preceding:
                         self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', preceding, filename)
                         self.assertIn(f'TMPDIR: {pilot_tmp}', preceding, filename)
                         self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', step, filename)
