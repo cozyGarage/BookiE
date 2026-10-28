@@ -84,10 +84,14 @@ pub enum SidebarRowMsg {
     NewTable,
     TableFromCsv,
     HideSchema,
+    ShowDiagram,
 }
 
 #[derive(Debug)]
 pub enum SidebarRowOutput {
+    ShowDiagram {
+        schema: Option<String>,
+    },
     NewTable {
         schema: Option<String>,
     },
@@ -350,6 +354,7 @@ impl FactoryComponent for SidebarRow {
                 Some(&crate::tr!("Show CREATE TABLE")),
                 Some("sidebar-row.show-create-table"),
             );
+            structure_section.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
             menu.append_section(None, &structure_section);
             let mutate_section = gtk::gio::Menu::new();
             mutate_section.append(Some(&crate::tr!("Import CSV\u{2026}")), Some("sidebar-row.import-csv"));
@@ -389,6 +394,10 @@ impl FactoryComponent for SidebarRow {
         let show_create_action = gtk::gio::ActionEntry::builder("show-create-table")
             .activate(move |_, _, _| sender_show.input(SidebarRowMsg::ShowCreateTable))
             .build();
+        let sender_diagram = sender.clone();
+        let diagram_action = gtk::gio::ActionEntry::builder("show-diagram")
+            .activate(move |_, _, _| sender_diagram.input(SidebarRowMsg::ShowDiagram))
+            .build();
         let sender_drop = sender.clone();
         let sender_import = sender.clone();
         let import_action = gtk::gio::ActionEntry::builder("import-csv")
@@ -409,6 +418,7 @@ impl FactoryComponent for SidebarRow {
             open_action,
             edit_action,
             show_create_action,
+            diagram_action,
             import_action,
             rename_action,
             truncate_action,
@@ -477,6 +487,7 @@ impl FactoryComponent for SidebarRow {
             SidebarRowMsg::NewTable => SidebarRowOutput::NewTable { schema },
             SidebarRowMsg::TableFromCsv => SidebarRowOutput::TableFromCsv { schema },
             SidebarRowMsg::HideSchema => SidebarRowOutput::HideSchema(schema.unwrap_or_default()),
+            SidebarRowMsg::ShowDiagram => SidebarRowOutput::ShowDiagram { schema },
         };
         let _ = sender.output(output);
     }
@@ -520,6 +531,7 @@ impl SidebarRow {
 
     fn wire_schema_menu(&mut self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
         let menu = gtk::gio::Menu::new();
+        menu.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
         menu.append(Some(&crate::tr!("Hide schema")), Some("sidebar-row.hide-schema"));
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(root);
@@ -527,8 +539,12 @@ impl SidebarRow {
         let hide_action = gtk::gio::ActionEntry::builder("hide-schema")
             .activate(move |_, _, _| sender_for_hide.input(SidebarRowMsg::HideSchema))
             .build();
+        let sender_for_diagram = sender.clone();
+        let diagram_action = gtk::gio::ActionEntry::builder("show-diagram")
+            .activate(move |_, _, _| sender_for_diagram.input(SidebarRowMsg::ShowDiagram))
+            .build();
         let group = gtk::gio::SimpleActionGroup::new();
-        group.add_action_entries([hide_action]);
+        group.add_action_entries([hide_action, diagram_action]);
         root.insert_action_group("sidebar-row", Some(&group));
         let popover_for_unmap = popover.clone();
         root.connect_unmap(move |_| popover_for_unmap.popdown());

@@ -71,6 +71,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
             SidebarRowOutput::DropTable { schema, name } => AppMsg::DropTablePrompt { schema, table: name },
             SidebarRowOutput::NewTable { schema } => AppMsg::NewTableTab { schema },
             SidebarRowOutput::TableFromCsv { schema } => AppMsg::CreateTableFromCsv { schema },
+            SidebarRowOutput::ShowDiagram { schema } => AppMsg::ShowErDiagram { schema },
             SidebarRowOutput::HideSchema(schema) => AppMsg::HideSidebarSchema(schema),
         });
 

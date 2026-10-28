@@ -67,11 +67,12 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 ![The table menu in the sidebar](images/table-menu-light.png)
 
-The sidebar table menu has Edit Structure, Show CREATE TABLE, Import CSV, Rename Table, Truncate Table and Drop Table.
+The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, Import CSV, Rename Table, Truncate Table and Drop Table.
 
 - Edit Structure has tabs for columns, indexes and foreign keys, and an SQL Preview tab.
 - Rename Table is refused while the table has open tabs, so no pending change is lost.
 - Truncate Table asks for confirmation and runs through the same guard as every other statement. SQLite does not support it.
+- Show ER Diagram (also on a schema row) draws the schema's tables as cards with their columns, key badges and foreign-key relations. It reads at most 150 tables with the connection's metadata calls, under the operation timeout, and can be cancelled. Pan by dragging, zoom with the buttons or Ctrl+scroll, and pick a table in the list to centre it. Cards are laid out automatically; they cannot be moved, and the diagram cannot be exported yet.
 
 ![The structure view of a table](images/structure-light.png)
 

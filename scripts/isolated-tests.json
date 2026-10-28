@@ -1151,6 +1151,31 @@
       "tablepro-app",
       "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::canvas::tests::a_diagram_is_laid_out_with_one_card_per_table_and_fits_the_view"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::canvas::tests::clicking_a_card_selects_it_and_clicking_empty_space_clears_the_selection"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::canvas::tests::zoom_steps_stay_within_the_limits_and_fit_restores_the_whole_diagram"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::card_text::tests::a_card_is_as_tall_as_its_rows_and_as_wide_as_its_longest_line"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::card_text::tests::a_very_long_name_is_cut_short"
     ]
   ],
   "keyring": [

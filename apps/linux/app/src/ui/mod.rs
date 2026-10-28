@@ -8,6 +8,7 @@ mod connect_dialog;
 pub(crate) mod connection_bundle;
 mod connection_row;
 mod count_format;
+mod diagram;
 mod editor;
 mod explain_dialog;
 mod explain_tree;

@@ -139,6 +139,9 @@ pub enum AppMsg {
     ShowAuditLog,
     ShowAuditOperation(Uuid),
     ShowCatalog,
+    ShowErDiagram {
+        schema: Option<String>,
+    },
     ExplainActiveQuery,
     ShowPreferences,
     NewWindow,

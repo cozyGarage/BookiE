@@ -1025,6 +1025,15 @@ impl SimpleComponent for App {
                 &self.preferences,
                 self.catalog_dialog_cancel.borrow().clone(),
             ),
+            AppMsg::ShowErDiagram { schema } => crate::ui::diagram::present(
+                self.window.upcast_ref::<gtk::Window>(),
+                schema,
+                self.connection_id,
+                &self.database,
+                &self.preferences,
+                crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
+                self.catalog_dialog_cancel.borrow().clone(),
+            ),
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
             AppMsg::ShowPreferences => super::preferences::present(
                 &self.window,
