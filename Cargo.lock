@@ -6579,6 +6579,7 @@ dependencies = [
  "sha2 0.11.1",
  "tablepro-core",
  "tablepro-driver-mongodb",
+ "tablepro-driver-mysql",
  "tablepro-driver-postgres",
  "tablepro-policy",
  "tablepro-storage",

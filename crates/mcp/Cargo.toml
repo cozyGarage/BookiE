@@ -36,8 +36,9 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"
 tempfile.workspace = true
 tablepro-driver-mongodb = { path = "../drivers/mongodb" }
 tablepro-driver-postgres = { path = "../drivers/postgres" }
+tablepro-driver-mysql = { path = "../drivers/mysql" }
 testcontainers.workspace = true
-testcontainers-modules = { workspace = true, features = ["mongo", "postgres"] }
+testcontainers-modules = { workspace = true, features = ["mongo", "postgres", "mysql"] }
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
 secrecy.workspace = true
 

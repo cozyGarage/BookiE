@@ -55,6 +55,16 @@ impl McpToolError {
         })
     }
 
+    pub(crate) fn preview_not_transactional() -> Self {
+        Self {
+            code: "preview_not_transactional",
+            operation_outcome: OperationOutcome::NotStarted,
+            transaction_outcome: TransactionOutcome::RolledBack,
+            message: "The statement touches a table whose storage engine ignores transactions, so a preview would change data that a rollback cannot undo. Nothing was executed.",
+            legacy_diagnostic: "preview refused: the statement touches a non-transactional table".into(),
+        }
+    }
+
     pub(crate) fn request_failed() -> Self {
         Self {
             code: "request_failed",
