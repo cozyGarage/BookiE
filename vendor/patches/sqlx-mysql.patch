@@ -545,10 +545,20 @@ index 4e9cc2b..d760b71 100755
 +    }
 +}
 diff --git a/src/protocol/text/column.rs b/src/protocol/text/column.rs
-index b7c9c7e..cb74dc3 100755
+index b7c9c7e..11b15bb 100755
 --- a/src/protocol/text/column.rs
 +++ b/src/protocol/text/column.rs
-@@ -171,10 +171,11 @@ impl ProtocolDecode<'_, Capabilities> for ColumnDefinition {
+@@ -148,6 +148,9 @@ impl ProtocolDecode<'_, Capabilities> for ColumnDefinition {
+         let alias = buf.get_bytes_lenenc()?;
+         let name = buf.get_bytes_lenenc()?;
+         let _next_len = buf.get_uint_lenenc()?; // always 0x0c
++        if buf.remaining() < 10 {
++            return Err(err_protocol!("expected 10 bytes in column definition but got {}", buf.remaining()));
++        }
+         let collation = buf.get_u16_le();
+         let max_size = buf.get_u32_le();
+         let type_id = buf.get_u8();
+@@ -171,10 +174,11 @@ impl ProtocolDecode<'_, Capabilities> for ColumnDefinition {
  }
  
  impl ColumnType {
@@ -562,7 +572,7 @@ index b7c9c7e..cb74dc3 100755
  
          match self {
              ColumnType::Tiny if max_size == Some(1) => "BOOLEAN",
-@@ -203,8 +204,10 @@ impl ColumnType {
+@@ -203,8 +207,10 @@ impl ColumnType {
              ColumnType::Geometry => "GEOMETRY",
              ColumnType::Json => "JSON",
  
@@ -574,6 +584,19 @@ index b7c9c7e..cb74dc3 100755
              ColumnType::VarChar | ColumnType::VarString if is_binary => "VARBINARY",
  
              ColumnType::String => "CHAR",
+@@ -264,3 +270,12 @@ impl ColumnType {
+         })
+     }
+ }
++
++#[test]
++fn truncated_column_definition_suffix_is_rejected() {
++    for length in 0..10 {
++        let mut packet = vec![0, 0, 0, 0, 0, 0, 12];
++        packet.extend(vec![0; length]);
++        assert!(ColumnDefinition::decode_with(Bytes::from(packet), Capabilities::empty()).is_err());
++    }
++}
 diff --git a/src/protocol/text/row.rs b/src/protocol/text/row.rs
 index 53f7c47..bb78c64 100755
 --- a/src/protocol/text/row.rs
