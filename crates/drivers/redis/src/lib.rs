@@ -237,7 +237,7 @@ impl Connection for RedisConnection {
             });
         }
         let mut conn = self.conn.lock().await;
-        let args = split_redis_cli(trimmed);
+        let args = split_redis_cli(trimmed)?;
         if args.is_empty() {
             return Err(DriverError::query("empty Redis command"));
         }
@@ -246,9 +246,11 @@ impl Connection for RedisConnection {
                 "Redis Pub/Sub, MONITOR, and client tracking streams are not supported by the request/response query interface".into(),
             ));
         }
-        let mut cmd = redis::cmd(&args[0]);
+        let command =
+            std::str::from_utf8(&args[0]).map_err(|_| DriverError::query("Redis command names must be valid UTF-8"))?;
+        let mut cmd = redis::cmd(command);
         for arg in &args[1..] {
-            cmd.arg(arg);
+            cmd.arg(arg.as_slice());
         }
         let value: RedisValue = cmd.query_async(&mut *conn).await.map_err(map_redis_error)?;
         Ok(redis_value_to_result(value))
@@ -516,8 +518,8 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
     }
 }
 
-fn is_redis_stream_command(args: &[String]) -> bool {
-    let Some(command) = args.first() else {
+fn is_redis_stream_command(args: &[Vec<u8>]) -> bool {
+    let Some(command) = args.first().and_then(|value| std::str::from_utf8(value).ok()) else {
         return false;
     };
     if matches!(
@@ -527,8 +529,8 @@ fn is_redis_stream_command(args: &[String]) -> bool {
         return true;
     }
     command.eq_ignore_ascii_case("CLIENT")
-        && args.get(1).is_some_and(|arg| arg.eq_ignore_ascii_case("TRACKING"))
-        && args.get(2).is_some_and(|arg| arg.eq_ignore_ascii_case("ON"))
+        && args.get(1).is_some_and(|arg| arg.eq_ignore_ascii_case(b"TRACKING"))
+        && args.get(2).is_some_and(|arg| arg.eq_ignore_ascii_case(b"ON"))
 }
 
 fn text_col(name: &str) -> ColumnInfo {
@@ -641,41 +643,87 @@ fn parse_db_name(table: &str) -> Result<u8, DriverError> {
         .map_err(|_| DriverError::query(format!("invalid Redis database name: {table}")))
 }
 
-/// Minimal Redis CLI tokenizer: splits on whitespace, respects double quotes.
-pub fn split_redis_cli(input: &str) -> Vec<String> {
+fn split_redis_cli(input: &str) -> Result<Vec<Vec<u8>>, DriverError> {
     let mut out = Vec::new();
-    let mut cur = String::new();
-    let mut in_quotes = false;
+    let mut cur = Vec::new();
+    let mut quote = None;
     let mut token_started = false;
     let mut chars = input.chars().peekable();
     while let Some(c) = chars.next() {
         match c {
-            '"' => {
-                in_quotes = !in_quotes;
+            '"' if quote == Some('"') => quote = None,
+            '"' if quote.is_none() => {
+                quote = Some('"');
                 token_started = true;
             }
-            '\\' if in_quotes => {
-                if let Some(next) = chars.next() {
-                    cur.push(next);
-                    token_started = true;
-                }
+            '\'' if quote == Some('\'') => quote = None,
+            '\'' if quote.is_none() => {
+                quote = Some('\'');
+                token_started = true;
             }
-            c if c.is_whitespace() && !in_quotes => {
+            '\\' if quote == Some('"') => append_double_quoted_escape(&mut chars, &mut cur)?,
+            '\\' if quote == Some('\'') => append_single_quoted_escape(&mut chars, &mut cur),
+            c if c.is_whitespace() && quote.is_none() => {
                 if token_started {
                     out.push(std::mem::take(&mut cur));
                     token_started = false;
                 }
             }
             _ => {
-                cur.push(c);
+                let mut encoded = [0; 4];
+                cur.extend_from_slice(c.encode_utf8(&mut encoded).as_bytes());
                 token_started = true;
             }
         }
     }
+    if quote.is_some() {
+        return Err(invalid_redis_command_quoting());
+    }
     if token_started {
         out.push(cur);
     }
-    out
+    Ok(out)
+}
+
+fn append_double_quoted_escape(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    token: &mut Vec<u8>,
+) -> Result<(), DriverError> {
+    let Some(escape) = chars.next() else {
+        return Err(invalid_redis_command_quoting());
+    };
+    match escape {
+        '"' | '\\' => token.push(escape as u8),
+        'n' => token.push(b'\n'),
+        'r' => token.push(b'\r'),
+        't' => token.push(b'\t'),
+        'b' => token.push(b'\x08'),
+        'a' => token.push(b'\x07'),
+        'x' => {
+            let Some(high) = chars.next().and_then(|digit| digit.to_digit(16)) else {
+                return Err(invalid_redis_command_quoting());
+            };
+            let Some(low) = chars.next().and_then(|digit| digit.to_digit(16)) else {
+                return Err(invalid_redis_command_quoting());
+            };
+            token.push(((high << 4) | low) as u8);
+        }
+        _ => return Err(invalid_redis_command_quoting()),
+    }
+    Ok(())
+}
+
+fn append_single_quoted_escape(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, token: &mut Vec<u8>) {
+    if let Some(next @ ('\'' | '\\')) = chars.peek().copied() {
+        chars.next();
+        token.push(next as u8);
+        return;
+    }
+    token.push(b'\\');
+}
+
+fn invalid_redis_command_quoting() -> DriverError {
+    DriverError::query("invalid Redis command quoting or escape")
 }
 
 /// An empty database means "use Redis's default (0)". Anything else must be

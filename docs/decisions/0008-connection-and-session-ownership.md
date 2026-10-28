@@ -24,7 +24,7 @@ The GUI must ask before accepting an unknown SSH host key on every hop, for buil
 
 An unknown write outcome blocks governed writes for that connection. Recovery uses the approved connection restart path. Journal-wide failure and unresolved durable recovery obligations stay fail-closed. Reconnect cannot erase an audit intent or prove whether the server committed a write. Old-generation callbacks cannot clear or poison a replacement's state. Each live connection owns its audit generation; a shared generation across connections is not this contract.
 
-Remaining transport, audit and installed acceptance live on [the B4 board](../b4-task-board.md).
+Remaining transport, audit and installed acceptance live on [the B4 board](../lane-boards.md#b4-transport-and-sessions).
 
 ## Rationale
 

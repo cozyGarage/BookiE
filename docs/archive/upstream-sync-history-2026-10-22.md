@@ -174,7 +174,7 @@ Reviewed macOS main at `5c2df3b60cd40c25ba86c57e3d1c87499340cb3c` against BookiE
 
 ## 2026-09-25: system OpenSSH transport
 
-Historical adoption checkpoint. The route is now assembled by shared transport and used by GUI/agentd; current behavior and remaining acceptance are in [connection handling](../connections.md) and [the B4 board](../b4-task-board.md).
+Historical adoption checkpoint. The route is now assembled by shared transport and used by GUI/agentd; current behavior and remaining acceptance are in [connection handling](../connections.md) and [the B4 board](../lane-boards.md#b4-transport-and-sessions).
 
 At this 2026-09-25 checkpoint, `crates/ssh/src/openssh/` added the system OpenSSH backend beside the unchanged russh `SshTunnel`. The transport, storage, app and `agentd` wiring happened later; current behavior and remaining acceptance are linked above.
 

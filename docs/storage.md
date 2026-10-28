@@ -12,14 +12,21 @@ BookiE uses XDG files for local state, SQLite for query history, a JSONL audit j
 | Workspace tabs | JSON | `$XDG_CONFIG_HOME/tablepro/workspace_state.json` |
 | Column widths | JSON | `$XDG_CONFIG_HOME/tablepro/column_widths.json` |
 | Table filters | JSON | `$XDG_CONFIG_HOME/tablepro/filter_settings.json` |
+| Hidden columns, column order | JSON | `$XDG_CONFIG_HOME/tablepro/hidden_columns.json`, `$XDG_CONFIG_HOME/tablepro/column_order.json` |
+| Named filter presets | JSON | `$XDG_CONFIG_HOME/tablepro/named_filter_presets.json` |
+| CSV import column mappings | JSON | `$XDG_CONFIG_HOME/tablepro/csv_import_mappings.json` |
+| Connection organization (groups, tags, favorite flag) | JSON, beside `connections.json` | `$XDG_CONFIG_HOME/tablepro/connection-organization.json` |
+| Query favorites | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/favorites.json` |
 | Query history | SQLite with FTS5 | `$XDG_CONFIG_HOME/tablepro/history.db` |
 | Policy | TOML | `$XDG_CONFIG_HOME/tablepro/policy.toml` |
 | Audit journal | Hash-chained JSONL | `$XDG_DATA_HOME/tablepro/audit.jsonl` |
+| MCP token registry (token hashes only) | JSON | `$XDG_CONFIG_HOME/tablepro/mcp-tokens.json` |
+| Built-in SSH known hosts | OpenSSH `known_hosts` format | `$XDG_CONFIG_HOME/tablepro/known_hosts` |
 | Database passwords, SSH passwords, SSH key passphrases | Secret Service through `oo7` | Desktop keyring |
 | GUI-issued MCP token plaintext | Returned once; storage is attempted through Secret Service | Desktop keyring, when the save succeeds |
 | `bookie-agentd` MCP token plaintext | Printed once to stdout, or written to the explicitly selected token file with owner-only permissions | Issuance output; the token registry stores only its hash |
 
-If `XDG_CONFIG_HOME` is unset, config storage falls back to `~/.config/tablepro/`. If `XDG_DATA_HOME` is unset, the audit journal falls back to `~/.local/share/tablepro/`. A development build uses `tablepro-devel` in place of `tablepro` for every path above, the policy file included.
+If `XDG_CONFIG_HOME` is unset, config storage falls back to `~/.config/tablepro/`. If `XDG_DATA_HOME` is unset, the audit journal falls back to `~/.local/share/tablepro/`. A development build uses `tablepro-devel` in place of `tablepro` for every path above that goes through the storage crate, the policy file included. The MCP token registry and the built-in SSH `known_hosts` file are the exceptions: their code builds the path itself and always uses `tablepro`, so a development build shares them with an installed release.
 
 The current history database is under XDG config because that is what `query_history::db_path()` implements. Do not document or migrate it to XDG data without a code change and a tested migration.
 
@@ -33,11 +40,11 @@ Connection records contain host, port, database, username, TLS mode, read-only s
 
 ## Preferences and UI state
 
-Application services own preferences, window state, workspace state, column widths, and table filters. They read from the XDG config directory and use defaults when a file is absent or cannot be decoded. Preferences and window geometry use GSettings when its schema is installed; the development build has a separate `com.tablepro.linux.Devel` schema. The last connection id remains in `window.json`. On first use, legacy `preferences.json` and `window.json` are copied to private `*.before-gsettings.json` files before migration. Every later save also writes the JSON files, so an older package can read current values after rollback. Preferences validate migration writes by reading them back, refuse future migration versions, and block edits when a legacy source is malformed. A failed JSON mirror write rolls back the preferences update. Cargo compiles the same schema used by packages for source-tree runs. If the schema is unavailable, the JSON files remain the source of both settings. To restore the original pre-migration values, copy `preferences.before-gsettings.json` over `preferences.json` after closing BookiE, then restart the newer package; it imports the restored JSON values. For window state, use the matching `window.before-gsettings.json` backup and reset `window-migrated`.
+Application services own preferences, window state, workspace state, column widths, and table filters. They read from the XDG config directory. Failure behavior varies by store; unreadable persisted state must not be assumed to reset safely to defaults. Preferences and window geometry use GSettings when its schema is installed; the development build has a separate `com.tablepro.linux.Devel` schema. The last connection id remains in `window.json`. On first use, legacy `preferences.json` and `window.json` are copied to private `*.before-gsettings.json` files before migration. Every later save also writes the JSON files, so an older package can read current values after rollback. Preferences validate migration writes by reading them back, refuse future migration versions, and block edits when a legacy source is malformed. A failed JSON mirror write rolls back the preferences update. Cargo compiles the same schema used by packages for source-tree runs. If the schema is unavailable, the JSON files remain the source of both settings. To restore the original pre-migration values, copy `preferences.before-gsettings.json` over `preferences.json` after closing BookiE, then restart the newer package; it imports the restored JSON values. For window state, use the matching `window.before-gsettings.json` backup and reset `window-migrated`.
 
 Window state stores size, maximize flag, and the last connection id. Closing a window keeps that id so the next launch can reopen the same connection. An explicit disconnect or deleting that saved connection clears it. Geometry writes do not drop the last connection id.
 
-Workspace state is keyed by connection UUID and limited before it is written. Unknown tab variants deserialize as `Unknown` and are dropped during restore. This lets an older build ignore a newer tab kind without rejecting the whole workspace file.
+Workspace state is keyed by connection UUID and limited before it is written. Unknown tab variants deserialize as `Unknown` and are dropped during restore. This lets an older build ignore a newer tab kind without rejecting the whole workspace file. Editor bodies are separate private draft files. Individual file replacements are atomic, but a workspace save is not atomic across all draft files and metadata: a later failure can leave an earlier draft updated ([#1821](https://github.com/cozyGarage/BookiE/issues/1821)). Prefetch currently loads all saved connections, so one unreadable draft can prevent restoring an unrelated requested workspace ([#1822](https://github.com/cozyGarage/BookiE/issues/1822)).
 
 ## Query history
 
@@ -54,7 +61,7 @@ History export from the GUI writes through a temporary sibling file and a rename
 
 ## Policy
 
-The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A missing file uses the built-in defaults. If a present file cannot be read or parsed, the GUI marks policy unavailable and the local guard receives the built-in defaults; CSV imports and MCP are disabled. Other local SQL operations still use those defaults, so restrictions in the unreadable file are not enforced. A later reload failure keeps the policy already in memory. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
+The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A missing file uses the built-in defaults. The GUI currently uses `Path::exists` for this decision, so a dangling policy symlink is also treated as missing and policy remains marked available ([#1823](https://github.com/cozyGarage/BookiE/issues/1823)). If a present file cannot be read or parsed, the GUI marks policy unavailable and the local guard receives the built-in defaults; CSV imports and MCP are disabled. Other local SQL operations still use those defaults, so restrictions in the unreadable file are not enforced. A later reload failure keeps the policy already in memory. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
 
 ## Audit journal
 

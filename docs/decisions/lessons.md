@@ -1,0 +1,11 @@
+# Decision lessons
+
+Reversed or corrected decisions and closures, each with what was assumed, the evidence that showed otherwise and what changed. Add a row when a closure is reopened or an ADR is superseded. This page records facts; it sets no rule ([documentation lifecycle proposal](../proposals/doc-lifecycle.md)).
+
+| Date | Item | Assumed | Evidence | What changed |
+| --- | --- | --- | --- | --- |
+| 2026-10-21 | [#1281](https://github.com/cozyGarage/BookiE/issues/1281) | A stale SQLite DROP-guard test failure was a product defect. | A shared Cargo target directory reused another worktree's test binary; a fresh target passed. | One target directory per worktree ([validation playbook](../validation-playbook.md#build-reuse-and-safe-parallel-work)). |
+| 2026-10-26 | [#1032](https://github.com/cozyGarage/BookiE/issues/1032) | Closure matched the merged streaming work. | The closure was tied to the wrong PR; aggregate retention acceptance was outstanding. | Reopened; acceptance stays on the issue. |
+| 2026-10-26 | [#790](https://github.com/cozyGarage/BookiE/issues/790), [#1140](https://github.com/cozyGarage/BookiE/issues/1140), [#1142](https://github.com/cozyGarage/BookiE/issues/1142), [#1145](https://github.com/cozyGarage/BookiE/issues/1145), [#1146](https://github.com/cozyGarage/BookiE/issues/1146) | A merged PR satisfied each issue. | The Done audit found acceptance items the PRs did not cover (for example Debian notices in #1145). | Reopened with the missing items named in each comment. |
+| 2026-10-27 | [#1175](https://github.com/cozyGarage/BookiE/issues/1175) | #1259 stopped ClickHouse grid edits rewriting several rows. | [#1739](https://github.com/cozyGarage/BookiE/issues/1739) shows a non-unique sort key can still do so. | #1739 owns the live defect. |
+| 2026-10-27 | [#555](https://github.com/cozyGarage/BookiE/issues/555), [#1540](https://github.com/cozyGarage/BookiE/issues/1540), [#1542](https://github.com/cozyGarage/BookiE/issues/1542) | A merged PR finished each issue. | Comments kept #555 open for remote and installed acceptance, and the legacy evidence packets were still unresolved; `manual-verification-grid.md` still named #555. | Reopened the same day. |
