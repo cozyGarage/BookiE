@@ -25,13 +25,12 @@ mod read_only_session;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
-#[path = "support/result_sets.rs"]
-mod result_sets;
-
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;
 #[path = "shared/mysql_trigger_errors.rs"]
 mod mysql_trigger_errors;
+#[path = "support/result_sets.rs"]
+mod result_sets;
 #[path = "support/schema_introspection.rs"]
 mod schema_introspection;
 #[path = "support/views.rs"]
