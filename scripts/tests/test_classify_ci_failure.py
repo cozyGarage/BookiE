@@ -25,6 +25,10 @@ class ClassifyCiFailureTests(unittest.TestCase):
     def test_a_fixture_that_never_became_ready_is_infrastructure(self):
         self.assertEqual(self.tag("MySQL fixture did not become ready\nJob failed"), "infra")
 
+    def test_a_missing_accessibility_service_binary_is_infrastructure(self):
+        text = "Failed to execute program org.a11y.Bus: No such file or directory\nJob failed"
+        self.assertEqual(self.tag(text), "infra")
+
     def test_a_compiler_crash_is_infrastructure(self):
         self.assertEqual(self.tag("sccache: Compiler killed by signal 11\nerror: could not compile `tablepro-app`"), "infra")
 

@@ -9,6 +9,8 @@ mkdir -p "$socket_root" "$config_root" \
   "$secret_root/home" "$secret_root/data" "$secret_root/cache" "$secret_root/state" "$secret_root/runtime"
 chmod 0700 "$secret_root/runtime"
 container_name="tablepro-pg-socket-${RANDOM}-$$"
+test_run_id="${TABLEPRO_TEST_RUN_ID:-local-$$}"
+[[ "$test_run_id" =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'invalid test-container run id' >&2; exit 1; }
 cleanup() {
   docker rm -f "$container_name" >/dev/null 2>&1 || true
   # PostgreSQL owns the sticky socket directory and its lock file inside the
@@ -18,9 +20,12 @@ cleanup() {
   rm -rf -- "$work_root"
 }
 trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 chmod 0777 "$socket_root"
 docker run --detach --name "$container_name" \
+  --label "com.tablepro.test-run=$test_run_id" \
   --env POSTGRES_HOST_AUTH_METHOD=trust \
   --volume "$socket_root:/var/run/postgresql" \
   postgres:16-alpine >/dev/null

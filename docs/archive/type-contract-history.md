@@ -454,7 +454,7 @@ row unchanged. Other unlisted array families remain open
 
 # Archived B3 board narrative (2026-10-09 consolidation pass 2)
 
-Moved from [type-contract-strategy.md](../type-contract-strategy.md) at tip `2978efe67`. This is dated evidence narrative, not the live board. Open remaining scope stays on the board's engine table; case proof lives in [value-contracts.md](../value-contracts.md) and `evidence/`. Failed or incomplete acceptance notes below remain retest indicators.
+Moved from [type-contract-strategy.md](../lane-boards.md#b3-types-and-values) at tip `2978efe67`. This is dated evidence narrative, not the live board. Open remaining scope stays on the board's engine table; case proof lives in [value-contracts.md](../value-contracts.md) and `evidence/`. Failed or incomplete acceptance notes below remain retest indicators.
 
 ## Intro paragraphs (pre-section)
 

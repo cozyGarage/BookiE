@@ -1,10 +1,14 @@
 use std::io::Error;
 
+#[cfg(feature = "tls-rustls")]
 use rustls::RootCertStore;
+#[cfg(feature = "tls-rustls")]
 use rustls::pki_types::pem::PemObject;
+#[cfg(feature = "tls-rustls")]
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
 use crate::connection::TlsConnParams;
+use crate::types::redacted_if_set;
 use crate::{Client, ConnectionAddr, ConnectionInfo, ErrorKind, RedisError, RedisResult};
 
 /// Structure to hold mTLS client _certificate_ and _key_ binaries in PEM format
@@ -15,6 +19,21 @@ pub struct ClientTlsConfig {
     pub client_cert: Vec<u8>,
     /// client key byte stream in PEM format
     pub client_key: Vec<u8>,
+}
+
+impl std::fmt::Debug for ClientTlsConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Destructured so that adding or removing a field breaks this impl; the bindings are
+        // unused because neither field's contents may be printed.
+        let Self {
+            client_cert: _,
+            client_key: _,
+        } = self;
+        f.debug_struct("ClientTlsConfig")
+            .field("client_cert", &"<redacted>")
+            .field("client_key", &"<redacted>")
+            .finish()
+    }
 }
 
 /// Structure to hold TLS certificates
@@ -32,6 +51,22 @@ pub struct TlsCertificates {
     /// address is a local forwarding endpoint, such as an SSH tunnel, but
     /// the certificate was issued for the server's real hostname.
     pub verify_host: Option<String>,
+}
+
+impl std::fmt::Debug for TlsCertificates {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            client_tls,
+            root_cert,
+            ..
+        } = self;
+
+        // Both fields are certificates, so their contents are never printed.
+        f.debug_struct("TlsCertificates")
+            .field("client_tls", &redacted_if_set(client_tls))
+            .field("root_cert", &redacted_if_set(root_cert))
+            .finish()
+    }
 }
 
 pub(crate) fn inner_build_with_tls(
@@ -63,6 +98,7 @@ pub(crate) fn inner_build_with_tls(
     Ok(Client { connection_info })
 }
 
+#[cfg(feature = "tls-rustls")]
 pub(crate) fn retrieve_tls_certificates(
     certificates: &TlsCertificates,
 ) -> RedisResult<TlsConnParams> {
@@ -119,12 +155,125 @@ pub(crate) fn retrieve_tls_certificates(
     Ok(TlsConnParams {
         client_tls_params,
         root_cert_store,
+        // Populated as well as the rustls fields, for a build in which another runtime selects
+        // `native-tls`.
+        #[cfg(any(
+            all(feature = "tls-native-tls", not(feature = "tls-rustls")),
+            all(feature = "tokio-native-tls-comp", not(feature = "tokio-rustls-comp")),
+            all(feature = "smol-native-tls-comp", not(feature = "smol-rustls-comp"))
+        ))]
+        native_tls_params: parse_native_tls_params(certificates)?,
         #[cfg(any(feature = "tls-rustls-insecure", feature = "tls-native-tls"))]
         danger_accept_invalid_hostnames: false,
         verify_host: verify_host.clone(),
     })
 }
 
+#[cfg(all(feature = "tls-native-tls", not(feature = "tls-rustls")))]
+pub(crate) fn retrieve_tls_certificates(
+    certificates: &TlsCertificates,
+) -> RedisResult<TlsConnParams> {
+    Ok(TlsConnParams {
+        native_tls_params: parse_native_tls_params(certificates)?,
+        danger_accept_invalid_hostnames: false,
+    })
+}
+
+/// Certificates and keys in the form the `native-tls` backends consume them.
+///
+/// Parsed when the client is built rather than when it connects, so that a malformed PEM is
+/// reported at the call that supplied it.
+#[cfg(any(
+    all(feature = "tls-native-tls", not(feature = "tls-rustls")),
+    all(feature = "tokio-native-tls-comp", not(feature = "tokio-rustls-comp")),
+    all(feature = "smol-native-tls-comp", not(feature = "smol-rustls-comp"))
+))]
+#[derive(Clone)]
+pub(crate) struct NativeTlsParams {
+    pub(crate) identity: Option<native_tls::Identity>,
+    pub(crate) root_certs: Vec<native_tls::Certificate>,
+}
+
+#[cfg(any(
+    all(feature = "tls-native-tls", not(feature = "tls-rustls")),
+    all(feature = "tokio-native-tls-comp", not(feature = "tokio-rustls-comp")),
+    all(feature = "smol-native-tls-comp", not(feature = "smol-rustls-comp"))
+))]
+impl std::fmt::Debug for NativeTlsParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NativeTlsParams")
+            .field("identity", &redacted_if_set(&self.identity))
+            .field("root_certs", &self.root_certs.len())
+            .finish()
+    }
+}
+
+#[cfg(any(
+    all(feature = "tls-native-tls", not(feature = "tls-rustls")),
+    all(feature = "tokio-native-tls-comp", not(feature = "tokio-rustls-comp")),
+    all(feature = "smol-native-tls-comp", not(feature = "smol-rustls-comp"))
+))]
+pub(crate) fn parse_native_tls_params(
+    certificates: &TlsCertificates,
+) -> RedisResult<Option<NativeTlsParams>> {
+    const PEM_BEGIN: &str = "-----BEGIN CERTIFICATE-----";
+    const PEM_END: &str = "-----END CERTIFICATE-----";
+
+    let TlsCertificates {
+        client_tls,
+        root_cert,
+    } = certificates;
+
+    if client_tls.is_none() && root_cert.is_none() {
+        return Ok(None);
+    }
+
+    let identity = client_tls
+        .as_ref()
+        .map(
+            |ClientTlsConfig {
+                 client_cert,
+                 client_key,
+             }| {
+                native_tls::Identity::from_pkcs8(client_cert, client_key).map_err(|err| {
+                    Error::other(format!("Unable to parse client identity PEM: {err}"))
+                })
+            },
+        )
+        .transpose()?;
+
+    // `Certificate::from_pem` reads a single certificate, so a bundle is split into its blocks
+    // first. Otherwise every certificate after the first is dropped without an error.
+    let root_certs = match root_cert {
+        Some(pem) => {
+            let text = std::str::from_utf8(pem).map_err(|err| {
+                Error::other(format!("Root certificate PEM is not valid UTF-8: {err}"))
+            })?;
+            let certs = text
+                .split_inclusive(PEM_END)
+                .filter_map(|block| block.find(PEM_BEGIN).map(|start| &block[start..]))
+                .map(|block| {
+                    native_tls::Certificate::from_pem(block.as_bytes()).map_err(|err| {
+                        Error::other(format!("Unable to parse root certificate PEM: {err}"))
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            if certs.is_empty() {
+                return Err(Error::other("Root certificate PEM contains no certificates").into());
+            }
+            certs
+        }
+        None => Vec::new(),
+    };
+
+    Ok(Some(NativeTlsParams {
+        identity,
+        root_certs,
+    }))
+}
+
+#[cfg(feature = "tls-rustls")]
 #[derive(Debug)]
 pub struct ClientTlsParams {
     pub(crate) client_cert_chain: Vec<CertificateDer<'static>>,
@@ -132,6 +281,7 @@ pub struct ClientTlsParams {
 }
 
 /// [`PrivateKeyDer`] does not implement `Clone` so we need to implement it manually.
+#[cfg(feature = "tls-rustls")]
 impl Clone for ClientTlsParams {
     fn clone(&self) -> Self {
         use PrivateKeyDer::*;
