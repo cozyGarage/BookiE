@@ -42,7 +42,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after about 2 seconds, while another connection still uses the Preferences timeout. **2026-10-12 Hyprland dark:** stopped after 2.007 s, passed; the wording was fixed by [#668](https://github.com/cozyGarage/BookiE/pull/668). No result for the second connection or installed retest is recorded here. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** the 2-second connection ended with "Query exceeded the 2s query timeout" and offered "Run again with a 8s timeout"; query history recorded the failed run at 2015 ms; the second connection was not run. The connection list popover was clipped at the window's left edge ([#1905](https://github.com/cozyGarage/BookiE/issues/1905)).
 - [ ] A connect timeout of 3 seconds to an unreachable host fails after about 3 seconds.
 
-- [ ] With a 2-second query timeout, run `SELECT pg_sleep(5)` on PostgreSQL (streamed) and `SELECT SLEEP(5)` on MySQL (materialized): after each, the toolbar shows **Run again with an 8s timeout**. Click it: the same query runs and completes. Running any other query removes the button, and the saved timeout is still 2 seconds.
+- [ ] With a 2-second query timeout, run `SELECT pg_sleep(5)` on PostgreSQL (streamed) and `SELECT SLEEP(5)` on MySQL (materialized): after each, the toolbar shows **Run again (8s timeout)**. Click it: the same query runs and completes. Running any other query removes the button, and the saved timeout is still 2 seconds.
 - [ ] Edit the editor text after a timeout, then click the button: the query that timed out runs, not the new text.
 
 ## Connection bundles

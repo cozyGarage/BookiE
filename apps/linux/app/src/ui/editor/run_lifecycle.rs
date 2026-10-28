@@ -95,8 +95,7 @@ impl SqlEditor {
         let Some(secs) = self.timeout_retry.offer(exceeded_secs, sql) else {
             return;
         };
-        self.longer_timeout_button
-            .set_label(&crate::tr!("Run again with a {n}s timeout").replace("{n}", &secs.to_string()));
+        self.longer_timeout_button.set_label(&timeout_retry::label(secs));
         self.longer_timeout_button.set_visible(true);
     }
 

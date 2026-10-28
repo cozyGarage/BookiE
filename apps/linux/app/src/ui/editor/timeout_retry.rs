@@ -1,5 +1,9 @@
 use crate::services::operation_control::longer_timeout_secs;
 
+pub(super) fn label(secs: u32) -> String {
+    crate::tr!("Run again ({n}s timeout)").replace("{n}", &secs.to_string())
+}
+
 struct Offer {
     secs: u32,
     sql: String,
@@ -37,6 +41,13 @@ impl TimeoutRetry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timeout_retry_label_uses_the_same_wording_for_each_duration() {
+        for secs in [2, 8, 11, 18, 60] {
+            assert_eq!(label(secs), format!("Run again ({secs}s timeout)"));
+        }
+    }
 
     #[test]
     fn accepting_an_offer_returns_the_same_sql_and_applies_the_longer_timeout_once() {
