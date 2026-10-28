@@ -12,6 +12,7 @@ use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statem
 use futures::stream::StreamExt;
 
 mod decode;
+mod spatial;
 use decode::extract_value;
 mod packed;
 mod session;
@@ -201,7 +202,11 @@ impl Connection for MysqlConnection {
         .fetch_all(&self.pool)
         .await
         .map_err(map_sqlx_error)?;
-        Ok(rows.iter().map(row_to_column_info).collect())
+        let mut columns: Vec<ColumnInfo> = rows.iter().map(row_to_column_info).collect();
+        if columns.iter().any(|column| spatial::is_spatial_type(&column.data_type)) {
+            self.name_spatial_srids(schema, table, &mut columns).await;
+        }
+        Ok(columns)
     }
 
     async fn fetch_rows(

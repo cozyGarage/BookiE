@@ -37,3 +37,31 @@ async fn a_structure_alter_keeps_on_update_current_timestamp() {
     };
     assert!(extra.contains("on update current_timestamp(3)"), "{extra}");
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_structure_alter_keeps_the_srid_of_a_spatial_column() {
+    let (_container, options) = start_mysql().await;
+    let connection = connect(options).await;
+    connection
+        .execute("CREATE TABLE places (id INT PRIMARY KEY, spot POINT SRID 4326 NOT NULL)")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "places").await.unwrap();
+    let mut draft = DraftColumn::from_info(columns.into_iter().find(|column| column.name == "spot").unwrap());
+    draft.comment = Some("where".into());
+
+    for statement in build_alter_column("mysql", None, "places", &draft).unwrap() {
+        connection.execute(&statement).await.unwrap();
+    }
+
+    let srid = connection
+        .query(
+            "SELECT srs_id FROM information_schema.st_geometry_columns \
+             WHERE table_schema = DATABASE() AND table_name = 'places' AND column_name = 'spot'",
+        )
+        .await
+        .unwrap()
+        .rows;
+    assert_eq!(srid, vec![vec![Value::Int(4326)]]);
+}
