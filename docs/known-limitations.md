@@ -73,6 +73,7 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   missing daylight-saving hour is shown as undecodable and is never turned into a
   literal, because the instant cannot be known.
 - **SQLite real numbers:** negative zero and NaN cannot be bound as parameters.
+- **SQLite views are not listed.** The sidebar lists tables only; a view exists and can be queried in the SQL editor, but it does not appear for browsing.
 - **SQLite JSON aggregates can return malformed text on older system libraries** (TEST-25 /
   [#1545](https://github.com/cozyGarage/BookiE/issues/1545)). With a SQL NULL
   key, `json_group_object(key, value ORDER BY ...)` emits a malformed `:2`

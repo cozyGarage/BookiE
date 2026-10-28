@@ -1,8 +1,8 @@
 diff --git a/src/aio/smol.rs b/src/aio/smol.rs
-index 760b560..803ef80 100644
+index eda7ef8..dc345c0 100644
 --- a/src/aio/smol.rs
 +++ b/src/aio/smol.rs
-@@ -212,12 +212,16 @@ impl RedisRuntime for Smol {
+@@ -207,12 +207,16 @@ impl RedisRuntime for Smol {
      ) -> RedisResult<Self> {
          let tcp_stream = connect_tcp(&socket_addr, tcp_settings).await?;
  
@@ -21,10 +21,10 @@ index 760b560..803ef80 100644
              )
              .await
 diff --git a/src/aio/tokio.rs b/src/aio/tokio.rs
-index e57d5eb..54a54ca 100644
+index 634d1fc..38a808e 100644
 --- a/src/aio/tokio.rs
 +++ b/src/aio/tokio.rs
-@@ -152,12 +152,16 @@ impl RedisRuntime for Tokio {
+@@ -142,12 +142,16 @@ impl RedisRuntime for Tokio {
          tls_params: &Option<TlsConnParams>,
          tcp_settings: &crate::io::tcp::TcpSettings,
      ) -> RedisResult<Self> {
@@ -43,23 +43,23 @@ index e57d5eb..54a54ca 100644
              )
              .await
 diff --git a/src/cluster_handling/client.rs b/src/cluster_handling/client.rs
-index b479905..c40dfa0 100644
+index 31d37cb..54ba8db 100644
 --- a/src/cluster_handling/client.rs
 +++ b/src/cluster_handling/client.rs
-@@ -191,6 +191,7 @@ impl ClusterParams {
-                 #[cfg(feature = "tls-rustls")]
-                 root_cert_store: None,
+@@ -338,6 +338,7 @@ impl ClusterParams {
+                 ))]
+                 native_tls_params: None,
                  danger_accept_invalid_hostnames: false,
 +                verify_host: None,
              });
              tls_params.danger_accept_invalid_hostnames = true;
              Some(tls_params)
 diff --git a/src/connection.rs b/src/connection.rs
-index e55e4b7..dd73ff5 100644
+index 961f324..b56aed3 100755
 --- a/src/connection.rs
 +++ b/src/connection.rs
-@@ -53,6 +53,11 @@ pub struct TlsConnParams {
-     pub(crate) root_cert_store: Option<RootCertStore>,
+@@ -67,6 +67,11 @@ pub struct TlsConnParams {
+     pub(crate) native_tls_params: Option<NativeTlsParams>,
      #[cfg(any(feature = "tls-rustls-insecure", feature = "tls-native-tls"))]
      pub(crate) danger_accept_invalid_hostnames: bool,
 +    /// Overrides the hostname used for certificate verification without
@@ -69,16 +69,16 @@ index e55e4b7..dd73ff5 100644
 +    pub(crate) verify_host: Option<String>,
  }
  
- static DEFAULT_PORT: u16 = 6379;
-@@ -206,6 +211,7 @@ impl ConnectionAddr {
-                     #[cfg(feature = "tls-rustls")]
-                     root_cert_store: None,
+ // Returns a builder rather than a connector because each backend wraps it differently:
+@@ -278,6 +283,7 @@ impl ConnectionAddr {
+                     ))]
+                     native_tls_params: None,
                      danger_accept_invalid_hostnames: insecure,
 +                    verify_host: None,
                  });
              }
          }
-@@ -983,10 +989,14 @@ impl ActualConnection {
+@@ -1049,10 +1055,14 @@ impl ActualConnection {
                  ref tls_params,
              } => {
                  let host: &str = host;
@@ -95,10 +95,10 @@ index e55e4b7..dd73ff5 100644
                  let reader = match timeout {
                      None => {
 diff --git a/src/tls.rs b/src/tls.rs
-index 5429e14..f7671c2 100644
+index b74a968..eda8438 100644
 --- a/src/tls.rs
 +++ b/src/tls.rs
-@@ -27,6 +27,11 @@ pub struct TlsCertificates {
+@@ -46,6 +46,11 @@ pub struct TlsCertificates {
      pub client_tls: Option<ClientTlsConfig>,
      /// root certificate byte stream in PEM format if the local truststore is *not* to be used
      pub root_cert: Option<Vec<u8>>,
@@ -109,8 +109,16 @@ index 5429e14..f7671c2 100644
 +    pub verify_host: Option<String>,
  }
  
- pub(crate) fn inner_build_with_tls(
-@@ -64,6 +69,7 @@ pub(crate) fn retrieve_tls_certificates(
+ impl std::fmt::Debug for TlsCertificates {
+@@ -53,6 +58,7 @@ impl std::fmt::Debug for TlsCertificates {
+         let Self {
+             client_tls,
+             root_cert,
++            ..
+         } = self;
+ 
+         // Both fields are certificates, so their contents are never printed.
+@@ -99,6 +105,7 @@ pub(crate) fn retrieve_tls_certificates(
      let TlsCertificates {
          client_tls,
          root_cert,
@@ -118,8 +126,8 @@ index 5429e14..f7671c2 100644
      } = certificates;
  
      let client_tls_params = if let Some(ClientTlsConfig {
-@@ -115,6 +121,7 @@ pub(crate) fn retrieve_tls_certificates(
-         root_cert_store,
+@@ -158,6 +165,7 @@ pub(crate) fn retrieve_tls_certificates(
+         native_tls_params: parse_native_tls_params(certificates)?,
          #[cfg(any(feature = "tls-rustls-insecure", feature = "tls-native-tls"))]
          danger_accept_invalid_hostnames: false,
 +        verify_host: verify_host.clone(),
