@@ -115,7 +115,7 @@ def validate_manifest(path, strict=False):
     warnings = []
     try:
         manifest = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
         return [f"{path}: {error}"], warnings
     if not isinstance(manifest, dict):
         return [f"{path}: manifest must be an object"], warnings

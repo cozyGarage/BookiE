@@ -22,7 +22,7 @@ class EvidenceDiscoveryTests(unittest.TestCase):
             for name, value in files.items():
                 path = evidence / name
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(value if isinstance(value, str) else json.dumps(value))
+                path.write_bytes(value) if isinstance(value, bytes) else path.write_text(value if isinstance(value, str) else json.dumps(value))
             output = io.StringIO()
             args = ["validate-evidence", "--strict"] if strict else ["validate-evidence"]
             with (mock.patch.object(VALIDATOR, "ROOT", root),
@@ -61,6 +61,11 @@ class EvidenceDiscoveryTests(unittest.TestCase):
     def test_malformed_named_evidence_is_reported(self):
         self.assertEqual(self.scan({"case/validation.json": "{"})[0], 1)
         self.assertEqual(self.scan({"case/manifest.json": "{"})[0], 1)
+
+    def test_invalid_utf8_in_named_evidence_is_reported(self):
+        for name in ("validation.json", "manifest.json"):
+            with self.subTest(name=name):
+                self.assertEqual(self.scan({"case/" + name: b"\xff"})[0], 1)
 
     def test_unrelated_json_and_unsupported_versions_do_not_become_evidence(self):
         files = {"case/validation.json": [1, 2], "case/other.json": {"schema_version": 1, "artifacts": []},
