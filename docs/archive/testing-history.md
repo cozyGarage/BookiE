@@ -2,7 +2,7 @@
 
 Archived from `aeac107a4` on 2026-10-03. Counts and uncovered behavior below
 belong to September 16; several named gaps have since gained regressions.
-Use [testing](../testing.md), [the B3 board](../type-contract-strategy.md) and
+Use [testing](../testing.md), [the B3 board](../lane-boards.md#b3-types-and-values) and
 [the scenario survey](b3-test-scenario-survey.md) for current work.
 
 ## Upstream test-suite parity

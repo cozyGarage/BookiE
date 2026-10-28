@@ -5,8 +5,8 @@ Reviewed 2026-10-06; companion to
 [external-audit-2026-10-06.md](external-audit-2026-10-06.md).
 This is a bounded review of Linux BookiE and selected primary-source examples,
 not an exhaustive audit of any client. Findings nominate work for the existing
-[B3](../type-contract-strategy.md) and
-[B4](../b4-task-board.md) owners; they did not change sprint order or
+[B3](../lane-boards.md#b3-types-and-values) and
+[B4](../lane-boards.md#b4-transport-and-sessions) owners; they did not change sprint order or
 claim release acceptance. The implementation follow-up below records changes
 made after the review; it does not claim hosted or release acceptance.
 
