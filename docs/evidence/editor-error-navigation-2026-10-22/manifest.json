@@ -1,4 +1,5 @@
 {
+  "source_status": "unverified-source",
   "date": "2026-10-22",
   "scope": "editor error navigation and authoritative statement source ranges",
   "base_commit": "a25b1b9c16250980467d04c4c8b92a93a2c2a4dc",

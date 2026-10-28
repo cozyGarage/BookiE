@@ -1,4 +1,5 @@
 {
+  "source_status": "unverified-source",
   "schema_version": 1,
   "date": "2026-10-07",
   "branch": "b3/mongodb-delete-new-field",

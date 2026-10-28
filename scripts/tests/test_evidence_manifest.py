@@ -467,6 +467,56 @@ class EvidenceManifestTests(unittest.TestCase):
 
         self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
 
+    def _drifted_source_manifest(self, status=None):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        repo = Path(directory.name)
+        subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+        (repo / "source.rs").write_text("current source")
+        manifest = {
+            "source_commit": "a" * 40,
+            "source_sha256": {"source.rs": hashlib.sha256(b"recorded source").hexdigest()},
+        }
+        if status:
+            manifest["source_status"] = status
+        path = repo / "manifest.json"
+        path.write_text(json.dumps(manifest))
+        return repo, path
+
+    def test_a_source_hash_that_matches_nothing_is_reported_until_the_packet_is_labelled_unverified(self):
+        repo, path = self._drifted_source_manifest()
+        with mock.patch.object(VALIDATOR, "ROOT", repo):
+            _, warnings = VALIDATOR.validate_manifest(path)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("source differs from the current checkout", warnings[0])
+
+    def test_a_packet_labelled_unverified_source_keeps_its_recorded_hash_without_a_warning(self):
+        repo, path = self._drifted_source_manifest("unverified-source")
+        with mock.patch.object(VALIDATOR, "ROOT", repo):
+            for strict in (False, True):
+                errors, warnings = VALIDATOR.validate_manifest(path, strict=strict)
+                self.assertEqual((errors, warnings), ([], []), f"strict={strict}")
+        self.assertEqual(json.loads(path.read_text())["source_sha256"]["source.rs"], hashlib.sha256(b"recorded source").hexdigest())
+
+    def test_an_unverified_source_label_does_not_excuse_a_malformed_digest(self):
+        repo, path = self._drifted_source_manifest("unverified-source")
+        manifest = json.loads(path.read_text())
+        manifest["source_sha256"]["source.rs"] = "not-a-digest"
+        path.write_text(json.dumps(manifest))
+        with mock.patch.object(VALIDATOR, "ROOT", repo):
+            errors, _ = VALIDATOR.validate_manifest(path)
+        self.assertTrue(any("invalid source digest" in error for error in errors))
+
+    def test_unverified_packets_are_counted_separately_in_the_summary(self):
+        repo, path = self._drifted_source_manifest("unverified-source")
+        manifest = json.loads(path.read_text())
+        manifest["schema_version"] = 1
+        path.write_text(json.dumps(manifest))
+        output = io.StringIO()
+        with mock.patch.object(VALIDATOR, "ROOT", repo), mock.patch.object(VALIDATOR, "manifests", return_value=[path]), contextlib.redirect_stdout(output):
+            VALIDATOR.main_with_args([])
+        self.assertIn("1 labelled unverified source", output.getvalue())
+
     def test_strict_manifest_rejects_a_missing_source_without_a_per_file_commit(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
