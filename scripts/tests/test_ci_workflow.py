@@ -120,6 +120,13 @@ class CiWorkflowTests(unittest.TestCase):
             job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
             self.assertNotRegex(job, r"(?m)^    (if|continue-on-error):")
 
+    def test_server_gtk_jobs_do_not_retry_stateful_scenarios_against_live_fixtures(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for name in ("e2e", "gtk-server"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn('TABLEPRO_GTK_SCENARIO_RETRIES: "0"', job)
+
     def test_cargo_path_covers_runner_service_homes(self):
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
