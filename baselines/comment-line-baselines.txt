@@ -84,7 +84,7 @@ crates/core/src/export/html.rs 6
 crates/core/src/export/mod.rs 10
 crates/core/src/export/xlsx.rs 2
 crates/core/src/export/xml.rs 6
-crates/core/src/filter.rs 73
+crates/core/src/filter.rs 68
 crates/core/src/filter_tests.rs 11
 crates/core/src/import/cell.rs 29
 crates/core/src/import/csv_import.rs 32
