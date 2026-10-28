@@ -6,7 +6,7 @@ Proposed; nothing here is accepted or scheduled. It turns the [October 28 side-b
 
 | Claim | Evidence |
 |---|---|
-| Upstream TablePro Linux has an ER diagram | the "ER diagram" row of upstream's `ROADMAP.md` and the GTK `ui/diagram/` module of its app crate (canvas, draw, export, keyboard description) at `origin/main` `86651d743`. Tables as cards, foreign keys in crow's foot notation, pan, zoom, drag, Reset Layout, PNG and SVG export |
+| Upstream TablePro Linux has an ER diagram | the `ROADMAP.md` row "ER diagram" and the GTK module `src/ui/diagram/` of the upstream Linux app crate (canvas, draw, export, keyboard description) at `origin/main` `86651d743`. Tables as cards, foreign keys in crow's foot notation, pan, zoom, drag, Reset Layout, PNG and SVG export |
 | BookiE has no ER diagram | No diagram module in `apps/` or `crates/`; the [feature comparison](../0.2-feature-comparison.md) lists it as "No diagram view identified" |
 | dbx can collapse the whole tree | `AppSidebar.vue` has a `collapseAllTreeNodes` action behind a "Collapse all" tooltip |
 | Beekeeper Studio can expand and collapse all | `entity-list` emits `bks-expand-all` and `bks-collapse-all` from two buttons |
