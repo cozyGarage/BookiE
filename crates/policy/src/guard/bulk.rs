@@ -273,6 +273,9 @@ impl PolicyGuard {
         scope.open = false;
         let committed = scope.committed;
         let (terminal_status, transaction_outcome, error_category) = bulk_terminal(end, committed);
+        if terminal_status == AuditTerminalStatus::Unknown {
+            self.ctx.audit_state.disable_governed_writes();
+        }
         let audit_result = self
             .record_outcome(
                 &scope.operation(),
@@ -411,6 +414,11 @@ pub(super) fn bulk_terminal(
             AuditTerminalStatus::Cancelled,
             partial_transaction_outcome(committed),
             Some(AuditErrorCategory::Cancelled),
+        ),
+        BulkInsertEnd::Failed(error) if is_ambiguous_post_dispatch(error) => (
+            AuditTerminalStatus::Unknown,
+            AuditTransactionOutcome::Unknown,
+            Some(error_category(error)),
         ),
         BulkInsertEnd::Failed(error @ DriverError::PartiallyApplied { .. }) => (
             controlled_error_terminal_status(error),
