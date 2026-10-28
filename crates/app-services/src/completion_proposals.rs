@@ -6,7 +6,7 @@ use tablepro_core::sql_syntax::script::{
 };
 
 use super::completion::{SchemaIndex, Scope, candidate_sql, scope_at};
-use super::completion_identifiers::{normalized, split_table_reference};
+use super::completion_identifiers::{normalized, plan_with, split_table_reference};
 
 pub struct Candidates {
     pub range: Range<usize>,
@@ -20,7 +20,7 @@ pub fn candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Candidates {
 pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: Option<LexicalSettings>) -> Candidates {
     let grammar = index.grammar.unwrap_or(SqlGrammar::PostgreSql);
     let settings_for_grammar = settings.unwrap_or_else(|| LexicalSettings::default_for(grammar));
-    let plan = ScriptPlan::build(sql, grammar, settings_for_grammar);
+    let plan = plan_with(sql, Some(grammar), Some(settings_for_grammar));
     let Some(mut range) = replacement_range(sql, cursor, &plan) else {
         return Candidates {
             range: cursor..cursor,
@@ -372,5 +372,54 @@ mod tests {
         assert!(offered(&index).contains(&"alpine".to_string()));
         index.clear();
         assert!(!offered(&index).contains(&"alpine".to_string()));
+    }
+
+    fn completion_work(tables: usize) -> (usize, usize) {
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_tables(
+            (0..tables)
+                .map(|i| format!("tenant_{:03}.table_{i:06}", i % 200))
+                .collect(),
+        );
+        let sql = "SELECT * FROM tenant_007.table_0000";
+        candidates(sql, sql.len(), &index);
+        let normalized = crate::completion_identifiers::normalized_calls();
+        let splits = crate::completion_identifiers::split_calls();
+        for _ in 0..4 {
+            candidates(sql, sql.len(), &index);
+        }
+        (
+            crate::completion_identifiers::normalized_calls() - normalized,
+            crate::completion_identifiers::split_calls() - splits,
+        )
+    }
+
+    #[test]
+    fn completion_work_per_keystroke_does_not_grow_with_catalog_size() {
+        let small = completion_work(1_000);
+        let large = completion_work(10_000);
+        assert_eq!(small, large, "four lookups did more work on a larger catalog");
+        assert!(
+            large.0 <= 800 && large.1 <= 400,
+            "four lookups did {large:?} (normalizations, splits)"
+        );
+    }
+
+    #[test]
+    fn completion_lexes_the_script_once_per_lookup() {
+        let mut sql = "SELECT a, b FROM t WHERE x = 1;\n".repeat(2_000);
+        sql.push_str("SELECT * FROM tenant_007.table_0000");
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_tables((0..50).map(|i| format!("tenant_{:03}.table_{i:06}", i % 200)).collect());
+        let before = crate::completion_identifiers::lexed_bytes();
+        candidates(&sql, sql.len(), &index);
+        let lexed = crate::completion_identifiers::lexed_bytes() - before;
+        assert!(
+            lexed <= sql.len() + sql.len() / 10,
+            "a {} byte script was lexed as {lexed} bytes",
+            sql.len()
+        );
     }
 }
