@@ -529,3 +529,12 @@ fn copied_update_and_delete_refuse_rows_without_a_usable_key() {
         Err(BuildSqlError::NothingToUpdate)
     ));
 }
+
+#[test]
+fn a_sqlite_text_literal_with_a_nul_byte_is_a_hex_cast() {
+    assert_eq!(
+        render_sql_literal("sqlite", &Value::Text("a\0b".into())).unwrap(),
+        "CAST(X'610062' AS TEXT)"
+    );
+    assert_eq!(render_sql_literal("sqlite", &Value::Text("ab".into())).unwrap(), "'ab'");
+}
