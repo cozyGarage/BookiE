@@ -799,6 +799,48 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertTrue(calls)
             self.assertFalse(any(b":/target" in call for call in calls))
 
+    def test_distro_runtime_retries_a_docker_hub_rate_limit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            docker_count = directory / "docker-count"
+            docker = binaries / "docker"
+            docker.write_text(
+                "#!/bin/sh\n"
+                "if [ \"$1\" = build ]; then\n"
+                "  count=$(cat \"$DOCKER_COUNT_FILE\" 2>/dev/null || printf 0)\n"
+                "  count=$((count + 1))\n"
+                "  printf '%s' \"$count\" > \"$DOCKER_COUNT_FILE\"\n"
+                "  if [ \"$count\" -eq 1 ]; then\n"
+                "    echo '429 Too Many Requests'\n"
+                "    exit 1\n"
+                "  fi\n"
+                "fi\n"
+            )
+            docker.chmod(0o755)
+            sleep = binaries / "sleep"
+            sleep.write_text("#!/bin/sh\nexit 0\n")
+            sleep.chmod(0o755)
+            package = directory / "bookie.deb"
+            package.write_bytes(b"package")
+            environment = os.environ.copy()
+            environment["PATH"] = f"{binaries}{os.pathsep}{environment['PATH']}"
+            environment["DOCKER_COUNT_FILE"] = str(docker_count)
+            environment["DISTRO_FLOOR_PACKAGE"] = str(package)
+
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/test-distro-floor.sh"), "debian:testing"],
+                cwd=ROOT,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(docker_count.read_text(), "2")
+
 
 if __name__ == "__main__":
     unittest.main()
