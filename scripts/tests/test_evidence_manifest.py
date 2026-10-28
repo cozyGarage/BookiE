@@ -539,6 +539,43 @@ class EvidenceManifestTests(unittest.TestCase):
         errors, _ = VALIDATOR.validate_manifest(path, strict=True)
         self.assertEqual(len(errors), 1)
 
+    def test_a_packet_labelled_unpinned_historical_needs_no_source_identity(self):
+        path, manifest = self.fixture()
+        manifest.pop("source_commit")
+        manifest["source_status"] = "unpinned-historical"
+        path.write_text(json.dumps(manifest))
+        for strict in (False, True):
+            errors, warnings = VALIDATOR.validate_manifest(path, strict=strict)
+            self.assertEqual((errors, warnings), ([], []), f"strict={strict}")
+
+    def test_a_packet_cannot_be_unpinned_and_also_record_a_source_identity(self):
+        path, manifest = self.fixture()
+        manifest["source_status"] = "unpinned-historical"
+        path.write_text(json.dumps(manifest))
+        errors, _ = VALIDATOR.validate_manifest(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("source_status", errors[0])
+
+    def test_an_unknown_source_status_is_rejected(self):
+        path, manifest = self.fixture()
+        manifest.pop("source_commit")
+        manifest["source_status"] = "probably-fine"
+        path.write_text(json.dumps(manifest))
+        errors, _ = VALIDATOR.validate_manifest(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("source_status", errors[0])
+
+    def test_an_unpinned_packet_is_counted_as_context_not_acceptance_proof(self):
+        path, manifest = self.fixture()
+        manifest.pop("source_commit")
+        manifest["source_status"] = "unpinned-historical"
+        path.write_text(json.dumps(manifest))
+        output = io.StringIO()
+        with mock.patch.object(VALIDATOR, "manifests", return_value=[path]), contextlib.redirect_stdout(output):
+            self.assertEqual(VALIDATOR.main_with_args([]), 0)
+        self.assertIn("1 labelled unpinned historical context", output.getvalue())
+        self.assertIn("0 historical/source-drift checks need review", output.getvalue())
+
     def test_clean_test_layer_report_uses_its_commit_as_source_identity(self):
         path, _ = self.layer_report_fixture()
         errors, warnings = VALIDATOR.validate_manifest(path, strict=True)

@@ -1,4 +1,5 @@
 {
+  "source_status": "unpinned-historical",
   "schema_version": 1,
   "baseline": "aeac107a4de43f627bce283e4bc88f84f2111283",
   "completed_utc": "2026-10-03T00:58:52.604695+00:00",

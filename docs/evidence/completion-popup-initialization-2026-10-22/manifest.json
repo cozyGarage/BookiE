@@ -1,4 +1,5 @@
 {
+  "source_status": "unpinned-historical",
   "base": "f22a4905ddfe4cff74fd37247d4d028ac9c534e3",
   "scope": "GtkSourceView initialization before application component construction",
   "source_sha256": {
