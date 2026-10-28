@@ -4,13 +4,12 @@ use tablepro_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build
 
 use order::resolved_order_by;
 
-const LONG_TEXT_BYTES: usize = 1_048_576;
-const PREVIEW_CHARS: usize = 1024;
-const PARTIAL_MARKER: &str = "\\x01bookie-partial:";
-
+mod long_text;
 mod mongodb;
 mod order;
 mod redis;
+
+pub use long_text::{mark_partial_cells, parse_partial};
 
 pub struct BrowseTarget<'a> {
     pub driver_id: &'a str,
@@ -137,7 +136,7 @@ impl BrowseTarget<'_> {
         direction: PageDirection,
     ) -> Result<PageQuery, String> {
         let (mut projection, projected) = self.projection();
-        let previewing = match self.long_text_projection().filter(|_| projected.is_none()) {
+        let previewing = match long_text::projection(self).filter(|_| projected.is_none()) {
             Some(preview) => {
                 projection = preview;
                 true
@@ -195,30 +194,6 @@ impl BrowseTarget<'_> {
         Ok(PageQuery::Sql(query))
     }
 
-    fn long_text_projection(&self) -> Option<String> {
-        if !self.long_text_preview || self.driver_id != "postgres" {
-            return None;
-        }
-        let quote = |name: &str| tablepro_core::sql_dialect::quote_ident(self.driver_id, name);
-        let mut any = false;
-        let list: Vec<String> = self
-            .columns
-            .iter()
-            .map(|column| {
-                let name = quote(&column.name);
-                if !is_postgres_text_type(&column.data_type) {
-                    return name;
-                }
-                any = true;
-                format!(
-                    "CASE WHEN octet_length({name}) > {LONG_TEXT_BYTES} THEN E'{PARTIAL_MARKER}' || octet_length({name})::text \
-                     || E'\\x01' || left({name}, {PREVIEW_CHARS}) ELSE {name} END AS {name}"
-                )
-            })
-            .collect();
-        any.then(|| list.join(", "))
-    }
-
     fn projection(&self) -> (String, Option<Vec<usize>>) {
         let projected = self.projected_columns();
         let sql = projected.as_ref().map_or_else(
@@ -250,31 +225,6 @@ impl BrowseTarget<'_> {
         }
         (required.len() < self.columns.len())
             .then(|| (0..self.columns.len()).filter(|i| required.contains(i)).collect())
-    }
-}
-
-fn is_postgres_text_type(data_type: &str) -> bool {
-    let lower = data_type.trim().to_ascii_lowercase();
-    lower == "text" || lower.starts_with("character varying") || lower.starts_with("varchar")
-}
-
-pub fn mark_partial_cells(result: &mut tablepro_core::QueryResult) {
-    const MARKER: &str = "\u{1}bookie-partial:";
-    for row in &mut result.rows {
-        for cell in row {
-            let Value::Text(text) = cell else {
-                continue;
-            };
-            let Some(rest) = text.strip_prefix(MARKER) else {
-                continue;
-            };
-            let Some((bytes, _preview)) = rest.split_once('\u{1}') else {
-                continue;
-            };
-            if bytes.parse::<u64>().is_ok() {
-                *cell = Value::Undecodable(format!("partial {bytes} bytes"));
-            }
-        }
     }
 }
 
@@ -603,7 +553,15 @@ mod tests {
             truncated: false,
         };
         mark_partial_cells(&mut result);
-        assert_eq!(result.rows[0][0], Value::Undecodable("partial 2097152 bytes".into()));
+        assert_eq!(
+            result.rows[0][0],
+            Value::Undecodable("partial 2097152 bytes\u{1}xxxx".into())
+        );
+        assert_eq!(
+            parse_partial("partial 2097152 bytes\u{1}xxxx"),
+            Some((2_097_152, "xxxx"))
+        );
+        assert_eq!(parse_partial("partial lots"), None);
         assert!(matches!(&result.rows[0][1], Value::Text(_)));
         assert_eq!(result.rows[0][2], Value::Text("plain".into()));
         assert_eq!(result.rows[0][3], Value::Null);

@@ -126,6 +126,19 @@ pub(super) fn install_grid_context_menus(
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
                     let row = view.upgrade().and_then(|view| row_object_at(&view, position(slot)));
+                    if row.as_ref().is_some_and(|row| row.cell_is_partial(slot.col_index)) {
+                        let (_, row_key) = cell_row_identity(&slot.widget);
+                        if !row_key.is_empty() {
+                            sender
+                                .send(GridMsg::FetchCellValue {
+                                    col_index: slot.col_index,
+                                    column_name: slot.column_name.clone(),
+                                    row_key,
+                                })
+                                .ok();
+                        }
+                        return;
+                    }
                     let text = copy_value_text(&slot.widget, row.as_ref(), slot.col_index);
                     sender.send(GridMsg::CopyToClipboard(text)).ok();
                 }

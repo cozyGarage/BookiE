@@ -2,7 +2,7 @@
 
 use drivers_postgres::PgDriver;
 use secrecy::SecretString;
-use tablepro_app_services::browse_query::{BrowseTarget, PageQuery, mark_partial_cells};
+use tablepro_app_services::browse_query::{BrowseTarget, PageQuery, mark_partial_cells, parse_partial};
 use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, FilterSet, TlsConfig, Value};
 use testcontainers::ImageExt;
 use testcontainers_modules::postgres::Postgres;
@@ -80,7 +80,10 @@ async fn a_huge_text_cell_arrives_as_a_small_partial_marker_and_a_normal_one_is_
         transferred < 16 * 1024,
         "only a small preview may cross the wire: {transferred}"
     );
-    assert_eq!(result.rows[0][1], Value::Undecodable("partial 2097152 bytes".into()));
+    let Value::Undecodable(partial) = &result.rows[0][1] else {
+        panic!("the huge cell is partial: {:?}", result.rows[0][1])
+    };
+    assert_eq!(parse_partial(partial), Some((2_097_152, "x".repeat(1024).as_str())));
     assert_eq!(result.rows[1][1], Value::Text("short".into()));
     assert_eq!(result.rows[2][1], Value::Null);
     assert_eq!(result.rows[0][2], Value::Text("big".into()));

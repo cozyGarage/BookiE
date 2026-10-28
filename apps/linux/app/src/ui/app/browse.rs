@@ -176,7 +176,7 @@ impl App {
             columns: &columns,
             filter: &filter,
             hidden_columns: Some(&hidden_columns),
-            long_text_preview: true,
+            long_text_preview: columns.iter().any(|column| column.primary_key),
         };
         let row_id_order = self.relation_is_ordinary_table(schema.as_deref(), &table);
         let page = if reverse_page {
