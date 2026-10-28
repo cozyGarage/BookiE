@@ -344,7 +344,7 @@ flowchart LR
     local -->|dial| driver["driver"]
 ```
 
-PostgreSQL uses the socket form so the certificate is checked against the real database hostname while traffic crosses the bastion. Unsupported combinations fail closed. See [connections.md](docs/connections.md) and the [current B4 acceptance board](docs/b4-task-board.md).
+PostgreSQL uses the socket form so the certificate is checked against the real database hostname while traffic crosses the bastion. Unsupported combinations fail closed. See [connections.md](docs/connections.md) and the [current B4 acceptance board](docs/lane-boards.md#b4-transport-and-sessions).
 
 ## Driver contract
 
@@ -403,8 +403,8 @@ The workspace graph shows allowed dependency direction. The trait table identifi
 |---|---|
 | Governed SQL / PolicyGuard | [ADR 0016](docs/decisions/0016-governed-consumer-seam.md), [specs/governed-sql](specs/governed-sql/spec.md) |
 | SSH host-key trust | [specs/ssh-transport](specs/ssh-transport/spec.md) |
-| Type and value preservation | [ADR 0007](docs/decisions/0007-type-and-value-preservation.md), [B3 board](docs/type-contract-strategy.md) |
-| Connection and session ownership | [ADR 0008](docs/decisions/0008-connection-and-session-ownership.md), [B4 board](docs/b4-task-board.md) |
+| Type and value preservation | [ADR 0007](docs/decisions/0007-type-and-value-preservation.md), [B3 board](docs/lane-boards.md#b3-types-and-values) |
+| Connection and session ownership | [ADR 0008](docs/decisions/0008-connection-and-session-ownership.md), [B4 board](docs/lane-boards.md#b4-transport-and-sessions) |
 | Persistence and identity | [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md), [storage.md](docs/storage.md) |
 | Paged query results | [ADR 0011](docs/decisions/0011-paged-query-results.md) |
 | Adding a driver | [adding-drivers.md](docs/adding-drivers.md) |

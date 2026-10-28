@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-07
+- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0012-show-database-objects-in-a-collapsible-sidebar-tree)
 - **Clarified**: 2026-10-15 for status. The Decision describes the target design; the Implementation status section records what has shipped. The sidebar still uses a `GtkListBox`.
 
 ## Context
@@ -18,10 +19,6 @@ Replace the list with a `GtkListView` over a `GtkTreeListModel`.
 4. Collapse state is saved per connection under the existing workspace state.
 5. Opening a table, view or catalog object keeps the current messages (`SelectTable`, `EditStructureTab`, and so on). Selection sync maps a tab to its node by schema, kind and name.
 6. Row context menus keep their actions. Group rows offer New Table and Table from CSV, which today sit on the schema header.
-
-## Implementation status
-
-The UI-11 slice implements collapsible Tables and Views groups, per-connection collapse state, and search expansion using the existing `GtkListBox` and explicit tree-node model. It does not implement the `GtkTreeListModel` migration or lazy in-place loading of Routines, Sequences and Types. The completed UI-11 record is in the [archived pre-migration ledger](../archive/known-issues-pre-project-migration-2026-10-12.md); those partial results do not mean every part of this decision has shipped. The remaining UI-23 catalog work is tracked in [issue #552](https://github.com/cozyGarage/BookiE/issues/552).
 
 ## Alternatives considered
 
