@@ -210,6 +210,7 @@ pub enum AppMsg {
     ShowToast(String),
     BrowseTabDirtyChanged(Uuid, bool),
     ToggleSidebarGroup(String),
+    RefreshSidebar,
     RevealInSidebar,
     HideSidebarSchema(String),
     ShowSidebarSchema(String),

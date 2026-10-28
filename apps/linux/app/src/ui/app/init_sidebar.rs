@@ -138,7 +138,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
         .icon_name("view-list-symbolic")
         .title(crate::tr!("No tables"))
         .description(crate::tr!(
-            "Nothing matches the current search, or this connection has no tables yet."
+            "Nothing matches the current search, or this connection has no tables yet. Use Refresh tables to check again."
         ))
         .build();
     sidebar_placeholder.add_css_class("compact");

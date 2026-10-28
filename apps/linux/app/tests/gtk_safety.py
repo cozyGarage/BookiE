@@ -2509,6 +2509,22 @@ def overlong_pasted_sql_is_refused_without_replacing_the_editor(_database, _base
 overlong_pasted_sql_is_refused_without_replacing_the_editor.environment = "local"
 
 
+def sidebar_refresh_finds_an_external_table(database, _base):
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE external_sidebar_refresh (id INTEGER PRIMARY KEY)")
+    wait_for_node(name="external_sidebar_refresh", present=False)
+    invoke(wait_for_node(name="Refresh tables", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="external_sidebar_refresh")
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE external_sidebar_shortcut (id INTEGER PRIMARY KEY)")
+    wait_for_node(name="external_sidebar_shortcut", present=False)
+    press_x11_key("r", ("Control_L", "Shift_L"))
+    wait_for_node(name="external_sidebar_shortcut")
+
+
+sidebar_refresh_finds_an_external_table.environment = "local"
+
+
 def committed_editor_ddl_refreshes_sidebar(database, base):
     run_sql("CREATE TABLE catalog_probe (id INTEGER PRIMARY KEY)")
     wait_for_node(name="catalog_probe")
@@ -2783,6 +2799,7 @@ def main():
     scenarios = [
         jump_to_column_keyboard_search,
         committed_editor_ddl_refreshes_sidebar,
+        sidebar_refresh_finds_an_external_table,
         overlong_sql_files_are_refused_without_replacing_the_editor,
         overlong_pasted_sql_is_refused_without_replacing_the_editor,
         mysql_unix_socket_endpoint_is_available_in_installed_form,
