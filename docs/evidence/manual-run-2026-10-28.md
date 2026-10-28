@@ -46,6 +46,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | CSV import, second pass (installed package) | A duplicate-key row stopped and rolled back the import with a row count; duplicate headers shown as `a` and `a [1]`; a headerless file refuses a saved mapping; Table from CSV inferred editable types and created the table; import refused on a read-only connection |
 | ENUM and SET pickers (installed package) | MySQL 8.4 ENUM and SET pickers write declared order, the empty member and the empty set correctly; PostgreSQL enum labels come in declared order; the SET popover clips its labels and Apply (#1945) |
 | SQLite Structure and tab menu (installed package) | Add Foreign Key is greyed with the right reason on an existing table; a disabled Comment row is shown on SQLite (#1946); the tab context menu entries are greyed and inert (#1947) |
+| Pending-edit teardown and MySQL comments (installed package) | Disconnect, Discard and disconnect, Ctrl+Q and window close all prompt with a pending cell edit and Cancel keeps the draft; MySQL column comments edit and clear correctly |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
