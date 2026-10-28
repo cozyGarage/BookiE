@@ -23,9 +23,12 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
-    def test_prebuilt_test_bundle_strips_debug_info(self):
+    def test_ci_build_artifacts_strip_symbols(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
-        self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-debuginfo}"', build)
+        self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"', build)
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        gtk_build = re.search(r"(?ms)^  gtk-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("CARGO_PROFILE_CI_STRIP: symbols", gtk_build)
 
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -122,9 +125,10 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("/home/runner/.cargo/bin", cargo_path, name)
             self.assertIn("/home/ubuntu/.cargo/bin", cargo_path, name)
 
-    def test_acceptance_jobs_use_the_pilot_and_builder_pools(self):
+    def test_acceptance_jobs_use_any_host_and_builder_pools(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow))
+        self.assertNotIn("ci-pilot", workflow)
         for name in ("gtk-build", "clippy", "test-build", "duckdb-build", "floor-build", "supply-chain"):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
@@ -134,7 +138,7 @@ class CiWorkflowTests(unittest.TestCase):
             "driver-tls", "keyring",
         ):
             with self.subTest(job=name):
-                self.assertIn("runs-on: ci-pilot", jobs[name])
+                self.assertIn("runs-on: any-host", jobs[name])
 
     def test_driver_tls_fixture_wait_is_bounded_with_failure_diagnostics(self):
         script = (ROOT / "scripts/test-driver-tls.sh").read_text()
@@ -208,10 +212,10 @@ class CiWorkflowTests(unittest.TestCase):
             'scripts/ci-mcp-port.py "${{ matrix.run }}"',
         ]:
             self.assertIn(call, ci + nightly)
-        ports = [port_helper.port_for_run(137, slot) for slot in range(1, 14)]
+        ports = [port_helper.port_for_run(137, slot) for slot in range(1, 17)]
         self.assertEqual(len(ports), len(set(ports)))
         self.assertTrue(all(20000 <= port <= 59999 for port in ports))
-        for slot in (0, 14, 16):
+        for slot in (0, 17):
             with self.assertRaises(ValueError):
                 port_helper.port_for_run(137, slot)
 
@@ -222,6 +226,18 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cleanup-testcontainers.py", driver)
         self.assertIn("trap cleanup_testcontainers EXIT", driver)
         self.assertIn("--test-threads=1", driver)
+
+    def test_socket_ssh_job_cleans_run_scoped_containers_on_cancel(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        job = workflow.split("  socket-ssh:\n", 1)[1].split("  gtk-server:\n", 1)[0]
+        script = (ROOT / "scripts/test-postgres-socket.sh").read_text()
+        self.assertIn("TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh", job)
+        self.assertIn("cleanup-testcontainers.py", job)
+        self.assertIn("trap 'cleanup_testcontainers; exit 143' TERM", job)
+        self.assertIn("trap 'cleanup_testcontainers; exit 130' INT", job)
+        self.assertIn('--label "com.tablepro.test-run=$test_run_id"', script)
+        self.assertIn("trap 'exit 143' TERM", script)
+        self.assertIn("trap 'exit 130' INT", script)
 
     def test_bounded_operation_guard_catches_multiline_calls(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -310,6 +326,43 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("scripts/run-test-layer.py app-server", ledger)
         self.assertNotIn("tablepro-driver-tests", ledger)
         self.assertNotIn("tablepro-driver-src", ledger)
+
+    def test_ignored_arch_source_does_not_hide_new_nonignored_inventory_tests(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".gitignore").write_text("apps/linux/packaging/arch/src/\n")
+            (root / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/core"]\nresolver = "3"\n')
+            crate = root / "crates/core"
+            (crate / "src").mkdir(parents=True)
+            (crate / "Cargo.toml").write_text(
+                '[package]\nname = "tablepro-core"\nversion = "0.1.0"\nedition = "2024"\n'
+            )
+            (crate / "src/lib.rs").write_text(
+                '#[ignore = "requires Docker"]\nfn tracked_ignored_test() {}\n'
+            )
+            untracked = crate / "src/new_test.rs"
+            untracked.write_text('#[ignore = "requires Docker"]\nfn untracked_ignored_test() {}\n')
+            generated = root / "apps/linux/packaging/arch/src/TablePro/apps/linux/app/src/copied.rs"
+            generated.parent.mkdir(parents=True)
+            generated.write_text('#[ignore = "requires Docker"]\nfn copied_ignored_test() {}\n')
+            (root / "scripts").mkdir()
+            inventory = root / "scripts/inventory-ignored-tests.py"
+            inventory.write_text((ROOT / "scripts/inventory-ignored-tests.py").read_text())
+            (root / "scripts/isolated-tests.json").write_text("{}\n")
+            subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "add", ".gitignore", "Cargo.toml", "crates", "scripts"],
+                check=True,
+            )
+
+            result = subprocess.run(
+                ["python3", str(inventory)], capture_output=True, text=True, check=False
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("tracked_ignored_test", result.stdout)
+            self.assertIn("untracked_ignored_test", result.stdout)
+            self.assertNotIn("copied_ignored_test", result.stdout)
 
     def test_full_gate_enforces_function_size_like_preflight(self):
         script = (ROOT / "scripts/ci-local.sh").read_text()
@@ -659,15 +712,29 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertLess(builder.index("flock 9"), builder.index("docker build -q"))
         self.assertIn("chown", builder)
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
-        self.assertIn('apt-get install -y -qq "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
+        self.assertIn('docker build -t "$tag"', floor_script)
+        self.assertIn("apt-get update\n", floor_script)
+        self.assertIn('apt-get install -y "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
         self.assertLess(floor_script.index('if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]'), floor_script.index("pkg-config --modversion"))
         self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
         gtk_safety_script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
-        self.assertIn('timeout 1500s python3 -u "$ROOT/apps/linux/app/tests/gtk_safety.py"', gtk_safety_script)
+        self.assertIn('timeout 1500s "$system_python" -u "$ROOT/apps/linux/app/tests/gtk_safety.py"', gtk_safety_script)
         runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
         self.assertIn("python3-pyatspi", runtime_image)
         self.assertIn("gir1.2-gtk-4.0", runtime_image)
         self.assertNotIn("rustup", runtime_image)
+
+    def test_gtk_safety_uses_private_atspi_activation(self):
+        script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
+        self.assertIn('XDG_DATA_HOME="$gtk_runtime/data"', script)
+        self.assertIn("org.a11y.Bus.service", script)
+        self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', script)
+        self.assertIn('"$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"', script)
+        self.assertLess(script.index("xvfb-run --auto-servernum"), script.index('dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh"'))
+        profile = (ROOT / "docs/evidence/postgres-stream-heap-profile-2026-10-25/run.sh").read_text()
+        self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', profile)
+        self.assertIn('"$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"', profile)
+        self.assertLess(profile.index("xvfb-run --auto-servernum"), profile.index('dbus-run-session -- bash "$RUNTIME/run-inner.sh"'))
 
     def test_distro_package_builder_uses_a_distinct_image_tag(self):
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
@@ -675,7 +742,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('docker build -q -t "$image"', builder)
         self.assertIn('"$image" bash -ceu', builder)
 
-    def test_distro_scenarios_share_the_package_and_partition_all_three_shards(self):
+    def test_distro_scenarios_share_the_package_and_partition_all_six_shards(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         producer = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
@@ -685,9 +752,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ci-gtk-artifact.py create --package", builder)
         self.assertIn("ci-gtk-artifact.py verify --package", producer)
         self.assertIn("needs: [distro-floor]", scenarios)
-        self.assertIn("shard: [1, 2, 3]", scenarios)
+        self.assertIn("shard: [1, 2, 3, 4, 5, 6]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
-        self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3", scenarios)
+        self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6", scenarios)
         self.assertIn('scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"', scenarios)
         self.assertNotIn("scripts/distro-floor-package.sh", scenarios)
         self.assertIn("scripts/test-distro-floor.sh debian:testing", scenarios)
