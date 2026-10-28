@@ -72,3 +72,37 @@ async fn a_stale_edit_is_refused_when_another_writer_changed_only_case_or_accent
         vec![vec![Value::Text("ADA".into())], vec![Value::Text("Zoë".into())]]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_single_precision_float_cell_can_be_edited_after_it_was_read() {
+    let (_container, options) = start_mysql().await;
+    let connection = connect(options).await;
+    connection
+        .execute("CREATE TABLE readings (id INT PRIMARY KEY, f FLOAT)")
+        .await
+        .unwrap();
+    connection.execute("INSERT INTO readings VALUES (1, 0.1)").await.unwrap();
+    let read = connection.query("SELECT f FROM readings").await.unwrap();
+    let original = read.rows[0][0].clone();
+    assert_eq!(original, Value::Float(0.1));
+    let columns = [column("id", "int", true), column("f", "float", false)];
+    let (sql, params) = build_optimistic_keyed_update(
+        "mysql",
+        None,
+        "readings",
+        &columns,
+        &[(1, original, Value::Float(0.2))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+
+    let affected = connection
+        .execute_in_transaction_checked(&[(sql, params)], &[0])
+        .await
+        .expect("the edit of an unchanged FLOAT cell is accepted");
+
+    assert_eq!(affected, vec![1]);
+    let stored = connection.query("SELECT f FROM readings").await.unwrap();
+    assert_eq!(stored.rows, vec![vec![Value::Float(0.2)]]);
+}

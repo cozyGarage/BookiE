@@ -176,6 +176,19 @@ fn is_geometric(data_type: &str) -> bool {
     )
 }
 
+fn widened_single_precision(driver_id: &str, column: &crate::ColumnInfo, value: &Value) -> Value {
+    let data_type = column.data_type.trim().to_ascii_lowercase();
+    let single = match driver_id {
+        "mysql" => data_type.starts_with("float"),
+        "mssql" => data_type == "real",
+        _ => false,
+    };
+    match value {
+        Value::Float(number) if single => Value::Float(f64::from(*number as f32)),
+        other => other.clone(),
+    }
+}
+
 fn optimistic_predicate(
     driver_id: &str,
     name: &str,
@@ -184,6 +197,7 @@ fn optimistic_predicate(
     params: &mut Vec<Value>,
 ) -> Result<String, BuildSqlError> {
     let placeholder = placeholder_for(driver_id, params.len());
+    let old_value = &widened_single_precision(driver_id, column, old_value);
     let predicate = match driver_id {
         "postgres" if matches!(column.data_type.trim().to_ascii_lowercase().as_str(), "real" | "float4") => {
             format!("{name} IS NOT DISTINCT FROM {placeholder}::real")
@@ -577,5 +591,38 @@ mod tests {
             build_keyed_value_select("postgres", None, "records", &keyed, 1, &[Value::Int(1)]),
             Err(crate::sql_dialect::BuildSqlError::StaleColumns)
         ));
+    }
+
+    #[test]
+    fn single_precision_original_values_are_widened_the_way_the_server_compares_them() {
+        let mut columns = [column("id", true), column("ratio", false)];
+        for (driver, data_type) in [("mysql", "float"), ("mysql", "float unsigned"), ("mssql", "real")] {
+            columns[1].data_type = data_type.into();
+            let (_, params) = build_optimistic_keyed_update(
+                driver,
+                None,
+                "records",
+                &columns,
+                &[(1, Value::Float(0.1), Value::Float(0.2))],
+                &[Value::Int(7)],
+            )
+            .unwrap();
+            assert_eq!(
+                params.last(),
+                Some(&Value::Float(f64::from(0.1_f32))),
+                "{driver} {data_type}"
+            );
+        }
+        columns[1].data_type = "double".into();
+        let (_, params) = build_optimistic_keyed_update(
+            "mysql",
+            None,
+            "records",
+            &columns,
+            &[(1, Value::Float(0.1), Value::Float(0.2))],
+            &[Value::Int(7)],
+        )
+        .unwrap();
+        assert_eq!(params.last(), Some(&Value::Float(0.1)));
     }
 }
