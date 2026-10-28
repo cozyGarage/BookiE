@@ -831,6 +831,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ci-gtk-artifact.py create --package", builder)
         self.assertIn("ci-gtk-artifact.py verify --package", producer)
         self.assertIn("needs: [distro-floor]", scenarios)
+        self.assertIn("max-parallel: 2", scenarios)
         self.assertIn("shard: [1, 2, 3, 4, 5, 6]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6", scenarios)

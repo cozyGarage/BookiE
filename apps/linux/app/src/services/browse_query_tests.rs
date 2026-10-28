@@ -183,6 +183,7 @@ async fn mysql_value_query_refetches_the_exact_blob_for_a_composite_key() {
     let container = Mysql::default()
         .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
         .unwrap();
