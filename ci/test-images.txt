@@ -31,3 +31,4 @@ driver-tls redis:7-alpine
 driver-tls postgres:16-alpine
 driver-tls mcr.microsoft.com/mssql/server:2022-latest
 driver-tls alpine:3.22
+distro-floor debian:testing
