@@ -13,7 +13,7 @@ The legacy-metadata regression uses a regular file in place of the drafts direct
 - `cargo test --locked -p tablepro-app-services --lib workspace_state::tests`: 43 passed.
 - `cargo test --locked -p tablepro-app-services --test workspace_persistence`: 15 passed.
 - Documentation links, issue ledger and whitespace checks passed.
-- Full preflight was started and remains running at draft publication. This is not a claim of full acceptance.
+- Full preflight passed at implementation commit `0a74b8a1e`: 2,255 unit tests (16 skipped), 298 sandbox tests (50 skipped) and the isolated Redis cancellation test. Debian package validation was skipped because `dpkg-deb` is unavailable. Hosted and Forgejo acceptance remain separate and pending.
 
 ## Related review
 
