@@ -55,9 +55,9 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Built-in SSH host keys and tunnel loss
 
-- [ ] A new host shows its fingerprint before trust; decline/cancel writes no key and opens no database connection. Explicit acceptance persists only that key.
-- [ ] A changed key is refused. Reconnect never silently learns an unknown key.
-- [ ] Bastion loss retires affected editor sessions and starts reconnect promptly; a result from the old session cannot replace current state.
+- [ ] A new host shows its fingerprint before trust; decline/cancel writes no key and opens no database connection. Explicit acceptance persists only that key. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container:** "Trust this SSH host?" showed the ssh-ed25519 fingerprint before any database connection; after Trust the tunnel opened and the database was reached. The Cancel path and the check that only that key is persisted were not run. The dialog opened as a separate window centred on the screen, not on the app window.
+- [x] A changed key is refused. Reconnect never silently learns an unknown key. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container:** after the bastion was recreated with new host keys, the reconnect was refused with "ssh host key changed … stored fingerprint differs (line 2)" and no new key was learned.
+- [ ] Bastion loss retires affected editor sessions and starts reconnect promptly; a result from the old session cannot replace current state. **2026-10-28 native Wayland, light, `bb9202644` debug build, MySQL 8.4 behind a bastion container:** stopping the bastion during an open session showed "Connection lost — reconnecting (attempt 2, will keep retrying)" with a Retry button; session retirement and stale-result handling were not checked.
 
 ## SSH agent (built-in client)
 

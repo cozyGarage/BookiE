@@ -8,7 +8,7 @@ This record covers a driven run of the app built from source. It is not an insta
 - Session: native Wayland on Hyprland 0.56.2, display scale 1, dark appearance, window tiled to 922 px wide.
 - Toolkit: GTK 4.24.1, libadwaita 1.10.0, GtkSourceView 5.22.0, Linux 7.2.8.
 - Profile: private `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME`, `GSETTINGS_BACKEND=memory`, so the user's saved connections and settings were not touched.
-- Databases: Redis 7.4.10, ClickHouse 24.8, SQL Server 2022, MySQL 8.4.11 (`mysql:8.4`), MongoDB 7.0.45 (`mongo:7`), PostgreSQL 18.6 (`postgres:18-alpine`, trust authentication, schemas `public`, `shop` and `Mixed Case`) and a SQLite 3.54.0 file with four tables and one view.
+- Databases: MySQL behind a bastion (`tests/fixtures/driver-tls`), Redis 7.4.10, ClickHouse 24.8, SQL Server 2022, MySQL 8.4.11 (`mysql:8.4`), MongoDB 7.0.45 (`mongo:7`), PostgreSQL 18.6 (`postgres:18-alpine`, trust authentication, schemas `public`, `shop` and `Mixed Case`) and a SQLite 3.54.0 file with four tables and one view.
 - Driving: pointer and keyboard input through `ydotool`, window geometry and screenshots through `hyprctl` and `grim`, text read from screenshots with `tesseract`, server state checked with `psql`. Screenshots are not committed.
 
 ## Results
@@ -37,6 +37,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 | Editor files, second pass | Close prompt Cancel and Discard and Save As in the changed-on-disk dialog passed |
 | Restore refresh | A browse tab open on a changed table refreshed to the restored value |
 | High contrast and icon | With libadwaita's high-contrast debug switch the editor and grid stayed readable; with the shipped icon on the data path About showed the BookiE artwork |
+| Built-in SSH tunnel | MySQL 8.4 behind a bastion container (the repository's driver-tls fixture): host-key trust prompt, tunnel with TLS Verify Full (`TLS_AES_256_GCM_SHA384`), "Connection lost — reconnecting" when the bastion stopped, changed host key refused |
 | Light appearance | Applied at once and survived a restart; Production header readable in light |
 
 ## Defects filed
@@ -51,12 +52,13 @@ The run was done in two sessions on the same build, one for the first six rows a
 - Reproduced on an existing issue: a passwordless MySQL root is refused with "using password: YES" ([#1861](https://github.com/cozyGarage/BookiE/issues/1861)); MySQL lists views under Tables while PostgreSQL has a Views group and SQLite omits them ([#1908](https://github.com/cozyGarage/BookiE/issues/1908)).
 - [#1919](https://github.com/cozyGarage/BookiE/issues/1919): the approval prompt shows an empty `tables:` line when no targets were detected.
 - [#1921](https://github.com/cozyGarage/BookiE/issues/1921): the sidebar cannot be refreshed after tables are created outside BookiE.
+- [#1925](https://github.com/cozyGarage/BookiE/issues/1925): MySQL `SHOW STATUS LIKE …` is held for approval as an unknown write.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
 ## Not run
 
-Connections and SSH items other than the Production marker and the 2-second timeout, the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, input-method editing, the backup progress window, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
+Connections items other than the Production marker, the 2-second timeout, the connection form and the built-in SSH host-key and tunnel-loss checks; SSH agent and system OpenSSH tunnels (OpenSSH would write the user's real `~/.ssh/known_hosts`); the remaining ClickHouse, SQL Server, Redis, MySQL and MongoDB items, a system high-contrast setting, input-method editing, the backup progress window, and a distribution package (`.deb`, Arch, Flatpak or AppImage): no package was installed. The release build installed with `cargo install` into a private prefix connected to PostgreSQL, browsed a table, ran a query and opened About, but it carries no icon, desktop or schema files.
 
 ## Cleanup
 

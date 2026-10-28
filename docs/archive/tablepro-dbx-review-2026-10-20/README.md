@@ -10,7 +10,7 @@ Dated review. It proves only the source pins below. It does not select work, cha
 | TablePro `main` | `3222542a4` (2026-10-19) | `linux/` source, `linux/ROADMAP.md`, 101 Linux fix commits (36 not yet in BookiE history, all read), 1,944 Apple fix commits filtered to 748 by keyword, about 100 diffs read, `apple/CHANGELOG.md` 0.1.1 to 0.82.0 |
 | dbx `main` | `d1e88ab4b` (2026-10-19) | `crates/`, `apps/desktop`, `docs/`, `handoff.md`, ER diagram design note, about 5,100 fix commits filtered by path and keyword, about 250 diffs read |
 
-Upstream trees were read as untrusted data. Nothing upstream was built or run in the October 20 review; the [October 28 capture](g-side-by-side-capture-2026-10-28.md) did run four clients. No BookiE test, database, Docker or GTK run backs these verdicts. The only executed checks were scratch-crate probes that called BookiE's `sql_lex::split_statements`, `transaction_control` and `classify`. Every "likely bug" below needs its failing regression test before an issue calls it confirmed.
+Upstream trees were read as untrusted data. Nothing upstream was built or run in the October 20 review; the [October 28 capture](g-side-by-side-capture-2026-10-28.md) did run four clients, and an addendum later ran DBeaver, DbGate and Antares. No BookiE test, database, Docker or GTK run backs these verdicts. The only executed checks were scratch-crate probes that called BookiE's `sql_lex::split_statements`, `transaction_control` and `classify`. Every "likely bug" below needs its failing regression test before an issue calls it confirmed.
 
 Items already owned by an earlier archive, the feature comparison or a backlog row appear once in the detail files as "already recorded". This review does not repeat the October 15 to October 20 reviews listed in the [documentation map](../../README.md#engineering-review-records).
 
@@ -24,7 +24,7 @@ Items already owned by an earlier archive, the feature comparison or a backlog r
 | [d-dbx-features.md](d-dbx-features.md) | dbx feature inventory, architecture ideas, where BookiE is ahead, ER diagram design for GTK, top 20 | About 4,400 words |
 | [e-dbx-backend-fixes.md](e-dbx-backend-fixes.md) | 105 dbx backend bug classes: 43 covered, 21 likely gaps, 17 unverified, 12 already recorded, 10 N/A | About 8,400 words |
 | [f-dbx-ux-fixes.md](f-dbx-ux-fixes.md) | 30 dbx UX bug classes and dbx UX features BookiE lacks, top 15 | About 2,600 words |
-| [g-side-by-side-capture-2026-10-28.md](g-side-by-side-capture-2026-10-28.md) | A later run of BookiE, TablePro Linux, Beekeeper Studio and dbx on one PostgreSQL database; UI layout of connect, sidebar, filter, editor and large results | About 1,300 words |
+| [g-side-by-side-capture-2026-10-28.md](g-side-by-side-capture-2026-10-28.md) | A later run of BookiE, TablePro Linux, Beekeeper Studio and dbx on one PostgreSQL database, with an addendum for DBeaver, DbGate and Antares at 1,400 px; UI layout of connect, sidebar, filter, editor and large results | About 2,000 words |
 
 Each detail table row carries the upstream commit or changelog version, the BookiE path, a verdict, a proposed test with its tier, a lane and a priority.
 
