@@ -205,7 +205,11 @@ fn optimistic_predicate(
             let value_sql = text_cast_placeholder(column, old_value, placeholder);
             format!("{name} IS NOT DISTINCT FROM {value_sql}")
         }
-        "sqlite" | "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
+        "sqlite" => format!("{name} COLLATE BINARY IS NOT DISTINCT FROM {placeholder}"),
+        "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
+        "mysql" if matches!(old_value, Value::Text(_)) => {
+            format!("CONVERT({name} USING utf8mb4) COLLATE utf8mb4_bin <=> {placeholder}")
+        }
         "mysql" => format!("{name} <=> {placeholder}"),
         "mssql" => {
             let next = placeholder_for(driver_id, params.len() + 1);
@@ -462,7 +466,7 @@ mod tests {
         columns[1].nullable = true;
         for (driver, expected) in [
             ("postgres", "\"payload\" IS NOT DISTINCT FROM $3"),
-            ("sqlite", "\"payload\" IS NOT DISTINCT FROM ?"),
+            ("sqlite", "\"payload\" COLLATE BINARY IS NOT DISTINCT FROM ?"),
             ("mysql", "`payload` <=> ?"),
             ("mssql", "([payload] = @P3 OR ([payload] IS NULL AND @P4 IS NULL))"),
         ] {
