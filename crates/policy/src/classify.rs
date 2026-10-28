@@ -232,12 +232,12 @@ pub(crate) fn dialect_for(driver_id: &str) -> Box<dyn Dialect> {
 }
 
 fn classify_statement(stmt: &Statement) -> StatementDetails {
-    let mut facts = classify_statement_details(stmt);
+    let mut facts = crate::show_statements::details(stmt);
     facts.effects = facts.effects.union(statement_effects(stmt, &facts));
     facts
 }
 
-fn classify_statement_details(stmt: &Statement) -> StatementDetails {
+pub(crate) fn classify_statement_details(stmt: &Statement) -> StatementDetails {
     match stmt {
         Statement::Query(q) => classify_query(q),
         Statement::Insert(insert) => classify_insert(insert),
