@@ -176,19 +176,6 @@ fn is_geometric(data_type: &str) -> bool {
     )
 }
 
-fn widened_single_precision(driver_id: &str, column: &crate::ColumnInfo, value: &Value) -> Value {
-    let data_type = column.data_type.trim().to_ascii_lowercase();
-    let single = match driver_id {
-        "mysql" => data_type.starts_with("float"),
-        "mssql" => data_type == "real",
-        _ => false,
-    };
-    match value {
-        Value::Float(number) if single => Value::Float(f64::from(*number as f32)),
-        other => other.clone(),
-    }
-}
-
 fn optimistic_predicate(
     driver_id: &str,
     name: &str,
@@ -197,7 +184,7 @@ fn optimistic_predicate(
     params: &mut Vec<Value>,
 ) -> Result<String, BuildSqlError> {
     let placeholder = placeholder_for(driver_id, params.len());
-    let old_value = &widened_single_precision(driver_id, column, old_value);
+    let old_value = &crate::numeric_input::widened_single_precision(driver_id, column, old_value);
     let predicate = match driver_id {
         "postgres" if matches!(column.data_type.trim().to_ascii_lowercase().as_str(), "real" | "float4") => {
             format!("{name} IS NOT DISTINCT FROM {placeholder}::real")

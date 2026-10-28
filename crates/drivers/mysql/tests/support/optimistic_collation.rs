@@ -109,3 +109,42 @@ async fn a_single_precision_float_cell_can_be_edited_after_it_was_read() {
     let stored = connection.query("SELECT f FROM readings").await.unwrap();
     assert_eq!(stored.rows, vec![vec![Value::Float(0.2)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn filtering_a_float_column_by_its_own_value_finds_the_row() {
+    use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+
+    let (_container, options) = start_mysql().await;
+    let connection = connect(options).await;
+    connection
+        .execute("CREATE TABLE readings (id INT PRIMARY KEY, f FLOAT)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO readings VALUES (1, 0.1), (2, 0.5)")
+        .await
+        .unwrap();
+    let columns = [column("id", "int", true), column("f", "float", false)];
+    let filter = |op: FilterOp| FilterSet {
+        rules: vec![FilterRule {
+            column: "f".into(),
+            op,
+            value: Some(FilterValue::Single("0.1".into())),
+        }],
+        ..Default::default()
+    };
+
+    let mut found = Vec::new();
+    for op in [FilterOp::Eq, FilterOp::Gt] {
+        let (clause, params) = build_filter_where("mysql", &columns, &filter(op)).unwrap().unwrap();
+        let rows = connection
+            .query_params(&format!("SELECT id FROM readings WHERE {clause} ORDER BY id"), &params)
+            .await
+            .unwrap();
+        found.push(rows.rows);
+    }
+
+    assert_eq!(found[0], vec![vec![Value::Int(1)]]);
+    assert_eq!(found[1], vec![vec![Value::Int(2)]]);
+}

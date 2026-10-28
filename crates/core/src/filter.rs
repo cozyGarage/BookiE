@@ -481,7 +481,7 @@ fn parse_value_for(col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterErr
 }
 
 fn parse_filter_value(driver_id: &str, col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterError> {
-    let value = parse_value_for(col, text)?;
+    let value = crate::numeric_input::widened_single_precision(driver_id, col, &parse_value_for(col, text)?);
     if driver_id != "duckdb" {
         return Ok(value);
     }

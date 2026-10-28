@@ -12,6 +12,23 @@ pub fn single_precision_as_f64(value: f32) -> f64 {
     value.to_string().parse().unwrap_or(f64::from(value))
 }
 
+pub(crate) fn widened_single_precision(
+    driver_id: &str,
+    column: &crate::ColumnInfo,
+    value: &crate::Value,
+) -> crate::Value {
+    let data_type = column.data_type.trim().to_ascii_lowercase();
+    let single = match driver_id {
+        "mysql" => data_type.starts_with("float"),
+        "mssql" => data_type == "real",
+        _ => false,
+    };
+    match value {
+        crate::Value::Float(number) if single => crate::Value::Float(f64::from(*number as f32)),
+        other => other.clone(),
+    }
+}
+
 pub fn parse_float_input(text: &str) -> Result<f64, FloatInputError> {
     let text = text.trim();
     let value = text.parse::<f64>().map_err(|_| FloatInputError::Invalid)?;
