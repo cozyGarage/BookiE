@@ -23,6 +23,14 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", workflow, re.M | re.S).group(1)
+        container = fast.split("    container:\n", 1)[1].split("\n    env:\n", 1)[0]
+        action = (ROOT / ".github/actions/dockerhub-login/action.yml").read_text()
+        self.assertIn("DOCKER_CONFIG: /github/home/.docker", container)
+        self.assertIn('config_dir="${DOCKER_CONFIG:-${HOME}/.docker}"', action)
+
     def test_ci_build_artifacts_strip_symbols(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
         self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"', build)
