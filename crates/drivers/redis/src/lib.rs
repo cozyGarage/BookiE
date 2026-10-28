@@ -317,7 +317,7 @@ async fn fetch_page(
     offset: u64,
     limit: u64,
 ) -> Result<QueryResult, DriverError> {
-    let keys = scan_keys(conn, "*", (offset + limit) as usize).await?;
+    let keys = scan_keys(conn, "*", scan_target(offset, limit)?).await?;
     let skip = offset as usize;
     let page: Vec<Vec<u8>> = keys.into_iter().skip(skip).take(limit as usize).collect();
     let mut rows = Vec::with_capacity(page.len());
@@ -329,6 +329,15 @@ async fn fetch_page(
         rows,
         truncated: false,
     })
+}
+
+fn scan_target(offset: u64, limit: u64) -> Result<usize, DriverError> {
+    offset
+        .checked_add(limit)
+        .and_then(|end| usize::try_from(end).ok())
+        .ok_or_else(|| {
+            DriverError::Unsupported("the requested page lies beyond what Redis browsing can address".into())
+        })
 }
 
 async fn scan_keys(

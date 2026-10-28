@@ -751,6 +751,34 @@ async fn browse_table_refuses_a_negative_page_and_an_unlisted_connection() {
     assert_eq!(provider.connection_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
 }
 
+#[tokio::test]
+async fn browse_table_refuses_an_offset_beyond_the_ceiling_before_reaching_the_driver() {
+    let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
+
+    for offset in [100_001_u64, 1_000_000_000_000, u64::MAX] {
+        let error = tablepro_mcp::dispatch(
+            &bridge,
+            &token,
+            "browse_table",
+            serde_json::json!({"connection_id": Uuid::nil().to_string(), "table": "items", "offset": offset}),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains("offset"), "{error}");
+    }
+    assert!(provider.requested_pages().is_empty());
+
+    tablepro_mcp::dispatch(
+        &bridge,
+        &token,
+        "browse_table",
+        serde_json::json!({"connection_id": Uuid::nil().to_string(), "table": "items", "offset": 100_000, "limit": 1}),
+    )
+    .await
+    .expect("the ceiling itself is still allowed");
+    assert_eq!(provider.requested_pages(), vec![(100_000, 1)]);
+}
+
 fn column(name: &str) -> ColumnInfo {
     ColumnInfo {
         name: name.into(),

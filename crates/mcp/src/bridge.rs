@@ -36,6 +36,8 @@ pub(crate) async fn scope_request_cancellation<F: Future>(cancellation: Cancella
     REQUEST_CANCELLATION.scope(cancellation, future).await
 }
 
+const MAX_BROWSE_OFFSET: u64 = 100_000;
+
 pub struct McpBridge {
     provider: Arc<dyn ConnectionProvider>,
     tokens: Arc<TokenStore>,
@@ -437,6 +439,11 @@ impl McpBridge {
             Some(schema) => Some(validated_identifier(&schema)?),
             None => None,
         };
+        if offset > MAX_BROWSE_OFFSET {
+            return Err(format!(
+                "offset must not exceed {MAX_BROWSE_OFFSET}; narrow the query with SQL instead"
+            ));
+        }
         let capped = limit.clamp(1, self.max_rows);
         self.with_connection(token, connection_id, move |conn, control| {
             Box::pin(async move {
