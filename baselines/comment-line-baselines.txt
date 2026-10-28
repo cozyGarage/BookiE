@@ -68,7 +68,8 @@ apps/linux/app/src/ui/structure_tab_dialogs.rs 59
 apps/linux/app/src/ui/welcome_view.rs 41
 crates/agentd/src/audit_isolation_tests.rs 1
 crates/agentd/src/lib.rs 4
-crates/agentd/src/main.rs 21
+crates/agentd/src/main.rs 16
+crates/agentd/src/main_tests.rs 5
 crates/app-services/src/filter_settings.rs 12
 crates/app-services/src/state_file.rs 2
 crates/app-services/src/structure_tracker.rs 23
@@ -83,12 +84,13 @@ crates/core/src/export/html.rs 6
 crates/core/src/export/mod.rs 10
 crates/core/src/export/xlsx.rs 2
 crates/core/src/export/xml.rs 6
-crates/core/src/filter.rs 73
+crates/core/src/filter.rs 68
 crates/core/src/filter_tests.rs 11
-crates/core/src/import/cell.rs 29
+crates/core/src/import/cell.rs 26
 crates/core/src/import/csv_import.rs 32
 crates/core/src/import/csv_import_tests.rs 3
-crates/core/src/import/infer.rs 21
+crates/core/src/import/infer.rs 18
+crates/core/src/import/infer_tests.rs 3
 crates/core/src/import/mod.rs 5
 crates/core/src/import/plan.rs 18
 crates/core/src/import/plan_tests.rs 4
@@ -130,7 +132,8 @@ crates/drivers/mssql/src/codec.rs 20
 crates/drivers/mssql/src/lib.rs 53
 crates/drivers/mssql/src/tests.rs 7
 crates/drivers/mysql/src/decode.rs 16
-crates/drivers/mysql/src/lib.rs 68
+crates/drivers/mysql/src/lib.rs 65
+crates/drivers/mysql/src/lib_tests.rs 3
 crates/drivers/mysql/src/session.rs 5
 crates/drivers/mysql/src/temporal.rs 1
 crates/drivers/postgres/src/array.rs 4
@@ -141,7 +144,8 @@ crates/drivers/redis/src/lib.rs 9
 crates/drivers/redis/src/tests.rs 2
 crates/drivers/sqlite/src/interrupt.rs 13
 crates/drivers/sqlite/src/lib.rs 59
-crates/mcp/src/bridge.rs 15
+crates/mcp/src/bridge.rs 11
+crates/mcp/src/bridge_tests.rs 4
 crates/mcp/src/lib.rs 7
 crates/mcp/src/server.rs 31
 crates/mcp/src/server_tests.rs 12
@@ -175,7 +179,8 @@ crates/storage/src/connections.rs 39
 crates/storage/src/connections_copy.rs 5
 crates/storage/src/query_history.rs 17
 crates/storage/src/query_history_tests.rs 2
-crates/storage/src/secrets.rs 9
+crates/storage/src/secrets.rs 3
+crates/storage/src/secrets_tests.rs 6
 crates/transport/src/lib.rs 8
 tests/driver-tls/src/lib.rs 10
 tests/release/src/lib.rs 3
