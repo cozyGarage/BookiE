@@ -2511,6 +2511,10 @@ overlong_pasted_sql_is_refused_without_replacing_the_editor.environment = "local
 
 def sidebar_refresh_finds_an_external_table(database, _base):
     with sqlite3.connect(database) as connection:
+        connection.execute("DROP TABLE safety_items")
+    invoke(wait_for_node(name="Refresh tables", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="No tables")
+    with sqlite3.connect(database) as connection:
         connection.execute("CREATE TABLE external_sidebar_refresh (id INTEGER PRIMARY KEY)")
     wait_for_node(name="external_sidebar_refresh", present=False)
     invoke(wait_for_node(name="Refresh tables", role=pyatspi.ROLE_PUSH_BUTTON))
