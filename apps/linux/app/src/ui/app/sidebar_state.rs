@@ -66,7 +66,13 @@ impl App {
 
     pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo]) {
         self.sidebar_tables = tables.to_vec();
-        let nodes = build_nodes(tables, &self.sidebar_views);
+        let mut nodes = build_nodes(tables, &self.sidebar_views);
+        let catalog_kinds = self
+            .current_driver_id
+            .as_deref()
+            .and_then(|id| self.registry.get(id))
+            .map_or(&[][..], |driver| driver.capabilities().catalog_object_kinds);
+        crate::services::sidebar_tree::append_catalog_entries(&mut nodes, catalog_kinds);
         let schema_filter_enabled = self.current_driver_id.as_deref() == Some("postgres");
         let timeout =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
@@ -93,6 +99,7 @@ impl App {
         );
         self.sidebar_factory.widget().invalidate_filter();
         self.schema_filter_button.set_visible(schema_filter_enabled);
+        self.sync_sidebar_fold_button();
         self.sync_sidebar_selection();
     }
 
@@ -114,7 +121,75 @@ impl App {
             &self.sidebar_hidden_schemas,
         );
         self.sidebar_factory.widget().invalidate_filter();
+        self.sync_sidebar_fold_button();
         self.persist_workspace_state();
+    }
+
+    pub(super) fn toggle_all_sidebar_groups(&mut self) {
+        if !self.table_search.text().is_empty() {
+            return;
+        }
+        {
+            let nodes = self.sidebar_nodes.borrow();
+            let mut collapsed = self.sidebar_collapsed.borrow_mut();
+            if collapsed.is_all_collapsed(&nodes) {
+                collapsed.expand_all();
+            } else {
+                collapsed.collapse_all(&nodes);
+            }
+        }
+        let states: Vec<(usize, bool)> = {
+            let collapsed = self.sidebar_collapsed.borrow();
+            self.sidebar_nodes
+                .borrow()
+                .iter()
+                .enumerate()
+                .filter(|(_, node)| matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)))
+                .map(|(index, node)| (index, collapsed.is_collapsed(&node.key)))
+                .collect()
+        };
+        for (index, collapsed) in states {
+            self.sidebar_factory.send(index, SidebarRowMsg::SetCollapsed(collapsed));
+        }
+        refresh_visible(
+            &self.sidebar_nodes,
+            &self.sidebar_collapsed,
+            &self.sidebar_visible,
+            &self.table_search.text(),
+            &self.sidebar_hidden_schemas,
+        );
+        self.sidebar_factory.widget().invalidate_filter();
+        self.sync_sidebar_fold_button();
+        self.persist_workspace_state();
+    }
+
+    pub(super) fn sync_sidebar_fold_button(&self) {
+        let all_collapsed = self
+            .sidebar_collapsed
+            .borrow()
+            .is_all_collapsed(&self.sidebar_nodes.borrow());
+        let (icon, label) = if all_collapsed {
+            ("go-down-symbolic", crate::tr!("Expand all"))
+        } else {
+            ("go-up-symbolic", crate::tr!("Collapse all"))
+        };
+        self.sidebar_fold_button.set_icon_name(icon);
+        self.sidebar_fold_button.set_tooltip_text(Some(&label));
+        self.sidebar_fold_button
+            .update_property(&[relm4::gtk::accessible::Property::Label(&label)]);
+        self.sidebar_fold_button
+            .set_visible(!self.sidebar_nodes.borrow().is_empty());
+    }
+
+    pub(super) fn show_catalog(&self, kind: Option<tablepro_core::CatalogObjectKind>) {
+        crate::ui::catalog_dialog::present(
+            self.window.upcast_ref::<relm4::gtk::Window>(),
+            self.connection_id,
+            &self.database,
+            &self.preferences,
+            self.catalog_dialog_cancel.borrow().clone(),
+            kind,
+        );
     }
 
     pub(super) fn on_reveal_in_sidebar(&mut self) {
@@ -267,6 +342,8 @@ fn sidebar_group_label(node: &crate::services::sidebar_tree::TreeNode) -> String
         NodeKind::Schema => node.schema.clone().unwrap_or_default(),
         NodeKind::Group(GroupKind::Tables) => crate::tr!("Tables").to_string(),
         NodeKind::Group(GroupKind::Views) => crate::tr!("Views").to_string(),
+        NodeKind::Group(GroupKind::Catalog) => crate::tr!("Catalog").to_string(),
+        NodeKind::Catalog(kind) => crate::ui::catalog_dialog::kind_label(*kind),
         NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
     }
 }
@@ -281,6 +358,16 @@ fn row_for(
     let (kind, group) = match &node.kind {
         NodeKind::Table { .. } => (SidebarObjectKind::Table, None),
         NodeKind::View { .. } => (SidebarObjectKind::View, None),
+        NodeKind::Catalog(_) => (
+            SidebarObjectKind::Catalog,
+            Some(GroupInit {
+                label: sidebar_group_label(node),
+                count: 0,
+                collapsed: false,
+                actions: false,
+                entry: true,
+            }),
+        ),
         NodeKind::Schema | NodeKind::Group(_) => (
             if schema_filter_enabled && node.schema.is_some() && matches!(node.kind, NodeKind::Schema) {
                 SidebarObjectKind::Schema
@@ -292,6 +379,7 @@ fn row_for(
                 count: node.count,
                 collapsed: collapsed.is_collapsed(&node.key),
                 actions: matches!(node.kind, NodeKind::Group(GroupKind::Tables)),
+                entry: false,
             }),
         ),
     };
@@ -402,5 +490,27 @@ mod sidebar_label_tests {
 
         assert_eq!(sidebar_group_label(table_group), crate::tr!("Tables").to_string());
         assert_eq!(sidebar_group_label(view_group), crate::tr!("Views").to_string());
+    }
+
+    #[test]
+    fn catalog_entries_get_a_catalog_row_kind_and_the_dialog_label() {
+        use crate::services::sidebar_tree::append_catalog_entries;
+        let mut nodes = build_nodes(&[], &[]);
+        append_catalog_entries(&mut nodes, &[tablepro_core::CatalogObjectKind::Role]);
+        let group = nodes
+            .iter()
+            .find(|node| node.kind == NodeKind::Group(GroupKind::Catalog))
+            .unwrap();
+        let entry = nodes
+            .iter()
+            .find(|node| node.kind == NodeKind::Catalog(tablepro_core::CatalogObjectKind::Role))
+            .unwrap();
+
+        assert_eq!(sidebar_group_label(group), crate::tr!("Catalog").to_string());
+        let init = row_for(entry, &Default::default(), false, None);
+        assert_eq!(init.kind, SidebarObjectKind::Catalog);
+        let group_init = init.group.unwrap();
+        assert!(group_init.entry);
+        assert_eq!(group_init.label, crate::tr!("Roles").to_string());
     }
 }

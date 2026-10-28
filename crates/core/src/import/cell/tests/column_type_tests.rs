@@ -32,6 +32,46 @@ fn a_catalog_type_name_reads_as_the_value_shape_it_stores() {
     assert_eq!(column_kind("IMAGE"), ColumnKind::Bytes);
 }
 
+#[test]
+fn only_integer_type_names_read_as_integer_columns() {
+    for name in [
+        "int",
+        "INT",
+        "integer",
+        "tinyint",
+        "tinyint(1)",
+        "smallint",
+        "mediumint",
+        "bigint",
+        "int(11)",
+        "int unsigned",
+        "bigint(20) unsigned zerofill",
+        "int2",
+        "int4",
+        "int8",
+        "serial",
+        "smallserial",
+        "serial8",
+        "Int8",
+        "UInt16",
+        "UInt64",
+    ] {
+        assert_eq!(column_kind(name), ColumnKind::Int, "{name}");
+    }
+    for name in [
+        "tinytext",
+        "multipoint",
+        "int4range",
+        "int8range",
+        "int4multirange",
+        "IntervalDay",
+        "Int256",
+        "UInt256",
+    ] {
+        assert_eq!(column_kind(name), ColumnKind::Text, "{name}");
+    }
+}
+
 fn import_one(column: ColumnInfo, text: &str, driver: &str) -> Result<Value, CellError> {
     row_to_values_for_driver(
         &[text.to_owned()],
