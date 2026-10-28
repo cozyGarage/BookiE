@@ -10,11 +10,7 @@ impl App {
         views: &[tablepro_core::TableInfo],
     ) {
         let driver = self.current_driver_id.as_deref().unwrap_or("postgres");
-        self.table_names = tables
-            .iter()
-            .chain(views)
-            .map(|table| catalog_reference(driver, table.schema.as_deref(), &table.name))
-            .collect();
+        self.table_names = completion_names(driver, tables, views);
     }
 
     pub(super) fn refresh_schema_index(&self) {
@@ -52,10 +48,34 @@ impl App {
     }
 }
 
+fn completion_names(
+    driver: &str,
+    tables: &[tablepro_core::TableInfo],
+    views: &[tablepro_core::TableInfo],
+) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    tables
+        .iter()
+        .chain(views)
+        .map(|table| catalog_reference(driver, table.schema.as_deref(), &table.name))
+        .filter(|name| seen.insert(name.clone()))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use tablepro_app_services::completion_identifiers::split_table_reference;
     use tablepro_core::sql_syntax::SqlGrammar;
+
+    #[test]
+    fn overlapping_view_names_appear_once_in_completion() {
+        let view = tablepro_core::TableInfo {
+            schema: Some("db".into()),
+            name: "recent".into(),
+        };
+        let result = super::completion_names("mysql", std::slice::from_ref(&view), &[view.clone()]);
+        assert_eq!(result.len(), 1);
+    }
 
     #[test]
     fn quoted_names_reach_metadata_without_losing_identity() {

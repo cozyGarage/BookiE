@@ -140,6 +140,15 @@ fn a_schema_or_table_name_with_separators_cannot_collide_with_another_node() {
 }
 
 #[test]
+fn a_view_also_returned_as_a_table_appears_only_in_views() {
+    let nodes = build_nodes(
+        &[info(Some("db"), "items"), info(Some("db"), "recent")],
+        &[info(Some("db"), "recent")],
+    );
+    assert_eq!(labels(&nodes, &all(&nodes)), ["Tables", "  items", "Views", "  recent"]);
+}
+
+#[test]
 fn an_empty_group_is_left_out() {
     let nodes = build_nodes(&[], &[info(None, "only_view")]);
     assert_eq!(labels(&nodes, &all(&nodes)), ["Views", "  only_view"]);

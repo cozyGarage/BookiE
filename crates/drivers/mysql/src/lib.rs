@@ -158,11 +158,11 @@ impl Connection for MysqlConnection {
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        catalog::list_relations(&self.pool, "BASE TABLE").await
+        catalog::list_relations(&self.pool, None).await
     }
 
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
-        catalog::list_relations(&self.pool, "VIEW").await
+        catalog::list_relations(&self.pool, Some("VIEW")).await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {

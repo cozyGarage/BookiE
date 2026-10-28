@@ -65,7 +65,11 @@ impl CollapseState {
 
 pub fn build_nodes(tables: &[TableInfo], views: &[TableInfo]) -> Vec<TreeNode> {
     let mut schemas = BTreeMap::<Option<String>, (Vec<&TableInfo>, Vec<&TableInfo>)>::new();
+    let view_keys: HashSet<_> = views.iter().map(|view| (&view.schema, &view.name)).collect();
     for table in tables {
+        if view_keys.contains(&(&table.schema, &table.name)) {
+            continue;
+        }
         schemas.entry(table.schema.clone()).or_default().0.push(table);
     }
     for view in views {

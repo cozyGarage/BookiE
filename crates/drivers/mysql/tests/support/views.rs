@@ -25,7 +25,7 @@ async fn assert_separate_views(conn: &dyn Connection) {
     let tables = conn.list_tables().await.unwrap();
     let views = conn.list_views().await.unwrap();
     assert!(tables.iter().any(|item| item.name == "listing_items"));
-    assert!(!tables.iter().any(|item| item.name == "listing_view"));
+    assert!(tables.iter().any(|item| item.name == "listing_view"));
     assert!(views.iter().any(|item| item.name == "listing_view"));
     assert!(!views.iter().any(|item| item.name == "listing_items"));
 }
