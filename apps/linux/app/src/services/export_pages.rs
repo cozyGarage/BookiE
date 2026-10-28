@@ -38,6 +38,7 @@ fn page_future(
         columns: &plan.columns,
         filter: &plan.filter,
         hidden_columns: None,
+        long_text_preview: false,
     };
     let page = if plan.row_id_order {
         target.page_by_row_id(offset, EXPORT_PAGE_ROWS, plan.sort, None)

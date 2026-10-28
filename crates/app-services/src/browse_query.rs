@@ -4,6 +4,10 @@ use tablepro_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build
 
 use order::resolved_order_by;
 
+const LONG_TEXT_BYTES: usize = 1_048_576;
+const PREVIEW_CHARS: usize = 1024;
+const PARTIAL_MARKER: &str = "\\x01bookie-partial:";
+
 mod mongodb;
 mod order;
 mod redis;
@@ -15,6 +19,7 @@ pub struct BrowseTarget<'a> {
     pub columns: &'a [ColumnInfo],
     pub filter: &'a FilterSet,
     pub hidden_columns: Option<&'a HashSet<String>>,
+    pub long_text_preview: bool,
 }
 
 #[derive(Debug)]
@@ -131,7 +136,14 @@ impl BrowseTarget<'_> {
         row_id_order: bool,
         direction: PageDirection,
     ) -> Result<PageQuery, String> {
-        let (projection, projected) = self.projection();
+        let (mut projection, projected) = self.projection();
+        let previewing = match self.long_text_projection().filter(|_| projected.is_none()) {
+            Some(preview) => {
+                projection = preview;
+                true
+            }
+            None => false,
+        };
         let mut query = self.filtered_query(&projection)?;
         query.projected_columns = projected;
         let order = if sort.is_none() && matches!(self.driver_id, "mongodb" | "redis") {
@@ -165,7 +177,7 @@ impl BrowseTarget<'_> {
         let actual_offset = if seek_last || cursor_applied {
             0
         } else {
-            if self.filter.is_empty() && order.is_none() {
+            if self.filter.is_empty() && order.is_none() && !previewing {
                 return Ok(PageQuery::Native);
             }
             offset
@@ -181,6 +193,30 @@ impl BrowseTarget<'_> {
             ));
         query.reverse_rows = (before && cursor_applied) || seek_last;
         Ok(PageQuery::Sql(query))
+    }
+
+    fn long_text_projection(&self) -> Option<String> {
+        if !self.long_text_preview || self.driver_id != "postgres" {
+            return None;
+        }
+        let quote = |name: &str| tablepro_core::sql_dialect::quote_ident(self.driver_id, name);
+        let mut any = false;
+        let list: Vec<String> = self
+            .columns
+            .iter()
+            .map(|column| {
+                let name = quote(&column.name);
+                if !is_postgres_text_type(&column.data_type) {
+                    return name;
+                }
+                any = true;
+                format!(
+                    "CASE WHEN octet_length({name}) > {LONG_TEXT_BYTES} THEN E'{PARTIAL_MARKER}' || octet_length({name})::text \
+                     || E'\\x01' || left({name}, {PREVIEW_CHARS}) ELSE {name} END AS {name}"
+                )
+            })
+            .collect();
+        any.then(|| list.join(", "))
     }
 
     fn projection(&self) -> (String, Option<Vec<usize>>) {
@@ -214,6 +250,31 @@ impl BrowseTarget<'_> {
         }
         (required.len() < self.columns.len())
             .then(|| (0..self.columns.len()).filter(|i| required.contains(i)).collect())
+    }
+}
+
+fn is_postgres_text_type(data_type: &str) -> bool {
+    let lower = data_type.trim().to_ascii_lowercase();
+    lower == "text" || lower.starts_with("character varying") || lower.starts_with("varchar")
+}
+
+pub fn mark_partial_cells(result: &mut tablepro_core::QueryResult) {
+    const MARKER: &str = "\u{1}bookie-partial:";
+    for row in &mut result.rows {
+        for cell in row {
+            let Value::Text(text) = cell else {
+                continue;
+            };
+            let Some(rest) = text.strip_prefix(MARKER) else {
+                continue;
+            };
+            let Some((bytes, _preview)) = rest.split_once('\u{1}') else {
+                continue;
+            };
+            if bytes.parse::<u64>().is_ok() {
+                *cell = Value::Undecodable(format!("partial {bytes} bytes"));
+            }
+        }
     }
 }
 
@@ -341,6 +402,7 @@ mod tests {
             columns: &columns,
             filter: &filter,
             hidden_columns: Some(&hidden),
+            long_text_preview: false,
         };
 
         let PageQuery::Sql(page) = target.page(0, 100, None, None).unwrap() else {
@@ -371,6 +433,7 @@ mod tests {
             columns: &columns,
             filter: &FilterSet::default(),
             hidden_columns: Some(&hidden),
+            long_text_preview: false,
         };
 
         let PageQuery::Sql(page) = target.page(0, 100, Some((3, true)), None).unwrap() else {
@@ -395,6 +458,7 @@ mod tests {
             columns: &columns,
             filter: &FilterSet::default(),
             hidden_columns: Some(&hidden),
+            long_text_preview: false,
         };
         assert_eq!(target.projected_columns(), None);
     }
@@ -411,6 +475,7 @@ mod tests {
                 columns: &columns,
                 filter: &FilterSet::default(),
                 hidden_columns: Some(&hidden),
+                long_text_preview: false,
             };
             assert_eq!(target.projected_columns(), None);
         }
@@ -428,6 +493,7 @@ mod tests {
                 columns: &columns,
                 filter: &FilterSet::default(),
                 hidden_columns: Some(&hidden),
+                long_text_preview: false,
             };
             assert_eq!(target.projected_columns(), None);
             assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
@@ -449,6 +515,7 @@ mod tests {
             columns: &columns,
             filter: &filter,
             hidden_columns: Some(&hidden),
+            long_text_preview: false,
         };
 
         let PageQuery::Sql(page) = target.page(0, 100, None, None).unwrap() else {
@@ -469,6 +536,7 @@ mod tests {
             columns: &columns,
             filter: &FilterSet::default(),
             hidden_columns: None,
+            long_text_preview: false,
         };
         let query = target
             .value_query(2, &[Value::Text("acme".into()), Value::Int(7)])
@@ -492,8 +560,52 @@ mod tests {
                 columns: &columns,
                 filter: &FilterSet::default(),
                 hidden_columns: None,
+                long_text_preview: false,
             };
             assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
         }
+    }
+
+    #[test]
+    fn preview_projection_is_postgres_only_and_opt_in() {
+        let columns = [column("id", true), column("body", false)];
+        let filter = FilterSet::default();
+        let target = |driver_id, long_text_preview| BrowseTarget {
+            driver_id,
+            schema: None,
+            table: "notes",
+            columns: &columns,
+            filter: &filter,
+            hidden_columns: None,
+            long_text_preview,
+        };
+        let PageQuery::Sql(on) = target("postgres", true).page(0, 10, None, None).unwrap() else {
+            panic!("preview pages run as SQL")
+        };
+        assert!(on.sql.contains("octet_length(\"body\") > 1048576"), "{}", on.sql);
+        for (driver, preview) in [("postgres", false), ("mysql", true), ("sqlite", true)] {
+            if let PageQuery::Sql(other) = target(driver, preview).page(0, 10, None, None).unwrap() {
+                assert!(!other.sql.contains("octet_length"), "{driver} {preview}: {}", other.sql);
+            }
+        }
+    }
+
+    #[test]
+    fn only_a_well_formed_marker_becomes_a_partial_cell() {
+        let mut result = tablepro_core::QueryResult {
+            columns: vec![],
+            rows: vec![vec![
+                Value::Text("\u{1}bookie-partial:2097152\u{1}xxxx".into()),
+                Value::Text("\u{1}bookie-partial:not-a-number\u{1}x".into()),
+                Value::Text("plain".into()),
+                Value::Null,
+            ]],
+            truncated: false,
+        };
+        mark_partial_cells(&mut result);
+        assert_eq!(result.rows[0][0], Value::Undecodable("partial 2097152 bytes".into()));
+        assert!(matches!(&result.rows[0][1], Value::Text(_)));
+        assert_eq!(result.rows[0][2], Value::Text("plain".into()));
+        assert_eq!(result.rows[0][3], Value::Null);
     }
 }

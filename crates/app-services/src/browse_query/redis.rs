@@ -46,6 +46,7 @@ mod tests {
             columns: &columns,
             filter: &FilterSet::default(),
             hidden_columns: None,
+            long_text_preview: false,
         };
         let binary_key = Value::Bytes(vec![0xff, b'?', b'\n']);
         let query = target.value_query(2, std::slice::from_ref(&binary_key)).unwrap();

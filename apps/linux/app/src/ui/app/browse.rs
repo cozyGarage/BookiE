@@ -176,6 +176,7 @@ impl App {
             columns: &columns,
             filter: &filter,
             hidden_columns: Some(&hidden_columns),
+            long_text_preview: true,
         };
         let row_id_order = self.relation_is_ordinary_table(schema.as_deref(), &table);
         let page = if reverse_page {
@@ -218,10 +219,11 @@ impl App {
                         ),
                         PageQuery::Sql(query) => {
                             let projected_columns = query.projected_columns.clone();
-                            (
-                                conn.query_params_controlled(&query.sql, &query.params, &control).await,
-                                projected_columns,
-                            )
+                            let mut page = conn.query_params_controlled(&query.sql, &query.params, &control).await;
+                            if let Ok(rows) = page.as_mut() {
+                                crate::services::browse_query::mark_partial_cells(rows);
+                            }
+                            (page, projected_columns)
                         }
                     };
                     match result {
@@ -350,6 +352,7 @@ impl App {
             columns: &columns,
             filter: &filter,
             hidden_columns: None,
+            long_text_preview: false,
         };
         let query = match target.count() {
             Ok(query) => query,
@@ -744,6 +747,7 @@ fn browse_cell_value_query(
         columns,
         filter: &tablepro_core::FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     }
     .value_query(col_index, row_key)
 }
