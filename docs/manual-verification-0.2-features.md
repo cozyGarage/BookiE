@@ -25,4 +25,4 @@ Independent value checks compare database-native results with the app's display 
 | Grid, filters and data transfer | [manual-verification-grid.md](manual-verification-grid.md) |
 | Catalog, sidebar and application shell | [manual-verification-app.md](manual-verification-app.md) |
 
-Dated run records: [installed run 2026-10-12 and AppImage run 2026-10-21](archive/manual-verification-runs-2026-10-21.md).
+Dated run records: [installed run 2026-10-12 and AppImage run 2026-10-21](archive/manual-verification-runs-2026-10-21.md) and the [source-build run of 2026-10-28](evidence/manual-run-2026-10-28.md).
