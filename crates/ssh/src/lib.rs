@@ -11,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 
 use russh::ChannelMsg;
 use russh::client::{self, Config, Handle};
+use russh::keys::agent::AgentIdentity;
 use russh::keys::ssh_key::{HashAlg, PublicKey};
 use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
 
@@ -635,6 +636,13 @@ fn requires_keyboard_interactive_only(remaining_methods: &russh::MethodSet) -> b
             .all(|method| matches!(method, russh::MethodKind::KeyboardInteractive))
 }
 
+fn identity_key_data(identity: &AgentIdentity) -> &russh::keys::ssh_key::public::KeyData {
+    match identity {
+        AgentIdentity::PublicKey { key, .. } => key.key_data(),
+        AgentIdentity::Certificate { certificate, .. } => certificate.public_key(),
+    }
+}
+
 async fn authenticate_with_agent(
     session: &mut Handle<ClientHandler>,
     username: &str,
@@ -644,16 +652,7 @@ async fn authenticate_with_agent(
     let mut agent = russh::keys::agent::client::AgentClient::connect_env()
         .await
         .map_err(|error| agent_error(&error))?;
-    let keys: Vec<PublicKey> = agent
-        .request_identities()
-        .await
-        .map_err(|error| agent_error(&error))?
-        .into_iter()
-        .filter_map(|identity| match identity {
-            russh::keys::agent::AgentIdentity::PublicKey { key, .. } => Some(key),
-            _ => None,
-        })
-        .collect();
+    let keys: Vec<AgentIdentity> = agent.request_identities().await.map_err(|error| agent_error(&error))?;
     if keys.is_empty() {
         return Err(SshError::Agent("the agent holds no keys".into()));
     }
@@ -661,9 +660,9 @@ async fn authenticate_with_agent(
         Some(path) => {
             let wanted = PublicKey::read_openssh_file(path)
                 .map_err(|error| SshError::Agent(format!("cannot read the public key {}: {error}", path.display())))?;
-            let chosen: Vec<PublicKey> = keys
+            let chosen: Vec<AgentIdentity> = keys
                 .into_iter()
-                .filter(|key| key.key_data() == wanted.key_data())
+                .filter(|identity| identity_key_data(identity) == wanted.key_data())
                 .collect();
             if chosen.is_empty() {
                 return Err(SshError::Agent(format!(
@@ -677,11 +676,20 @@ async fn authenticate_with_agent(
     };
     let hash = session.best_supported_rsa_hash().await?.flatten();
     let total = keys.len();
-    for (refused, key) in keys.into_iter().enumerate() {
-        let result = match session
-            .authenticate_publickey_with(username, key, hash, &mut agent)
-            .await
-        {
+    for (refused, identity) in keys.into_iter().enumerate() {
+        let attempt = match identity {
+            AgentIdentity::PublicKey { key, .. } => {
+                session
+                    .authenticate_publickey_with(username, key, hash, &mut agent)
+                    .await
+            }
+            AgentIdentity::Certificate { certificate, .. } => {
+                session
+                    .authenticate_certificate_with(username, certificate, hash, &mut agent)
+                    .await
+            }
+        };
+        let result = match attempt {
             Ok(result) => result,
             Err(_) if refused > 0 => return Err(SshError::AgentKeyLimit { refused, total }),
             Err(error) => return Err(agent_error(&error)),

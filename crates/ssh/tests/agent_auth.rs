@@ -19,6 +19,14 @@ const SSHD_SCRIPT: &str = "apk add --no-cache openssh >/dev/null \
     && chown -R deploy /home/deploy/.ssh && chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys \
     && exec /usr/sbin/sshd -D -e -p 2222 -o PasswordAuthentication=no -o AllowTcpForwarding=yes";
 
+const CERT_SSHD_SCRIPT: &str = "apk add --no-cache openssh >/dev/null \\
+    && ssh-keygen -A >/dev/null \\
+    && adduser -D deploy && echo 'deploy:unused' | chpasswd \\
+    && mkdir -p /home/deploy/.ssh && : > /home/deploy/.ssh/authorized_keys \\
+    && chown -R deploy /home/deploy/.ssh && chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys \\
+    && printf '%s\\n' \"$CA_KEY\" > /etc/ssh/ca.pub \\
+    && exec /usr/sbin/sshd -D -e -p 2222 -o PasswordAuthentication=no -o AllowTcpForwarding=yes -o TrustedUserCAKeys=/etc/ssh/ca.pub";
+
 const PASSWORD_SSHD_SCRIPT: &str = "apk add --no-cache openssh >/dev/null \
     && ssh-keygen -A >/dev/null \
     && adduser -D deploy && echo 'deploy:s3cret' | chpasswd \
@@ -684,4 +692,58 @@ async fn a_chosen_agent_key_authenticates_although_the_agent_holds_more_keys_tha
         "{:?}",
         missing.err()
     );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_certificate_held_by_the_agent_authenticates_against_a_trusted_ca() {
+    let temp = tempfile::tempdir().unwrap();
+    let keygen = |args: &[&str]| {
+        let status = Command::new("ssh-keygen").args(args).status().unwrap();
+        assert!(status.success());
+    };
+    let ca = temp.path().join("ca");
+    let user = temp.path().join("id_ed25519");
+    keygen(&["-q", "-t", "ed25519", "-N", "", "-f", ca.to_str().unwrap()]);
+    keygen(&["-q", "-t", "ed25519", "-N", "", "-f", user.to_str().unwrap()]);
+    keygen(&[
+        "-q",
+        "-s",
+        ca.to_str().unwrap(),
+        "-I",
+        "deploy-cert",
+        "-n",
+        "deploy",
+        "-V",
+        "+1h",
+        user.with_extension("pub").to_str().unwrap(),
+    ]);
+    let ca_public = std::fs::read_to_string(ca.with_extension("pub")).unwrap();
+    let container = GenericImage::new("alpine", "3.22")
+        .with_exposed_port(2222.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_env_var("CA_KEY", ca_public.trim())
+        .with_cmd(["sh", "-c", CERT_SSHD_SCRIPT])
+        .start()
+        .await
+        .unwrap();
+    let host = container.get_host().await.unwrap().to_string();
+    let port = container.get_host_port_ipv4(2222).await.unwrap();
+    let socket = temp.path().join("agent.sock");
+    let _agent = start_agent(&socket);
+    // SAFETY: see the single-key test above; this suite runs with --test-threads=1.
+    unsafe {
+        std::env::set_var("SSH_AUTH_SOCK", &socket);
+        std::env::set_var("XDG_CONFIG_HOME", temp.path());
+    }
+    let added = Command::new("ssh-add")
+        .arg(&user)
+        .env("SSH_AUTH_SOCK", &socket)
+        .status()
+        .unwrap();
+    assert!(added.success());
+
+    let tunnel = SshTunnel::open(config(&host, port), "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
+
+    assert!(tunnel.is_ok(), "{:?}", tunnel.err());
 }
