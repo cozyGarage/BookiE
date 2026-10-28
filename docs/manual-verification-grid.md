@@ -69,9 +69,9 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Go to Referenced Row
 
-- [ ] In a table with a foreign key, right-click a non-empty value in the key column: Go to Referenced Row opens the referenced table with one filter rule on the referenced column. **2026-10-12 Hyprland dark:** failed because foreign keys arrived after the grid was drawn; fixed by [#664](https://github.com/cozyGarage/BookiE/pull/664); no installed retest is recorded here.
-- [ ] On a cell of a column that is not a foreign key, or on a NULL key, the item is greyed out.
-- [ ] With the referenced table already open, the same action switches to that tab and replaces its filter.
+- [x] In a table with a foreign key, right-click a non-empty value in the key column: Go to Referenced Row opens the referenced table with one filter rule on the referenced column. **2026-10-12 Hyprland dark:** failed because foreign keys arrived after the grid was drawn; fixed by [#664](https://github.com/cozyGarage/BookiE/pull/664); no installed retest is recorded here. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** `shop.orders.customer_id` value 2: Go to Referenced Row opened `shop.customers` with one row (`Customer 2`) and a `Filter 1` badge; the filter strip held one rule `id = 4` after the later jump (below).
+- [ ] On a cell of a column that is not a foreign key, or on a NULL key, the item is greyed out. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** on SQLite `customers.name` and a BLOB cell the item was greyed out; a NULL foreign key cell was not tried.
+- [x] With the referenced table already open, the same action switches to that tab and replaces its filter. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** from another `orders` row (customer_id 4) the action returned to the existing `shop.customers` tab (tab count stayed 8) and its filter changed from id 2 to `id = 4`.
 - [ ] A composite key filters every referenced column from the same row; with one of its columns hidden, a toast says so.
 
 ## Filter by This Value
@@ -128,6 +128,6 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 
 ## Result headers, selection statistics, error copy and connection strip
 
-- [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the exact engine type spelling beneath it, in light and dark. **2026-10-12 Hyprland dark:** name and type passed; key markers were missing before [#664](https://github.com/cozyGarage/BookiE/pull/664); no installed retest is recorded here.
+- [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the exact engine type spelling beneath it, in light and dark. **2026-10-12 Hyprland dark:** name and type passed; key markers were missing before [#664](https://github.com/cozyGarage/BookiE/pull/664); no installed retest is recorded here. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6:** `shop.orders` header: `id` with a key icon and `INT4`, `customer_id` with a link icon and `INT4`, `total NUMERIC`, `status mood`; light mode only.
 - [ ] Select several rows of a numeric column: the selection badge popover lists the column's count, sum, average, min and max, and Copy summary copies them. A text column is not listed. **2026-10-12 Hyprland dark:** passed; also covered by the installed GTK scenario `selection_statistics_summarise_the_selected_rows`.
 - [ ] Run a failing statement in the editor: Copy error places the exact error text on the clipboard. **2026-10-12 Hyprland dark:** passed.
