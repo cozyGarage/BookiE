@@ -29,3 +29,7 @@ Dated source review of the Rust packages that peer database clients use, compare
 - DuckDB 2.0 is in use elsewhere. dbdelve's history contains "link the bundled extensions on Linux with GNU ld", a Linux build problem to check before BookiE moves to `1.20000`.
 - BookiE links the system SQLite, so it cannot take a newer bundled SQLite the way `rusqlite` users can. That belongs to the SQLite runtime decision in [#1545](https://github.com/cozyGarage/BookiE/issues/1545).
 - The connection URL parser in `crates/storage/src/connection_url.rs` is hand-written and tested. The `url` crate is already in the dependency tree, so no peer package is needed for it.
+
+## DuckDB 1.20000 trial, October 28
+
+A trial build of `duckdb` 1.20000 (DuckDB 2.0) with Arrow 60 compiled on Linux. The DuckDB driver tests passed 64 of 67. The three failures are the TIMESTAMPTZ contracts: the `icu` extension is no longer built in, and the driver correctly refuses the runtime download because external access is off. The crate's `icu` feature turns on `bundled-cmake`, which needs CMake. Neither the local toolchain nor the CI configuration provides CMake today, so a move to 1.20000 also needs CMake in the Forgejo images, the Flatpak build and the Arch and Debian packaging. Until that is decided, BookiE stays on the 1.5 line (`duckdb` 1.10506.1). No code was merged.
