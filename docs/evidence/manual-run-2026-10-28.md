@@ -83,6 +83,7 @@ The run was done in two sessions on the same build, one for the first six rows a
 - [#1949](https://github.com/cozyGarage/BookiE/issues/1949): a profile with no saved connections has no way to import a bundle.
 - [#1952](https://github.com/cozyGarage/BookiE/issues/1952): refusing `SET autocommit=0` or `XA START` shows the BEGIN/COMMIT/ROLLBACK message.
 - [#1953](https://github.com/cozyGarage/BookiE/issues/1953): closing the window with an open session transaction while the database is down leaves the confirmation dialog stuck.
+- [#1966](https://github.com/cozyGarage/BookiE/issues/1966): creating a connection with the same endpoint, database and user as a saved one silently overwrites that saved connection.
 - Re-confirmed on an existing issue: an editor INSERT that wrote a row shows "No rows returned" ([#1486](https://github.com/cozyGarage/BookiE/issues/1486)).
 - The editor toolbar wrapped onto three rows at 922 px and the bottom bar kept its unlabelled icon between Results and Errors; both are already tracked in [#1862](https://github.com/cozyGarage/BookiE/issues/1862) and [#1864](https://github.com/cozyGarage/BookiE/issues/1864).
 
@@ -92,11 +93,11 @@ Counted from the four checklists at the head of this run. "With a 2026-10-28 res
 
 | Checklist | Items | Ticked | With a 2026-10-28 result | Without one |
 |---|---|---|---|---|
-| Catalog, sidebar and application shell | 38 | 6 | 16 | 22 |
-| Connections and SSH | 44 | 13 | 25 | 19 |
+| Catalog, sidebar and application shell | 38 | 7 | 20 | 18 |
+| Connections and SSH | 44 | 15 | 29 | 15 |
 | SQL editor and sessions | 62 | 30 | 34 | 28 |
-| Grid, filters and data transfer | 76 | 10 | 34 | 42 |
-| **All four** | 220 | 59 | 109 | 111 |
+| Grid, filters and data transfer | 76 | 14 | 41 | 35 |
+| **All four** | 220 | 66 | 124 | 96 |
 
 Why the rest are open:
 
