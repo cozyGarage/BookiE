@@ -19,9 +19,9 @@ Open a result, then Export Results.
 
 Right-click a table in the sidebar, then Import CSV. Separately, use the second icon button in a schema header for Table from CSV.
 
-- [ ] Separator and header-row detection are right for a comma file, a semicolon file, and a file with no header. **2026-10-12 Hyprland dark:** semicolon file with a header passed; comma and headerless files not run.
+- [ ] Separator and header-row detection are right for a comma file, a semicolon file, and a file with no header. **2026-10-12 Hyprland dark:** semicolon file with a header passed; comma and headerless files not run. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** SQLite: a semicolon file with a header row was detected (Semicolon, header on); comma and headerless files not run.
 - [ ] The preview grid matches the file.
-- [ ] Column mapping is prefilled sensibly and can be changed. **2026-10-12 Hyprland dark:** prefill passed on MariaDB (auto-increment `id` on Skip, `name` mapped); changing a mapping not run.
+- [ ] Column mapping is prefilled sensibly and can be changed. **2026-10-12 Hyprland dark:** prefill passed on MariaDB (auto-increment `id` on Skip, `name` mapped); changing a mapping not run. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** SQLite `nokey`: both columns were prefilled and the three rows landed in the right columns; changing a mapping not run. The import ended with "Imported 3 rows into nokey".
 - [ ] For an existing table, remember a mapping, reorder the CSV headers, restore it, and confirm values still target the named columns; added destination columns remain on Skip.
 - [ ] Duplicate CSV headers are distinguishable, and a saved mapping refuses to restore if its selected header or destination column is missing or ambiguous.
 - [ ] A mapping saved for one connection, database, schema or table is not offered for another; Forget removes only the current table mapping.
