@@ -76,10 +76,10 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Filter by This Value
 
-- [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; no installed retest of the expanded editor is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
-- [ ] On a NULL cell it filters with IS NULL.
-- [ ] Doing it again on another value of the same column replaces that rule.
-- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run.
+- [x] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; no installed retest of the expanded editor is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)). **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** on `customers`, Filter by This Value on `Ada` left one row, "Rows 1 – 1 of 1", a `Filter 1` badge, and a rule `name equals Ada` in the rule editor (the strip shows Saved filters, WHERE and rule editor as separate rows, which is the layout [#1864](https://github.com/cozyGarage/BookiE/issues/1864) reviews).
+- [x] On a NULL cell it filters with IS NULL. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** the NULL `note` cell produced the rule `note is empty` and returned only that row; an empty-text cell produced `note equals` with an empty value and returned only that row.
+- [ ] Doing it again on another value of the same column replaces that rule. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** not run: the filtered view held a single row.
+- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** a SQLite BLOB cell showed "Values of this type can't be used as a filter" on choosing the item; JSON was not run.
 - [ ] The item is absent from SQL editor result grids.
 
 ## Named browse filters
