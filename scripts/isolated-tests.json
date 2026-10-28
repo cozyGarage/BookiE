@@ -1176,6 +1176,11 @@
       "tablepro-app",
       "--lib",
       "ui::diagram::card_text::tests::a_very_long_name_is_cut_short"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
     ]
   ],
   "keyring": [

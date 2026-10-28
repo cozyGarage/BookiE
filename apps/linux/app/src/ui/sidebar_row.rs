@@ -13,6 +13,7 @@ pub enum SidebarObjectKind {
     View,
     Group,
     Schema,
+    Catalog,
 }
 
 #[derive(Debug, Clone)]
@@ -21,6 +22,7 @@ pub struct GroupInit {
     pub count: usize,
     pub collapsed: bool,
     pub actions: bool,
+    pub entry: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +48,7 @@ fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
         SidebarObjectKind::View => "view-paged-symbolic",
         SidebarObjectKind::Group => "folder-symbolic",
         SidebarObjectKind::Schema => "folder-symbolic",
+        SidebarObjectKind::Catalog => "emblem-system-symbolic",
     }
 }
 
@@ -193,7 +196,7 @@ impl FactoryComponent for SidebarRow {
                 gtk::Image {
                     set_icon_name: Some(sidebar_icon(self.kind)),
                     set_pixel_size: 16,
-                    set_visible: self.group.is_none(),
+                    set_visible: self.group.as_ref().is_none_or(|group| group.entry),
                 },
 
                 gtk::Label {
@@ -201,12 +204,12 @@ impl FactoryComponent for SidebarRow {
                     set_xalign: 0.0,
                     set_hexpand: true,
                     set_ellipsize: pango::EllipsizeMode::End,
-                    set_css_classes: if self.group.is_some() { &["caption-heading"] } else { &[] },
+                    set_css_classes: if self.group.as_ref().is_some_and(|group| !group.entry) { &["caption-heading"] } else { &[] },
                 },
 
                 gtk::Label {
                     set_label: &self.group.as_ref().map(|group| group.count.to_string()).unwrap_or_default(),
-                    set_visible: self.group.is_some(),
+                    set_visible: self.group.as_ref().is_some_and(|group| !group.entry),
                     set_css_classes: &["dim-label", "caption"],
                 },
 
@@ -248,7 +251,7 @@ impl FactoryComponent for SidebarRow {
         };
         let collapsed = init.group.as_ref().is_some_and(|group| group.collapsed);
         let chevron = gtk::Image::from_icon_name(chevron_icon(collapsed));
-        chevron.set_visible(init.group.is_some());
+        chevron.set_visible(init.group.as_ref().is_some_and(|group| !group.entry));
         open_button.set_visible(init.group.is_none());
         Self {
             info: init.info,
@@ -505,11 +508,11 @@ impl SidebarRow {
         let Some(group) = &self.group else {
             return;
         };
-        root.update_property(&[
-            gtk::accessible::Property::Label(&group.label),
-            gtk::accessible::Property::Description(&group.count.to_string()),
-        ]);
-        root.update_state(&[gtk::accessible::State::Expanded(Some(!group.collapsed))]);
+        root.update_property(&[gtk::accessible::Property::Label(&group.label)]);
+        if !group.entry {
+            root.update_property(&[gtk::accessible::Property::Description(&group.count.to_string())]);
+            root.update_state(&[gtk::accessible::State::Expanded(Some(!group.collapsed))]);
+        }
         self.row = Some(root.clone());
     }
 
@@ -600,6 +603,7 @@ mod tests {
                 count: 3,
                 collapsed: false,
                 actions: true,
+                entry: false,
             }),
         });
         factory.guard().push_back(SidebarRowInit {
@@ -624,6 +628,41 @@ mod tests {
         pump();
 
         assert_eq!(chevron_of(0).0.as_deref(), Some("pan-end-symbolic"));
+    }
+}
+
+#[cfg(test)]
+mod catalog_entry_tests {
+    use super::*;
+    use relm4::factory::FactoryVecDeque;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon() {
+        relm4::adw::init().unwrap();
+        let list = gtk::ListBox::new();
+        let mut factory = FactoryVecDeque::<SidebarRow>::builder().launch(list.clone()).detach();
+        factory.guard().push_back(SidebarRowInit {
+            info: TableInfo {
+                schema: None,
+                name: "catalog/role".into(),
+            },
+            kind: SidebarObjectKind::Catalog,
+            depth: 1,
+            column_source: None,
+            group: Some(GroupInit {
+                label: "Roles".into(),
+                count: 0,
+                collapsed: false,
+                actions: false,
+                entry: true,
+            }),
+        });
+        let context = glib::MainContext::default();
+        while context.iteration(false) {}
+        let row = factory.get(0).unwrap();
+        assert!(!row.chevron.is_visible());
+        assert_eq!(sidebar_icon(row.kind), "emblem-system-symbolic");
     }
 }
 

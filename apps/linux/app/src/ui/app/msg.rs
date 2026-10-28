@@ -142,6 +142,8 @@ pub enum AppMsg {
     ShowErDiagram {
         schema: Option<String>,
     },
+    ShowCatalogKind(tablepro_core::CatalogObjectKind),
+    ToggleAllSidebarGroups,
     ExplainActiveQuery,
     ShowPreferences,
     NewWindow,
