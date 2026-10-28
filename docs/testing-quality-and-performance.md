@@ -58,6 +58,10 @@ Run display-dependent contracts with bash scripts/test-gtk-widgets.sh. Fast pref
 
 These structural guards do not bound total process RSS, allocator caches, driver buffers, GPU resources or arbitrarily long sessions. Measure those separately on the changed workload and display backend. A watchdog around an asynchronous lifecycle test is not a throughput target.
 
+## Completion host profile
+
+`cargo run --release -p tablepro-app-services --example completion_benchmark` prints one JSON array with the minimum, median and mean time of one completion lookup over catalogs of 1,000 to 100,000 names and scripts of 16 KB to 3.6 MB. It is a host sample, not a gate: the work contracts above are what fail a build. The [2026-10-28 profile](evidence/completion-keystroke-profile-2026-10-28/README.md) records a before and after run and the host it ran on.
+
 ## Browse performance
 
 See [the September measurements](archive/performance-2026-09.md) and the `browse_benchmark` example in the release-test crate. One warm-up plus five measured samples cover first, filtered, deep, wide and capped result sets. Run each case in a separate process against a disposable fixture, with builds complete before measuring. Report memory improvements and latency regressions separately.
