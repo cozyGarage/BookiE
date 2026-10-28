@@ -472,6 +472,9 @@ impl SimpleComponent for App {
         widgets
             .table_search
             .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Search tables"))]);
+        widgets
+            .sidebar_fold_button
+            .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Collapse all"))]);
 
         let schema_filter_list = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
