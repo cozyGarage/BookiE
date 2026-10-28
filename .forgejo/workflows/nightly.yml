@@ -50,9 +50,18 @@ jobs:
       - name: Line coverage of the unit tier
         run: |
           cd src
-          cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --lib --bins --json --summary-only --output-path /tmp/coverage.json
-          python3 scripts/check-coverage-floor.py /tmp/coverage.json
+          cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --lib --bins --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage.json"
+          python3 scripts/check-coverage-floor.py "$GITHUB_WORKSPACE/coverage.json"
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   docker-coverage:
     runs-on: any-host
     needs: coverage
@@ -98,9 +107,18 @@ jobs:
           targets=(--lib --tests)
           [ "${{ matrix.driver }}" = postgres ] && targets=(--lib --test integration)
           cargo llvm-cov --no-report --locked -p "tablepro-driver-${{ matrix.driver }}" "${targets[@]}" -- --include-ignored --test-threads=1
-          cargo llvm-cov report --json --summary-only --output-path /tmp/coverage-${{ matrix.driver }}.json
-          python3 scripts/check-crate-coverage-floors.py /tmp/coverage-${{ matrix.driver }}.json --only "crates/drivers/${{ matrix.driver }}"
+          cargo llvm-cov report --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage-${{ matrix.driver }}.json"
+          python3 scripts/check-crate-coverage-floors.py "$GITHUB_WORKSPACE/coverage-${{ matrix.driver }}.json" --only "crates/drivers/${{ matrix.driver }}"
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   mutation:
     runs-on: any-host
     needs: coverage
@@ -148,7 +166,7 @@ jobs:
         run: |
           cd src
           args=(--package "${{ matrix.package }}" --test-tool cargo --shard "${{ matrix.shard }}"
-                --output "/tmp/mutants-${{ matrix.label }}" --timeout 60 --build-timeout 900 --no-shuffle)
+                --output "$GITHUB_WORKSPACE/mutants-${{ matrix.label }}" --timeout 60 --build-timeout 900 --no-shuffle)
           if [ "${{ matrix.package }}" = tablepro-driver-postgres ]; then
             args+=(--file crates/drivers/postgres/src/array.rs --file crates/drivers/postgres/src/numeric.rs
                    --file crates/drivers/postgres/src/temporal.rs --file crates/drivers/postgres/src/decode.rs)
@@ -159,8 +177,17 @@ jobs:
           cargo mutants "${args[@]}" -- "${test_args[@]}" || status=$?
           partial=()
           [ "${{ matrix.shard }}" = 0/1 ] || partial=(--partial)
-          python3 scripts/check-mutants-baseline.py "${{ matrix.package }}" "/tmp/mutants-${{ matrix.label }}" "$status" "${partial[@]}"
+          python3 scripts/check-mutants-baseline.py "${{ matrix.package }}" "$GITHUB_WORKSPACE/mutants-${{ matrix.label }}" "$status" "${partial[@]}"
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   gtk-soak:
     runs-on: any-host
     needs: [docker-coverage, mutation]
@@ -198,12 +225,21 @@ jobs:
           install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-app" "$binary"
           for attempt in 1 2 3 4 5; do
             echo "soak run ${{ matrix.run }} attempt $attempt at $(git rev-parse HEAD)"
-            TABLEPRO_GTK_BINARY="$binary" bash scripts/test-gtk-safety.sh >"/tmp/soak-${{ matrix.run }}-$attempt.log" 2>&1 || {
-              grep -aE "^passed:|^FAILED|scenario.s. failed|AssertionError" "/tmp/soak-${{ matrix.run }}-$attempt.log" | tail -20
+            TABLEPRO_GTK_BINARY="$binary" bash scripts/test-gtk-safety.sh >"$GITHUB_WORKSPACE/soak-${{ matrix.run }}-$attempt.log" 2>&1 || {
+              grep -aE "^passed:|^FAILED|scenario.s. failed|AssertionError" "$GITHUB_WORKSPACE/soak-${{ matrix.run }}-$attempt.log" | tail -20
               exit 1
             }
           done
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   arch-package:
     runs-on: any-host
     needs: [docker-coverage, mutation]
@@ -227,6 +263,15 @@ jobs:
       - name: Build the Arch package in a container and upgrade from the released one
         run: |
           cd src && bash scripts/test-arch-package-container.sh
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   values:
     runs-on: any-host
     needs: [docker-coverage, mutation]
@@ -252,3 +297,12 @@ jobs:
       - name: Shared value contracts across drivers, GTK and DuckDB
         run: |
           cd src && python3 scripts/run-test-layer.py values
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
