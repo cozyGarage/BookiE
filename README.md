@@ -70,7 +70,7 @@ The name grew out of watching *Peaky Blinders* and thinking about the bookies ke
 
 BookiE is for the people doing that work today. Its purpose is to help you understand your data, maintain your databases, and make deliberate changes with a clear record of what happened.
 
-Open source made this project possible. BookiE grew from TablePro's Linux work and draws inspiration from the wider open-source database community. Building it is a way to give back through useful software, fixes, tests, documentation, and shared lessons. Contributions and credit belong alongside the code.
+Open source makes this project possible. BookiE is an independent database client developed for the Linux desktop, drawing inspiration from the wider open-source database community. Building it is a way to give back through high-performance software, robust safety policy, comprehensive tests, documentation, and shared lessons. Contributions and credit belong alongside the code.
 
 ## Status
 
@@ -94,9 +94,11 @@ The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/Bo
 
 Start with the [documentation map](docs/README.md) and [completion and continuation](docs/bookie-0.2-sprint.md) for release status and acceptance owners.
 
-### Compatibility names
+### Independence and system compatibility identifiers
 
-The product name is BookiE. Installed commands are `bookie` and `bookie-agentd`, with `tablepro*` aliases for compatibility. Existing installations keep their settings and credentials: app ID, configuration and data paths, keyring schema, UUIDs, audit format, and protocol contracts retain their existing `tablepro` / `com.tablepro.linux` identifiers. Cargo packages and binaries remain `tablepro-app` / `tablepro-agentd`, and crate names remain `tablepro-*`.
+BookiE is an independent, standalone Linux database client with its own autonomous architecture, development lifecycle, and product roadmap.
+
+Installed commands are `bookie` and `bookie-agentd`, with `tablepro*` aliases provided for launcher compatibility. To guarantee seamless user upgrades and prevent data loss, existing installations preserve their established local storage schemas and credentials: app ID (`com.tablepro.linux`), configuration and data paths (`~/.config/tablepro/`), keyring schema, UUIDs, audit format, and protocol contracts retain their existing identifiers. Cargo packages and binaries remain `tablepro-app` / `tablepro-agentd`, and workspace crate names remain `tablepro-*`.
 
 
 ## Build requirements
