@@ -12,7 +12,7 @@ Open a result, then Export Results.
 - [x] A SQL options group with an editable Table name shows only for SQL. **2026-10-12 Hyprland dark:** passed. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** passed for CSV, JSON and SQL: only SQL showed a Table name.
 - [ ] For a browse tab the Table name is prefilled `schema.table`; for an editor tab it is the tab label, and editing it changes the emitted statements. **2026-10-12 Hyprland dark:** browse tab passed (prefilled `public.customers`, edited name reached the INSERT statements); editor tab not run. Export after a column rename used the old name; fixed by [#676](https://github.com/cozyGarage/BookiE/pull/676); no installed retest is recorded here. **2026-10-28 native Wayland, dark, `bb9202644` debug build:** editor tab prefilled `select-from-shop-customers` (the query text, not a tab label); editing not run.
 - [ ] The written `.xlsx` opens in LibreOffice and the `.html` in a browser.
-- [ ] Cancelling a large export leaves any existing destination file untouched.
+- [ ] Cancelling a large export leaves any existing destination file untouched. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), PostgreSQL 18.6, a 4,000,000-row table:** not verified: exporting all rows to an existing `exp.csv` (content `keep`) asked "A file named … already exists. Do you want to replace it?"; after Replace the progress dialog counted rows and at 1,036,600 rows written the destination still held `keep`, so the file is replaced only at the end; my Cancel click came after the export had finished (the file then held the full 4,000,001 lines), so the cancel path itself was not exercised. A larger result or a slower disk is needed.
 - [ ] An Excel export above the sheet row limit is refused, and the message names the limit.
 
 ## CSV import
@@ -76,10 +76,10 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 ## Filter by This Value
 
-- [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; no installed retest of the expanded editor is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)).
-- [ ] On a NULL cell it filters with IS NULL.
-- [ ] Doing it again on another value of the same column replaces that rule.
-- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run.
+- [x] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule. **2026-10-12 historical run:** filtering passed, but the rule editor opened collapsed; fixed by [#820](https://github.com/cozyGarage/BookiE/pull/820). The installed GTK scenario `filter_by_this_value_narrows_the_browse_rows` covers the filter action; no installed retest of the expanded editor is recorded here ([#660](https://github.com/cozyGarage/BookiE/issues/660)). **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** on `customers`, Filter by This Value on `Ada` left one row, "Rows 1 – 1 of 1", a `Filter 1` badge, and a rule `name equals Ada` in the rule editor (the strip shows Saved filters, WHERE and rule editor as separate rows, which is the layout [#1864](https://github.com/cozyGarage/BookiE/issues/1864) reviews).
+- [x] On a NULL cell it filters with IS NULL. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** the NULL `note` cell produced the rule `note is empty` and returned only that row; an empty-text cell produced `note equals` with an empty value and returned only that row.
+- [ ] Doing it again on another value of the same column replaces that rule. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** not run: the filtered view held a single row.
+- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter". **2026-10-12 Hyprland dark:** JSON passed; binary not run. **2026-10-28 native Wayland, light, installed `bookie 0.2.0-1` (from `cbe0a5816`), SQLite:** a SQLite BLOB cell showed "Values of this type can't be used as a filter" on choosing the item; JSON was not run.
 - [ ] The item is absent from SQL editor result grids.
 
 ## Named browse filters
