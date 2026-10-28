@@ -728,10 +728,11 @@ class CiWorkflowTests(unittest.TestCase):
         script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
         self.assertIn('XDG_DATA_HOME="$gtk_runtime/data"', script)
         self.assertIn("org.a11y.Bus.service", script)
-        self.assertIn("Name=org.a11y.Bus", script)
-        self.assertIn("Exec=/usr/lib/at-spi-bus-launcher", script)
+        self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', script)
+        self.assertIn('"$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"', script)
         self.assertLess(script.index("xvfb-run --auto-servernum"), script.index('dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh"'))
         profile = (ROOT / "docs/evidence/postgres-stream-heap-profile-2026-10-25/run.sh").read_text()
+        self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', profile)
         self.assertIn('"$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"', profile)
         self.assertLess(profile.index("xvfb-run --auto-servernum"), profile.index('dbus-run-session -- bash "$RUNTIME/run-inner.sh"'))
 
