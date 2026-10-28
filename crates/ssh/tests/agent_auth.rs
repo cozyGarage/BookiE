@@ -557,3 +557,58 @@ async fn a_changed_key_on_the_second_hop_is_reported_as_a_host_key_mismatch() {
         second.err()
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_agent_with_more_keys_than_the_servers_attempt_limit_gets_a_clear_failure() {
+    let temp = tempfile::tempdir().unwrap();
+    let new_key = |name: &str| {
+        let path = temp.path().join(name);
+        let generated = Command::new("ssh-keygen")
+            .args(["-q", "-t", "ed25519", "-N", "", "-f"])
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(generated.success());
+        path
+    };
+    let wanted = new_key("wanted");
+    let public = std::fs::read_to_string(wanted.with_extension("pub")).unwrap();
+    let container = GenericImage::new("alpine", "3.22")
+        .with_exposed_port(2222.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_env_var("AUTHORIZED_KEY", public.trim())
+        .with_cmd(["sh", "-c", SSHD_SCRIPT])
+        .start()
+        .await
+        .unwrap();
+    let host = container.get_host().await.unwrap().to_string();
+    let port = container.get_host_port_ipv4(2222).await.unwrap();
+    let socket = temp.path().join("agent.sock");
+    let _agent = start_agent(&socket);
+    // SAFETY: see the single-key test above; this suite runs with --test-threads=1.
+    unsafe {
+        std::env::set_var("SSH_AUTH_SOCK", &socket);
+        std::env::set_var("XDG_CONFIG_HOME", temp.path());
+    }
+    let mut keys: Vec<_> = (0..7).map(|index| new_key(&format!("other{index}"))).collect();
+    keys.push(wanted);
+    for key in &keys {
+        let added = Command::new("ssh-add")
+            .arg(key)
+            .env("SSH_AUTH_SOCK", &socket)
+            .status()
+            .unwrap();
+        assert!(added.success());
+    }
+
+    let result = SshTunnel::open(config(&host, port), "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
+
+    let error = result
+        .err()
+        .expect("the right key is offered after the server's attempt limit");
+    assert!(
+        matches!(error, SshError::AgentKeyLimit { refused, total: 8 } if refused >= 1),
+        "{error:?}"
+    );
+}
