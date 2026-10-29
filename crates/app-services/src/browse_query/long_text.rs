@@ -1,4 +1,5 @@
-use tablepro_core::{QueryResult, Value};
+pub use tablepro_core::parse_partial;
+use tablepro_core::{QueryResult, Value, partial_value};
 
 use super::BrowseTarget;
 
@@ -110,7 +111,7 @@ pub fn mark_partial_cells(result: &mut QueryResult, preview_columns: &[usize]) {
                 _ => None,
             };
             if let Some(partial) = marked {
-                *cell = Value::Undecodable(partial);
+                *cell = partial;
             }
         }
         row.truncate(visible);
@@ -118,15 +119,8 @@ pub fn mark_partial_cells(result: &mut QueryResult, preview_columns: &[usize]) {
     result.columns.truncate(visible);
 }
 
-fn parse_marker(text: &str) -> Option<String> {
+fn parse_marker(text: &str) -> Option<Value> {
     let rest = text.strip_prefix('\u{1}')?.strip_prefix(MARKER)?;
     let (bytes, prefix) = rest.split_once('\u{1}')?;
-    bytes.parse::<u64>().ok()?;
-    Some(format!("partial {bytes} bytes\u{1}{prefix}"))
-}
-
-pub fn parse_partial(type_name: &str) -> Option<(u64, &str)> {
-    let rest = type_name.strip_prefix("partial ")?;
-    let (bytes, prefix) = rest.split_once(" bytes\u{1}")?;
-    Some((bytes.parse().ok()?, prefix))
+    Some(partial_value(bytes.parse().ok()?, prefix))
 }

@@ -105,7 +105,7 @@ fn shared_result_rows_do_not_clone_large_cell_payloads_into_row_objects() {
 
 #[test]
 fn a_server_cut_cell_shows_its_prefix_and_blocks_row_copy_and_export() {
-    let partial = Value::Undecodable("partial 2097152 bytes\u{1}begin".into());
+    let partial = tablepro_core::partial_value(2_097_152, "begin");
     let row = RowObject::new(vec![Value::Int(7), partial.clone()]);
     row.preview_long_values(&[0]);
 
