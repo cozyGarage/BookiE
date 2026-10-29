@@ -20,6 +20,7 @@ mod decode;
 mod numeric;
 mod params;
 mod pool;
+mod pool_saturation;
 mod query;
 mod session;
 mod temporal;
@@ -664,6 +665,9 @@ impl Connection for PgConnection {
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
+        if pool_saturation::is_saturated(&self.pool) {
+            return Ok(());
+        }
         sqlx::query("SELECT 1")
             .execute(&self.pool)
             .await

@@ -326,43 +326,73 @@ impl DiagramCanvas {
 }
 
 fn install_controllers(canvas: &DiagramCanvas) {
+    install_drag_controller(canvas);
+    install_click_controller(canvas);
+    install_key_controller(canvas);
+    install_scroll_controller(canvas);
+}
+
+fn install_drag_controller(canvas: &DiagramCanvas) {
     let drag = gtk::GestureDrag::new();
     drag.connect_drag_begin({
-        let canvas = canvas.clone();
-        move |_, _, _| canvas.imp().drag_origin.set(canvas.imp().offset.get())
+        let canvas = canvas.downgrade();
+        move |_, _, _| {
+            if let Some(canvas) = canvas.upgrade() {
+                canvas.imp().drag_origin.set(canvas.imp().offset.get());
+            }
+        }
     });
     drag.connect_drag_update({
-        let canvas = canvas.clone();
+        let canvas = canvas.downgrade();
         move |_, dx, dy| {
+            let Some(canvas) = canvas.upgrade() else {
+                return;
+            };
             let (ox, oy) = canvas.imp().drag_origin.get();
             canvas.imp().offset.set((ox + dx, oy + dy));
             canvas.queue_draw();
         }
     });
     canvas.add_controller(drag);
+}
 
+fn install_click_controller(canvas: &DiagramCanvas) {
     let click = gtk::GestureClick::new();
     click.connect_pressed({
-        let canvas = canvas.clone();
+        let canvas = canvas.downgrade();
         move |_, _, x, y| {
+            let Some(canvas) = canvas.upgrade() else {
+                return;
+            };
             canvas.grab_focus();
             let (sx, sy) = canvas.to_scene(x, y);
             canvas.select_at(sx, sy);
         }
     });
     canvas.add_controller(click);
+}
 
+fn install_key_controller(canvas: &DiagramCanvas) {
     let keys = gtk::EventControllerKey::new();
     keys.connect_key_pressed({
-        let canvas = canvas.clone();
-        move |_, key, _, _| canvas.key(key)
+        let canvas = canvas.downgrade();
+        move |_, key, _, _| {
+            canvas
+                .upgrade()
+                .map_or(glib::Propagation::Proceed, |canvas| canvas.key(key))
+        }
     });
     canvas.add_controller(keys);
+}
 
+fn install_scroll_controller(canvas: &DiagramCanvas) {
     let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
     wheel.connect_scroll({
-        let canvas = canvas.clone();
+        let canvas = canvas.downgrade();
         move |controller, dx, dy| {
+            let Some(canvas) = canvas.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
             let pointer = controller
                 .current_event()
                 .and_then(|event| event.position())

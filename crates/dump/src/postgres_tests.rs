@@ -23,6 +23,7 @@ fn options() -> ConnectOptions {
         application_name: None,
         connect_timeout_secs: Some(7),
         read_only: false,
+        attached_databases: Vec::new(),
     }
 }
 
