@@ -94,7 +94,7 @@ Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/134
 
 ## SQL Server non-dbo catalog objects
 
-- [ ] On a SQL Server database containing objects in non-dbo schemas (such as `sales`, `analytics`, or custom user schemas), the sidebar lists tables, views, triggers, routines, sequences, custom types, and roles partitioned under their respective schemas.
-- [ ] Disabled triggers display a `(disabled)` status indicator in their sidebar listing.
+- [ ] On a SQL Server database containing objects in non-dbo schemas (such as `sales`, `analytics`, or custom user schemas), the sidebar lists tables, views, triggers, routines, sequences, custom types, and roles partitioned under their respective schemas. **2026-10-29 native Wayland, dark, debug `tablepro-app` of `e226d3f5c` (`linux`), private profile, SQL Server 2022, database `nd` with `sales.v_orders`, `sales.trg_o`, `sales.seq1` and `analytics.short`:** not met. The sidebar partitions only Tables (`analytics`, `dbo`, `sales`); there is no Views group even though `sales.v_orders` exists, and the Catalog says "This engine does not list triggers" and "does not list functions and procedures".
+- [ ] Disabled triggers display a `(disabled)` status indicator in their sidebar listing. **2026-10-29 native Wayland, dark, debug `tablepro-app` of `e226d3f5c` (`linux`), private profile, SQL Server 2022:** not reachable; triggers are not listed (see above), so the disabled `sales.trg_o` could not be seen.
 - [ ] Multi-statement scripts creating and using session `#temp` tables execute sequentially and return results without syntax or scoping errors.
 
