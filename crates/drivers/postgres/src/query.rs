@@ -366,7 +366,7 @@ async fn refresh_enum_type_names(
 
     let rows = sqlx::query(
         "SELECT type.oid::bigint, pg_catalog.format_type(type.oid, NULL), \
-         ns.nspname, type.typname, type.typtype, \
+         ns.nspname, type.typname, type.typtype::text, \
          elem_ns.nspname, elem.typname \
          FROM pg_catalog.pg_type AS type \
          JOIN pg_catalog.pg_namespace AS ns ON ns.oid = type.typnamespace \

@@ -9,8 +9,8 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | ID | Issue | Lane |
 | --- | --- | --- |
 | UI-44 | [#1349](https://github.com/cozyGarage/BookiE/issues/1349) | UX |
-| UI-45 | [#1991](https://github.com/cozyGarage/BookiE/issues/1991) | UX |
 | UI-46 | [#1966](https://github.com/cozyGarage/BookiE/issues/1966) | UX |
+| UI-45 | [#1991](https://github.com/cozyGarage/BookiE/issues/1991) | UX |
 | UI-41 | [#1333](https://github.com/cozyGarage/BookiE/issues/1333) | UX |
 | UI-42 | [#1332](https://github.com/cozyGarage/BookiE/issues/1332) | UX |
 | PEER-4 | [#1026](https://github.com/cozyGarage/BookiE/issues/1026) | UX |
@@ -81,5 +81,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | DRV-1 | [#1688](https://github.com/cozyGarage/BookiE/issues/1688) | UX |
 | B4-24 | [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | B4 |
 | PERF-11 | [#580](https://github.com/cozyGarage/BookiE/issues/580) | UX |
+| PERF-12 | [#1989](https://github.com/cozyGarage/BookiE/issues/1989) | B3 |
 
 When you finish a row, close or move the GitHub issue on the project. Remove its index line in the same docs change. When you move work between lanes, change the project **Lane** field (and `lane:*` label) and update the Lane column here in the same commit.

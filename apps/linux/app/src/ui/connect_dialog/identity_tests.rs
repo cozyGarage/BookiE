@@ -21,12 +21,13 @@ fn matches_existing(saved: &SavedConnection, identity: &ConnectionIdentity<'_>) 
 fn saving_the_same_driver_keeps_attached_database_files() {
     let mut existing = saved("sqlite", "", AuthMode::Password);
     existing.attached_databases = vec![AttachedDatabase::new("archive", "/data/archive.db")];
+    let mut options = ConnectOptions::default();
 
-    assert_eq!(
-        super::super::preserved_attached_databases("sqlite", Some(&existing)),
-        existing.attached_databases
-    );
-    assert!(super::super::preserved_attached_databases("postgres", Some(&existing)).is_empty());
+    super::super::preserve_attached_databases("sqlite", Some(&existing), &mut options);
+    assert_eq!(options.attached_databases, existing.attached_databases);
+
+    super::super::preserve_attached_databases("postgres", Some(&existing), &mut options);
+    assert!(options.attached_databases.is_empty());
 }
 
 fn saved(driver_id: &str, username: &str, auth_mode: AuthMode) -> SavedConnection {
@@ -241,7 +242,7 @@ fn a_typed_name_replaces_the_endpoint_label() {
 }
 
 #[test]
-fn a_new_connection_does_not_choose_between_saved_matches() {
+fn an_explicit_connection_id_wins_over_endpoint_matching() {
     let first = saved("mssql", "sa", AuthMode::Password);
     let mut second = saved("mssql", "sa", AuthMode::Password);
     second.name = "reporting".into();
@@ -255,7 +256,10 @@ fn a_new_connection_does_not_choose_between_saved_matches() {
         select_existing(&accounts, &bound).map(|connection| connection.id),
         Some(second.id)
     );
-    assert!(select_existing(&accounts, &identity("mssql", &options, false)).is_none());
+    assert_eq!(
+        select_existing(&accounts, &identity("mssql", &options, false)).map(|connection| connection.id),
+        Some(first.id)
+    );
 }
 
 #[test]
