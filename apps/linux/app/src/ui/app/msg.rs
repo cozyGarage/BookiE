@@ -140,6 +140,9 @@ pub enum AppMsg {
     ShowAuditLog,
     ShowAuditOperation(Uuid),
     ShowCatalog,
+    ShowErDiagram {
+        schema: Option<String>,
+    },
     ShowCatalogKind(tablepro_core::CatalogObjectKind),
     ToggleAllSidebarGroups,
     ExplainActiveQuery,
