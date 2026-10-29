@@ -60,6 +60,12 @@ impl Connection for Catalog {
             self.calls.cancellation.cancel();
         }
         if self.failing.contains(&table) {
+            if table == "disconnected" {
+                return Err(DriverError::Disconnected);
+            }
+            if table == "denied" {
+                return Err(DriverError::PolicyDenied("denied".into()));
+            }
             return Err(DriverError::query("permission denied"));
         }
         Ok(vec![column("id")])
@@ -163,6 +169,28 @@ async fn an_engine_without_foreign_key_metadata_reads_no_keys_and_says_so() {
 
     assert!(!read.foreign_keys_supported);
     assert_eq!(calls.keys.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn terminal_metadata_errors_stop_diagram_loading() {
+    for name in ["denied", "disconnected"] {
+        let calls = Arc::new(Calls::default());
+        let connection = catalog(&calls, vec![name]);
+        let result = read_schema(
+            &connection,
+            Some("shop"),
+            &[table(name), table("later")],
+            capabilities(true),
+            &control(&calls),
+            |_, _| {},
+        )
+        .await;
+        assert!(matches!(
+            result,
+            Err(DriverError::Disconnected | DriverError::PolicyDenied(_))
+        ));
+        assert_eq!(calls.columns.load(Ordering::SeqCst), 1);
+    }
 }
 
 #[tokio::test]

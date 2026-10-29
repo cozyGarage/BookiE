@@ -40,7 +40,15 @@ pub async fn read_schema(
         check_pre_dispatch(control)?;
         match read_table(connection, schema, name, capabilities, control).await {
             Ok(table) => read.reads.push(table),
-            Err(error @ (DriverError::Cancelled | DriverError::TimedOut)) => return Err(error),
+            Err(
+                error @ (DriverError::Cancelled
+                | DriverError::TimedOut
+                | DriverError::Disconnected
+                | DriverError::ConnectionRefused
+                | DriverError::AuthFailed
+                | DriverError::Tls(_)
+                | DriverError::PolicyDenied(_)),
+            ) => return Err(error),
             Err(_) => read.skipped.push(name.to_string()),
         }
         progress(done + 1, wanted);
