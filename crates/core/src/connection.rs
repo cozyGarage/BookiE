@@ -24,6 +24,21 @@ pub enum AuthMode {
     Kerberos,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct AttachedDatabase {
+    pub name: String,
+    pub path: String,
+}
+
+impl AttachedDatabase {
+    pub fn new(name: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            path: path.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ConnectOptions {
     pub host: String,
@@ -43,6 +58,7 @@ pub struct ConnectOptions {
     pub connect_timeout_secs: Option<u32>,
     pub read_only: bool,
     pub auth_source: Option<String>,
+    pub attached_databases: Vec<AttachedDatabase>,
 }
 
 pub fn bare_host(host: &str) -> &str {
@@ -133,6 +149,7 @@ impl Default for ConnectOptions {
             connect_timeout_secs: None,
             read_only: false,
             auth_source: None,
+            attached_databases: Vec::new(),
         }
     }
 }
