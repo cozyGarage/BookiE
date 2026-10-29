@@ -1201,6 +1201,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::choice_editor::tests::the_choice_popover_is_as_wide_as_its_widest_content"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::history_dialog::export_tests::a_failed_history_export_shows_a_dismissible_error"
     ]
   ],
   "keyring": [
