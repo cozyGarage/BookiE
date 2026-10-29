@@ -241,7 +241,7 @@ fn a_typed_name_replaces_the_endpoint_label() {
 }
 
 #[test]
-fn an_explicit_connection_id_wins_over_endpoint_matching() {
+fn a_new_connection_does_not_choose_between_saved_matches() {
     let first = saved("mssql", "sa", AuthMode::Password);
     let mut second = saved("mssql", "sa", AuthMode::Password);
     second.name = "reporting".into();
@@ -255,10 +255,23 @@ fn an_explicit_connection_id_wins_over_endpoint_matching() {
         select_existing(&accounts, &bound).map(|connection| connection.id),
         Some(second.id)
     );
-    assert_eq!(
-        select_existing(&accounts, &identity("mssql", &options, false)).map(|connection| connection.id),
-        Some(first.id)
-    );
+    assert!(select_existing(&accounts, &identity("mssql", &options, false)).is_none());
+}
+
+#[test]
+fn a_new_connection_does_not_replace_a_saved_profile_with_the_same_endpoint() {
+    let first = saved("postgres", "postgres", AuthMode::Password);
+    let mut second = saved("postgres", "postgres", AuthMode::Password);
+    second.name = "pg-2s-timeout".into();
+    second.query_timeout_secs = Some(2);
+    let mut production = saved("postgres", "postgres", AuthMode::Password);
+    production.name = "pg-prod".into();
+    production.environment = Environment::Prod;
+    production.read_only = true;
+    let profiles = [first, second, production];
+    let options = opts("postgres", AuthMode::Password);
+
+    assert!(select_existing(&profiles, &identity("postgres", &options, false)).is_none());
 }
 
 #[test]

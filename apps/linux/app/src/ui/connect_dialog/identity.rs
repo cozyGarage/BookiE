@@ -67,14 +67,13 @@ pub(super) fn select_existing<'a>(
         .iter()
         .filter(|saved| matches_endpoint(saved, identity))
         .collect();
-    candidates
-        .iter()
-        .copied()
-        .find(|saved| {
-            identity.file_based
-                || saved.username == identity.opts.username && saved.auth_mode == identity.opts.auth_mode
-        })
-        .or_else(|| (candidates.len() == 1).then(|| candidates[0]))
+    let mut matching = candidates.iter().copied().filter(|saved| {
+        identity.file_based || saved.username == identity.opts.username && saved.auth_mode == identity.opts.auth_mode
+    });
+    if let Some(saved) = matching.next() {
+        return matching.next().is_none().then_some(saved);
+    }
+    (candidates.len() == 1).then(|| candidates[0])
 }
 
 fn matches_endpoint(saved: &SavedConnection, identity: &ConnectionIdentity<'_>) -> bool {
