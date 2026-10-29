@@ -11,7 +11,9 @@ use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statem
 
 use futures::stream::StreamExt;
 
+mod attributes;
 mod decode;
+mod spatial;
 use decode::extract_value;
 mod packed;
 mod session;
@@ -201,7 +203,11 @@ impl Connection for MysqlConnection {
         .fetch_all(&self.pool)
         .await
         .map_err(map_sqlx_error)?;
-        Ok(rows.iter().map(row_to_column_info).collect())
+        let mut columns: Vec<ColumnInfo> = rows.iter().map(row_to_column_info).collect();
+        if columns.iter().any(|column| spatial::is_spatial_type(&column.data_type)) {
+            self.name_spatial_srids(schema, table, &mut columns).await;
+        }
+        Ok(columns)
     }
 
     async fn fetch_rows(
@@ -903,7 +909,7 @@ async fn index_key_expression(
 // MariaDB 10.2.7+ already reports the DEFAULT clause itself and reports a
 // column without a default as the text NULL.
 fn default_expression(raw: Option<String>, column_type: &str, extra: &str, mariadb: bool) -> Option<String> {
-    let raw = raw?;
+    let raw = attributes::with_on_update(raw?, column_type, extra);
     if mariadb {
         return (!raw.eq_ignore_ascii_case("null")).then_some(raw);
     }
@@ -921,7 +927,7 @@ fn default_expression(raw: Option<String>, column_type: &str, extra: &str, maria
 
 fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
     let extra = r.try_get::<String, _>(4).unwrap_or_default().to_ascii_lowercase();
-    let column_type = r.get::<String, _>(1);
+    let column_type = attributes::with_invisible(r.get::<String, _>(1), &extra);
     let mariadb = r.try_get::<i64, _>(9).unwrap_or(0) == 1;
     let default_value = default_expression(
         r.try_get::<Option<String>, _>(5).unwrap_or(None),
@@ -930,6 +936,7 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
         mariadb,
     );
     let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
+    let column_type = attributes::with_generation(column_type, generation_expr.as_deref(), &extra);
     ColumnInfo {
         name: r.get::<String, _>(0),
         data_type: column_type,
