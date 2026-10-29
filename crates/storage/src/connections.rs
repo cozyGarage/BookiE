@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::error::StorageError;
 use crate::file_access::{lock_path, read_bounded, write_atomically};
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 const CURRENT_VERSION: u32 = 2;
 const MAX_CONNECTIONS_FILE_BYTES: usize = 16 * 1024 * 1024;
@@ -65,6 +65,7 @@ pub(crate) const KNOWN_CONNECTION_FIELDS: &[&str] = &[
     "connect_timeout_secs",
     "query_timeout_secs",
     "auth_source",
+    "attached_databases",
 ];
 
 const KNOWN_FILE_FIELDS: &[&str] = &["version", "connections"];
@@ -121,6 +122,8 @@ pub struct SavedConnection {
     pub query_timeout_secs: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attached_databases: Vec<AttachedDatabase>,
 }
 
 impl SavedConnection {
@@ -496,6 +499,7 @@ pub(super) mod tests {
             last_opened_at: None,
             connect_timeout_secs: None,
             query_timeout_secs: None,
+            attached_databases: Vec::new(),
         }
     }
 
@@ -1057,6 +1061,7 @@ pub(super) mod tests {
         connection.connect_timeout_secs = Some(5);
         connection.query_timeout_secs = Some(30);
         connection.auth_source = Some("admin".into());
+        connection.attached_databases = vec![tablepro_core::AttachedDatabase::new("aux", "/tmp/aux.db")];
         connection.ssh = Some(SavedSshConfig {
             hop_id: Uuid::new_v4(),
             credential_revision: 0,
