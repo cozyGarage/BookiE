@@ -1,6 +1,14 @@
-# Optional upstream reference review
+# External peer references and client review
 
-BookiE is an independent Rust and GTK database client. Other database clients are references for behavior, security fixes, SQL semantics and user expectations; their source trees are not merge or synchronization targets. Accepted ADRs and BookiE's issue owners decide what applies.
+BookiE is an independent, autonomous Rust and GTK database client. It maintains no ongoing upstream dependencies, synchronization requirements, or upstream tracking workflows. Other database clients (such as TablePro, DBeaver, TablePlus, Beekeeper Studio, and dbx) are reviewed strictly as external peer references for user expectations, standard SQL behaviors, driver quirks, and desktop UX ideas. Accepted ADRs and BookiE's maintainers exclusively decide all design, architecture, and roadmap choices.
+
+```mermaid
+flowchart LR
+    Peers["External Peer References<br/>(DBeaver, TablePlus, Beekeeper, TablePro)"] -.->|Optional Feature Insights| BookiE["BookiE Independent Architecture"]
+    BookiE --> AGENTS["AGENTS.md & Principles"]
+    BookiE --> ADRs["Accepted ADRs"]
+    BookiE --> Roadmap["BookiE Autonomous Roadmap"]
+```
 
 ## Current reviews
 

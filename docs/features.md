@@ -31,37 +31,54 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 ## Browse and edit tables
 
-![Browsing a table in the light theme](images/browse-light.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/browse-dark.png">
+  <img alt="Browsing a table in BookiE with column types and key marks" src="images/browse-light.png" width="100%">
+</picture>
 
 - Click a table to open it in a preview tab. Edit or keep the tab to make it permanent.
 - Tables are read in bounded pages. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
 - Edit a cell with a double-click, F2 or Enter. Edits stay pending, with a dot on the tab, until Ctrl+S. Undo and redo apply to pending edits.
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.
-- NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL.
+- NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL. Sparse document fields that an object lacks show as (missing) and remain distinct from NULL.
 - The header shows each column's type. Primary key columns have a key mark, foreign key columns a link mark, and a column comment appears under the name.
 - Filter with the filter bar, and save filters by name per table. Sort by clicking a header.
 - Hide and reorder columns, and reset dragged column widths. The choice is remembered per table.
-- Long cells in query results and keyed browse rows show a preview and byte count. View Value shows a bounded rendering of the current value. Copy Value copies the complete text or JSON value, including pending edits and drafts; binary cells currently copy only a byte-count placeholder ([#1587](https://github.com/cozyGarage/BookiE/issues/1587)). Eligible text/JSON cells can be edited in the full-value dialog up to 1 MiB. See [known limitations](known-limitations.md#data-and-values) for keyless-table behavior.
-- The row inspector lists every column and its type. Values omitted from the fetched page show as Not fetched. Selection statistics show count, sum, average, minimum and maximum.
+- Long cells over 8 KiB show a preview and byte count. **View Value** displays up to 1 MiB rendered text or 16 KiB hex. **Copy Value** copies complete values. Eligible text and JSON cells can be edited in the full-value dialog with semantic JSON formatting.
+- The row inspector lists every column and its type. Selection statistics show count, sum, average, min, and max across numeric columns.
+
+### Filters and search
+
+![Structured filter rule editor](images/filter-builder.png)
+
+![Filter applied in the data grid](images/filter-applied.png)
 
 ## Write SQL
 
-![The SQL editor in the dark theme, with a result below](images/sql-editor-dark.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/sql-editor-dark.png">
+  <img alt="The SQL editor in BookiE, with query result below" src="images/sql-editor-light.png" width="100%">
+</picture>
 
 - Ctrl+E opens an editor tab. Ctrl+Enter runs the selected text, or the whole script when nothing is selected. Ctrl+Shift+Enter runs the statement at the cursor. Escape cancels a running query when the server supports it.
 - Syntax highlighting, code folding and a side-by-side split of the same query.
 - Completion offers keywords, tables after `FROM` and `JOIN`, and the columns of the tables named in the statement. `alias.` and `table.` narrow the list. Chosen names are inserted quoted for the engine.
-- Write `:name` where a value belongs. BookiE asks for each value and sends it as a bound parameter. Each value has a type choice: `Auto`, `Text`, `Integer`, `Decimal`, `Boolean` or `Null`. Placeholders inside string literals, quoted identifiers, comments, dollar-quoted bodies, PostgreSQL `::` casts and existing `$1` or `?` placeholders are left alone.
-- Results load in pages. PostgreSQL single-statement `SELECT` queries stream within an estimated 64 MiB row-storage budget. When retained pages exceed the budget, earlier pages move to an encrypted on-disk spool and stay reachable; the newest page remains in memory even if it alone exceeds the estimate. Each statement in a script has its own result view. Pin results to keep them above the next run.
-- Sorting and filtering a result are local and do not run the SQL again.
-- Session keeps one connection for the tab, so settings, temporary tables and transactions carry over. While a transaction is open the button says so and, after a minute, how long it has been open.
-- Explain shows the plan. PostgreSQL plans open as a tree with the share of estimated cost per step; SQLite plans open as a tree without costs.
-- A query that hits the timeout offers Run again with a longer timeout, once, without changing the saved timeout.
-- Query history opens in a panel under the workspace. Statements that set a password or key are not saved in history; editor drafts keep their text on disk.
-- Favorites: Ctrl+D saves the current query under a name in `$XDG_CONFIG_HOME/tablepro/favorites.json`. Saving an existing name replaces its statement.
-- Open Quickly: Ctrl+P searches favorites, open tabs and saved connections.
+- Bound parameters: Write `:name` in queries; BookiE prompts for typed values before execution without string concatenation.
+- Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL.
+- Local sort and filter: Sorting and filtering loaded query results are local and do not re-execute SQL.
+- Session mode: Binds tabs to dedicated connections for temporary tables and transactions, displaying live transaction state.
+- Visual explain plans: PostgreSQL displays execution trees with relative cost bars; SQLite displays indented trees.
+- Timeout retry: Queries that hit timeouts offer an instant extended retry button.
+- Query history & favorites: Toggle history with `Ctrl+H`, save favorites with `Ctrl+D`, view favorites with `Ctrl+Shift+B`, and use Open Quickly with `Ctrl+P`.
 
-![The same editor in the light theme](images/sql-editor-light.png)
+### Split editor and streaming
+
+![Split SQL query editor with side-by-side execution](images/sql-split-editor.png)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/stream-pager-dark.png">
+  <img alt="Stream result pager showing retained row range" src="images/stream-pager-light.png" width="100%">
+</picture>
 
 ## Tables and structure
 
@@ -76,7 +93,11 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 
 ![The structure view of a table](images/structure-light.png)
 
+![Structure view with foreign keys and metadata](images/structure-foreign-keys.png)
+
 ## Import and export
+
+![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
 - Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook.
 - CSV export can protect cells that start like formulas, and can keep plain numbers unprotected so they import back into numeric columns.
@@ -85,6 +106,8 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 - Mappings can be remembered per connection and table.
 
 ## Safety and records
+
+![Application preferences and connection safety configuration](images/preferences.png)
 
 - Every statement is checked before it runs. Writes on a read-only connection are refused.
 - Depending on the environment and policy, risky statements ask for approval first.
@@ -106,12 +129,4 @@ BookiE can let an AI assistant use saved connections through the Model Context P
 - No database snapshots. [ADR 0015](decisions/0015-database-snapshots.md) records the accepted design; implementation is in the [post-0.2.0 backlog](backlog.md) with no release target.
 - Linux only ([platforms](platforms.md)).
 
-## Workspace controls
-
-- The Run menu exposes whole-script and current-statement execution, with shortcuts, plus labeled export choices for individual loaded result sets or a guarded stream rerun.
-- Owned editor sessions show transaction state and commit/rollback-and-close controls. Shared-connection transaction refusal and audit rules still apply.
-- The header **Tables sidebar** button shows or hides the tables sidebar at every width. Wide windows dock it with a native resize divider; below 960 px it becomes an overlay that stays closed after connection. Tables expand for bounded field/type previews. The header Collapse all / Expand all button folds the whole tree, and a Catalog group opens the Catalog dialog on the chosen object kind for PostgreSQL.
-- Grid headers retain exact engine type case. Their native details menu exposes key, nullability and comment metadata.
-- Export presents data scope before format and keeps unqualified full-table snapshot export unavailable.
-
-Behavior and limits are described in the [workspace spec](../specs/database-workspace/spec.md) and [user guide](user-guide.md).
+Detailed behavior, keyboard shortcuts, and limits are documented in the [user guide](user-guide.md) and [known limitations](known-limitations.md).
