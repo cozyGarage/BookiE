@@ -72,7 +72,15 @@ async fn mysql_accepts_a_query_through_a_local_socket_file() {
             socket_directory.path().to_string_lossy().to_string(),
             "/var/run/mysqld",
         ));
-    let container = image.start().await.expect("start mysql container");
+    let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
+        Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
+        Err(_) => image,
+    };
+    let container = image
+        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .start()
+        .await
+        .expect("start mysql container");
     let options = ConnectOptions {
         local_socket_path: Some(socket_directory.path().join("mysqld.sock")),
         database: "mysql".into(),
