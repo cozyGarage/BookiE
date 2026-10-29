@@ -254,7 +254,12 @@ def scenarios(ui):
             )
 
         start = focused_item()
-        target = (-1 if start is None else start) + position
+        if position == "last":
+            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+            assert items, "the menu has no items"
+            target = len(items) - 1
+        else:
+            target = (-1 if start is None else start) + position
         deadline = time.monotonic() + ui.WAIT_SECONDS
         moves = 0
         while focused_item() != target:
@@ -2005,7 +2010,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        choose_menu_item(15)
+        choose_menu_item("last")
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
