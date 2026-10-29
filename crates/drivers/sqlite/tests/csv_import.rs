@@ -63,6 +63,7 @@ struct Fixture {
 async fn fixture() -> Fixture {
     let directory = TempDir::new().expect("temp dir");
     let path = directory.path().join("import.db");
+    let _ = std::fs::File::create(&path);
     let inner: Arc<dyn Connection> = SqliteDriver
         .connect(ConnectOptions {
             database: path.to_string_lossy().to_string(),

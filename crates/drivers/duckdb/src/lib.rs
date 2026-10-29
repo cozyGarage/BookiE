@@ -248,6 +248,9 @@ fn open_path(path: &str) -> Result<DuckConnection, DriverError> {
     if path.is_empty() || path == ":memory:" {
         return DuckConnection::open_in_memory().map_err(map_duck_error);
     }
+    if !std::path::Path::new(path).exists() {
+        return Err(DriverError::Internal(format!("database file does not exist: {path}")));
+    }
     let Some(reader_fn) = flat_file_reader_fn(path) else {
         return DuckConnection::open(path).map_err(map_duck_error);
     };

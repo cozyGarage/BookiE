@@ -16,6 +16,7 @@ fn options_for(path: &str) -> ConnectOptions {
 
 async fn connect_file(directory: &TempDir) -> Arc<dyn Connection> {
     let path = directory.path().join("cancel.db");
+    let _ = std::fs::File::create(&path);
     let path = path.to_string_lossy().to_string();
     SqliteDriver
         .connect(options_for(&path))
