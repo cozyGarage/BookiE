@@ -40,6 +40,20 @@ if ! flock -n 9; then
   echo "another gate is running on this host; waiting for it to finish"
   flock 9
 fi
+gate_lock_dir="${FORGEJO_GATE_LOCK_DIR:-${XDG_RUNTIME_DIR:-$HOME/.cache}/bookie-forgejo-gates}"
+mkdir -p "$gate_lock_dir"
+slot_acquired=0
+for slot in 1 2; do
+  exec {slot_fd}>"$gate_lock_dir/slot-$slot.lock"
+  if flock -n "$slot_fd"; then
+    slot_acquired=1
+    break
+  fi
+done
+if [ "$slot_acquired" -eq 0 ]; then
+  echo "two Forgejo gates are already running on this host; waiting for a slot"
+  flock "$slot_fd"
+fi
 latest_run_id() {
   api_get "$api/actions/runs?page=1&limit=1" | python3 -c '
 import json, sys
