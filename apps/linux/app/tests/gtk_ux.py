@@ -283,7 +283,7 @@ def scenarios(ui):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
         assert len(items) >= 10, f"grid menu exposed only {len(items)} actionable items"
-        actions = items[10].queryAction()
+        actions = items[11].queryAction()
         click_action = next(
             index for index in range(actions.nActions) if actions.getName(index) == "click"
         )
