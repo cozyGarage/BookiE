@@ -191,6 +191,33 @@ pub(super) fn install_grid_context_menus(
         columns.clone(),
         export::render_markdown,
     );
+    let copy_text_table_entry = copy_rows_action(
+        "copy-text-table",
+        context.clone(),
+        sender.clone(),
+        column_view,
+        columns.clone(),
+        export::render_text_table,
+    );
+    let copy_json_lines_entry = copy_rows_action(
+        "copy-json-lines",
+        context.clone(),
+        sender.clone(),
+        column_view,
+        columns.clone(),
+        export::render_json_lines,
+    );
+    let copy_values_list_entry = {
+        let driver_id = driver_id.clone();
+        copy_rows_action(
+            "copy-values-list",
+            context.clone(),
+            sender.clone(),
+            column_view,
+            columns.clone(),
+            move |columns, rows| export::render_value_list(&driver_id, columns, rows),
+        )
+    };
     let supports_sql = tablepro_core::export::supports_sql_literals(&driver_id);
     let copy_in_clause_action = {
         let context = context.clone();
@@ -414,11 +441,14 @@ pub(super) fn install_grid_context_menus(
         copy_column_name_action,
         copy_rows_entry,
         copy_rows_headers_entry,
+        copy_text_table_entry,
         copy_json_entry,
+        copy_json_lines_entry,
         copy_csv_entry,
         copy_csv_headers_entry,
         copy_markdown_entry,
         copy_in_clause_action,
+        copy_values_list_entry,
         view_value_action,
         show_row_json_action,
         export_action,
@@ -435,6 +465,12 @@ pub(super) fn install_grid_context_menus(
     column_view.insert_action_group("cell", Some(&group));
     if let Some(action) = group
         .lookup_action("copy-in-clause")
+        .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+    {
+        action.set_enabled(supports_sql);
+    }
+    if let Some(action) = group
+        .lookup_action("copy-values-list")
         .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
     {
         action.set_enabled(supports_sql);
@@ -488,6 +524,26 @@ fn export_loaded_item() -> gio::MenuItem {
     item
 }
 
+fn build_copy_as_menu(insert_copy: bool) -> gio::Menu {
+    let copy_as = gio::Menu::new();
+    copy_as.append(Some(&crate::tr!("Rows")), Some("cell.copy-rows"));
+    copy_as.append(Some(&crate::tr!("With Headers")), Some("cell.copy-rows-headers"));
+    copy_as.append(Some(&crate::tr!("Text Table")), Some("cell.copy-text-table"));
+    copy_as.append(Some(&crate::tr!("JSON")), Some("cell.copy-json"));
+    copy_as.append(Some(&crate::tr!("JSON Lines")), Some("cell.copy-json-lines"));
+    copy_as.append(Some(&crate::tr!("CSV")), Some("cell.copy-csv"));
+    copy_as.append(Some(&crate::tr!("CSV with Headers")), Some("cell.copy-csv-headers"));
+    copy_as.append(Some(&crate::tr!("Markdown")), Some("cell.copy-markdown"));
+    copy_as.append(Some(&crate::tr!("IN Clause")), Some("cell.copy-in-clause"));
+    copy_as.append(Some(&crate::tr!("Values List")), Some("cell.copy-values-list"));
+    if insert_copy {
+        copy_as.append(Some(&crate::tr!("INSERT Statement")), Some("cell.copy-row-insert"));
+        copy_as.append(Some(&crate::tr!("UPDATE Statement")), Some("cell.copy-row-update"));
+        copy_as.append(Some(&crate::tr!("DELETE Statement")), Some("cell.copy-row-delete"));
+    }
+    copy_as
+}
+
 fn build_menu(
     editable: bool,
     row_operations: bool,
@@ -506,22 +562,9 @@ fn build_menu(
         section.append_item(&full_value);
         menu.append_section(None, &section);
     }
-    let copy_as = gio::Menu::new();
-    copy_as.append(Some(&crate::tr!("Rows")), Some("cell.copy-rows"));
-    copy_as.append(Some(&crate::tr!("With Headers")), Some("cell.copy-rows-headers"));
-    copy_as.append(Some(&crate::tr!("JSON")), Some("cell.copy-json"));
-    copy_as.append(Some(&crate::tr!("CSV")), Some("cell.copy-csv"));
-    copy_as.append(Some(&crate::tr!("CSV with Headers")), Some("cell.copy-csv-headers"));
-    copy_as.append(Some(&crate::tr!("Markdown")), Some("cell.copy-markdown"));
-    copy_as.append(Some(&crate::tr!("IN Clause")), Some("cell.copy-in-clause"));
-    if insert_copy {
-        copy_as.append(Some(&crate::tr!("INSERT Statement")), Some("cell.copy-row-insert"));
-        copy_as.append(Some(&crate::tr!("UPDATE Statement")), Some("cell.copy-row-update"));
-        copy_as.append(Some(&crate::tr!("DELETE Statement")), Some("cell.copy-row-delete"));
-    }
     let copy = gio::Menu::new();
     copy.append(Some(&crate::tr!("Copy value")), Some("cell.copy-value"));
-    copy.append_submenu(Some(&crate::tr!("Copy as")), &copy_as);
+    copy.append_submenu(Some(&crate::tr!("Copy as")), &build_copy_as_menu(insert_copy));
     copy.append(Some(&crate::tr!("Copy column name")), Some("cell.copy-column-name"));
     menu.append_section(None, &copy);
     let display = gio::Menu::new();
