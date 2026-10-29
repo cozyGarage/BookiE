@@ -47,16 +47,22 @@ pub async fn pg_dump(
         return Err(DumpError::PathNotAbsolute);
     }
     let partial = partial_path(request.output);
+    let cleanup = tokio::task::spawn_blocking(move || create_private_partial(partial))
+        .await
+        .map_err(|_| DumpError::Io(std::io::Error::other("backup file creation task failed")))??;
+    let args = dump_args(request.format, &cleanup.0);
+    run_pg_tool(tool, request.options, args, runtime_dir, cancel, None).await?;
+    tokio::fs::rename(&cleanup.0, request.output).await?;
+    Ok(())
+}
+
+fn create_private_partial(partial: PathBuf) -> Result<RemoveOnDrop, DumpError> {
     std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
         .open(&partial)?;
-    let _cleanup = RemoveOnDrop(partial.clone());
-    let args = dump_args(request.format, &partial);
-    run_pg_tool(tool, request.options, args, runtime_dir, cancel, None).await?;
-    tokio::fs::rename(&partial, request.output).await?;
-    Ok(())
+    Ok(RemoveOnDrop(partial))
 }
 
 pub async fn pg_restore(
