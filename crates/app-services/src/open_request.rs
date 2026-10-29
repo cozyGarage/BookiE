@@ -103,6 +103,7 @@ pub fn file_connection(file: &DatabaseFile) -> SavedConnection {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 
