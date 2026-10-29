@@ -12,42 +12,7 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   page or a loaded query result instead. A per-engine consistent export path is
   an unselected future candidate; database snapshots for backup and restore are
   a separate feature with an accepted design and no release target ([ADR 0015](decisions/0015-database-snapshots.md)).
-- **Large results still have materialization limits** ([#1272](https://github.com/cozyGarage/BookiE/issues/1272)). Materialized
-  results stop at 1 million rows, 10 million cells or 64 MiB estimated size.
-  Single-statement PostgreSQL `SELECT`s in the SQL editor stream cursor pages
-  through Core and PolicyGuard, retaining them while estimated row storage stays
-  within 64 MiB and always keeping the newest page and the page being read, even if
-  either alone exceeds the estimate. A process-local encrypted spool ([#1660](https://github.com/cozyGarage/BookiE/pull/1660)) with a shared 1 GiB
-  quota and a 4,096-page per-result cap keeps fetched pages revisitable
-  after leaving the RAM cache without rerunning SQL. A storage, quota or page-cap
-  refusal stops the stream as incomplete; pages already stored remain available
-  while their result owners stay open. The installed 100,000-row PostgreSQL GTK
-  scenario and refreshed local preflight passed. The spool design is recorded in
-  [ADR 0025](decisions/0025-transient-result-page-spool.md).
-  The received-row summary identifies the retained
-  range; row ranges are positions in the result, not database row identifiers.
-  Incoming decoding, concurrent snapshots, pins, widgets and allocator retention
-  remain outside this cache estimate, which is not a process-memory ceiling.
-  An October 16 synthetic stress profile at source `9c23bc80` allocated about
-  1.28 GiB across four pinned results and one active stream, reaching 1,325 MiB
-  RSS ([record](evidence/stream-retention-synthetic-2026-10-16/README.md)).
-  Paging and ownership code changed after that run, so it is historical evidence,
-  not a current memory bound. An October 24 installed Omarchy profile from
-  package build source `d9b5aaca` navigated a narrow 100,000-row result back to
-  rows 1–5,000. A result with 2,048 text characters per row retained only rows
-  70,001–100,000; Previous could not reach earlier rows before the spool landed.
-  Peak process RSS was
-  145,216 KiB for the narrow query and 298,024 KiB for the wide query in their
-  respective samples. The [installed profile](evidence/native-wayland-profile-2026-10-24/README.md)
-  records the binary hash, environment, page screenshots and sampling limits.
-  A source-built release profile on native Wayland then received 2 million rows
-  and retained rows 1,855,001–2,000,000; earlier rows were unavailable in that
-  pre-spool build. This is
-  not installed-package acceptance. See the [October 25 profile](evidence/postgres-stream-native-wayland-2026-10-25/README.md).
-  This single-query result does not measure the pinned-stream stress case, normal
-  workloads or the complete process ceiling. Other engines and unsupported
-  statement shapes remain materialized. Broader resource and lifecycle acceptance
-  remains under [#1272](https://github.com/cozyGarage/BookiE/issues/1272) (ADR 0011). Separate GUI stream ownership, aggregate retention and export/cancellation work remain open under [#1032](https://github.com/cozyGarage/BookiE/issues/1032); that issue does not claim an already-established process-memory bound.
+- **Large results have materialization limits** ([#1272](https://github.com/cozyGarage/BookiE/issues/1272)). Materialized results stop at 1 million rows, 10 million cells, or 64 MiB estimated size. Single-statement PostgreSQL `SELECT`s stream cursor pages through `PolicyGuard`, retaining them within an estimated 64 MiB row budget while keeping the newest page and the page being read. A process-local encrypted spool ([#1660](https://github.com/cozyGarage/BookiE/pull/1660), [ADR 0025](decisions/0025-transient-result-page-spool.md)) with a shared 1 GiB quota and a 4,096-page cap per result keeps evicted pages navigable via **Previous page** without re-executing SQL. Other statement shapes and engines remain materialized. Measured memory benchmarks are preserved in [native Wayland profile](evidence/native-wayland-profile-2026-10-24/README.md) and [October 25 profile](evidence/postgres-stream-native-wayland-2026-10-25/README.md). Separate GUI stream ownership and aggregate retention work remain open under [#1032](https://github.com/cozyGarage/BookiE/issues/1032).
 - **SQL result filters apply only to loaded rows.** Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **File exports use text markers for undecodable cells** ([#883](https://github.com/cozyGarage/BookiE/issues/883)). CSV, JSON, Markdown, HTML, XML, Excel, copied text and MCP CSV content use a visible `<undecodable TYPE>` string; these text representations do not retain a separate typed marker, so a real text value with the same spelling is ambiguous. SQL export refuses the value. MCP JSON retains an explicit tagged `undecodable` value.
 - **Long cells are shown as a preview** (PERF-10). Values over 8 KiB show a typed
