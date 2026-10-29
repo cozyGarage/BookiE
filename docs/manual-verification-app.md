@@ -58,7 +58,7 @@ Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/134
 
 ## Carried over from the earlier sprint
 
-- [ ] `cell_editor.rs`: in-place cell editing in light and dark. Held since the `OnceCell` removal.
+- [x] `cell_editor.rs`: in-place cell editing in light and dark. Held since the `OnceCell` removal. **2026-10-29 native Wayland, debug `tablepro-app` of `e944fd824` and `d20a9f8b9`:** double-click editing of text cells opened an inline editor, committed with Enter and staged an underlined pending cell in both light and dark on PostgreSQL 17.11 and SQLite 3.54; the typed value reached the database after Save.
 
 ## Known gaps that are not GTK
 
