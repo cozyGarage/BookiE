@@ -230,7 +230,7 @@ def scenarios(ui):
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
-        choose_menu_item(9)
+        choose_menu_item(11)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switch = next(
@@ -244,9 +244,31 @@ def scenarios(ui):
         wait_for_adw_dialog("Columns", present=False)
 
     def choose_menu_item(position):
-        for _ in range(position):
+        menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
+
+        def focused_item():
+            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+            return next(
+                (index for index, node in enumerate(items) if node.getState().contains(pyatspi.STATE_FOCUSED)),
+                None,
+            )
+
+        start = focused_item()
+        target = (-1 if start is None else start) + position
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        moves = 0
+        while focused_item() != target:
+            if time.monotonic() > deadline:
+                raise AssertionError(
+                    f"the menu focus stopped after {moves} moves at {focused_item()}, expected item {target}"
+                )
+            before = focused_item()
             ui.press_x11_key("Down")
-            time.sleep(0.1)
+            settled = time.monotonic() + 1.0
+            while time.monotonic() < settled and focused_item() == before:
+                time.sleep(ui.POLL_SECONDS)
+            if focused_item() != before:
+                moves += 1
         ui.press_x11_key("Return")
 
     def sqlite_grid_context_menu_columns_action_is_reachable_via_atspi(database, _base):
@@ -260,8 +282,8 @@ def scenarios(ui):
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-        assert len(items) >= 10, f"grid menu exposed only {len(items)} actionable items"
-        actions = items[10].queryAction()
+        assert len(items) >= 12, f"grid menu exposed only {len(items)} actionable items"
+        actions = items[11].queryAction()
         click_action = next(
             index for index in range(actions.nActions) if actions.getName(index) == "click"
         )
@@ -1025,6 +1047,39 @@ GLib.MainLoop().run()
             raise AssertionError(f"the viewer changed the stored text:\n{ui.accessible_snapshot()}")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
 
+    def large_result_value_viewer_opens_without_stalling(database, _base):
+        import sqlite3
+        value = "AA" * 600_000
+        with sqlite3.connect(database) as connection:
+            connection.execute("INSERT INTO safety_items(id, note) VALUES (1, ?)", (value,))
+        ui.run_sql("SELECT note FROM safety_items")
+        wait_for_result_column("note")
+        ui.press_x11_key("j", ("Control_L", "Shift_L"))
+        search = ui.wait_for_node(name="Search columns")
+        search.queryEditableText().setTextContents("note")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Search columns", present=False)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            focused = next((
+                node for node in ui.descendants(ui.application_node())
+                if ui.node_role(node) in (pyatspi.ROLE_TABLE_CELL, pyatspi.ROLE_TABLE_ROW)
+                and "1200000 bytes total" in ui.node_name(node)
+                and node.getState().contains(pyatspi.STATE_FOCUSED)
+                and node.getState().contains(pyatspi.STATE_SHOWING)
+            ), None)
+            if focused is not None:
+                break
+            time.sleep(ui.POLL_SECONDS)
+        else:
+            raise AssertionError(f"large result row was not focused:\n{ui.accessible_snapshot()}")
+        started = time.monotonic()
+        ui.press_x11_key("Menu")
+        ui.wait_for_node(role=pyatspi.ROLE_MENU)
+        choose_menu_item(4)
+        ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON, timeout=10)
+        assert time.monotonic() - started < 10, "the large value viewer took too long to open"
+
 
     def explain_plan_window_closes_on_escape(_database, _base):
         ui.run_sql("SELECT 1 AS value")
@@ -1399,6 +1454,77 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="2 \u00b7 note: beta")
         ui.press_x11_key("Return")
         ui.wait_for_node(name="Search the loaded rows", present=False)
+
+    def selected_history_exports_to_sql_and_csv(database, base):
+        query = "SELECT 'é' AS history_export_marker;"
+        import sqlite3
+        ui.run_sql(query)
+        ui.wait_for_node_containing("done in")
+        history = base / "config" / ui.storage_dir_name() / "history.db"
+        recorded = None
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            with sqlite3.connect(f"file:{history}?mode=ro", uri=True) as connection:
+                recorded = connection.execute(
+                    "SELECT query FROM history WHERE query LIKE ? ORDER BY id DESC LIMIT 1",
+                    ("%history_export_marker%",),
+                ).fetchone()
+            if recorded is not None:
+                break
+            time.sleep(ui.POLL_SECONDS)
+        assert recorded is not None, "the query was never recorded in history"
+        query = recorded[0]
+        ui.invoke_accessible_action("win.show-history")
+        ui.wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.invoke(ui.wait_for_node(name="Select", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        extents = None
+        last_error = None
+        while time.monotonic() < deadline and extents is None:
+            try:
+                row = ui.find_node(name=query, role=pyatspi.ROLE_LABEL)
+                while row is not None and ui.node_role(row) != pyatspi.ROLE_LIST_ITEM:
+                    row = row.parent
+                checkbox = ui.find_within(row, role=pyatspi.ROLE_CHECK_BOX) if row is not None else None
+                if checkbox is not None and checkbox.getState().contains(pyatspi.STATE_SHOWING):
+                    candidate = checkbox.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+                    if candidate.width > 0 and candidate.height > 0:
+                        extents = candidate
+            except Exception as error:
+                last_error = error
+            if extents is None:
+                time.sleep(ui.POLL_SECONDS)
+        assert extents is not None, (
+            f"the history selection checkbox did not become visible: {last_error or 'no accessible checkbox'}"
+        )
+        x11_click(extents.x + extents.width // 2, extents.y + extents.height // 2, button=1)
+        ui.wait_for_node(name="1 selected")
+        for position, extension in [(0, "sql"), (1, "csv")]:
+            ui.invoke(ui.wait_for_node_containing("Export", role=pyatspi.ROLE_TOGGLE_BUTTON))
+            ui.wait_for_node(role=pyatspi.ROLE_MENU)
+            ui.press_x11_key("Home")
+            choose_menu_item(position)
+            chooser = ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES)
+            ui.show_file_chooser_location(chooser)
+            path = base / "home" / f"selected-history.{extension}"
+            entry = ui.set_visible_editable_within("Export query history", ui.FILE_CHOOSER_ROLES, str(path))
+            text = entry.queryText()
+            assert text.getText(0, text.characterCount) == str(path), "the chooser did not accept the export path"
+            save = ui.find_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON)
+            assert save is not None, f"the export chooser has no Save button:\n{ui.accessible_snapshot()}"
+            ui.invoke(save)
+            ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES, present=False)
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline and not path.exists():
+                time.sleep(ui.POLL_SECONDS)
+            assert path.exists(), f"history {extension} export was not created:\n{ui.accessible_snapshot()}"
+            assert query in path.read_text(encoding="utf-8"), "the selected SQL was not preserved"
+            if extension == "csv":
+                import csv
+                with path.open(encoding="utf-8", newline="") as output:
+                    assert [row["query"] for row in csv.DictReader(output)] == [query]
+        ui.invoke(ui.wait_for_node(name="Close history", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
 
     def query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)
@@ -1873,7 +1999,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        choose_menu_item(15)
+        choose_menu_item(17)
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
@@ -2318,6 +2444,7 @@ GLib.MainLoop().run()
         welcome_connection_removal_confirms_once_and_preserves_the_database,
         find_bar_replaces_every_match_in_the_editor,
         view_value_preserves_duplicate_json_keys_and_text_formatting,
+        large_result_value_viewer_opens_without_stalling,
         explain_plan_window_closes_on_escape,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
@@ -2345,6 +2472,7 @@ GLib.MainLoop().run()
         sql_editor_clickables_all_have_a_keyboard_path,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
+        selected_history_exports_to_sql_and_csv,
         query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace,
         server_activity_dialog_uses_title_case,
         find_in_loaded_rows_lists_matches_and_selects_one,

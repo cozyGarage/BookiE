@@ -16,9 +16,9 @@ use sqlx::{
 use futures::stream::StreamExt;
 
 use tablepro_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, check_pre_dispatch,
-    run_controlled_setup, run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo,
+    Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod drop_guard;
@@ -83,29 +83,73 @@ impl DatabaseDriver for SqliteDriver {
             .create_if_missing(!opts.read_only)
             .read_only(opts.read_only && !in_memory);
         let session_options = (!in_memory).then(|| connect_opts.clone());
+        let attached_databases = opts.attached_databases.clone();
+        let attached_for_pool = attached_databases.clone();
         let pool = SqlitePoolOptions::new()
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
+            .after_connect(move |conn, _| {
+                let attached = attached_for_pool.clone();
+                Box::pin(async move {
+                    attach_databases_to_connection(conn, &attached).await;
+                    Ok(())
+                })
+            })
             .connect_with(connect_opts)
             .await
             .map_err(map_sqlx_error)?;
-        Ok(Box::new(SqliteConnection { pool, session_options }))
+        Ok(Box::new(SqliteConnection {
+            pool,
+            session_options,
+            attached_databases,
+        }))
     }
+}
+
+pub(crate) async fn attach_databases_to_connection(
+    conn: &mut SqlxSqliteConnection,
+    attached: &[tablepro_core::AttachedDatabase],
+) {
+    for db in attached {
+        let expanded = expand_tilde(&db.path);
+        if std::path::Path::new(&expanded).exists() {
+            let sql = format!(
+                "ATTACH DATABASE '{}' AS {}",
+                expanded.replace('\'', "''"),
+                quote_ident(&db.name)
+            );
+            let _ = sqlx::query(sqlx::AssertSqlSafe(sql)).execute(&mut *conn).await;
+        }
+    }
+}
+
+fn expand_tilde(path: &str) -> String {
+    if path == "~" {
+        return std::env::var("HOME").unwrap_or_else(|_| "~".into());
+    }
+    if let Some(rest) = path.strip_prefix("~/")
+        && let Ok(home) = std::env::var("HOME")
+    {
+        return format!("{home}/{rest}");
+    }
+    path.to_string()
 }
 
 struct SqliteConnection {
     pool: Pool<Sqlite>,
     session_options: Option<SqliteConnectOptions>,
+    attached_databases: Vec<tablepro_core::AttachedDatabase>,
 }
 
 // `foreign_key_list.to` is NULL when a key references the parent's primary key implicitly.
 impl SqliteConnection {
     async fn primary_key_columns(
         connection: &mut SqlxSqliteConnection,
+        schema: &str,
         table: &str,
     ) -> Result<Vec<String>, DriverError> {
-        refresh_schema(connection, "main").await?;
-        let sql = format!("PRAGMA table_info({})", quote_ident(table));
+        refresh_schema(connection, schema).await?;
+        let sql = format!("PRAGMA {}.table_info({})", quote_ident(schema), quote_ident(table));
         let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
             .fetch_all(&mut *connection)
             .await
@@ -123,36 +167,85 @@ impl SqliteConnection {
         columns.sort_unstable_by_key(|(ordinal, _)| *ordinal);
         Ok(columns.into_iter().map(|(_, name)| name).collect())
     }
+
+    async fn collect_schema_objects(
+        &self,
+        connection: &mut SqlxSqliteConnection,
+        obj_type: &str,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        let mut objects = query_schema_objects(connection, None, "main", obj_type).await?;
+        let attached: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_database_list WHERE name NOT IN ('main', 'temp') ORDER BY seq")
+                .fetch_all(&mut *connection)
+                .await
+                .map_err(map_sqlx_error)?;
+        for schema in attached {
+            let mut more = query_schema_objects(connection, Some(&schema), &schema, obj_type).await?;
+            objects.append(&mut more);
+        }
+        Ok(objects)
+    }
+}
+
+async fn query_schema_objects(
+    connection: &mut SqlxSqliteConnection,
+    schema_label: Option<&str>,
+    schema_name: &str,
+    obj_type: &str,
+) -> Result<Vec<TableInfo>, DriverError> {
+    let sql = format!(
+        "SELECT name FROM {}.sqlite_master WHERE type = '{}' AND substr(name, 1, 7) <> 'sqlite_' ORDER BY name",
+        quote_ident(schema_name),
+        obj_type
+    );
+    let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .fetch_all(connection)
+        .await
+        .map_err(map_sqlx_error)?;
+    Ok(rows
+        .into_iter()
+        .map(|r| TableInfo {
+            schema: schema_label.map(ToString::to_string),
+            name: r.get::<String, _>(0),
+        })
+        .collect())
 }
 
 #[async_trait]
 impl Connection for SqliteConnection {
-    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        let rows = sqlx::query(
-            "SELECT name FROM sqlite_master
-             WHERE type = 'table' AND substr(name, 1, 7) <> 'sqlite_'
-             ORDER BY name",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| TableInfo {
-                schema: None,
-                name: r.get::<String, _>(0),
-            })
-            .collect())
+    async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        let rows: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_database_list WHERE name <> 'temp' ORDER BY seq")
+                .fetch_all(&mut *connection)
+                .await
+                .map_err(map_sqlx_error)?;
+        Ok(rows)
     }
 
-    async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        self.collect_schema_objects(&mut connection, "table").await
+    }
+
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        self.collect_schema_objects(&mut connection, "view").await
+    }
+
+    async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         // PRAGMA table_xinfo includes the `hidden` column which we use
         // to detect virtual / generated columns. Falls back to
         // table_info on older SQLite (< 3.37) — both have the same
         // first 6 columns: cid, name, type, notnull, dflt_value, pk.
+        let target_schema = schema.unwrap_or("main");
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
-        refresh_schema(&mut connection, "main").await?;
-        let sql = format!("PRAGMA table_xinfo({})", quote_ident(table));
+        refresh_schema(&mut connection, target_schema).await?;
+        let sql = format!(
+            "PRAGMA {}.table_xinfo({})",
+            quote_ident(target_schema),
+            quote_ident(table)
+        );
         let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
             .fetch_all(&mut *connection)
             .await
@@ -169,14 +262,17 @@ impl Connection for SqliteConnection {
         // TABLE DDL for "AUTOINCREMENT", which mis-flagged columns
         // whose names contained that token, comments mentioning the
         // keyword, or unrelated parts of the schema.
-        let table_has_autoincrement =
-            sqlx::query_scalar::<_, String>("SELECT name FROM sqlite_sequence WHERE name = ?")
-                .bind(table)
-                .fetch_optional(&mut *connection)
-                .await
-                .ok()
-                .flatten()
-                .is_some();
+        let seq_sql = format!(
+            "SELECT name FROM {}.sqlite_sequence WHERE name = ?",
+            quote_ident(target_schema)
+        );
+        let table_has_autoincrement = sqlx::query_scalar::<_, String>(sqlx::AssertSqlSafe(seq_sql))
+            .bind(table)
+            .fetch_optional(&mut *connection)
+            .await
+            .ok()
+            .flatten()
+            .is_some();
 
         // Single-column PK detection: only a single-column INTEGER PK
         // is a rowid alias and auto-fills. Composite PKs (each member
@@ -223,12 +319,16 @@ impl Connection for SqliteConnection {
 
     async fn fetch_rows(
         &self,
-        _schema: Option<&str>,
+        schema: Option<&str>,
         table: &str,
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let sql = format!("SELECT * FROM {} LIMIT {limit} OFFSET {offset}", quote_ident(table));
+        let table_ref = match schema {
+            Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
+            None => quote_ident(table),
+        };
+        let sql = format!("SELECT * FROM {table_ref} LIMIT {limit} OFFSET {offset}");
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
         stream_into_result(&mut connection, &sql, limit as usize).await
     }
@@ -249,7 +349,7 @@ impl Connection for SqliteConnection {
 
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
         match &self.session_options {
-            Some(options) => session::open(options).await,
+            Some(options) => session::open(options, &self.attached_databases).await,
             None => Err(DriverError::Unsupported(
                 "dedicated sessions on an in-memory database, which each connection sees separately".into(),
             )),
@@ -323,16 +423,21 @@ impl Connection for SqliteConnection {
         transaction::execute_in_transaction_checked(&self.pool, statements, expect_one).await
     }
 
-    async fn fetch_indexes(&self, _schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
+    async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
         // SQLite catalog access is via PRAGMAs — they're scoped to the
         // current database file (no schema parameter needed). For each
         // entry from index_list we issue an index_info to get column
         // ordering. PK index doesn't always show up in index_list (a
         // bare INTEGER PRIMARY KEY uses the rowid alias, no real
         // index), so we synthesise one from table_info if missing.
+        let target_schema = schema.unwrap_or("main");
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
-        refresh_schema(&mut connection, "main").await?;
-        let sql = format!("PRAGMA index_list({})", quote_ident(table));
+        refresh_schema(&mut connection, target_schema).await?;
+        let sql = format!(
+            "PRAGMA {}.index_list({})",
+            quote_ident(target_schema),
+            quote_ident(table)
+        );
         let list = sqlx::query(sqlx::AssertSqlSafe(sql))
             .fetch_all(&mut *connection)
             .await
@@ -347,7 +452,7 @@ impl Connection for SqliteConnection {
             if primary {
                 saw_primary = true;
             }
-            let keys = index_keys(&mut connection, &name).await?;
+            let keys = index_keys(&mut connection, target_schema, &name).await?;
             out.push(IndexInfo {
                 constraint: None,
                 name,
@@ -365,7 +470,7 @@ impl Connection for SqliteConnection {
             // Synthesise the implicit PK index from PRAGMA table_info
             // so the UI can render PK columns even when SQLite chose
             // the rowid-alias path.
-            let pk_cols = Self::primary_key_columns(&mut connection, table).await?;
+            let pk_cols = Self::primary_key_columns(&mut connection, target_schema, table).await?;
             if !pk_cols.is_empty() {
                 out.push(IndexInfo {
                     constraint: None,
@@ -381,15 +486,20 @@ impl Connection for SqliteConnection {
         Ok(out)
     }
 
-    async fn fetch_foreign_keys(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
+    async fn fetch_foreign_keys(&self, schema: Option<&str>, table: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         // PRAGMA foreign_key_list returns one row per (constraint, ordinal)
         // grouped by the synthetic `id` field. Constraint names aren't
         // stored by SQLite, so we synthesise "fk_{table}_{id}" — stable
         // across re-runs of the same schema. Group by id and build
         // ForeignKeyInfo.
+        let target_schema = schema.unwrap_or("main");
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
-        refresh_schema(&mut connection, "main").await?;
-        let sql = format!("PRAGMA foreign_key_list({})", quote_ident(table));
+        refresh_schema(&mut connection, target_schema).await?;
+        let sql = format!(
+            "PRAGMA {}.foreign_key_list({})",
+            quote_ident(target_schema),
+            quote_ident(table)
+        );
         let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
             .fetch_all(&mut *connection)
             .await
@@ -405,7 +515,7 @@ impl Connection for SqliteConnection {
             let entry = by_id.entry(id).or_insert_with(|| ForeignKeyInfo {
                 name: format!("fk_{table}_{id}"),
                 columns: Vec::new(),
-                ref_schema: None,
+                ref_schema: schema.map(ToString::to_string),
                 ref_table,
                 ref_columns: Vec::new(),
                 on_delete: Some(on_delete.clone()).filter(|s| !s.is_empty() && s != "NO ACTION"),
@@ -417,10 +527,34 @@ impl Connection for SqliteConnection {
         let mut keys: Vec<ForeignKeyInfo> = by_id.into_values().collect();
         for key in &mut keys {
             if key.ref_columns.iter().all(String::is_empty) {
-                key.ref_columns = Self::primary_key_columns(&mut connection, &key.ref_table).await?;
+                key.ref_columns = Self::primary_key_columns(&mut connection, target_schema, &key.ref_table).await?;
             }
         }
         Ok(keys)
+    }
+
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        _schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let tables = self.list_tables().await?;
+        let mut inbound = Vec::new();
+        for t in tables {
+            let fks = self.fetch_foreign_keys(None, &t.name).await?;
+            for fk in fks {
+                if fk.ref_table.eq_ignore_ascii_case(table) {
+                    inbound.push(InboundForeignKeyInfo {
+                        name: fk.name,
+                        source_schema: None,
+                        source_table: t.name.clone(),
+                        source_columns: fk.columns,
+                        target_columns: fk.ref_columns,
+                    });
+                }
+            }
+        }
+        Ok(inbound)
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
@@ -697,8 +831,12 @@ async fn declared_table_columns(
         .collect()
 }
 
-async fn index_keys(connection: &mut SqlxSqliteConnection, index: &str) -> Result<Vec<Option<String>>, DriverError> {
-    let sql = format!("PRAGMA index_info({})", quote_ident(index));
+async fn index_keys(
+    connection: &mut SqlxSqliteConnection,
+    schema: &str,
+    index: &str,
+) -> Result<Vec<Option<String>>, DriverError> {
+    let sql = format!("PRAGMA {}.index_info({})", quote_ident(schema), quote_ident(index));
     sqlx::query(sqlx::AssertSqlSafe(sql))
         .fetch_all(connection)
         .await
@@ -760,25 +898,69 @@ fn extract_value(row: &SqliteRow, idx: usize) -> Value {
         },
         "BOOLEAN" => row
             .try_get::<bool, _>(idx)
-            .map(Value::Bool)
+            .map(|flag| boolean_value(flag, row.try_get_unchecked::<i64, _>(idx).ok()))
             .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "DATE" | "TIME" | "DATETIME" | "TIMESTAMP" => {
+            decode_declared_temporal(row, idx, type_name.as_str(), runtime_type.as_str())
+        }
+        _ => untyped_value(row, idx),
+    }
+}
+
+fn decode_declared_temporal(row: &SqliteRow, idx: usize, declared_type: &str, runtime_type: &str) -> Value {
+    match runtime_type {
+        "INTEGER" => row
+            .try_get::<i64, _>(idx)
+            .map(Value::Int)
+            .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "REAL" => row
+            .try_get::<f64, _>(idx)
+            .map(Value::Float)
+            .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "BLOB" => row
+            .try_get::<Vec<u8>, _>(idx)
+            .map(Value::Bytes)
+            .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "TEXT" => decode_temporal_text(row, idx, declared_type),
+        _ => decode_fallback(row, idx),
+    }
+}
+
+fn decode_temporal_text(row: &SqliteRow, idx: usize, declared_type: &str) -> Value {
+    let Ok(text) = row.try_get::<String, _>(idx) else {
+        return decode_fallback(row, idx);
+    };
+    if temporal_text_has_offset(&text, declared_type) {
+        return Value::Text(text);
+    }
+    match declared_type {
         "DATE" => row
             .try_get::<chrono::NaiveDate, _>(idx)
             .map(Value::Date)
-            .or_else(|_| row.try_get::<String, _>(idx).map(Value::Text))
-            .unwrap_or_else(|_| decode_fallback(row, idx)),
+            .unwrap_or(Value::Text(text)),
         "TIME" => row
             .try_get::<chrono::NaiveTime, _>(idx)
             .map(Value::Time)
-            .or_else(|_| row.try_get::<String, _>(idx).map(Value::Text))
-            .unwrap_or_else(|_| decode_fallback(row, idx)),
+            .unwrap_or(Value::Text(text)),
         "DATETIME" | "TIMESTAMP" => row
             .try_get::<chrono::NaiveDateTime, _>(idx)
             .map(Value::DateTime)
-            .or_else(|_| row.try_get::<String, _>(idx).map(Value::Text))
-            .unwrap_or_else(|_| decode_fallback(row, idx)),
-        _ => untyped_value(row, idx),
+            .unwrap_or(Value::Text(text)),
+        _ => Value::Text(text),
     }
+}
+
+fn temporal_text_has_offset(text: &str, declared_type: &str) -> bool {
+    if text.ends_with('Z') || text.ends_with('z') {
+        return true;
+    }
+    let time_start = match declared_type {
+        "TIME" => 0,
+        "DATETIME" | "TIMESTAMP" => text.find(['T', ' ']).map_or(text.len(), |index| index + 1),
+        _ => return false,
+    };
+    text.get(time_start..)
+        .is_some_and(|time| time.contains('+') || time.contains('-'))
 }
 
 /// A column with no declared type - every expression, aggregate and
@@ -825,6 +1007,13 @@ fn sqlite_row_payload_bytes(row: &SqliteRow) -> usize {
 /// type's own decode fails, this is reached to find out whether the
 /// value is genuinely NULL or just stored as text/bytes instead, so a
 /// real value is never silently shown as an empty cell.
+fn boolean_value(flag: bool, stored: Option<i64>) -> Value {
+    match (flag, stored) {
+        (true, Some(other)) if other != 1 => Value::Int(other),
+        _ => Value::Bool(flag),
+    }
+}
+
 fn decode_fallback(row: &SqliteRow, idx: usize) -> Value {
     untyped_value(row, idx)
 }
