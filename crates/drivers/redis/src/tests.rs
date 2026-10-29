@@ -664,3 +664,36 @@ fn only_connection_level_failures_can_hide_a_tls_problem() {
     let wrong_type = RedisError::from((redis::ErrorKind::UnexpectedReturnType, "wrong type"));
     assert!(!redis_error_can_hide_tls(&wrong_type));
 }
+
+#[test]
+fn a_host_that_would_change_the_url_is_refused() {
+    for host in [
+        "cache#insecure",
+        "user@cache",
+        "cache/1",
+        "cache?x=1",
+        "cache name",
+        "a,b",
+        "",
+    ] {
+        let opts = ConnectOptions {
+            host: host.into(),
+            ..Default::default()
+        };
+        assert!(connection_url(&opts).is_err(), "host must be refused: {host:?}");
+    }
+}
+
+#[test]
+fn ordinary_hosts_build_the_expected_url() {
+    let mut opts = ConnectOptions {
+        host: "cache.internal".into(),
+        port: 6380,
+        ..Default::default()
+    };
+    assert_eq!(connection_url(&opts).unwrap(), "redis://cache.internal:6380/0");
+    opts.host = "::1".into();
+    assert_eq!(connection_url(&opts).unwrap(), "redis://[::1]:6380/0");
+    opts.host = "[::1]".into();
+    assert_eq!(connection_url(&opts).unwrap(), "redis://[::1]:6380/0");
+}
