@@ -62,3 +62,25 @@ async fn a_queued_query_cannot_use_a_client_retired_by_failed_cleanup() {
     ));
     assert!(matches!(query.await, Err(DriverError::Disconnected)));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn confirmed_rollback_keeps_the_parameter_failure_and_client_usable() {
+    use tablepro_core::Value;
+    let (_container, options) = start_mssql().await;
+    let connection = connect(options).await;
+    let result = connection
+        .execute_in_transaction(&[(
+            "SELECT @P1".into(),
+            vec![Value::Undecodable("unsupported fixture value".into())],
+        )])
+        .await;
+    assert!(
+        matches!(result, Err(DriverError::Transaction { statement_index: 0, source })
+        if matches!(source.as_ref(), DriverError::Unsupported(_)))
+    );
+    assert_eq!(
+        connection.query("SELECT 1").await.unwrap().rows,
+        vec![vec![Value::Int(1)]]
+    );
+}
