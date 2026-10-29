@@ -31,6 +31,8 @@ These are service and database reproductions. The audit did not reproduce them t
 
 ## Policy and evidence risks confirmed from source
 
+Correction during #1824 implementation: the omitted `validation.json` records were originally called schema-v1 here. Their actual shape is unversioned legacy records declaring `source_sha256`. The discovery and missing-run-identity observations are unchanged.
+
 ### Configured policy can disappear into defaults
 
 `apps/linux/app/src/services/database_service.rs:24–29` uses `Path::exists()` to decide whether a policy is absent. A dangling symlink returns false, so default policy is loaded successfully and `policy_available` stays true. The filesystem condition was executed; the installed GUI/MCP route was traced rather than run. [#1823](https://github.com/cozyGarage/BookiE/issues/1823) tracks this P1 configuration risk in UX with B4 consultation.
@@ -41,7 +43,7 @@ A separate, already documented branch handles readable malformed policy by marki
 
 The baseline default evidence scan succeeded with 165 schema-v1 manifests, four legacy provenance packets and 87 warnings requiring review. The command's success does not mean every warning is resolved or every evidence file was inspected.
 
-Default discovery at `scripts/validate-evidence.py:234–244` searches only `manifest.json`. Twelve other schema-v1 records use `validation.json`; explicit strict validation identified 11 with no source/base commit. A broad filename glob also includes an unrelated array, which is not a supported evidence record. [#1824](https://github.com/cozyGarage/BookiE/issues/1824) owns schema-aware discovery and honest provenance recovery.
+Default discovery at `scripts/validate-evidence.py:234–244` searches only `manifest.json`. Twelve unversioned legacy source-provenance records use `validation.json`; explicit strict validation identified 11 with no source/base commit. A broad filename glob also includes an unrelated array, which is not a supported evidence record. [#1824](https://github.com/cozyGarage/BookiE/issues/1824) owns schema-aware discovery and honest provenance recovery.
 
 Do not update historical hashes to current bytes to turn a check green. Recover the actual tested commit where possible; otherwise retain the uncertainty. Missing logs, incomplete provenance, historical source drift and a reproduced product defect are distinct findings.
 
@@ -51,7 +53,7 @@ These are already filed and are not new audit discoveries. The source paths stil
 
 | Concern | Current source and implication | Existing work |
 | --- | --- | --- |
-| Wrong-row mutations | ClickHouse metadata reports a non-unique MergeTree key as `primary_key`; the materializer's fallback uses that key, without checked single-row transactions. One displayed row can identify multiple physical rows. | [#1739](https://github.com/cozyGarage/BookiE/issues/1739) |
+| Wrong-row mutations | ClickHouse rejects an edit when a preflight query finds multiple rows for the key. That check and the mutation are separate operations, so a concurrent insertion may invalidate the check; this race has not been reproduced. | [#1739](https://github.com/cozyGarage/BookiE/issues/1739) |
 | Empty versus NULL | The production optimistic MySQL update builder binds empty text directly; the `SPACE(0)` special case exists in another builder. MariaDB `EMPTY_STRING_IS_NULL` needs the production path qualified. | [#1707](https://github.com/cozyGarage/BookiE/issues/1707) |
 | False conflicts and filters | MySQL FLOAT and MSSQL real predicates lack the corresponding native-width treatment. PostgreSQL already has a real cast. Exact operators must be tested per type. | [#1708](https://github.com/cozyGarage/BookiE/issues/1708) |
 | Uncertain writes | Bulk import errors can be audited with stronger failure/rollback claims than the driver outcome supports. Session blast-radius queries use the shared connection rather than the owned session. | [#1720](https://github.com/cozyGarage/BookiE/issues/1720), [#1726](https://github.com/cozyGarage/BookiE/issues/1726) |

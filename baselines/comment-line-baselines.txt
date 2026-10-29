@@ -47,7 +47,7 @@ apps/linux/app/src/ui/connection_bundle/mod.rs 8
 apps/linux/app/src/ui/connection_row.rs 8
 apps/linux/app/src/ui/editor/schema.rs 3
 apps/linux/app/src/ui/explain_dialog.rs 3
-apps/linux/app/src/ui/filter_strip.rs 106
+apps/linux/app/src/ui/filter_strip.rs 98
 apps/linux/app/src/ui/grid/display.rs 8
 apps/linux/app/src/ui/grid/export.rs 1
 apps/linux/app/src/ui/grid/mod.rs 6
@@ -86,7 +86,7 @@ crates/core/src/export/xlsx.rs 2
 crates/core/src/export/xml.rs 6
 crates/core/src/filter.rs 68
 crates/core/src/filter_tests.rs 11
-crates/core/src/import/cell.rs 29
+crates/core/src/import/cell.rs 26
 crates/core/src/import/csv_import.rs 32
 crates/core/src/import/csv_import_tests.rs 3
 crates/core/src/import/infer.rs 18

@@ -26,6 +26,16 @@ pub(super) fn saved_connection_name(entered: &str, driver_id: &str, opts: &Conne
     derived_connection_name(driver_id, opts)
 }
 
+pub(super) fn preserve_attached_databases(
+    driver_id: &str,
+    existing: Option<&SavedConnection>,
+    options: &mut ConnectOptions,
+) {
+    options.attached_databases = existing
+        .filter(|connection| connection.driver_id == driver_id)
+        .map_or_else(Vec::new, |connection| connection.attached_databases.clone());
+}
+
 fn derived_connection_name(driver_id: &str, opts: &ConnectOptions) -> String {
     if driver_id == "sqlite" {
         return opts.database.clone();

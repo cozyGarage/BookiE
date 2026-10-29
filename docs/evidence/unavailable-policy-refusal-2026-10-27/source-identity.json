@@ -1,0 +1,19 @@
+{
+  "base_commit": "52813e341fed3c000c0872915a29e785e2a9da69",
+  "source_sha256": {
+    "apps/linux/app/src/services/database_service.rs": "09f2da05b5586f28b2158459b7dc600f5088ca6bb9761d39e98b1148a9921cb2",
+    "apps/linux/app/src/services/database_service/policy_loading.rs": "d12d835d0a8170a4d8a40aac14a86e2fbef471d16f7703590273c5e9f6ee063c",
+    "apps/linux/app/src/services/database_service/tests/policy_failure_tests.rs": "70e6d8d90c22897dd6e202491d71f25269f50febfe004d174ae8e39bcd37f9bf",
+    "apps/linux/app/src/services/connection_service.rs": "19cefc65aa7eb76d4154c652741aa439b738bc8bb43dce38052beaea00515bef",
+    "apps/linux/app/src/ui/connect_dialog/mod.rs": "131bdae9d8929856ca59352035b9c39275c6c1b837c93a6c54e7d0e753095a9b",
+    "apps/linux/app/src/ui/mcp_preferences.rs": "1ea2f31fdcc214090cf5e2bd1c4f2525543f78018871da1c1e6533d6a0921958",
+    "apps/linux/app/tests/gtk_safety.py": "0b035f93efea3ad2859313a19e41aa0213addf4579dcb67d2b106eeaf629e256",
+    "apps/linux/app/tests/gtk_policy.py": "d2a5caa45fe8d62ba9e0fdf2b01a8b205e7e868ead367185a232c2d084879275"
+  },
+  "pre_fix_binary_sha256": "b010798fc53429b3779b5283439f2e6e344e745deb058fdfbecaebce750a6c58",
+  "source_scope": "Changed application and scenario files over the stated Linux base; working tree source before commit.",
+  "fixed_binary_sha256": "2f74955888c128d5cc21600ad177a8ede95856b97ccd489a8e1198e75ad4d1c9",
+  "log_sha256": {
+    "results.txt": "bca0dd75251acecdf561b0e6f677a436c2d3f2defc0561f640116465111215f3"
+  }
+}

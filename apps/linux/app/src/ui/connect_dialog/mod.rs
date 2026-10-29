@@ -97,7 +97,7 @@ mod error_tests;
 pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
 use form::{default_driver_row, test_result_text};
-use identity::{ConnectionIdentity, find_existing, saved_connection_name};
+use identity::{ConnectionIdentity, find_existing, preserve_attached_databases, saved_connection_name};
 pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
 
 pub struct ConnectDialogInit {
@@ -630,7 +630,11 @@ impl Component for ConnectDialog {
                                                 &metadata,
                                                 tablepro_policy::Principal::human_gui(),
                                             );
-                                            match guarded.list_tables_controlled(&control).await {
+                                            let listed = match guarded {
+                                                Ok(guarded) => guarded.list_tables_controlled(&control).await,
+                                                Err(error) => Err(tablepro_core::DriverError::PolicyDenied(error)),
+                                            };
+                                            match listed {
                                                 Ok(tables) => Ok(tables.len()),
                                                 Err(error) => Err(crate::services::error_text::driver_message(&error)),
                                             }
@@ -969,7 +973,7 @@ async fn open_candidate(
         conn.clone(),
         bootstrap.metadata,
         tablepro_policy::Principal::human_gui(),
-    );
+    )?;
     let server_version = match guarded.server_version().await {
         Ok(version) => version,
         Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
@@ -1010,6 +1014,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         query_timeout_secs,
         cancel,
     } = request;
+    let mut opts = opts;
     let stored_password: SecretString = opts.password.clone();
     let ssh_for_establish = ssh.as_ref().map(SshInputs::route).transpose()?;
     let opts_clone = opts.clone();
@@ -1022,6 +1027,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         ssh: ssh.as_ref(),
     };
     let existing = find_existing(&identity).await;
+    preserve_attached_databases(&driver_id, existing.as_ref(), &mut opts);
     let id = existing
         .as_ref()
         .map(|connection| connection.id)
@@ -1095,6 +1101,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         connect_timeout_secs: opts_clone.connect_timeout_secs,
         query_timeout_secs,
         auth_source: opts_clone.auth_source.clone(),
+        attached_databases: opts.attached_databases.clone(),
     };
 
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;

@@ -25,8 +25,8 @@ mod temporal;
 use tablepro_core::sql_syntax::script::LexicalSettings;
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo,
-    Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
+    QueryResultBudget, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 /// Name of the SSH-forwarded rendezvous socket inside the private directory
@@ -461,6 +461,48 @@ impl Connection for MysqlConnection {
         Ok(by_name.into_values().collect())
     }
 
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT
+                CAST(kcu.constraint_name AS CHAR),
+                CAST(kcu.table_schema AS CHAR),
+                CAST(kcu.table_name AS CHAR),
+                CAST(kcu.column_name AS CHAR),
+                CAST(kcu.referenced_column_name AS CHAR)
+            FROM information_schema.key_column_usage kcu
+            WHERE kcu.referenced_table_schema = COALESCE(?, DATABASE())
+              AND kcu.referenced_table_name = ?
+            ORDER BY kcu.constraint_name, kcu.ordinal_position",
+        )
+        .bind(schema)
+        .bind(table)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        let mut by_name: std::collections::BTreeMap<String, InboundForeignKeyInfo> = std::collections::BTreeMap::new();
+        for r in rows {
+            let name: String = r.get(0);
+            let source_schema: Option<String> = r.try_get(1).unwrap_or(None);
+            let source_table: String = r.get(2);
+            let source_column: String = r.get(3);
+            let target_column: String = r.get(4);
+            let entry = by_name.entry(name.clone()).or_insert_with(|| InboundForeignKeyInfo {
+                name,
+                source_schema,
+                source_table,
+                source_columns: Vec::new(),
+                target_columns: Vec::new(),
+            });
+            entry.source_columns.push(source_column);
+            entry.target_columns.push(target_column);
+        }
+        Ok(by_name.into_values().collect())
+    }
+
     async fn ping(&self) -> Result<(), DriverError> {
         sqlx::query("SELECT 1")
             .execute(&self.pool)
@@ -828,7 +870,6 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
     mysql_opts = mysql_opts
         .database(&opts.database)
         .username(&opts.username)
-        .password(opts.password.expose_secret())
         .ssl_mode(match opts.tls.mode {
             TlsMode::Disabled => sqlx::mysql::MySqlSslMode::Disabled,
             TlsMode::Prefer => sqlx::mysql::MySqlSslMode::Preferred,
@@ -836,6 +877,9 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
             TlsMode::VerifyCa => sqlx::mysql::MySqlSslMode::VerifyCa,
             TlsMode::VerifyFull => sqlx::mysql::MySqlSslMode::VerifyIdentity,
         });
+    if !opts.password.expose_secret().is_empty() {
+        mysql_opts = mysql_opts.password(opts.password.expose_secret());
+    }
     if let Some(path) = &opts.tls.root_cert {
         mysql_opts = mysql_opts.ssl_ca(path);
     }
@@ -936,6 +980,7 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
         mariadb,
     );
     let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
+    let column_type = attributes::with_generation(column_type, generation_expr.as_deref(), &extra);
     ColumnInfo {
         name: r.get::<String, _>(0),
         data_type: column_type,

@@ -20,6 +20,7 @@ The wordmark is written `BookiE`. The final capital E is set in brass.
 | [`banner-light.svg`](banner-light.svg), [`banner-dark.svg`](banner-dark.svg) | README header, 1280 by 320. |
 | [`social-card.svg`](social-card.svg), [`social-card.png`](social-card.png) | GitHub social preview, 1280 by 640. Upload the PNG in the repository settings. |
 | [`palette.svg`](palette.svg) | The colours below as swatches. |
+| [`badges/`](badges/) | Vector badges for supported database engines and core desktop capabilities. |
 
 All files are vector, except the two PNG exports. Text in every SVG is converted to outlines, so the files look the same without any font installed.
 

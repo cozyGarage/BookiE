@@ -96,3 +96,41 @@ async fn a_structure_alter_keeps_a_column_invisible() {
     };
     assert!(extra.contains("invisible"), "{extra}");
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_structure_alter_keeps_the_expression_of_a_generated_column() {
+    let (_container, options) = start_mysql().await;
+    let connection = connect(options).await;
+    connection
+        .execute(
+            "CREATE TABLE totals (id INT PRIMARY KEY, a INT NOT NULL, b INT NOT NULL, \
+             stored_sum INT GENERATED ALWAYS AS (a + b) STORED, virtual_sum INT GENERATED ALWAYS AS (a * b) VIRTUAL)",
+        )
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "totals").await.unwrap();
+
+    for name in ["stored_sum", "virtual_sum"] {
+        let mut draft = DraftColumn::from_info(columns.iter().find(|column| column.name == name).unwrap().clone());
+        draft.comment = Some("derived".into());
+        for statement in build_alter_column("mysql", None, "totals", &draft).unwrap() {
+            connection.execute(&statement).await.unwrap();
+        }
+    }
+
+    let kept = connection
+        .query(
+            "SELECT column_name, LOWER(extra), generation_expression FROM information_schema.columns \
+             WHERE table_schema = DATABASE() AND table_name = 'totals' AND column_name LIKE '%\\_sum' ORDER BY column_name",
+        )
+        .await
+        .unwrap()
+        .rows;
+    let text = |row: usize, col: usize| match &kept[row][col] {
+        Value::Text(text) => text.clone(),
+        other => panic!("text expected, got {other:?}"),
+    };
+    assert!(text(0, 1).contains("stored generated") && text(0, 2).contains("a") && text(0, 2).contains('+'));
+    assert!(text(1, 1).contains("virtual generated") && text(1, 2).contains('*'));
+}
