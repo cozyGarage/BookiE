@@ -6,6 +6,28 @@ Design rules distilled from past audits (test ownership, runner parsers, oracles
 
 ## Executable gates
 
+```mermaid
+flowchart TD
+    subgraph Tiers ["BookiE Validation Tiers"]
+        Installed["Installed GTK & Wayland Suite<br/>(scripts/test-gtk-safety.sh)"]
+        Keyring["Keyring & Secret Service<br/>(scripts/test-secret-service.sh)"]
+        Widgets["GTK Widgets Isolated<br/>(scripts/test-gtk-widgets.sh)"]
+        Release["PostgreSQL Release Fixture<br/>(scripts/test-postgres-release.sh)"]
+        TLS["Driver TLS Fixture<br/>(scripts/test-driver-tls.sh)"]
+        Drivers["Driver Integration (Docker)<br/>(scripts/ci-local.sh integration)"]
+        Sandbox["Sandbox Integration (No DB/Display)<br/>(scripts/test-sandbox.sh)"]
+        Unit["Unit Tier (nextest)<br/>(scripts/preflight.sh)"]
+    end
+
+    Unit --> Sandbox
+    Sandbox --> Drivers
+    Drivers --> TLS
+    TLS --> Release
+    Release --> Widgets
+    Widgets --> Keyring
+    Keyring --> Installed
+```
+
 `scripts/ci-local.sh` remains the shared local/CI entry for full, widgets and integration modes. Registrations for isolated GTK and keyring tests live in `scripts/isolated-tests.json`; zero selected tests is a failure. Each run saves its HEAD, worktree status, tracked diff digest, untracked input paths and digest, tool versions and logs under `target/quality/`. The runner hashes non-ignored untracked file paths and contents; Git-ignored build outputs are excluded. A clean tree skips the untracked scan. Reports still do not archive untracked file contents, so commit tested changes before handing them off for exact-source acceptance. Release mode does not certify package installation, Wayland, upgrade/rollback or retry-free candidate soak. See the [packaging guide](../apps/linux/packaging/README.md) and [manual checklist](manual-verification-0.2-features.md).
 
 The script harness checks selected documented Rust declarations against source and generates the gettext template in memory and fails if extraction breaks. The template (`bookie.pot`) and `POTFILES.in` are build outputs, ignored by git; run `python3 scripts/update-translations.py` to write them. The catalog check needs GNU `xgettext` and does not load GTK GIR bindings or a desktop session.

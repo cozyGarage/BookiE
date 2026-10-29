@@ -1,12 +1,17 @@
 use sha2::Digest;
 use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
-use testcontainers::runners::AsyncRunner;
+use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::mssql_server::MssqlServer;
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mssql_max_values_survive_connection_session_and_consumers() {
-    let container = MssqlServer::default().with_accept_eula().start().await.unwrap();
+    let container = MssqlServer::default()
+        .with_accept_eula()
+        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
     let connection = drivers_mssql::MssqlDriver
         .connect(ConnectOptions {
             host: container.get_host().await.unwrap().to_string(),
