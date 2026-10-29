@@ -5,7 +5,7 @@
 Two parts, both against BookiE `linux` at `367006fe626d6ccb069508f032a754219d15482d`:
 
 1. A read-only code audit of the B3 (core, drivers), B4 (policy, storage, transport, SSH, MCP, agentd) and UX (app, app-services) areas, plus documentation drift. Findings were spot-checked against the code before filing; none was reproduced at runtime.
-2. A review of what peer clients fixed over their whole history, how they are built and how they test. Earlier reviews ([October 26](database-client-review-2026-10-26.md), [October 15 dbx](2026-10-15-dbx-review.md), [October 20](tablepro-dbx-review-2026-10-20/README.md)) compared features; this one looks at fix classes, practices and tests. New peers: DbGate, Antares SQL, HeidiSQL, Sequel Ace, Azure Data Studio, pgcli, mycli, litecli, usql, harlequin, rainfrog and gobang. Driver libraries were checked against crates.io, upstream changelogs and RustSec.
+2. A review of what peer clients fixed over their whole history, how they are built and how they test. Earlier reviews (October 26, [October 15 dbx](2026-10-15-dbx-review.md), [October 20](tablepro-dbx-review-2026-10-20/README.md)) compared features; this one looks at fix classes, practices and tests. New peers: DbGate, Antares SQL, HeidiSQL, Sequel Ace, Azure Data Studio, pgcli, mycli, litecli, usql, harlequin, rainfrog and gobang. Driver libraries were checked against crates.io, upstream changelogs and RustSec.
 
 The [source manifest](../evidence/client-lifetime-review-2026-10-27/manifest.json) pins every repository. No third-party code was built or run. Fix-class shares are approximate keyword counts over `git log` or issue search, not a classification of every commit. DBeaver history came from issue search because a full clone did not fit the workspace.
 

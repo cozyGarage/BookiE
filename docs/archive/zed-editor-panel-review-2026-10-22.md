@@ -11,7 +11,7 @@ Reviewed the BookiE Linux editor layout, outcome rendering and error-location he
 - [Terminal view dependencies](https://github.com/zed-industries/zed/blob/544780422affd11699fb531c49af5cc6e82a3fd7/crates/terminal_view/Cargo.toml)
 - [Diagnostics interaction](https://zed.dev/docs/diagnostics), [terminal interaction](https://zed.dev/docs/terminal) and [GTK VTE candidate](https://gnome.pages.gitlab.gnome.org/vte/gtk4/)
 
-The GPUI client review, including dbdelve, is [already archived](gpui-client-review-2026-10-22.md). Its research completion is separate from the open PostgreSQL regression proposal #1316.
+The GPUI client review, including dbdelve, is a completed research archive. Its research completion is separate from the open PostgreSQL regression proposal #1316.
 
 ## Existing work to retain
 
