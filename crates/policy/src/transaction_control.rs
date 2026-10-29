@@ -5,6 +5,7 @@ use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Token, Tokenizer};
 
 use crate::classify::dialect_for;
+use crate::show_statements::is_read_only_show;
 use crate::tsql_transaction::{self, TsqlPhrase};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,21 +98,8 @@ pub(crate) fn mysql_statement_is_transaction_safe(sql: &str) -> bool {
         }
         Statement::Savepoint { .. }
         | Statement::ReleaseSavepoint { .. }
-        | Statement::Rollback { savepoint: Some(_), .. }
-        | Statement::ShowVariable { .. }
-        | Statement::ShowStatus { .. }
-        | Statement::ShowVariables { .. }
-        | Statement::ShowCreate { .. }
-        | Statement::ShowColumns { .. }
-        | Statement::ShowCatalogs { .. }
-        | Statement::ShowDatabases { .. }
-        | Statement::ShowProcessList { .. }
-        | Statement::ShowSchemas { .. }
-        | Statement::ShowCharset(_)
-        | Statement::ShowObjects(_)
-        | Statement::ShowTables { .. }
-        | Statement::ShowViews { .. }
-        | Statement::ShowCollation { .. } => true,
+        | Statement::Rollback { savepoint: Some(_), .. } => true,
+        shown if is_read_only_show(shown) => true,
         _ => false,
     }
 }
