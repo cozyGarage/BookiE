@@ -219,12 +219,15 @@ pub fn load_from_path(path: &Path) -> Result<PolicyConfig, String> {
         let id: uuid::Uuid = key
             .parse()
             .map_err(|e| format!("[connection_overrides.{key}] is not a connection id: {e}"))?;
-        canonical_overrides.insert(id.to_string(), value);
+        if canonical_overrides.insert(id.to_string(), value).is_some() {
+            return Err(format!(
+                "[connection_overrides.{key}] names a connection that another override already names"
+            ));
+        }
     }
     policy.connection_overrides = canonical_overrides;
     Ok(policy)
 }
 
-#[cfg(test)]
 #[path = "config_tests.rs"]
 mod tests;
