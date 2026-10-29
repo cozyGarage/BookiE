@@ -532,11 +532,21 @@ impl Connection for PgConnection {
 
     async fn fetch_enum_labels(&self, schema: &str, name: &str) -> Result<Vec<String>, DriverError> {
         let rows = sqlx::query(
-            "SELECT e.enumlabel::text
+            "WITH RECURSIVE type_chain(oid, typtype, typbasetype) AS (
+                 SELECT t.oid, t.typtype, t.typbasetype
+                 FROM pg_catalog.pg_type t
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+                 WHERE n.nspname = $1 AND t.typname = $2
+                 UNION ALL
+                 SELECT base.oid, base.typtype, base.typbasetype
+                 FROM pg_catalog.pg_type base
+                 JOIN type_chain ON base.oid = type_chain.typbasetype
+                 WHERE type_chain.typtype = 'd'
+             )
+             SELECT e.enumlabel::text
              FROM pg_catalog.pg_enum e
-             JOIN pg_catalog.pg_type t ON t.oid = e.enumtypid
-             JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
-             WHERE n.nspname = $1 AND t.typname = $2
+             JOIN type_chain tc ON tc.oid = e.enumtypid
+             WHERE tc.typtype = 'e'
              ORDER BY e.enumsortorder",
         )
         .bind(schema)
