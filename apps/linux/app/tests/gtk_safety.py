@@ -24,6 +24,7 @@ import gtk_editor_panel
 import gtk_csv_refresh
 import gtk_catalog
 import gtk_connect_form
+import gtk_policy
 import gtk_reimport
 import gtk_deleted_drafts
 import gtk_unreadable_drafts
@@ -2840,6 +2841,7 @@ def main():
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_connect_form.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_policy.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_reimport.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_deleted_drafts.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_unreadable_drafts.scenarios(sys.modules[__name__]))

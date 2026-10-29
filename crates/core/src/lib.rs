@@ -35,7 +35,7 @@ mod transaction;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
-pub use connection::{AuthMode, ConnectOptions, Connection, SocketOrigin, Transport};
+pub use connection::{AttachedDatabase, AuthMode, ConnectOptions, Connection, SocketOrigin, Transport};
 pub use driver::{
     ConnectionFormDefaults, DatabaseDriver, DriverCapabilities, DriverMaturity, EnumInputStyle,
     connection_form_defaults, initial_connection_form_defaults,
@@ -59,9 +59,9 @@ pub use pagination::{
 };
 pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse_parameter_value};
 pub use query::{
-    ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_CURSOR_PAGE_ROWS, MAX_QUERY_RESULT_BYTES,
-    MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage, QueryResult,
-    QueryResultBatch, QueryResultBudget, TableInfo, Value,
+    ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_CURSOR_PAGE_ROWS,
+    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage,
+    QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value,
 };
 pub use registry::DriverRegistry;
 pub use session::{Session, SessionCommitOutcome};
