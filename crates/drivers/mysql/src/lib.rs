@@ -11,7 +11,9 @@ use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statem
 
 use futures::stream::StreamExt;
 
+mod attributes;
 mod decode;
+mod spatial;
 use decode::extract_value;
 mod packed;
 mod session;
@@ -23,8 +25,8 @@ mod temporal;
 use tablepro_core::sql_syntax::script::LexicalSettings;
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo,
-    Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
+    QueryResultBudget, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 /// Name of the SSH-forwarded rendezvous socket inside the private directory
@@ -201,7 +203,11 @@ impl Connection for MysqlConnection {
         .fetch_all(&self.pool)
         .await
         .map_err(map_sqlx_error)?;
-        Ok(rows.iter().map(row_to_column_info).collect())
+        let mut columns: Vec<ColumnInfo> = rows.iter().map(row_to_column_info).collect();
+        if columns.iter().any(|column| spatial::is_spatial_type(&column.data_type)) {
+            self.name_spatial_srids(schema, table, &mut columns).await;
+        }
+        Ok(columns)
     }
 
     async fn fetch_rows(
@@ -451,6 +457,48 @@ impl Connection for MysqlConnection {
             });
             entry.columns.push(column);
             entry.ref_columns.push(ref_column);
+        }
+        Ok(by_name.into_values().collect())
+    }
+
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT
+                CAST(kcu.constraint_name AS CHAR),
+                CAST(kcu.table_schema AS CHAR),
+                CAST(kcu.table_name AS CHAR),
+                CAST(kcu.column_name AS CHAR),
+                CAST(kcu.referenced_column_name AS CHAR)
+            FROM information_schema.key_column_usage kcu
+            WHERE kcu.referenced_table_schema = COALESCE(?, DATABASE())
+              AND kcu.referenced_table_name = ?
+            ORDER BY kcu.constraint_name, kcu.ordinal_position",
+        )
+        .bind(schema)
+        .bind(table)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        let mut by_name: std::collections::BTreeMap<String, InboundForeignKeyInfo> = std::collections::BTreeMap::new();
+        for r in rows {
+            let name: String = r.get(0);
+            let source_schema: Option<String> = r.try_get(1).unwrap_or(None);
+            let source_table: String = r.get(2);
+            let source_column: String = r.get(3);
+            let target_column: String = r.get(4);
+            let entry = by_name.entry(name.clone()).or_insert_with(|| InboundForeignKeyInfo {
+                name,
+                source_schema,
+                source_table,
+                source_columns: Vec::new(),
+                target_columns: Vec::new(),
+            });
+            entry.source_columns.push(source_column);
+            entry.target_columns.push(target_column);
         }
         Ok(by_name.into_values().collect())
     }
@@ -822,7 +870,6 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
     mysql_opts = mysql_opts
         .database(&opts.database)
         .username(&opts.username)
-        .password(opts.password.expose_secret())
         .ssl_mode(match opts.tls.mode {
             TlsMode::Disabled => sqlx::mysql::MySqlSslMode::Disabled,
             TlsMode::Prefer => sqlx::mysql::MySqlSslMode::Preferred,
@@ -830,6 +877,9 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
             TlsMode::VerifyCa => sqlx::mysql::MySqlSslMode::VerifyCa,
             TlsMode::VerifyFull => sqlx::mysql::MySqlSslMode::VerifyIdentity,
         });
+    if !opts.password.expose_secret().is_empty() {
+        mysql_opts = mysql_opts.password(opts.password.expose_secret());
+    }
     if let Some(path) = &opts.tls.root_cert {
         mysql_opts = mysql_opts.ssl_ca(path);
     }
@@ -903,7 +953,7 @@ async fn index_key_expression(
 // MariaDB 10.2.7+ already reports the DEFAULT clause itself and reports a
 // column without a default as the text NULL.
 fn default_expression(raw: Option<String>, column_type: &str, extra: &str, mariadb: bool) -> Option<String> {
-    let raw = raw?;
+    let raw = attributes::with_on_update(raw?, column_type, extra);
     if mariadb {
         return (!raw.eq_ignore_ascii_case("null")).then_some(raw);
     }
@@ -921,7 +971,7 @@ fn default_expression(raw: Option<String>, column_type: &str, extra: &str, maria
 
 fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
     let extra = r.try_get::<String, _>(4).unwrap_or_default().to_ascii_lowercase();
-    let column_type = r.get::<String, _>(1);
+    let column_type = attributes::with_invisible(r.get::<String, _>(1), &extra);
     let mariadb = r.try_get::<i64, _>(9).unwrap_or(0) == 1;
     let default_value = default_expression(
         r.try_get::<Option<String>, _>(5).unwrap_or(None),
@@ -930,6 +980,7 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
         mariadb,
     );
     let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
+    let column_type = attributes::with_generation(column_type, generation_expr.as_deref(), &extra);
     ColumnInfo {
         name: r.get::<String, _>(0),
         data_type: column_type,
