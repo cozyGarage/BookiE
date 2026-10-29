@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::net::IpAddr;
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
@@ -46,6 +47,11 @@ pub async fn pg_dump(
         return Err(DumpError::PathNotAbsolute);
     }
     let partial = partial_path(request.output);
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&partial)?;
     let _cleanup = RemoveOnDrop(partial.clone());
     let args = dump_args(request.format, &partial);
     run_pg_tool(tool, request.options, args, runtime_dir, cancel, None).await?;
