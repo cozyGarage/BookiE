@@ -103,6 +103,7 @@ pub fn file_connection(file: &DatabaseFile) -> SavedConnection {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 
@@ -203,6 +204,7 @@ mod tests {
         assert_eq!(saved.database, path.to_str().unwrap());
         assert!(saved.host.is_empty() && saved.username.is_empty());
         assert!(saved.ssh.is_none());
+        assert!(saved.attached_databases.is_empty());
         assert!(saved.tls_root_cert.is_none() && saved.tls_client_cert.is_none() && saved.tls_client_key.is_none());
     }
 }
