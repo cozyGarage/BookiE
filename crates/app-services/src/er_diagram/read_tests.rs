@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use tablepro_core::{
-    ColumnInfo, Connection, DriverCapabilities, DriverError, ExecResult, ForeignKeyInfo, OperationControl, QueryResult,
-    TableInfo, Value,
+    ColumnInfo, Connection, DriverCapabilities, DriverError, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl,
+    QueryResult, TableInfo, Value,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -15,6 +15,7 @@ use super::read::{MAX_TABLES, read_schema};
 struct Calls {
     columns: AtomicUsize,
     keys: AtomicUsize,
+    indexes: AtomicUsize,
     cancel_at: AtomicUsize,
     cancellation: CancellationToken,
 }
@@ -23,6 +24,7 @@ struct Catalog {
     calls: Arc<Calls>,
     failing: Vec<&'static str>,
     keys: HashMap<&'static str, Vec<ForeignKeyInfo>>,
+    indexes: Vec<IndexInfo>,
 }
 
 fn column(name: &str) -> ColumnInfo {
@@ -97,6 +99,11 @@ impl Connection for Catalog {
         self.calls.keys.fetch_add(1, Ordering::SeqCst);
         Ok(self.keys.get(table).cloned().unwrap_or_default())
     }
+
+    async fn fetch_indexes(&self, _schema: Option<&str>, _table: &str) -> Result<Vec<IndexInfo>, DriverError> {
+        self.calls.indexes.fetch_add(1, Ordering::SeqCst);
+        Ok(self.indexes.clone())
+    }
 }
 
 fn catalog(calls: &Arc<Calls>, failing: Vec<&'static str>) -> Catalog {
@@ -104,12 +111,14 @@ fn catalog(calls: &Arc<Calls>, failing: Vec<&'static str>) -> Catalog {
         calls: calls.clone(),
         failing,
         keys: HashMap::new(),
+        indexes: Vec::new(),
     }
 }
 
-fn capabilities(foreign_keys: bool) -> DriverCapabilities {
+fn capabilities(foreign_keys: bool, indexes: bool) -> DriverCapabilities {
     DriverCapabilities {
         supports_foreign_key_metadata: foreign_keys,
+        supports_index_metadata: indexes,
         ..DriverCapabilities::default()
     }
 }
@@ -129,7 +138,7 @@ async fn every_table_is_read_in_name_order_with_progress() {
         &connection,
         Some("shop"),
         &tables,
-        capabilities(true),
+        capabilities(true, false),
         &control(&calls),
         |done, total| progress.push((done, total)),
     )
@@ -154,7 +163,7 @@ async fn an_engine_without_foreign_key_metadata_reads_no_keys_and_says_so() {
         &connection,
         None,
         &[table("items")],
-        capabilities(false),
+        capabilities(false, false),
         &control(&calls),
         |_, _| {},
     )
@@ -163,6 +172,48 @@ async fn an_engine_without_foreign_key_metadata_reads_no_keys_and_says_so() {
 
     assert!(!read.foreign_keys_supported);
     assert_eq!(calls.keys.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.indexes.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn unique_indexes_are_loaded_for_tables_with_foreign_keys() {
+    let calls = Arc::new(Calls::default());
+    let mut connection = catalog(&calls, Vec::new());
+    connection.keys.insert(
+        "orders",
+        vec![ForeignKeyInfo {
+            name: "orders_customer".into(),
+            columns: vec!["customer_id".into()],
+            ref_schema: Some("shop".into()),
+            ref_table: "customers".into(),
+            ref_columns: vec!["id".into()],
+            on_delete: None,
+            on_update: None,
+        }],
+    );
+    connection.indexes = vec![IndexInfo {
+        name: "orders_customer_unique".into(),
+        columns: vec!["customer_id".into()],
+        unique: true,
+        primary: false,
+        predicate: None,
+        constraint: None,
+        has_expression_key: false,
+    }];
+
+    let read = read_schema(
+        &connection,
+        Some("shop"),
+        &[table("orders")],
+        capabilities(true, true),
+        &control(&calls),
+        |_, _| {},
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(calls.indexes.load(Ordering::SeqCst), 1);
+    assert_eq!(read.reads[0].indexes[0].name, "orders_customer_unique");
 }
 
 #[tokio::test]
@@ -174,7 +225,7 @@ async fn a_table_the_account_cannot_read_is_skipped_and_named() {
         &connection,
         Some("shop"),
         &[table("secrets"), table("items")],
-        capabilities(true),
+        capabilities(true, false),
         &control(&calls),
         |_, _| {},
     )
@@ -195,7 +246,7 @@ async fn a_large_schema_is_cut_at_the_table_limit_and_reports_the_total() {
         &connection,
         Some("shop"),
         &tables,
-        capabilities(true),
+        capabilities(true, false),
         &control(&calls),
         |_, _| {},
     )
@@ -219,7 +270,7 @@ async fn cancelling_stops_the_read_before_the_next_table() {
         &connection,
         Some("shop"),
         &tables,
-        capabilities(true),
+        capabilities(true, false),
         &control(&calls),
         |_, _| {},
     )

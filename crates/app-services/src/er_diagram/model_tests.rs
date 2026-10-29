@@ -1,4 +1,4 @@
-use tablepro_core::{ColumnInfo, ForeignKeyInfo};
+use tablepro_core::{ColumnInfo, ForeignKeyInfo, IndexInfo};
 
 use super::*;
 
@@ -42,6 +42,7 @@ fn read(name: &str, columns: Vec<ColumnInfo>, foreign_keys: Vec<ForeignKeyInfo>)
         name: name.into(),
         columns,
         foreign_keys,
+        indexes: Vec::new(),
     }
 }
 
@@ -87,6 +88,67 @@ fn a_key_is_optional_when_a_key_column_takes_null_and_unique_when_it_covers_the_
     ]);
     assert!(!one_to_one.relations[0].optional);
     assert!(one_to_one.relations[0].unique);
+}
+
+#[test]
+fn a_unique_index_on_foreign_key_columns_marks_the_relation_one_to_one() {
+    let mut profile = read(
+        "profile",
+        vec![column("id", true, false), column("user_id", false, false)],
+        vec![key("profile_user", &["user_id"], None, "users", &["id"])],
+    );
+    profile.indexes.push(unique_index(vec!["user_id".into()]));
+    let diagram = SchemaDiagram::build(vec![
+        profile,
+        read("users", vec![column("id", true, false)], Vec::new()),
+    ]);
+
+    assert!(diagram.relations[0].unique);
+}
+
+#[test]
+fn a_partial_expression_or_noncovering_unique_index_does_not_mark_a_relation_one_to_one() {
+    let indexes = [
+        IndexInfo {
+            unique: false,
+            ..unique_index(vec!["user_id".into()])
+        },
+        IndexInfo {
+            predicate: Some("user_id IS NOT NULL".into()),
+            ..unique_index(vec!["user_id".into()])
+        },
+        IndexInfo {
+            has_expression_key: true,
+            ..unique_index(vec!["user_id".into()])
+        },
+        unique_index(vec!["user_id".into(), "tenant_id".into()]),
+    ];
+    for index in indexes {
+        let mut profile = read(
+            "profile",
+            vec![column("id", true, false), column("user_id", false, false)],
+            vec![key("profile_user", &["user_id"], None, "users", &["id"])],
+        );
+        profile.indexes.push(index);
+        let diagram = SchemaDiagram::build(vec![
+            profile,
+            read("users", vec![column("id", true, false)], Vec::new()),
+        ]);
+
+        assert!(!diagram.relations[0].unique);
+    }
+}
+
+fn unique_index(columns: Vec<String>) -> IndexInfo {
+    IndexInfo {
+        name: "profile_user_unique".into(),
+        columns,
+        unique: true,
+        primary: false,
+        predicate: None,
+        constraint: None,
+        has_expression_key: false,
+    }
 }
 
 #[test]

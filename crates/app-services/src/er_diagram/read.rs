@@ -61,10 +61,16 @@ async fn read_table(
     } else {
         Vec::new()
     };
+    let indexes = if capabilities.supports_index_metadata && !foreign_keys.is_empty() {
+        connection.fetch_indexes_controlled(schema, name, control).await?
+    } else {
+        Vec::new()
+    };
     Ok(TableRead {
         schema: schema.map(str::to_string),
         name: name.to_string(),
         columns,
         foreign_keys,
+        indexes,
     })
 }

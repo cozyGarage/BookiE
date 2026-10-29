@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 
-use tablepro_core::{ColumnInfo, ForeignKeyInfo};
+use tablepro_core::{ColumnInfo, ForeignKeyInfo, IndexInfo};
 
 #[derive(Debug, Clone)]
 pub struct TableRead {
@@ -8,6 +8,7 @@ pub struct TableRead {
     pub name: String,
     pub columns: Vec<ColumnInfo>,
     pub foreign_keys: Vec<ForeignKeyInfo>,
+    pub indexes: Vec<IndexInfo>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -72,7 +73,7 @@ impl SchemaDiagram {
                             .iter()
                             .any(|column| &column.name == name && column.nullable)
                     }),
-                    unique: covers_primary_key(&read.columns, &key.columns),
+                    unique: covers_unique_key(&read.columns, &read.indexes, &key.columns),
                 });
             }
         }
@@ -151,4 +152,15 @@ fn covers_primary_key(columns: &[ColumnInfo], key: &[String]) -> bool {
         .map(|column| column.name.as_str())
         .collect();
     !primary.is_empty() && primary.is_subset(&key)
+}
+
+fn covers_unique_key(columns: &[ColumnInfo], indexes: &[IndexInfo], key: &[String]) -> bool {
+    covers_primary_key(columns, key)
+        || indexes.iter().any(|index| {
+            index.unique
+                && index.predicate.is_none()
+                && !index.has_expression_key
+                && !index.columns.is_empty()
+                && index.columns.iter().all(|column| key.contains(column))
+        })
 }

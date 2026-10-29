@@ -80,12 +80,14 @@ mod tests {
                     on_delete: None,
                     on_update: None,
                 }],
+                indexes: Vec::new(),
             },
             TableRead {
                 schema: None,
                 name: "customers".into(),
                 columns: vec![column("id", true, false)],
                 foreign_keys: Vec::new(),
+                indexes: Vec::new(),
             },
         ])
     }
