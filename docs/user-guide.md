@@ -4,99 +4,112 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 
 ## Connect
 
-1. Click **New connection** (the `+` in the window header).
-2. Pick the database type, then fill in host, port, database and user. For SQLite and DuckDB, choose the file.
-3. Click **Test** to check the details, then **Connect**.
+![Saved connections with environment markers and quick actions](images/connections-light.png)
 
-The form shows the test result at the top, including the number of visible tables on success. Editing a field clears the result.
+1. Click **New connection** (the `+` in the header), or use **Add Connection**, **Import from URL…**, or **Import connections…** on a fresh profile.
+2. Pick the database engine, then enter host, port, database, and user (or select the database file for SQLite / DuckDB).
+3. Click **Test** to verify connectivity, then **Connect**.
 
-For MySQL and MariaDB, choose a local socket file instead of a host to connect through a Unix socket; the path is saved with the connection and exported in bundles. For PostgreSQL, the schema filter menu hides schema groups per connection and restores them. PostgreSQL login and missing-database errors stop the app's reconnect loop; the initial SQLx pool startup may retry until its connection deadline. The General preferences choose how NULL is shown in the grid (NULL, the empty-set symbol or (null)).
+### Connection options
 
-Saved connection passwords live in your desktop keyring; the saved connection file omits them. An encrypted connection bundle can include credentials when you opt in.
-
-- **From the file manager or a terminal**: choose BookiE in **Open With** for a SQLite file, or run `bookie books.db` (SQLite or DuckDB) or `bookie postgres://user@host:5432/database`. A file must exist and be a database of the engine its extension names (`.sqlite`, `.sqlite3`, `.db`, `.db3`, `.s3db` or `.duckdb`, `.ddb`). A URL opens a dialog to confirm before it is saved and connected. If BookiE is already running, the running window handles the request. Avoid putting a password in a URL on the command line, because other users on the machine can see it in the process list.
-- **SSH**: the form configures one SSH host. The built-in transport can use saved multi-hop routes, but the form cannot edit them yet. System OpenSSH uses jump hosts from your SSH configuration. BookiE asks before trusting an unknown host key, including keys presented by a jump host.
-- **TLS**: choose how strictly the server certificate is checked. "Verify full" checks both the certificate authority and the host name.
-- **Environment and read-only**: mark a connection as production, staging or local, and tick **Read-only** to refuse every change on it. A production connection shows a red **Production** badge, a tinted header bar and `[Production]` at the start of its window title, so it stands out in the taskbar and Alt-Tab.
-- **Import from URL** fills the form from a connection URL such as `postgres://user@host:5432/db`. A local Unix socket is written `mysql://user@/db?socket=/run/mysqld/mysqld.sock` or `postgres://user@/db?host=/run/postgresql`.
-- **Share connections**: export or import connections from the menu in the saved list. Encrypt the export with a passphrase to include stored database and SSH credentials. Plaintext exports contain no credentials.
+- **Socket connections**: For MySQL, MariaDB, or PostgreSQL, specify a local Unix socket file (e.g. `mysql://user@/db?socket=/run/mysqld/mysqld.sock`).
+- **SSH tunneling**: Configure an SSH bastion host. BookiE verifies host keys against `$XDG_CONFIG_HOME/tablepro/known_hosts` and prompts before trusting unknown keys.
+- **TLS verification**: Select verification strictness, up to **Verify full** (validates certificate authority and host identity).
+- **Environment markers**: Tag connections as **Local**, **Dev**, **Staging**, or **Production**. Production connections display a red badge, a tinted header, and `[Production]` in the window title.
+- **Keyring security**: Passwords stay in the desktop keyring (Secret Service via `oo7`). Plaintext connection files never store credentials.
+- **CLI launch**: Open databases directly from a terminal: `bookie books.db` or `bookie postgres://user@host:5432/db`.
+- **Bundles**: Export or import connections with optional passphrase encryption to share configurations across machines.
 
 ## Browse a table
 
-Click a table in the sidebar. It opens as a preview tab, marked with an icon, and the next table click reuses that preview. Edit the table or choose **Keep Tab** from the tab menu to keep it open. Tabs with pending edits are kept automatically. Ctrl+click or the sidebar's **Open in new tab** action always creates a durable tab. Turn off **Reuse one tab when opening tables** in Preferences to give every table its own tab; a table that is already open is still selected instead of duplicated. The sidebar groups tables and views under each schema; click a group to collapse it, and type in the search to find a table.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/browse-dark.png">
+  <img alt="BookiE browsing a table with column types, keys, and cell editors" src="images/browse-light.png" width="100%">
+</picture>
 
-Use First, Previous, Next and Last to move through table pages. Unsorted tables with primary keys use keyset seeks for deep Previous navigation and Last. Each page is a separate read, so concurrent database changes can alter which rows appear between page requests; browsing does not hold a snapshot across pages.
+Click any table in the sidebar to open it in a preview tab. Editing the table or selecting **Keep Tab** makes it permanent.
 
-- **Edit**: double-click a cell, or move to it with Tab and press F2 or Enter (a single click selects the row; F2 and Enter act on the focused cell). Changes stay pending (shown with a dot on the tab) until you press Ctrl+S. **Preview SQL** in the bar below the grid shows the statements and values that Save would run, without running them. Ctrl+Z and Ctrl+Y undo and redo pending changes.
-- **Insert and delete**: Ctrl+N inserts a row, Delete removes the selected rows. Ctrl+Shift+N sets the focused cell to NULL.
-- **Filter and sort**: Ctrl+F opens the filter bar. Save structured filters by name for the current connection, schema and table, then select and apply them later; you can rename or delete saved filters there too. Click a column header to sort. Right-click a cell and choose **Filter by This Value** for a quick filter. On a foreign key cell, **Go to Referenced Row** opens the referenced table filtered to that row (composite keys use every column of the key). If the column belongs to multiple foreign keys, choose the target table. Click a cell and press Ctrl+V to paste tab-separated text (for example copied from a spreadsheet) into the cells from that one: each value is checked like a typed edit, nothing is applied if any cell is refused, and the result is a set of pending changes you review and save. An empty pasted value on a nullable column becomes NULL. On PostgreSQL (a column whose type is an enum, or a domain over one; not arrays of enums) and on MySQL and MariaDB, double-clicking an ENUM cell opens a list of its members (choose one with the mouse or the arrow keys and Enter), and a SET cell opens a list with a check for each member and an Apply button; the empty member shows as (empty) and is stored as the empty value, not NULL.
-- **Columns**: the **Columns…** entry in the cell menu hides or shows columns. Drag a header to reorder columns. Both are remembered per table. **Reset** in the Columns dialog forgets the widths you set by dragging.
-- **Find**: Ctrl+Alt+F lists loaded rows that contain a text.
-- **Long values**: cells longer than 8 KiB show a bounded preview and the full value's size. Text and JSON previews show up to 512 Unicode characters. **View Value** opens a read-only view of up to 1 MiB of rendered text or the first 16 KiB of binary data as hex. **Copy Value** copies the complete text or JSON value. For binary cells it currently copies only a byte-count placeholder ([#1587](https://github.com/cozyGarage/BookiE/issues/1587)). Right-click an editable text or JSON cell and choose **Edit Full Value…** to edit the entire value up to 1 MiB. **Apply** stages the value for review; invalid JSON stays in the dialog without staging. **Format JSON** visibly formats semantic JSON values. Source-text JSON keeps its exact text, including key order and number spelling. **Set to NULL** is separate from empty text, JSON `null`, and the text `null`. **Cancel** stages nothing. Values over 1 MiB cannot be edited in that dialog. SQL result grids remain read-only. Exports use full values when fetched; full-row copy and current-page export are refused if hidden columns leave values unavailable.
-- **Row inspector**: shows every column of the selected row with its type.
-- **Selection statistics**: select several rows and open the selection badge to see count, sum, average, min and max per numeric column; **Copy summary** copies them.
+Navigation uses **First**, **Previous**, **Next**, and **Last**. Unsorted tables with primary keys use fast keyset seeks.
+
+![Structured filter presets and condition builder](images/filter-builder.png)
+
+### Grid operations
+
+- **Edit cells**: Double-click or press F2/Enter. Changes remain pending (marked with a dot on the tab) until saved with `Ctrl+S`. Preview the exact SQL changes before saving. Undo and redo with `Ctrl+Z` / `Ctrl+Y`.
+- **Insert and delete**: Press `Ctrl+N` to insert a row, `Delete` to remove selected rows, and `Ctrl+Shift+N` to set a cell to NULL.
+- **Filter and sort**: Press `Ctrl+F` to open the structured filter bar. The WHERE field, **Saved filters** menu, **Clear all**, and **Apply** share one row, with the rule editor available under disclosure. Save named filter presets per table. Right-click any cell to **Filter by This Value**. Click column headers to sort.
+- **Foreign key jumps**: Right-click a foreign key cell and choose **Go to Referenced Row** to open the target table filtered to that specific record.
+- **Paste rows**: Paste tab-separated spreadsheet data (`Ctrl+V`) directly into cells. Each value is type-checked before staging.
+- **ENUM & SET pickers**: Double-click an ENUM or SET cell to open a dedicated item selection popover with an **Apply** button.
+- **Long values & JSON**: Cells over 8 KiB show a preview and size. Right-click to **View Value** (up to 1 MiB text / 16 KiB hex) or **Edit Full Value…** with automated JSON formatting.
+- **Row inspector & statistics**: View all columns and data types in the side inspector. Select multiple rows to view aggregate count, sum, average, min, and max.
 
 ## Run SQL
 
-In a focused result grid, **Ctrl+Shift+J** opens **Jump to Column** and **Ctrl+Alt+F** opens **Find in Loaded Rows**. Selecting a match or dismissing either dialog returns focus to row navigation. **Ctrl+Home** and **Ctrl+End** move to the first and last loaded row; they do not fetch additional rows.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/sql-editor-dark.png">
+  <img alt="BookiE SQL editor with query results in the light theme" src="images/sql-editor-light.png" width="100%">
+</picture>
 
-Ctrl+E opens a SQL editor tab for the current connection.
+In a focused result grid, **Ctrl+Shift+J** opens **Jump to Column** and **Ctrl+Alt+F** opens **Find in Loaded Rows**. **Ctrl+Home** and **Ctrl+End** navigate to the first and last loaded rows.
 
-Supported single-statement PostgreSQL `SELECT`s load progressively. Each streamed result keeps pages within its own 64 MiB estimated row cache, always keeping the newest page; use **Previous page** and **Next page** to navigate retained pages. The row summary states which rows remain when older pages leave the forward-only window. Pages that leave the in-memory budget move to a process-local encrypted spool (1 GiB shared, up to 4,096 pages per result), so earlier pages stay reachable without rerunning the query while the result is open. If the spool refuses a page, the stream stops and is marked incomplete. Other engines and unsupported query shapes load a capped result. A truncated, failed or cancelled result is incomplete; see [result limits](known-limitations.md#data-and-values).
+### Editor controls
 
-SQL files are limited to 8 MiB in total and 256 KiB of UTF-8 text per physical line. Files with longer lines are refused before opening to limit text-layout memory. The file on disk is unchanged; split long lines in another editor before opening it here. Dropping a file into existing SQL also checks the combined lines and total size before insertion. Existing editor contents can still be saved without truncation.
+- **Open editor**: Press `Ctrl+E` or `Ctrl+T` to open a SQL tab.
+- **Split editor**: Click **Split** in the toolbar to edit side-by-side with shared carets and independent scroll.
+- **Code folding**: Press `Ctrl+Shift+[` inside any block to fold it; `Ctrl+Shift+]` or the gutter markers unfold blocks.
+- **Autocompletion**: Context-aware suggestions for keywords, schemas, tables, and columns.
+- **Bound parameters**: Write `:name` in your query; BookiE prompts for typed values before execution without string concatenation.
 
-Automatic completion, statement shading and character diagnostics are available for SQL buffers up to 200,000 UTF-8 bytes. Larger files remain editable, saveable and executable; automatic assistance is disabled to bound background analysis.
+### Query execution
 
-SQL completion offers keywords and scoped table and column names. Choosing an identifier inserts its complete quoted SQL name. Table names keep their schema; column suggestions after an alias keep that alias. Arbitrary words elsewhere in the editor are not suggestions.
+- **Execute**: Press `Ctrl+Enter` (or click **Run**) to run selected SQL or the full buffer. Press `Ctrl+Shift+Enter` to run only the statement under the cursor.
+- **Cancel**: Press `Escape` to cancel a running query where the driver supports it.
+- **Timeout retry**: If a query times out, click **Run again** in the toolbar to run with an extended deadline once.
+- **Error navigation**: Click **Go to error** on a failed statement to jump directly to the character location in your SQL.
 
-While a query runs again, the previous result stays on screen, dimmed, until the new result, an error, or a cancel or timeout message replaces it.
+### Progressive streaming & spooling
 
-Click a sortable result column header to order the rows already loaded in that result. This is a local view change and does not run the SQL again, including for write statements that return rows. SQL NULL values stay last; columns with mixed, JSON or undecodable values cannot be sorted. Text follows the desktop locale collation, which can differ from the database collation.
+Single-statement PostgreSQL `SELECT` queries stream progressively:
+- **In-memory cache**: Keeps pages within an estimated 64 MiB row budget.
+- **Encrypted disk spool**: Evicted pages write to a local encrypted spool (up to 4,096 pages, 1 GiB quota), keeping earlier pages navigable via **Previous page** without re-running the query.
+- Other statement shapes and database engines load capped results.
 
-Right-click a result cell and choose **Filter by This Value** to filter the loaded rows in that result. This also works on pinned results, shows visible and loaded row counts, and does not run the SQL again.
+### Sessions, explain plans & history
 
-When a query stops at the query timeout, the editor toolbar offers **Run again with a longer timeout** (four times as long, up to 24 hours). It runs the same SQL that timed out, applies to that run only, and leaves the saved timeout unchanged. Starting any other run removes the button.
-
-Use **Split** in the editor toolbar to show the same query in a second side-by-side pane. Edits and the caret are shared; each pane keeps its own scroll position.
-
-To collapse a multiline SQL block, place the cursor inside it and press **Ctrl+Shift+[**. Click its gutter marker to unfold it, or choose **Unfold all** in the toolbar. **Ctrl+Shift+]** also unfolds every block. Folding hides lines in the editor without changing the SQL that runs. Editing the query clears folds so hidden text cannot be mistaken for the current query.
-
-- Ctrl+Enter (and the Run button) runs the selected text when something other than blank space is selected, otherwise the whole script (a find match left selected counts as a selection); Ctrl+Shift+Enter runs the statement under the cursor (shaded). Escape cancels a running query when the server supports it. The arrow beside **Run** offers whole-script and current-statement actions with their shortcuts. After execution, its **File output** section lists loaded result sets separately; a streamed result offers an explicitly labeled rerun export.
-- Each statement has a result view. SQL Server statements that return multiple result sets show those sets in order within that view. More than five statement results collapse into a drop-down. **Pin results** keeps the current results above the next run.
-- After a run, the gutter marks each statement with a tick or a cross. For supported SQL dialects, SQL text inside comments does not receive a statement mark.
-- A failed statement shows the error with **Copy error**. When the server supplies a position for the original SQL, **Go to error** in the result and **Errors** views restores the editor and places the caret there. Positions count Unicode characters and refer to the statement that failed, including when the same statement occurs twice. Editing the query, running it again, or changing its connection requires a fresh error before an old action can navigate. Errors without a usable position remain readable and copyable.
-- `:name` placeholders ask for values before the statement runs and send them as bound parameters, never pasted into the SQL.
-- **Session** keeps one connection for the tab, so settings, temporary tables and transactions carry over between runs. MySQL sessions allow locking reads, user variables, savepoints and supported `SHOW` forms inside an open transaction; raw transaction-control SQL, DDL, account statements, `LOCK TABLES` and `SET autocommit` remain refused. `ROLLBACK` does not undo user-variable assignments or release named locks acquired by functions in assignment expressions; close the session to release those locks.
-- Outside **Session**, a lone `BEGIN`, `COMMIT` or `ROLLBACK` is refused before database dispatch, including when run under the cursor. In a Session, send transaction-control statements separately so BookiE can track the transaction. `COMMIT` without an open transaction and transaction control hidden in a multi-statement script are refused.
-- **Explain** shows the plan of the selected text, or of the whole editor when nothing is selected. For PostgreSQL the plan opens as a **Tree** (indented by nesting, with a bar for each step's share of the estimated cost; hover a bar for the numbers) and the **Text** tab keeps the raw plan. SQLite also opens a **Tree**, but SQLite reports no cost estimates, so its steps have no cost bars. Other engines show the text plan only. The costs are the planner's estimates; nothing is executed.
-- Ctrl+H opens query history in a panel beneath the workspace. Statements that set a password, an encryption key or a connection secret are not saved there. Editor drafts are a separate store: the text of open editor tabs stays on disk under the workspace directory, and closing a tab removes its draft file after the workspace is saved ([#1731](https://github.com/cozyGarage/BookiE/issues/1731)). Search, filter, pin, export or reopen queries there; **Close history** returns the full space to your current workspace. Ctrl+D saves the query as a favorite, and Ctrl+P opens Open Quickly for favorites, tabs and connections.
-
-A session with an open transaction also shows **Transaction active**, **Commit & close session**, and **Roll back & close session**. Both actions end that editor session. They are unavailable while a statement or session operation is running. A failed commit keeps the existing recovery behavior; an aborted PostgreSQL transaction can report a rollback instead of a commit.
-
-The header's **Tables sidebar** button shows or hides database navigation at any window width. In a wide window the sidebar is docked: drag the divider or focus its native handle and use the keyboard to resize it. In a window narrower than 960 px the sidebar becomes an overlay that stays closed after connecting and returns docked when the window is widened. The arrow beside a table or view expands its fields without opening another tab. Names lead, engine types are secondary, and primary-key fields show a key icon. **Structure…** opens the full metadata view. Expansion previews up to 256 fields per object, with at most 2,048 fields retained across expanded objects and four metadata requests at once. Collapse and expand to retry a failed load; collapsing releases its field budget. The header's **Collapse all** button folds every schema and group in the sidebar and becomes **Expand all**; the folded state is remembered per connection, and the button does nothing while a search is active. On engines that list catalog objects (PostgreSQL), a **Catalog** group at the end lists Functions and procedures, Triggers, Sequences, Extensions, Roles, Types and Privileges; choosing one opens the Catalog dialog on that kind.
-
-Grid headers show the column name and exact engine type spelling on separate lines. The native header menu shows **Column details**, including keys, nullability and the column comment. Comments are kept out of the header so they do not increase every header's height.
+- **Timeout retry**: When a query times out, click **Run again with a longer timeout** (4× duration) for an immediate one-shot extended run.
+- **Side-by-side split & code folding**: Use **Split** to edit the query in two synced panes. Place the cursor and press `Ctrl+Shift+[` to fold a block, or use the toolbar's fold menu (`⋯`) to unfold.
+- **Results & Errors switcher**: Results and Errors share a linked bottom switcher. Errors displays a badge count only when errors occur; click **Go to error** to jump directly to the failing statement position.
+- **Session mode**: Toggle **Session** to bind the tab to a dedicated connection for transactions and temporary tables. When a transaction is active, use **Commit & close session** or **Roll back & close session**.
+- **Explain plans**: Click **Explain** to inspect execution plans. PostgreSQL displays a visual **Tree** with cost-distribution bars alongside raw text; SQLite provides an indented tree.
+- **Query history**: Press `Ctrl+H` to toggle the bottom history drawer. Statements containing secrets are automatically excluded.
+- **Favorites & Open Quickly**: Press `Ctrl+D` to save a favorite query, `Ctrl+Shift+B` to view saved favorites, and `Ctrl+P` for Open Quickly across tabs, favorites, and connections.
 
 ## Import and export
 
-- **Export** opens one dialog with **Scope** before **Format**. A table uses its current page and active server-side filter; **All matching table rows** explains the snapshot requirement and cannot start an export. A query exports its loaded result columns, including joins and aliases, without running SQL again. A streamed result's all-row export explicitly runs the guarded query again and can observe changed data. Choose CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook after reviewing the scope. Full-table export remains refused until a consistent snapshot path is supported.
-  SQL row export and Copy as INSERT are not database backups; see the
-  [identity and generated-column limitations](known-limitations.md#data-and-values).
-- **Import**: right-click a table and choose **Import CSV…** to load a CSV file
-  into it, or use the button on a schema header to create a new table from a CSV
-  file. A `.xlsx` workbook is read from its first worksheet that has data, using the values the file stores (formulas show their last saved result, dates as ISO text); there is no sheet picker yet. Separator, header row and column mapping are detected and can be changed, as can the quote character, backslash escaping of quotes and the text encoding (UTF-8, Windows-1252 or UTF-16; a file that is not UTF-8 opens with a matching choice).
-  For an existing table, use **Remember mapping** and **Restore mapping** to reuse
-  the destination choices for that connection and table. Generated columns stay on
-  Skip. PostgreSQL, MySQL/MariaDB and SQLite accept mapped auto-increment values;
-  SQL Server identity columns stay on Skip. See
-  [known limitations](known-limitations.md#data-and-values).
-  PostgreSQL `timestamptz` values should include an explicit zone; unzoned values are
-  currently treated as UTC. See [known limitations](known-limitations.md#data-and-values).
+![Export scope dialog choosing data scope before format](images/export-wizard.png)
+
+- **Export**: Select **Scope** (Current table page or loaded query result) before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). Full-table unindexed snapshot exports remain unavailable until a consistent snapshot path is supported.
+- **Import**: Right-click any table and choose **Import CSV…**, or import from a schema header to create a new table. Excel `.xlsx` files read the first populated sheet. Delimiters, headers, encodings (UTF-8, Windows-1252, UTF-16), and column mappings are detected automatically and can be remembered per table.
 
 ## Safety
 
 BookiE checks every statement before it runs:
+
+```mermaid
+flowchart TD
+    Statement[SQL Statement / Query] --> Guard[PolicyGuard]
+    Guard --> Classify[Classify Statement Kind]
+    Classify --> PolicyCheck{Rules Evaluation}
+    PolicyCheck -->|Needs Approval| AskUser[Request Human Approval]
+    AskUser -->|Approved| Intent[Write Audit Intent to Journal]
+    PolicyCheck -->|Allowed| Intent
+    PolicyCheck -->|Denied| AuditDeny[Audit Terminal Denied]
+    Intent --> Driver[Database Driver Execution]
+    Driver --> Mask[Mask Sensitive Data]
+    Mask --> AuditSuccess[Write Terminal Audit Succeeded]
+    AuditSuccess --> Result[Return Result to UI / MCP]
+```
 
 - Writes on a read-only connection are refused.
 - Depending on the connection's environment and your policy, risky statements (for example a `DELETE` without `WHERE`, or schema changes in production) ask for your approval first. The time spent waiting for approval is not counted in the statement's elapsed time.
@@ -112,7 +125,31 @@ Database snapshots are not available. [ADR 0015](decisions/0015-database-snapsho
 
 ## AI agents (MCP)
 
-BookiE can let an AI assistant use your saved connections through the Model Context Protocol. Open **Preferences → MCP** to create a token, choose which connections it may use and which tools it may call. The token appears once; the dialog reports whether it was saved in the system keyring. If saving fails, copy it into your MCP client configuration before closing the dialog. Every agent statement goes through the same safety checks, and agent changes follow the approval rules of the connection's environment. `bookie-agentd` runs the same server without the window, for headless use.
+BookiE can let an AI assistant use your saved connections through the Model Context Protocol. Open **Preferences → MCP** to create a token, choose which connections it may use and which tools it may call.
+
+```mermaid
+flowchart LR
+    subgraph Client ["AI Agent / IDE"]
+        MCP[MCP Tool Call]
+    end
+    subgraph Daemon ["bookie-agentd / GUI"]
+        ScopeCheck{Token Scopes Valid?}
+        AllowCheck{Connection Allowlisted?}
+        Guard[PolicyGuard Engine]
+    end
+    subgraph Target ["Database"]
+        DB[(Database Engine)]
+    end
+
+    MCP --> ScopeCheck
+    ScopeCheck -->|No| Deny1[Deny Access]
+    ScopeCheck -->|Yes| AllowCheck
+    AllowCheck -->|No| Deny2[Deny Access]
+    AllowCheck -->|Yes| Guard
+    Guard --> DB
+```
+
+The token appears once; the dialog reports whether it was saved in the system keyring. If saving fails, copy it into your MCP client configuration before closing the dialog. Every agent statement goes through the same safety checks, and agent changes follow the approval rules of the connection's environment. `bookie-agentd` runs the same server without the window, for headless use.
 
 Open **Audit Log** from the main menu to review persisted operation records. Each record shows its connection, principal, kind, outcome, row count and duration, and expands to its operation id, policy rule, stored statement and error. Statement text appears in the redacted form the journal keeps. A Local or Dev policy may allow a human write to continue after audit-intent failure without a persisted record; see [Safety](#safety).
 
@@ -141,6 +178,8 @@ Press Ctrl+? for the full list. The most used:
 | Ctrl+Alt+F | Find in loaded rows |
 | Ctrl+Shift+J | Jump to a column |
 | Ctrl+Shift+L | Reveal the open table in the sidebar |
+| Ctrl+D | Save query as favorite |
+| Ctrl+Shift+B | Open saved queries (favorites) |
 | Ctrl+P | Open Quickly |
 | Ctrl+H | Query history |
 | Ctrl+Tab | Most recently used tab |
@@ -152,6 +191,6 @@ Press Ctrl+? for the full list. The most used:
 
 ### Results panel
 
-Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Show result sets** returns from the Errors view to the existing result selector. **Errors** lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
+Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Results** and **Errors** are one switcher with the active view marked: choosing **Results** while Errors is shown returns to the existing result selector, and choosing it again hides the panel. **Errors** shows a count only when the latest run failed, and lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
 
 Drag the divider to resize the panel. **Maximize results** hides the SQL area; **Restore editor** returns to the previous divider position and SQL focus. Hiding a maximized panel also restores the editor. Panel size is retained within the open editor, not across an application restart. Closing the query releases its panel with the rest of that editor.
