@@ -37,21 +37,28 @@ pub fn load_metadata(path: &Path) -> std::io::Result<WorkspaceState> {
 }
 
 pub fn save(path: &Path, drafts: &Path, mut state: WorkspaceState) -> std::io::Result<()> {
+    super::config_io::prepare_private_file(path)?;
     let existing = read_existing(path)?;
-    if let Some(bytes) = &existing {
-        let previous: WorkspaceState = serde_json::from_slice(bytes).map_err(std::io::Error::other)?;
-        if has_legacy_draft(&previous) {
-            let backup = path.with_extension("before-drafts.json");
-            if !backup.try_exists()? {
-                atomic_write_bytes(&backup, bytes)?;
-            }
+    let mut previous: WorkspaceState = existing
+        .as_ref()
+        .map(|bytes| serde_json::from_slice(bytes).map_err(std::io::Error::other))
+        .transpose()?
+        .unwrap_or_default();
+    if let Some(bytes) = &existing
+        && has_legacy_draft(&previous)
+    {
+        let backup = path.with_extension("before-drafts.json");
+        if !backup.try_exists()? {
+            atomic_write_bytes(&backup, bytes)?;
         }
     }
+    let mut batch = staged_drafts::DraftBatch::new(drafts, &mut previous);
     for (connection, workspace) in &mut state.connections {
         let connection = Uuid::parse_str(connection).map_err(std::io::Error::other)?;
-        save_connection_drafts(connection, workspace, drafts)?;
+        clean_previous_drafts(drafts, connection, &mut previous)?;
+        batch.stage(connection, workspace, drafts)?;
     }
-    atomic_write_json(path, &state)?;
+    batch.publish(|| atomic_write_json(path, &state))?;
     for (connection, workspace) in &mut state.connections {
         retired_drafts::remove(
             drafts,
@@ -75,6 +82,7 @@ pub fn save_connections(
     drafts: &Path,
     updates: Vec<(Uuid, ConnectionWorkspaceState)>,
 ) -> std::io::Result<()> {
+    super::config_io::prepare_private_file(path)?;
     let existing = read_existing(path)?;
     let mut state = match &existing {
         Some(bytes) => serde_json::from_slice(bytes).map_err(std::io::Error::other)?,
@@ -88,14 +96,17 @@ pub fn save_connections(
             atomic_write_bytes(&backup, bytes)?;
         }
     }
+    let mut previous = state.clone();
     super::workspace_state::clamp(&mut state);
     let updated: Vec<Uuid> = updates.iter().map(|(connection, _)| *connection).collect();
+    let mut batch = staged_drafts::DraftBatch::new(drafts, &mut previous);
     for (connection, mut workspace) in updates {
         super::workspace_state::clamp_connection(&mut workspace);
-        save_connection_drafts(connection, &mut workspace, drafts)?;
+        clean_previous_drafts(drafts, connection, &mut previous)?;
+        batch.stage(connection, &mut workspace, drafts)?;
         state.connections.insert(connection.to_string(), workspace);
     }
-    atomic_write_json(path, &state)?;
+    batch.publish(|| atomic_write_json(path, &state))?;
     for connection in updated {
         if let Some(workspace) = state.connections.get_mut(&connection.to_string()) {
             retired_drafts::remove(drafts, connection, workspace)?;
@@ -149,23 +160,16 @@ pub(super) fn load_connection_drafts(
     Ok(())
 }
 
-fn save_connection_drafts(
-    connection: Uuid,
-    workspace: &mut ConnectionWorkspaceState,
-    drafts: &Path,
-) -> std::io::Result<()> {
-    for tab in workspace.all_tabs_mut() {
-        if let WorkspaceTabRecord::Editor { query, draft_id, .. } = tab {
-            let id = *draft_id.get_or_insert_with(Uuid::new_v4);
-            atomic_write_bytes(
-                &drafts.join(connection.to_string()).join(format!("{id}.sql")),
-                query.as_bytes(),
-            )?;
-            query.clear();
-        }
-    }
-    Ok(())
+fn clean_previous_drafts(drafts: &Path, connection: Uuid, previous: &mut WorkspaceState) -> std::io::Result<()> {
+    let mut empty = ConnectionWorkspaceState::default();
+    let workspace = previous
+        .connections
+        .get_mut(&connection.to_string())
+        .unwrap_or(&mut empty);
+    retired_drafts::remove(drafts, connection, workspace)
 }
+
+mod staged_drafts;
 
 #[cfg(test)]
 mod tests {

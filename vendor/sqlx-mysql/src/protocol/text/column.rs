@@ -148,6 +148,9 @@ impl ProtocolDecode<'_, Capabilities> for ColumnDefinition {
         let alias = buf.get_bytes_lenenc()?;
         let name = buf.get_bytes_lenenc()?;
         let _next_len = buf.get_uint_lenenc()?; // always 0x0c
+        if buf.remaining() < 10 {
+            return Err(err_protocol!("expected 10 bytes in column definition but got {}", buf.remaining()));
+        }
         let collation = buf.get_u16_le();
         let max_size = buf.get_u32_le();
         let type_id = buf.get_u8();
@@ -265,5 +268,14 @@ impl ColumnType {
                 return Err(err_protocol!("unknown column type 0x{:02x}", id));
             }
         })
+    }
+}
+
+#[test]
+fn truncated_column_definition_suffix_is_rejected() {
+    for length in 0..10 {
+        let mut packet = vec![0, 0, 0, 0, 0, 0, 12];
+        packet.extend(vec![0; length]);
+        assert!(ColumnDefinition::decode_with(Bytes::from(packet), Capabilities::empty()).is_err());
     }
 }

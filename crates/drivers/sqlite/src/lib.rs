@@ -16,9 +16,9 @@ use sqlx::{
 use futures::stream::StreamExt;
 
 use tablepro_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, check_pre_dispatch,
-    run_controlled_setup, run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo,
+    Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod drop_guard;
@@ -531,6 +531,30 @@ impl Connection for SqliteConnection {
             }
         }
         Ok(keys)
+    }
+
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        _schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let tables = self.list_tables().await?;
+        let mut inbound = Vec::new();
+        for t in tables {
+            let fks = self.fetch_foreign_keys(None, &t.name).await?;
+            for fk in fks {
+                if fk.ref_table.eq_ignore_ascii_case(table) {
+                    inbound.push(InboundForeignKeyInfo {
+                        name: fk.name,
+                        source_schema: None,
+                        source_table: t.name.clone(),
+                        source_columns: fk.columns,
+                        target_columns: fk.ref_columns,
+                    });
+                }
+            }
+        }
+        Ok(inbound)
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
