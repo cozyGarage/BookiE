@@ -28,14 +28,17 @@ pub(super) struct GridMenus {
     edit_action: gio::SimpleAction,
     edit_full_value_action: gio::SimpleAction,
     reference_action: gio::SimpleAction,
+    show_referencing_action: gio::SimpleAction,
     export_loaded: Option<(gio::SimpleAction, LocalResultView)>,
     foreign_key_columns: Rc<std::collections::HashSet<String>>,
+    has_inbound_foreign_keys: bool,
 }
 
 pub(super) struct GridMenuOptions {
     pub(super) filterable: bool,
     pub(super) row_mutations_allowed: bool,
     pub(super) foreign_key_columns: std::collections::HashSet<String>,
+    pub(super) has_inbound_foreign_keys: bool,
     pub(super) local_result_view: Option<LocalResultView>,
 }
 
@@ -191,6 +194,33 @@ pub(super) fn install_grid_context_menus(
         columns.clone(),
         export::render_markdown,
     );
+    let copy_text_table_entry = copy_rows_action(
+        "copy-text-table",
+        context.clone(),
+        sender.clone(),
+        column_view,
+        columns.clone(),
+        export::render_text_table,
+    );
+    let copy_json_lines_entry = copy_rows_action(
+        "copy-json-lines",
+        context.clone(),
+        sender.clone(),
+        column_view,
+        columns.clone(),
+        export::render_json_lines,
+    );
+    let copy_values_list_entry = {
+        let driver_id = driver_id.clone();
+        copy_rows_action(
+            "copy-values-list",
+            context.clone(),
+            sender.clone(),
+            column_view,
+            columns.clone(),
+            move |columns, rows| export::render_value_list(&driver_id, columns, rows),
+        )
+    };
     let supports_sql = tablepro_core::export::supports_sql_literals(&driver_id);
     let copy_in_clause_action = {
         let context = context.clone();
@@ -383,6 +413,8 @@ pub(super) fn install_grid_context_menus(
         options.local_result_view,
     );
     let reference_action = go_to_reference_action(context.clone(), sender.clone(), column_view, columns.clone());
+    let show_referencing_action =
+        show_referencing_action(context.clone(), sender.clone(), column_view, columns.clone());
     let duplicate_row_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -414,11 +446,14 @@ pub(super) fn install_grid_context_menus(
         copy_column_name_action,
         copy_rows_entry,
         copy_rows_headers_entry,
+        copy_text_table_entry,
         copy_json_entry,
+        copy_json_lines_entry,
         copy_csv_entry,
         copy_csv_headers_entry,
         copy_markdown_entry,
         copy_in_clause_action,
+        copy_values_list_entry,
         view_value_action,
         show_row_json_action,
         export_action,
@@ -432,9 +467,16 @@ pub(super) fn install_grid_context_menus(
         filter_action,
     ]);
     group.add_action(&reference_action);
+    group.add_action(&show_referencing_action);
     column_view.insert_action_group("cell", Some(&group));
     if let Some(action) = group
         .lookup_action("copy-in-clause")
+        .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+    {
+        action.set_enabled(supports_sql);
+    }
+    if let Some(action) = group
+        .lookup_action("copy-values-list")
         .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
     {
         action.set_enabled(supports_sql);
@@ -465,8 +507,10 @@ pub(super) fn install_grid_context_menus(
         edit_action,
         edit_full_value_action,
         reference_action,
+        show_referencing_action,
         export_loaded,
         foreign_key_columns: Rc::new(options.foreign_key_columns),
+        has_inbound_foreign_keys: options.has_inbound_foreign_keys,
     };
     keyboard_menu::install(column_view, &menus);
     pointer_menu::install(column_view, &menus, empty_popover);
@@ -488,6 +532,26 @@ fn export_loaded_item() -> gio::MenuItem {
     item
 }
 
+fn build_copy_as_menu(insert_copy: bool) -> gio::Menu {
+    let copy_as = gio::Menu::new();
+    copy_as.append(Some(&crate::tr!("Rows")), Some("cell.copy-rows"));
+    copy_as.append(Some(&crate::tr!("With Headers")), Some("cell.copy-rows-headers"));
+    copy_as.append(Some(&crate::tr!("Text Table")), Some("cell.copy-text-table"));
+    copy_as.append(Some(&crate::tr!("JSON")), Some("cell.copy-json"));
+    copy_as.append(Some(&crate::tr!("JSON Lines")), Some("cell.copy-json-lines"));
+    copy_as.append(Some(&crate::tr!("CSV")), Some("cell.copy-csv"));
+    copy_as.append(Some(&crate::tr!("CSV with Headers")), Some("cell.copy-csv-headers"));
+    copy_as.append(Some(&crate::tr!("Markdown")), Some("cell.copy-markdown"));
+    copy_as.append(Some(&crate::tr!("IN Clause")), Some("cell.copy-in-clause"));
+    copy_as.append(Some(&crate::tr!("Values List")), Some("cell.copy-values-list"));
+    if insert_copy {
+        copy_as.append(Some(&crate::tr!("INSERT Statement")), Some("cell.copy-row-insert"));
+        copy_as.append(Some(&crate::tr!("UPDATE Statement")), Some("cell.copy-row-update"));
+        copy_as.append(Some(&crate::tr!("DELETE Statement")), Some("cell.copy-row-delete"));
+    }
+    copy_as
+}
+
 fn build_menu(
     editable: bool,
     row_operations: bool,
@@ -506,22 +570,9 @@ fn build_menu(
         section.append_item(&full_value);
         menu.append_section(None, &section);
     }
-    let copy_as = gio::Menu::new();
-    copy_as.append(Some(&crate::tr!("Rows")), Some("cell.copy-rows"));
-    copy_as.append(Some(&crate::tr!("With Headers")), Some("cell.copy-rows-headers"));
-    copy_as.append(Some(&crate::tr!("JSON")), Some("cell.copy-json"));
-    copy_as.append(Some(&crate::tr!("CSV")), Some("cell.copy-csv"));
-    copy_as.append(Some(&crate::tr!("CSV with Headers")), Some("cell.copy-csv-headers"));
-    copy_as.append(Some(&crate::tr!("Markdown")), Some("cell.copy-markdown"));
-    copy_as.append(Some(&crate::tr!("IN Clause")), Some("cell.copy-in-clause"));
-    if insert_copy {
-        copy_as.append(Some(&crate::tr!("INSERT Statement")), Some("cell.copy-row-insert"));
-        copy_as.append(Some(&crate::tr!("UPDATE Statement")), Some("cell.copy-row-update"));
-        copy_as.append(Some(&crate::tr!("DELETE Statement")), Some("cell.copy-row-delete"));
-    }
     let copy = gio::Menu::new();
     copy.append(Some(&crate::tr!("Copy value")), Some("cell.copy-value"));
-    copy.append_submenu(Some(&crate::tr!("Copy as")), &copy_as);
+    copy.append_submenu(Some(&crate::tr!("Copy as")), &build_copy_as_menu(insert_copy));
     copy.append(Some(&crate::tr!("Copy column name")), Some("cell.copy-column-name"));
     menu.append_section(None, &copy);
     let display = gio::Menu::new();
@@ -530,6 +581,10 @@ fn build_menu(
     }
     if filterable {
         display.append(Some(&crate::tr!("Go to Referenced Row")), Some("cell.go-to-reference"));
+        display.append(
+            Some(&crate::tr!("Show Referencing Rows")),
+            Some("cell.show-referencing-rows"),
+        );
     }
     display.append(Some(&crate::tr!("View Value…")), Some("cell.view-value"));
     display.append(Some(&crate::tr!("Show Row as JSON")), Some("cell.show-row-json"));
@@ -584,6 +639,32 @@ fn go_to_reference_action(
                 row,
             })
             .ok();
+    });
+    action
+}
+
+fn show_referencing_action(
+    context: CellContextStore,
+    sender: relm4::Sender<GridMsg>,
+    column_view: &gtk::ColumnView,
+    columns: Rc<Vec<ColumnInfo>>,
+) -> gio::SimpleAction {
+    let action = gio::SimpleAction::new("show-referencing-rows", None);
+    action.set_enabled(false);
+    let view = column_view.downgrade();
+    action.connect_activate(move |_, _| {
+        let context = context.snapshot();
+        let Some(slot) = context.as_ref() else { return };
+        let Some(view) = view.upgrade() else { return };
+        let Some(cells) = row_at(&view, position(slot)) else {
+            return;
+        };
+        let row = columns
+            .iter()
+            .zip(cells)
+            .map(|(column, value)| (column.name.clone(), value))
+            .collect();
+        sender.send(GridMsg::ShowReferencingRows { row }).ok();
     });
     action
 }
@@ -691,6 +772,9 @@ fn prepare_cell_menu(
                 row.with_cell_value(options.idx, |value| !matches!(value, Value::Null))
                     .unwrap_or(false)
             }),
+    );
+    menus.show_referencing_action.set_enabled(
+        menus.has_inbound_foreign_keys && row_object_at(view, position).is_some_and(|row| row.draft_id().is_none()),
     );
     if options.is_editable {
         menus.editable_popover.clone()

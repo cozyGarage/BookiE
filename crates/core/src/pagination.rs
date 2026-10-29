@@ -78,8 +78,10 @@ fn keyset_where_comparison(
     let mut params: Vec<Value> = Vec::new();
     let mut placeholder_idx = placeholder_start;
 
+    let nulls_sort_first = driver_id == "sqlite";
     for depth in 0..pk_columns.len() {
-        if matches!(boundary_values[depth], Value::Null) {
+        let boundary_is_null = matches!(boundary_values[depth], Value::Null);
+        if boundary_is_null && !(nulls_sort_first && comparison == ">") {
             continue;
         }
         let mut and_parts: Vec<String> = Vec::with_capacity(depth + 1);
@@ -95,12 +97,23 @@ fn keyset_where_comparison(
         }
 
         let ident = quote_ident(driver_id, pk_columns[depth]);
-        and_parts.push(format!(
-            "{ident} {comparison} {}",
-            placeholder_for(driver_id, placeholder_idx)
-        ));
-        placeholder_idx += 1;
-        params.push(boundary_values[depth].clone());
+        if boundary_is_null {
+            and_parts.push(format!("{ident} IS NOT NULL"));
+        } else if nulls_sort_first && comparison == "<" {
+            and_parts.push(format!(
+                "({ident} {comparison} {} OR {ident} IS NULL)",
+                placeholder_for(driver_id, placeholder_idx)
+            ));
+            placeholder_idx += 1;
+            params.push(boundary_values[depth].clone());
+        } else {
+            and_parts.push(format!(
+                "{ident} {comparison} {}",
+                placeholder_for(driver_id, placeholder_idx)
+            ));
+            placeholder_idx += 1;
+            params.push(boundary_values[depth].clone());
+        }
 
         if let [only] = and_parts.as_slice() {
             or_arms.push(only.clone());
@@ -236,5 +249,20 @@ mod tests {
             keyset_order_by_before("postgres", &["tenant_id", "id"]),
             " ORDER BY \"tenant_id\" DESC, \"id\" DESC"
         );
+    }
+
+    #[test]
+    fn sqlite_keyset_seeks_past_a_null_component_where_nulls_sort_first() {
+        let (sql, params) = keyset_where_clause("sqlite", &["a", "b"], &[Value::Int(1), Value::Null], 0).unwrap();
+        assert_eq!(sql, r#"("a" > ? OR ("a" = ? AND "b" IS NOT NULL))"#);
+        assert_eq!(params, vec![Value::Int(1), Value::Int(1)]);
+
+        let (sql, params) =
+            keyset_before_where_clause("sqlite", &["a", "b"], &[Value::Int(1), Value::Text("x".into())], 0).unwrap();
+        assert_eq!(
+            sql,
+            r#"(("a" < ? OR "a" IS NULL) OR ("a" = ? AND ("b" < ? OR "b" IS NULL)))"#
+        );
+        assert_eq!(params, vec![Value::Int(1), Value::Int(1), Value::Text("x".into())]);
     }
 }
