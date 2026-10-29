@@ -10,7 +10,8 @@ use async_trait::async_trait;
 use hyper_util::client::legacy::Client as HyperClient;
 use hyper_util::rt::TokioExecutor;
 use query::{
-    LineReader, confirms_cancellation, exception_row_message, new_query_id, parse_line, request_cancellation, tag_query,
+    LineReader, RowCell, confirms_cancellation, exception_row_message, new_query_id, parse_line, parse_row,
+    request_cancellation, tag_query,
 };
 use secrecy::ExposeSecret;
 use serde::Deserialize;
@@ -464,7 +465,7 @@ async fn fetch_result(
             break;
         }
         let Some(row) = budget.decode_and_admit_row(columns.len(), line.len(), || {
-            let raw: Vec<serde_json::Value> = parse_line(&line)?;
+            let raw = parse_row(&line)?;
             if let Some(message) = exception_row_message(&raw) {
                 return Err(DriverError::Query {
                     message: message.to_owned(),
@@ -515,7 +516,7 @@ fn response_columns(names: Vec<String>, types: Vec<String>) -> Result<Vec<Column
         .collect())
 }
 
-fn response_row(raw: Vec<serde_json::Value>, columns: &[ColumnInfo]) -> Result<Vec<Value>, DriverError> {
+fn response_row(raw: Vec<RowCell>, columns: &[ColumnInfo]) -> Result<Vec<Value>, DriverError> {
     if raw.len() != columns.len() {
         return Err(DriverError::Internal(format!(
             "clickhouse response row width mismatch: {} values, {} columns",
@@ -523,11 +524,28 @@ fn response_row(raw: Vec<serde_json::Value>, columns: &[ColumnInfo]) -> Result<V
             columns.len()
         )));
     }
-    Ok(columns
-        .iter()
-        .enumerate()
-        .map(|(index, column)| json_to_value(raw[index].clone(), &column.data_type))
-        .collect())
+    raw.into_iter()
+        .zip(columns)
+        .map(|(cell, column)| response_cell(cell, &column.data_type))
+        .collect()
+}
+
+fn response_cell(cell: RowCell, data_type: &str) -> Result<Value, DriverError> {
+    match cell {
+        RowCell::Json(raw) => Ok(json_to_value(raw, data_type)),
+        RowCell::StringBytes(bytes) if matches!(base_type(data_type), "String" | "FixedString") => {
+            Ok(match String::from_utf8(bytes) {
+                Ok(text) => Value::Text(text),
+                Err(error) => Value::Bytes(error.into_bytes()),
+            })
+        }
+        RowCell::StringBytes(bytes) => {
+            let text = String::from_utf8(bytes).map_err(|_| {
+                DriverError::Internal(format!("clickhouse response string for {data_type} is not UTF-8"))
+            })?;
+            Ok(json_to_value(serde_json::Value::String(text), data_type))
+        }
+    }
 }
 
 fn empty_result() -> QueryResult {
@@ -647,7 +665,13 @@ fn json_to_value(raw: serde_json::Value, type_name: &str) -> Value {
             .and_then(|s| s.parse::<uuid::Uuid>().ok())
             .map(Value::Uuid)
             .unwrap_or_else(|| fallback_text(&raw)),
-        "Array" | "Map" | "Tuple" | "Nested" | "JSON" | "Object" | "Variant" | "Dynamic" => Value::Json(Box::new(raw)),
+        "Array" | "Map" | "Tuple" | "Nested" | "JSON" | "Object" | "Variant" | "Dynamic" => {
+            let value = match raw {
+                serde_json::Value::String(ref text) => serde_json::from_str(text).unwrap_or(raw),
+                other => other,
+            };
+            Value::Json(Box::new(value))
+        }
         _ => fallback_text(&raw),
     }
 }
