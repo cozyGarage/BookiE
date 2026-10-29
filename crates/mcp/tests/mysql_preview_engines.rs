@@ -84,6 +84,7 @@ async fn a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb() {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     };
     let directory = tempfile::tempdir().unwrap();
     let tokens = Arc::new(TokenStore::open(directory.path().join("tokens.json")).unwrap());
