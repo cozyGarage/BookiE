@@ -256,14 +256,19 @@ def scenarios(ui):
         start = focused_item()
         target = (-1 if start is None else start) + position
         deadline = time.monotonic() + ui.WAIT_SECONDS
+        moves = 0
         while focused_item() != target:
             if time.monotonic() > deadline:
-                raise AssertionError(f"the menu focus stopped at {focused_item()}, expected item {target}")
+                raise AssertionError(
+                    f"the menu focus stopped after {moves} moves at {focused_item()}, expected item {target}"
+                )
             before = focused_item()
             ui.press_x11_key("Down")
             settled = time.monotonic() + 1.0
             while time.monotonic() < settled and focused_item() == before:
                 time.sleep(ui.POLL_SECONDS)
+            if focused_item() != before:
+                moves += 1
         ui.press_x11_key("Return")
 
     def sqlite_grid_context_menu_columns_action_is_reachable_via_atspi(database, _base):
