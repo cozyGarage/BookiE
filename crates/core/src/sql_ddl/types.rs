@@ -489,7 +489,7 @@ pub(crate) fn mssql_alter_column_keeping_mask(
     format!(
         "DECLARE @bookie_mask nvarchar(4000) = (\
 SELECT masking_function FROM sys.masked_columns \
-WHERE object_id = OBJECT_ID('{table_literal}') AND name = '{column_literal}'); \
+WHERE object_id = OBJECT_ID(N'{table_literal}') AND name = N'{column_literal}'); \
 {alter}; \
 IF @bookie_mask IS NOT NULL BEGIN \
 DECLARE @bookie_restore nvarchar(max) = N'ALTER TABLE {table_literal} ALTER COLUMN {quoted_column} ADD MASKED WITH (FUNCTION = ''' + REPLACE(@bookie_mask, '''', '''''') + ''')'; \

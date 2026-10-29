@@ -74,3 +74,25 @@ async fn a_partial_mask_keeps_its_arguments_and_an_unmasked_column_still_alters(
         vec![vec![Value::Text("note".into())], vec![Value::Text("phone".into())]]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_mask_on_unicode_identifiers_survives_an_alter() {
+    let (_container, options) = crate::start_mssql().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE TABLE [dbo].[顧客] ([連絡先] NVARCHAR(50) MASKED WITH (FUNCTION = 'email()') NOT NULL)")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(Some("dbo"), "顧客").await.unwrap();
+    let mut draft = DraftColumn::from_info(columns.into_iter().find(|column| column.name == "連絡先").unwrap());
+    draft.nullable = true;
+    for statement in build_alter_column("mssql", Some("dbo"), "顧客", &draft).unwrap() {
+        connection.execute(&statement).await.unwrap();
+    }
+    let masks = connection
+        .query("SELECT masking_function FROM sys.masked_columns WHERE object_id = OBJECT_ID(N'[dbo].[顧客]') AND name = N'連絡先'")
+        .await
+        .unwrap();
+    assert_eq!(masks.rows, vec![vec![Value::Text("email()".into())]]);
+}
