@@ -206,7 +206,7 @@ fn optimistic_predicate(
 ) -> Result<String, BuildSqlError> {
     if is_mysql_empty_text(driver_id, old_value) {
         return Ok(format!(
-            "CONVERT({name} USING utf8mb4) COLLATE utf8mb4_bin <=> SPACE(0)"
+            "CAST(CONVERT({name} USING utf8mb4) AS BINARY) <=> CAST(SPACE(0) AS BINARY)"
         ));
     }
     let placeholder = placeholder_for(driver_id, params.len());
@@ -653,7 +653,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             sql,
-            "UPDATE `records` SET `note` = SPACE(0) WHERE `id` = ? AND CONVERT(`note` USING utf8mb4) COLLATE utf8mb4_bin <=> SPACE(0)"
+            "UPDATE `records` SET `note` = SPACE(0) WHERE `id` = ? AND CAST(CONVERT(`note` USING utf8mb4) AS BINARY) <=> CAST(SPACE(0) AS BINARY)"
         );
         assert_eq!(params, vec![Value::Int(7)]);
     }
