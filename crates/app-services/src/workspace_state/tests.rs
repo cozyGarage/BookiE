@@ -249,7 +249,7 @@ fn prefetch_cannot_replace_a_save_started_while_snapshot_is_loading() {
         prefetch_connections_coordinated(
             &prefetch_memory,
             &[id],
-            || {},
+            || Ok(()),
             || {
                 load_started_sender.send(()).unwrap();
                 continue_load_receiver.recv().unwrap();
@@ -288,7 +288,7 @@ fn a_save_does_not_wait_for_a_slow_prefetch() {
         prefetch_connections_coordinated(
             &prefetch_memory,
             &[id],
-            || {},
+            || Ok(()),
             || {
                 load_started_sender.send(()).unwrap();
                 continue_load_receiver.recv().unwrap();
@@ -952,7 +952,7 @@ fn a_late_prefetch_cannot_restore_a_deleted_connection_but_keeps_unrelated_works
     prefetch_connections_coordinated(
         &store.inner.memory,
         &[deleted, retained],
-        || {},
+        || Ok(()),
         || {
             let snapshot = prefetch_locked(&store.inner.paths, &[deleted, retained])?;
             store.forget_connection(deleted);
@@ -968,4 +968,23 @@ fn a_late_prefetch_cannot_restore_a_deleted_connection_but_keeps_unrelated_works
     assert!(matches!(&surviving.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT retained"));
     let disk = load_locked(&store.inner.paths).unwrap();
     assert!(!disk.connections.contains_key(&deleted.to_string()));
+}
+
+#[test]
+fn failed_prefetch_flush_preserves_the_newer_cached_draft() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("workspace.json");
+    let drafts = root.path().join("drafts");
+    let id = Uuid::new_v4();
+    let mut previous = WorkspaceState::default();
+    previous.connections.insert(id.to_string(), connection("SELECT old"));
+    std::fs::write(&path, serde_json::to_vec(&previous).unwrap()).unwrap();
+    std::fs::write(&drafts, b"blocked").unwrap();
+    let store = WorkspaceStore::new(Some(path), drafts);
+    store.save_connection(id, connection("SELECT new"));
+
+    let result = store.prefetch_connections(&[id]);
+    let cached = store.load_connection(id).unwrap();
+    assert!(matches!(&cached.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT new"));
+    assert_eq!(result, Err(WorkspaceFlushError::WriteFailed));
 }

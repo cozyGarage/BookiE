@@ -398,9 +398,7 @@ impl WorkspaceStore {
             ids,
             || {
                 let receiver = self.flush();
-                if !matches!(receiver.recv(), Ok(Ok(()))) {
-                    tracing::warn!("workspace_state: preload flush failed");
-                }
+                receiver.recv().map_err(|_| WorkspaceFlushError::WriterUnavailable)?
             },
             || {
                 let _guard = self
@@ -617,11 +615,11 @@ impl WorkspaceStore {
 fn prefetch_connections_coordinated(
     memory: &Mutex<Memory>,
     ids: &[Uuid],
-    flush: impl FnOnce(),
+    flush: impl FnOnce() -> Result<(), WorkspaceFlushError>,
     load: impl FnOnce() -> Result<WorkspacePrefetch, WorkspaceFlushError>,
 ) -> Result<(), WorkspaceFlushError> {
     let started = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clock;
-    flush();
+    flush()?;
     let loaded = load()?;
     let mut memory = memory.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     for id in ids {

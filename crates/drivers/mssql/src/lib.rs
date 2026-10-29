@@ -12,8 +12,8 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tablepro_core::sql_dialect::build_order_and_pagination;
 use tablepro_core::{
     AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
-    ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
-    QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
+    ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
+    QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
 };
 
 mod catalog;
@@ -652,6 +652,61 @@ impl Connection for MssqlConnection {
                     ref_columns: vec![ref_col],
                     on_delete: as_text(row.get(5)).and_then(|d| map_referential_action(&d)),
                     on_update: as_text(row.get(6)).and_then(|d| map_referential_action(&d)),
+                }),
+            }
+        }
+        Ok(out)
+    }
+
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let sql = "SELECT fk.name AS fk_name, \
+                       s.name AS source_schema, \
+                       o.name AS source_table, \
+                       cpar.name AS source_col, \
+                       cref.name AS target_col \
+                   FROM sys.foreign_keys fk \
+                   JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id \
+                   JOIN sys.objects o ON o.object_id = fk.parent_object_id \
+                   JOIN sys.schemas s ON s.schema_id = o.schema_id \
+                   JOIN sys.columns cpar ON cpar.object_id = fk.parent_object_id AND cpar.column_id = fkc.parent_column_id \
+                   JOIN sys.objects rt ON rt.object_id = fk.referenced_object_id \
+                   JOIN sys.schemas rs ON rs.schema_id = rt.schema_id \
+                   JOIN sys.columns cref ON cref.object_id = fk.referenced_object_id AND cref.column_id = fkc.referenced_column_id \
+                   WHERE rt.name = @P1 AND rs.name = COALESCE(@P2, SCHEMA_NAME()) \
+                   ORDER BY fk.name, fkc.constraint_column_id";
+        let mut client = self.client().await?;
+        let result = self
+            .query_result(
+                &mut client,
+                sql,
+                &[text_param(table), schema_param(schema)],
+                MAX_QUERY_ROWS,
+            )
+            .await?;
+        let mut out: Vec<InboundForeignKeyInfo> = Vec::new();
+        for row in &result.rows {
+            let Some(name) = as_text(row.first()) else {
+                continue;
+            };
+            let source_schema = as_text(row.get(1));
+            let source_table = as_text(row.get(2)).unwrap_or_default();
+            let source_col = as_text(row.get(3)).unwrap_or_default();
+            let target_col = as_text(row.get(4)).unwrap_or_default();
+            match out.iter_mut().find(|fk| fk.name == name) {
+                Some(fk) => {
+                    fk.source_columns.push(source_col);
+                    fk.target_columns.push(target_col);
+                }
+                None => out.push(InboundForeignKeyInfo {
+                    name,
+                    source_schema,
+                    source_table,
+                    source_columns: vec![source_col],
+                    target_columns: vec![target_col],
                 }),
             }
         }

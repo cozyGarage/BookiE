@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use tablepro_core::{
-    AuthMode, ColumnInfo, Connection, DriverError, DriverRegistry, ExecResult, ForeignKeyInfo, IndexInfo,
-    OperationControl, QueryResult, TableInfo, TlsMode, Transaction, Value,
+    AuthMode, ColumnInfo, Connection, DriverError, DriverRegistry, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo,
+    IndexInfo, OperationControl, QueryResult, TableInfo, TlsMode, Transaction, Value,
 };
 use tablepro_mcp::ConnectionProvider;
 use tablepro_policy::{AuditState, GuardContext, PolicyConfig, PolicyGuard, Principal};
@@ -234,6 +234,25 @@ impl Connection for SessionConnection {
         control: &OperationControl,
     ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         self.inner.fetch_foreign_keys_controlled(schema, table, control).await
+    }
+
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        self.inner.fetch_inbound_foreign_keys(schema, table).await
+    }
+
+    async fn fetch_inbound_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        self.inner
+            .fetch_inbound_foreign_keys_controlled(schema, table, control)
+            .await
     }
 
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
