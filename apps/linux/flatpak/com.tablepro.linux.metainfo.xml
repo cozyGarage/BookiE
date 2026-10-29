@@ -24,6 +24,28 @@
       <li>Multi-tab workspace with structure / DDL editor</li>
     </ul>
   </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Database table browser with live cell editing and filter builder</caption>
+      <image type="source" width="1400" height="860">https://raw.githubusercontent.com/cozyGarage/BookiE/linux/docs/images/browse-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>SQL query editor with syntax highlighting and results grid</caption>
+      <image type="source" width="1400" height="860">https://raw.githubusercontent.com/cozyGarage/BookiE/linux/docs/images/sql-editor-dark.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Visual filter builder with column operators and live execution</caption>
+      <image type="source" width="1920" height="1200">https://raw.githubusercontent.com/cozyGarage/BookiE/linux/docs/images/filter-builder.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Table schema structure viewer with column types and foreign keys</caption>
+      <image type="source" width="1400" height="860">https://raw.githubusercontent.com/cozyGarage/BookiE/linux/docs/images/structure-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Connection manager with environment badges and SSH tunneling</caption>
+      <image type="source" width="1400" height="860">https://raw.githubusercontent.com/cozyGarage/BookiE/linux/docs/images/connections-light.png</image>
+    </screenshot>
+  </screenshots>
   <launchable type="desktop-id">com.tablepro.linux.desktop</launchable>
   <url type="homepage">https://github.com/cozyGarage/BookiE</url>
   <url type="bugtracker">https://github.com/cozyGarage/BookiE/issues</url>

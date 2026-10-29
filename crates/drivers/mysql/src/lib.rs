@@ -11,7 +11,9 @@ use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statem
 
 use futures::stream::StreamExt;
 
+mod attributes;
 mod decode;
+mod spatial;
 use decode::extract_value;
 mod packed;
 mod session;
@@ -23,8 +25,8 @@ mod temporal;
 use tablepro_core::sql_syntax::script::LexicalSettings;
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo,
-    Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
+    QueryResultBudget, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 /// Name of the SSH-forwarded rendezvous socket inside the private directory
@@ -201,7 +203,11 @@ impl Connection for MysqlConnection {
         .fetch_all(&self.pool)
         .await
         .map_err(map_sqlx_error)?;
-        Ok(rows.iter().map(row_to_column_info).collect())
+        let mut columns: Vec<ColumnInfo> = rows.iter().map(row_to_column_info).collect();
+        if columns.iter().any(|column| spatial::is_spatial_type(&column.data_type)) {
+            self.name_spatial_srids(schema, table, &mut columns).await;
+        }
+        Ok(columns)
     }
 
     async fn fetch_rows(
@@ -451,6 +457,48 @@ impl Connection for MysqlConnection {
             });
             entry.columns.push(column);
             entry.ref_columns.push(ref_column);
+        }
+        Ok(by_name.into_values().collect())
+    }
+
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT
+                CAST(kcu.constraint_name AS CHAR),
+                CAST(kcu.table_schema AS CHAR),
+                CAST(kcu.table_name AS CHAR),
+                CAST(kcu.column_name AS CHAR),
+                CAST(kcu.referenced_column_name AS CHAR)
+            FROM information_schema.key_column_usage kcu
+            WHERE kcu.referenced_table_schema = COALESCE(?, DATABASE())
+              AND kcu.referenced_table_name = ?
+            ORDER BY kcu.constraint_name, kcu.ordinal_position",
+        )
+        .bind(schema)
+        .bind(table)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        let mut by_name: std::collections::BTreeMap<String, InboundForeignKeyInfo> = std::collections::BTreeMap::new();
+        for r in rows {
+            let name: String = r.get(0);
+            let source_schema: Option<String> = r.try_get(1).unwrap_or(None);
+            let source_table: String = r.get(2);
+            let source_column: String = r.get(3);
+            let target_column: String = r.get(4);
+            let entry = by_name.entry(name.clone()).or_insert_with(|| InboundForeignKeyInfo {
+                name,
+                source_schema,
+                source_table,
+                source_columns: Vec::new(),
+                target_columns: Vec::new(),
+            });
+            entry.source_columns.push(source_column);
+            entry.target_columns.push(target_column);
         }
         Ok(by_name.into_values().collect())
     }
@@ -822,7 +870,6 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
     mysql_opts = mysql_opts
         .database(&opts.database)
         .username(&opts.username)
-        .password(opts.password.expose_secret())
         .ssl_mode(match opts.tls.mode {
             TlsMode::Disabled => sqlx::mysql::MySqlSslMode::Disabled,
             TlsMode::Prefer => sqlx::mysql::MySqlSslMode::Preferred,
@@ -830,6 +877,9 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
             TlsMode::VerifyCa => sqlx::mysql::MySqlSslMode::VerifyCa,
             TlsMode::VerifyFull => sqlx::mysql::MySqlSslMode::VerifyIdentity,
         });
+    if !opts.password.expose_secret().is_empty() {
+        mysql_opts = mysql_opts.password(opts.password.expose_secret());
+    }
     if let Some(path) = &opts.tls.root_cert {
         mysql_opts = mysql_opts.ssl_ca(path);
     }
@@ -903,7 +953,7 @@ async fn index_key_expression(
 // MariaDB 10.2.7+ already reports the DEFAULT clause itself and reports a
 // column without a default as the text NULL.
 fn default_expression(raw: Option<String>, column_type: &str, extra: &str, mariadb: bool) -> Option<String> {
-    let raw = raw?;
+    let raw = attributes::with_on_update(raw?, column_type, extra);
     if mariadb {
         return (!raw.eq_ignore_ascii_case("null")).then_some(raw);
     }
@@ -921,7 +971,7 @@ fn default_expression(raw: Option<String>, column_type: &str, extra: &str, maria
 
 fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
     let extra = r.try_get::<String, _>(4).unwrap_or_default().to_ascii_lowercase();
-    let column_type = r.get::<String, _>(1);
+    let column_type = attributes::with_invisible(r.get::<String, _>(1), &extra);
     let mariadb = r.try_get::<i64, _>(9).unwrap_or(0) == 1;
     let default_value = default_expression(
         r.try_get::<Option<String>, _>(5).unwrap_or(None),
@@ -930,6 +980,7 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
         mariadb,
     );
     let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
+    let column_type = attributes::with_generation(column_type, generation_expr.as_deref(), &extra);
     ColumnInfo {
         name: r.get::<String, _>(0),
         data_type: column_type,
@@ -1000,186 +1051,5 @@ fn is_pool_startup_timeout(err: &sqlx::Error) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn undecodable_cell_cannot_be_bound_as_null() {
-        let params = [Value::Undecodable("GEOMETRY".into())];
-        assert!(matches!(
-            bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe("SELECT ?")), &params),
-            Err(DriverError::Unsupported(_))
-        ));
-    }
-
-    #[test]
-    fn unexpected_io_eof_is_reported_as_disconnected() {
-        let error = sqlx::Error::Io(std::io::Error::new(
-            std::io::ErrorKind::UnexpectedEof,
-            "server closed the connection",
-        ));
-        assert!(matches!(map_sqlx_error(error), DriverError::Disconnected));
-    }
-
-    #[test]
-    fn a_tls_certificate_failure_wrapped_in_io_remains_a_tls_error() {
-        #[derive(Debug)]
-        struct CertificateNameMismatch;
-
-        impl std::fmt::Display for CertificateNameMismatch {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("invalid peer certificate: NotValidForName")
-            }
-        }
-
-        impl std::error::Error for CertificateNameMismatch {}
-
-        #[derive(Debug)]
-        struct ClosedTlsHandshake(CertificateNameMismatch);
-
-        impl std::fmt::Display for ClosedTlsHandshake {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("connection closed unexpectedly")
-            }
-        }
-
-        impl std::error::Error for ClosedTlsHandshake {
-            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-                Some(&self.0)
-            }
-        }
-
-        let error = sqlx::Error::Io(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            ClosedTlsHandshake(CertificateNameMismatch),
-        ));
-        assert!(matches!(map_sqlx_error(error), DriverError::Tls(message) if message.contains("certificate")));
-    }
-
-    #[test]
-    fn connection_refusal_remains_distinct_from_disconnection() {
-        let error = sqlx::Error::Io(std::io::Error::new(
-            std::io::ErrorKind::ConnectionRefused,
-            "connection refused",
-        ));
-        assert!(matches!(map_sqlx_error(error), DriverError::ConnectionRefused));
-    }
-
-    #[test]
-    fn structure_metadata_declarations_match_the_connection_impl() {
-        let d = MysqlDriver;
-        let source = include_str!("lib.rs");
-        assert!(d.supports_index_metadata());
-        assert!(d.supports_foreign_key_metadata());
-        assert!(source.contains(&["async fn ", "fetch_indexes("].concat()));
-        assert!(source.contains(&["async fn ", "fetch_foreign_keys("].concat()));
-    }
-
-    #[test]
-    fn driver_metadata() {
-        let d = MysqlDriver;
-        assert_eq!(d.id(), "mysql");
-        assert_eq!(d.display_name(), "MySQL");
-        assert_eq!(d.default_port(), 3306);
-        assert_eq!(d.default_database(), "mysql");
-        assert_eq!(d.default_username(), "root");
-        assert!(d.supports_client_tls_auth());
-    }
-
-    #[test]
-    fn map_io_refused_returns_connection_refused() {
-        let err = sqlx::Error::Io(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
-        assert!(matches!(map_sqlx_error(err), DriverError::ConnectionRefused));
-    }
-
-    #[test]
-    fn a_pool_startup_timeout_is_not_mapped_as_an_established_disconnect() {
-        assert!(matches!(
-            map_sqlx_connect_error(sqlx::Error::PoolTimedOut),
-            DriverError::ConnectionRefused
-        ));
-        assert!(matches!(
-            map_sqlx_error(sqlx::Error::PoolTimedOut),
-            DriverError::Disconnected
-        ));
-        assert!(matches!(
-            map_sqlx_connect_error(sqlx::Error::PoolClosed),
-            DriverError::Disconnected
-        ));
-    }
-
-    #[test]
-    fn quote_ident_doubles_embedded_backticks() {
-        assert_eq!(quote_ident("users"), "`users`");
-        assert_eq!(quote_ident("My Table"), "`My Table`");
-        assert_eq!(quote_ident("evil`; DROP TABLE x; --"), "`evil``; DROP TABLE x; --`");
-    }
-
-    fn connect_opts_with_client_tls(mode: tablepro_core::TlsMode) -> ConnectOptions {
-        ConnectOptions {
-            host: "db.corp.example".into(),
-            port: 3306,
-            tls: tablepro_core::TlsConfig {
-                mode,
-                client_cert: Some(std::path::PathBuf::from("/tmp/tablepro-client.crt")),
-                client_key: Some(std::path::PathBuf::from("/tmp/tablepro-client.key")),
-                ..Default::default()
-            },
-            ..Default::default()
-        }
-    }
-
-    fn mysql_url_query(mysql_opts: &MySqlConnectOptions) -> Vec<(String, String)> {
-        use sqlx::ConnectOptions as _;
-        mysql_opts
-            .to_url_lossy()
-            .query_pairs()
-            .map(|(key, value)| (key.into_owned(), value.into_owned()))
-            .collect()
-    }
-
-    fn mysql_url_has_client_tls_material(mysql_opts: &MySqlConnectOptions) -> bool {
-        mysql_url_query(mysql_opts)
-            .iter()
-            .any(|(key, _)| key == "ssl-cert" || key == "ssl-key")
-    }
-
-    #[test]
-    fn disabled_tls_ignores_saved_client_cert_and_key() {
-        let mysql_opts = mysql_connect_options(&connect_opts_with_client_tls(tablepro_core::TlsMode::Disabled));
-        let query = mysql_url_query(&mysql_opts);
-        assert!(
-            query
-                .iter()
-                .any(|(key, value)| key == "ssl-mode" && value == "DISABLED")
-        );
-        assert!(!mysql_url_has_client_tls_material(&mysql_opts));
-    }
-
-    #[test]
-    fn prefer_and_require_tls_still_apply_saved_client_cert_and_key() {
-        for mode in [tablepro_core::TlsMode::Prefer, tablepro_core::TlsMode::Require] {
-            let mysql_opts = mysql_connect_options(&connect_opts_with_client_tls(mode));
-            assert!(mysql_url_has_client_tls_material(&mysql_opts));
-        }
-    }
-
-    /// H1: a tunnelled connection must dial the forwarded local socket but
-    /// keep verifying TLS against the real service hostname, not 127.0.0.1
-    /// -- exactly the pattern PostgreSQL's driver already uses.
-    #[test]
-    fn a_tunnelled_connection_dials_the_forwarded_socket_and_verifies_the_service_hostname() {
-        let directory = std::path::PathBuf::from("/tmp/tablepro-ssh-abc123");
-        let opts = ConnectOptions {
-            host: "127.0.0.1".into(),
-            port: 54321,
-            service_endpoint: Some(("db.corp.example".into(), 3306)),
-            forwarded_socket_dir: Some(directory.clone()),
-            ..Default::default()
-        };
-        let mysql_opts = mysql_connect_options(&opts);
-        assert_eq!(mysql_opts.get_host(), "db.corp.example");
-        assert_eq!(mysql_opts.get_port(), 3306);
-        assert_eq!(mysql_opts.get_socket(), Some(&directory.join(FORWARDED_SOCKET_NAME)));
-    }
-}
+#[path = "lib_tests.rs"]
+mod tests;

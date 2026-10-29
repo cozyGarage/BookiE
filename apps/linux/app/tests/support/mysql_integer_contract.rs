@@ -88,6 +88,7 @@ async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_pr
     let container = Mysql::default()
         .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
         .unwrap();
