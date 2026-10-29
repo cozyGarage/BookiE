@@ -44,14 +44,25 @@ pub async fn a_ping_does_not_report_a_disconnect_while_every_pooled_connection_i
     }
 }
 
-pub async fn a_ping_still_reports_a_server_that_cannot_be_reached<Guard, Start, Started, Connect, Connected>(
+pub async fn a_ping_still_reports_a_server_that_cannot_be_reached<
+    Guard,
+    Start,
+    Started,
+    Connect,
+    Connected,
+    Stop,
+    Stopped,
+>(
     start: Start,
     connect: Connect,
+    stop: Stop,
 ) where
     Start: FnOnce() -> Started,
     Started: Future<Output = (Guard, ConnectOptions)>,
     Connect: FnOnce(ConnectOptions) -> Connected,
     Connected: Future<Output = Box<dyn Connection>>,
+    Stop: FnOnce(Guard) -> Stopped,
+    Stopped: Future<Output = ()>,
 {
     let (server, options) = start().await;
     let connection = connect(options).await;
@@ -60,7 +71,7 @@ pub async fn a_ping_still_reports_a_server_that_cannot_be_reached<Guard, Start, 
         before.is_ok(),
         "the server was not reachable before it was stopped: {before:?}"
     );
-    drop(server);
+    stop(server).await;
 
     let outcome = tokio::time::timeout(Duration::from_secs(20), connection.ping()).await;
 
