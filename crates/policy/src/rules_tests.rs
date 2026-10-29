@@ -238,6 +238,38 @@ fn joined_verdict_is_independent_of_rule_evaluation_order_and_keeps_rule_names()
     assert_eq!(forward.rule_name(), "human_ddl_approve+human_write_approve");
 }
 
+fn refusal_message(sql: &str, driver: &str) -> String {
+    match shared_connection_decision(sql, driver, &classify(sql, driver)) {
+        Some(Decision::Deny { message, .. }) => message,
+        other => panic!("{driver}: {sql} was not refused: {other:?}"),
+    }
+}
+
+#[test]
+fn a_statement_that_starts_a_transaction_implicitly_is_refused_by_name() {
+    for (sql, driver, named) in [
+        ("SET autocommit=0", "mysql", "SET autocommit=0"),
+        ("XA START 'x1'", "mysql", "XA START"),
+        ("SET IMPLICIT_TRANSACTIONS ON", "mssql", "SET IMPLICIT_TRANSACTIONS ON"),
+    ] {
+        let message = refusal_message(sql, driver);
+        assert!(message.contains(named), "{driver}: {sql} was refused with: {message}");
+        assert!(
+            !message.contains("BEGIN, COMMIT and ROLLBACK"),
+            "{driver}: {sql} was refused as if it were BEGIN, COMMIT or ROLLBACK: {message}"
+        );
+        assert!(
+            message.contains("Session"),
+            "{driver}: {sql} does not point to Session: {message}"
+        );
+    }
+}
+
+#[test]
+fn a_lone_begin_keeps_the_transaction_control_message() {
+    assert!(refusal_message("BEGIN", "postgres").contains("BEGIN, COMMIT and ROLLBACK"));
+}
+
 #[test]
 fn a_lone_transaction_statement_is_refused_and_a_whole_transaction_batch_is_not() {
     for (sql, driver) in [
