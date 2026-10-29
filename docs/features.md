@@ -64,7 +64,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Syntax highlighting, code folding and a side-by-side split of the same query.
 - Completion offers keywords, tables after `FROM` and `JOIN`, and the columns of the tables named in the statement. `alias.` and `table.` narrow the list. Chosen names are inserted quoted for the engine.
 - Bound parameters: Write `:name` in queries; BookiE prompts for typed values before execution without string concatenation.
-- Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL.
+- Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL. The newest page and the page currently being viewed remain in memory while later pages arrive; if a stream times out or is cancelled, received pages stay selected.
 - Local sort and filter: Sorting and filtering loaded query results are local and do not re-execute SQL.
 - Session mode: Binds tabs to dedicated connections for temporary tables and transactions, displaying live transaction state.
 - Visual explain plans: PostgreSQL displays execution trees with relative cost bars; SQLite displays indented trees.
