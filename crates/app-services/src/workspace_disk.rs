@@ -121,7 +121,7 @@ fn has_legacy_draft(state: &WorkspaceState) -> bool {
     })
 }
 
-fn load_connection_drafts(
+pub(super) fn load_connection_drafts(
     connection: Uuid,
     workspace: &mut ConnectionWorkspaceState,
     drafts: &Path,
