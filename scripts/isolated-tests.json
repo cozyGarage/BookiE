@@ -1175,6 +1175,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::diagram::canvas::tests::a_diagram_is_laid_out_with_one_card_per_table_and_fits_the_view"
     ],
     [
