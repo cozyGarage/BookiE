@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::error::StorageError;
 use crate::file_access::{lock_path, read_bounded, write_atomically};
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 const CURRENT_VERSION: u32 = 2;
 const MAX_CONNECTIONS_FILE_BYTES: usize = 16 * 1024 * 1024;
@@ -62,7 +62,10 @@ pub(crate) const KNOWN_CONNECTION_FIELDS: &[&str] = &[
     "environment",
     "ssh",
     "last_opened_at",
+    "connect_timeout_secs",
+    "query_timeout_secs",
     "auth_source",
+    "attached_databases",
 ];
 
 const KNOWN_FILE_FIELDS: &[&str] = &["version", "connections"];
@@ -119,6 +122,8 @@ pub struct SavedConnection {
     pub query_timeout_secs: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attached_databases: Vec<AttachedDatabase>,
 }
 
 impl SavedConnection {
@@ -467,4 +472,4 @@ fn connections_path() -> Result<PathBuf, StorageError> {
 
 #[cfg(test)]
 #[path = "connections_tests.rs"]
-mod tests;
+pub(super) mod tests;

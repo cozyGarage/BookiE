@@ -6,6 +6,7 @@ use tempfile::TempDir;
 pub(super) fn sample_connection() -> SavedConnection {
     SavedConnection {
         auth_source: None,
+        attached_databases: Vec::new(),
         id: Uuid::new_v4(),
         name: "Local Postgres".into(),
         driver_id: "postgres".into(),
@@ -694,3 +695,6 @@ async fn concurrent_deletions_do_not_restore_another_deleted_connection() {
     second_result.unwrap();
     assert!(load_from(&path).await.unwrap().is_empty());
 }
+
+#[path = "connections/tests/field_tests.rs"]
+mod field_tests;

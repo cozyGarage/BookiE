@@ -26,7 +26,10 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
             &stream_page_label(result, page_index as usize),
         );
     }
-    if let Some(page) = stream_terminal_page(result, outcome.identity.statement_index) {
+    let notice = stream_terminal_notice(result);
+    if notice.is_none()
+        && let Some(page) = stream_terminal_page(result, outcome.identity.statement_index)
+    {
         page_switcher.add_titled(&page, Some("status"), &crate::tr!("Status"));
     }
     if let Some(last) = page_switcher.last_child() {
@@ -42,6 +45,11 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
         progress.set_widget_name(super::super::stream_view::LIVE_PROGRESS);
     }
     holder.append(&progress);
+    if let Some(notice) = notice {
+        let banner = adw::Banner::new(&notice);
+        banner.set_revealed(true);
+        holder.append(&banner);
+    }
     if let Some(request) = result.export.clone() {
         let export = gtk::Button::with_label(&crate::tr!("Export all rows…"));
         export.add_css_class("flat");
@@ -146,6 +154,17 @@ pub(in crate::ui::editor) fn stream_page_label(result: &StreamedResult, page_ind
     crate::tr!("Rows {start}-{end}")
         .replace("{start}", &start.to_string())
         .replace("{end}", &end.to_string())
+}
+
+fn stream_terminal_notice(result: &StreamedResult) -> Option<String> {
+    if result.total_pages == 0 {
+        return None;
+    }
+    match result.terminal {
+        StreamTerminal::TimedOut => Some(crate::tr!("Query timed out. All received pages remain available.")),
+        StreamTerminal::Cancelled => Some(crate::tr!("Query cancelled. All received pages remain available.")),
+        _ => None,
+    }
 }
 
 fn stream_terminal_page(result: &StreamedResult, statement_index: usize) -> Option<gtk::Widget> {

@@ -40,7 +40,7 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   fi
 done
 
-container="$(docker run --rm --detach --publish 127.0.0.1::3306 \
+container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::3306 \
   --tmpfs /var/lib/mysql \
   --env MYSQL_ROOT_PASSWORD=tablepro_test \
   --env MYSQL_ROOT_HOST=% \

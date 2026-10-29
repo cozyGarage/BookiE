@@ -8,6 +8,7 @@ mod cell;
 mod csv_import;
 mod extended_temporal;
 mod infer;
+mod integer_type;
 mod plan;
 mod text_kind;
 mod xlsx_import;
