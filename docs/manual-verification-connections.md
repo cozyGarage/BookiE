@@ -75,3 +75,11 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 - [ ] A saved password is used for the target host; a jump host asking for a password gets a dialog instead of the saved one.
 - [ ] A PostgreSQL connection with Verify Full through the OpenSSH tunnel verifies the database hostname.
 - [ ] After closing the app, no `ssh -M` process is left running.
+
+## SQLite attached databases
+
+- [ ] In connection settings for an SQLite connection, add one or more attached databases with a schema alias and file path (including `~/` home directory expansion). On connect, each attached database schema appears in the sidebar alongside the primary schema with its tables and views.
+- [ ] Cross-schema queries (such as `SELECT * FROM main.orders JOIN aux.customers ON orders.customer_id = aux.customers.id`) execute in the SQL editor and return combined rows.
+- [ ] If an attached database file does not exist or cannot be opened, connection establishment reports a clear error identifying the invalid path or alias.
+- [ ] Connection export and import preserve configured attached database definitions across profiles.
+
