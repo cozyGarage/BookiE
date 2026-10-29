@@ -1,6 +1,6 @@
 use relm4::ComponentSender;
 
-use tablepro_core::{FilterSet, ForeignKeyInfo, Value};
+use tablepro_core::{FilterSet, ForeignKeyInfo, InboundForeignKeyInfo, Value};
 
 use super::*;
 
@@ -66,9 +66,69 @@ fn reference_target(
     })
 }
 
+pub(super) fn referencing_targets(
+    inbound_keys: &[InboundForeignKeyInfo],
+    row: &[(String, Value)],
+) -> Result<Vec<ReferencedRowTarget>, String> {
+    if inbound_keys.is_empty() {
+        return Err(crate::tr!("No foreign keys reference this table"));
+    }
+    let (targets, errors): (Vec<_>, Vec<_>) = inbound_keys
+        .iter()
+        .map(|key| referencing_target(key, row))
+        .partition(Result::is_ok);
+    if targets.is_empty() {
+        return Err(errors.into_iter().find_map(Result::err).unwrap_or_default());
+    }
+    Ok(targets.into_iter().flatten().collect())
+}
+
+fn referencing_target(key: &InboundForeignKeyInfo, row: &[(String, Value)]) -> Result<ReferencedRowTarget, String> {
+    let mut rules = Vec::new();
+    for (source_col, target_col) in key.source_columns.iter().zip(&key.target_columns) {
+        let value = row
+            .iter()
+            .find(|(name, _)| name == target_col)
+            .map(|(_, value)| value)
+            .ok_or_else(|| crate::tr!("A column referenced by this foreign key is hidden"))?;
+        if matches!(value, Value::Null) {
+            return Err(crate::tr!("A referenced value is empty"));
+        }
+        rules.push(
+            tablepro_core::equality_rule(source_col, value)
+                .ok_or_else(|| crate::tr!("Values of this type can't be used as a filter"))?,
+        );
+    }
+    Ok(ReferencedRowTarget {
+        foreign_key: key.name.clone(),
+        schema: key.source_schema.clone(),
+        table: key.source_table.clone(),
+        filter: FilterSet {
+            rules,
+            ..FilterSet::default()
+        },
+    })
+}
+
 impl BrowseTab {
     pub(super) fn go_to_reference(&self, column: &str, row: &[(String, Value)], sender: &ComponentSender<Self>) {
         let output = match reference_targets(&self.foreign_keys, self.schema.as_deref(), column, row) {
+            Ok(mut targets) if targets.len() == 1 => {
+                let target = targets.remove(0);
+                BrowseTabOutput::OpenReferencedRow {
+                    schema: target.schema,
+                    table: target.table,
+                    filter: target.filter,
+                }
+            }
+            Ok(targets) => BrowseTabOutput::ChooseReferencedRow(targets),
+            Err(message) => BrowseTabOutput::ShowToast(message),
+        };
+        let _ = sender.output(output);
+    }
+
+    pub(super) fn show_referencing_rows(&self, row: &[(String, Value)], sender: &ComponentSender<Self>) {
+        let output = match referencing_targets(&self.inbound_foreign_keys, row) {
             Ok(mut targets) if targets.len() == 1 => {
                 let target = targets.remove(0);
                 BrowseTabOutput::OpenReferencedRow {
@@ -231,5 +291,81 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    fn inbound_foreign_key(
+        name: &str,
+        source_schema: Option<&str>,
+        source_table: &str,
+        source_columns: &[&str],
+        target_columns: &[&str],
+    ) -> InboundForeignKeyInfo {
+        InboundForeignKeyInfo {
+            name: name.into(),
+            source_schema: source_schema.map(str::to_owned),
+            source_table: source_table.into(),
+            source_columns: source_columns.iter().map(|s| s.to_string()).collect(),
+            target_columns: target_columns.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn referencing_targets_filters_referencing_table_by_local_row_values() {
+        let keys = [inbound_foreign_key(
+            "orders_customer_id_fkey",
+            Some("sales"),
+            "orders",
+            &["customer_id"],
+            &["id"],
+        )];
+        let targets = referencing_targets(
+            &keys,
+            &row(&[("id", Value::Int(42)), ("name", Value::Text("Alice".into()))]),
+        )
+        .unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].foreign_key, "orders_customer_id_fkey");
+        assert_eq!(targets[0].schema.as_deref(), Some("sales"));
+        assert_eq!(targets[0].table, "orders");
+        assert_eq!(targets[0].filter.rules.len(), 1);
+        assert_eq!(targets[0].filter.rules[0].column, "customer_id");
+        assert_eq!(targets[0].filter.rules[0].op, FilterOp::Eq);
+    }
+
+    #[test]
+    fn referencing_targets_handles_composite_keys() {
+        let keys = [inbound_foreign_key(
+            "child_composite_fkey",
+            None,
+            "child",
+            &["parent_tenant", "parent_id"],
+            &["tenant_id", "id"],
+        )];
+        let targets =
+            referencing_targets(&keys, &row(&[("tenant_id", Value::Int(1)), ("id", Value::Int(99))])).unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].filter.rules.len(), 2);
+        assert_eq!(targets[0].filter.rules[0].column, "parent_tenant");
+        assert_eq!(targets[0].filter.rules[1].column, "parent_id");
+    }
+
+    #[test]
+    fn referencing_targets_offers_all_valid_referencing_tables() {
+        let keys = [
+            inbound_foreign_key("orders_fk", Some("sales"), "orders", &["cid"], &["id"]),
+            inbound_foreign_key("invoices_fk", Some("billing"), "invoices", &["client_id"], &["id"]),
+        ];
+        let targets = referencing_targets(&keys, &row(&[("id", Value::Int(10))])).unwrap();
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].table, "orders");
+        assert_eq!(targets[1].table, "invoices");
+    }
+
+    #[test]
+    fn referencing_targets_refusals_on_empty_null_or_missing() {
+        assert!(referencing_targets(&[], &row(&[("id", Value::Int(1))])).is_err());
+        let keys = [inbound_foreign_key("orders_fk", None, "orders", &["cid"], &["id"])];
+        assert!(referencing_targets(&keys, &row(&[("other", Value::Int(1))])).is_err());
+        assert!(referencing_targets(&keys, &row(&[("id", Value::Null)])).is_err());
     }
 }

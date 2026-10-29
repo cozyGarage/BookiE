@@ -10,7 +10,8 @@ use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
 use crate::operation::{OperationControl, run_controlled};
 use crate::query::{
-    ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo, Value,
+    ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo,
+    Value,
 };
 use crate::tls::TlsConfig;
 use crate::transaction::Transaction;
@@ -358,6 +359,21 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         run_controlled(self.fetch_foreign_keys(schema, table), control).await
+    }
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        _schema: Option<&str>,
+        _table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        Ok(Vec::new())
+    }
+    async fn fetch_inbound_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        run_controlled(self.fetch_inbound_foreign_keys(schema, table), control).await
     }
     async fn fetch_enum_labels(&self, _schema: &str, _name: &str) -> Result<Vec<String>, DriverError> {
         Ok(Vec::new())

@@ -28,14 +28,17 @@ pub(super) struct GridMenus {
     edit_action: gio::SimpleAction,
     edit_full_value_action: gio::SimpleAction,
     reference_action: gio::SimpleAction,
+    show_referencing_action: gio::SimpleAction,
     export_loaded: Option<(gio::SimpleAction, LocalResultView)>,
     foreign_key_columns: Rc<std::collections::HashSet<String>>,
+    has_inbound_foreign_keys: bool,
 }
 
 pub(super) struct GridMenuOptions {
     pub(super) filterable: bool,
     pub(super) row_mutations_allowed: bool,
     pub(super) foreign_key_columns: std::collections::HashSet<String>,
+    pub(super) has_inbound_foreign_keys: bool,
     pub(super) local_result_view: Option<LocalResultView>,
 }
 
@@ -410,6 +413,8 @@ pub(super) fn install_grid_context_menus(
         options.local_result_view,
     );
     let reference_action = go_to_reference_action(context.clone(), sender.clone(), column_view, columns.clone());
+    let show_referencing_action =
+        show_referencing_action(context.clone(), sender.clone(), column_view, columns.clone());
     let duplicate_row_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -462,6 +467,7 @@ pub(super) fn install_grid_context_menus(
         filter_action,
     ]);
     group.add_action(&reference_action);
+    group.add_action(&show_referencing_action);
     column_view.insert_action_group("cell", Some(&group));
     if let Some(action) = group
         .lookup_action("copy-in-clause")
@@ -501,8 +507,10 @@ pub(super) fn install_grid_context_menus(
         edit_action,
         edit_full_value_action,
         reference_action,
+        show_referencing_action,
         export_loaded,
         foreign_key_columns: Rc::new(options.foreign_key_columns),
+        has_inbound_foreign_keys: options.has_inbound_foreign_keys,
     };
     keyboard_menu::install(column_view, &menus);
     pointer_menu::install(column_view, &menus, empty_popover);
@@ -573,6 +581,10 @@ fn build_menu(
     }
     if filterable {
         display.append(Some(&crate::tr!("Go to Referenced Row")), Some("cell.go-to-reference"));
+        display.append(
+            Some(&crate::tr!("Show Referencing Rows")),
+            Some("cell.show-referencing-rows"),
+        );
     }
     display.append(Some(&crate::tr!("View Value…")), Some("cell.view-value"));
     display.append(Some(&crate::tr!("Show Row as JSON")), Some("cell.show-row-json"));
@@ -627,6 +639,32 @@ fn go_to_reference_action(
                 row,
             })
             .ok();
+    });
+    action
+}
+
+fn show_referencing_action(
+    context: CellContextStore,
+    sender: relm4::Sender<GridMsg>,
+    column_view: &gtk::ColumnView,
+    columns: Rc<Vec<ColumnInfo>>,
+) -> gio::SimpleAction {
+    let action = gio::SimpleAction::new("show-referencing-rows", None);
+    action.set_enabled(false);
+    let view = column_view.downgrade();
+    action.connect_activate(move |_, _| {
+        let context = context.snapshot();
+        let Some(slot) = context.as_ref() else { return };
+        let Some(view) = view.upgrade() else { return };
+        let Some(cells) = row_at(&view, position(slot)) else {
+            return;
+        };
+        let row = columns
+            .iter()
+            .zip(cells)
+            .map(|(column, value)| (column.name.clone(), value))
+            .collect();
+        sender.send(GridMsg::ShowReferencingRows { row }).ok();
     });
     action
 }
@@ -734,6 +772,9 @@ fn prepare_cell_menu(
                 row.with_cell_value(options.idx, |value| !matches!(value, Value::Null))
                     .unwrap_or(false)
             }),
+    );
+    menus.show_referencing_action.set_enabled(
+        menus.has_inbound_foreign_keys && row_object_at(view, position).is_some_and(|row| row.draft_id().is_none()),
     );
     if options.is_editable {
         menus.editable_popover.clone()
