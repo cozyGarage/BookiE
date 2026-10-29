@@ -56,6 +56,20 @@ pub fn render_json(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
     }
 }
 
+pub fn render_json_lines(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
+    let names = json_field_names(columns);
+    let mut out = String::new();
+    for row in rows {
+        if let Ok(object) = raw_json_object(&names, row) {
+            if let Ok(line) = serde_json::to_string(&object) {
+                out.push_str(&line);
+                out.push('\n');
+            }
+        }
+    }
+    out
+}
+
 struct RawJsonObject(Vec<(String, JsonExportValue)>);
 
 enum JsonExportValue {
