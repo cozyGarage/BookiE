@@ -29,14 +29,14 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
         let mut row_payload_bytes = 0usize;
         let mut output_bytes = 0u64;
         let mut current = None;
-        let mut first_row = 0;
-        let mut rows_written = 0usize;
+        let (mut first_row, mut rows_written) = (0, 0usize);
         while let Some(cell) = cells.next_cell().map_err(|_| ImportError::NotSpreadsheet)? {
             let (row_index, column) = cell.get_position();
             let current_row = *current.get_or_insert_with(|| {
                 first_row = row_index;
                 row_index
             });
+            check_row_order(current_row, row_index)?;
             if row_index != current_row {
                 write_row(
                     &mut writer,
@@ -77,6 +77,13 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
         }
     }
     Err(ImportError::NoColumns)
+}
+
+fn check_row_order(current_row: u32, next_row: u32) -> Result<(), ImportError> {
+    if next_row < current_row {
+        return Err(ImportError::NotSpreadsheet);
+    }
+    Ok(())
 }
 
 fn set_cell(
@@ -305,6 +312,36 @@ mod tests {
         assert!(is_xlsx(&bytes));
         let csv = String::from_utf8(xlsx_to_csv(&bytes).unwrap()).unwrap();
         assert_eq!(csv, "id,note\n7,\"a,b\"\n\"\"\n1.5\n");
+    }
+
+    #[test]
+    fn rejects_cells_with_decreasing_row_numbers() {
+        let mut workbook = rust_xlsxwriter::Workbook::new();
+        let sheet = workbook.add_worksheet();
+        sheet.write_number(0, 0, 1).unwrap();
+        sheet.write_number(1, 0, 2).unwrap();
+        let bytes = workbook.save_to_buffer().unwrap();
+        let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+        let mut output = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        for index in 0..archive.len() {
+            let mut file = archive.by_index(index).unwrap();
+            let name = file.name().unwrap().into_owned();
+            output
+                .start_file(name.clone(), zip::write::SimpleFileOptions::default())
+                .unwrap();
+            if name == "xl/worksheets/sheet1.xml" {
+                let mut xml = String::new();
+                std::io::Read::read_to_string(&mut file, &mut xml).unwrap();
+                let xml = xml
+                    .replace("r=\"A1\"", "r=\"A2\"")
+                    .replace("r=\"A2\"><v>2", "r=\"A1\"><v>2");
+                std::io::Write::write_all(&mut output, xml.as_bytes()).unwrap();
+            } else {
+                std::io::copy(&mut file, &mut output).unwrap();
+            }
+        }
+        let bytes = output.finish().unwrap().into_inner();
+        assert_eq!(xlsx_to_csv(&bytes), Err(ImportError::NotSpreadsheet));
     }
 
     #[test]
