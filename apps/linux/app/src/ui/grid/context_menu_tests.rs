@@ -225,6 +225,7 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
             filterable: false,
             row_mutations_allowed: false,
             foreign_key_columns: ["linked".into()].into(),
+            has_inbound_foreign_keys: false,
             local_result_view: Some(local.clone()),
         },
     );

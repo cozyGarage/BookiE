@@ -1,3 +1,5 @@
+#[path = "column_on_update.rs"]
+mod column_on_update;
 #[path = "exact_grid_original.rs"]
 mod exact_grid_original;
 pub(crate) use super::{connect, start_mariadb, start_mysql};

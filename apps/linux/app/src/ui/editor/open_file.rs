@@ -1,11 +1,73 @@
 use relm4::gtk;
 use relm4::gtk::prelude::*;
+use std::io::{BufRead, BufReader, Read};
 use tablepro_app_services::sql_text::{EDITOR_MAX_SQL_LINE_BYTES, SqlTextError, SqlTextLimits};
 use tablepro_core::text_file::{FileVersion, TextFile, TextFileError, read_text_file, save_text_file};
 
 use super::MAX_SQL_FILE_BYTES;
 
+fn first_overlong_sql_line(reader: &mut impl BufRead) -> std::io::Result<Option<usize>> {
+    let mut line = 1;
+    let mut line_bytes = 0;
+    let mut last_was_carriage_return = false;
+    loop {
+        let available = reader.fill_buf()?;
+        if available.is_empty() {
+            return Ok((line_bytes > EDITOR_MAX_SQL_LINE_BYTES).then_some(line));
+        }
+        let mut consumed = 0;
+        let mut overlong = None;
+        for byte in available {
+            consumed += 1;
+            if *byte == b'\n' {
+                let content_bytes = line_bytes.saturating_sub(usize::from(last_was_carriage_return));
+                if content_bytes > EDITOR_MAX_SQL_LINE_BYTES {
+                    overlong = Some(line);
+                    break;
+                }
+                line += 1;
+                line_bytes = 0;
+                last_was_carriage_return = false;
+                continue;
+            }
+            line_bytes = line_bytes.saturating_add(1);
+            last_was_carriage_return = *byte == b'\r';
+            if line_bytes > EDITOR_MAX_SQL_LINE_BYTES.saturating_add(1)
+                || (line_bytes > EDITOR_MAX_SQL_LINE_BYTES && !last_was_carriage_return)
+            {
+                overlong = Some(line);
+                break;
+            }
+        }
+        if overlong.is_some() {
+            return Ok(overlong);
+        }
+        reader.consume(consumed);
+    }
+}
+
+fn validate_sql_file_lines(path: &std::path::Path) -> Result<(), String> {
+    let file = std::fs::File::open(path).map_err(|error| file_error_message(&TextFileError::Io(error)))?;
+    let mut reader = BufReader::new(file).take(MAX_SQL_FILE_BYTES.saturating_add(1));
+    if let Some(line) =
+        first_overlong_sql_line(&mut reader).map_err(|error| file_error_message(&TextFileError::Io(error)))?
+    {
+        return Err(sql_text_error_message(SqlTextError::LineTooLong { line }));
+    }
+    if reader.limit() == 0 {
+        return Err(file_error_message(&TextFileError::TooLarge(MAX_SQL_FILE_BYTES)));
+    }
+    Ok(())
+}
+
 pub(crate) fn read_sql_file(path: &std::path::Path) -> Result<TextFile, String> {
+    if std::fs::metadata(path)
+        .map_err(|error| file_error_message(&TextFileError::Io(error)))?
+        .len()
+        <= MAX_SQL_FILE_BYTES
+    {
+        validate_sql_file_lines(path)?;
+    }
     let file = read_text_file(path, MAX_SQL_FILE_BYTES).map_err(|error| file_error_message(&error))?;
     validate_sql_text(&file.text)?;
     Ok(file)
@@ -153,7 +215,25 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::io::{BufReader, Cursor, Write};
+
+    #[test]
+    fn an_overlong_line_is_detected_before_reading_the_rest_of_the_file() {
+        let mut cursor = Cursor::new(vec![b'x'; EDITOR_MAX_SQL_LINE_BYTES * 32]);
+        {
+            let mut reader = BufReader::with_capacity(8192, &mut cursor);
+            assert_eq!(first_overlong_sql_line(&mut reader).unwrap(), Some(1));
+        }
+        assert!(cursor.position() <= (EDITOR_MAX_SQL_LINE_BYTES + 8192) as u64);
+    }
+
+    #[test]
+    fn the_line_limit_excludes_a_crlf_terminator() {
+        let mut text = vec![b'x'; EDITOR_MAX_SQL_LINE_BYTES];
+        text.extend_from_slice(b"\r\n");
+        let mut reader = BufReader::new(Cursor::new(text));
+        assert_eq!(first_overlong_sql_line(&mut reader).unwrap(), None);
+    }
 
     fn written(bytes: &[u8]) -> (tempfile::TempDir, std::path::PathBuf) {
         let dir = tempfile::tempdir().expect("temp dir");

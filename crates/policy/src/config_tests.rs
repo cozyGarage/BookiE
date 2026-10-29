@@ -186,3 +186,25 @@ fn a_connection_override_key_that_is_not_a_uuid_is_refused_at_load() {
     .unwrap();
     assert!(load_from_path(&path).is_err());
 }
+
+#[test]
+fn two_override_keys_naming_the_same_connection_are_refused_at_load() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("policy.toml");
+    let id = uuid::Uuid::new_v4();
+    std::fs::write(
+        &path,
+        format!(
+            r#"
+                [connection_overrides."{upper}"]
+                human_approve_ddl = false
+                [connection_overrides."{lower}"]
+                human_approve_ddl = true
+                "#,
+            upper = id.to_string().to_uppercase(),
+            lower = id,
+        ),
+    )
+    .unwrap();
+    assert!(load_from_path(&path).is_err());
+}

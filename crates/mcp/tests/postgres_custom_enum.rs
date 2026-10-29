@@ -82,6 +82,7 @@ fn mcp_context(
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     };
     let provider = Arc::new(PostgresProvider {
         connection_id,
@@ -622,6 +623,7 @@ async fn postgres_lost_write_ack_is_structured_and_never_retried() {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     };
     let provider = Arc::new(WriteProvider {
         connection_id,
