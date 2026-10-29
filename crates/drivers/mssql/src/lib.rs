@@ -241,6 +241,9 @@ impl MssqlConnection {
             return Err(DriverError::Disconnected);
         }
         let guard = self.client.lock().await;
+        if !self.usable.load(Ordering::Acquire) {
+            return Err(DriverError::Disconnected);
+        }
         match tokio::sync::MutexGuard::try_map(guard, Option::as_mut) {
             Ok(client) => Ok(client),
             Err(_guard) => Err(DriverError::Disconnected),

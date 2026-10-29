@@ -22,3 +22,43 @@ async fn failed_batch_rollback_is_explicit_and_retires_the_connection() {
         Err(DriverError::Disconnected)
     ));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_queued_query_cannot_use_a_client_retired_by_failed_cleanup() {
+    use std::sync::Arc;
+    use tablepro_core::{Connection, Value};
+    let (_container, options) = start_mssql().await;
+    let admin = connect(options.clone()).await;
+    let connection: Arc<dyn Connection> = connect(options).await.into();
+    let running = Arc::clone(&connection);
+    let batch = tokio::spawn(async move {
+        running
+            .execute_in_transaction(&[("WAITFOR DELAY '00:00:03'; COMMIT TRANSACTION".into(), vec![])])
+            .await
+    });
+    let mut active = false;
+    for _ in 0..100 {
+        let result = admin
+            .query("SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id <> @@SPID AND wait_type = 'WAITFOR'")
+            .await
+            .unwrap();
+        if result.rows == vec![vec![Value::Int(1)]] {
+            active = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert!(
+        active,
+        "the batch must hold the shared client before queueing the query"
+    );
+    let query = connection.query("SELECT 1");
+    tokio::pin!(query);
+    assert!(futures::poll!(&mut query).is_pending());
+    assert!(matches!(
+        batch.await.unwrap(),
+        Err(DriverError::TransactionRollbackFailed { .. })
+    ));
+    assert!(matches!(query.await, Err(DriverError::Disconnected)));
+}
