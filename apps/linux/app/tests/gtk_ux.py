@@ -244,9 +244,27 @@ def scenarios(ui):
         wait_for_adw_dialog("Columns", present=False)
 
     def choose_menu_item(position):
-        for _ in range(position):
+        menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
+
+        def focused_item():
+            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+            return next(
+                (index for index, node in enumerate(items) if node.getState().contains(pyatspi.STATE_FOCUSED)),
+                None,
+            )
+
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        moves = 0
+        while moves < position:
+            before = focused_item()
             ui.press_x11_key("Down")
-            time.sleep(0.1)
+            settled = time.monotonic() + 1.0
+            while time.monotonic() < settled and focused_item() == before:
+                time.sleep(ui.POLL_SECONDS)
+            if focused_item() != before:
+                moves += 1
+            elif time.monotonic() > deadline:
+                raise AssertionError(f"the menu ignored the Down key after {moves} moves")
         ui.press_x11_key("Return")
 
     def sqlite_grid_context_menu_columns_action_is_reachable_via_atspi(database, _base):
