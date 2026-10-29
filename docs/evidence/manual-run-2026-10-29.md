@@ -89,3 +89,16 @@ After merging `linux` at `0a46b6bd0` (the commit `df1996177` that added enum met
 ## Contrast sample
 
 Measured from full-resolution captures on the grid, not from class names. Light header text is 2.28:1 and dark header text is 3.76:1; both are below 4.5:1. Other sampled text is 7:1 or higher. The values are on the [application checklist](../manual-verification-app.md#visual-audit-matrix).
+
+## Fix branches and what was driven
+
+Each branch was built and driven in the app after its tests passed. None is merged and none has been through the Forgejo gate.
+
+| Branch | Change | Driven result |
+|---|---|---|
+| `fix/bundle-attached-databases` | Bundles carry SQLite attachments, and an in-place import keeps local ones | Export of 15 connections carried both attachments; import into an empty second profile wrote them |
+| `feat/mssql-non-dbo-catalog` (existing branch, `1d007e1f1`) | Added SQL Server views to the existing catalog work | Sidebar shows `sales > Views > v_orders`; Catalog lists triggers (with `(disabled)`), sequences and types |
+| `fix/diagram-zoom-label` | The ER diagram zoom label follows keys, scroll, fit and buttons | Label tracked every action from 75% to 200% |
+| `fix/redis-filter-by-value` | New `supports_browse_filters` driver capability; Redis declares false, the app hides the filter actions | Redis menu, Filter button and Ctrl+F no longer offer filtering; PostgreSQL filtering unchanged |
+
+The SQL Server work was added to the existing branch because open work already covered the same checklist item. The other three had no existing branch.
