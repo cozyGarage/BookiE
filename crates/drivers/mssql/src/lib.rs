@@ -252,6 +252,29 @@ impl MssqlConnection {
         }
     }
 
+    async fn list_relations(&self, catalog_view: &'static str) -> Result<Vec<TableInfo>, DriverError> {
+        let sql = format!(
+            "SELECT s.name AS schema_name, t.name AS table_name \
+             FROM {catalog_view} t \
+             JOIN sys.schemas s ON t.schema_id = s.schema_id \
+             WHERE t.is_ms_shipped = 0 \
+             ORDER BY s.name, t.name"
+        );
+        let mut client = self.client().await?;
+        let result = self.query_result(&mut client, &sql, &[], MAX_QUERY_ROWS).await?;
+        Ok(result
+            .rows
+            .iter()
+            .filter_map(|row| {
+                let name = as_text(row.get(1))?;
+                Some(TableInfo {
+                    schema: as_text(row.first()),
+                    name,
+                })
+            })
+            .collect())
+    }
+
     async fn run_abandonable<T, F>(&self, operation: F, control: &OperationControl) -> Result<T, DriverError>
     where
         F: std::future::Future<Output = Result<T, DriverError>>,
@@ -324,23 +347,11 @@ impl Connection for MssqlConnection {
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        let sql = "SELECT s.name AS schema_name, t.name AS table_name \
-                   FROM sys.tables t \
-                   JOIN sys.schemas s ON t.schema_id = s.schema_id \
-                   ORDER BY s.name, t.name";
-        let mut client = self.client().await?;
-        let result = self.query_result(&mut client, sql, &[], MAX_QUERY_ROWS).await?;
-        Ok(result
-            .rows
-            .iter()
-            .filter_map(|row| {
-                let name = as_text(row.get(1))?;
-                Some(TableInfo {
-                    schema: as_text(row.first()),
-                    name,
-                })
-            })
-            .collect())
+        self.list_relations("sys.tables").await
+    }
+
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        self.list_relations("sys.views").await
     }
 
     async fn list_objects(

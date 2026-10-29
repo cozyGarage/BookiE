@@ -123,3 +123,30 @@ async fn batch_query_supports_temp_tables_without_params() {
     assert_eq!(res.rows[0], vec![Value::Int(10), Value::Text("alpha".into())]);
     assert_eq!(res.rows[1], vec![Value::Int(20), Value::Text("beta".into())]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn list_views_includes_non_dbo_views_and_excludes_tables() {
+    let (_container, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+
+    conn.execute("EXEC('CREATE SCHEMA sales')").await.unwrap();
+    conn.execute("CREATE TABLE sales.orders (id INT PRIMARY KEY)")
+        .await
+        .unwrap();
+    conn.execute("EXEC('CREATE VIEW sales.v_orders AS SELECT id FROM sales.orders')")
+        .await
+        .unwrap();
+    conn.execute("EXEC('CREATE VIEW dbo.v_plain AS SELECT 1 AS one')")
+        .await
+        .unwrap();
+
+    let views = conn.list_views().await.unwrap();
+    let names: Vec<(Option<&str>, &str)> = views.iter().map(|v| (v.schema.as_deref(), v.name.as_str())).collect();
+    assert!(names.contains(&(Some("sales"), "v_orders")), "{names:?}");
+    assert!(names.contains(&(Some("dbo"), "v_plain")), "{names:?}");
+    assert!(!names.iter().any(|(_, name)| *name == "orders"), "{names:?}");
+
+    let tables = conn.list_tables().await.unwrap();
+    assert!(!tables.iter().any(|t| t.name == "v_orders"));
+}
