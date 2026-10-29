@@ -80,6 +80,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | DBF-7 | [#1997](https://github.com/cozyGarage/BookiE/issues/1997) | B3 |
 | DRV-1 | [#1688](https://github.com/cozyGarage/BookiE/issues/1688) | UX |
 | B4-24 | [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | B4 |
+| B4-25 | [#1999](https://github.com/cozyGarage/BookiE/issues/1999) | B4 |
 | PERF-11 | [#580](https://github.com/cozyGarage/BookiE/issues/580) | UX |
 
 When you finish a row, close or move the GitHub issue on the project. Remove its index line in the same docs change. When you move work between lanes, change the project **Lane** field (and `lane:*` label) and update the Lane column here in the same commit.
