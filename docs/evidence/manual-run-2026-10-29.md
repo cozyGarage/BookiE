@@ -17,11 +17,13 @@ Counted from the four checklists after this run. "Ticked" means every clause of 
 
 | Checklist | Items | Ticked | Open |
 |---|---|---|---|
-| Catalog, sidebar and application shell | 38 | 15 | 23 |
-| Connections and SSH | 44 | 24 | 20 |
-| SQL editor and sessions | 62 | 34 | 28 |
-| Grid, filters and data transfer | 76 | 46 | 30 |
-| **All four** | 220 | 119 | 101 |
+| Catalog, sidebar and application shell | 46 | 15 | 31 |
+| Connections and SSH | 48 | 24 | 24 |
+| SQL editor and sessions | 63 | 34 | 29 |
+| Grid, filters and data transfer | 83 | 48 | 35 |
+| **All four** | 240 | 121 | 119 |
+
+Other contributors added 20 items to the checklists while this run merged `linux`, so the open count is higher than the 101 recorded at the first push. Counts are from the files at the head of this run.
 
 The run added a note or changed a tick on 52 items. One item, the native Wayland repeat of the restart restore, was unticked because its own text says that repeat is untested.
 
