@@ -37,7 +37,7 @@ Navigation uses **First**, **Previous**, **Next**, and **Last**. Unsorted tables
 
 - **Edit cells**: Double-click or press F2/Enter. Changes remain pending (marked with a dot on the tab) until saved with `Ctrl+S`. Preview the exact SQL changes before saving. Undo and redo with `Ctrl+Z` / `Ctrl+Y`.
 - **Insert and delete**: Press `Ctrl+N` to insert a row, `Delete` to remove selected rows, and `Ctrl+Shift+N` to set a cell to NULL.
-- **Filter and sort**: Press `Ctrl+F` to open the structured filter bar. Save named filter presets per table. Right-click any cell to **Filter by This Value**. Click column headers to sort.
+- **Filter and sort**: Press `Ctrl+F` to open the structured filter bar. The WHERE field, **Saved filters** menu, **Clear all**, and **Apply** share one row, with the rule editor available under disclosure. Save named filter presets per table. Right-click any cell to **Filter by This Value**. Click column headers to sort.
 - **Foreign key jumps**: Right-click a foreign key cell and choose **Go to Referenced Row** to open the target table filtered to that specific record.
 - **Paste rows**: Paste tab-separated spreadsheet data (`Ctrl+V`) directly into cells. Each value is type-checked before staging.
 - **ENUM & SET pickers**: Double-click an ENUM or SET cell to open a dedicated item selection popover with an **Apply** button.
@@ -77,6 +77,9 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 
 ### Sessions, explain plans & history
 
+- **Timeout retry**: When a query times out, click **Run again with a longer timeout** (4× duration) for an immediate one-shot extended run.
+- **Side-by-side split & code folding**: Use **Split** to edit the query in two synced panes. Place the cursor and press `Ctrl+Shift+[` to fold a block, or use the toolbar's fold menu (`⋯`) to unfold.
+- **Results & Errors switcher**: Results and Errors share a linked bottom switcher. Errors displays a badge count only when errors occur; click **Go to error** to jump directly to the failing statement position.
 - **Session mode**: Toggle **Session** to bind the tab to a dedicated connection for transactions and temporary tables. When a transaction is active, use **Commit & close session** or **Roll back & close session**.
 - **Explain plans**: Click **Explain** to inspect execution plans. PostgreSQL displays a visual **Tree** with cost-distribution bars alongside raw text; SQLite provides an indented tree.
 - **Query history**: Press `Ctrl+H` to toggle the bottom history drawer. Statements containing secrets are automatically excluded.
@@ -188,6 +191,6 @@ Press Ctrl+? for the full list. The most used:
 
 ### Results panel
 
-Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Show result sets** returns from the Errors view to the existing result selector. **Errors** lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
+Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Results** and **Errors** are one switcher with the active view marked: choosing **Results** while Errors is shown returns to the existing result selector, and choosing it again hides the panel. **Errors** shows a count only when the latest run failed, and lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
 
 Drag the divider to resize the panel. **Maximize results** hides the SQL area; **Restore editor** returns to the previous divider position and SQL focus. Hiding a maximized panel also restores the editor. Panel size is retained within the open editor, not across an application restart. Closing the query releases its panel with the rest of that editor.
