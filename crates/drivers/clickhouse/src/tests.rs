@@ -41,8 +41,12 @@ fn clickhouse_response_rejects_column_type_count_mismatch() {
 fn clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls() {
     let columns = response_columns(vec!["a".into(), "b".into()], vec!["UInt8".into(), "UInt8".into()]).unwrap();
     for raw in [
-        vec![serde_json::json!(1)],
-        vec![serde_json::json!(1), serde_json::json!(2), serde_json::json!(3)],
+        vec![RowCell::Json(serde_json::json!(1))],
+        vec![
+            RowCell::Json(serde_json::json!(1)),
+            RowCell::Json(serde_json::json!(2)),
+            RowCell::Json(serde_json::json!(3)),
+        ],
     ] {
         let result = response_row(raw, &columns);
         assert!(matches!(result, Err(DriverError::Internal(_))));
@@ -51,18 +55,21 @@ fn clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls() {
 
 #[test]
 fn clickhouse_terminal_exception_row_is_an_error_not_partial_success() {
-    let exception = serde_json::json!(
-        "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED) (version 24.8.14.39 (official build))"
+    let exception =
+        "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED) (version 24.8.14.39 (official build))";
+    let exception_cell = RowCell::StringBytes(exception.as_bytes().to_vec());
+    assert_eq!(
+        exception_row_message(std::slice::from_ref(&exception_cell)),
+        Some(exception)
     );
     assert_eq!(
-        exception_row_message(std::slice::from_ref(&exception)),
-        exception.as_str()
-    );
-    assert_eq!(
-        exception_row_message(&[serde_json::json!("Code: this is ordinary user data")]),
+        exception_row_message(&[RowCell::StringBytes(b"Code: this is ordinary user data".to_vec())]),
         None
     );
-    assert_eq!(exception_row_message(&[serde_json::json!("Code: 394")]), None);
+    assert_eq!(
+        exception_row_message(&[RowCell::StringBytes(b"Code: 394".to_vec())]),
+        None
+    );
     for malformed in [
         "Code: invalid. DB::Exception: Query was cancelled. (version 24.8.14.39 (official build))",
         "Code: 394. SomeException: Query was cancelled. (version 24.8.14.39 (official build))",
@@ -71,7 +78,7 @@ fn clickhouse_terminal_exception_row_is_an_error_not_partial_success() {
         "Code: 394. DB::Exception: Query was cancelled. (version 24.8.14.39 (official build)",
     ] {
         assert_eq!(
-            exception_row_message(&[serde_json::json!(malformed)]),
+            exception_row_message(&[RowCell::StringBytes(malformed.as_bytes().to_vec())]),
             None,
             "{malformed}"
         );
@@ -86,8 +93,54 @@ fn clickhouse_response_preserves_explicit_null_cells() {
     )
     .unwrap();
     assert_eq!(
-        response_row(vec![serde_json::Value::Null, serde_json::json!(7)], &columns).unwrap(),
+        response_row(
+            vec![
+                RowCell::Json(serde_json::Value::Null),
+                RowCell::Json(serde_json::json!(7))
+            ],
+            &columns
+        )
+        .unwrap(),
         vec![Value::Null, Value::Int(7)]
+    );
+}
+
+#[test]
+fn clickhouse_json_row_parser_preserves_raw_string_bytes_and_json_escapes() {
+    let raw = b"[\"a\xffb\", \"caf\xc3\xa9\", \"\\u00ff\", \"line\\nfeed\", \"\\ud83d\\ude00\", {\"text\":\"comma, bracket ]\",\"items\":[1,2]}]";
+    let row = query::parse_row(raw).unwrap();
+
+    assert!(matches!(&row[0], RowCell::StringBytes(bytes) if bytes == b"a\xffb"));
+    assert!(matches!(&row[1], RowCell::StringBytes(bytes) if bytes == b"caf\xc3\xa9"));
+    assert!(matches!(&row[2], RowCell::StringBytes(bytes) if bytes == b"\xc3\xbf"));
+    assert!(matches!(&row[3], RowCell::StringBytes(bytes) if bytes == b"line\nfeed"));
+    assert!(matches!(&row[4], RowCell::StringBytes(bytes) if bytes == "😀".as_bytes()));
+    assert!(matches!(&row[5], RowCell::Json(value) if value["items"] == serde_json::json!([1, 2])));
+}
+
+#[test]
+fn clickhouse_json_row_parser_rejects_malformed_strings_and_surrogates() {
+    for row in [b"[\"unterminated]".as_slice(), b"[\"\\ud800\"]", b"[\"text\",]"] {
+        assert!(query::parse_row(row).is_err(), "{row:?}");
+    }
+}
+
+#[test]
+fn clickhouse_string_types_decode_invalid_utf8_as_bytes_and_valid_utf8_as_text() {
+    let string = response_columns(vec!["string".into()], vec!["LowCardinality(Nullable(String))".into()]).unwrap();
+    let fixed = response_columns(vec!["fixed".into()], vec!["FixedString(2)".into()]).unwrap();
+
+    assert_eq!(
+        response_row(vec![RowCell::StringBytes(b"a\xffb".to_vec())], &string).unwrap(),
+        vec![Value::Bytes(b"a\xffb".to_vec())]
+    );
+    assert_eq!(
+        response_row(vec![RowCell::StringBytes(b"caf\xc3\xa9".to_vec())], &string).unwrap(),
+        vec![Value::Text("café".into())]
+    );
+    assert_eq!(
+        response_row(vec![RowCell::StringBytes(vec![0xff, 0x00])], &fixed).unwrap(),
+        vec![Value::Bytes(vec![0xff, 0x00])]
     );
 }
 
@@ -263,10 +316,10 @@ fn clickhouse_enum_values_decode_as_exact_labels_and_keep_sql_null_distinct() {
 
 #[test]
 fn clickhouse_json_row_preserves_wide_integer_tokens_exactly() {
-    let raw: Vec<serde_json::Value> = query::parse_line(
-            br#"[-170141183460469231731687303715884105728,170141183460469231731687303715884105727,340282366920938463463374607431768211455]"#,
-        )
-        .unwrap();
+    let raw = query::parse_row(
+        br#"[-170141183460469231731687303715884105728,170141183460469231731687303715884105727,340282366920938463463374607431768211455]"#,
+    )
+    .unwrap();
     let columns = response_columns(
         ["signed_min", "signed_max", "unsigned_max"].map(str::to_owned).into(),
         ["Int128", "Int128", "UInt128"].map(str::to_owned).into(),

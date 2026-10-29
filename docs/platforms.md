@@ -4,6 +4,14 @@ One page for what runs where. The [completion page](bookie-0.2-sprint.md) record
 
 ## Supported stacks
 
+| Distribution / Target | Toolkit Stack | Support Status | Primary Package / Run Method |
+|---|---|---|---|
+| **Arch Linux / Omarchy** | GTK 4.24, libadwaita 1.10, GtkSourceView 5.22 | **Supported** | `bookie-0.2.0-1-x86_64.pkg.tar.zst` |
+| **Debian testing** | GTK 4.24, libadwaita 1.10, GtkSourceView 5.22 | **Supported** | `tablepro_0.2.0-1_amd64.deb` (`bookie`) |
+| **AppImage (Linux x86_64)** | Bundled runtime | **Supported** | `BookiE-0.2.0-x86_64.AppImage` |
+| **Flatpak Bundle** | GNOME 51 Runtime SDK | **In Progress** | `bookie.flatpak` bundle |
+| **Debian 13 / Ubuntu 24.04** | GTK 4.14 – 4.18 (Below Floor) | **Use AppImage/Flatpak** | Bundled / containerized runtime |
+
 The current `linux` branch supports one native-library floor, set by [ADR 0021](decisions/0021-toolkit-floor.md): GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22, with GLib 2.88. Arch Linux and Debian testing ship this stack. The root Meson project, the Debian and Arch package dependencies and a startup check enforce it; an older stack makes the application exit with a message naming the required and found versions.
 
 Ubuntu 26.04 LTS (GTK 4.22), Debian 13 (GTK 4.18) and Ubuntu 24.04 (GTK 4.14) are below the native-library floor and unsupported for native packages. The published 0.2.0 Flatpak bundle uses GNOME 50 and does not qualify the current branch; a GNOME 51 bundle is not yet published. Fixes are not backported to older native toolkits.

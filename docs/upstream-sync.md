@@ -1,6 +1,14 @@
-# Optional upstream reference review
+# External peer references and client review
 
-BookiE is an independent Rust and GTK database client. Other database clients are references for behavior, security fixes, SQL semantics and user expectations; their source trees are not merge or synchronization targets. Accepted ADRs and BookiE's issue owners decide what applies.
+BookiE is an independent, autonomous Rust and GTK database client. It maintains no ongoing upstream dependencies, synchronization requirements, or upstream tracking workflows. Other database clients (such as TablePro, DBeaver, TablePlus, Beekeeper Studio, and dbx) are reviewed strictly as external peer references for user expectations, standard SQL behaviors, driver quirks, and desktop UX ideas. Accepted ADRs and BookiE's maintainers exclusively decide all design, architecture, and roadmap choices.
+
+```mermaid
+flowchart LR
+    Peers["External Peer References<br/>(DBeaver, TablePlus, Beekeeper, TablePro)"] -.->|Optional Feature Insights| BookiE["BookiE Independent Architecture"]
+    BookiE --> AGENTS["AGENTS.md & Principles"]
+    BookiE --> ADRs["Accepted ADRs"]
+    BookiE --> Roadmap["BookiE Autonomous Roadmap"]
+```
 
 ## Current reviews
 
@@ -16,4 +24,4 @@ For each candidate, record the reference repository and exact commit or release,
 
 Keep PolicyGuard, audit, storage, GTK ownership, session and driver boundaries intact. Manually implement only behavior that applies to Linux. Do not copy platform framework code or remove a local dependency patch without a separate decision and equivalence evidence. Add a regression test that observes the behavior, then link the change and its proof from the owning issue.
 
-Review is optional. Routine Linux development does not need an upstream comparison.
+Review is purely optional. Routine BookiE development does not need an external comparison.
