@@ -34,9 +34,12 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   acceptance does not establish this behavior.
 - **A table without a primary key cannot be deleted from the grid** (TEST-14). There
   is no all-column fallback, by design.
+- **Busy PostgreSQL and MySQL pools:** a health ping skips a pool already saturated when it starts. If the pool becomes saturated while the ping waits, it may still be reported as disconnected; reconnecting can replace the old SSH tunnel ([#1735](https://github.com/cozyGarage/BookiE/issues/1735)). This timing race remains source-based and needs a reproduction.
+- **ClickHouse nested values:** JSON, CSV and spreadsheet exports can retain nested values in JSON form. SQL literal export and parameter binding refuse nested values when the required type metadata is unavailable; they do not silently coerce them.
 - **ClickHouse ambiguous local times:** a `DateTime64` that falls in a repeated or
   missing daylight-saving hour is shown as undecodable and is never turned into a
   literal, because the instant cannot be known.
+- **MySQL generated columns:** Structure edits do not preserve every generation expression. Expressions rejected by the metadata safety filter, including some with string literals or quoted identifiers, can retain the earlier failure or loss behavior ([#1248](https://github.com/cozyGarage/BookiE/issues/1248)). Avoid altering those columns in the Structure tab until this is resolved.
 - **SQLite real numbers:** negative zero and NaN cannot be bound as parameters.
 - **SQLite views are not listed.** The sidebar lists tables only; a view exists and can be queried in the SQL editor, but it does not appear for browsing.
 - **SQLite JSON aggregates can return malformed text on older system libraries** (TEST-25 /
