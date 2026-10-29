@@ -58,7 +58,7 @@ Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/134
 
 ## Carried over from the earlier sprint
 
-- [ ] `cell_editor.rs`: in-place cell editing in light and dark. Held since the `OnceCell` removal.
+- [x] `cell_editor.rs`: in-place cell editing in light and dark. Held since the `OnceCell` removal. **2026-10-29 native Wayland, debug `tablepro-app` of `e944fd824` and `d20a9f8b9`:** double-click editing of text cells opened an inline editor, committed with Enter and staged an underlined pending cell in both light and dark on PostgreSQL 17.11 and SQLite 3.54; the typed value reached the database after Save.
 
 ## Known gaps that are not GTK
 
@@ -81,7 +81,7 @@ Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/134
 
 - [ ] With an open owned-session transaction, check the separate active badge and commit/rollback-and-close buttons at narrow width and enlarged text. While a query runs they cannot dispatch; Commit on an aborted PostgreSQL transaction reports rollback. Session closure and connection replacement do not accept an old queued action.
 - [ ] Run All and Run Current through the menu match their shortcuts in both split panes. File output names the statement/result set; exporting loaded rows never reruns SQL. A stream rerun is clearly labeled.
-- [ ] Table toolbar and grid-menu export both show Scope before Format. All matching rows explains its snapshot refusal and cannot proceed; returning to Current page restores the action. A joined query exports its result columns and cannot be mistaken for a full source-table export.
+- [x] Table toolbar and grid-menu export both show Scope before Format. All matching rows explains its snapshot refusal and cannot proceed; returning to Current page restores the action. A joined query exports its result columns and cannot be mistaken for a full source-table export. **2026-10-29 audit of this run's results:** on the 1,100,000-row `public.huge` browse tab the dialog listed Scope above Format and "All matching table rows" was refused ("Full-table export requires a consistent snapshot…") with Export disabled until Current table page was chosen again; an editor query `select id, name from shop.customers where id < 4` exported exactly its two result columns as INSERT statements. Both the toolbar and the cell menu were used on separate occasions, the menu entry only for the editor result.
 - [ ] Header names and types retain their case; Column details exposes complete null/key metadata and a bounded column comment without making every header taller. Test keyboard menus and light/dark/high-contrast themes.
 
 ## Schema ER diagram
