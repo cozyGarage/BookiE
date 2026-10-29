@@ -41,7 +41,7 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool rg;
   fi
 done
 
-container="$(docker run --rm --detach --publish 127.0.0.1::8123 \
+container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::8123 \
   --env CLICKHOUSE_PASSWORD=tablepro \
   --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
   clickhouse/clickhouse-server:24.8)"
