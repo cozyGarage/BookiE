@@ -194,6 +194,16 @@ class PrepullTestImagesTests(unittest.TestCase):
         self.assertIn('bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"', ci)
         self.assertIn("bash src/scripts/prepull-test-images.sh driver-tls", ci)
 
+    def test_distro_floor_package_builds_pre_pull_their_base_image(self):
+        self.assertEqual(listed_groups().get("distro-floor"), {"debian:testing"})
+        for name, needle in (
+            ("test-deb-package.sh", "bash scripts/prepull-test-images.sh distro-floor"),
+            ("distro-floor-package.sh", 'bash "$root/scripts/prepull-test-images.sh" distro-floor'),
+        ):
+            with self.subTest(script=name):
+                script = (ROOT / "scripts" / name).read_text()
+                self.assertLess(script.index(needle), script.index("docker build"))
+
     def test_the_github_fast_job_pre_pulls_before_the_app_server_tests(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]

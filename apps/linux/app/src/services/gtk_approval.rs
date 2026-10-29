@@ -47,6 +47,33 @@ fn truncate_sql(sql: &str) -> String {
     }
 }
 
+fn approval_body(req: &ApprovalRequest) -> String {
+    let targets = if req.facts.tables.is_empty() {
+        "(none detected)".to_string()
+    } else {
+        req.facts.tables.join(", ")
+    };
+    let mut body = format!(
+        "Rule: {}\n{}\n\nPrincipal: {}\nEnvironment: {}\nClass: {:?}\nTargets: {}",
+        req.rule,
+        req.reason,
+        req.principal.label(),
+        req.environment.display_name(),
+        req.facts.class,
+        targets,
+    );
+    if let Some(preview) = &req.preview
+        && !(req.facts.tables.is_empty() && preview == "tables: ")
+    {
+        body.push_str("\n\n");
+        body.push_str(preview);
+    }
+    if let Some(rows) = req.estimated_rows {
+        body.push_str(&format!("\n\nExact affected-row count: {rows}"));
+    }
+    body
+}
+
 async fn acquire_dialog_permit(
     gate: Arc<tokio::sync::Semaphore>,
     deadline: tokio::time::Instant,
@@ -81,27 +108,7 @@ impl ApprovalSink for GtkApprovalSink {
         let permit = Arc::new(Mutex::new(Some(permit)));
 
         let heading = format!("Approve write: {}", req.connection_name);
-        let targets = if req.facts.tables.is_empty() {
-            "(none detected)".to_string()
-        } else {
-            req.facts.tables.join(", ")
-        };
-        let mut body = format!(
-            "Rule: {}\n{}\n\nPrincipal: {}\nEnvironment: {}\nClass: {:?}\nTargets: {}",
-            req.rule,
-            req.reason,
-            req.principal.label(),
-            req.environment.display_name(),
-            req.facts.class,
-            targets,
-        );
-        if let Some(preview) = &req.preview {
-            body.push_str("\n\n");
-            body.push_str(preview);
-        }
-        if let Some(rows) = req.estimated_rows {
-            body.push_str(&format!("\n\nExact affected-row count: {rows}"));
-        }
+        let body = approval_body(&req);
 
         let heading_c = heading.clone();
         let body_c = body.clone();
@@ -242,6 +249,32 @@ impl ApprovalSink for GtkApprovalSink {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn approval_body_omits_empty_table_preview_but_keeps_meaningful_previews() {
+        let mut req = ApprovalRequest {
+            principal: tablepro_policy::Principal::human_gui(),
+            environment: tablepro_core::Environment::Prod,
+            connection_id: uuid::Uuid::new_v4(),
+            connection_name: "db".into(),
+            sql: "SET @x = 5".into(),
+            facts: tablepro_policy::StatementFacts::unparseable("test"),
+            rule: "test".into(),
+            reason: "test".into(),
+            preview: Some("tables: ".into()),
+            estimated_rows: Some(3),
+            cancellation: None,
+        };
+        let body = approval_body(&req);
+        assert!(body.contains("Targets: (none detected)"));
+        assert!(!body.contains("tables:"));
+        assert!(body.contains("Exact affected-row count: 3"));
+        req.preview = Some("other important information".into());
+        assert!(approval_body(&req).contains("other important information"));
+        req.facts.tables.push("jobs".into());
+        req.preview = Some("tables: jobs".into());
+        assert!(approval_body(&req).contains("tables: jobs"));
+    }
 
     #[test]
     fn dismissed_approval_denies() {

@@ -18,5 +18,18 @@
     "gtk_widgets": "passed: 180 isolated tests",
     "app_clippy": "passed",
     "installed_accessibility": "passed: connection_colour_chooser_has_an_accessible_button; opens menu, selects Blue, verifies updated toggle"
+  },
+  "source_commits": {
+    "apps/linux/app/src/ui/app/organization.rs": "1669a146fc58ec2619c853297b73e03f664c0842",
+    "apps/linux/app/src/ui/app/organization/lifetime_tests.rs": "1669a146fc58ec2619c853297b73e03f664c0842",
+    "scripts/isolated-tests.json": "1669a146fc58ec2619c853297b73e03f664c0842",
+    "apps/linux/app/tests/gtk_ux.py": "47a2f876f25b24f5b23ea63dfb7891d5b7f0a8b5"
+  },
+  "provenance_review": {
+    "status": "run_snapshot_unrecorded",
+    "review_source": "d7f9273be1002766f621f876630369231a432e50",
+    "file_mappings": "Matched recorded file hashes to Git blobs reachable from BookiE GitHub remote refs; these mappings do not establish the complete executed run tree.",
+    "unmapped_source_paths": [],
+    "limitation": "The original record has no exact source_commit/base_commit for the executed run. Existing result claims are retained as historical reports, not current-source acceptance."
   }
 }

@@ -1,12 +1,17 @@
 use super::parse_input_for_driver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
-use testcontainers::runners::AsyncRunner;
+use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::mssql_server::MssqlServer;
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings() {
-    let container = MssqlServer::default().with_accept_eula().start().await.unwrap();
+    let container = MssqlServer::default()
+        .with_accept_eula()
+        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
     let connection = drivers_mssql::MssqlDriver
         .connect(ConnectOptions {
             host: container.get_host().await.unwrap().to_string(),

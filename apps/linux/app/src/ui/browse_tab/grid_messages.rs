@@ -61,5 +61,6 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
         GridMsg::FilterByValue { column, value } => BrowseTabInput::FilterByValue { column, value },
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
+        GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
     }
 }
