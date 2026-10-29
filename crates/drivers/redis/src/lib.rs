@@ -43,26 +43,8 @@ impl DatabaseDriver for RedisDriver {
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        let scheme = match opts.tls.mode {
-            tablepro_core::TlsMode::Disabled => "redis",
-            _ => "rediss",
-        };
-        let password = opts.password.expose_secret();
-        let auth = if !opts.username.is_empty() && !password.is_empty() {
-            format!("{}:{}@", urlencoding_lite(&opts.username), urlencoding_lite(password))
-        } else if !password.is_empty() {
-            format!(":{}@", urlencoding_lite(password))
-        } else {
-            String::new()
-        };
-        let db_index = parse_db_index(&opts.database)?;
         let verifies = opts.tls.mode.verifies_cert();
-        let suffix = if opts.tls.mode.encrypts() && !verifies {
-            "#insecure"
-        } else {
-            ""
-        };
-        let url = format!("{scheme}://{auth}{}:{}/{}{suffix}", opts.host, opts.port, db_index);
+        let url = connection_url(&opts)?;
         let client = if opts.tls.mode.encrypts() {
             Client::build_with_tls(url, tls_certificates_for(&opts, verifies)?)
                 .map_err(|err| map_redis_connect_error(err, verifies))?
@@ -733,6 +715,31 @@ fn append_single_quoted_escape(chars: &mut std::iter::Peekable<std::str::Chars<'
 
 fn invalid_redis_command_quoting() -> DriverError {
     DriverError::query("invalid Redis command quoting or escape")
+}
+
+fn connection_url(opts: &ConnectOptions) -> Result<String, DriverError> {
+    let scheme = match opts.tls.mode {
+        tablepro_core::TlsMode::Disabled => "redis",
+        _ => "rediss",
+    };
+    let password = opts.password.expose_secret();
+    let auth = if !opts.username.is_empty() && !password.is_empty() {
+        format!("{}:{}@", urlencoding_lite(&opts.username), urlencoding_lite(password))
+    } else if !password.is_empty() {
+        format!(":{}@", urlencoding_lite(password))
+    } else {
+        String::new()
+    };
+    let host =
+        tablepro_core::uri_host(&opts.host).ok_or_else(|| DriverError::Unsupported("invalid Redis host".into()))?;
+    let db_index = parse_db_index(&opts.database)?;
+    let verifies = opts.tls.mode.verifies_cert();
+    let suffix = if opts.tls.mode.encrypts() && !verifies {
+        "#insecure"
+    } else {
+        ""
+    };
+    Ok(format!("{scheme}://{auth}{host}:{}/{}{suffix}", opts.port, db_index))
 }
 
 /// An empty database means "use Redis's default (0)". Anything else must be

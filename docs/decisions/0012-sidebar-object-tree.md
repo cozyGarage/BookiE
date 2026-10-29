@@ -24,7 +24,7 @@ Replace the list with a `GtkListView` over a `GtkTreeListModel`.
 
 - **Keep the `GtkListBox` and hide rows with the list filter.** Rejected as the target. A header belongs to the first row below it, so filtering hides the header and its controls and groups cannot collapse (UI-11). The shipped slice keeps the `GtkListBox` with an explicit tree-node model as a step, not as the end state.
 - **Leave catalog objects only in the Catalog dialog.** Rejected. A flat list per kind makes Routines, Sequences and Types unreachable in context.
-- **A generic docking or panel framework.** Not adopted. Add one only when concrete behaviours need it ([Zed panel review](../archive/zed-editor-panel-review-2026-10-22.md)).
+- **A generic docking or panel framework.** Not adopted. Add one only when concrete behaviours need it. The existing editor split supports the identified results and error panel work; a generic framework is not required for it.
 
 ## Consequences
 

@@ -17,11 +17,13 @@ Counted from the four checklists after this run. "Ticked" means every clause of 
 
 | Checklist | Items | Ticked | Open |
 |---|---|---|---|
-| Catalog, sidebar and application shell | 38 | 15 | 23 |
-| Connections and SSH | 44 | 24 | 20 |
-| SQL editor and sessions | 62 | 34 | 28 |
-| Grid, filters and data transfer | 76 | 46 | 30 |
-| **All four** | 220 | 119 | 101 |
+| Catalog, sidebar and application shell | 46 | 15 | 31 |
+| Connections and SSH | 48 | 24 | 24 |
+| SQL editor and sessions | 63 | 34 | 29 |
+| Grid, filters and data transfer | 83 | 48 | 35 |
+| **All four** | 240 | 121 | 119 |
+
+Other contributors added 20 items to the checklists while this run merged `linux`, so the open count is higher than the 101 recorded at the first push. Counts are from the files at the head of this run.
 
 The run added a note or changed a tick on 52 items. One item, the native Wayland repeat of the restart restore, was unticked because its own text says that repeat is untested.
 
@@ -41,6 +43,14 @@ These were seen on `65befe8aa`. None has been filed from this run; the rows belo
 - A hidden column makes Go to Referenced Row greyed out instead of showing a toast, and removes the edit entries from the cell menu.
 - The Pin results button sits where the Session button moves when the transaction banner appears, so a second click lands on Pin results.
 - With a pending edit open, a wrong path typed into the portal file chooser opens an error dialog that does not show in screenshots and blocks the chooser until it is closed with `hyprctl`.
+
+## Findings after the first push
+
+- Redis 7.4.11: "Filter by This Value" on a Key cell adds `Key equals a` and the tab then fails with "Redis bound reads support the Value column for one key". The filter persists with the tab across a restart until Clear all is used.
+- SQL Server: the sidebar and Catalog list no views, triggers or sequences outside tables (see the application checklist).
+- Connection bundles drop configured SQLite attachments (source read, see the connections checklist).
+- The ER diagram zoom label stays at 100% while the canvas zooms.
+- SQLite views are listed in the sidebar on `e226d3f5c`; they were missing on `65befe8aa`.
 
 ## Not run
 
@@ -63,6 +73,7 @@ dbx 0.6.59 (`/usr/bin/dbx`, a Tauri and web view client) was run with a private 
 | Results | Tabs for Table Data, Summary (per statement status, rows, time), Chart (bar, line, pie) and Messages | Results and Errors, result sets selector, pinned results | A per-statement summary; a basic chart |
 | Settings | Fourteen themes including editor presets, UI scale, fonts, corner style, tab bar options, formatter, snippets, rebindable and searchable shortcuts with conflict detection | System light and dark, editor font and size, Vim keys | Searchable shortcuts page; SQL formatter |
 | Navigation | Quick open (Ctrl+P) across all connections and objects with type chips; back and forward navigation; reopen closed tab | Open Quickly for favourites, tabs, connections and tables; reopen closed tab (Ctrl+Shift+T) | Show the connection path on Open Quickly rows |
+| Themes | Fourteen presets and a custom option | Five themes (Default, Ledger, Catppuccin, Tokyo Night, Gruvbox) chosen in Preferences | Keep; add a high-contrast variant |
 | Colour | Light "White" default with a green accent and black primary buttons; tint per connection | Follows the system; blue accent; Production red bar | Keep the system theme; consider tinting the sidebar by connection colour |
 
 Safe-by-design differences are not gaps. BookiE refuses unsafe writes through `PolicyGuard`, asks for approval, audits every statement and runs sessions as a separate transaction owner; dbx shows an Auto-commit selector instead.
@@ -70,3 +81,36 @@ Safe-by-design differences are not gaps. BookiE refuses unsafe writes through `P
 ## Cleanup
 
 The app and `ydotoold` stay running until the maintainer stops them; the compose project `bookie-manual-20261029`, the `bm-pg18` container and the private profiles under `/tmp/opencode` were started by this run and are listed here for removal.
+
+## Regression found and fixed after the merge
+
+After merging `linux` at `0a46b6bd0` (the commit `df1996177` that added enum metadata to query columns), every browse of a PostgreSQL table with an enum column failed with "Couldn't load rows: error occurred while decoding column 4: mismatched types; Rust type `String` (as SQL type `TEXT`) is not compatible with SQL type `"CHAR"`". The metadata query reads `pg_type.typtype`, which is the `"char"` type. The existing integration test `enum_labels_come_back_in_declared_order_for_the_named_type_only` failed on the unfixed code and passes with `typtype::text`. The fix is one line on branch `fix/postgres-enum-typtype-decode` (commit `98e136030`), pushed to GitHub without a pull request because `gh` is not authenticated on this machine. It has not been through the Forgejo gate.
+
+## Contrast sample
+
+Measured from full-resolution captures on the grid, not from class names. Light header text is 2.28:1 and dark header text is 3.76:1; both are below 4.5:1. Other sampled text is 7:1 or higher. The values are on the [application checklist](../manual-verification-app.md#visual-audit-matrix).
+
+## Fix branches and what was driven
+
+Each branch was built and driven in the app after its tests passed. None is merged and none has been through the Forgejo gate.
+
+| Branch | Change | Driven result |
+|---|---|---|
+| `fix/bundle-attached-databases` | Bundles carry SQLite attachments, and an in-place import keeps local ones | Export of 15 connections carried both attachments; import into an empty second profile wrote them |
+| `feat/mssql-non-dbo-catalog` (existing branch, `1d007e1f1`) | Added SQL Server views to the existing catalog work | Sidebar shows `sales > Views > v_orders`; Catalog lists triggers (with `(disabled)`), sequences and types |
+| `fix/diagram-zoom-label` | The ER diagram zoom label follows keys, scroll, fit and buttons | Label tracked every action from 75% to 200% |
+| `fix/redis-filter-by-value` | New `supports_browse_filters` driver capability; Redis declares false, the app hides the filter actions | Redis menu, Filter button and Ctrl+F no longer offer filtering; PostgreSQL filtering unchanged |
+
+The SQL Server work was added to the existing branch because open work already covered the same checklist item. The other three had no existing branch.
+
+## Existing UI fix branches, built and driven
+
+These five branches were open when the run started and none has merged. Each was built, driven on native Wayland and compared with `linux` where it mattered. The checklist items they touch stay unticked until the branches land.
+
+| Branch | Result |
+|---|---|
+| `fix/tab-context-menu-actions` | Close Tabs to the Right and Close Other Tabs work on the clicked tab, and a pending edit still prompts Save, Discard or Cancel |
+| `fix/inspector-shortcut` | Saved Queries opens with Ctrl+Shift+B; delete works; a confirmed rename was not verified |
+| `fix/dismiss-editor-completion` | The completion list no longer stays over the result after a run; `linux` still shows it |
+| `fix/connection-popover-position` | The popover fits at 700 px, but `linux` also fits there, so the original clipping was not reproduced |
+| `fix/progress-dialog-title` | The backup progress window now names its operation; `linux` shows only a spinner |
