@@ -665,7 +665,13 @@ fn json_to_value(raw: serde_json::Value, type_name: &str) -> Value {
             .and_then(|s| s.parse::<uuid::Uuid>().ok())
             .map(Value::Uuid)
             .unwrap_or_else(|| fallback_text(&raw)),
-        "Array" | "Map" | "Tuple" | "Nested" | "JSON" | "Object" | "Variant" | "Dynamic" => Value::Json(Box::new(raw)),
+        "Array" | "Map" | "Tuple" | "Nested" | "JSON" | "Object" | "Variant" | "Dynamic" => {
+            let value = match raw {
+                serde_json::Value::String(ref text) => serde_json::from_str(text).unwrap_or(raw),
+                other => other,
+            };
+            Value::Json(Box::new(value))
+        }
         _ => fallback_text(&raw),
     }
 }
