@@ -110,7 +110,7 @@ Recorded so a contributor does not reopen them without new evidence. Each row ci
 | dbx's cell and error model: cells as `serde_json::Value`, binary as `"0x…"` text, user WHERE or edits spliced into SQL, a regex production-safety unlock, passwords as plain strings across the UI | Declined | [ADR 0007](0007-type-and-value-preservation.md) and bound values; source: [application-layer audit](../archive/app-layer-external-audit-2026-10-06.md). |
 | Trusted production mutations, unattended MCP writes, a public package | Not approved (SEC-8) | [ADR 0016](0016-governed-consumer-seam.md). |
 | A YAML driver capability manifest or runtime-loaded engine descriptors | Declined | Capabilities are compile-time Rust types on the driver contract ([ADR 0001](0001-no-plugin-system.md)); the proposed direction is one static `DriverCapabilities` struct replacing the `supports_*` methods; source: [dbx features review](../archive/tablepro-dbx-review-2026-10-20/d-dbx-features.md). |
-| Result charts, facet charts, theme editor or theme sync | Out of scope | Not in product goals; source: [feature comparison history](../archive/feature-comparison-history-2026-10-23.md). |
+| Result charts, facet charts, theme editor or theme sync | Out of scope | Not in product goals. |
 
 ## Open forks (do not invent answers here)
 
