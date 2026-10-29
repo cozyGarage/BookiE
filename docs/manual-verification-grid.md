@@ -134,7 +134,7 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 
 ## Clipboard export formats (Copy as...)
 
-- [ ] Select multiple rows or cells in a result grid, right-click, and choose **Copy as > Text Table**: the clipboard receives an ASCII-rendered table with header names, border delimiters `+---+`, column dividers `|`, and right-aligned numbers.
+- [ ] Select multiple rows in a result grid, right-click, and choose **Copy as > Text Table**: the clipboard receives complete selected rows in an ASCII-rendered table with header names, border delimiters `+---+`, column dividers `|`, and right-aligned numbers.
 - [ ] Select multiple rows, right-click, and choose **Copy as > JSON Lines**: the clipboard receives newline-delimited JSON objects with one object per row and column names as keys.
 - [ ] Select multiple rows in a SQL-supported connection, right-click, and choose **Copy as > Values List**: the clipboard receives a comma-separated SQL tuple list `(val1, val2), (val3, val4)` with engine-specific escaping (`TRUE`/`FALSE` or `1`/`0`, `N'...'` on SQL Server).
 - [ ] On MongoDB and Redis connections, the Values List action is omitted or disabled.
