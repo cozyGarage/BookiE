@@ -1206,6 +1206,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::dispatch_tests::running_a_query_dismisses_the_visible_completion_popup"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::history_dialog::export_tests::a_failed_history_export_shows_a_dismissible_error"
     ]
   ],
   "keyring": [
