@@ -56,9 +56,9 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [CI build speed proposal](../proposals/ci-build-speed.md): where Forgejo gate time goes, a `ci` build profile for GUI scenario jobs and sharded distro-floor scenarios, ordered after the ADR 0021 runner upgrade.
 - [Workstation test reuse plan](workstation-test-reuse-2026-10-20.md): dated local execution plan and pilot evidence.
 
-- [Zed editor and panel review, October 22](../archive/zed-editor-panel-review-2026-10-22.md): completed research, existing PR dependencies and issue-owned results/error/message panel follow-ups.
-- [GPUI client review, October 22](../archive/gpui-client-review-2026-10-22.md): completed source research including dbdelve; open adoption proposals remain on their issues.
-- [Transaction-control proposal review, October 22](../archive/transaction-control-review-2026-10-22.md): completed DBF-5 verification against existing shared-connection and owned-session guards.
+- Zed editor and panel review, October 22: completed research, existing PR dependencies and issue-owned results/error/message panel follow-ups.
+- GPUI client review, October 22: completed source research including dbdelve; open adoption proposals remain on their issues.
+- Transaction-control proposal review, October 22: completed DBF-5 verification against existing shared-connection and owned-session guards.
 - [Grid search focus, October 22](../evidence/grid-search-focus-2026-10-22/README.md): owned focus restoration and keyboard regression coverage for large and wide results.
 
 - [Editor bottom panel desktop acceptance, October 22](../evidence/editor-bottom-panel-2026-10-22/README.md): source-built native Wayland, keyboard/pointer, error/timeout and layout evidence; package and Forgejo gates stay separate.
@@ -70,7 +70,7 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [Query row decoding budget, October 22](../evidence/query-row-budget-2026-10-22/README.md): pre-decode row checks, measured PostgreSQL client RSS reduction and remaining allocation limits.
 - [Borrowed row identity checks, October 22](../evidence/row-key-borrowing-2026-10-22/README.md): reduced copying during stale-edit validation, with key contract tests and allocation measurements.
 
-- [Linux follow-up review, October 22](../archive/linux-follow-up-review-2026-10-22.md): merged result-memory fixes, corrected evidence status and nonduplicating UI acceptance order.
+- Linux follow-up review, October 22: merged result-memory fixes, corrected evidence status and nonduplicating UI acceptance order.
 
 - [Session opening and SQL execution ordering, October 22](../evidence/session-opening-run-order-2026-10-22/README.md): held-open regression and shared execution readiness checks.
 - [Arch wrapper release date, October 22](../evidence/arch-wrapper-date-2026-10-22/README.md): mandatory-date forwarding, boundary regressions and real isolated package upgrade/removal evidence.

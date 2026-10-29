@@ -2,7 +2,7 @@
 
 ## Scope and evidence
 
-Reviewed BookiE `220c68757743ef936dafdff859373d05e20595a6` against the database clients already named in the documentation. The [source inventory](../evidence/client-review-2026-10-23/manifest.json) records full pins, release observations, commit counts and selected diffs. This refresh follows the [October 20 deep review](tablepro-dbx-review-2026-10-20/README.md), [October 21 collaboration review](tablepro-collaboration-2026-10-21.md) and [October 22 GPUI review](gpui-client-review-2026-10-22.md).
+Reviewed BookiE `220c68757743ef936dafdff859373d05e20595a6` against the database clients already named in the documentation. The [source inventory](../evidence/client-review-2026-10-23/manifest.json) records full pins, release observations, commit counts and selected diffs. This refresh follows the [October 20 deep review](tablepro-dbx-review-2026-10-20/README.md), [October 21 collaboration review](tablepro-collaboration-2026-10-21.md) and October 22 GPUI review.
 
 Official GitHub APIs supplied default-branch pins, releases, commits since October 20, and bounded recent PR/issue feeds. High-volume commit feeds were paginated rather than capped at 100. Selected implementation and test diffs were read; a commit inventory is not a whole-repository audit. BookiE paths and existing tests were inspected, and current issues were checked before suggesting work. No third-party application, build script, database fixture or benchmark was executed. No new BookiE runtime defect is established here.
 

@@ -23,6 +23,7 @@ fn options() -> ConnectOptions {
         application_name: None,
         connect_timeout_secs: Some(7),
         read_only: false,
+        attached_databases: Vec::new(),
     }
 }
 
@@ -115,6 +116,21 @@ async fn the_password_reaches_the_tool_only_through_the_passfile() {
         .filter(|name| name.contains("pgpass") || name.contains(".partial-"))
         .collect();
     assert!(leftovers.is_empty(), "{leftovers:?}");
+}
+
+#[tokio::test]
+async fn the_finished_dump_is_readable_only_by_its_owner() {
+    let dir = tempfile::tempdir().unwrap();
+    let tool = fake_tool(dir.path(), r#"echo 'table data' > "${3#--file=}""#);
+    let options = options();
+    let output = dir.path().join("appdb.dump");
+
+    pg_dump(&tool, request(&options, &output), dir.path(), CancellationToken::new())
+        .await
+        .unwrap();
+
+    let mode = std::fs::metadata(&output).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "{mode:o}");
 }
 
 #[tokio::test]
