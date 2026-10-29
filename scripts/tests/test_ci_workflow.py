@@ -199,7 +199,7 @@ class CiWorkflowTests(unittest.TestCase):
             harness.index("scripts/update-third-party-notices.py --check"),
         )
 
-    def test_forgejo_workflows_queue_without_cancelling_across_refs(self):
+    def test_forgejo_workflows_do_not_block_other_runs(self):
         groups = []
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
@@ -208,9 +208,7 @@ class CiWorkflowTests(unittest.TestCase):
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
             group = settings["group"].strip()
             self.assertTrue(group, name)
-            self.assertEqual(group, "bookie-lab-${{ github.ref }}", name)
-            self.assertNotIn("${{ github.run_id }}", group, name)
-            self.assertNotIn("${{ github.workflow }}", group, name)
+            self.assertEqual(group, "bookie-lab-${{ github.workflow }}-${{ github.run_id }}", name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
             groups.append(group)
         self.assertEqual(groups[0], groups[1])

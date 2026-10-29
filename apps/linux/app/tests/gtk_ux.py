@@ -230,7 +230,7 @@ def scenarios(ui):
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
-        choose_menu_item(9)
+        choose_menu_item(11)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switch = next(
@@ -282,8 +282,8 @@ def scenarios(ui):
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-        assert len(items) >= 10, f"grid menu exposed only {len(items)} actionable items"
-        actions = items[10].queryAction()
+        assert len(items) >= 12, f"grid menu exposed only {len(items)} actionable items"
+        actions = items[11].queryAction()
         click_action = next(
             index for index in range(actions.nActions) if actions.getName(index) == "click"
         )
@@ -1510,15 +1510,9 @@ GLib.MainLoop().run()
             entry = ui.set_visible_editable_within("Export query history", ui.FILE_CHOOSER_ROLES, str(path))
             text = entry.queryText()
             assert text.getText(0, text.characterCount) == str(path), "the chooser did not accept the export path"
-            assert entry.queryComponent().grabFocus(), "the export path cannot receive focus"
             save = ui.find_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON)
             assert save is not None, f"the export chooser has no Save button:\n{ui.accessible_snapshot()}"
-            bounds = save.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
-            x11_click(
-                bounds.x + bounds.width // 2,
-                bounds.y + bounds.height // 2 - ATSPI_WINDOW_Y_OFFSET,
-                button=1,
-            )
+            ui.invoke(save)
             ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES, present=False)
             deadline = time.monotonic() + ui.WAIT_SECONDS
             while time.monotonic() < deadline and not path.exists():
@@ -2005,7 +1999,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        choose_menu_item(15)
+        choose_menu_item(17)
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))

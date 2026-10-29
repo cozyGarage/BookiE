@@ -17,11 +17,13 @@ Counted from the four checklists after this run. "Ticked" means every clause of 
 
 | Checklist | Items | Ticked | Open |
 |---|---|---|---|
-| Catalog, sidebar and application shell | 38 | 15 | 23 |
-| Connections and SSH | 44 | 24 | 20 |
-| SQL editor and sessions | 62 | 34 | 28 |
-| Grid, filters and data transfer | 76 | 46 | 30 |
-| **All four** | 220 | 119 | 101 |
+| Catalog, sidebar and application shell | 46 | 15 | 31 |
+| Connections and SSH | 48 | 24 | 24 |
+| SQL editor and sessions | 63 | 34 | 29 |
+| Grid, filters and data transfer | 83 | 48 | 35 |
+| **All four** | 240 | 121 | 119 |
+
+Other contributors added 20 items to the checklists while this run merged `linux`, so the open count is higher than the 101 recorded at the first push. Counts are from the files at the head of this run.
 
 The run added a note or changed a tick on 52 items. One item, the native Wayland repeat of the restart restore, was unticked because its own text says that repeat is untested.
 
@@ -41,6 +43,14 @@ These were seen on `65befe8aa`. None has been filed from this run; the rows belo
 - A hidden column makes Go to Referenced Row greyed out instead of showing a toast, and removes the edit entries from the cell menu.
 - The Pin results button sits where the Session button moves when the transaction banner appears, so a second click lands on Pin results.
 - With a pending edit open, a wrong path typed into the portal file chooser opens an error dialog that does not show in screenshots and blocks the chooser until it is closed with `hyprctl`.
+
+## Findings after the first push
+
+- Redis 7.4.11: "Filter by This Value" on a Key cell adds `Key equals a` and the tab then fails with "Redis bound reads support the Value column for one key". The filter persists with the tab across a restart until Clear all is used.
+- SQL Server: the sidebar and Catalog list no views, triggers or sequences outside tables (see the application checklist).
+- Connection bundles drop configured SQLite attachments (source read, see the connections checklist).
+- The ER diagram zoom label stays at 100% while the canvas zooms.
+- SQLite views are listed in the sidebar on `e226d3f5c`; they were missing on `65befe8aa`.
 
 ## Not run
 
@@ -63,6 +73,7 @@ dbx 0.6.59 (`/usr/bin/dbx`, a Tauri and web view client) was run with a private 
 | Results | Tabs for Table Data, Summary (per statement status, rows, time), Chart (bar, line, pie) and Messages | Results and Errors, result sets selector, pinned results | A per-statement summary; a basic chart |
 | Settings | Fourteen themes including editor presets, UI scale, fonts, corner style, tab bar options, formatter, snippets, rebindable and searchable shortcuts with conflict detection | System light and dark, editor font and size, Vim keys | Searchable shortcuts page; SQL formatter |
 | Navigation | Quick open (Ctrl+P) across all connections and objects with type chips; back and forward navigation; reopen closed tab | Open Quickly for favourites, tabs, connections and tables; reopen closed tab (Ctrl+Shift+T) | Show the connection path on Open Quickly rows |
+| Themes | Fourteen presets and a custom option | Five themes (Default, Ledger, Catppuccin, Tokyo Night, Gruvbox) chosen in Preferences | Keep; add a high-contrast variant |
 | Colour | Light "White" default with a green accent and black primary buttons; tint per connection | Follows the system; blue accent; Production red bar | Keep the system theme; consider tinting the sidebar by connection colour |
 
 Safe-by-design differences are not gaps. BookiE refuses unsafe writes through `PolicyGuard`, asks for approval, audits every statement and runs sessions as a separate transaction owner; dbx shows an Auto-commit selector instead.
