@@ -280,3 +280,37 @@ fn a_column_named_like_a_host_function_is_not_administrative() {
     assert_ne!(facts.class, StatementClass::Administrative);
     assert!(!facts.writes());
 }
+
+#[test]
+fn clickhouse_table_functions_that_reach_files_and_other_servers_are_administrative() {
+    for sql in [
+        "SELECT * FROM file('/var/lib/clickhouse/user_files/secrets.csv', 'CSV')",
+        "SELECT * FROM url('http://169.254.169.254/latest/meta-data/', 'LineAsString')",
+        "SELECT * FROM s3('https://bucket.s3.amazonaws.com/data.csv', 'CSV')",
+        "SELECT * FROM remote('other-host:9000', db.t)",
+        "SELECT * FROM mysql('host:3306', 'db', 't', 'user', 'pw')",
+    ] {
+        assert_admin_denied(sql, "clickhouse");
+    }
+}
+
+#[test]
+fn sql_server_rowset_functions_that_reach_files_and_linked_servers_are_administrative() {
+    for sql in [
+        "SELECT * FROM OPENROWSET('SQLNCLI', 'Server=other;Trusted_Connection=yes;', 'SELECT 1') AS d",
+        "SELECT * FROM OPENQUERY(linked, 'SELECT 1')",
+    ] {
+        assert_admin_denied(sql, "mssql");
+    }
+}
+
+#[test]
+fn sql_server_rowset_forms_that_do_not_parse_are_not_a_plain_read_for_an_agent() {
+    for sql in [
+        "SELECT * FROM OPENROWSET(BULK 'C:\\data\\secrets.csv', SINGLE_CLOB) AS d",
+        "SELECT * FROM OPENDATASOURCE('SQLNCLI', 'Data Source=other;').db.dbo.t",
+    ] {
+        assert!(classify(sql, "mssql").writes(), "{sql}");
+        assert!(matches!(agent_decision(sql, "mssql"), Decision::Deny { .. }), "{sql}");
+    }
+}

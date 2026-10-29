@@ -98,6 +98,9 @@ pub enum GridMsg {
         column: String,
         row: Vec<(String, tablepro_core::Value)>,
     },
+    ShowReferencingRows {
+        row: Vec<(String, tablepro_core::Value)>,
+    },
 }
 
 #[derive(Clone, Default)]
@@ -116,6 +119,7 @@ pub struct TabGridContext {
     /// Marks the column header so a reference is visible before the
     /// cell value picker (a later slice) exists.
     pub foreign_key_columns: std::collections::HashSet<String>,
+    pub has_inbound_foreign_keys: bool,
     pub choices: ChoiceMap,
 }
 
@@ -209,6 +213,7 @@ pub fn build_column_view(
                 filterable: tab_ctx.tab_id.is_some(),
                 row_mutations_allowed: tab_ctx.row_mutations_allowed,
                 foreign_key_columns: tab_ctx.foreign_key_columns.clone(),
+                has_inbound_foreign_keys: tab_ctx.has_inbound_foreign_keys,
                 local_result_view: tab_ctx.local_result_view.clone(),
             },
         )

@@ -12,6 +12,7 @@ EVIDENCE = ROOT / "docs/evidence"
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 COMMIT_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 MAX_SOURCE_COMMITS = 128
+SOURCE_STATUSES = {"unpinned-historical", "unverified-source"}
 
 
 def test_selector(command):
@@ -40,10 +41,9 @@ def test_selector(command):
 
 
 def is_test_layer_report(manifest):
-    return all(
-        key in manifest
-        for key in ("commit", "working_tree", "tracked_diff_sha256", "status", "layers")
-    )
+    if "layers" in manifest:
+        return any(key in manifest for key in ("commit", "working_tree", "tracked_diff_sha256"))
+    return "working_tree" in manifest and "tracked_diff_sha256" in manifest
 
 
 def validate_test_layer_report(path, report):
@@ -116,7 +116,7 @@ def validate_manifest(path, strict=False):
     warnings = []
     try:
         manifest = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
         return [f"{path}: {error}"], warnings
     if not isinstance(manifest, dict):
         return [f"{path}: manifest must be an object"], warnings
@@ -125,7 +125,15 @@ def validate_manifest(path, strict=False):
         return errors, warnings
     if is_test_layer_report(manifest):
         return validate_test_layer_report(path, manifest)
-    if not isinstance(manifest.get("source_commit", manifest.get("base_commit")), str):
+    source_status = manifest.get("source_status")
+    if source_status is not None and source_status not in SOURCE_STATUSES:
+        errors.append(f"{path}: source_status must be one of {sorted(SOURCE_STATUSES)}")
+        return errors, warnings
+    has_identity = isinstance(manifest.get("source_commit", manifest.get("base_commit")), str)
+    if source_status == "unpinned-historical":
+        if has_identity:
+            errors.append(f"{path}: source_status is unpinned-historical but the packet records a source identity")
+    elif not has_identity:
         if strict:
             errors.append(f"{path}: source_commit or base_commit is required")
         else:
@@ -155,6 +163,8 @@ def validate_manifest(path, strict=False):
         if not isinstance(expected, str) or not SHA256_PATTERN.fullmatch(expected):
             errors.append(f"{path}: invalid source digest for {name}")
             continue
+        if source_status == "unverified-source":
+            continue
         if name in source_commits:
             source_commit = source_commits[name]
             if not isinstance(source_commit, str) or not COMMIT_PATTERN.fullmatch(source_commit):
@@ -179,6 +189,8 @@ def validate_manifest(path, strict=False):
             continue
         if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
             warnings.append(f"{path}: source differs from the current checkout: {name}")
+    if source_status == "unpinned-historical":
+        warnings.clear()
     if legacy_source_only:
         return errors, warnings
     log_digests = manifest.get("log_sha256", {})
@@ -232,6 +244,27 @@ def validate_manifest(path, strict=False):
     return errors, warnings
 
 
+def declared_evidence_record(manifest, named_validation=False):
+    if not isinstance(manifest, dict):
+        return False
+    if "schema_version" not in manifest:
+        return "source_sha256" in manifest
+    if manifest.get("schema_version") != 1:
+        return False
+    fields = ("source_commit", "base_commit", "source_sha256", "source_commits", "source_file")
+    return named_validation or is_test_layer_report(manifest) or any(key in manifest for key in fields)
+
+
+def discovered_manifest(path):
+    if path.name == "manifest.json":
+        return True
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return path.name == "validation.json"
+    return declared_evidence_record(manifest, named_validation=path.name == "validation.json")
+
+
 def manifests(paths):
     if paths:
         resolved = []
@@ -241,24 +274,34 @@ def manifests(paths):
                 path = ROOT / path
             resolved.append(path)
         return resolved
-    return sorted(EVIDENCE.rglob("manifest.json"))
+    return sorted(path for path in EVIDENCE.rglob("*.json") if discovered_manifest(path))
 
 
 def main():
+    return main_with_args(sys.argv[1:])
+
+
+def main_with_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--strict", action="store_true")
     parser.add_argument("paths", nargs="*")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     failures = []
     warnings = []
     checked_v1 = 0
     checked_legacy_source = 0
+    unpinned = 0
+    unverified = 0
     for path in manifests(args.paths):
         errors, notes = validate_manifest(path, args.strict)
         try:
             manifest = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
+        except (OSError, UnicodeError, json.JSONDecodeError):
             manifest = None
+        if isinstance(manifest, dict) and manifest.get("source_status") == "unpinned-historical":
+            unpinned += 1
+        if isinstance(manifest, dict) and manifest.get("source_status") == "unverified-source":
+            unverified += 1
         if isinstance(manifest, dict) and manifest.get("schema_version") == 1:
             checked_v1 += 1
         elif isinstance(manifest, dict) and "schema_version" not in manifest and "source_sha256" in manifest:
@@ -270,7 +313,9 @@ def main():
         return 1
     print(
         f"Validated {checked_v1} schema-v1 evidence manifests; checked source provenance in "
-        f"{checked_legacy_source} legacy packets; {len(warnings)} historical/source-drift checks need review."
+        f"{checked_legacy_source} legacy packets; {len(warnings)} historical/source-drift checks need review; "
+        f"{unpinned} labelled unpinned historical context (not acceptance proof); "
+        f"{unverified} labelled unverified source (recorded hashes kept, not proven)."
     )
     if warnings:
         print("\n".join(warnings[:10]))

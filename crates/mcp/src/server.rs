@@ -314,7 +314,7 @@ pub(crate) fn tool_description(name: &str) -> &'static str {
             "Run a write with optional transaction preview (preview=true by default). Results include value_format=bookie-tagged-v1; numeric counts are exact tagged strings."
         }
         "explain_query" => {
-            "Run EXPLAIN on a SQL statement; plan rows are withheld from read-scoped agents. Results include value_format=bookie-tagged-v1 and tagged cells."
+            "Run EXPLAIN on a SQL statement; a read-scoped token may read the plan, while EXPLAIN ANALYZE needs tools:write scope. Results include value_format=bookie-tagged-v1 and tagged cells."
         }
         "export_data" => {
             "Run a query and return CSV or JSON; CSV responses include the null_marker used for SQL NULL cells. JSON results use value_format=bookie-tagged-v1; tagged cells preserve value kinds and exact numeric digits, parsed JSON is recursively tagged, and raw JSON text remains exact under json_text"

@@ -43,7 +43,7 @@ done
 socket_directory="$XDG_RUNTIME_DIR/mysql-socket"
 mkdir -m 777 "$socket_directory"
 
-container="$(docker run --rm --detach --publish 127.0.0.1::3306 \
+container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::3306 \
   --tmpfs /var/lib/mysql \
   --mount "type=bind,source=$socket_directory,target=/var/run/mysqld" \
   --env MYSQL_ROOT_PASSWORD=tablepro_test \

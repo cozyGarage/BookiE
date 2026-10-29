@@ -124,6 +124,7 @@ fn saved_with_bastion(host: &str, bastion_port: u16) -> SavedConnection {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 
@@ -152,6 +153,7 @@ fn saved_sqlite(path: &std::path::Path) -> SavedConnection {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 

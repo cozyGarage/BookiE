@@ -38,3 +38,40 @@ async fn narrow_queries_stop_at_the_row_limit_and_report_truncation() {
     assert_eq!(result.rows.last(), Some(&vec![Value::Int((cap - 1) as i64)]));
     assert!(result.truncated);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_readonly_user_can_connect_and_a_grid_save_still_waits_for_its_mutation() {
+    let (_c, opts) = start_clickhouse().await;
+    let admin = connect(opts.clone()).await;
+    admin
+        .execute("CREATE TABLE default.notes (id UInt32, note String) ENGINE = MergeTree ORDER BY id")
+        .await
+        .unwrap();
+    admin
+        .execute("INSERT INTO default.notes VALUES (1, 'a')")
+        .await
+        .unwrap();
+    admin
+        .execute("CREATE USER ro IDENTIFIED WITH plaintext_password BY 'ro-secret' SETTINGS readonly = 1")
+        .await
+        .unwrap();
+    admin.execute("GRANT SELECT ON default.* TO ro").await.unwrap();
+    let mut read_only = opts.clone();
+    read_only.username = "ro".into();
+    read_only.password = secrecy::SecretString::new("ro-secret".to_string().into());
+
+    let connection = tablepro_core::DatabaseDriver::connect(&drivers_clickhouse::ClickhouseDriver, read_only).await;
+
+    assert!(
+        connection.is_ok(),
+        "a readonly=1 user must be able to connect: {:?}",
+        connection.err()
+    );
+    admin
+        .execute("ALTER TABLE default.notes UPDATE note = 'b' WHERE id = 1")
+        .await
+        .unwrap();
+    let saved = admin.query("SELECT note FROM default.notes").await.unwrap();
+    assert_eq!(saved.rows, vec![vec![Value::Text("b".into())]]);
+}

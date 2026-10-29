@@ -1,4 +1,5 @@
 import time
+import traceback
 
 
 def run_scenarios(scenarios, run, retries, report=print):
@@ -16,6 +17,7 @@ def run_scenarios(scenarios, run, retries, report=print):
                 if attempt == retries:
                     failures.append((name, error))
                     report(f"FAILED: {name} (duration: {elapsed:.3f}s)")
+                    report("".join(traceback.format_exception(error)).rstrip())
                     report(f"AssertionError: {error}")
                     break
                 first = str(error).splitlines()[0][:300]

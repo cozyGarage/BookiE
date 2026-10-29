@@ -43,6 +43,7 @@ fn networked_saved(driver_id: &str, auth_mode: AuthMode) -> SavedConnection {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 

@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::error::StorageError;
 use crate::file_access::{lock_path, read_bounded, write_atomically};
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 const CURRENT_VERSION: u32 = 2;
 const MAX_CONNECTIONS_FILE_BYTES: usize = 16 * 1024 * 1024;
@@ -62,7 +62,10 @@ pub(crate) const KNOWN_CONNECTION_FIELDS: &[&str] = &[
     "environment",
     "ssh",
     "last_opened_at",
+    "connect_timeout_secs",
+    "query_timeout_secs",
     "auth_source",
+    "attached_databases",
 ];
 
 const KNOWN_FILE_FIELDS: &[&str] = &["version", "connections"];
@@ -119,6 +122,8 @@ pub struct SavedConnection {
     pub query_timeout_secs: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attached_databases: Vec<AttachedDatabase>,
 }
 
 impl SavedConnection {
@@ -494,6 +499,7 @@ pub(super) mod tests {
             last_opened_at: None,
             connect_timeout_secs: None,
             query_timeout_secs: None,
+            attached_databases: Vec::new(),
         }
     }
 
@@ -1046,41 +1052,6 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
-    async fn the_known_field_list_covers_every_serialized_key() {
-        let mut connection = sample_connection();
-        connection.socket_dir = Some(PathBuf::from("/run/postgresql"));
-        connection.socket_path = Some(PathBuf::from("/run/mysqld/mysqld.sock"));
-        connection.tls_root_cert = Some(PathBuf::from("/etc/ca.crt"));
-        connection.last_opened_at = Some(Utc::now());
-        connection.auth_source = Some("admin".into());
-        connection.ssh = Some(SavedSshConfig {
-            hop_id: Uuid::new_v4(),
-            credential_revision: 0,
-            host: "bastion".into(),
-            port: 22,
-            username: "u".into(),
-            auth: SavedSshAuth::Password,
-            jump: None,
-            client: Default::default(),
-            agent: false,
-        });
-        let value = serde_json::to_value(&connection).unwrap();
-        let keys: Vec<&String> = value.as_object().unwrap().keys().collect();
-        for key in &keys {
-            assert!(
-                KNOWN_CONNECTION_FIELDS.contains(&key.as_str()),
-                "{key} is serialized but missing from KNOWN_CONNECTION_FIELDS"
-            );
-        }
-        for known in KNOWN_CONNECTION_FIELDS {
-            assert!(
-                keys.iter().any(|key| key.as_str() == *known),
-                "{known} is listed but no longer serialized"
-            );
-        }
-    }
-
-    #[tokio::test]
     async fn a_field_written_by_a_newer_version_survives_a_rewrite() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("connections.json");
@@ -1100,22 +1071,6 @@ pub(super) mod tests {
         assert_eq!(rewritten["future_section"]["keep"], true);
         assert_eq!(rewritten["connections"][0]["name"], "Renamed");
         assert_eq!(load_from(&path).await.unwrap()[0].name, "Renamed");
-    }
-
-    #[tokio::test]
-    async fn clearing_an_optional_field_is_not_undone_by_field_preservation() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("connections.json");
-        let mut connection = sample_connection();
-        connection.tls_root_cert = Some(PathBuf::from("/etc/tablepro/corp-ca.crt"));
-        save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
-
-        connection.tls_root_cert = None;
-        save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
-
-        let rewritten: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        assert!(rewritten["connections"][0].get("tls_root_cert").is_none());
-        assert!(load_from(&path).await.unwrap()[0].tls_root_cert.is_none());
     }
 
     #[tokio::test]
@@ -1156,4 +1111,7 @@ pub(super) mod tests {
         second_result.unwrap();
         assert!(load_from(&path).await.unwrap().is_empty());
     }
+
+    #[path = "field_tests.rs"]
+    mod field_tests;
 }

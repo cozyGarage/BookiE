@@ -1,5 +1,6 @@
 use super::supports_sql_literals;
-use crate::query::Value;
+use crate::export::value_to_text;
+use crate::query::{ColumnInfo, Value};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct InClause {
@@ -21,6 +22,30 @@ pub fn render_in_clause(driver_id: &str, rows: &[Vec<Value>], column_index: usiz
             format!("({})", literals.join(", "))
         },
     }
+}
+
+pub fn render_value_list(driver_id: &str, columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
+    if rows.is_empty() || columns.is_empty() {
+        return String::new();
+    }
+    let mut row_tuples = Vec::with_capacity(rows.len());
+    for row in rows {
+        let mut literals = Vec::with_capacity(columns.len());
+        for (i, _) in columns.iter().enumerate() {
+            let val = row.get(i).unwrap_or(&Value::Null);
+            if matches!(val, Value::Null) {
+                literals.push("NULL".to_string());
+            } else if let Some(lit) = in_clause_literal(driver_id, val) {
+                literals.push(lit);
+            } else if let Some(txt) = value_to_text(val) {
+                literals.push(format!("'{}'", txt.replace('\'', "''")));
+            } else {
+                literals.push("NULL".to_string());
+            }
+        }
+        row_tuples.push(format!("({})", literals.join(", ")));
+    }
+    row_tuples.join(",\n")
 }
 
 fn in_clause_literal(driver_id: &str, value: &Value) -> Option<String> {
@@ -47,6 +72,7 @@ fn in_clause_literal(driver_id: &str, value: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::export::test_support::column;
     use crate::export::value_to_text;
 
     #[test]
@@ -87,5 +113,32 @@ mod tests {
             render_in_clause("postgres", &[vec![time]], 0).sql,
             "('12:34:56.123456')"
         );
+    }
+
+    #[test]
+    fn value_list_renderer_formats_sql_tuples_and_handles_nulls() {
+        let columns = vec![column("id"), column("title"), column("is_active")];
+        let rows = vec![
+            vec![Value::Int(1), Value::Text("Book's Title".into()), Value::Bool(true)],
+            vec![Value::Int(2), Value::Null, Value::Bool(false)],
+        ];
+
+        let sql = render_value_list("postgres", &columns, &rows);
+        assert_eq!(sql, "(1, 'Book''s Title', TRUE),\n(2, NULL, FALSE)");
+        assert_eq!(render_value_list("postgres", &columns, &[]), "");
+        assert_eq!(render_value_list("postgres", &[], &rows), "");
+    }
+
+    #[test]
+    fn value_list_renderer_formats_dates_and_dialect_specific_literals() {
+        let columns = vec![column("id"), column("created"), column("flag")];
+        let date = Value::Date(chrono::NaiveDate::from_ymd_opt(2026, 10, 29).unwrap());
+        let rows = vec![vec![Value::Int(10), date, Value::Bool(true)]];
+
+        let mssql_sql = render_value_list("mssql", &columns, &rows);
+        assert_eq!(mssql_sql, "(10, N'2026-10-29', 1)");
+
+        let sqlite_sql = render_value_list("sqlite", &columns, &rows);
+        assert_eq!(sqlite_sql, "(10, '2026-10-29', TRUE)");
     }
 }

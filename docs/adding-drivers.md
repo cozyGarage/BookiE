@@ -4,6 +4,16 @@ Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions
 
 ## Contracts and crate boundaries
 
+```mermaid
+flowchart LR
+    A["crates/drivers/<engine>"] --> B["Implement DatabaseDriver"]
+    B --> C["Implement Connection & Session"]
+    C --> D["Wrap in PolicyGuard"]
+    D --> E["Register in Composition Roots"]
+    E --> F["tablepro-app (GUI)"]
+    E --> G["tablepro-agentd (MCP)"]
+```
+
 Read the actual traits before implementing a driver:
 
 - [DatabaseDriver](../crates/core/src/driver.rs): identity, defaults and static capabilities. The typed profile and the rules for connection-scoped or metadata-derived behavior are in [static driver capabilities](#static-driver-capabilities).
