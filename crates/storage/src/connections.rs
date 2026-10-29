@@ -62,6 +62,8 @@ pub(crate) const KNOWN_CONNECTION_FIELDS: &[&str] = &[
     "environment",
     "ssh",
     "last_opened_at",
+    "connect_timeout_secs",
+    "query_timeout_secs",
     "auth_source",
 ];
 
@@ -1052,6 +1054,8 @@ pub(super) mod tests {
         connection.socket_path = Some(PathBuf::from("/run/mysqld/mysqld.sock"));
         connection.tls_root_cert = Some(PathBuf::from("/etc/ca.crt"));
         connection.last_opened_at = Some(Utc::now());
+        connection.connect_timeout_secs = Some(5);
+        connection.query_timeout_secs = Some(30);
         connection.auth_source = Some("admin".into());
         connection.ssh = Some(SavedSshConfig {
             hop_id: Uuid::new_v4(),
@@ -1103,22 +1107,6 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
-    async fn clearing_an_optional_field_is_not_undone_by_field_preservation() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("connections.json");
-        let mut connection = sample_connection();
-        connection.tls_root_cert = Some(PathBuf::from("/etc/tablepro/corp-ca.crt"));
-        save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
-
-        connection.tls_root_cert = None;
-        save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
-
-        let rewritten: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        assert!(rewritten["connections"][0].get("tls_root_cert").is_none());
-        assert!(load_from(&path).await.unwrap()[0].tls_root_cert.is_none());
-    }
-
-    #[tokio::test]
     async fn a_file_written_by_this_version_still_loads_unchanged() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("connections.json");
@@ -1156,4 +1144,7 @@ pub(super) mod tests {
         second_result.unwrap();
         assert!(load_from(&path).await.unwrap().is_empty());
     }
+
+    #[path = "field_tests.rs"]
+    mod field_tests;
 }
