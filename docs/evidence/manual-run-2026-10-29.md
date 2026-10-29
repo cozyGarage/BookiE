@@ -65,6 +65,7 @@ dbx 0.6.59 (`/usr/bin/dbx`, a Tauri and web view client) was run with a private 
 | Results | Tabs for Table Data, Summary (per statement status, rows, time), Chart (bar, line, pie) and Messages | Results and Errors, result sets selector, pinned results | A per-statement summary; a basic chart |
 | Settings | Fourteen themes including editor presets, UI scale, fonts, corner style, tab bar options, formatter, snippets, rebindable and searchable shortcuts with conflict detection | System light and dark, editor font and size, Vim keys | Searchable shortcuts page; SQL formatter |
 | Navigation | Quick open (Ctrl+P) across all connections and objects with type chips; back and forward navigation; reopen closed tab | Open Quickly for favourites, tabs, connections and tables; reopen closed tab (Ctrl+Shift+T) | Show the connection path on Open Quickly rows |
+| Themes | Fourteen presets and a custom option | Five themes (Default, Ledger, Catppuccin, Tokyo Night, Gruvbox) chosen in Preferences | Keep; add a high-contrast variant |
 | Colour | Light "White" default with a green accent and black primary buttons; tint per connection | Follows the system; blue accent; Production red bar | Keep the system theme; consider tinting the sidebar by connection colour |
 
 Safe-by-design differences are not gaps. BookiE refuses unsafe writes through `PolicyGuard`, asks for approval, audits every statement and runs sessions as a separate transaction owner; dbx shows an Auto-commit selector instead.

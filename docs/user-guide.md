@@ -18,7 +18,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 - **Environment markers**: Tag connections as **Local**, **Dev**, **Staging**, or **Production**. Production connections display a red badge, a tinted header, and `[Production]` in the window title.
 - **Keyring security**: Passwords stay in the desktop keyring (Secret Service via `oo7`). Plaintext connection files never store credentials.
 - **CLI launch**: Open databases directly from a terminal: `bookie books.db` or `bookie postgres://user@host:5432/db`.
-- **Attached SQLite databases**: For SQLite connections, configure additional database files with schema aliases to browse and query multiple databases in one session.
+- **Attached SQLite databases**: The SQLite driver can use configured attachments, but the connection form does not currently provide controls to add or edit them. Existing attachment lists are preserved when editing the same connection.
 - **Bundles**: Export or import connections with optional passphrase encryption to share configurations across machines.
 
 ## Browse a table
@@ -40,8 +40,8 @@ Navigation uses **First**, **Previous**, **Next**, and **Last**. Unsorted tables
 - **Insert and delete**: Press `Ctrl+N` to insert a row, `Delete` to remove selected rows, and `Ctrl+Shift+N` to set a cell to NULL.
 - **Filter and sort**: Press `Ctrl+F` to open the structured filter bar. The WHERE field, **Saved filters** menu, **Clear all**, and **Apply** share one row, with the rule editor available under disclosure. Save named filter presets per table. Right-click any cell to **Filter by This Value**. Click column headers to sort.
 - **Foreign key jumps**: Right-click a foreign key cell and choose **Go to Referenced Row** to open the target table filtered to that specific record.
-- **Referencing rows**: Right-click any row in a table referenced by other tables and choose **Show Referencing Rows** to navigate directly to matching child records in referencing tables with pre-populated filters.
-- **Copy as formats**: Right-click a selection of rows or cells and choose **Copy as** to copy as **CSV**, **CSV (with headers)**, **Markdown**, **Text Table** (aligned ASCII borders with right-aligned numeric cells), **JSON Lines** (newline-delimited JSON objects), or **Values List** (multi-row SQL tuples with engine-specific escaping).
+- **Referencing rows**: Right-click a saved row in a table with detected incoming foreign keys and choose **Show Referencing Rows** to open matching child records with pre-populated filters. The action is unavailable for new draft rows; referenced values must be present and non-NULL.
+- **Copy as formats**: Right-click a row selection and choose **Copy as** to copy complete selected rows as **CSV**, **CSV (with headers)**, **Markdown**, **Text Table** (aligned ASCII borders with right-aligned numeric cells), **JSON Lines** (newline-delimited JSON objects), or **Values List** (multi-row SQL tuples with engine-specific escaping).
 - **Paste rows**: Paste tab-separated spreadsheet data (`Ctrl+V`) directly into cells. Each value is type-checked before staging.
 - **ENUM & SET pickers**: Double-click an ENUM or SET cell to open a dedicated item selection popover with an **Apply** button.
 - **Long values & JSON**: Cells over 8 KiB show a preview and size. Right-click to **View Value** (up to 1 MiB text / 16 KiB hex) or **Edit Full Value…** with automated JSON formatting.
