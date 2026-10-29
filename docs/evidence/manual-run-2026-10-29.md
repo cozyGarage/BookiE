@@ -44,6 +44,14 @@ These were seen on `65befe8aa`. None has been filed from this run; the rows belo
 - The Pin results button sits where the Session button moves when the transaction banner appears, so a second click lands on Pin results.
 - With a pending edit open, a wrong path typed into the portal file chooser opens an error dialog that does not show in screenshots and blocks the chooser until it is closed with `hyprctl`.
 
+## Findings after the first push
+
+- Redis 7.4.11: "Filter by This Value" on a Key cell adds `Key equals a` and the tab then fails with "Redis bound reads support the Value column for one key". The filter persists with the tab across a restart until Clear all is used.
+- SQL Server: the sidebar and Catalog list no views, triggers or sequences outside tables (see the application checklist).
+- Connection bundles drop configured SQLite attachments (source read, see the connections checklist).
+- The ER diagram zoom label stays at 100% while the canvas zooms.
+- SQLite views are listed in the sidebar on `e226d3f5c`; they were missing on `65befe8aa`.
+
 ## Not run
 
 Orca and any screen reader, a language input method, DuckDB, MariaDB and Kerberos fixtures, the `.deb`, Flatpak and AppImage packages, ProxyJump and system OpenSSH password cases, local-socket MySQL, a contrast-ratio measurement, a system high-contrast setting, scale 1.25 and 2, enlarged desktop text, and opening the `.xlsx` in LibreOffice (not installed). An Excel export above the row limit cannot be reached from the browse scope, which refuses all rows first.
