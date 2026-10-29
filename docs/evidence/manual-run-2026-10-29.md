@@ -89,3 +89,28 @@ After merging `linux` at `0a46b6bd0` (the commit `df1996177` that added enum met
 ## Contrast sample
 
 Measured from full-resolution captures on the grid, not from class names. Light header text is 2.28:1 and dark header text is 3.76:1; both are below 4.5:1. Other sampled text is 7:1 or higher. The values are on the [application checklist](../manual-verification-app.md#visual-audit-matrix).
+
+## Fix branches and what was driven
+
+Each branch was built and driven in the app after its tests passed. None is merged and none has been through the Forgejo gate.
+
+| Branch | Change | Driven result |
+|---|---|---|
+| `fix/bundle-attached-databases` | Bundles carry SQLite attachments, and an in-place import keeps local ones | Export of 15 connections carried both attachments; import into an empty second profile wrote them |
+| `feat/mssql-non-dbo-catalog` (existing branch, `1d007e1f1`) | Added SQL Server views to the existing catalog work | Sidebar shows `sales > Views > v_orders`; Catalog lists triggers (with `(disabled)`), sequences and types |
+| `fix/diagram-zoom-label` | The ER diagram zoom label follows keys, scroll, fit and buttons | Label tracked every action from 75% to 200% |
+| `fix/redis-filter-by-value` | New `supports_browse_filters` driver capability; Redis declares false, the app hides the filter actions | Redis menu, Filter button and Ctrl+F no longer offer filtering; PostgreSQL filtering unchanged |
+
+The SQL Server work was added to the existing branch because open work already covered the same checklist item. The other three had no existing branch.
+
+## Existing UI fix branches, built and driven
+
+These five branches were open when the run started and none has merged. Each was built, driven on native Wayland and compared with `linux` where it mattered. The checklist items they touch stay unticked until the branches land.
+
+| Branch | Result |
+|---|---|
+| `fix/tab-context-menu-actions` | Close Tabs to the Right and Close Other Tabs work on the clicked tab, and a pending edit still prompts Save, Discard or Cancel |
+| `fix/inspector-shortcut` | Saved Queries opens with Ctrl+Shift+B; delete works; a confirmed rename was not verified |
+| `fix/dismiss-editor-completion` | The completion list no longer stays over the result after a run; `linux` still shows it |
+| `fix/connection-popover-position` | The popover fits at 700 px, but `linux` also fits there, so the original clipping was not reproduced |
+| `fix/progress-dialog-title` | The backup progress window now names its operation; `linux` shows only a spinner |
