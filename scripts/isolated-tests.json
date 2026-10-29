@@ -1185,6 +1185,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::structure_tab::columns::tests::a_comment_row_is_shown_only_for_engines_that_can_store_one"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
     ],
     [
