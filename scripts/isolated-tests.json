@@ -1200,6 +1200,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::diagram::canvas::tests::every_way_of_zooming_reports_the_new_level"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::diagram::card_text::tests::a_card_is_as_tall_as_its_rows_and_as_wide_as_its_longest_line"
     ],
     [
