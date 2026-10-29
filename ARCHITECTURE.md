@@ -1,8 +1,19 @@
 # Architecture
 
-**BookiE** is a Linux-only native database client. Two composition roots (the GTK app and the headless MCP daemon) share one governed path: resolve credentials → open a tunnel if needed → wrap the driver in `PolicyGuard` → classify and evaluate → approve when required → write required audit intent → execute → mask eligible returned results → write terminal audit → return bounded results. There is no browser UI, no runtime driver plugin ABI, and no remote entitlement gate.
+**BookiE** is an independent, native Linux database client. Two composition roots (the GTK app and the headless MCP daemon) share one governed path: resolve credentials → open a tunnel if needed → wrap the driver in `PolicyGuard` → classify and evaluate → approve when required → write required audit intent → execute → mask eligible returned results → write terminal audit → return bounded results. There is no browser UI, no runtime driver plugin ABI, and no remote entitlement gate.
 
-The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). The Cargo workspace lives at the repository root (Rust 1.98). Crate and Cargo binary names stay `tablepro-*`. Packaging and Meson install `bookie` / `bookie-agentd` and add `tablepro` / `tablepro-agentd` aliases. App ID, XDG paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Check the [compatibility policy](AGENTS.md#project) and accepted ADRs before renaming any of them.
+The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). BookiE is a fully autonomous project with its own architecture, development lifecycle, and product roadmap.
+
+### Independence and stable system identifiers
+
+BookiE is completely decoupled from any external upstream projects and operates independently. To ensure seamless continuity for users, desktop environments, and Linux package maintainers, low-level system and storage identifiers remain stable:
+- **Crate & binary names**: Workspace crates and Cargo binaries use `tablepro-*`, `tablepro-app`, and `tablepro-agentd`.
+- **Packaging names**: The user-facing binaries installed by Meson and distro packages are `bookie` and `bookie-agentd` (with `tablepro*` symlink aliases for launcher compatibility).
+- **Application ID & D-Bus**: `com.tablepro.linux`
+- **XDG storage paths**: `$XDG_CONFIG_HOME/tablepro/` and `$XDG_DATA_HOME/tablepro/`
+- **Secret Service schema**: `com.tablepro.linux.Password`
+
+These identifiers are retained strictly for on-disk persistence stability, keyring continuity, and rollback safety across upgrades.
 
 ![BookiE architecture overview: the desktop app and the headless MCP host reach every database through one PolicyGuard, then routing and static drivers](docs/images/architecture-overview.svg)
 
@@ -364,6 +375,63 @@ Each engine exports a type implementing `tablepro_core::DatabaseDriver`. Connect
 `rust_decimal` is the shared decimal carrier; exact support is recorded per type/consumer under [ADR 0007](docs/decisions/0007-type-and-value-preservation.md). Session trust: [ADR 0008](docs/decisions/0008-connection-and-session-ownership.md). Durable identity: [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md). Registration: [adding drivers](docs/adding-drivers.md).
 
 ## UI and async ownership
+
+```mermaid
+sequenceDiagram
+    autonumber
+    box rgba(31, 79, 72, 0.15) GLib Main Context (GTK Thread)
+        participant UI as GTK4 / Libadwaita Widgets
+        participant Comp as Relm4 Component Model
+    end
+    box rgba(14, 36, 33, 0.25) Tokio Async Runtime (Threadpool)
+        participant Cmd as Relm4 Async Command
+        participant Guard as PolicyGuard
+        participant Driver as Database Driver
+    end
+
+    UI->>Comp: User Action (e.g. Run Query, Seek Page)
+    Comp->>Cmd: Spawn Command with Generation ID & CancellationToken
+    Note over Comp,Cmd: GTK thread remains non-blocking & responsive
+    Cmd->>Guard: Execute Statement
+    Guard->>Driver: Run Query on Tokio Worker Pool
+    Driver-->>Guard: Raw Stream / Paged Rows
+    Guard-->>Cmd: Masked Result Set
+    Cmd->>Comp: Component Message (Result, Generation ID)
+    alt Generation ID Matches Current View
+        Comp->>UI: Update RowStore (gio::ListModel) / GtkColumnView
+    else Generation Stale (User switched tab / cancelled)
+        Comp->>Comp: Drop Result (Prevents UI Desynchronization)
+    end
+```
+
+### Result streaming and memory spooling
+
+```mermaid
+flowchart TD
+    subgraph Engine ["PostgreSQL Driver"]
+        Cursor["Server-Side Cursor (SELECT)"]
+    end
+
+    subgraph MemoryBudget ["64 MiB In-Memory Budget"]
+        PageNew["Newest Retained Page"]
+        PageRecent["Recent Pages"]
+    end
+
+    subgraph DiskSpool ["Transient Result Spool (1 GiB quota)"]
+        Spool["Process-Local Encrypted Spool<br/>(Up to 4,096 evicted pages)"]
+    end
+
+    subgraph UIView ["GTK ColumnView Grid"]
+        Store["RowStore (gio::ListModel)"]
+        Pager["Result Pager Controls<br/>(Previous / Next Retained Page)"]
+    end
+
+    Cursor -->|Stream Pages| MemoryBudget
+    MemoryBudget -->|Over 64 MiB Budget| Spool
+    Pager -->|Navigate Back| Spool
+    Spool -->|Restore Page| UIView
+    MemoryBudget --> UIView
+```
 
 | Rule | Detail |
 |---|---|
