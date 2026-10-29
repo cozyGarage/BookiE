@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use sha2::{Digest, Sha256};
 use tablepro_core::{
-    ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl,
-    QueryResult, QueryResultBatch, TableInfo, Transaction, Value, check_pre_dispatch,
+    ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo,
+    OperationControl, QueryResult, QueryResultBatch, TableInfo, Transaction, Value, check_pre_dispatch,
 };
 use uuid::Uuid;
 

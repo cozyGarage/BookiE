@@ -761,6 +761,9 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, crate::ui::browse_tab::BrowseTabInput::EnumLabelsLoaded(labels))
             }
             AppMsg::ForeignKeysLoaded(tab_id, foreign_keys) => self.on_browse_foreign_keys_loaded(tab_id, foreign_keys),
+            AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
+                self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound)
+            }
             AppMsg::RowsLoaded(tab_id, request, result, projected_columns) => {
                 self.on_browse_rows_loaded(tab_id, request, result, projected_columns)
             }

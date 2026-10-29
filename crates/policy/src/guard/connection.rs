@@ -603,6 +603,26 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
+        let operation = self.metadata_operation("FETCH INBOUND FOREIGN KEYS", vec![target]);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH INBOUND FOREIGN KEYS",
+                self.inner.fetch_inbound_foreign_keys(schema, table),
+            )
+            .await;
+        let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
+        self.audit_read_result(&operation, start, &result, rows).await?;
+        result
+    }
+
     async fn fetch_enum_labels(&self, schema: &str, name: &str) -> Result<Vec<String>, DriverError> {
         let operation = self.metadata_operation("FETCH ENUM LABELS", vec![format!("{schema}.{name}")]);
         self.prepare_governed_read(&operation).await?;
@@ -652,6 +672,29 @@ impl Connection for PolicyGuard {
             .caught_read(
                 "FETCH FOREIGN KEYS",
                 self.inner.fetch_foreign_keys_controlled(schema, table, control),
+            )
+            .await;
+        let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
+        self.audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
+    async fn fetch_inbound_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        check_pre_dispatch(control)?;
+        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
+        let operation = self.metadata_operation("FETCH INBOUND FOREIGN KEYS", vec![target]);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH INBOUND FOREIGN KEYS",
+                self.inner.fetch_inbound_foreign_keys_controlled(schema, table, control),
             )
             .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);

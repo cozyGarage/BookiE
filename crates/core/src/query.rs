@@ -51,6 +51,15 @@ pub struct ForeignKeyInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InboundForeignKeyInfo {
+    pub name: String,
+    pub source_schema: Option<String>,
+    pub source_table: String,
+    pub source_columns: Vec<String>,
+    pub target_columns: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ColumnInfo {
     pub name: String,
     pub data_type: String,
