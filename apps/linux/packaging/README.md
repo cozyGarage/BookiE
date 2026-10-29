@@ -66,6 +66,6 @@ Flathub submission still needs offline Cargo sources; portal permissions and pub
 
 ## Release versions
 
-`[workspace.package].version` in the root `Cargo.toml` is the BookiE release version. Every workspace crate inherits it. For a release or hotfix, update that value, the Meson version and the newest AppStream entry together, then regenerate `Cargo.lock`. Keep older AppStream entries and published upgrade fixtures intact. The published 0.2.0 entry remains `type="development"` and records its preparation date, 2026-10-21; this type does not mean the release is unpublished.
+`[workspace.package].version` in the root `Cargo.toml` is the BookiE release version. Every workspace crate inherits it. For a release or hotfix, update that value, the Meson version and the newest AppStream entry together, then regenerate `Cargo.lock`. Keep older AppStream entries and published upgrade fixtures intact. The published 0.2.0 entry is marked `type="stable"` with release date 2026-10-23.
 
 Run `python3 scripts/check-release-version.py` to check consistency; the script harness also runs it. `--print` returns the source version for packaging. Translation generation resolves the inherited version, and MCP advertises its compiled crate version. These version declarations do not change compatibility identifiers, create a tag or publish artifacts.
