@@ -57,7 +57,7 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [Workstation test reuse plan](workstation-test-reuse-2026-10-20.md): dated local execution plan and pilot evidence.
 
 - [Zed editor and panel review, October 22](../archive/zed-editor-panel-review-2026-10-22.md): completed research, existing PR dependencies and issue-owned results/error/message panel follow-ups.
-- [GPUI client review, October 22](../archive/gpui-client-review-2026-10-22.md): completed source research including dbdelve; open adoption proposals remain on their issues.
+- GPUI client review, October 22: completed source research including dbdelve; open adoption proposals remain on their issues.
 - [Transaction-control proposal review, October 22](../archive/transaction-control-review-2026-10-22.md): completed DBF-5 verification against existing shared-connection and owned-session guards.
 - [Grid search focus, October 22](../evidence/grid-search-focus-2026-10-22/README.md): owned focus restoration and keyboard regression coverage for large and wide results.
 

@@ -26,4 +26,4 @@ The Ubuntu click calibration keeps an explicit environment override and has host
 
 [#1359](https://github.com/cozyGarage/BookiE/issues/1359) already has source/test and native investigation showing shared-connection transaction control is refused and owned sessions expose transaction state. A new confirmation prompt is not justified by that report. Issue closure should use its recorded acceptance rather than add redundant product behavior.
 
-The [Zed review](zed-editor-panel-review-2026-10-22.md) and [GPUI/dbdelve review](gpui-client-review-2026-10-22.md) remain completed research archives. Their open implementation and qualification issues own the remaining work.
+The [Zed review](zed-editor-panel-review-2026-10-22.md) and GPUI/dbdelve review remain completed research archives. Their open implementation and qualification issues own the remaining work.
