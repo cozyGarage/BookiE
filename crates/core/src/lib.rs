@@ -35,7 +35,7 @@ mod transaction;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
-pub use connection::{AttachedDatabase, AuthMode, ConnectOptions, Connection, SocketOrigin, Transport};
+pub use connection::{AttachedDatabase, AuthMode, ConnectOptions, Connection, SocketOrigin, Transport, uri_host};
 pub use driver::{
     ConnectionFormDefaults, DatabaseDriver, DriverCapabilities, DriverMaturity, EnumInputStyle,
     connection_form_defaults, initial_connection_form_defaults,
