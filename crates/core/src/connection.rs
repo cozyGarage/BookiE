@@ -69,6 +69,27 @@ pub fn bare_host(host: &str) -> &str {
         .unwrap_or(trimmed)
 }
 
+pub fn uri_host(host: &str) -> Option<String> {
+    let raw_host = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host);
+    if raw_host.is_empty()
+        || raw_host.chars().any(|ch| {
+            ch.is_control() || ch.is_whitespace() || matches!(ch, '/' | '?' | '#' | '@' | '%' | ',' | '\\' | '[' | ']')
+        })
+    {
+        return None;
+    }
+    if raw_host.parse::<std::net::Ipv6Addr>().is_ok() {
+        return Some(format!("[{raw_host}]"));
+    }
+    if host.starts_with('[') || raw_host.contains(':') {
+        return None;
+    }
+    Some(raw_host.to_owned())
+}
+
 impl ConnectOptions {
     pub fn service_address(&self) -> (&str, u16) {
         self.service_endpoint
@@ -788,6 +809,19 @@ mod tests {
         };
 
         assert_eq!(options.service_address(), ("sql.corp.example", 1433));
+    }
+
+    #[test]
+    fn a_uri_host_is_a_plain_name_or_an_address_that_cannot_alter_the_url() {
+        for host in [
+            "", "db/x", "db?x", "db#x", "u@db", "db%2f", "a,b", "db\\x", "db name", "[bad]", "a:b",
+        ] {
+            assert_eq!(uri_host(host), None, "{host:?}");
+        }
+        assert_eq!(uri_host("db.internal").as_deref(), Some("db.internal"));
+        assert_eq!(uri_host("127.0.0.1").as_deref(), Some("127.0.0.1"));
+        assert_eq!(uri_host("::1").as_deref(), Some("[::1]"));
+        assert_eq!(uri_host("[::1]").as_deref(), Some("[::1]"));
     }
 
     #[test]
