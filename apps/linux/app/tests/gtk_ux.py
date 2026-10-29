@@ -2005,7 +2005,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        choose_menu_item(15)
+        choose_menu_item(17)
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
