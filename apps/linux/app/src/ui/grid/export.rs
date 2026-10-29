@@ -1,5 +1,8 @@
 //! All result surfaces share the core serializers.
-pub(super) use tablepro_core::export::{render_in_clause, render_json, render_markdown, render_row_json, render_tsv};
+pub(super) use tablepro_core::export::{
+    render_in_clause, render_json, render_json_lines, render_markdown, render_row_json, render_text_table, render_tsv,
+    render_value_list,
+};
 
 pub(super) fn render_csv(
     columns: &[tablepro_core::ColumnInfo],
