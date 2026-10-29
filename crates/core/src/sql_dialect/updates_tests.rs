@@ -128,7 +128,7 @@ fn optimistic_updates_compare_the_original_value_with_null_safe_dialect_syntax()
     columns[1].nullable = true;
     for (driver, expected) in [
         ("postgres", "\"payload\" IS NOT DISTINCT FROM $3"),
-        ("sqlite", "\"payload\" IS NOT DISTINCT FROM ?"),
+        ("sqlite", "\"payload\" COLLATE BINARY IS NOT DISTINCT FROM ?"),
         ("mysql", "`payload` <=> ?"),
         ("mssql", "([payload] = @P3 OR ([payload] IS NULL AND @P4 IS NULL))"),
     ] {
