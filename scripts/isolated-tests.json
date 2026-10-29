@@ -200,6 +200,21 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::diagram::dialog::lifetime_tests::the_zoom_refresh_tick_does_not_retain_its_dialog_owner"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::dialog::lifetime_tests::the_diagram_canvas_releases_its_controllers"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::dialog::lifetime_tests::diagram_selection_callbacks_do_not_retain_the_list_or_canvas"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::theme::tests::given_gruvbox_when_warning_text_is_styled_then_it_is_distinct_and_readable"
     ],
     [
@@ -1151,6 +1166,11 @@
       "tablepro-app",
       "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::row_inspector::tests::markup_like_values_and_names_are_shown_as_typed"
     ],
     [
       "tablepro-app",

@@ -8,7 +8,7 @@ This page describes current behavior on the `linux` branch, including changes ma
 |---|---|---|
 | PostgreSQL | Stable | Broadest test coverage, including server-confirmed cancellation and verified TLS through SSH. |
 | MySQL and MariaDB | Stable | Unix socket connections are supported. |
-| SQLite | Stable | File based. |
+| SQLite | Stable | File based. Additional database files can be attached under custom schema aliases. |
 | SQL Server | Stable | Kerberos sign-in is available. |
 | ClickHouse | Stable | Mutations are awaited, so saved edits show up in the grid. |
 | MongoDB | Experimental | Collections, find and aggregate. An optional authentication database can be set. |
@@ -26,6 +26,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - TLS has several strictness levels, up to checking both the certificate authority and the host name.
 - Each connection has an environment: Local, Dev, Staging or Prod. A Prod connection shows a red badge, a tinted header and `[Production]` in the window title.
 - A read-only connection refuses every change.
+- SQLite connections support attaching additional database files under custom schema aliases, enabling cross-schema queries and unified catalog browsing.
 - A connection can be filled from a URL such as `postgres://user@host:5432/db`.
 - Connections can be exported and imported. An export encrypted with a passphrase includes stored credentials. A plaintext export contains none.
 
@@ -43,6 +44,8 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL. Sparse document fields that an object lacks show as (missing) and remain distinct from NULL.
 - The header shows each column's type. Primary key columns have a key mark, foreign key columns a link mark, and a column comment appears under the name.
 - Filter with the filter bar, and save filters by name per table. Sort by clicking a header.
+- Foreign key navigation is bidirectional: **Go to Referenced Row** opens the parent table, and **Show Referencing Rows** navigates to matching child records in referencing tables with pre-populated filters.
+- Copy selections in multiple formats: CSV, CSV with headers, Markdown, Text Table (aligned ASCII borders with right-aligned numeric cells), JSON Lines, and Values List (SQL multi-row tuples with dialect-specific syntax).
 - Hide and reorder columns, and reset dragged column widths. The choice is remembered per table.
 - Long cells over 8 KiB show a preview and byte count. **View Value** displays up to 1 MiB rendered text or 16 KiB hex. **Copy Value** copies complete values. Eligible text and JSON cells can be edited in the full-value dialog with semantic JSON formatting.
 - The row inspector lists every column and its type. Selection statistics show count, sum, average, min, and max across numeric columns.
