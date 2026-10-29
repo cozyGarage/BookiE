@@ -133,6 +133,21 @@ async fn the_password_reaches_the_tool_only_through_the_passfile() {
 }
 
 #[tokio::test]
+async fn the_finished_dump_is_readable_only_by_its_owner() {
+    let dir = tempfile::tempdir().unwrap();
+    let tool = fake_tool(dir.path(), r#"echo 'table data' > "${3#--file=}""#);
+    let options = options();
+    let output = dir.path().join("appdb.dump");
+
+    pg_dump(&tool, request(&options, &output), dir.path(), CancellationToken::new())
+        .await
+        .unwrap();
+
+    let mode = std::fs::metadata(&output).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "{mode:o}");
+}
+
+#[tokio::test]
 async fn a_failed_dump_keeps_the_previous_file_and_redacts_connection_details() {
     let dir = tempfile::tempdir().unwrap();
     let tool = fake_tool(

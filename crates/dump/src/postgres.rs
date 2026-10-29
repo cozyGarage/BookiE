@@ -1,6 +1,5 @@
 use std::ffi::OsString;
 use std::net::IpAddr;
-use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
@@ -47,22 +46,12 @@ pub async fn pg_dump(
         return Err(DumpError::PathNotAbsolute);
     }
     let partial = partial_path(request.output);
-    let cleanup = tokio::task::spawn_blocking(move || create_private_partial(partial))
-        .await
-        .map_err(|_| DumpError::Io(std::io::Error::other("backup file creation task failed")))??;
-    let args = dump_args(request.format, &cleanup.0);
+    let _cleanup = RemoveOnDrop(partial.clone());
+    create_private_file(&partial).await?;
+    let args = dump_args(request.format, &partial);
     run_pg_tool(tool, request.options, args, runtime_dir, cancel, None).await?;
-    tokio::fs::rename(&cleanup.0, request.output).await?;
+    tokio::fs::rename(&partial, request.output).await?;
     Ok(())
-}
-
-fn create_private_partial(partial: PathBuf) -> Result<RemoveOnDrop, DumpError> {
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(&partial)?;
-    Ok(RemoveOnDrop(partial))
 }
 
 pub async fn pg_restore(
@@ -136,6 +125,16 @@ fn restore_args(input: &Path) -> Vec<OsString> {
     .map(OsString::from)
     .chain([input.as_os_str().to_owned()])
     .collect()
+}
+
+async fn create_private_file(path: &Path) -> Result<(), DumpError> {
+    tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+        .await?;
+    Ok(())
 }
 
 fn partial_path(output: &Path) -> PathBuf {
