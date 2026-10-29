@@ -27,7 +27,20 @@ pub(super) fn projection(target: &BrowseTarget<'_>) -> Option<String> {
             }
         })
         .collect();
-    any.then(|| list.join(", "))
+    any.then(|| {
+        let mut list = list;
+        for index in preview_columns(target) {
+            let name = quote(&target.columns[index].name);
+            let length = match driver_id {
+                "postgres" => format!("octet_length({name}::text)"),
+                "mysql" => format!("OCTET_LENGTH({name})"),
+                "sqlite" => format!("length(CAST({name} AS BLOB))"),
+                _ => format!("DATALENGTH({name})"),
+            };
+            list.push(format!("CASE WHEN {length} > {LONG_TEXT_BYTES} THEN 1 ELSE 0 END"));
+        }
+        list.join(", ")
+    })
 }
 
 fn preview_expression(driver_id: &str, data_type: &str, name: &str) -> Option<String> {
@@ -68,9 +81,26 @@ fn preview_expression(driver_id: &str, data_type: &str, name: &str) -> Option<St
     }
 }
 
-pub fn mark_partial_cells(result: &mut QueryResult) {
+pub(super) fn preview_columns(target: &BrowseTarget<'_>) -> Vec<usize> {
+    target
+        .columns
+        .iter()
+        .enumerate()
+        .filter_map(|(index, column)| preview_expression(target.driver_id, &column.data_type, "value").map(|_| index))
+        .collect()
+}
+
+pub fn mark_partial_cells(result: &mut QueryResult, preview_columns: &[usize]) {
+    if preview_columns.is_empty() {
+        return;
+    }
+    let visible = result.columns.len().saturating_sub(preview_columns.len());
     for row in &mut result.rows {
-        for cell in row {
+        for (flag, &index) in preview_columns.iter().enumerate() {
+            if row.get(visible + flag) != Some(&Value::Int(1)) {
+                continue;
+            }
+            let Some(cell) = row.get_mut(index) else { continue };
             let marked = match &*cell {
                 Value::Text(text) => parse_marker(text),
                 Value::Json(json) => json.as_str().and_then(parse_marker),
@@ -83,7 +113,9 @@ pub fn mark_partial_cells(result: &mut QueryResult) {
                 *cell = Value::Undecodable(partial);
             }
         }
+        row.truncate(visible);
     }
+    result.columns.truncate(visible);
 }
 
 fn parse_marker(text: &str) -> Option<String> {

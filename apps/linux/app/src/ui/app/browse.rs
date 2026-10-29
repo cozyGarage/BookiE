@@ -221,7 +221,7 @@ impl App {
                             let projected_columns = query.projected_columns.clone();
                             let mut page = conn.query_params_controlled(&query.sql, &query.params, &control).await;
                             if let Ok(rows) = page.as_mut() {
-                                crate::services::browse_query::mark_partial_cells(rows);
+                                crate::services::browse_query::mark_partial_cells(rows, &query.preview_columns);
                             }
                             (page, projected_columns)
                         }

@@ -27,6 +27,7 @@ pub struct BoundQuery {
     pub params: Vec<Value>,
     pub projected_columns: Option<Vec<usize>>,
     pub reverse_rows: bool,
+    pub preview_columns: Vec<usize>,
 }
 
 #[derive(Debug)]
@@ -55,6 +56,7 @@ impl BrowseTarget<'_> {
             params: Vec::new(),
             projected_columns: None,
             reverse_rows: false,
+            preview_columns: Vec::new(),
         };
         if let Some((clause, params)) = filter {
             query.sql.push_str(" WHERE ");
@@ -89,6 +91,7 @@ impl BrowseTarget<'_> {
             params,
             projected_columns: None,
             reverse_rows: false,
+            preview_columns: Vec::new(),
         })
     }
 
@@ -145,6 +148,9 @@ impl BrowseTarget<'_> {
         };
         let mut query = self.filtered_query(&projection)?;
         query.projected_columns = projected;
+        if previewing {
+            query.preview_columns = long_text::preview_columns(self);
+        }
         let order = if sort.is_none() && matches!(self.driver_id, "mongodb" | "redis") {
             None
         } else {

@@ -262,17 +262,21 @@ fn preview_projection_is_opt_in_and_per_engine() {
 #[test]
 fn only_a_well_formed_marker_becomes_a_partial_cell() {
     let mut result = tablepro_core::QueryResult {
-        columns: vec![],
+        columns: (0..7).map(|index| column(&index.to_string(), false)).collect(),
         rows: vec![vec![
             Value::Text("\u{1}bookie-partial:2097152\u{1}xxxx".into()),
             Value::Text("\u{1}bookie-partial:not-a-number\u{1}x".into()),
             Value::Text("plain".into()),
             Value::Null,
             Value::Json(Box::new(serde_json::json!("\u{1}bookie-partial:5\u{1}{}"))),
+            Value::Int(1),
+            Value::Int(1),
         ]],
         truncated: false,
     };
-    mark_partial_cells(&mut result);
+    mark_partial_cells(&mut result, &[0, 4]);
+    assert_eq!(result.columns.len(), 5);
+    assert_eq!(result.rows[0].len(), 5);
     assert_eq!(
         result.rows[0][0],
         Value::Undecodable("partial 2097152 bytes\u{1}xxxx".into())
@@ -286,4 +290,16 @@ fn only_a_well_formed_marker_becomes_a_partial_cell() {
     assert_eq!(result.rows[0][2], Value::Text("plain".into()));
     assert_eq!(result.rows[0][3], Value::Null);
     assert_eq!(result.rows[0][4], Value::Undecodable("partial 5 bytes\u{1}{}".into()));
+}
+
+#[test]
+fn ordinary_marker_shaped_text_is_preserved() {
+    let stored = Value::Text("\u{1}bookie-partial:2097152\u{1}xxxx".into());
+    let mut result = tablepro_core::QueryResult {
+        columns: vec![],
+        rows: vec![vec![stored.clone()]],
+        truncated: false,
+    };
+    mark_partial_cells(&mut result, &[]);
+    assert_eq!(result.rows[0][0], stored);
 }

@@ -58,7 +58,7 @@ async fn assert_preview_column(
             _ => 0,
         })
         .sum();
-    mark_partial_cells(&mut result);
+    mark_partial_cells(&mut result, &query.preview_columns);
 
     assert!(
         wire < 16 * 1024,
@@ -97,6 +97,29 @@ async fn sqlite_previews_a_huge_text_cell() {
     let columns = [column("id", "INTEGER", true), column("body", "TEXT", false)];
 
     assert_preview_page("sqlite", connection.as_ref(), &columns, "notes").await;
+    let stored = "\u{1}bookie-partial:2097152\u{1}xxxx";
+    connection
+        .execute_params("UPDATE notes SET body = ? WHERE id = 2", &[Value::Text(stored.into())])
+        .await
+        .unwrap();
+    let filter = FilterSet::default();
+    let target = BrowseTarget {
+        driver_id: "sqlite",
+        schema: None,
+        table: "notes",
+        columns: &columns,
+        filter: &filter,
+        hidden_columns: None,
+        long_text_preview: true,
+    };
+    let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
+        panic!("SQL preview")
+    };
+    let mut result = connection.query_params(&query.sql, &query.params).await.unwrap();
+    mark_partial_cells(&mut result, &query.preview_columns);
+    assert_eq!(result.columns.len(), 2);
+    assert!(result.rows.iter().all(|row| row.len() == 2));
+    assert_eq!(result.rows[1][1], Value::Text(stored.into()));
 }
 
 #[tokio::test]
@@ -246,7 +269,7 @@ async fn postgres_previews_huge_json_and_jsonb_cells() {
             _ => 0,
         })
         .sum();
-    mark_partial_cells(&mut result);
+    mark_partial_cells(&mut result, &query.preview_columns);
 
     assert!(wire < 16 * 1024, "only a small preview may cross the wire: {wire}");
     for at in [1, 2] {
@@ -333,7 +356,7 @@ async fn sql_server_previews_huge_legacy_text_and_ntext_cells() {
     };
 
     let mut result = connection.query_params(&query.sql, &query.params).await.unwrap();
-    mark_partial_cells(&mut result);
+    mark_partial_cells(&mut result, &query.preview_columns);
 
     for at in [1, 2] {
         assert!(

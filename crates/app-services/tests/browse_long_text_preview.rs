@@ -74,7 +74,7 @@ async fn a_huge_text_cell_arrives_as_a_small_partial_marker_and_a_normal_one_is_
         .flatten()
         .map(|cell| if let Value::Text(text) = cell { text.len() } else { 0 })
         .sum();
-    mark_partial_cells(&mut result);
+    mark_partial_cells(&mut result, &query.preview_columns);
 
     assert!(
         transferred < 16 * 1024,
