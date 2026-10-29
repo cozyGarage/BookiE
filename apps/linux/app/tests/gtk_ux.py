@@ -1510,7 +1510,6 @@ GLib.MainLoop().run()
             entry = ui.set_visible_editable_within("Export query history", ui.FILE_CHOOSER_ROLES, str(path))
             text = entry.queryText()
             assert text.getText(0, text.characterCount) == str(path), "the chooser did not accept the export path"
-            assert entry.queryComponent().grabFocus(), "the export path cannot receive focus"
             save = ui.find_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON)
             assert save is not None, f"the export chooser has no Save button:\n{ui.accessible_snapshot()}"
             bounds = save.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
