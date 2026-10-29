@@ -1,6 +1,9 @@
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[path = "hostile_server.rs"]
+mod hostile_server;
+
 #[derive(Default)]
 struct MysqlProxyState {
     prepare_ack_pending: bool,
