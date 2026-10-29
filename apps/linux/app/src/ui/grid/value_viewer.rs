@@ -8,6 +8,7 @@ use tablepro_core::Value;
 use super::display::{readonly_null_sentinel, value_to_full_edit_text};
 
 const MAX_VIEW_BYTES: usize = 1 << 20;
+const MAX_WORD_WRAP_BYTES: usize = 4 * 1024;
 const HEX_ROW_BYTES: usize = 16;
 const HEX_MAX_BYTES: usize = 16 * 1024;
 
@@ -116,7 +117,7 @@ fn build_text_view(text: &str) -> gtk::TextView {
         .editable(false)
         .cursor_visible(false)
         .monospace(true)
-        .wrap_mode(gtk::WrapMode::WordChar)
+        .wrap_mode(wrap_mode(text))
         .top_margin(8)
         .bottom_margin(8)
         .left_margin(12)
@@ -131,6 +132,14 @@ fn build_text_view(text: &str) -> gtk::TextView {
     buffer.tag_table().add(&no_hyphens);
     buffer.apply_tag(&no_hyphens, &buffer.start_iter(), &buffer.end_iter());
     view
+}
+
+fn wrap_mode(text: &str) -> gtk::WrapMode {
+    if text.len() <= MAX_WORD_WRAP_BYTES {
+        gtk::WrapMode::WordChar
+    } else {
+        gtk::WrapMode::None
+    }
 }
 
 pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value, null_copy_text: Option<String>) {
@@ -245,6 +254,11 @@ mod tests {
         assert_eq!(body(&Value::Text(r#"{"a":1}"#.into())), r#"{"a":1}"#);
         assert_eq!(body(&Value::Text("{not json".into())), "{not json");
         assert_eq!(body(&Value::Text("hello".into())), "hello");
+    }
+
+    #[test]
+    fn long_values_use_horizontal_scrolling_instead_of_character_wrapping() {
+        assert_eq!(wrap_mode(&"x".repeat(MAX_WORD_WRAP_BYTES + 1)), gtk::WrapMode::None);
     }
 
     #[test]

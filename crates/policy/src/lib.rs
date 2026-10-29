@@ -21,6 +21,7 @@ mod rules;
 mod script_statements;
 mod select_writes;
 mod sensitive_projection;
+mod show_statements;
 mod single_read;
 mod transaction_control;
 mod tsql_transaction;
