@@ -16,7 +16,6 @@ from pathlib import Path
 LIMIT = 60
 
 ROOT = Path(__file__).resolve().parent.parent
-CRATES = [ROOT / "crates", ROOT / "apps", ROOT / "tests"]
 BASELINES = ROOT / "baselines" / "function-size-baselines.txt"
 
 RAW_STRING = re.compile(r'b?r(?P<hashes>#*)"')
@@ -167,12 +166,22 @@ def read_baselines() -> dict[str, int]:
     return allowed
 
 
+def source_files(root: Path = ROOT) -> list[Path]:
+    generated_arch_src = root / "apps/linux/packaging/arch/src"
+    return sorted(
+        path
+        for directory in (root / "crates", root / "apps", root / "tests")
+        for path in directory.rglob("*.rs")
+        if generated_arch_src not in path.parents
+    )
+
+
 def main() -> int:
     allowed = read_baselines()
     errors = 0
     seen: set[str] = set()
 
-    for path in sorted(p for d in CRATES for p in d.rglob("*.rs")):
+    for path in source_files():
         relative = path.relative_to(ROOT).as_posix()
         if "/tests/" in relative or path.name.endswith("_tests.rs"):
             continue

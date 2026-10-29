@@ -99,7 +99,7 @@ Recorded so a contributor does not reopen them without new evidence. Each row ci
 | Direction | Status | Record |
 | --- | --- | --- |
 | In-app AI client or chat | Out of scope | The governed MCP server is the agent interface ([ADR 0017](0017-mcp-sdk-behind-the-governed-seam.md), [ADR 0016](0016-governed-consumer-seam.md)); source: [feature comparison](../0.2-feature-comparison.md#explicitly-out-of-scope-unless-product-goals-change). |
-| Upstream TablePro as a merge target | Declined | Upstream is a behaviour and fixture reference; upstream compatibility is not an acceptance criterion by itself. [upstream sync](../upstream-sync.md), [capability review](../capability-review.md). |
+| Upstream TablePro as a merge target | Declined | BookiE is fully detached and autonomous; external projects are peer references only with no upstream tracking or merge obligations. [peer review](../upstream-sync.md), [capability review](../capability-review.md). |
 | Oracle, Cassandra and runtime-bridge engines | Out of scope | [ADR 0001](0001-no-plugin-system.md). |
 | Importing dbx crates | Declined | [ADR 0018](0018-headless-app-services-crate.md). |
 | Second SQL classifier, permissive fail-open classification, lifecycle scripting hooks | Declined | [ADR 0016](0016-governed-consumer-seam.md). |
@@ -110,7 +110,7 @@ Recorded so a contributor does not reopen them without new evidence. Each row ci
 | dbx's cell and error model: cells as `serde_json::Value`, binary as `"0x…"` text, user WHERE or edits spliced into SQL, a regex production-safety unlock, passwords as plain strings across the UI | Declined | [ADR 0007](0007-type-and-value-preservation.md) and bound values; source: [application-layer audit](../archive/app-layer-external-audit-2026-10-06.md). |
 | Trusted production mutations, unattended MCP writes, a public package | Not approved (SEC-8) | [ADR 0016](0016-governed-consumer-seam.md). |
 | A YAML driver capability manifest or runtime-loaded engine descriptors | Declined | Capabilities are compile-time Rust types on the driver contract ([ADR 0001](0001-no-plugin-system.md)); the proposed direction is one static `DriverCapabilities` struct replacing the `supports_*` methods; source: [dbx features review](../archive/tablepro-dbx-review-2026-10-20/d-dbx-features.md). |
-| Result charts, facet charts, theme editor or theme sync | Out of scope | Not in product goals; source: [feature comparison history](../archive/feature-comparison-history-2026-10-23.md). |
+| Result charts, facet charts, theme editor or theme sync | Out of scope | Not in product goals. |
 
 ## Open forks (do not invent answers here)
 

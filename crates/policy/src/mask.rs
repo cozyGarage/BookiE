@@ -36,6 +36,46 @@ impl SensitivePatterns {
         self.0.iter().any(|pattern| pattern.matches(&name))
     }
 
+    fn redact_nested(&self, cell: &mut Value) {
+        match cell {
+            Value::Json(value) => {
+                self.redact_json(value);
+            }
+            Value::JsonText(text) => {
+                let Ok(mut value) = serde_json::from_str::<serde_json::Value>(text) else {
+                    return;
+                };
+                if self.redact_json(&mut value)
+                    && let Ok(redacted) = serde_json::to_string(&value)
+                {
+                    *text = redacted;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn redact_json(&self, value: &mut serde_json::Value) -> bool {
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut changed = false;
+                for (key, entry) in map.iter_mut() {
+                    if self.matches(key) && !entry.is_null() {
+                        *entry = serde_json::Value::String(REDACTED.into());
+                        changed = true;
+                    } else {
+                        changed |= self.redact_json(entry);
+                    }
+                }
+                changed
+            }
+            serde_json::Value::Array(items) => items
+                .iter_mut()
+                .fold(false, |changed, item| self.redact_json(item) | changed),
+            _ => false,
+        }
+    }
+
     pub(crate) fn mask(&self, mut result: QueryResult, sensitive_positions: Option<&[bool]>) -> QueryResult {
         let sensitive: Vec<bool> = result
             .columns
@@ -43,13 +83,18 @@ impl SensitivePatterns {
             .enumerate()
             .map(|(i, c)| self.matches(&c.name) || sensitive_positions.and_then(|s| s.get(i)).copied().unwrap_or(false))
             .collect();
-        if !sensitive.iter().any(|s| *s) {
+        if self.0.is_empty() && !sensitive.iter().any(|s| *s) {
             return result;
         }
         for row in &mut result.rows {
             for (i, cell) in row.iter_mut().enumerate() {
-                if sensitive.get(i).copied().unwrap_or(false) && !matches!(cell, Value::Null) {
+                if matches!(cell, Value::Null) {
+                    continue;
+                }
+                if sensitive.get(i).copied().unwrap_or(false) {
                     *cell = Value::Text(REDACTED.into());
+                } else {
+                    self.redact_nested(cell);
                 }
             }
         }
@@ -171,5 +216,47 @@ mod tests {
         };
         let masked = apply_masking(result, &[], Some(&[true]));
         assert_eq!(masked.rows[0][0], Value::Text(REDACTED.into()));
+    }
+
+    #[test]
+    fn redacts_sensitive_keys_nested_in_json_cells() {
+        let patterns = vec!["*password*".into(), "*ssn*".into()];
+        let column = |name: &str| ColumnInfo {
+            name: name.into(),
+            data_type: "jsonb".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        };
+        let result = QueryResult {
+            columns: vec![column("auth"), column("profile")],
+            rows: vec![vec![
+                Value::Json(Box::new(
+                    serde_json::json!({"user": "ada", "creds": [{"Password": "p"}]}),
+                )),
+                Value::JsonText(r#"{"name":"ada","ssn":"123-45-6789"}"#.into()),
+            ]],
+            truncated: false,
+        };
+
+        let masked = apply_masking(result, &patterns, None);
+
+        let Value::Json(auth) = &masked.rows[0][0] else {
+            panic!("a JSON cell stays JSON");
+        };
+        assert_eq!(auth["user"], "ada");
+        assert_eq!(auth["creds"][0]["Password"], REDACTED);
+        let Value::JsonText(profile) = &masked.rows[0][1] else {
+            panic!("a JSON text cell stays JSON text");
+        };
+        let profile: serde_json::Value = serde_json::from_str(profile).unwrap();
+        assert_eq!(profile["name"], "ada");
+        assert_eq!(profile["ssn"], REDACTED);
     }
 }
