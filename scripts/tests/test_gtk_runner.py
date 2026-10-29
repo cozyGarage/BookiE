@@ -104,6 +104,7 @@ class GtkRunnerTests(unittest.TestCase):
         _, lines, _ = self.run_all(["a"], {"a": ["first line\nsecond line"]})
         self.assertTrue(any(line.startswith("FAILED: a ") for line in lines))
         self.assertIn("AssertionError: first line\nsecond line", lines)
+        self.assertTrue(any("Traceback (most recent call last):" in line and "__call__" in line for line in lines))
 
     def test_the_summary_lists_every_failed_scenario(self):
         _, _, failures = self.run_all(["a", "b", "c"], {"a": ["x"], "c": ["y"]})

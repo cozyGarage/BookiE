@@ -78,8 +78,8 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 
 ## SQLite attached databases
 
-- [ ] In connection settings for an SQLite connection, add one or more attached databases with a schema alias and file path (including `~/` home directory expansion). On connect, each attached database schema appears in the sidebar alongside the primary schema with its tables and views.
+- [ ] When attachment editing is available in connection settings, add one or more SQLite files with schema aliases and paths (including `~/` expansion). On connect, verify each schema appears in the sidebar. The current form has no add or edit control.
 - [ ] Cross-schema queries (such as `SELECT * FROM main.orders JOIN aux.customers ON orders.customer_id = aux.customers.id`) execute in the SQL editor and return combined rows.
-- [ ] If an attached database file does not exist or cannot be opened, connection establishment reports a clear error identifying the invalid path or alias.
+- [ ] Verify attachment failures are surfaced when implemented. Missing paths are currently skipped, and errors attaching existing paths are ignored; [#1993](https://github.com/cozyGarage/BookiE/issues/1993) tracks the latter.
 - [ ] Connection export and import preserve configured attached database definitions across profiles.
 
