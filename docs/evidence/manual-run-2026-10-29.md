@@ -114,3 +114,11 @@ These five branches were open when the run started and none has merged. Each was
 | `fix/dismiss-editor-completion` | The completion list no longer stays over the result after a run; `linux` still shows it |
 | `fix/connection-popover-position` | The popover fits at 700 px, but `linux` also fits there, so the original clipping was not reproduced |
 | `fix/progress-dialog-title` | The backup progress window now names its operation; `linux` shows only a spinner |
+
+## System OpenSSH with a jump host
+
+Driven on `018779bd5` against a two-hop chain of containers (jump host, target host, PostgreSQL) with a scratch `~/.ssh` bound over the real one with `bwrap`. The app never reads a jump hop from the saved form for system OpenSSH, so the chain comes from `ProxyJump` in that config.
+
+- **Passed:** the ProxyJump route connects; each hop asks for its own host-key approval and a declined hop writes nothing; no `ssh -M` is left after closing; Verify Full through the tunnel verifies the database name.
+- **Not resolved:** a jump host asking for a password got its own dialog rather than the saved target password, but the connection never completed. Every attempt that took longer than about 10 seconds to answer the dialogs ended with "Connection timed out during banner exchange". With both trust dialogs answered within two seconds the same chain connected. The 10 s `ConnectTimeout` therefore covers the time a person takes to answer the dialogs, which may be worth a separate look.
+- **Setup note:** the jump host and the target needed their `sshd` restarted after repeated failed attempts, because their pre-auth connections were being dropped.
