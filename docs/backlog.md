@@ -13,16 +13,15 @@ Check Project #3 for the live issue order and lane before starting work; issue b
 
 ## Current correctness review
 
-The [October 27 code audit](archive/current-code-correctness-audit-2026-10-27.md) records four failing diagnostic probes, documentation corrections and Project reconciliation at its pinned source. These findings are open work, not fixes or a release qualification.
+The [October 27 code audit](archive/current-code-correctness-audit-2026-10-27.md) records the findings at its pinned source. This table reflects the current Linux source: a merged fix does not by itself complete the acceptance recorded on its issue.
 
-| Finding | Tracking | Lane |
-| --- | --- | --- |
-| Stale grid updates can accept a concurrent case-only change | [#1820](https://github.com/cozyGarage/BookiE/issues/1820) | B3 |
-| Failed workspace batches can change previously durable draft bodies | [#1821](https://github.com/cozyGarage/BookiE/issues/1821) | UX |
-| An unreadable draft blocks unrelated workspace restoration | [#1822](https://github.com/cozyGarage/BookiE/issues/1822) | UX |
-| Late preload can recache a deleted connection | [#1730](https://github.com/cozyGarage/BookiE/issues/1730) | UX |
-| A dangling policy symlink silently enables default policy | [#1823](https://github.com/cozyGarage/BookiE/issues/1823) | UX, B4 consultation |
-| Supported evidence packets are omitted from default discovery | [#1824](https://github.com/cozyGarage/BookiE/issues/1824) | UX |
+| Finding | Tracking | Lane | Current Linux status |
+| --- | --- | --- | --- |
+| Stale grid updates can accept a concurrent case-only change | [#1820](https://github.com/cozyGarage/BookiE/issues/1820) | B3 | Open; defect remains |
+| Failed workspace batches can change previously durable draft bodies | [#1821](https://github.com/cozyGarage/BookiE/issues/1821) | UX | Source fixes in [#1829](https://github.com/cozyGarage/BookiE/pull/1829), [#1964](https://github.com/cozyGarage/BookiE/pull/1964) and [#1965](https://github.com/cozyGarage/BookiE/pull/1965); issue remains open for acceptance |
+| Late preload can recache a deleted connection | [#1730](https://github.com/cozyGarage/BookiE/issues/1730) | UX | Fixed in [#1798](https://github.com/cozyGarage/BookiE/pull/1798) and [#1827](https://github.com/cozyGarage/BookiE/pull/1827); issue remains open for acceptance |
+| A dangling policy symlink silently enables default policy | [#1823](https://github.com/cozyGarage/BookiE/issues/1823) | UX, B4 consultation | Fixed in [#1832](https://github.com/cozyGarage/BookiE/pull/1832); issue remains open for acceptance |
+| Supported evidence packets are omitted from default discovery | [#1824](https://github.com/cozyGarage/BookiE/issues/1824) | UX | Open; defect remains |
 
 ## Post-release acceptance follow-ups
 

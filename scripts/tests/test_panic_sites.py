@@ -20,10 +20,18 @@ class PanicSiteModuleResolutionTests(unittest.TestCase):
         shutil.copy2(CHECKER, checker)
         (root / "baselines" / "panic-site-baselines.txt").write_text("", encoding="utf8")
         for path, source in files.items():
-            target = root / "crates" / "sample" / "src" / path
+            target = (
+                root / "apps/linux/packaging/arch/src/TablePro/cargo-vendor/sample/src/lib.rs"
+                if path == "generated-vendor.rs"
+                else root / "crates" / "sample" / "src" / path
+            )
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(source, encoding="utf8")
         return subprocess.run(["bash", str(checker)], capture_output=True, text=True)
+
+    def test_generated_arch_vendor_source_is_not_scanned(self):
+        result = self.run_guard({"generated-vendor.rs": 'fn generated() { panic!("external"); }\n'})
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_nested_test_module_does_not_hide_a_production_tests_rs(self):
         result = self.run_guard(

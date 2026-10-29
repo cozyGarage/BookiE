@@ -17,6 +17,7 @@ mod json;
 mod markdown;
 mod paged;
 mod sql;
+mod text_table;
 mod xlsx;
 mod xml;
 
@@ -27,10 +28,11 @@ pub use csv::{
 };
 pub use error::ExportError;
 pub use file::{ResultExport, ResultFormat, SqlTarget, write_result_file};
-pub use in_clause::{InClause, render_in_clause};
-pub use json::{json_field_names, render_json, render_row_json, row_to_json};
+pub use in_clause::{InClause, render_in_clause, render_value_list};
+pub use json::{json_field_names, render_json, render_json_lines, render_row_json, row_to_json};
 pub use markdown::render_markdown;
 pub use paged::{RowPage, write_paged_file};
+pub use text_table::render_text_table;
 pub use xlsx::MAX_WORKBOOK_ROWS;
 
 pub(crate) fn value_to_text(value: &Value) -> Option<String> {

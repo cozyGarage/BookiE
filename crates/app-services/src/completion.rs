@@ -529,7 +529,7 @@ fn statement_range(
     current.range.start..current.range.end.max(cursor)
 }
 
-fn floor_char_boundary(text: &str, mut index: usize) -> usize {
+pub(super) fn floor_char_boundary(text: &str, mut index: usize) -> usize {
     while index > 0 && !text.is_char_boundary(index) {
         index -= 1;
     }

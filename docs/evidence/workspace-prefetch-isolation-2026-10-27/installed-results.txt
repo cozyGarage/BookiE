@@ -1,0 +1,5 @@
+Corrected pre-fix control: exit 1
+AssertionError: expected an accessible name containing 'SELECT 1822 AS restored_health' to appear:
+Fixed build: exit 0, retries disabled
+passed: deleting_another_connection_keeps_an_unreadable_draft_recoverable (duration: 8.294s)
+passed: a_healthy_workspace_restores_when_another_connection_has_an_unreadable_draft (duration: 8.430s)

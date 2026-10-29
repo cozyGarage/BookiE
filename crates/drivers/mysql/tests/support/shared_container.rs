@@ -20,6 +20,15 @@ pub(crate) struct TestDatabase {
 }
 
 impl TestDatabase {
+    pub(crate) async fn stop(self) {
+        self._container
+            .as_ref()
+            .expect("dedicated MySQL container")
+            .stop_with_timeout(None)
+            .await
+            .unwrap();
+    }
+
     pub(crate) async fn create_multi_result_procedure(&self) {
         if let Some(container) = self._container.as_ref() {
             create_multi_result_procedure(container).await;
