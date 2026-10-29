@@ -19,7 +19,6 @@ mod params;
 mod query;
 mod registry;
 mod session;
-mod shortcut_label;
 pub mod sql_credentials;
 pub mod sql_ddl;
 pub mod sql_diagnostics;
@@ -65,8 +64,5 @@ pub use query::{
 };
 pub use registry::DriverRegistry;
 pub use session::{Session, SessionCommitOutcome};
-pub use shortcut_label::{
-    BrowseDrawnShortcuts, BrowseShortcut, browse_drawn_shortcuts, browse_item_accelerator, browse_visible_key,
-};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;
