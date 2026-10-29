@@ -12,7 +12,7 @@ flowchart LR
 
 ## Current reviews
 
-- The [October 23 database-client review](archive/database-client-review-2026-10-23.md) records source and release pins, corrections to older pagination advice and candidate follow-ups.
+- The October 23 database-client review records source and release pins, corrections to older pagination advice and candidate follow-ups.
 - The [October 21 TablePro adoption review](archive/tablepro-collaboration-2026-10-21.md) records its inspected source, Linux changes and contribution candidates.
 - Earlier source and issue snapshots are preserved in the [upstream review archive](archive/upstream-sync-history-2026-10-22.md). Their issue and pull request states are historical.
 
