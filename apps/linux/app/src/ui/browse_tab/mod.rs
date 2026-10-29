@@ -89,6 +89,7 @@ pub struct BrowseTab {
     /// `current_columns`. Drives the cell value picker; empty for a
     /// driver that doesn't report foreign keys or a table with none.
     foreign_keys: Vec<ForeignKeyInfo>,
+    inbound_foreign_keys: Vec<tablepro_core::InboundForeignKeyInfo>,
     choice_labels: crate::ui::grid::ChoiceMap,
     current_result: Option<std::sync::Arc<QueryResult>>,
     current_projection: Option<Vec<usize>>,
@@ -630,6 +631,7 @@ impl SimpleComponent for BrowseTab {
             current_filter: initial_filter,
             current_columns: Vec::new(),
             foreign_keys: Vec::new(),
+            inbound_foreign_keys: Vec::new(),
             choice_labels: Default::default(),
             current_result: None,
             current_projection: None,
@@ -800,6 +802,13 @@ impl SimpleComponent for BrowseTab {
                     self.render_grid_if_ready(sender);
                 }
             }
+            BrowseTabInput::InboundForeignKeysLoaded(inbound) => {
+                if self.inbound_foreign_keys != inbound {
+                    self.inbound_foreign_keys = inbound;
+                    self.current_column_view = None;
+                    self.render_grid_if_ready(sender);
+                }
+            }
             BrowseTabInput::RowCountLoaded { request, count } => {
                 if !self.row_count_requests.accepts(request) {
                     return;
@@ -866,6 +875,7 @@ impl SimpleComponent for BrowseTab {
             }
             BrowseTabInput::FilterByValue { column, value } => self.filter_by_value(&column, &value, &sender),
             BrowseTabInput::GoToReference { column, row } => self.go_to_reference(&column, &row, &sender),
+            BrowseTabInput::ShowReferencingRows { row } => self.show_referencing_rows(&row, &sender),
             BrowseTabInput::ToggleFilterStrip => {
                 if let Some(strip) = self.filter_strip.as_ref() {
                     strip.toggle();
