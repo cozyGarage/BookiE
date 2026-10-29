@@ -14,6 +14,8 @@ Stored marker-shaped text remains ordinary text. A binary prefix is an explicit 
 - All 14 Redis native integration cases passed before the Linux refresh, including full-value refetch.
 - The shared core descriptor round-trip and malformed-descriptor test passed.
 - The GTK row-object test that blocks row copy/export for partial cells passed using the shared encoder.
-- Full preflight and the complete GTK widget suite were pending when this record was written.
+- Full preflight passed on the refreshed implementation: 2,317 unit tests and 314 sandbox tests, plus harness, guards, formatting and Clippy.
+- The complete isolated GTK widget suite passed: 211 tests.
+- Published validation head: `afa97c9f5`. The following evidence-only commit does not change tested code.
 
 The unchanged collection previews remain unbounded by member bytes. HSCAN/SSCAN count hints do not establish a hard memory limit, and lists or sorted sets can contain large elements. This correction does not resolve that separate finding. Native Wayland and Forgejo acceptance were not run.
