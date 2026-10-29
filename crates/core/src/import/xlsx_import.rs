@@ -69,7 +69,6 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
                 });
             }
             if row.len() <= column {
-                row_payload_bytes += (column + 1 - row.len()) * field_csv_bytes("");
                 row.resize(column + 1, String::new());
             }
             let text = cell_text(cell.get_value());
@@ -82,7 +81,7 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
             let old_size = field_csv_bytes(&row[column]);
             let new_size = field_csv_bytes(&text);
             row_payload_bytes = row_payload_bytes - old_size + new_size;
-            check_output_size(output_bytes, row_payload_bytes.saturating_add(row.len().max(1)))?;
+            check_output_size(output_bytes, row_csv_bytes(row_payload_bytes, row.len()))?;
             row[column] = text.into_owned();
         }
         if current.is_some() {
@@ -109,7 +108,7 @@ fn write_row(
     if *rows_written > MAX_IMPORT_ROWS {
         return Err(ImportError::TooManyRows { limit: MAX_IMPORT_ROWS });
     }
-    let row_bytes = row_payload_bytes.saturating_add(row.len().max(1));
+    let row_bytes = row_csv_bytes(*row_payload_bytes, row.len());
     check_output_size(*output_bytes, row_bytes)?;
     writer
         .write_record(row.iter())
@@ -193,9 +192,6 @@ fn check_shared_string_limit(count: usize) -> Result<(), ImportError> {
 
 fn field_csv_bytes(value: &str) -> usize {
     let bytes = value.as_bytes();
-    if bytes.is_empty() {
-        return 2;
-    }
     let quotes = bytes.iter().filter(|byte| **byte == b'"').count();
     if bytes.iter().any(|byte| matches!(byte, b',' | b'"' | b'\r' | b'\n')) {
         bytes.len() + quotes + 2
@@ -213,6 +209,14 @@ fn check_output_size(current: u64, added: usize) -> Result<(), ImportError> {
         });
     }
     Ok(())
+}
+
+fn row_csv_bytes(payload: usize, columns: usize) -> usize {
+    payload.saturating_add(if columns <= 1 && payload == 0 {
+        3
+    } else {
+        columns.max(1)
+    })
 }
 
 fn cell_text<'a>(value: &'a DataRef<'_>) -> Cow<'a, str> {
@@ -294,7 +298,14 @@ mod tests {
             let mut writer = csv::WriterBuilder::new().from_writer(Vec::new());
             writer.write_record([value]).unwrap();
             let output = writer.into_inner().unwrap();
-            assert_eq!(field_csv_bytes(value) + 1, output.len());
+            assert_eq!(row_csv_bytes(field_csv_bytes(value), 1), output.len());
+        }
+        for fields in [vec![], vec!["", ""], vec!["", "value", ""]] {
+            let mut writer = csv::WriterBuilder::new().from_writer(Vec::new());
+            writer.write_record(&fields).unwrap();
+            let output = writer.into_inner().unwrap();
+            let payload = fields.iter().map(|field| field_csv_bytes(field)).sum();
+            assert_eq!(row_csv_bytes(payload, fields.len()), output.len());
         }
     }
 
