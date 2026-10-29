@@ -4,6 +4,32 @@ BookiE uses XDG files for local state, SQLite for query history, a JSONL audit j
 
 ## Locations
 
+```mermaid
+graph TD
+    subgraph XDG_CONFIG ["$XDG_CONFIG_HOME/tablepro/ (or tablepro-devel)"]
+        Conn["connections.json<br/>(No Credentials)"]
+        Prefs["preferences.json<br/>+ GSettings"]
+        History["history.db<br/>(SQLite + FTS5)"]
+        Favs["favorites.json"]
+        Policy["policy.toml"]
+        Tokens["mcp-tokens.json<br/>(Hashes only)"]
+        KnownHosts["known_hosts<br/>(SSH keys)"]
+    end
+
+    subgraph XDG_DATA ["$XDG_DATA_HOME/tablepro/"]
+        Audit["audit.jsonl<br/>(Hash-chained journal)"]
+    end
+
+    subgraph SECRETS ["Secret Service (Desktop Keyring)"]
+        DBPass["DB Passwords"]
+        SSHPass["SSH Secrets"]
+        MCPToken["MCP Token Plaintext"]
+    end
+
+    Conn -.->|Resolved at runtime via UUID| DBPass
+    Conn -.->|Resolved at runtime| SSHPass
+```
+
 | Data | Format | Default path |
 |---|---|---|
 | Saved connections | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/connections.json` |
@@ -61,7 +87,9 @@ History export from the GUI writes through a temporary sibling file and a rename
 
 ## Policy
 
-The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A missing file uses the built-in defaults. The GUI currently uses `Path::exists` for this decision, so a dangling policy symlink is also treated as missing and policy remains marked available ([#1823](https://github.com/cozyGarage/BookiE/issues/1823)). If a present file cannot be read or parsed, the GUI marks policy unavailable and the local guard receives the built-in defaults; CSV imports and MCP are disabled. Other local SQL operations still use those defaults, so restrictions in the unreadable file are not enforced. A later reload failure keeps the policy already in memory. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
+The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A genuinely absent file uses the built-in defaults. A dangling symlink, inaccessible path, unreadable file or invalid policy leaves policy unavailable. The application refuses connection bootstrap and active guarded handles; CSV imports and MCP remain disabled. The connection error gives repair and restart instructions. A valid symlink loads its target normally.
+
+A failed reload preserves the last successfully loaded policy. Repair the file and reopen Preferences to reload it, or restart BookiE. A successful reload restores guarded connection access. MCP disabled at startup requires an application restart to start its server. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
 
 ## Audit journal
 
@@ -122,7 +150,7 @@ Exported: `id`, `name`, `driver_id`, `host`, `port`, `socket_dir`, `socket_path`
 
 Withheld: `use_tls` (the legacy boolean `tls_mode` replaced, so no bundle can claim `use_tls: true, tls_mode: disabled`), `last_opened_at` (local telemetry), unknown keys carried from a newer version, the contents of TLS certificate and key files and any SSH private key (paths only), and policy `connection_overrides`.
 
-`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal `KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on `SavedConnection` fails the build until someone classifies it. Known gap: `connect_timeout_secs` and `query_timeout_secs` are not yet in `KNOWN_CONNECTION_FIELDS` and escape this check ([#1718](https://github.com/cozyGarage/BookiE/issues/1718)).
+`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal `KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on `SavedConnection` fails the build until someone classifies it. `connect_timeout_secs` and `query_timeout_secs` are classified as withheld: a bundle does not carry them, and importing a bundle over an existing connection keeps that connection's local timeouts.
 
 ### Credentials
 

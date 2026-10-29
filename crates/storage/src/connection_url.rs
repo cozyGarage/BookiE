@@ -142,6 +142,7 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     };
 
     Ok(ParsedConnectionUrl { connection, password })

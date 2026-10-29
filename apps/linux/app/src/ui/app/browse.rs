@@ -317,6 +317,13 @@ impl App {
                     {
                         sender_clone.input(AppMsg::ForeignKeysLoaded(tab_id, foreign_keys));
                     }
+                    if let Ok(inbound) = conn
+                        .fetch_inbound_foreign_keys_controlled(schema.as_deref(), &table, &control)
+                        .await
+                        && !control.cancellation_token().is_cancelled()
+                    {
+                        sender_clone.input(AppMsg::InboundForeignKeysLoaded(tab_id, inbound));
+                    }
                 })
                 .drop_on_shutdown()
         });
@@ -438,6 +445,14 @@ impl App {
 
     pub(super) fn on_browse_foreign_keys_loaded(&self, tab_id: Uuid, foreign_keys: Vec<tablepro_core::ForeignKeyInfo>) {
         self.dispatch_to_tab(tab_id, BrowseTabInput::ForeignKeysLoaded(foreign_keys));
+    }
+
+    pub(super) fn on_browse_inbound_foreign_keys_loaded(
+        &self,
+        tab_id: Uuid,
+        inbound: Vec<tablepro_core::InboundForeignKeyInfo>,
+    ) {
+        self.dispatch_to_tab(tab_id, BrowseTabInput::InboundForeignKeysLoaded(inbound));
     }
 
     pub(super) fn on_browse_rows_loaded(
