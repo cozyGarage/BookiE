@@ -39,7 +39,7 @@ postgres|ROLLBACK|Transaction||true|false|false|false
 postgres|START TRANSACTION|Transaction||true|false|false|false
 postgres|SAVEPOINT s1|Other||true|false|false|false
 postgres|SET search_path = public|Other||true|false|false|false
-postgres|SHOW search_path|Other||true|false|false|false
+postgres|SHOW search_path|Select||true|false|false|false
 postgres|EXPLAIN SELECT * FROM users|Select|users|true|false|false|false
 postgres|EXPLAIN ANALYZE DELETE FROM users|Delete|users|false|true|false|false
 postgres|CALL do_things()|Other||true|false|false|false
@@ -65,7 +65,7 @@ mysql|TRUNCATE TABLE users|Ddl|users|true|true|false|false
 mysql|CREATE TABLE t (id int) ENGINE=InnoDB|Ddl|t|true|false|false|false
 mysql|ALTER TABLE users ADD INDEX i (name)|Ddl|users|true|false|false|false
 mysql|DROP DATABASE shop|Ddl|shop|true|false|false|false
-mysql|SHOW TABLES|Other||true|false|false|false
+mysql|SHOW TABLES|Select||true|false|false|false
 mysql|USE shop|Other||true|false|false|false
 mysql|SET @a = 1|Other||true|false|false|false
 mysql|GRANT SELECT ON shop.* TO 'bob'@'%'|Ddl|shop.*|true|false|false|false

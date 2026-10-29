@@ -123,6 +123,26 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "CAST(map(toUInt8(1), [tuple('wide', CAST(toUInt128('18446744073709551616') AS Nullable(UInt128))), tuple('missing', CAST(NULL AS Nullable(UInt128)))], toUInt8(255), CAST([] AS Array(Tuple(String, Nullable(UInt128))))) AS Map(UInt8, Array(Tuple(String, Nullable(UInt128)))))",
             "Map(UInt8, Array(Tuple(String, Nullable(UInt128))))",
         ),
+        (
+            "CAST([[1, 2, 3], [4, 5, 6]] AS Array(Array(UInt32)))",
+            "Array(Array(UInt32))",
+        ),
+        (
+            "CAST([['alpha', 'beta'], ['gamma', 'delta']] AS Array(Array(String)))",
+            "Array(Array(String))",
+        ),
+        (
+            "CAST([['alpha', CAST(NULL AS Nullable(String))], ['beta']] AS Array(Array(Nullable(String))))",
+            "Array(Array(Nullable(String)))",
+        ),
+        (
+            "CAST([[[1, 2], [3, 4]], [[5, 6], [7, 8]]] AS Array(Array(Array(Int64))))",
+            "Array(Array(Array(Int64)))",
+        ),
+        (
+            "CAST([[toDecimal128('123.45', 2), toDecimal128('678.90', 2)], [toDecimal128('-0.01', 2)]] AS Array(Array(Decimal(38, 2))))",
+            "Array(Array(Decimal(38, 2)))",
+        ),
     ];
 
     for (index, (expression, expected_type)) in cases.into_iter().enumerate() {
@@ -276,4 +296,56 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         );
         connection.query(&format!("DROP TABLE {table}")).await.unwrap();
     }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_clickhouse_nested_structures_decode_and_round_trip() {
+    let (_container, opts) = start_clickhouse().await;
+    let connection = connect(opts).await;
+    let table = "nested_structures_round_trip";
+    connection
+        .query(&format!("DROP TABLE IF EXISTS {table}"))
+        .await
+        .unwrap();
+    connection
+        .query(&format!(
+            "CREATE TABLE {table} (id UInt32, items Nested(name String, count UInt32, tags Array(String))) ENGINE = MergeTree ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    connection
+        .query(&format!(
+            "INSERT INTO {table} VALUES (1, ['apple', 'banana'], [10, 20], [['fruit', 'sweet'], ['fruit', 'yellow']])"
+        ))
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, table).await.unwrap();
+    assert!(columns.iter().any(|c| c.name == "items.name"));
+    assert!(columns.iter().any(|c| c.name == "items.count"));
+    assert!(columns.iter().any(|c| c.name == "items.tags"));
+    let source = connection
+        .query(&format!(
+            "SELECT id, items.name, items.count, items.tags FROM {table} WHERE id = 1"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(source.rows.len(), 1);
+    assert_eq!(source.rows[0][0], Value::Int(1));
+    assert_eq!(
+        source.rows[0][1],
+        Value::Json(Box::new(serde_json::json!(["apple", "banana"])))
+    );
+    assert_eq!(source.rows[0][2], Value::Json(Box::new(serde_json::json!([10, 20]))));
+    assert_eq!(
+        source.rows[0][3],
+        Value::Json(Box::new(serde_json::json!([["fruit", "sweet"], ["fruit", "yellow"]])))
+    );
+    let json_output: serde_json::Value =
+        serde_json::from_str(&tablepro_core::export::render_json(&source.columns, &source.rows)).unwrap();
+    assert_eq!(
+        json_output[0]["items.tags"],
+        serde_json::json!([["fruit", "sweet"], ["fruit", "yellow"]])
+    );
+    connection.query(&format!("DROP TABLE {table}")).await.unwrap();
 }
