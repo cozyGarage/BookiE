@@ -9,7 +9,7 @@
 crates/core/src/import/cell.rs 575
 crates/core/src/sql_dialect.rs 378
 crates/storage/src/connections.rs 1150
-crates/drivers/mssql/tests/integration.rs 1108
+crates/drivers/mssql/tests/integration.rs 1075
 crates/drivers/mysql/tests/support/value_contracts.rs 1201
 crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs 1461
 crates/drivers/postgres/tests/support/domain_contract_parts/basic_domains.rs 1021

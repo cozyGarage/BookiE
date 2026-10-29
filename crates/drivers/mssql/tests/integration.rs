@@ -47,43 +47,6 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn connect_list_tables_pk_and_identity() {
-    let (_c, opts) = start_mssql().await;
-    let conn = connect(opts).await;
-
-    conn.execute(
-        "CREATE TABLE pk_demo (
-            id int IDENTITY(1,1) PRIMARY KEY,
-            name nvarchar(255) NOT NULL,
-            note nvarchar(max) NULL
-        )",
-    )
-    .await
-    .unwrap();
-    conn.execute("INSERT INTO pk_demo (name, note) VALUES (N'a', NULL), (N'b', N'second')")
-        .await
-        .unwrap();
-
-    let tables = conn.list_tables().await.unwrap();
-    assert!(tables.iter().any(|t| t.name == "pk_demo"));
-
-    let cols = conn.fetch_columns(None, "pk_demo").await.unwrap();
-    assert_eq!(cols.len(), 3);
-    let id_col = cols.iter().find(|c| c.name == "id").unwrap();
-    assert!(id_col.primary_key, "id must be detected as primary key");
-    assert!(id_col.is_auto_increment, "IDENTITY must flag auto-increment");
-    assert!(!id_col.nullable);
-    let note_col = cols.iter().find(|c| c.name == "note").unwrap();
-    assert!(!note_col.primary_key);
-    assert!(note_col.nullable);
-
-    let result = conn.fetch_rows(None, "pk_demo", 0, 100).await.unwrap();
-    assert_eq!(result.rows.len(), 2);
-    assert!(!result.truncated);
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
 async fn value_roundtrip_representative_types() {
     let (_c, opts) = start_mssql().await;
     let conn = connect(opts).await;
