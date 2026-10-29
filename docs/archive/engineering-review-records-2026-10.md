@@ -3,7 +3,7 @@
 This dated catalog preserves evidence links from the October 2026 review cycle. It is historical navigation, not current task status. See the [current documentation map](../README.md), [completion page](../bookie-0.2-sprint.md) and [backlog](../backlog.md) for current direction.
 
 
-- [Database-client refresh, October 23](../archive/database-client-review-2026-10-23.md): all 14 named clients, source/release pins, pagination reversal, FK comparison semantics and ranked BookiE follow-ups.
+- Database-client refresh, October 23: all 14 named clients, source/release pins, pagination reversal, FK comparison semantics and ranked BookiE follow-ups.
 
 - [Saved connection row layouts, October 23](../evidence/saved-connection-row-2026-10-23/README.md): light/dark narrow/normal widget captures, allocation checks and the remaining GTK measurement warning.
 
