@@ -1156,6 +1156,11 @@
       "tablepro-app",
       "--lib",
       "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::choice_editor::tests::the_choice_popover_is_as_wide_as_its_widest_content"
     ]
   ],
   "keyring": [
