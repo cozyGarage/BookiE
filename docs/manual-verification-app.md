@@ -83,3 +83,18 @@ Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/134
 - [ ] Run All and Run Current through the menu match their shortcuts in both split panes. File output names the statement/result set; exporting loaded rows never reruns SQL. A stream rerun is clearly labeled.
 - [ ] Table toolbar and grid-menu export both show Scope before Format. All matching rows explains its snapshot refusal and cannot proceed; returning to Current page restores the action. A joined query exports its result columns and cannot be mistaken for a full source-table export.
 - [ ] Header names and types retain their case; Column details exposes complete null/key metadata and a bounded column comment without making every header taller. Test keyboard menus and light/dark/high-contrast themes.
+
+## Schema ER diagram
+
+- [ ] Right-click a schema or table in the sidebar and choose "Show ER Diagram": a dialog opens showing cards for the schema's tables, column names with types, PK and FK indicators, and connector lines for foreign keys.
+- [ ] Pan the canvas by mouse drag or arrow keys; zoom in and out with `+`, `-`, `0` and Ctrl+scroll.
+- [ ] Selecting a table name from the left-side list centres and highlights that table card and highlights connected foreign-key paths.
+- [ ] On a database with more than 150 tables in the selected schema, the ER diagram caps loading at 150 and displays a notice explaining the ceiling.
+- [ ] Opening the diagram on an engine without foreign-key metadata (or without defined foreign keys) renders the table cards cleanly without connector lines or layout errors.
+
+## SQL Server non-dbo catalog objects
+
+- [ ] On a SQL Server database containing objects in non-dbo schemas (such as `sales`, `analytics`, or custom user schemas), the sidebar lists tables, views, triggers, routines, sequences, custom types, and roles partitioned under their respective schemas.
+- [ ] Disabled triggers display a `(disabled)` status indicator in their sidebar listing.
+- [ ] Multi-statement scripts creating and using session `#temp` tables execute sequentially and return results without syntax or scoping errors.
+
