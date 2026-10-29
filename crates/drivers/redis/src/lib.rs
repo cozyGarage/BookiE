@@ -34,6 +34,10 @@ impl DatabaseDriver for RedisDriver {
         6379
     }
 
+    fn supports_browse_filters(&self) -> bool {
+        false
+    }
+
     fn default_database(&self) -> &'static str {
         "0"
     }

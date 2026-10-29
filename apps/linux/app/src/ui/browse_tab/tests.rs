@@ -271,6 +271,7 @@ fn browse_page_fetch_waits_until_the_new_columns_are_applied() {
             table: "customers".into(),
             driver_id: "postgres".into(),
             enum_input_style: EnumInputStyle::RawValue,
+            browse_filters: true,
             connection_id: None,
             read_only: false,
             page_size: 100,
@@ -322,7 +323,7 @@ fn spin_until(context: &relm4::gtk::glib::MainContext, mut condition: impl FnMut
     assert!(condition());
 }
 
-fn spin_for(context: &relm4::gtk::glib::MainContext, duration: std::time::Duration) {
+pub(super) fn spin_for(context: &relm4::gtk::glib::MainContext, duration: std::time::Duration) {
     let deadline = std::time::Instant::now() + duration;
     while std::time::Instant::now() < deadline {
         context.iteration(false);
@@ -343,6 +344,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
             table: "items".into(),
             driver_id: "postgres".into(),
             enum_input_style: EnumInputStyle::RawValue,
+            browse_filters: true,
             connection_id: None,
             read_only: false,
             page_size: 100,
@@ -422,6 +424,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
             table: "items".into(),
             driver_id: "sqlite".into(),
             enum_input_style: EnumInputStyle::RawValue,
+            browse_filters: true,
             connection_id: None,
             read_only: false,
             page_size: 2,
@@ -1137,6 +1140,7 @@ fn a_closed_browse_tab_releases_its_root_widget() {
             table: "customers".into(),
             driver_id: "postgres".into(),
             enum_input_style: EnumInputStyle::RawValue,
+            browse_filters: true,
             connection_id: None,
             read_only: true,
             page_size: 100,

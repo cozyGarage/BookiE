@@ -120,6 +120,7 @@ pub struct TabGridContext {
     /// cell value picker (a later slice) exists.
     pub foreign_key_columns: std::collections::HashSet<String>,
     pub has_inbound_foreign_keys: bool,
+    pub filters_unavailable: bool,
     pub choices: ChoiceMap,
 }
 
@@ -210,7 +211,7 @@ pub fn build_column_view(
             result.truncated,
             driver_id,
             context_menu::GridMenuOptions {
-                filterable: tab_ctx.tab_id.is_some(),
+                filterable: tab_ctx.tab_id.is_some() && !tab_ctx.filters_unavailable,
                 row_mutations_allowed: tab_ctx.row_mutations_allowed,
                 foreign_key_columns: tab_ctx.foreign_key_columns.clone(),
                 has_inbound_foreign_keys: tab_ctx.has_inbound_foreign_keys,
