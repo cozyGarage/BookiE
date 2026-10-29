@@ -1185,6 +1185,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::diagram::canvas::tests::a_diagram_is_laid_out_with_one_card_per_table_and_fits_the_view"
     ],
     [
@@ -1196,6 +1201,11 @@
       "tablepro-app",
       "--lib",
       "ui::diagram::canvas::tests::zoom_steps_stay_within_the_limits_and_fit_restores_the_whole_diagram"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::canvas::tests::every_way_of_zooming_reports_the_new_level"
     ],
     [
       "tablepro-app",
