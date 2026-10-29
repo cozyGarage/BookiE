@@ -194,3 +194,19 @@ fn json_field_names_make_progress_when_duplicate_names_have_gaps() {
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }
+
+#[test]
+fn json_lines_renders_one_json_object_per_row() {
+    let columns = vec![column("id"), column("name"), column("active")];
+    let rows = vec![
+        vec![Value::Int(1), Value::Text("Alice".into()), Value::Bool(true)],
+        vec![Value::Int(2), Value::Text("Bob".into()), Value::Bool(false)],
+    ];
+
+    let output = render_json_lines(&columns, &rows);
+    let lines = output.lines().collect::<Vec<_>>();
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0], r#"{"id":1,"name":"Alice","active":true}"#);
+    assert_eq!(lines[1], r#"{"id":2,"name":"Bob","active":false}"#);
+    assert_eq!(render_json_lines(&columns, &[]), "");
+}

@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="230" viewBox="0 0 1120 230" role="img" aria-label="BookiE Quickstart Workflow">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E2421"/>
+      <stop offset="100%" stop-color="#14312D"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#183D37" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#112925" stop-opacity="0.9"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Container background -->
+  <rect width="1120" height="230" rx="16" fill="url(#bg)" stroke="#1F4F48" stroke-width="1"/>
+
+  <!-- Flow connecting track -->
+  <path d="M 245 115 L 295 115" stroke="#C9A24B" stroke-width="2" stroke-dasharray="4 4"/>
+  <polygon points="295,111 303,115 295,119" fill="#C9A24B"/>
+
+  <path d="M 525 115 L 575 115" stroke="#C9A24B" stroke-width="2" stroke-dasharray="4 4"/>
+  <polygon points="575,111 583,115 575,119" fill="#C9A24B"/>
+
+  <path d="M 805 115 L 855 115" stroke="#C9A24B" stroke-width="2" stroke-dasharray="4 4"/>
+  <polygon points="855,111 863,115 855,119" fill="#C9A24B"/>
+
+  <!-- Step 1: Connect -->
+  <g transform="translate(25, 25)" filter="url(#shadow)">
+    <rect width="220" height="180" rx="12" fill="url(#cardGrad)" stroke="#1F4F48" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="32" rx="8" fill="#1F4F48"/>
+    <text x="32" y="37" font-family="-apple-system, sans-serif" font-size="16" font-weight="700" fill="#C9A24B" text-anchor="middle">1</text>
+    <text x="60" y="38" font-family="-apple-system, sans-serif" font-size="15" font-weight="700" fill="#F3EAD6">Connect</text>
+    <text x="16" y="74" font-family="-apple-system, sans-serif" font-size="12" font-weight="600" fill="#9EAE9A">8 Native Engines</text>
+    <text x="16" y="94" font-family="-apple-system, sans-serif" font-size="11.5" fill="#F3EAD6">Postgres, MySQL, SQLite, MSSQL, ClickHouse, DuckDB</text>
+    <path d="M 16 114 L 204 114" stroke="#1F4F48" stroke-width="1"/>
+    <text x="16" y="134" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Secret Service Keyring</text>
+    <text x="16" y="152" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Built-in SSH Tunneling</text>
+    <text x="16" y="170" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Local / Dev / Staging / Prod</text>
+  </g>
+
+  <!-- Step 2: Browse & Edit -->
+  <g transform="translate(305, 25)" filter="url(#shadow)">
+    <rect width="220" height="180" rx="12" fill="url(#cardGrad)" stroke="#1F4F48" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="32" rx="8" fill="#1F4F48"/>
+    <text x="32" y="37" font-family="-apple-system, sans-serif" font-size="16" font-weight="700" fill="#C9A24B" text-anchor="middle">2</text>
+    <text x="60" y="38" font-family="-apple-system, sans-serif" font-size="15" font-weight="700" fill="#F3EAD6">Browse &amp; Edit</text>
+    <text x="16" y="74" font-family="-apple-system, sans-serif" font-size="12" font-weight="600" fill="#9EAE9A">High-Perf Grid</text>
+    <text x="16" y="94" font-family="-apple-system, sans-serif" font-size="11.5" fill="#F3EAD6">Seek-based keyset paging, instant filtering &amp; sort</text>
+    <path d="M 16 114 L 204 114" stroke="#1F4F48" stroke-width="1"/>
+    <text x="16" y="134" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Staged edits with undo/redo</text>
+    <text x="16" y="152" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Foreign-key jump navigation</text>
+    <text x="16" y="170" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Full-value dialog &amp; JSON view</text>
+  </g>
+
+  <!-- Step 3: Run SQL -->
+  <g transform="translate(585, 25)" filter="url(#shadow)">
+    <rect width="220" height="180" rx="12" fill="url(#cardGrad)" stroke="#1F4F48" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="32" rx="8" fill="#1F4F48"/>
+    <text x="32" y="37" font-family="-apple-system, sans-serif" font-size="16" font-weight="700" fill="#C9A24B" text-anchor="middle">3</text>
+    <text x="60" y="38" font-family="-apple-system, sans-serif" font-size="15" font-weight="700" fill="#F3EAD6">Write SQL</text>
+    <text x="16" y="74" font-family="-apple-system, sans-serif" font-size="12" font-weight="600" fill="#9EAE9A">GtkSourceView Editor</text>
+    <text x="16" y="94" font-family="-apple-system, sans-serif" font-size="11.5" fill="#F3EAD6">Syntax shading, autocomplete, folding &amp; split view</text>
+    <path d="M 16 114 L 204 114" stroke="#1F4F48" stroke-width="1"/>
+    <text x="16" y="134" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Parameter binding (:name)</text>
+    <text x="16" y="152" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• 64 MiB row stream + spool</text>
+    <text x="16" y="170" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Visual explain plan tree</text>
+  </g>
+
+  <!-- Step 4: Governed Safety -->
+  <g transform="translate(865, 25)" filter="url(#shadow)">
+    <rect width="220" height="180" rx="12" fill="url(#cardGrad)" stroke="#1F4F48" stroke-width="1.5"/>
+    <rect x="16" y="16" width="32" height="32" rx="8" fill="#1F4F48"/>
+    <text x="32" y="37" font-family="-apple-system, sans-serif" font-size="16" font-weight="700" fill="#C9A24B" text-anchor="middle">4</text>
+    <text x="60" y="38" font-family="-apple-system, sans-serif" font-size="15" font-weight="700" fill="#F3EAD6">Policy &amp; Audit</text>
+    <text x="16" y="74" font-family="-apple-system, sans-serif" font-size="12" font-weight="600" fill="#9EAE9A">PolicyGuard Protection</text>
+    <text x="16" y="94" font-family="-apple-system, sans-serif" font-size="11.5" fill="#F3EAD6">Local safety checks before every statement execution</text>
+    <path d="M 16 114 L 204 114" stroke="#1F4F48" stroke-width="1"/>
+    <text x="16" y="134" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Unbounded write approvals</text>
+    <text x="16" y="152" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Local encrypted audit journal</text>
+    <text x="16" y="170" font-family="-apple-system, sans-serif" font-size="11" fill="#C5D0C2">• Model Context Protocol (MCP)</text>
+  </g>
+</svg>

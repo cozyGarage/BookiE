@@ -36,6 +36,8 @@ pub(crate) async fn scope_request_cancellation<F: Future>(cancellation: Cancella
     REQUEST_CANCELLATION.scope(cancellation, future).await
 }
 
+const MAX_BROWSE_OFFSET: u64 = 100_000;
+
 pub struct McpBridge {
     provider: Arc<dyn ConnectionProvider>,
     tokens: Arc<TokenStore>,
@@ -437,6 +439,11 @@ impl McpBridge {
             Some(schema) => Some(validated_identifier(&schema)?),
             None => None,
         };
+        if offset > MAX_BROWSE_OFFSET {
+            return Err(format!(
+                "offset must not exceed {MAX_BROWSE_OFFSET}; narrow the query with SQL instead"
+            ));
+        }
         let capped = limit.clamp(1, self.max_rows);
         self.with_connection(token, connection_id, move |conn, control| {
             Box::pin(async move {
@@ -498,10 +505,21 @@ impl McpBridge {
                 }
                 outcome
             })?;
-            let result = transaction.execute_controlled(&sql, &control).await;
+            let refused = match self.driver_id_for_controlled(connection_id, &control).await {
+                Ok(driver_id) => touches_nontransactional_table(transaction.as_mut(), &driver_id, &sql, &control).await,
+                Err(_) => false,
+            };
+            let result = if refused {
+                Err(DriverError::ReadOnly)
+            } else {
+                transaction.execute_controlled(&sql, &control).await
+            };
             let cleanup_control = operation_control_for(CancellationToken::new(), PREVIEW_CLEANUP_TIMEOUT);
             if let Err(error) = transaction.rollback_controlled(&cleanup_control).await {
                 return Err(McpToolError::transaction_rollback_failed(&error));
+            }
+            if refused {
+                return Err(McpToolError::preview_not_transactional());
             }
             let result = result.map_err(|error| {
                 let mut outcome = McpToolError::from_write_error(&error);
@@ -534,6 +552,51 @@ pub struct TableSchema {
 pub enum WriteOutcome {
     Preview { rows_affected: u64, rolled_back: bool },
     Committed { rows_affected: u64 },
+}
+
+pub(crate) fn nontransactional_engine_query(driver_id: &str, sql: &str) -> Option<String> {
+    if driver_id != "mysql" {
+        return None;
+    }
+    let tables: Vec<String> = tablepro_policy::classify(sql, driver_id)
+        .tables
+        .iter()
+        .map(|table| {
+            table
+                .rsplit('.')
+                .next()
+                .unwrap_or(table)
+                .trim_matches('`')
+                .replace('\'', "''")
+        })
+        .collect();
+    if tables.is_empty() {
+        return None;
+    }
+    let names = tables
+        .iter()
+        .map(|table| format!("'{table}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some(format!(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() \
+         AND table_name IN ({names}) AND UPPER(COALESCE(engine, '')) NOT IN ('INNODB', 'NDB', 'NDBCLUSTER')"
+    ))
+}
+
+async fn touches_nontransactional_table(
+    transaction: &mut dyn tablepro_core::Transaction,
+    driver_id: &str,
+    sql: &str,
+    control: &OperationControl,
+) -> bool {
+    let Some(query) = nontransactional_engine_query(driver_id, sql) else {
+        return false;
+    };
+    match transaction.query_controlled(&query, control).await {
+        Ok(result) => !matches!(result.rows.first().and_then(|row| row.first()), Some(Value::Int(0))),
+        Err(_) => true,
+    }
 }
 
 fn validated_identifier(name: &str) -> Result<String, String> {

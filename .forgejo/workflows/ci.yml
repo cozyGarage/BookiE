@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: bookie-lab-${{ github.ref }}
+  group: bookie-lab-${{ github.workflow }}-${{ github.run_id }}
   cancel-in-progress: false
 
 defaults:
@@ -681,6 +681,7 @@ jobs:
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       TABLEPRO_GTK_SCENARIO_RETRIES: "0"
+      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-e2e-${{ matrix.server }}
     strategy:
       fail-fast: false
       matrix:
@@ -1071,6 +1072,7 @@ jobs:
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       TABLEPRO_GTK_SCENARIO_RETRIES: "0"
+      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
     strategy:
       fail-fast: false
       matrix:
