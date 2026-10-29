@@ -17,12 +17,7 @@ pub fn is_xlsx(bytes: &[u8]) -> bool {
 }
 
 pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
-    if bytes.len() as u64 > MAX_FILE_BYTES {
-        return Err(ImportError::FileTooLarge {
-            size: bytes.len() as u64,
-            limit: MAX_FILE_BYTES,
-        });
-    }
+    check_output_size(0, bytes.len())?;
     check_workbook_xml_bounds(bytes)?;
     let mut workbook: Xlsx<_> = open_workbook_from_rs(Cursor::new(bytes)).map_err(|_| ImportError::NotSpreadsheet)?;
     for name in workbook.sheet_names() {
@@ -61,28 +56,14 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
                 }
                 current = Some(row_index);
             }
-            let column = column as usize;
-            if column >= MAX_COLUMNS {
-                return Err(ImportError::TooManyColumns {
-                    columns: column + 1,
-                    limit: MAX_COLUMNS,
-                });
-            }
-            if row.len() <= column {
-                row.resize(column + 1, String::new());
-            }
-            let text = cell_text(cell.get_value());
-            if text.len() > MAX_FIELD_BYTES {
-                return Err(ImportError::FieldTooLong {
-                    line: (row_index - first_row) as usize + 1,
-                    limit: MAX_FIELD_BYTES,
-                });
-            }
-            let old_size = field_csv_bytes(&row[column]);
-            let new_size = field_csv_bytes(&text);
-            row_payload_bytes = row_payload_bytes - old_size + new_size;
-            check_output_size(output_bytes, row_csv_bytes(row_payload_bytes, row.len()))?;
-            row[column] = text.into_owned();
+            set_cell(
+                &mut row,
+                column as usize,
+                cell.get_value(),
+                (row_index - first_row) as usize + 1,
+                output_bytes,
+                &mut row_payload_bytes,
+            )?;
         }
         if current.is_some() {
             write_row(
@@ -96,6 +77,36 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
         }
     }
     Err(ImportError::NoColumns)
+}
+
+fn set_cell(
+    row: &mut Vec<String>,
+    column: usize,
+    value: &DataRef<'_>,
+    line: usize,
+    output_bytes: u64,
+    row_payload_bytes: &mut usize,
+) -> Result<(), ImportError> {
+    if column >= MAX_COLUMNS {
+        return Err(ImportError::TooManyColumns {
+            columns: column + 1,
+            limit: MAX_COLUMNS,
+        });
+    }
+    if row.len() <= column {
+        row.resize(column + 1, String::new());
+    }
+    let text = cell_text(value);
+    if text.len() > MAX_FIELD_BYTES {
+        return Err(ImportError::FieldTooLong {
+            line,
+            limit: MAX_FIELD_BYTES,
+        });
+    }
+    *row_payload_bytes = *row_payload_bytes - field_csv_bytes(&row[column]) + field_csv_bytes(&text);
+    check_output_size(output_bytes, row_csv_bytes(*row_payload_bytes, row.len()))?;
+    row[column] = text.into_owned();
+    Ok(())
 }
 
 fn write_row(
