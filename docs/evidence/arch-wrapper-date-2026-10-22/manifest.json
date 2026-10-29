@@ -1,4 +1,5 @@
 {
+  "source_status": "unpinned-historical",
   "base": "f22a4905ddfe4cff74fd37247d4d028ac9c534e3",
   "source_sha256": {
     "scripts/test-arch-package-container.sh": "20ac64a0202ebb5db026b325f30836aadfe2afc70def3d5505fb18a4bedcf864",
