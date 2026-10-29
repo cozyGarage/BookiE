@@ -364,5 +364,6 @@ async fn catalog_deadline_applies_while_waiting_for_the_shared_client() {
     )
     .await
     .expect("catalog request must honor its deadline before the client is available");
-    assert!(result.is_err());
+    assert!(matches!(result, Err(DriverError::TimedOut)));
+    assert!(connection.usable.load(Ordering::Acquire));
 }

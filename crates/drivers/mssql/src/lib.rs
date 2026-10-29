@@ -369,14 +369,9 @@ impl Connection for MssqlConnection {
         schema: Option<&str>,
         control: &OperationControl,
     ) -> Result<Vec<CatalogObject>, DriverError> {
-        self.run_abandonable(
-            async {
-                let mut client = self.client().await?;
-                catalog::list_objects(&mut client, kind, schema).await
-            },
-            control,
-        )
-        .await
+        let mut client = tablepro_core::run_controlled_setup(self.client(), control).await??;
+        self.run_abandonable(catalog::list_objects(&mut client, kind, schema), control)
+            .await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
