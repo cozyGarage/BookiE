@@ -18,6 +18,17 @@ pub(crate) struct TestDatabase {
     _test_lock: Option<MutexGuard<'static, ()>>,
 }
 
+impl TestDatabase {
+    pub(crate) async fn stop(self) {
+        self._container
+            .as_ref()
+            .expect("dedicated PostgreSQL container")
+            .stop_with_timeout(None)
+            .await
+            .unwrap();
+    }
+}
+
 static SERVER: OnceCell<Server> = OnceCell::const_new();
 static CONTAINER: StdMutex<Option<ContainerAsync<Postgres>>> = StdMutex::new(None);
 static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
