@@ -41,7 +41,7 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool rg;
   fi
 done
 
-container="$(docker run --rm --detach --publish 127.0.0.1::27017 mongo:7 --bind_ip_all)"
+container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::27017 mongo:7 --bind_ip_all)"
 cleanup() {
   docker rm --force "$container" >/dev/null 2>&1 || true
 }

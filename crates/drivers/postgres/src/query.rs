@@ -345,6 +345,11 @@ fn has_enum_leaf(type_info: &PgTypeInfo) -> bool {
     }
 }
 
+struct EnumTypeMeta {
+    formatted: String,
+    enum_type: Option<QualifiedTypeName>,
+}
+
 async fn refresh_enum_type_names(
     connection: &mut PoolConnection<Postgres>,
     columns: &mut [ColumnInfo],
@@ -360,27 +365,50 @@ async fn refresh_enum_type_names(
     }
 
     let rows = sqlx::query(
-        "SELECT type.oid::bigint, pg_catalog.format_type(type.oid, NULL) \
+        "SELECT type.oid::bigint, pg_catalog.format_type(type.oid, NULL), \
+         ns.nspname, type.typname, type.typtype::text, \
+         elem_ns.nspname, elem.typname \
          FROM pg_catalog.pg_type AS type \
+         JOIN pg_catalog.pg_namespace AS ns ON ns.oid = type.typnamespace \
+         LEFT JOIN pg_catalog.pg_type AS elem ON elem.oid = type.typelem AND type.typtype = 'b' AND elem.typtype = 'e' \
+         LEFT JOIN pg_catalog.pg_namespace AS elem_ns ON elem_ns.oid = elem.typnamespace \
          WHERE type.oid IN (SELECT unnest($1::bigint[])::oid)",
     )
     .bind(&type_oids)
     .fetch_all(&mut **connection)
     .await
     .map_err(map_sqlx_error)?;
-    let mut names = HashMap::with_capacity(rows.len());
+    let mut names: HashMap<i64, EnumTypeMeta> = HashMap::with_capacity(rows.len());
     for row in rows {
         let oid: i64 = row.try_get(0).map_err(map_sqlx_error)?;
-        let name: String = row.try_get(1).map_err(map_sqlx_error)?;
-        names.insert(oid, name);
+        let formatted: String = row.try_get(1).map_err(map_sqlx_error)?;
+        let ns: String = row.try_get(2).map_err(map_sqlx_error)?;
+        let typname: String = row.try_get(3).map_err(map_sqlx_error)?;
+        let typtype: String = row.try_get(4).map_err(map_sqlx_error)?;
+        let elem_ns: Option<String> = row.try_get(5).map_err(map_sqlx_error)?;
+        let elem_name: Option<String> = row.try_get(6).map_err(map_sqlx_error)?;
+        let enum_type = if typtype == "e" {
+            Some(QualifiedTypeName {
+                schema: ns,
+                name: typname,
+            })
+        } else if let (Some(schema), Some(name)) = (elem_ns, elem_name) {
+            Some(QualifiedTypeName { schema, name })
+        } else {
+            None
+        };
+        names.insert(oid, EnumTypeMeta { formatted, enum_type });
     }
 
     for (column, type_info) in iter::zip(columns, type_infos) {
         if has_enum_leaf(type_info)
             && let Some(oid) = type_info.oid().map(|oid| i64::from(oid.0))
-            && let Some(name) = names.get(&oid)
+            && let Some(meta) = names.get(&oid)
         {
-            column.data_type.clone_from(name);
+            column.data_type.clone_from(&meta.formatted);
+            if column.enum_type.is_none() {
+                column.enum_type.clone_from(&meta.enum_type);
+            }
         }
     }
     Ok(())

@@ -129,24 +129,7 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
 }
 
 fn uri_host(host: &str) -> Result<String, DriverError> {
-    let raw_host = host
-        .strip_prefix('[')
-        .and_then(|host| host.strip_suffix(']'))
-        .unwrap_or(host);
-    if raw_host.is_empty()
-        || raw_host.chars().any(|ch| {
-            ch.is_control() || ch.is_whitespace() || matches!(ch, '/' | '?' | '#' | '@' | '%' | ',' | '\\' | '[' | ']')
-        })
-    {
-        return Err(DriverError::Unsupported("invalid MongoDB host".into()));
-    }
-    if raw_host.parse::<std::net::Ipv6Addr>().is_ok() {
-        return Ok(format!("[{raw_host}]"));
-    }
-    if host.starts_with('[') || raw_host.contains(':') {
-        return Err(DriverError::Unsupported("invalid MongoDB host".into()));
-    }
-    Ok(raw_host.to_owned())
+    tablepro_core::uri_host(host).ok_or_else(|| DriverError::Unsupported("invalid MongoDB host".into()))
 }
 
 fn encode_uri(s: &str) -> String {

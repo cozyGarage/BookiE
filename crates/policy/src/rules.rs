@@ -5,7 +5,7 @@ use crate::config::EnvPolicy;
 use crate::effects::Effects;
 use crate::principal::Principal;
 use crate::transaction_control::{
-    TransactionControl, has_implicit_transaction_starter, leaves_tsql_transaction_unclosed,
+    TransactionControl, implicit_transaction_starter, leaves_tsql_transaction_unclosed,
     mysql_statement_is_transaction_safe, transaction_control,
 };
 pub use crate::verdict::Decision;
@@ -60,8 +60,17 @@ pub(crate) fn evaluate_with_effects(
 }
 
 pub(crate) fn shared_connection_decision(sql: &str, driver_id: &str, facts: &StatementFacts) -> Option<Decision> {
+    if let Some(statement) = implicit_transaction_starter(sql, driver_id) {
+        return Some(Decision::Deny {
+            rule: "transaction_control_needs_session".into(),
+            message: format!(
+                "{statement} starts a transaction that nothing on a shared connection would end, so the statements \
+                 after it would run inside it. Turn on Session for this editor tab to keep a transaction open \
+                 between statements, or send the whole transaction as one batch"
+            ),
+        });
+    }
     if (facts.class == StatementClass::Transaction && !facts.is_multi_statement)
-        || has_implicit_transaction_starter(sql, driver_id)
         || has_unclosed_shared_transaction(sql, driver_id)
     {
         return Some(Decision::Deny {

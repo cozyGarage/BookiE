@@ -467,6 +467,56 @@ class EvidenceManifestTests(unittest.TestCase):
 
         self.assertTrue(any("source digest does not match its recorded commit" in error for error in errors))
 
+    def _drifted_source_manifest(self, status=None):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        repo = Path(directory.name)
+        subprocess.run(["git", "init", "--quiet"], cwd=repo, check=True)
+        (repo / "source.rs").write_text("current source")
+        manifest = {
+            "source_commit": "a" * 40,
+            "source_sha256": {"source.rs": hashlib.sha256(b"recorded source").hexdigest()},
+        }
+        if status:
+            manifest["source_status"] = status
+        path = repo / "manifest.json"
+        path.write_text(json.dumps(manifest))
+        return repo, path
+
+    def test_a_source_hash_that_matches_nothing_is_reported_until_the_packet_is_labelled_unverified(self):
+        repo, path = self._drifted_source_manifest()
+        with mock.patch.object(VALIDATOR, "ROOT", repo):
+            _, warnings = VALIDATOR.validate_manifest(path)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("source differs from the current checkout", warnings[0])
+
+    def test_a_packet_labelled_unverified_source_keeps_its_recorded_hash_without_a_warning(self):
+        repo, path = self._drifted_source_manifest("unverified-source")
+        with mock.patch.object(VALIDATOR, "ROOT", repo):
+            for strict in (False, True):
+                errors, warnings = VALIDATOR.validate_manifest(path, strict=strict)
+                self.assertEqual((errors, warnings), ([], []), f"strict={strict}")
+        self.assertEqual(json.loads(path.read_text())["source_sha256"]["source.rs"], hashlib.sha256(b"recorded source").hexdigest())
+
+    def test_an_unverified_source_label_does_not_excuse_a_malformed_digest(self):
+        repo, path = self._drifted_source_manifest("unverified-source")
+        manifest = json.loads(path.read_text())
+        manifest["source_sha256"]["source.rs"] = "not-a-digest"
+        path.write_text(json.dumps(manifest))
+        with mock.patch.object(VALIDATOR, "ROOT", repo):
+            errors, _ = VALIDATOR.validate_manifest(path)
+        self.assertTrue(any("invalid source digest" in error for error in errors))
+
+    def test_unverified_packets_are_counted_separately_in_the_summary(self):
+        repo, path = self._drifted_source_manifest("unverified-source")
+        manifest = json.loads(path.read_text())
+        manifest["schema_version"] = 1
+        path.write_text(json.dumps(manifest))
+        output = io.StringIO()
+        with mock.patch.object(VALIDATOR, "ROOT", repo), mock.patch.object(VALIDATOR, "manifests", return_value=[path]), contextlib.redirect_stdout(output):
+            VALIDATOR.main_with_args([])
+        self.assertIn("1 labelled unverified source", output.getvalue())
+
     def test_strict_manifest_rejects_a_missing_source_without_a_per_file_commit(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -538,6 +588,43 @@ class EvidenceManifestTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         errors, _ = VALIDATOR.validate_manifest(path, strict=True)
         self.assertEqual(len(errors), 1)
+
+    def test_a_packet_labelled_unpinned_historical_needs_no_source_identity(self):
+        path, manifest = self.fixture()
+        manifest.pop("source_commit")
+        manifest["source_status"] = "unpinned-historical"
+        path.write_text(json.dumps(manifest))
+        for strict in (False, True):
+            errors, warnings = VALIDATOR.validate_manifest(path, strict=strict)
+            self.assertEqual((errors, warnings), ([], []), f"strict={strict}")
+
+    def test_a_packet_cannot_be_unpinned_and_also_record_a_source_identity(self):
+        path, manifest = self.fixture()
+        manifest["source_status"] = "unpinned-historical"
+        path.write_text(json.dumps(manifest))
+        errors, _ = VALIDATOR.validate_manifest(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("source_status", errors[0])
+
+    def test_an_unknown_source_status_is_rejected(self):
+        path, manifest = self.fixture()
+        manifest.pop("source_commit")
+        manifest["source_status"] = "probably-fine"
+        path.write_text(json.dumps(manifest))
+        errors, _ = VALIDATOR.validate_manifest(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("source_status", errors[0])
+
+    def test_an_unpinned_packet_is_counted_as_context_not_acceptance_proof(self):
+        path, manifest = self.fixture()
+        manifest.pop("source_commit")
+        manifest["source_status"] = "unpinned-historical"
+        path.write_text(json.dumps(manifest))
+        output = io.StringIO()
+        with mock.patch.object(VALIDATOR, "manifests", return_value=[path]), contextlib.redirect_stdout(output):
+            self.assertEqual(VALIDATOR.main_with_args([]), 0)
+        self.assertIn("1 labelled unpinned historical context", output.getvalue())
+        self.assertIn("0 historical/source-drift checks need review", output.getvalue())
 
     def test_clean_test_layer_report_uses_its_commit_as_source_identity(self):
         path, _ = self.layer_report_fixture()
@@ -727,6 +814,34 @@ class EvidenceManifestTests(unittest.TestCase):
             "Validated 0 schema-v1 evidence manifests; checked source provenance in 1 legacy packets",
             output.getvalue(),
         )
+
+    def test_default_scan_rejects_malformed_declared_evidence_under_another_filename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            packet = evidence / "validation.json"
+            packet.write_text(json.dumps({"source_sha256": {"source.rs": "invalid-digest"}}))
+            (evidence / "unrelated.json").write_text('[{"value": 1}]')
+            errors = io.StringIO()
+            with (
+                mock.patch.object(VALIDATOR, "EVIDENCE", evidence),
+                mock.patch.object(sys, "argv", ["validate-evidence"]),
+                contextlib.redirect_stderr(errors),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                result = VALIDATOR.main()
+            self.assertEqual(result, 1)
+            self.assertIn(str(packet), errors.getvalue())
+
+    def test_default_scan_discovers_declared_records_independently_of_filename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            packet = evidence / "source-proof.json"
+            packet.write_text(json.dumps({"source_sha256": {}}))
+            manifest = evidence / "manifest.json"
+            manifest.write_text("invalid json")
+            (evidence / "other.json").write_text('[{"schema_version": 1}]')
+            with mock.patch.object(VALIDATOR, "EVIDENCE", evidence):
+                self.assertEqual(VALIDATOR.manifests([]), sorted([manifest, packet]))
 
 
 if __name__ == "__main__":

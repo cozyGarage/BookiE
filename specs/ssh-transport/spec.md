@@ -24,6 +24,19 @@ Turn a saved SSH hop into a local forward, and decide whether an unknown or chan
 
 ## Core concepts
 
+```mermaid
+flowchart TD
+    Start[Assemble SSH Route] --> CheckKnown{Host Key in known_hosts?}
+    CheckKnown -->|Trusted| OpenTunnel[Open Forwarded Socket / Port]
+    CheckKnown -->|Changed / Mismatch| RejectChanged[Reject: Host Key Changed]
+    CheckKnown -->|Unknown| PromptUser{Prompt User: Trust Key?}
+    PromptUser -->|Refuse| Abort[Abort Connection]
+    PromptUser -->|Learn & Trust| SaveKey[Append to BookiE known_hosts]
+    SaveKey --> OpenTunnel
+    OpenTunnel --> SeparateTLS[Route Bytes to Local Forward<br/>Verify TLS against Real DB Hostname]
+    SeparateTLS --> Handshake[Database TLS Handshake]
+```
+
 - **Dial target.** Where bytes are sent (forwarded socket or `127.0.0.1:ephemeral`).
 - **TLS service identity.** The hostname the certificate must match (the saved database host).
 - **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (an absolute `$XDG_CONFIG_HOME/tablepro/known_hosts`, or `~/.config/tablepro/known_hosts` when XDG_CONFIG_HOME is absent, empty or relative). System `~/.ssh/known_hosts` is unused by that backend (by construction; no negative test).
