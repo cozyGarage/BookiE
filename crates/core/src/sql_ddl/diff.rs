@@ -310,7 +310,7 @@ fn ordered_renames(mut pending: Vec<(String, String)>, used_names: &[&str]) -> V
         let temporary = loop {
             temporaries += 1;
             let candidate = format!("bookie_tmp_{temporaries}");
-            if !used_names.contains(&candidate.as_str()) {
+            if !used_names.iter().any(|name| name.eq_ignore_ascii_case(&candidate)) {
                 break candidate;
             }
         };

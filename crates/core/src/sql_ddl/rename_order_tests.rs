@@ -68,6 +68,29 @@ fn swapping_two_column_names_renames_through_a_free_name() {
 }
 
 #[test]
+fn temporary_names_do_not_collide_with_existing_names_in_another_case() {
+    let original = vec![
+        existing("a", "text"),
+        existing("b", "text"),
+        existing("BOOKIE_TMP_1", "text"),
+    ];
+    let drafts = renamed_drafts(&original, &["b", "a", "BOOKIE_TMP_1"]);
+    let ops = diff_to_ops(None, "t", "t", &original, &drafts, &[], &[], &[], &[]);
+    let temporary = ops
+        .iter()
+        .find_map(|op| match op {
+            StructureOp::RenameColumn { new_name, .. } => Some(new_name),
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        !original
+            .iter()
+            .any(|column| column.name.eq_ignore_ascii_case(temporary))
+    );
+}
+
+#[test]
 fn a_chain_of_renames_runs_in_dependency_order_whatever_the_column_order() {
     let original = vec![existing("a", "text"), existing("b", "text")];
     let drafts = renamed_drafts(&original, &["b", "c"]);
