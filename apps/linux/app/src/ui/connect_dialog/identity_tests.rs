@@ -21,12 +21,13 @@ fn matches_existing(saved: &SavedConnection, identity: &ConnectionIdentity<'_>) 
 fn saving_the_same_driver_keeps_attached_database_files() {
     let mut existing = saved("sqlite", "", AuthMode::Password);
     existing.attached_databases = vec![AttachedDatabase::new("archive", "/data/archive.db")];
+    let mut options = ConnectOptions::default();
 
-    assert_eq!(
-        super::super::preserved_attached_databases("sqlite", Some(&existing)),
-        existing.attached_databases
-    );
-    assert!(super::super::preserved_attached_databases("postgres", Some(&existing)).is_empty());
+    super::super::preserve_attached_databases("sqlite", Some(&existing), &mut options);
+    assert_eq!(options.attached_databases, existing.attached_databases);
+
+    super::super::preserve_attached_databases("postgres", Some(&existing), &mut options);
+    assert!(options.attached_databases.is_empty());
 }
 
 fn saved(driver_id: &str, username: &str, auth_mode: AuthMode) -> SavedConnection {
