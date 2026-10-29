@@ -18,7 +18,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 - **Environment markers**: Tag connections as **Local**, **Dev**, **Staging**, or **Production**. Production connections display a red badge, a tinted header, and `[Production]` in the window title.
 - **Keyring security**: Passwords stay in the desktop keyring (Secret Service via `oo7`). Plaintext connection files never store credentials.
 - **CLI launch**: Open databases directly from a terminal: `bookie books.db` or `bookie postgres://user@host:5432/db`.
-- **Attached SQLite databases**: For SQLite connections, configure additional database files with schema aliases to browse and query multiple databases in one session.
+- **Attached SQLite databases**: The SQLite driver can use configured attachments, but the connection form does not currently provide controls to add or edit them. Existing attachment lists are preserved when editing the same connection.
 - **Bundles**: Export or import connections with optional passphrase encryption to share configurations across machines.
 
 ## Browse a table
