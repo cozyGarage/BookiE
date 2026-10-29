@@ -1,4 +1,4 @@
-use tablepro_core::ConnectOptions;
+use tablepro_core::{AttachedDatabase, ConnectOptions};
 use tablepro_storage::{SavedConnection, SavedSshConfig};
 use uuid::Uuid;
 
@@ -24,6 +24,15 @@ pub(super) fn saved_connection_name(entered: &str, driver_id: &str, opts: &Conne
         return entered.to_owned();
     }
     derived_connection_name(driver_id, opts)
+}
+
+pub(super) fn preserved_attached_databases(
+    driver_id: &str,
+    existing: Option<&SavedConnection>,
+) -> Vec<AttachedDatabase> {
+    existing
+        .filter(|connection| connection.driver_id == driver_id)
+        .map_or_else(Vec::new, |connection| connection.attached_databases.clone())
 }
 
 fn derived_connection_name(driver_id: &str, opts: &ConnectOptions) -> String {

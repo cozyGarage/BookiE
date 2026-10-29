@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 fn identity<'a>(driver_id: &'a str, opts: &'a ConnectOptions, file_based: bool) -> ConnectionIdentity<'a> {
     ConnectionIdentity {
@@ -15,6 +15,18 @@ fn matches_existing(saved: &SavedConnection, identity: &ConnectionIdentity<'_>) 
     matches_endpoint(saved, identity)
         && (identity.file_based
             || saved.username == identity.opts.username && saved.auth_mode == identity.opts.auth_mode)
+}
+
+#[test]
+fn saving_the_same_driver_keeps_attached_database_files() {
+    let mut existing = saved("sqlite", "", AuthMode::Password);
+    existing.attached_databases = vec![AttachedDatabase::new("archive", "/data/archive.db")];
+
+    assert_eq!(
+        super::super::preserved_attached_databases("sqlite", Some(&existing)),
+        existing.attached_databases
+    );
+    assert!(super::super::preserved_attached_databases("postgres", Some(&existing)).is_empty());
 }
 
 fn saved(driver_id: &str, username: &str, auth_mode: AuthMode) -> SavedConnection {
@@ -41,6 +53,7 @@ fn saved(driver_id: &str, username: &str, auth_mode: AuthMode) -> SavedConnectio
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 

@@ -97,7 +97,7 @@ mod error_tests;
 pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
 use form::{default_driver_row, test_result_text};
-use identity::{ConnectionIdentity, find_existing, saved_connection_name};
+use identity::{ConnectionIdentity, find_existing, preserved_attached_databases, saved_connection_name};
 pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
 
 pub struct ConnectDialogInit {
@@ -1099,6 +1099,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         connect_timeout_secs: opts_clone.connect_timeout_secs,
         query_timeout_secs,
         auth_source: opts_clone.auth_source.clone(),
+        attached_databases: preserved_attached_databases(&driver_id, existing.as_ref()),
     };
 
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;
