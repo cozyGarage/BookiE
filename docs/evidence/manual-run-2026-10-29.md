@@ -17,11 +17,13 @@ Counted from the four checklists after this run. "Ticked" means every clause of 
 
 | Checklist | Items | Ticked | Open |
 |---|---|---|---|
-| Catalog, sidebar and application shell | 38 | 15 | 23 |
-| Connections and SSH | 44 | 24 | 20 |
-| SQL editor and sessions | 62 | 34 | 28 |
-| Grid, filters and data transfer | 76 | 46 | 30 |
-| **All four** | 220 | 119 | 101 |
+| Catalog, sidebar and application shell | 46 | 15 | 31 |
+| Connections and SSH | 48 | 24 | 24 |
+| SQL editor and sessions | 63 | 34 | 29 |
+| Grid, filters and data transfer | 83 | 48 | 35 |
+| **All four** | 240 | 121 | 119 |
+
+Other contributors added 20 items to the checklists while this run merged `linux`, so the open count is higher than the 101 recorded at the first push. Counts are from the files at the head of this run.
 
 The run added a note or changed a tick on 52 items. One item, the native Wayland repeat of the restart restore, was unticked because its own text says that repeat is untested.
 
@@ -70,3 +72,11 @@ Safe-by-design differences are not gaps. BookiE refuses unsafe writes through `P
 ## Cleanup
 
 The app and `ydotoold` stay running until the maintainer stops them; the compose project `bookie-manual-20261029`, the `bm-pg18` container and the private profiles under `/tmp/opencode` were started by this run and are listed here for removal.
+
+## Regression found and fixed after the merge
+
+After merging `linux` at `0a46b6bd0` (the commit `df1996177` that added enum metadata to query columns), every browse of a PostgreSQL table with an enum column failed with "Couldn't load rows: error occurred while decoding column 4: mismatched types; Rust type `String` (as SQL type `TEXT`) is not compatible with SQL type `"CHAR"`". The metadata query reads `pg_type.typtype`, which is the `"char"` type. The existing integration test `enum_labels_come_back_in_declared_order_for_the_named_type_only` failed on the unfixed code and passes with `typtype::text`. The fix is one line on branch `fix/postgres-enum-typtype-decode` (commit `98e136030`), pushed to GitHub without a pull request because `gh` is not authenticated on this machine. It has not been through the Forgejo gate.
+
+## Contrast sample
+
+Measured from full-resolution captures on the grid, not from class names. Light header text is 2.28:1 and dark header text is 3.76:1; both are below 4.5:1. Other sampled text is 7:1 or higher. The values are on the [application checklist](../manual-verification-app.md#visual-audit-matrix).
