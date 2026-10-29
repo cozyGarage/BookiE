@@ -4,7 +4,7 @@ Part of [testing](testing.md), which holds the test tiers, runner and fixtures.
 
 ## CI
 
-Where each check runs is owned by [CI tiers in the validation playbook](validation-playbook.md#ci-tiers). GitHub runs the cheap tier on pull requests; Forgejo runs the merge tier on branch pushes. Documentation-only changes skip the heavy path. Do not treat a skipped GitHub merge-tier job as a pass.
+Where each check runs is owned by [CI tiers in the validation playbook](validation-playbook.md#ci-tiers). GitHub runs the cheap tier and Driver TLS fixture on pull requests. Forgejo runs the remaining merge-tier acceptance on branch pushes; Driver TLS currently overlaps during migration. Documentation-only changes skip the heavy path. Do not treat a skipped GitHub merge-tier job as a pass.
 
 The `Linux PR readiness` workflow is an always-running GitHub check for pull requests to `linux`. It reads the exact pull request head's GitHub check runs and waits for the checks applicable to the changed paths; missing or non-success results fail closed. The `pull_request` job has read-only permissions and checks out that exact head to run the readiness script. No repository secrets are passed to the script. This check reports GitHub readiness only. It does not run or replace the Forgejo gate, and it is not a branch-protection requirement until the repository ruleset explicitly requires its context. The workflow and path mapping are tested by `scripts/tests/test_pr_readiness.py`.
 Headless driver, TLS, PostgreSQL release and dump, and socket/SSH jobs start after guards, Clippy, unit and sandbox pass. They do not wait for widget tests. Widgets remain a required job, and GUI jobs retain their widget dependencies. Every tier must still pass for merge acceptance.

@@ -169,14 +169,27 @@ fn ready_page(banner: &adw::Banner, list: &gtk::ListBox, canvas: &DiagramCanvas)
 
 fn header(canvas: &DiagramCanvas, zoom_label: &gtk::Label) -> adw::HeaderBar {
     let bar = adw::HeaderBar::new();
-    let out = zoom_button("zoom-out-symbolic", &tr!("Zoom out"), canvas, DiagramCanvas::zoom_out);
+    let out = zoom_button(
+        "zoom-out-symbolic",
+        &tr!("Zoom out"),
+        canvas,
+        zoom_label,
+        DiagramCanvas::zoom_out,
+    );
     let fit = zoom_button(
         "zoom-fit-best-symbolic",
         &tr!("Fit diagram to window"),
         canvas,
+        zoom_label,
         DiagramCanvas::fit,
     );
-    let into = zoom_button("zoom-in-symbolic", &tr!("Zoom in"), canvas, DiagramCanvas::zoom_in);
+    let into = zoom_button(
+        "zoom-in-symbolic",
+        &tr!("Zoom in"),
+        canvas,
+        zoom_label,
+        DiagramCanvas::zoom_in,
+    );
     bar.pack_end(&into);
     bar.pack_end(zoom_label);
     bar.pack_end(&fit);
@@ -184,13 +197,25 @@ fn header(canvas: &DiagramCanvas, zoom_label: &gtk::Label) -> adw::HeaderBar {
     bar
 }
 
-fn zoom_button(icon: &str, tooltip: &str, canvas: &DiagramCanvas, action: fn(&DiagramCanvas)) -> gtk::Button {
+fn zoom_button(
+    icon: &str,
+    tooltip: &str,
+    canvas: &DiagramCanvas,
+    zoom_label: &gtk::Label,
+    action: fn(&DiagramCanvas),
+) -> gtk::Button {
     let button = gtk::Button::from_icon_name(icon);
     button.set_tooltip_text(Some(tooltip));
     button.update_property(&[gtk::accessible::Property::Label(tooltip)]);
     button.connect_clicked({
-        let canvas = canvas.clone();
-        move |_| action(&canvas)
+        let (canvas, zoom_label) = (canvas.downgrade(), zoom_label.downgrade());
+        move |_| {
+            let (Some(canvas), Some(zoom_label)) = (canvas.upgrade(), zoom_label.upgrade()) else {
+                return;
+            };
+            action(&canvas);
+            update_zoom(&canvas, &zoom_label);
+        }
     });
     button
 }
@@ -221,19 +246,26 @@ fn show_diagram(ui: &Rc<Ui>, read: SchemaRead) {
     fill_list(ui, &diagram);
     ui.canvas.set_diagram(diagram);
     ui.stack.set_visible_child_name("ready");
-    update_zoom(ui);
-    ui.canvas.add_tick_callback({
-        let ui = ui.clone();
-        move |_, _| {
-            update_zoom(&ui);
-            glib::ControlFlow::Continue
-        }
-    });
+    update_zoom(&ui.canvas, &ui.zoom_label);
+    schedule_zoom_update(ui);
     ui.canvas.grab_focus();
 }
 
-fn update_zoom(ui: &Ui) {
-    ui.zoom_label.set_text(&format!("{}%", zoom::percent(ui.canvas.zoom())));
+fn schedule_zoom_update(ui: &Rc<Ui>) {
+    let canvas = ui.canvas.downgrade();
+    let zoom_label = ui.zoom_label.downgrade();
+    ui.canvas.add_tick_callback({
+        move |_, _| {
+            if let (Some(canvas), Some(zoom_label)) = (canvas.upgrade(), zoom_label.upgrade()) {
+                update_zoom(&canvas, &zoom_label);
+            }
+            glib::ControlFlow::Break
+        }
+    });
+}
+
+fn update_zoom(canvas: &DiagramCanvas, zoom_label: &gtk::Label) {
+    zoom_label.set_text(&format!("{}%", zoom::percent(canvas.zoom())));
 }
 
 fn fill_list(ui: &Rc<Ui>, diagram: &SchemaDiagram) {
@@ -254,9 +286,16 @@ fn fill_list(ui: &Rc<Ui>, diagram: &SchemaDiagram) {
         ]);
         ui.list.append(&row);
     }
-    ui.list.connect_row_selected({
-        let canvas = ui.canvas.clone();
+    connect_selection(&ui.list, &ui.canvas);
+}
+
+fn connect_selection(list: &gtk::ListBox, canvas: &DiagramCanvas) {
+    list.connect_row_selected({
+        let canvas = canvas.downgrade();
         move |_, row| {
+            let Some(canvas) = canvas.upgrade() else {
+                return;
+            };
             let index = row.and_then(|row| usize::try_from(row.index()).ok());
             canvas.select(index);
             if let Some(index) = index {
@@ -264,11 +303,16 @@ fn fill_list(ui: &Rc<Ui>, diagram: &SchemaDiagram) {
             }
         }
     });
-    ui.canvas.connect_selected({
-        let list = ui.list.clone();
-        move |index| match index.and_then(|at| list.row_at_index(i32::try_from(at).unwrap_or(-1))) {
-            Some(row) => list.select_row(Some(&row)),
-            None => list.unselect_all(),
+    canvas.connect_selected({
+        let list = list.downgrade();
+        move |index| {
+            let Some(list) = list.upgrade() else {
+                return;
+            };
+            match index.and_then(|at| list.row_at_index(i32::try_from(at).unwrap_or(-1))) {
+                Some(row) => list.select_row(Some(&row)),
+                None => list.unselect_all(),
+            }
         }
     });
 }
@@ -292,3 +336,7 @@ fn notice_text(read: &SchemaRead) -> String {
     }
     parts.join(" ")
 }
+
+#[cfg(test)]
+#[path = "dialog_lifetime_tests.rs"]
+mod lifetime_tests;

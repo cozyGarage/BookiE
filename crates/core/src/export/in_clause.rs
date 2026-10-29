@@ -128,4 +128,17 @@ mod tests {
         assert_eq!(render_value_list("postgres", &columns, &[]), "");
         assert_eq!(render_value_list("postgres", &[], &rows), "");
     }
+
+    #[test]
+    fn value_list_renderer_formats_dates_and_dialect_specific_literals() {
+        let columns = vec![column("id"), column("created"), column("flag")];
+        let date = Value::Date(chrono::NaiveDate::from_ymd_opt(2026, 10, 29).unwrap());
+        let rows = vec![vec![Value::Int(10), date, Value::Bool(true)]];
+
+        let mssql_sql = render_value_list("mssql", &columns, &rows);
+        assert_eq!(mssql_sql, "(10, N'2026-10-29', 1)");
+
+        let sqlite_sql = render_value_list("sqlite", &columns, &rows);
+        assert_eq!(sqlite_sql, "(10, '2026-10-29', TRUE)");
+    }
 }
