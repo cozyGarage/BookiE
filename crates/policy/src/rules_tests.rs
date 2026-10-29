@@ -691,3 +691,49 @@ fn connection_override_policy_is_used_directly() {
     );
     assert!(d.is_allow(), "{d:?}");
 }
+
+fn human_decision(sql: &str, driver: &str) -> Decision {
+    evaluate(
+        &Principal::human_gui(),
+        Environment::Local,
+        &classify(sql, driver),
+        false,
+        &env_policy(Environment::Local),
+        None,
+    )
+}
+
+#[test]
+fn read_only_show_statements_run_without_a_prompt_on_a_local_connection() {
+    for sql in [
+        "SHOW STATUS LIKE 'Ssl_cipher'",
+        "SHOW VARIABLES LIKE 'max_connections'",
+        "SHOW TABLES",
+        "SHOW CREATE TABLE items",
+        "SHOW COLUMNS FROM items",
+        "SHOW DATABASES",
+        "SHOW PROCESSLIST",
+    ] {
+        let decision = human_decision(sql, "mysql");
+        assert!(
+            matches!(decision, Decision::Allow { .. }),
+            "{sql} was held: {decision:?}"
+        );
+    }
+}
+
+#[test]
+fn statements_that_are_not_recognised_reads_keep_their_prompt() {
+    for sql in [
+        "SHOW STATUS LIKE",
+        "FLUSH TABLES",
+        "SET GLOBAL max_connections = 1",
+        "LOAD DATA INFILE 'x' INTO TABLE t",
+    ] {
+        let decision = human_decision(sql, "mysql");
+        assert!(
+            matches!(decision, Decision::RequireApproval { .. }),
+            "{sql} was not held: {decision:?}"
+        );
+    }
+}
