@@ -1512,12 +1512,7 @@ GLib.MainLoop().run()
             assert text.getText(0, text.characterCount) == str(path), "the chooser did not accept the export path"
             save = ui.find_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON)
             assert save is not None, f"the export chooser has no Save button:\n{ui.accessible_snapshot()}"
-            bounds = save.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
-            x11_click(
-                bounds.x + bounds.width // 2,
-                bounds.y + bounds.height // 2 - ATSPI_WINDOW_Y_OFFSET,
-                button=1,
-            )
+            ui.invoke(save)
             ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES, present=False)
             deadline = time.monotonic() + ui.WAIT_SECONDS
             while time.monotonic() < deadline and not path.exists():

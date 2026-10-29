@@ -30,6 +30,6 @@ The MongoDB SCRAM change merged upstream as [#1833](https://github.com/mongodb/m
 
 The links preserve issue provenance only. Current release status, patch contents, dependency versions and test selectors must be checked before changing `vendor/`.
 
-The [October 28 peer dependency review](../archive/peer-dependency-review-2026-10-28.md) compares these patches and the direct dependencies with eight peer clients.
+An October 28 trial of DuckDB 2.0 compiled on Linux and passed 64 of 67 driver tests. Three TIMESTAMPTZ tests failed because the ICU extension was unavailable with external downloads disabled. Enabling bundled ICU requires CMake in the build environments and packaging. The trial did not change the selected dependency version.
 
 On 2026-10-28 two other unreleased SQLx changes were reviewed and not vendored. [Pull request 4394](https://github.com/launchbadge/sqlx/pull/4394) (a transaction cancelled during `BEGIN`) does not reach BookiE: its pool runs `DISCARD ALL` on release, which fails inside a transaction and closes the connection. [Pull request 4289](https://github.com/launchbadge/sqlx/pull/4289) (a pool maintenance CPU spin) changes `sqlx-core`, which BookiE does not vendor. Revisit both when SQLx publishes a release that contains them.

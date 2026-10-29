@@ -666,6 +666,13 @@ fn only_connection_level_failures_can_hide_a_tls_problem() {
 }
 
 #[test]
+fn a_page_end_beyond_the_address_space_is_refused_instead_of_wrapping() {
+    assert_eq!(scan_target(10, 5).unwrap(), 15);
+    assert!(scan_target(u64::MAX - 1, 10).is_err());
+    assert!(scan_target(u64::MAX, u64::MAX).is_err());
+}
+
+#[test]
 fn a_host_that_would_change_the_url_is_refused() {
     for host in [
         "cache#insecure",
