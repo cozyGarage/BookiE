@@ -264,6 +264,23 @@ impl MssqlConnection {
         Ok(())
     }
 
+    async fn rollback_batch(&self, client: &mut MssqlClient, index: usize, source: DriverError) -> DriverError {
+        match exec_simple(client, "ROLLBACK").await {
+            Ok(()) => DriverError::Transaction {
+                statement_index: index,
+                source: Box::new(source),
+            },
+            Err(error) => {
+                let _ = self.retire().await;
+                DriverError::TransactionRollbackFailed {
+                    statement_index: index,
+                    source: Box::new(source),
+                    rollback_error: Box::new(error),
+                }
+            }
+        }
+    }
+
     async fn query_result(
         &self,
         client: &mut MssqlClient,
@@ -482,11 +499,7 @@ impl Connection for MssqlConnection {
             let boxes = match boxed_params(params) {
                 Ok(boxes) => boxes,
                 Err(error) => {
-                    let _ = exec_simple(&mut client, "ROLLBACK").await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(error),
-                    });
+                    return Err(self.rollback_batch(&mut client, idx, error).await);
                 }
             };
             let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
@@ -494,32 +507,23 @@ impl Connection for MssqlConnection {
                 Ok(res) => {
                     let total = res.total();
                     if expect_one.contains(&idx) && total != 1 {
-                        let source = DriverError::ConcurrentModification;
-                        let rollback = exec_simple(&mut client, "ROLLBACK").await;
-                        return Err(match rollback {
-                            Ok(()) => DriverError::Transaction {
-                                statement_index: idx,
-                                source: Box::new(source),
-                            },
-                            Err(error) => DriverError::TransactionRollbackFailed {
-                                statement_index: idx,
-                                source: Box::new(source),
-                                rollback_error: Box::new(error),
-                            },
-                        });
+                        return Err(self
+                            .rollback_batch(&mut client, idx, DriverError::ConcurrentModification)
+                            .await);
                     }
                     affected.push(total);
                 }
                 Err(e) => {
-                    let _ = exec_simple(&mut client, "ROLLBACK").await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(map_tiberius_error(e)),
-                    });
+                    return Err(self.rollback_batch(&mut client, idx, map_tiberius_error(e)).await);
                 }
             }
         }
-        exec_simple(&mut client, "COMMIT").await?;
+        if let Err(error) = exec_simple(&mut client, "COMMIT").await {
+            self.retire().await?;
+            return Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(error),
+            });
+        }
         Ok(affected)
     }
 
