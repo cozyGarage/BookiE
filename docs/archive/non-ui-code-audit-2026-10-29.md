@@ -61,3 +61,22 @@ The guards pass because their baselines absorb the debt. The reviewers counted c
 ## Not reviewed
 
 Decoders against ADR 0007 line by line (`postgres/decode.rs`, `mysql/decode.rs`, `mssql/codec.rs`, `clickhouse/temporal.rs`, `mongodb/codec.rs`), the `#[ignore]` inventory against the isolated-test registrations, test assertion text, CSV import and export formatting (they live in `core`, not `app-services`), and anything under `apps/linux`.
+
+## Follow-up: fixes started the same day
+
+Each fix is one commit on its own branch from `linux` with a failing test first. None is merged, none has a pull request (the author's `gh` is not logged in), and none has run through the Forgejo gate.
+
+| Finding | Branch | Result |
+|---|---|---|
+| 1. Dump file mode | `fix/dump-output-mode` | The backup file is created 0600 before `pg_dump` writes it; a new test failed at mode 0644 before the change. |
+| 2. ClickHouse and SQL Server external-source functions | `fix/policy-engine-file-functions` | `file`, `url`, `s3`, `remote`, `OPENROWSET`, `OPENQUERY` and the related names now classify as administrative; the new tests failed with class `Select` before the change. This is the B4 lane (`crates/policy`); the handoff comment is still to be recorded on the issue. `OPENROWSET(BULK ...)` and `OPENDATASOURCE(...).t` do not parse and were already denied as unparseable. |
+| 4. MCP `explain_query` text | `fix/mcp-explain-description` | The description now says what the code and its existing test enforce: a read-scoped token may read a plan and `EXPLAIN ANALYZE` needs write scope. A text-only change with no new test. |
+| 6. Redis host in the URL | `fix/redis-host-validation` | Redis and MongoDB share one validated `uri_host` in `core`. The new tests failed before the change, which also fixed an unbracketed IPv6 host that produced a broken URL. |
+| 7. Dead shortcut module | `chore/remove-dead-shortcut-label` | The module and its re-export are removed; the workspace builds. |
+
+Not changed:
+
+- **Finding 3** (a read-scoped token backed only by the classifier) needs a read-only session design for agents. It is a decision for the B4 lane, not a small fix.
+- **Finding 5** (SQL Server `COMMIT` failure) is downgraded. When `COMMIT` fails on SQL Server the transaction has almost always already ended, and no test can tell fixed code from unfixed code, so no change was made.
+- **Findings 8 and 9** (file formats in `core`, MongoDB and Redis cancellation) need an ADR decision first.
+
