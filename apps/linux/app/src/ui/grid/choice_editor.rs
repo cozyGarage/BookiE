@@ -136,6 +136,19 @@ fn set_content(picker: Picker, labels: Vec<String>, current: &str) -> gtk::Widge
     body.upcast()
 }
 
+fn choice_scroller(content: &gtk::Widget) -> gtk::ScrolledWindow {
+    gtk::ScrolledWindow::builder()
+        .max_content_height(320)
+        .propagate_natural_height(true)
+        .propagate_natural_width(true)
+        .margin_top(8)
+        .margin_bottom(8)
+        .margin_start(8)
+        .margin_end(8)
+        .child(content)
+        .build()
+}
+
 pub(super) fn show_choice_popover(
     cell: &CellEditor,
     col_index: usize,
@@ -158,16 +171,7 @@ pub(super) fn show_choice_popover(
     } else {
         enum_content(picker, labels, &current)
     };
-    let scrolled = gtk::ScrolledWindow::builder()
-        .max_content_height(320)
-        .propagate_natural_height(true)
-        .margin_top(8)
-        .margin_bottom(8)
-        .margin_start(8)
-        .margin_end(8)
-        .child(&content)
-        .build();
-    popover.set_child(Some(&scrolled));
+    popover.set_child(Some(&choice_scroller(&content)));
     let cell_for_close = cell.downgrade();
     popover.connect_closed(move |p| {
         p.unparent();
@@ -232,5 +236,22 @@ mod tests {
         let list = enum_choice_list(&all, "done");
 
         assert_eq!(list.selected_row().map(|row| row.index()), Some(2));
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_choice_popover_is_as_wide_as_its_widest_content() {
+        gtk4::init().unwrap();
+        let content = gtk4::Label::new(Some("a label that is much wider than any scrollbar minimum"));
+        let (_, content_natural, _, _) = gtk4::prelude::WidgetExt::measure(&content, gtk4::Orientation::Horizontal, -1);
+
+        let scroller = choice_scroller(gtk4::prelude::Cast::upcast_ref(&content));
+        let (_, scroller_natural, _, _) =
+            gtk4::prelude::WidgetExt::measure(&scroller, gtk4::Orientation::Horizontal, -1);
+
+        assert!(
+            scroller_natural >= content_natural,
+            "the popover asks for {scroller_natural} px but its content needs {content_natural} px"
+        );
     }
 }
