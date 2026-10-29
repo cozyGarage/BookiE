@@ -493,6 +493,16 @@ impl PolicyGuard {
         }
     }
 
+    fn table_metadata_operation<'a>(
+        &self,
+        operation: &'a str,
+        schema: Option<&str>,
+        table: &str,
+    ) -> AuditOperation<'a> {
+        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
+        self.metadata_operation(operation, vec![target])
+    }
+
     fn commit_operation(batch_id: Uuid) -> AuditOperation<'static> {
         AuditOperation {
             operation_id: Uuid::new_v4(),
