@@ -42,13 +42,18 @@ impl LineReader {
                 Some(chunk) => {
                     self.buf.drain(..self.consumed);
                     self.consumed = 0;
-                    self.buf.extend_from_slice(&chunk);
-                    check_line_cap(self.buf.len())?;
+                    append_chunk(&mut self.buf, &chunk)?;
                 }
                 None => self.eof = true,
             }
         }
     }
+}
+
+pub(super) fn append_chunk(buffer: &mut Vec<u8>, chunk: &[u8]) -> Result<(), DriverError> {
+    check_line_cap(buffer.len().saturating_add(chunk.len()))?;
+    buffer.extend_from_slice(chunk);
+    Ok(())
 }
 
 pub(super) fn check_line_cap(pending_bytes: usize) -> Result<(), DriverError> {
