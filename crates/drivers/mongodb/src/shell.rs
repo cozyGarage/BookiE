@@ -40,7 +40,7 @@ pub(super) fn parse_find_shell(input: &str) -> Option<FindQuery> {
             limit = n.trim().parse().ok()?;
             remaining = after;
         } else {
-            break;
+            return None;
         }
     }
     if !remaining.trim().is_empty() {
@@ -235,6 +235,8 @@ mod tests {
 
     #[test]
     fn shell_commands_reject_trailing_text_instead_of_executing_a_prefix() {
+        assert!(parse_find_shell("db.users.find({}).").is_none());
+        assert!(parse_find_shell("db.users.find({}).limit(1). ").is_none());
         assert!(parse_find_shell(r#"db.users.find({}).limit(1) unexpected"#).is_none());
         assert!(parse_find_shell(r#"db.users.find({}).unknown()"#).is_none());
         assert!(parse_find_shell(r#"db.users.find({})x.limit(1)"#).is_none());
