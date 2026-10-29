@@ -710,7 +710,7 @@ async fn params_into_result(
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
         .map_err(map_sqlx_error)?;
-    let columns = statement_columns(statement.columns());
+    let mut columns = statement_columns(statement.columns());
     let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
     let mut rows = Vec::with_capacity(limit.min(1024));
@@ -721,6 +721,9 @@ async fn params_into_result(
         if rows.len() >= limit {
             truncated = true;
             break;
+        }
+        if columns.is_empty() {
+            columns = statement_columns(row.columns());
         }
         let Some(values) = budget.decode_and_admit_row(row.len(), mysql_row_payload_bytes(&row), || {
             Ok::<_, DriverError>((0..columns.len()).map(|index| extract_value(&row, index)).collect())
