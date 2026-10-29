@@ -33,3 +33,23 @@ async fn use_on_a_pooled_connection_does_not_change_what_later_catalog_reads_see
         assert_eq!(names, vec!["home_table".to_string()]);
     }
 }
+
+#[path = "../../../shared/pool_saturation.rs"]
+mod contract;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_health_ping_does_not_report_a_disconnect_while_every_pooled_connection_is_busy() {
+    contract::a_ping_does_not_report_a_disconnect_while_every_pooled_connection_is_busy(
+        start_mysql,
+        connect,
+        "SELECT SLEEP(12)",
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_health_ping_still_reports_a_pool_that_cannot_reach_its_server() {
+    contract::a_ping_still_reports_a_server_that_cannot_be_reached(start_mysql, connect).await;
+}
