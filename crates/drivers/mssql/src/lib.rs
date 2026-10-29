@@ -11,17 +11,18 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 use tablepro_core::sql_dialect::build_order_and_pagination;
 use tablepro_core::{
-    AuthMode, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value,
-    check_pre_dispatch, run_server_cancellable,
+    AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
+    ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
+    QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
 };
 
+mod catalog;
 mod codec;
 mod session;
 mod variant_guard;
 mod zoned;
 
-type MssqlClient = Client<Compat<TcpStream>>;
+pub(crate) type MssqlClient = Client<Compat<TcpStream>>;
 
 /// Matches the `acquire_timeout` the sqlx-backed drivers give their
 /// pools, so a dead host fails at the same speed on every engine.
@@ -83,6 +84,10 @@ impl DatabaseDriver for MssqlDriver {
 
     fn supports_foreign_key_metadata(&self) -> bool {
         true
+    }
+
+    fn catalog_object_kinds(&self) -> &'static [tablepro_core::CatalogObjectKind] {
+        catalog::SUPPORTED_KINDS
     }
 
     fn supports_integrated_auth(&self) -> bool {
@@ -271,7 +276,12 @@ impl MssqlConnection {
         params: &[Value],
         limit: usize,
     ) -> Result<QueryResult, DriverError> {
-        let result = run_query(client, sql, params, limit).await;
+        let result = match params.is_empty() {
+            true => run_batch_sets(client, sql, limit, false)
+                .await
+                .map(QueryResultBatch::into_first),
+            false => run_query(client, sql, params, limit).await,
+        };
         if result.as_ref().is_err_and(variant_guard::is_unsupported_result) {
             self.retire().await?;
         }
@@ -285,7 +295,10 @@ impl MssqlConnection {
         params: &[Value],
         limit: usize,
     ) -> Result<QueryResultBatch, DriverError> {
-        let result = run_query_sets(client, sql, params, limit, true).await;
+        let result = match params.is_empty() {
+            true => run_batch_sets(client, sql, limit, true).await,
+            false => run_query_sets(client, sql, params, limit, true).await,
+        };
         if result.as_ref().is_err_and(variant_guard::is_unsupported_result) {
             self.retire().await?;
         }
@@ -328,6 +341,26 @@ impl Connection for MssqlConnection {
                 })
             })
             .collect())
+    }
+
+    async fn list_objects(
+        &self,
+        kind: CatalogObjectKind,
+        schema: Option<&str>,
+    ) -> Result<Vec<CatalogObject>, DriverError> {
+        let mut client = self.client().await?;
+        catalog::list_objects(&mut client, kind, schema).await
+    }
+
+    async fn list_objects_controlled(
+        &self,
+        kind: CatalogObjectKind,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<CatalogObject>, DriverError> {
+        let mut client = self.client().await?;
+        self.run_abandonable(catalog::list_objects(&mut client, kind, schema), control)
+            .await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
@@ -645,7 +678,7 @@ impl Connection for MssqlConnection {
     }
 }
 
-async fn run_query(
+pub(crate) async fn run_query(
     client: &mut MssqlClient,
     sql: &str,
     params: &[Value],

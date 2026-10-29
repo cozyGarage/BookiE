@@ -56,6 +56,14 @@ fn structure_metadata_declarations_match_the_connection_impl() {
     assert!(d.supports_foreign_key_metadata());
     assert!(source.contains(&["async fn ", "fetch_indexes("].concat()));
     assert!(source.contains(&["async fn ", "fetch_foreign_keys("].concat()));
+    assert!(source.contains(&["async fn ", "list_objects("].concat()));
+}
+
+#[test]
+fn catalog_object_kinds_match_catalog_module() {
+    let d = MssqlDriver;
+    assert_eq!(d.catalog_object_kinds(), catalog::SUPPORTED_KINDS);
+    assert!(d.catalog_object_kinds().contains(&CatalogObjectKind::Trigger));
 }
 
 #[test]

@@ -9,8 +9,12 @@ use rust_decimal::Decimal;
 
 use drivers_mssql::MssqlDriver;
 use shared_container::{assert_tmpfs_data_dir, start_mssql, start_mssql_durable};
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
+use tablepro_core::{
+    CatalogObjectKind, ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value,
+};
 
+#[path = "support/catalog_objects.rs"]
+mod catalog_objects;
 #[path = "support/column_defaults.rs"]
 mod column_defaults;
 #[path = "../../shared/connect_refusal.rs"]
