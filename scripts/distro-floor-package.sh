@@ -9,6 +9,7 @@ image=bookie-floor-package-debian-testing
 mkdir -p "$cache"
 exec 9>"$cache/.lock"
 flock 9
+bash "$root/scripts/prepull-test-images.sh" distro-floor
 docker build -q -t "$image" --build-arg BASE=debian:testing "$root/scripts/distro-floor" >/dev/null
 marker=".visible-$$"
 touch "$cache/$marker"

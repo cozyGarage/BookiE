@@ -10,7 +10,8 @@ use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
 use crate::operation::{OperationControl, run_controlled};
 use crate::query::{
-    ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo, Value,
+    ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo,
+    Value,
 };
 use crate::tls::TlsConfig;
 use crate::transaction::Transaction;
@@ -21,6 +22,21 @@ pub enum AuthMode {
     #[default]
     Password,
     Kerberos,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct AttachedDatabase {
+    pub name: String,
+    pub path: String,
+}
+
+impl AttachedDatabase {
+    pub fn new(name: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            path: path.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +58,7 @@ pub struct ConnectOptions {
     pub connect_timeout_secs: Option<u32>,
     pub read_only: bool,
     pub auth_source: Option<String>,
+    pub attached_databases: Vec<AttachedDatabase>,
 }
 
 pub fn bare_host(host: &str) -> &str {
@@ -132,6 +149,7 @@ impl Default for ConnectOptions {
             connect_timeout_secs: None,
             read_only: false,
             auth_source: None,
+            attached_databases: Vec::new(),
         }
     }
 }
@@ -358,6 +376,21 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         run_controlled(self.fetch_foreign_keys(schema, table), control).await
+    }
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        _schema: Option<&str>,
+        _table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        Ok(Vec::new())
+    }
+    async fn fetch_inbound_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        run_controlled(self.fetch_inbound_foreign_keys(schema, table), control).await
     }
     async fn fetch_enum_labels(&self, _schema: &str, _name: &str) -> Result<Vec<String>, DriverError> {
         Ok(Vec::new())

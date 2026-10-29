@@ -25,6 +25,7 @@ for base in "${images[@]}"; do
   if [ -n "${PREBUILT_DEB:-}" ]; then
     dockerfile=scripts/distro-floor/Dockerfile.runtime
   fi
+  bash scripts/prepull-test-images.sh distro-floor
   docker build -q -t "$tag" --build-arg "BASE=$base" -f "$dockerfile" scripts/distro-floor >/dev/null
   docker run --rm ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} "${previous_mount[@]}" "${prebuilt_mount[@]}" -v "$PWD:/src:ro" -v "${tag}-target:/target" -v "${tag}-cargo:/opt/cargo/registry" -v "${tag}-git:/opt/cargo/git" -e CARGO_TARGET_DIR=/target -e "BOOKIE_BUILD_PROFILE=${BOOKIE_BUILD_PROFILE:-release}" "$tag" bash -ceux '
     source /src/scripts/command-failure-context.sh
