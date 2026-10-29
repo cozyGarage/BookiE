@@ -6,15 +6,24 @@ const INSERT: &str = "INSERT INTO people (id, name) VALUES ($1, $2)";
 struct BulkConn {
     batches: Arc<Mutex<Vec<usize>>>,
     fails_from_batch: usize,
+    failure: fn() -> DriverError,
 }
 
 impl BulkConn {
     fn open(fails_from_batch: usize) -> (Arc<dyn Connection>, Arc<Mutex<Vec<usize>>>) {
+        Self::open_failing_with(fails_from_batch, query_error)
+    }
+
+    fn open_failing_with(
+        fails_from_batch: usize,
+        failure: fn() -> DriverError,
+    ) -> (Arc<dyn Connection>, Arc<Mutex<Vec<usize>>>) {
         let batches = Arc::new(Mutex::new(Vec::new()));
         (
             Arc::new(Self {
                 batches: batches.clone(),
                 fails_from_batch,
+                failure,
             }),
             batches,
         )
@@ -50,7 +59,7 @@ impl Connection for BulkConn {
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
         let mut batches = self.batches.lock().expect("batch lock");
         if batches.len() + 1 >= self.fails_from_batch {
-            return Err(query_error());
+            return Err((self.failure)());
         }
         batches.push(statements.len());
         Ok(vec![1; statements.len()])
@@ -664,4 +673,31 @@ async fn a_row_budget_outside_the_import_limit_is_refused() {
             .await
             .is_err()
     );
+}
+
+#[tokio::test]
+async fn a_batch_that_may_have_committed_ends_the_import_as_unknown_and_stops_governed_writes() {
+    let (connection, _batches) = BulkConn::open_failing_with(1, || DriverError::Transaction {
+        statement_index: 0,
+        source: Box::new(DriverError::Disconnected),
+    });
+    let (guard, audit, state) = approved_guard(connection, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(6)).await.expect("scope");
+    let rows = rows(3);
+
+    let error = guard
+        .execute_bulk_batch(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await
+        .expect_err("the connection dropped during the batch");
+    let _ = guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Failed(&error))
+        .await;
+
+    let outcome = events(&audit)
+        .into_iter()
+        .rfind(|event| event.phase == AuditRecordPhase::Outcome)
+        .expect("a terminal outcome is recorded");
+    assert_eq!(outcome.terminal_status, AuditTerminalStatus::Unknown);
+    assert_eq!(outcome.transaction_outcome, AuditTransactionOutcome::Unknown);
+    assert!(state.governed_writes_disabled());
 }

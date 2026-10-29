@@ -4,6 +4,19 @@ These documents record the reasons behind major technical choices. Accepted deci
 
 Which forks already have an answer (and which are still open) is listed in the [decision checklist](checklist.md). Prefer a link there over inventing a second record for the same choice. Closures and decisions that were later corrected are recorded in [decision lessons](lessons.md).
 
+## Lifecycle
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Proposed: Author new decision
+    Proposed --> Accepted: Maintainer review & approval
+    Accepted --> Superseded: Replaced by subsequent ADR (e.g. 0002 -> 0021)
+    Accepted --> Deprecated: Capability or architectural path retired
+    Superseded --> [*]
+    Deprecated --> [*]
+```
+
 ## Format
 
 ```markdown

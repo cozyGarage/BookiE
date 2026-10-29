@@ -761,6 +761,9 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, crate::ui::browse_tab::BrowseTabInput::EnumLabelsLoaded(labels))
             }
             AppMsg::ForeignKeysLoaded(tab_id, foreign_keys) => self.on_browse_foreign_keys_loaded(tab_id, foreign_keys),
+            AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
+                self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound)
+            }
             AppMsg::RowsLoaded(tab_id, request, result, projected_columns) => {
                 self.on_browse_rows_loaded(tab_id, request, result, projected_columns)
             }
@@ -1034,6 +1037,15 @@ impl SimpleComponent for App {
             AppMsg::ShowCatalog => self.show_catalog(None),
             AppMsg::ShowCatalogKind(kind) => self.show_catalog(Some(kind)),
             AppMsg::ToggleAllSidebarGroups => self.toggle_all_sidebar_groups(),
+            AppMsg::ShowErDiagram { schema } => crate::ui::diagram::present(
+                self.window.upcast_ref::<gtk::Window>(),
+                schema,
+                self.connection_id,
+                &self.database,
+                &self.preferences,
+                crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
+                self.catalog_dialog_cancel.borrow().clone(),
+            ),
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
             AppMsg::ShowPreferences => super::preferences::present(
                 &self.window,

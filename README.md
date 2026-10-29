@@ -14,6 +14,26 @@ BookiE is a free, open-source database client for Linux, built for data analysts
   </picture>
 </p>
 
+<p align="center">
+  <img src="docs/brand/badges/badge-gtk4.svg" alt="Linux Native">
+  <img src="docs/brand/badges/badge-policy.svg" alt="PolicyGuard Safety">
+  <img src="docs/brand/badges/badge-keyring.svg" alt="Secret Service">
+  <img src="docs/brand/badges/badge-mcp.svg" alt="Model Context Protocol">
+</p>
+
+## Supported engines
+
+<p align="center">
+  <img src="docs/brand/badges/postgres.svg" alt="PostgreSQL">
+  <img src="docs/brand/badges/mysql.svg" alt="MySQL / MariaDB">
+  <img src="docs/brand/badges/sqlite.svg" alt="SQLite">
+  <img src="docs/brand/badges/mssql.svg" alt="SQL Server">
+  <img src="docs/brand/badges/clickhouse.svg" alt="ClickHouse">
+  <img src="docs/brand/badges/duckdb.svg" alt="DuckDB">
+  <img src="docs/brand/badges/redis.svg" alt="Redis">
+  <img src="docs/brand/badges/mongodb.svg" alt="MongoDB">
+</p>
+
 ## At a glance
 
 | | |
@@ -36,6 +56,8 @@ To build from source, see [Build and run](#build-and-run).
 
 ## First steps
 
+![BookiE Quickstart Workflow](docs/images/quickstart-flow.svg)
+
 1. Click the `+` in the window header, choose the database type and fill in the connection.
 2. Click **Test**, then **Connect**.
 3. Click a table in the sidebar to browse it, or press Ctrl+E to open a SQL editor.
@@ -48,7 +70,7 @@ The name grew out of watching *Peaky Blinders* and thinking about the bookies ke
 
 BookiE is for the people doing that work today. Its purpose is to help you understand your data, maintain your databases, and make deliberate changes with a clear record of what happened.
 
-Open source made this project possible. BookiE grew from TablePro's Linux work and draws inspiration from the wider open-source database community. Building it is a way to give back through useful software, fixes, tests, documentation, and shared lessons. Contributions and credit belong alongside the code.
+Open source makes this project possible. BookiE is an independent database client developed for the Linux desktop, drawing inspiration from the wider open-source database community. Building it is a way to give back through high-performance software, robust safety policy, comprehensive tests, documentation, and shared lessons. Contributions and credit belong alongside the code.
 
 ## Status
 
@@ -72,9 +94,11 @@ The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/Bo
 
 Start with the [documentation map](docs/README.md) and [completion and continuation](docs/bookie-0.2-sprint.md) for release status and acceptance owners.
 
-### Compatibility names
+### Independence and system compatibility identifiers
 
-The product name is BookiE. Installed commands are `bookie` and `bookie-agentd`, with `tablepro*` aliases for compatibility. Existing installations keep their settings and credentials: app ID, configuration and data paths, keyring schema, UUIDs, audit format, and protocol contracts retain their existing `tablepro` / `com.tablepro.linux` identifiers. Cargo packages and binaries remain `tablepro-app` / `tablepro-agentd`, and crate names remain `tablepro-*`.
+BookiE is an independent, standalone Linux database client with its own autonomous architecture, development lifecycle, and product roadmap.
+
+Installed commands are `bookie` and `bookie-agentd`, with `tablepro*` aliases provided for launcher compatibility. To guarantee seamless user upgrades and prevent data loss, existing installations preserve their established local storage schemas and credentials: app ID (`com.tablepro.linux`), configuration and data paths (`~/.config/tablepro/`), keyring schema, UUIDs, audit format, and protocol contracts retain their existing identifiers. Cargo packages and binaries remain `tablepro-app` / `tablepro-agentd`, and workspace crate names remain `tablepro-*`.
 
 
 ## Build requirements

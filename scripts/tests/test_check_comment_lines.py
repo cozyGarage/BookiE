@@ -24,7 +24,13 @@ class CommentLineTests(unittest.TestCase):
         self.assertEqual(counts, {"crates/a/src/lib.rs": 3})
 
     def test_tests_directories_and_vendored_code_are_not_scanned(self):
-        counts = self.counts({"crates/a/tests/t.rs": "// c\n", "vendor/x/src/lib.rs": "// c\n"})
+        counts = self.counts(
+            {
+                "crates/a/tests/t.rs": "// c\n",
+                "vendor/x/src/lib.rs": "// c\n",
+                "apps/linux/packaging/arch/src/TablePro/cargo-vendor/x/src/lib.rs": "// c\n",
+            }
+        )
         self.assertEqual(counts, {})
 
     def test_a_file_may_not_gain_comment_lines_and_a_new_file_starts_at_zero(self):
