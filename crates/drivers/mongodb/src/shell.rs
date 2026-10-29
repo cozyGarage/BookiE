@@ -35,12 +35,11 @@ pub(super) fn parse_find_shell(input: &str) -> Option<FindQuery> {
             let (n, after) = extract_balanced(rest.trim_start(), '(', ')')?;
             skip = n.trim().parse().ok()?;
             remaining = after;
-        } else if let Some(rest) = remaining.strip_prefix("limit") {
+        } else {
+            let rest = remaining.strip_prefix("limit")?;
             let (n, after) = extract_balanced(rest.trim_start(), '(', ')')?;
             limit = n.trim().parse().ok()?;
             remaining = after;
-        } else {
-            return None;
         }
     }
     if !remaining.trim().is_empty() {
