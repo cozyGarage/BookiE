@@ -1,6 +1,14 @@
-# Optional upstream reference review
+# External peer references and client review
 
-BookiE is an independent Rust and GTK database client. Other database clients are references for behavior, security fixes, SQL semantics and user expectations; their source trees are not merge or synchronization targets. Accepted ADRs and BookiE's issue owners decide what applies.
+BookiE is an independent, autonomous Rust and GTK database client. It maintains no ongoing upstream dependencies, synchronization requirements, or upstream tracking workflows. Other database clients (such as TablePro, DBeaver, TablePlus, Beekeeper Studio, and dbx) are reviewed strictly as external peer references for user expectations, standard SQL behaviors, driver quirks, and desktop UX ideas. Accepted ADRs and BookiE's maintainers exclusively decide all design, architecture, and roadmap choices.
+
+```mermaid
+flowchart LR
+    Peers["External Peer References<br/>(DBeaver, TablePlus, Beekeeper, TablePro)"] -.->|Optional Feature Insights| BookiE["BookiE Independent Architecture"]
+    BookiE --> AGENTS["AGENTS.md & Principles"]
+    BookiE --> ADRs["Accepted ADRs"]
+    BookiE --> Roadmap["BookiE Autonomous Roadmap"]
+```
 
 ## Current reviews
 
@@ -17,3 +25,14 @@ For each candidate, record the reference repository and exact commit or release,
 Keep PolicyGuard, audit, storage, GTK ownership, session and driver boundaries intact. Manually implement only behavior that applies to Linux. Do not copy platform framework code or remove a local dependency patch without a separate decision and equivalence evidence. Add a regression test that observes the behavior, then link the change and its proof from the owning issue.
 
 Review is optional. Routine Linux development does not need an upstream comparison.
+
+## Adopted source
+
+BookiE and the TablePro Linux client are both AGPL-3.0, so a reviewed file may be adopted with its history of origin recorded here instead of in source comments.
+
+| BookiE file | Upstream file (TablePro commit `86651d743`, its `diagram` UI module) | Changes |
+|---|---|---|
+| `crates/app-services/src/er_diagram/layout.rs`, `scene.rs`, `zoom.rs` | `layout.rs`, `scene.rs`, `zoom.rs` | Moved to the services crate and made public; comments removed; tests kept. |
+| `apps/linux/app/src/ui/diagram/card_text.rs`, `draw.rs`, `palette.rs` | `card_text.rs`, `draw.rs`, `palette.rs` | Comments removed; the palette takes a light or dark theme; GTK tests registered as isolated tests. |
+
+The model, the bounded metadata read, the canvas, the dialog and the accessible descriptions are BookiE's own. Upstream's export and its movable-card nodes are not adopted.

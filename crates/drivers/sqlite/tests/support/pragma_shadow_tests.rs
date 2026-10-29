@@ -24,7 +24,11 @@ async fn user_objects_cannot_shadow_sqlite_metadata_pragmas() {
         .connect_with(SqliteConnectOptions::from_str("sqlite::memory:").unwrap())
         .await
         .unwrap();
-    let connection = SqliteConnection { pool, session_options: None };
+    let connection = SqliteConnection {
+        pool,
+        session_options: None,
+        attached_databases: Vec::new(),
+    };
     for sql in [
         "CREATE TABLE \"parent.with space\" (a INTEGER, b TEXT, value TEXT, PRIMARY KEY (b, a))",
         "CREATE TABLE child (id INTEGER PRIMARY KEY, pa INTEGER, pb TEXT, FOREIGN KEY (pb, pa) REFERENCES \"parent.with space\")",

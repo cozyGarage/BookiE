@@ -122,6 +122,7 @@ async fn mongodb_extended_json_survives_the_mcp_query_tool_round_trip() {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     };
     let provider = Arc::new(MongoProvider {
         connection_id,
