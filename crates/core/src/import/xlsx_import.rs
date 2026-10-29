@@ -124,7 +124,11 @@ fn check_workbook_xml_bounds(bytes: &[u8]) -> Result<(), ImportError> {
     let mut archive = ZipArchive::new(Cursor::new(bytes)).map_err(|_| ImportError::NotSpreadsheet)?;
     for index in 0..archive.len() {
         let mut file = archive.by_index(index).map_err(|_| ImportError::NotSpreadsheet)?;
-        let name = file.name().map_err(|_| ImportError::NotSpreadsheet)?;
+        let name = file
+            .name()
+            .map_err(|_| ImportError::NotSpreadsheet)?
+            .replace('\\', "/")
+            .to_ascii_lowercase();
         if !name.ends_with(".xml") && !name.ends_with(".rels") {
             continue;
         }
@@ -134,7 +138,7 @@ fn check_workbook_xml_bounds(bytes: &[u8]) -> Result<(), ImportError> {
                 limit: MAX_SHARED_STRINGS_BYTES,
             });
         }
-        if name == "xl/sharedStrings.xml" {
+        if name.rsplit('/').next() == Some("sharedstrings.xml") {
             let mut xml = Vec::with_capacity(file.size() as usize);
             file.by_ref()
                 .take(MAX_SHARED_STRINGS_BYTES + 1)
@@ -340,6 +344,26 @@ mod tests {
             xlsx_to_csv(&bytes),
             Err(ImportError::TooManySharedStrings { limit: MAX_IMPORT_ROWS })
         );
+    }
+
+    #[test]
+    fn refuses_large_shared_string_counts_at_alternate_paths() {
+        for name in [
+            "other/SHAREDSTRINGS.XML",
+            "other\\sharedStrings.xml",
+            "sharedStrings.xml",
+        ] {
+            let mut output = zip::ZipWriter::new(Cursor::new(Vec::new()));
+            output
+                .start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            std::io::Write::write_all(&mut output, b"<sst uniqueCount=\"1000001\"/>").unwrap();
+            let bytes = output.finish().unwrap().into_inner();
+            assert_eq!(
+                check_workbook_xml_bounds(&bytes),
+                Err(ImportError::TooManySharedStrings { limit: MAX_IMPORT_ROWS })
+            );
+        }
     }
 
     fn with_shared_string_count(bytes: &[u8], count: usize) -> Vec<u8> {
