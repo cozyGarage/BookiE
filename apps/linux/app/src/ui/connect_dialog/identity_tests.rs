@@ -256,10 +256,7 @@ fn an_explicit_connection_id_wins_over_endpoint_matching() {
         select_existing(&accounts, &bound).map(|connection| connection.id),
         Some(second.id)
     );
-    assert_eq!(
-        select_existing(&accounts, &identity("mssql", &options, false)).map(|connection| connection.id),
-        Some(first.id)
-    );
+    assert!(select_existing(&accounts, &identity("mssql", &options, false)).is_none());
 }
 
 #[test]
