@@ -17,9 +17,30 @@ case "$1" in
   *) exit 91 ;;
 esac
 """
-CURL = """import json, os, pathlib, sys
+CURL = """import fcntl, json, os, pathlib, sys, time
 fixture = pathlib.Path(os.environ['GATE_TEST_FIXTURE'])
 data = json.loads(fixture.read_text())
+active_file = os.environ.get('GATE_TEST_ACTIVE_FILE')
+if active_file:
+    state = pathlib.Path(active_file)
+    with state.open('r+') as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        current, maximum = map(int, (stream.read() or '0 0').split())
+        current += 1
+        stream.seek(0)
+        stream.truncate()
+        stream.write(f'{current} {max(current, maximum)}')
+        stream.flush()
+        fcntl.flock(stream, fcntl.LOCK_UN)
+    time.sleep(float(os.environ.get('GATE_TEST_CURL_DELAY', '0')))
+    with state.open('r+') as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        current, maximum = map(int, stream.read().split())
+        stream.seek(0)
+        stream.truncate()
+        stream.write(f'{current - 1} {maximum}')
+        stream.flush()
+        fcntl.flock(stream, fcntl.LOCK_UN)
 if any('fixture-token' in arg for arg in sys.argv):
     raise SystemExit('gate token passed in curl arguments')
 config = pathlib.Path(sys.argv[sys.argv.index('--config') + 1]).read_text()
@@ -94,6 +115,37 @@ class ForgejoGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('cancelled cancelled-job (job 101)', result.stdout)
         self.assertNotIn('job logs requested for nonfailure job', result.stdout + result.stderr)
+
+    def test_at_most_two_gates_run_at_once_on_this_host(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            active = root / 'active'
+            active.write_text('0 0')
+            lock_dir = root / 'locks'
+            processes = []
+            for index in range(3):
+                run_root = root / str(index)
+                tools = run_root / 'bin'
+                tools.mkdir(parents=True)
+                for name, source in [('git', GIT), ('curl', f'#!{sys.executable}\n' + CURL), ('sleep', '#!/bin/sh\nexit 0\n')]:
+                    path = tools / name
+                    path.write_text(source)
+                    path.chmod(0o755)
+                fixture = run_root / 'fixture.json'
+                fixture.write_text(json.dumps({'run': {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml'}, 'initial_status': 'success', 'tasks': [], 'logs': ''}))
+                token = run_root / 'token'
+                token.write_text('fixture-token')
+                env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'],
+                           GATE_TEST_HEAD=HEAD, GATE_TEST_FIXTURE=str(fixture), FORGEJO_TOKEN_FILE=str(token),
+                           FORGEJO_GATE_LOCK=str(run_root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(lock_dir),
+                           FORGEJO_GATE_TIMEOUT_MINUTES='1', GATE_TEST_ACTIVE_FILE=str(active), GATE_TEST_CURL_DELAY='0.2')
+                processes.append(subprocess.Popen(['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject'],
+                                                  cwd=run_root, env=env, stdout=subprocess.PIPE,
+                                                  stderr=subprocess.PIPE, text=True))
+            for process in processes:
+                stdout, stderr = process.communicate(timeout=10)
+                self.assertEqual(process.returncode, 0, stdout + stderr)
+            self.assertEqual(active.read_text().split()[1], '2')
 
 
 if __name__ == '__main__':

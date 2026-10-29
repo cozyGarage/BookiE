@@ -116,4 +116,17 @@ mod tests {
         let expected = "+----+-------+\n| id | title |\n+----+-------+\n+----+-------+";
         assert_eq!(table, expected);
     }
+
+    #[test]
+    fn text_table_formats_boolean_floats_and_unicode_text() {
+        let columns = vec![column("flag"), column("ratio"), column("city")];
+        let rows = vec![
+            vec![Value::Bool(true), Value::Float(3.14), Value::Text("Tokyo".into())],
+            vec![Value::Bool(false), Value::Float(0.0), Value::Text("Zürich".into())],
+        ];
+
+        let table = render_text_table(&columns, &rows);
+        let expected = "+-------+-------+--------+\n| flag  | ratio | city   |\n+-------+-------+--------+\n| true  |  3.14 | Tokyo  |\n| false |     0 | Zürich |\n+-------+-------+--------+";
+        assert_eq!(table, expected);
+    }
 }
