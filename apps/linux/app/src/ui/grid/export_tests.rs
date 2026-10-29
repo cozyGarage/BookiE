@@ -217,7 +217,7 @@ fn export_text_table_json_lines_and_value_list_format_rows() {
     let table = super::render_text_table(&columns, &rows);
     assert_eq!(
         table,
-        "+----+-------+\n| id | title |\n+----+-------+\n| 10 | Alpha |\n| 20 |  NULL |\n+----+-------+"
+        "+----+-------+\n| id | title |\n+----+-------+\n| 10 | Alpha |\n| 20 | NULL  |\n+----+-------+"
     );
 
     let json_lines = super::render_json_lines(&columns, &rows);
