@@ -30,7 +30,7 @@ BookiE reviews shared Rust/Linux foundations and portable behavior under the acc
 
 ## Current upstream reference and adoption
 
-The [October 23 database-client refresh](../archive/database-client-review-2026-10-23.md) is the newest cross-product review. It records current source/release pins, superseded pagination advice and existing BookiE issue ownership. Earlier entries below remain dated evidence.
+The October 23 database-client refresh is the newest cross-product review. It records current source/release pins, superseded pagination advice and existing BookiE issue ownership. Earlier entries below remain dated evidence.
 
 The [October 21 adoption and collaboration review](../archive/tablepro-collaboration-2026-10-21.md) records its inspected pin, Linux changes, open upstream work and contribution candidates. Its [source inventory](evidence/tablepro-collaboration-2026-10-21/README.md) preserves the commit range. These are dated findings; the backlog and owning issue still select implementation.
 
