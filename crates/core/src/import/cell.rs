@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::import::csv_import::CsvImportOptions;
 use crate::import::extended_temporal::{duckdb_extended_date, duckdb_extended_timestamptz_nanos};
+use crate::import::integer_type::is_integer_type_name;
 use crate::query::{ColumnInfo, Value};
 
 mod mysql_calendar;
@@ -109,19 +110,13 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
     if let Some(kind) = temporal_kind(&base, &lowered) {
         return kind;
     }
-    // These catalog names contain the substring `int` but are not integer
-    // types. Keep them as exact text for native consumers such as DuckDB's
-    // INTERVAL insert and PostgreSQL's unsupported geometric point values.
-    if matches!(base.as_str(), "interval" | "point") {
-        return ColumnKind::Text;
-    }
     if base.contains("bool") || base == "bit" {
         return ColumnKind::Bool;
     }
     if base.contains("uuid") || base.contains("uniqueidentifier") {
         return ColumnKind::Uuid;
     }
-    if matches!(base.as_str(), "int128" | "uint128") {
+    if matches!(base.as_str(), "int128" | "uint128" | "int256" | "uint256") {
         return ColumnKind::Text;
     }
     if base.contains("json") {
@@ -133,7 +128,7 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
     if base.contains("decimal") || base.contains("numeric") || base.contains("money") {
         return ColumnKind::Decimal;
     }
-    if base.contains("int") || base.contains("serial") {
+    if base.split_whitespace().any(is_integer_type_name) {
         return ColumnKind::Int;
     }
     if base.contains("float") || base.contains("double") || base.contains("real") {

@@ -26,6 +26,36 @@ The only path a consumer may hold to a live database. Token scopes and connectio
 
 ## Core concepts
 
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Consumer as GUI / MCP Consumer
+    participant Guard as PolicyGuard
+    participant Policy as Policy Rules Engine
+    participant Approval as Approval Sink
+    participant Journal as Audit Journal
+    participant Driver as Driver Connection
+
+    Consumer->>Guard: execute(statement, control)
+    Guard->>Policy: classify & evaluate rules
+    alt Require Approval
+        Policy-->>Guard: Decision::RequireApproval
+        Guard->>Approval: request_approval(rule, details)
+        Approval-->>Guard: Approved / Denied
+    end
+    alt Denied
+        Guard->>Journal: record_terminal(Outcome::Denied)
+        Guard-->>Consumer: Err(PolicyDenied)
+    else Allowed
+        Guard->>Journal: record_intent(operation_id)
+        Guard->>Driver: execute(statement, bound_params)
+        Driver-->>Guard: raw_result
+        Guard->>Guard: mask eligible returned values
+        Guard->>Journal: record_terminal(Outcome::Succeeded)
+        Guard-->>Consumer: Ok(masked_result)
+    end
+```
+
 - **PolicyGuard.** The issued consumer-facing database handle (`PolicyGuard` in `crates/policy/src/guard.rs`). Composition roots may keep a raw driver internally for reconnect; `DatabaseService::handle` and `agentd::guarded` wrap before return.
 - **Decision.** `Allow`, `RequireApproval` or `Deny`, each with a `rule` string (`Decision` in `crates/policy/src/verdict.rs`).
 - **StatementClass.** Coarse class including `Unparseable`, which `is_write` treats as a write (`StatementClass` in `crates/policy/src/classify.rs`).

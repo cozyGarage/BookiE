@@ -99,7 +99,7 @@ Recorded so a contributor does not reopen them without new evidence. Each row ci
 | Direction | Status | Record |
 | --- | --- | --- |
 | In-app AI client or chat | Out of scope | The governed MCP server is the agent interface ([ADR 0017](0017-mcp-sdk-behind-the-governed-seam.md), [ADR 0016](0016-governed-consumer-seam.md)); source: [feature comparison](../0.2-feature-comparison.md#explicitly-out-of-scope-unless-product-goals-change). |
-| Upstream TablePro as a merge target | Declined | Upstream is a behaviour and fixture reference; upstream compatibility is not an acceptance criterion by itself. [upstream sync](../upstream-sync.md), [capability review](../capability-review.md). |
+| Upstream TablePro as a merge target | Declined | BookiE is fully detached and autonomous; external projects are peer references only with no upstream tracking or merge obligations. [peer review](../upstream-sync.md), [capability review](../capability-review.md). |
 | Oracle, Cassandra and runtime-bridge engines | Out of scope | [ADR 0001](0001-no-plugin-system.md). |
 | Importing dbx crates | Declined | [ADR 0018](0018-headless-app-services-crate.md). |
 | Second SQL classifier, permissive fail-open classification, lifecycle scripting hooks | Declined | [ADR 0016](0016-governed-consumer-seam.md). |

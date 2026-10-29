@@ -51,6 +51,15 @@ pub struct ForeignKeyInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InboundForeignKeyInfo {
+    pub name: String,
+    pub source_schema: Option<String>,
+    pub source_table: String,
+    pub source_columns: Vec<String>,
+    pub target_columns: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ColumnInfo {
     pub name: String,
     pub data_type: String,
@@ -105,6 +114,14 @@ pub enum Value {
     /// sqlx cannot represent). Carries the driver's column type name so the
     /// UI can explain the gap instead of showing it as an editable NULL.
     Undecodable(String),
+}
+
+impl Value {
+    pub const MISSING_FIELD: &'static str = "missing BSON field";
+
+    pub fn is_missing_field(&self) -> bool {
+        matches!(self, Self::Undecodable(kind) if kind == Self::MISSING_FIELD)
+    }
 }
 
 /// Soft upper bound on rows materialized by an arbitrary SQL `query` call.
