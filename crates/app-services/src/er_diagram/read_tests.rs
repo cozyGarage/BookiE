@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use tablepro_core::{
@@ -18,6 +18,8 @@ struct Calls {
     indexes: AtomicUsize,
     cancel_at: AtomicUsize,
     cancellation: CancellationToken,
+    column_targets: Mutex<Vec<(Option<String>, String)>>,
+    key_targets: Mutex<Vec<(Option<String>, String)>>,
 }
 
 struct Catalog {
@@ -56,7 +58,12 @@ impl Connection for Catalog {
         Ok(Vec::new())
     }
 
-    async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+    async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        self.calls
+            .column_targets
+            .lock()
+            .unwrap()
+            .push((schema.map(str::to_string), table.to_string()));
         let seen = self.calls.columns.fetch_add(1, Ordering::SeqCst) + 1;
         if seen == self.calls.cancel_at.load(Ordering::SeqCst) {
             self.calls.cancellation.cancel();
@@ -95,8 +102,13 @@ impl Connection for Catalog {
         Ok(())
     }
 
-    async fn fetch_foreign_keys(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
+    async fn fetch_foreign_keys(&self, schema: Option<&str>, table: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         self.calls.keys.fetch_add(1, Ordering::SeqCst);
+        self.calls
+            .key_targets
+            .lock()
+            .unwrap()
+            .push((schema.map(str::to_string), table.to_string()));
         Ok(self.keys.get(table).cloned().unwrap_or_default())
     }
 
@@ -152,6 +164,55 @@ async fn every_table_is_read_in_name_order_with_progress() {
     assert!(read.foreign_keys_supported);
     assert!(read.skipped.is_empty());
     assert!(!read.truncated());
+}
+
+#[tokio::test]
+async fn same_named_tables_keep_their_schema_when_reading_all_schemas() {
+    let calls = Arc::new(Calls::default());
+    let connection = catalog(&calls, Vec::new());
+    let tables = [
+        TableInfo {
+            schema: Some("archive".into()),
+            name: "accounts".into(),
+        },
+        TableInfo {
+            schema: Some("public".into()),
+            name: "accounts".into(),
+        },
+    ];
+
+    let read = read_schema(
+        &connection,
+        None,
+        &tables,
+        capabilities(true, false),
+        &control(&calls),
+        |_, _| {},
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        read.reads
+            .iter()
+            .map(|table| (table.schema.as_deref(), table.name.as_str()))
+            .collect::<Vec<_>>(),
+        [(Some("archive"), "accounts"), (Some("public"), "accounts")]
+    );
+    assert_eq!(
+        *calls.column_targets.lock().unwrap(),
+        [
+            (Some("archive".into()), "accounts".into()),
+            (Some("public".into()), "accounts".into())
+        ]
+    );
+    assert_eq!(
+        *calls.key_targets.lock().unwrap(),
+        [
+            (Some("archive".into()), "accounts".into()),
+            (Some("public".into()), "accounts".into())
+        ]
+    );
 }
 
 #[tokio::test]
@@ -233,7 +294,7 @@ async fn a_table_the_account_cannot_read_is_skipped_and_named() {
     .unwrap();
 
     assert_eq!(read.reads.len(), 1);
-    assert_eq!(read.skipped, ["secrets"]);
+    assert_eq!(read.skipped, ["shop.secrets"]);
 }
 
 #[tokio::test]
