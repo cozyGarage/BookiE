@@ -229,5 +229,6 @@ pub fn load_from_path(path: &Path) -> Result<PolicyConfig, String> {
     Ok(policy)
 }
 
+#[cfg(test)]
 #[path = "config_tests.rs"]
 mod tests;
