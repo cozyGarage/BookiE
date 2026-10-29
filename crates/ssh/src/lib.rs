@@ -691,14 +691,20 @@ async fn authenticate_with_agent(
         };
         let result = match attempt {
             Ok(result) => result,
-            Err(_) if refused > 0 => return Err(SshError::AgentKeyLimit { refused, total }),
-            Err(error) => return Err(agent_error(&error)),
+            Err(error) => return Err(agent_auth_error(error, refused, total)),
         };
         if result.success() {
             return Ok(result);
         }
     }
     Err(SshError::Auth)
+}
+
+fn agent_auth_error(error: russh::AgentAuthError, refused: usize, total: usize) -> SshError {
+    if refused > 0 && matches!(error, russh::AgentAuthError::Send(_)) {
+        return SshError::AgentKeyLimit { refused, total };
+    }
+    SshError::Agent(error.to_string())
 }
 
 fn map_connect_error(
