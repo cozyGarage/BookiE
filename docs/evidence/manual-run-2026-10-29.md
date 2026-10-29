@@ -70,3 +70,11 @@ Safe-by-design differences are not gaps. BookiE refuses unsafe writes through `P
 ## Cleanup
 
 The app and `ydotoold` stay running until the maintainer stops them; the compose project `bookie-manual-20261029`, the `bm-pg18` container and the private profiles under `/tmp/opencode` were started by this run and are listed here for removal.
+
+## Regression found and fixed after the merge
+
+After merging `linux` at `0a46b6bd0` (the commit `df1996177` that added enum metadata to query columns), every browse of a PostgreSQL table with an enum column failed with "Couldn't load rows: error occurred while decoding column 4: mismatched types; Rust type `String` (as SQL type `TEXT`) is not compatible with SQL type `"CHAR"`". The metadata query reads `pg_type.typtype`, which is the `"char"` type. The existing integration test `enum_labels_come_back_in_declared_order_for_the_named_type_only` failed on the unfixed code and passes with `typtype::text`. The fix is one line on branch `fix/postgres-enum-typtype-decode` (commit `98e136030`), pushed to GitHub without a pull request because `gh` is not authenticated on this machine. It has not been through the Forgejo gate.
+
+## Contrast sample
+
+Measured from full-resolution captures on the grid, not from class names. Light header text is 2.28:1 and dark header text is 3.76:1; both are below 4.5:1. Other sampled text is 7:1 or higher. The values are on the [application checklist](../manual-verification-app.md#visual-audit-matrix).

@@ -16,6 +16,7 @@ mod decode;
 mod spatial;
 use decode::extract_value;
 mod packed;
+mod pool_saturation;
 mod session;
 mod text_protocol;
 pub(crate) use text_protocol::{is_call_statement, text_protocol};
@@ -504,6 +505,9 @@ impl Connection for MysqlConnection {
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
+        if pool_saturation::is_saturated(&self.pool) {
+            return Ok(());
+        }
         sqlx::query("SELECT 1")
             .execute(&self.pool)
             .await
