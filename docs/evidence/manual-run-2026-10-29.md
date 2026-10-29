@@ -102,3 +102,15 @@ Each branch was built and driven in the app after its tests passed. None is merg
 | `fix/redis-filter-by-value` | New `supports_browse_filters` driver capability; Redis declares false, the app hides the filter actions | Redis menu, Filter button and Ctrl+F no longer offer filtering; PostgreSQL filtering unchanged |
 
 The SQL Server work was added to the existing branch because open work already covered the same checklist item. The other three had no existing branch.
+
+## Existing UI fix branches, built and driven
+
+These five branches were open when the run started and none has merged. Each was built, driven on native Wayland and compared with `linux` where it mattered. The checklist items they touch stay unticked until the branches land.
+
+| Branch | Result |
+|---|---|
+| `fix/tab-context-menu-actions` | Close Tabs to the Right and Close Other Tabs work on the clicked tab, and a pending edit still prompts Save, Discard or Cancel |
+| `fix/inspector-shortcut` | Saved Queries opens with Ctrl+Shift+B; delete works; a confirmed rename was not verified |
+| `fix/dismiss-editor-completion` | The completion list no longer stays over the result after a run; `linux` still shows it |
+| `fix/connection-popover-position` | The popover fits at 700 px, but `linux` also fits there, so the original clipping was not reproduced |
+| `fix/progress-dialog-title` | The backup progress window now names its operation; `linux` shows only a spinner |
