@@ -229,6 +229,10 @@ fn base_type_strips_arguments_and_wrappers() {
     assert_eq!(base_type("Nullable(Decimal(18, 4))"), "Decimal");
     assert_eq!(base_type("LowCardinality(Nullable(String))"), "String");
     assert_eq!(base_type("Array(Nullable(String))"), "Array");
+    assert_eq!(base_type("Array(Array(String))"), "Array");
+    assert_eq!(base_type("Array(Array(Array(Int32)))"), "Array");
+    assert_eq!(base_type("Nested(id UInt32, name String)"), "Nested");
+    assert_eq!(base_type("Array(Nested(x String, y Int32))"), "Array");
     assert_eq!(base_type("Map(String, UInt64)"), "Map");
 }
 
@@ -240,6 +244,8 @@ fn nullability_survives_low_cardinality() {
     assert!(!type_is_nullable("LowCardinality(String)"));
     // The inner Nullable belongs to the element, not the column.
     assert!(!type_is_nullable("Array(Nullable(String))"));
+    assert!(!type_is_nullable("Array(Array(Nullable(String)))"));
+    assert!(!type_is_nullable("Nested(id UInt32, name Nullable(String))"));
 }
 
 #[test]
@@ -297,6 +303,21 @@ fn json_to_value_maps_common_types() {
     assert_eq!(
         json_to_value(serde_json::json!([1, 2]), "Array(UInt8)"),
         Value::Json(Box::new(serde_json::json!([1, 2])))
+    );
+    assert_eq!(
+        json_to_value(serde_json::json!([[1, 2], [3, 4]]), "Array(Array(UInt8))"),
+        Value::Json(Box::new(serde_json::json!([[1, 2], [3, 4]])))
+    );
+    assert_eq!(
+        json_to_value(
+            serde_json::json!([{"id": 1, "name": "click"}]),
+            "Nested(id UInt32, name String)"
+        ),
+        Value::Json(Box::new(serde_json::json!([{"id": 1, "name": "click"}])))
+    );
+    assert_eq!(
+        json_to_value(serde_json::json!("[[1, 2], [3, 4]]"), "Array(Array(UInt8))"),
+        Value::Json(Box::new(serde_json::json!([[1, 2], [3, 4]])))
     );
 }
 
