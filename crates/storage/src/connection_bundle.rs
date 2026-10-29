@@ -67,6 +67,7 @@ pub const BUNDLE_EXCLUDED_FIELDS: &[&str] = &[
     "last_opened_at",
     "connect_timeout_secs",
     "query_timeout_secs",
+    "attached_databases",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -179,6 +180,7 @@ impl BundleConnection {
             connect_timeout_secs: None,
             query_timeout_secs: None,
             auth_source: self.auth_source.clone(),
+            attached_databases: Vec::new(),
         }
     }
 }
