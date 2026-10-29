@@ -1043,6 +1043,39 @@ GLib.MainLoop().run()
             raise AssertionError(f"the viewer changed the stored text:\n{ui.accessible_snapshot()}")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
 
+    def large_result_value_viewer_opens_without_stalling(database, _base):
+        import sqlite3
+        value = "AA" * 600_000
+        with sqlite3.connect(database) as connection:
+            connection.execute("INSERT INTO safety_items(id, note) VALUES (1, ?)", (value,))
+        ui.run_sql("SELECT note FROM safety_items")
+        wait_for_result_column("note")
+        ui.press_x11_key("j", ("Control_L", "Shift_L"))
+        search = ui.wait_for_node(name="Search columns")
+        search.queryEditableText().setTextContents("note")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Search columns", present=False)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            focused = next((
+                node for node in ui.descendants(ui.application_node())
+                if ui.node_role(node) in (pyatspi.ROLE_TABLE_CELL, pyatspi.ROLE_TABLE_ROW)
+                and "1200000 bytes total" in ui.node_name(node)
+                and node.getState().contains(pyatspi.STATE_FOCUSED)
+                and node.getState().contains(pyatspi.STATE_SHOWING)
+            ), None)
+            if focused is not None:
+                break
+            time.sleep(ui.POLL_SECONDS)
+        else:
+            raise AssertionError(f"large result row was not focused:\n{ui.accessible_snapshot()}")
+        started = time.monotonic()
+        ui.press_x11_key("Menu")
+        ui.wait_for_node(role=pyatspi.ROLE_MENU)
+        choose_menu_item(4)
+        ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON, timeout=10)
+        assert time.monotonic() - started < 10, "the large value viewer took too long to open"
+
 
     def explain_plan_window_closes_on_escape(_database, _base):
         ui.run_sql("SELECT 1 AS value")
@@ -2336,6 +2369,7 @@ GLib.MainLoop().run()
         welcome_connection_removal_confirms_once_and_preserves_the_database,
         find_bar_replaces_every_match_in_the_editor,
         view_value_preserves_duplicate_json_keys_and_text_formatting,
+        large_result_value_viewer_opens_without_stalling,
         explain_plan_window_closes_on_escape,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
