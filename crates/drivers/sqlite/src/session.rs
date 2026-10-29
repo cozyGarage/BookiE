@@ -16,7 +16,10 @@ pub(crate) struct SqliteSession {
     pool: Pool<Sqlite>,
 }
 
-pub(crate) async fn open(options: &SqliteConnectOptions) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+pub(crate) async fn open(
+    options: &SqliteConnectOptions,
+    attached: &[tablepro_core::AttachedDatabase],
+) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
         .acquire_timeout(SESSION_SETUP_TIMEOUT)
@@ -26,6 +29,7 @@ pub(crate) async fn open(options: &SqliteConnectOptions) -> Result<Box<dyn table
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;
     connection.close_on_drop();
+    crate::attach_databases_to_connection(&mut connection, attached).await;
     Ok(Box::new(SqliteSession {
         connection: Some(connection),
         pool,

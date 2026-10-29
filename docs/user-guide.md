@@ -44,6 +44,10 @@ Navigation uses **First**, **Previous**, **Next**, and **Last**. Unsorted tables
 - **Long values & JSON**: Cells over 8 KiB show a preview and size. Right-click to **View Value** (up to 1 MiB text / 16 KiB hex) or **Edit Full Value…** with automated JSON formatting.
 - **Row inspector & statistics**: View all columns and data types in the side inspector. Select multiple rows to view aggregate count, sum, average, min, and max.
 
+## Show an ER diagram
+
+Right-click a schema, or a table, in the sidebar and choose **Show ER Diagram**. BookiE reads the tables of that schema (up to 150, with a notice if there are more) and draws each as a card with its columns, primary-key and foreign-key badges, and a line for every foreign key. Cancel the read with **Cancel** or by closing the window. Drag to pan; use **+**, **-**, **0**, the arrow keys or Ctrl+scroll to zoom and move; click a card or a name in the list on the left to select it and see what it references. Engines that do not report foreign keys show the tables without relations.
+
 ## Run SQL
 
 <picture>

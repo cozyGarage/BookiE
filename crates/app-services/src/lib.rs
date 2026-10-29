@@ -11,6 +11,7 @@ pub mod database_backup;
 pub mod driver_error_presentation;
 pub mod editor_panel;
 pub mod enum_input;
+pub mod er_diagram;
 pub mod filter_settings;
 pub mod ordered_refresh;
 pub mod preparation;

@@ -461,3 +461,29 @@ fn a_failed_later_draft_preserves_the_previous_acknowledged_workspace_body() {
     assert!(matches!(&saved.tabs[1], WorkspaceTabRecord::Editor { query, .. } if query == "new second"));
     assert_eq!(std::fs::read_dir(&bodies).unwrap().count(), 2);
 }
+
+#[test]
+fn failed_prefetch_flush_preserves_the_newer_pending_memory_snapshot() {
+    let root = tempfile::tempdir().unwrap();
+    let original = root.path().join("original.json");
+    let path = root.path().join("workspace.json");
+    let drafts = root.path().join("drafts");
+    let connection = Uuid::new_v4();
+    let first = Uuid::new_v4();
+    let second = Uuid::new_v4();
+    let writer = WorkspaceStore::new(Some(original.clone()), drafts.clone());
+    writer.save_connection(connection, two_drafts(first, second, "old first", "old second"));
+    assert_eq!(flush(&writer), Ok(()));
+    std::os::unix::fs::symlink(&original, &path).unwrap();
+    let failing = WorkspaceStore::new(Some(path.clone()), drafts);
+    failing.save_connection(connection, two_drafts(first, second, "pending first", "pending second"));
+    assert!(failing.prefetch_connections(&[connection]).is_err());
+    let pending = failing.load_connection(connection).unwrap();
+    assert!(matches!(&pending.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "pending first"));
+    std::fs::remove_file(&path).unwrap();
+    std::fs::rename(&original, &path).unwrap();
+    assert_eq!(flush(&failing), Ok(()));
+    failing.prefetch_connections(&[connection]).unwrap();
+    let restored = failing.load_connection(connection).unwrap();
+    assert!(matches!(&restored.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "pending first"));
+}
