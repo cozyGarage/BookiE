@@ -173,13 +173,15 @@ async fn mariadb_empty_text_edits_survive_the_empty_string_is_null_mode() {
 #[ignore = "requires docker"]
 async fn an_empty_original_does_not_overwrite_a_concurrent_space() {
     let (_container, options) = super::start_mariadb().await;
+    let setup = connect(options.clone()).await;
+    setup
+        .execute("SET GLOBAL sql_mode = 'EMPTY_STRING_IS_NULL'")
+        .await
+        .unwrap();
+    setup.close().await.unwrap();
     let connection = connect(options).await;
     connection
         .execute("CREATE TABLE notes (id INT PRIMARY KEY, tag VARCHAR(20))")
-        .await
-        .unwrap();
-    connection
-        .execute("SET SESSION sql_mode = 'EMPTY_STRING_IS_NULL'")
         .await
         .unwrap();
     connection
