@@ -52,13 +52,6 @@
     "Forgejo"
   ],
   "recorded_at_utc": "2026-10-27T17:51:04.618227+00:00",
-  "project_verification": {
-    "verified_at_utc": "2026-10-27T17:51:50.599130+00:00",
-    "field_updates_checked": 45,
-    "issue_additions_checked": 7,
-    "problems": [],
-    "additional_direct_node_checks": 2
-  },
   "publication_base_commit": "3d236be3d60cdb451efae9f914222c660df28c20",
   "production_diff_since_source_empty": true,
   "source_commits": {
