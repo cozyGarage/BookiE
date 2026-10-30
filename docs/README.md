@@ -35,7 +35,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | Current capability behaviour extracted from code | [specs/](../specs/README.md) | Descriptive only; when a spec and the code disagree, fix the spec |
 | An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR; keep the [checklist](decisions/checklist.md) row in sync |
 | Which forks already have an answer | The [decision checklist](decisions/checklist.md) | Link, N/A, or open item; do not invent a decision to fill a cell |
-| A design not yet decided | [proposal index](proposals/README.md) | Becomes an ADR or is deleted; aggregate Forgejo trains are accepted in [ADR 0020](decisions/0020-aggregate-forgejo-trains.md) |
+| A design not yet decided | [proposal index](proposals/README.md) | Becomes an accepted decision or is removed from active proposals |
 | An open issue, its status and lane | [Project #3](https://github.com/users/cozyGarage/projects/3); ID map in the [ledger index](known-issues.md) | Status and Lane on the project; keep the index ID→issue→Lane table in sync; `scripts/check-known-issues.py` checks format offline, while `scripts/check-github-issue-status.py` reports live issue state |
 | Milestone completion and subsequent order | [Completion and scope](bookie-0.2-sprint.md), [backlog](backlog.md) | Record maintainer completion separately from publication; keep issue acceptance on Project #3 and dated proof in the archive |
 | B3 remaining work | Project #3 Lane B3; [B3 board pointer](lane-boards.md#b3-types-and-values) | Issues on the project; pointer keeps accepted refusals and the case record |
