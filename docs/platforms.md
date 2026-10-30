@@ -78,7 +78,7 @@ The 0.2.0 release includes a Flatpak bundle, but BookiE is not listed on Flathub
 
 The current manifests allow network and IPC, X11/Wayland display and graphics access, home-directory access, read-only host configuration, the Kerberos credential-cache socket, `org.freedesktop.secrets`, and the SSH-agent socket. Home-directory access versus portal-only access is the decision recorded under PKG-8. The `ssh-auth` socket supports the built-in client's agent authentication. The system OpenSSH option needs a host `ssh` executable and must refuse explicitly in the sandbox instead of falling back to the built-in client.
 
-A manual run on a Debian 13 guest on October 7–8, 2026 verified building, installing, launching, uninstalling and showing the default manifest's window ([archived PKG-4 record](archive/known-issues-pre-project-migration-2026-10-12.md#packaging-and-qualification)). This is historical packaging evidence, not release qualification for the current source. Flathub submission and screenshots are tracked under PKG-4.
+A manual run on a Debian 13 guest on October 7–8, 2026 verified building, installing, launching, uninstalling and showing the default manifest's window. This is historical packaging evidence, not release qualification for the current source. Flathub submission and screenshots are tracked under PKG-4.
 
 ## Accessibility
 

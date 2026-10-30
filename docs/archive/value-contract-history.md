@@ -2219,8 +2219,8 @@ The composed parser-to-server test passed against the PostgreSQL 16 Docker fixtu
 
 ## PostgreSQL array checkpoint
 
-Scenario B3-1 follows the DBeaver array distinctions recorded in the
-[external survey](b3-test-scenario-survey.md). The first real-server regression
+Scenario B3-1 follows the DBeaver array distinctions recorded in the migrated
+private scenario survey. The first real-server regression
 failed on an empty int4 array, which returned Undecodable. No external fixture
 or source code was copied.
 
@@ -2613,8 +2613,8 @@ also passed. Installed desktop acceptance remains a later gate.
 
 ## PostgreSQL time checkpoint
 
-B3-2 adopts the temporal-boundary scenarios from the
-[external survey](b3-test-scenario-survey.md). The new server regression first
+B3-2 adopts the temporal-boundary scenarios from the migrated private survey.
+The new server regression first
 failed because `24:00:00` was decoded as midnight: exported wire bytes changed
 from `000000141dd76000` to `0000000000000000`.
 

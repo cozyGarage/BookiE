@@ -39,16 +39,14 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - The October 18 upstream Linux adoption and source movement audits were moved to the private research archive; accepted BookiE decisions and shipped behavior remain documented in ADRs and capability specs.
 - [0.2.0 completion handoff](../archive/bookie-0.2-completion-handoff-2026-10-18.md): maintainer completion statement, publication boundary and previous scope/sprint snapshots.
 
-- [Code and UI audit, October 18](../archive/code-and-ui-audit-2026-10-18.md): dated source evidence for pending-state cues, high contrast and responsiveness.
+- The October 18 cross-client code and UI audit was moved to the private research archive. Current implementation behavior and visual acceptance remain in the manual verification guide and active issue tracker.
 - [Capability review](../capability-review.md): general evaluation method and BookiE's current technical boundaries.
 - Database-client architecture, CI and operation-outcome review, October 15: source-specific evidence is preserved in the dated archive; current general evaluation criteria are in the [capability review](../capability-review.md).
 - [Peer-review delivery tracker](https://github.com/cozyGarage/BookiE/issues/1026) and its lane-owned slices are the current work queue for the review below.
-- [Linux documentation update plan and peer review, October 16](../archive/linux-peer-review-2026-10-16.md): source reconciliation, architecture boundaries, and regression candidates.
-- [Linux peer review, October 17](../archive/linux-peer-review-2026-10-17.md): dated source checks and applicable regression-test lessons.
+- The October 16–17 cross-client peer reviews and B3 test-source survey were moved to the private research archive. Current work remains on Project #3; applicable test rules remain in the validation playbook and test design rules.
 - The October 15 PostgreSQL client comparison and probe packet was moved to the private research archive. Current BookiE contracts are summarized in the [capability review](../capability-review.md).
 
 
-- [CI build speed proposal](../proposals/ci-build-speed.md): where Forgejo gate time goes, a `ci` build profile for GUI scenario jobs and sharded distro-floor scenarios, ordered after the ADR 0021 runner upgrade.
 
 - Zed editor and panel review, October 22: completed research, existing PR dependencies and issue-owned results/error/message panel follow-ups.
 - GPUI client review, October 22: completed source research including dbdelve; open adoption proposals remain on their issues.
@@ -73,7 +71,6 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [Completion popup initialization, October 22](../evidence/completion-popup-initialization-2026-10-22/README.md): reproduced missing GtkSourceView initialization, independent probe and startup regression.
 - [Owned GTK process checks, October 22](../evidence/owned-gtk-process-2026-10-22/README.md): fixture PID/lifetime ownership for memory sampling and second launch, with two-process regressions and targeted GTK acceptance.
 
-- [Evidence branch migration proposal](../proposals/evidence-branch.md): gradual artifact relocation, immutable source identity and a separately tested CI publisher.
 
 - [Toolkit startup ordering, October 23](../evidence/toolkit-startup-2026-10-23/README.md): fresh-process regression for GTK initialization before library version checks.
 

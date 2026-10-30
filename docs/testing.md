@@ -186,7 +186,7 @@ The [manual checklist](manual-verification-0.2-features.md) records installed GT
 
 ## Regression case selection
 
-The [historical test record](archive/testing-history.md#upstream-test-suite-parity) preserves the original cases and counts. The [scenario survey](archive/b3-test-scenario-survey.md) is a dated source study, not a current backlog; current B3 case status belongs to the board and [value-contract index](value-contracts.md). Failure reports are hypotheses, not confirmed BookiE defects; the active checklist is [#790](https://github.com/cozyGarage/BookiE/issues/790). Trace the matching BookiE path and reproduce a candidate against current source before changing code; a historical claim of zero tests does not establish a current coverage gap.
+Current B3 case status belongs to the board and [value-contract index](value-contracts.md). Failure reports are hypotheses, not confirmed BookiE defects; the active checklist is [#790](https://github.com/cozyGarage/BookiE/issues/790). Trace the matching BookiE path and reproduce a candidate against current source before changing code; a historical claim of zero tests does not establish a current coverage gap.
 
 ## File-size guard
 
