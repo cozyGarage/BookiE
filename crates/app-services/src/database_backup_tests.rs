@@ -198,3 +198,81 @@ async fn a_saved_connection_that_is_not_postgres_is_refused_before_any_tool_runs
     .await;
     assert!(matches!(outcome, Err(DriverError::Unsupported(_))), "{outcome:?}");
 }
+
+struct RecordingAudit(std::sync::Mutex<Vec<tablepro_policy::AuditEvent>>);
+
+#[async_trait::async_trait]
+impl tablepro_policy::AuditSink for RecordingAudit {
+    async fn record(&self, event: tablepro_policy::AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+        self.0.lock().unwrap().push(event);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn a_restore_refused_by_policy_is_audited_before_any_secret_or_route_is_resolved() {
+    let audit = Arc::new(RecordingAudit(std::sync::Mutex::new(Vec::new())));
+    let guard = PolicyGuard::new(
+        Arc::new(IdleConnection),
+        tablepro_policy::GuardContext {
+            connection_id: uuid::Uuid::new_v4(),
+            connection_name: "unit".into(),
+            driver_id: "postgres".into(),
+            environment: tablepro_core::Environment::Local,
+            read_only: true,
+            principal: tablepro_policy::Principal::human_gui(),
+            policy: Arc::new(tablepro_policy::PolicyConfig::default()),
+            approval: Arc::new(tablepro_policy::AutoApproveSink),
+            audit: audit.clone(),
+            audit_state: Arc::new(tablepro_policy::AuditState::new()),
+        },
+    );
+    let saved: SavedConnection = serde_json::from_value(serde_json::json!({
+        "id": uuid::Uuid::new_v4(),
+        "name": "read only",
+        "driver_id": "postgres",
+        "host": "127.0.0.1",
+        "port": 5432,
+        "database": "app",
+        "username": "app",
+        "ssh": {
+            "hop_id": uuid::Uuid::new_v4(),
+            "credential_revision": 0,
+            "host": "bastion.invalid",
+            "port": 22,
+            "username": "jump",
+            "auth": {"kind": "private_key", "path": "/nonexistent/key", "has_passphrase": false}
+        },
+    }))
+    .unwrap();
+    let environment = SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse);
+    let runtime = std::env::temp_dir();
+    let context = SavedBackupContext {
+        guard: &guard,
+        driver: &UnusedDriver,
+        saved: &saved,
+        environment: &environment,
+        server_version: Some("PostgreSQL 17.2"),
+        runtime_dir: &runtime,
+    };
+    let control = OperationControl::new(tokio_util::sync::CancellationToken::new(), None);
+
+    let outcome = run_saved_backup_job(
+        context,
+        BackupJob::Restore {
+            input: PathBuf::from("/tmp/never-read.dump"),
+        },
+        &control,
+    )
+    .await;
+
+    assert!(matches!(outcome, Err(DriverError::PolicyDenied(_))), "{outcome:?}");
+    let events = audit.0.lock().unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|event| event.terminal_status == tablepro_policy::AuditTerminalStatus::Denied),
+        "{} events",
+        events.len()
+    );
+}

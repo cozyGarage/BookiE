@@ -1,4 +1,5 @@
 use secrecy::SecretString;
+use std::os::unix::fs::OpenOptionsExt;
 use std::sync::Arc;
 use std::time::Duration;
 use tablepro_core::Environment;
@@ -292,7 +293,10 @@ fn validate_client_tls_auth(driver: &dyn DatabaseDriver, opts: &ConnectOptions) 
         .into());
     }
     for path in [cert, key] {
-        let file = std::fs::File::open(path)
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(path)
             .map_err(|_| DriverError::Unsupported("TLS client certificate or key file cannot be opened".into()))?;
         let metadata = file
             .metadata()

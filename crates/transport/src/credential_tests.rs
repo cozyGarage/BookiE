@@ -257,3 +257,28 @@ fn the_crypto_provider_is_installed_for_rustls() {
     install_crypto_provider();
     assert!(rustls::crypto::CryptoProvider::get_default().is_some());
 }
+
+#[test]
+fn a_named_pipe_as_a_client_tls_file_is_refused_without_blocking() {
+    let directory = tempfile::tempdir().unwrap();
+    let key = directory.path().join("client.key");
+    std::fs::write(&key, b"key").unwrap();
+    let pipe = directory.path().join("client.pem");
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&pipe)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let supported = ClientTlsDriver { supported: true };
+        let result = validate_client_tls_auth(&supported, &client_tls_opts(Some(pipe), Some(key), TlsMode::VerifyFull));
+        let _ = sender.send(result.is_err());
+    });
+
+    let refused = receiver.recv_timeout(std::time::Duration::from_secs(5));
+
+    assert_eq!(refused, Ok(true));
+}
