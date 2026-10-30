@@ -123,7 +123,7 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | [upstream-adoption.md](../../archive/upstream-adoption.md) | 73 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [upstream-linux-adoption-2026-10-18.md](../../archive/upstream-linux-adoption-2026-10-18.md) | 84 | 0 | 9 closed / 1 open | Historical record; no current runtime claim |
 | [upstream-linux-movement-2026-10-18.md](../../archive/upstream-linux-movement-2026-10-18.md) | 227 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [upstream-main-analysis-2026-10-20.md](../../archive/upstream-main-analysis-2026-10-20.md) | 125 | 2 | 0 closed / 1 open | Research complete; selected claims rerun above; implementation open |
+| `upstream-main-analysis-2026-10-20.md` | 125 | 2 | 0 closed / 1 open | Historical source review; migrated out of the public repository after this inventory |
 | [upstream-main-review-2026-10-03-inventory.md](../../archive/upstream-main-review-2026-10-03-inventory.md) | 275 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [upstream-main-review-2026-10-03.md](../../archive/upstream-main-review-2026-10-03.md) | 218 | 7 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [upstream-older-releases-2026-10-03-inventory.md](../../archive/upstream-older-releases-2026-10-03-inventory.md) | 146 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
@@ -134,4 +134,4 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 
 ## Limits and next work
 
-No application feature was changed by this contribution. Historical GTK, Wayland, Secret Service, non-PostgreSQL drivers, extension matrices, crash-save, retained-memory limits, distribution floors, package installation, advisory scans and mutation totals were not rerun. Their archived passes, failures, cancellations and uncertainty remain intact. The [workstation plan](../../archive/workstation-test-reuse-2026-10-20.md) and [nightly recovery inventory](../nightly-778-selective-rerun-2026-10-20/README.md) preserve the reuse and selective rerun records. This documentation update starts no new heavy gate.
+No application feature was changed by this contribution. Historical GTK, Wayland, Secret Service, non-PostgreSQL drivers, extension matrices, crash-save, retained-memory limits, distribution floors, package installation, advisory scans and mutation totals were not rerun. Their archived passes, failures, cancellations and uncertainty remain intact. The workstation plan and nightly recovery inventory were moved to the private research archive. This documentation update starts no new heavy gate.

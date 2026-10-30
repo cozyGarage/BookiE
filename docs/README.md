@@ -84,7 +84,6 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 - [Installed native Wayland run, October 23](evidence/installed-wayland-0.2.0-2026-10-23/README.md): oracle-checked end-to-end flows on Hyprland and the defects filed from them.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
 - [Installed Arch profile, October 24](evidence/installed-arch-profile-2026-10-24/README.md): package integrity, automated test results, native PostgreSQL UI checks and resource samples.
-- [Forgejo nightly #778 terminal inventory, October 20](evidence/nightly-778-selective-rerun-2026-10-20/README.md): dated record of completed, cancelled and OOM-interrupted jobs; it is not current runner guidance.
 - [PostgreSQL restricted-role catalog visibility, October 24](evidence/postgres-catalog-visibility-2026-10-24/README.md): the original isolated SQL probe and its metadata-visibility limits.
 - [PostgreSQL driver coverage, October 24](evidence/postgres-driver-coverage-2026-10-24/README.md): the recovered integration-coverage report at source `d2166fd`.
 - [Workspace unit coverage at `d2166fd`, October 24](evidence/workspace-unit-coverage-d2166fd-2026-10-24/README.md) and [at `583c244`](evidence/workspace-unit-coverage-583c244-2026-10-24/README.md): recovered historical reports for two distinct source revisions.
@@ -105,7 +104,6 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
 - [Changelog fragment evaluation, October 19](archive/changelog-fragment-evaluation-2026-10-19.md) (kept the current workflow because commit volume did not establish conflict cost)
 - [Development feedback-loop proposal, October 23](archive/devops-feedback-loop-2026-10-23.md) (dated proposal snapshot; active work and priority live in the backlog and Project #3)
-- [Workstation test reuse plan, October 20](archive/workstation-test-reuse-2026-10-20.md) (dated local pilot and execution plan; current validation commands are in the playbook)
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md) and its [inventory companion](archive/architecture-consistency-2026-10-03-inventory.md)
 - [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
 - [App layer audit](archive/app-layer-external-audit-2026-10-06.md): UI layering, request ownership and test-boundary findings

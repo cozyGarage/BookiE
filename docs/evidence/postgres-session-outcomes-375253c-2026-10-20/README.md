@@ -1,6 +1,6 @@
 # PostgreSQL session outcomes, October 20, 2026
 
-Implementation evidence for [#1186](https://github.com/cozyGarage/BookiE/issues/1186) and [#1187](https://github.com/cozyGarage/BookiE/issues/1187), delivered together in [PR #1190](https://github.com/cozyGarage/BookiE/pull/1190). Findings originated in the [upstream review](../../archive/upstream-next-slices-2026-10-20.md).
+Implementation evidence for [#1186](https://github.com/cozyGarage/BookiE/issues/1186) and [#1187](https://github.com/cozyGarage/BookiE/issues/1187), delivered together in [PR #1190](https://github.com/cozyGarage/BookiE/pull/1190).
 
 ## Source and scope
 
