@@ -447,6 +447,9 @@ pub(crate) fn classify_query(query: &Query) -> StatementDetails {
     administrative |= body_facts.class == StatementClass::Administrative;
     effects = effects.union(body_facts.effects);
     contains_unscoped_dml |= body_facts.contains_unscoped_dml;
+    if !query.locks.is_empty() {
+        effects = effects.union(Effects::WRITES_ROWS);
+    }
     writes |= administrative || !query.locks.is_empty();
     tables.extend(body_facts.tables);
 
