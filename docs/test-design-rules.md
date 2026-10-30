@@ -28,5 +28,5 @@ Rules that earlier audits paid for. Each one names the failure it prevents. The 
 
 ## Changing a test or guard
 
-- **Do not delete a test that pins a wrong expectation.** Amend it, and say in the commit why the expectation changed. Write the failing regression first. For example, the crate-boundary check must keep permitted dev edges (driver to policy) distinct from forbidden GUI edges ([Linux peer review, 2026-10-16](archive/linux-peer-review-2026-10-16.md), finding 2).
+- **Do not delete a test that pins a wrong expectation.** Amend it, and say in the commit why the expectation changed. Write the failing regression first. Crate-boundary checks must keep permitted dev edges (driver to policy) distinct from forbidden GUI edges.
 - **Weakening a contract guardrail needs the contract owner's agreement** ([AGENTS.md](../AGENTS.md)).
