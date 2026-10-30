@@ -61,7 +61,7 @@ Source: [dbx trigger SQL builder and tests](https://github.com/t8y2/dbx/pull/125
 - The live [peer-review tracker #1026](https://github.com/cozyGarage/BookiE/issues/1026) now marks #1028 complete and closed by merged #1037. #1029, #1030, #1031, #1032, #1033 and #1034 remain open in their recorded lanes; #1054 and #1056 are separate open follow-ups. Check the project before selecting work.
 - Thirteen UX-owned PR branches were synced to Linux `6ab7d79e1`; merge-only comments record each exact head and GitHub check snapshot. No failures were present at the refresh; some inexpensive jobs remained in progress. Forgejo/native acceptance remains separate and was not run in this review.
 
-The longer October 16 source review remains at [linux-peer-review-2026-10-16.md](linux-peer-review-2026-10-16.md). The comparison table is maintained in [0.2-feature-comparison.md](../0.2-feature-comparison.md); open work and order remain on Project #3 and the active sprint.
+The longer October 16 source review remains at [linux-peer-review-2026-10-16.md](linux-peer-review-2026-10-16.md). The dated comparison table was later moved to the private research archive; open work and order remain on Project #3 and the active sprint.
 
 ## 2026-10-17 12:00 UTC: current issue and PR follow-up
 

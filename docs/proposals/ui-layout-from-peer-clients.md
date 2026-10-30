@@ -1,18 +1,10 @@
-# UI layout changes drawn from peer clients
+# UI layout changes
 
-Proposed; nothing here is accepted or scheduled. It turns an October 28 side-by-side capture at 920 and 1,400 px and the maintainer's preferences into small slices for [#1862](https://github.com/cozyGarage/BookiE/issues/1862), [#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1864](https://github.com/cozyGarage/BookiE/issues/1864) and [#1867](https://github.com/cozyGarage/BookiE/issues/1867). The maintainer picks the order and what to drop.
+Proposed; nothing here is accepted or scheduled. This page records candidate UI changes for [#1862](https://github.com/cozyGarage/BookiE/issues/1862), [#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1864](https://github.com/cozyGarage/BookiE/issues/1864) and [#1867](https://github.com/cozyGarage/BookiE/issues/1867). The maintainer picks the order and what to drop.
 
-## What was checked first
+## Scope
 
-| Claim | Evidence |
-|---|---|
-| Upstream TablePro Linux has an ER diagram | the "ER diagram" row of upstream's `ROADMAP.md` and the GTK `ui/diagram/` module of its app crate (canvas, draw, export, keyboard description) at `origin/main` `86651d743`. Tables as cards, foreign keys in crow's foot notation, pan, zoom, drag, Reset Layout, PNG and SVG export |
-| BookiE has no ER diagram | No diagram module in `apps/` or `crates/`; the [feature comparison](../0.2-feature-comparison.md) lists it as "No diagram view identified" |
-| dbx can collapse the whole tree | `AppSidebar.vue` has a `collapseAllTreeNodes` action behind a "Collapse all" tooltip |
-| Beekeeper Studio can expand and collapse all | `entity-list` emits `bks-expand-all` and `bks-collapse-all` from two buttons |
-| dbx shows users and privileges in the tree | Observed: a "Users & Privileges" node under a PostgreSQL connection, plus per-schema Procedures, Functions, Sequences and Types. Not opened, so its contents are not described here |
-| BookiE already has roles and privileges, but not in the sidebar | `catalog_dialog.rs` lists `Role` and `Grant` ("Privileges") kinds; the sidebar shows only Tables and Views, with no collapse-all or expand-all command |
-| BookiE's sidebar-header list icon is the schema filter | `schema_filter_button` in `ui/app/mod.rs` |
+Each candidate describes an observable UI behavior. Existing safety, accessibility and driver capability contracts continue to apply.
 
 ## Slices
 
@@ -21,11 +13,11 @@ Each slice is independent and keeps shortcuts and AT-SPI names unless the slice 
 1. **Result strip ([#1862](https://github.com/cozyGarage/BookiE/issues/1862)).** Replace the `Results` toggle, the bare list icon and `Errors (0)` with one grouped switcher with an active state. Show the error count only when it is not zero. Keep the maximize button on the right. Small, UX.
 2. **Filter row ([#1864](https://github.com/cozyGarage/BookiE/issues/1864)).** One always-visible row: column, operator, value, add rule, a raw-WHERE toggle, and Apply next to the field. Move saved filters (Apply saved, Delete, Save as, Rename) into one menu. The structured rule model and the core filter builder stay as they are. Medium, UX.
 3. **Editor toolbar ([#1864](https://github.com/cozyGarage/BookiE/issues/1864)).** Keep Run, Session and Explain visible; move Fold block, Unfold all, Pin results and Split into an overflow menu with their shortcuts shown. Small, UX.
-4. **Large results ([#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1867](https://github.com/cozyGarage/BookiE/issues/1867)).** Keep the rows already received on screen while later pages stream; show the total as it is learned; at the end or after a timeout keep the last good page and its row range and show the timeout as a notice. Whether to load a first page and count on demand (dbx, Beekeeper) is a decision for ADR 0011 and 0025, not for this slice. Medium, UX.
+4. **Large results ([#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1867](https://github.com/cozyGarage/BookiE/issues/1867)).** Keep the rows already received on screen while later pages stream; show the total as it is learned; at the end or after a timeout keep the last good page and its row range and show the timeout as a notice. Whether to load a first page and count on demand is a decision for ADR 0011 and 0025, not for this slice. Medium, UX.
 5. **Sidebar tree.** Add Collapse all and Expand all buttons to the sidebar header. Add Materialized Views, Routines, Sequences and Types groups, and a Users & Privileges node, for engines whose `capabilities()` profile says the catalog kind exists. Reuse the catalog queries behind the Catalog dialog; do not add new queries per group until measured against [#580](https://github.com/cozyGarage/BookiE/issues/580). Medium, UX with B3.
-6. **ER diagram.** Adapt the upstream TablePro Linux diagram read-only first, with provenance and attribution. It needs foreign-key metadata per engine (`supports_foreign_key_metadata`), a bound on tables read at once, and the keyboard and screen-reader access the upstream roadmap describes. Large, UX with B3.
+6. **ER diagram.** Keep the diagram read-only. Improvements need foreign-key metadata per engine (`supports_foreign_key_metadata`), a bound on tables read at once, and keyboard and screen-reader access. Large, UX with B3.
 
-7. **Row density.** Measured at 1,400 px against DBeaver, DbGate and Antares: BookiE's sidebar rows are about 48 px tall (peers 18 to 25) and grid rows about 35 px (peers 18 to 25). Reduce the sidebar and grid row heights (a compact density), widen the sidebar so names do not truncate to `custom...`, and show table size next to each name where the catalog already provides it. Small to medium, UX. Slice 1 and 4 free more height; this slice makes it usable.
+7. **Row density.** Measure sidebar and grid row heights at narrow and wide window sizes. Consider a compact density, a wider sidebar so names remain readable, and table sizes next to names where the catalog already provides them. Small to medium, UX. Slices 1 and 4 free more height; this slice makes it usable.
 
 ## Constraints
 
@@ -37,11 +29,11 @@ Each slice is independent and keeps shortcuts and AT-SPI names unless the slice 
 ## Open decisions
 
 - Order. A reasonable first group is 1, 3 and the end-of-stream part of 4, because they are small and visible.
-- Whether saved filters stay (BookiE added them to the upstream panel) or move to a menu only.
+- Whether saved filters stay directly visible or move to a menu.
 - Which sidebar groups to show by default, and whether the Users & Privileges node needs its own approval path because it exposes grants.
 - Whether the ER diagram ships read-only or with later editing, and its table limit.
-- Whether to adopt the peer clients' first-page loading for large results.
+- Whether large results should load an initial page and total count on demand.
 
 ## Not proposed
 
-Copying dbx's AI actions (Fix with AI, Ask AI), a JSON sidebar or other paid-tier features of the peer clients, a custom theme, or any change to what is executed or audited.
+AI actions, a JSON sidebar, account-gated features, a custom theme, or any change to what is executed or audited.

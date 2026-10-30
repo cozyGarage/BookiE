@@ -6,7 +6,7 @@
 
 ## Context
 
-BookiE can reach a database through a saved `ssh` tunnel handled by the system OpenSSH client. The upstream implementation this port was based on answered the first `'s password:` prompt with the stored password whatever account the prompt named, so a jump host could receive the destination's password. It also relied on process-global task trackers and on error and transport types from the core crate.
+BookiE can reach a database through a saved `ssh` tunnel handled by the system OpenSSH client. An earlier askpass implementation answered the first `'s password:` prompt with the stored password regardless of the account named, so a jump host could receive the destination's password. It also relied on process-global task trackers and on error and transport types from the core crate.
 
 ## Decision
 
@@ -29,8 +29,8 @@ A secret goes only to the host that asked for it by its exact name. Independent 
 
 ## Alternatives considered
 
-- **Answer the first password prompt (the upstream behaviour).** Rejected: a jump host receives the destination password.
+- **Answer any password prompt.** Rejected: a jump host could receive the destination password.
 - **Learn host keys on first use (`StrictHostKeyChecking=accept-new`).** Rejected. [ADR 0008](0008-connection-and-session-ownership.md) requires an explicit ask for every hop, and an unknown key must write nothing when the user declines ([connections](../connections.md#built-in-ssh-trust)).
-- **Keep upstream's global task tracker and runtime cell.** Rejected: hidden shared state across connections and in tests.
+- **Use a process-global task tracker and runtime cell.** Rejected: hidden shared state across connections and in tests.
 - **Reuse core's `SshFailure` and `Transport` trait.** Rejected: it would give the ssh crate a dependency on `core` and reverse the layering in [ADR 0018](0018-headless-app-services-crate.md).
 - **Rely on the user's `ssh_config` for host-key policy.** Rejected: a user setting could silently disable the check for the destination.
