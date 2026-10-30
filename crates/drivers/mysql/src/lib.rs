@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use async_trait::async_trait;
 use secrecy::ExposeSecret;
 use sqlparser::ast::Statement as SqlStatement;
@@ -12,6 +10,7 @@ use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statem
 use futures::stream::StreamExt;
 
 mod attributes;
+mod catalog;
 mod decode;
 mod spatial;
 use decode::extract_value;
@@ -106,9 +105,10 @@ impl DatabaseDriver for MysqlDriver {
         let session_options = mysql_opts.clone();
         let read_only = opts.read_only;
         let database: std::sync::Arc<str> = opts.database.as_str().into();
+        let acquire_timeout = opts.pool_acquire_timeout();
         let pool = MySqlPoolOptions::new()
             .max_connections(4)
-            .acquire_timeout(Duration::from_secs(5))
+            .acquire_timeout(acquire_timeout)
             .after_connect(move |connection, _| Box::pin(prepare_session(connection, read_only)))
             .before_acquire(move |connection, _| {
                 let database = std::sync::Arc::clone(&database);
@@ -127,7 +127,7 @@ impl DatabaseDriver for MysqlDriver {
         // requested.
         let cancellation_pool = MySqlPoolOptions::new()
             .max_connections(1)
-            .acquire_timeout(Duration::from_secs(5))
+            .acquire_timeout(acquire_timeout)
             .connect_lazy_with(cancellation_options);
         Ok(Box::new(MysqlConnection {
             pool,
@@ -160,22 +160,11 @@ impl Connection for MysqlConnection {
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        let rows = sqlx::query(
-            "SELECT CAST(table_schema AS CHAR), CAST(table_name AS CHAR)
-             FROM information_schema.tables
-             WHERE table_schema = DATABASE()
-             ORDER BY table_name",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| TableInfo {
-                schema: Some(r.get::<String, _>(0)),
-                name: r.get::<String, _>(1),
-            })
-            .collect())
+        catalog::list_relations(&self.pool, None).await
+    }
+
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        catalog::list_relations(&self.pool, Some("VIEW")).await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
@@ -710,7 +699,7 @@ async fn params_into_result(
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
         .map_err(map_sqlx_error)?;
-    let columns = statement_columns(statement.columns());
+    let mut columns = statement_columns(statement.columns());
     let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
     let mut rows = Vec::with_capacity(limit.min(1024));
@@ -721,6 +710,9 @@ async fn params_into_result(
         if rows.len() >= limit {
             truncated = true;
             break;
+        }
+        if columns.is_empty() {
+            columns = statement_columns(row.columns());
         }
         let Some(values) = budget.decode_and_admit_row(row.len(), mysql_row_payload_bytes(&row), || {
             Ok::<_, DriverError>((0..columns.len()).map(|index| extract_value(&row, index)).collect())

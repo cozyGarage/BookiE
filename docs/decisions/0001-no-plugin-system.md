@@ -62,5 +62,3 @@ Gained:
 ## Revisit conditions for a JDBC bridge
 
 An optional JVM/JDBC bridge needs an amendment to this ADR before any code. The amendment must define a narrow exception, a list of approved engine, class and artifact profiles (no arbitrary JARs), a typed encoding for values (JSON-RPC alone is not lossless for temporal zones and precision or for native and nested values), and no bridge-local SQL-prefix classifier. [`PolicyGuard`](0016-governed-consumer-seam.md) stays the only consumer connection.
-
-Sources: [grid memory and fetch plan](../archive/grid-memory-and-fetch-action-plan-2026-10-07.md), [external audit](../archive/external-audit-2026-10-06.md), [feature comparison history](../archive/feature-comparison-history-2026-10-23.md).

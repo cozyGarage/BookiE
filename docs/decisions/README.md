@@ -69,12 +69,12 @@ Other options and why they were rejected.
 | [0017](0017-mcp-sdk-behind-the-governed-seam.md) | Official Rust MCP SDK behind the governed seam | Accepted | Target: replace the hand-written protocol and transport layer while keeping tokens, allowlists, approval and audit in BookiE's code. |
 | [0018](0018-headless-app-services-crate.md) | Headless application-services crate | Accepted | GTK-free services, the tab model and workspace persistence have moved; GTK controllers and page handling remain in the app. |
 | [0019](0019-database-tooling-without-sidecars.md) | Database tooling without sidecars | Accepted | DuckDB for file conversion, `refinery` behind `PolicyGuard` for migrations, supervised vendor dump tools for backup; no sidecar binaries |
-| [0020](0020-aggregate-forgejo-trains.md) | Aggregate pull requests are the Forgejo gate unit | Accepted | Gate one immutable aggregate head, verify its merge tree and close constituent PRs as included |
 | [0021](0021-toolkit-floor.md) | Support only the newest GTK toolkit | Accepted | GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 at startup, build, package and CI; older distributions are unsupported |
 | [0022](0022-release-notes-from-merge-commits.md) | Release notes come from merge commits | Accepted | A `Release-Note:` trailer on each squash commit replaces edits to `CHANGELOG.md`; notes are assembled at release. |
 | [0023](0023-system-openssh-transport-boundaries.md) | System OpenSSH transport boundaries | Accepted | Askpass answers only exact prompts, forced client options, no global state, and no `core` dependency in the ssh crate. |
 | [0024](0024-keyed-grid-writes-check-what-they-overwrite.md) | Keyed grid writes check what they overwrite | Accepted | Relational updates compare edited columns' original values and must affect exactly one row; MongoDB guards by field and row; deletes and ABA are limits. |
 | [0025](0025-transient-result-page-spool.md) | Keep fetched result pages in a transient spool | Accepted | A private, bounded, encrypted spool makes every fetched PostgreSQL page revisitable without retaining all rows in RAM or rerunning SQL. |
+| [0026](0026-audit-journal-segments.md) | Rotate the audit journal into verified segments | Proposed | A size-rotated, hash-chained set of segments bounds start-up and verification cost without dropping audit records. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

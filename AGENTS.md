@@ -32,8 +32,8 @@ Lanes keep parallel agents from editing the same files. Pick open work from [Pro
 | --- | --- |
 | B3 | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display, the [B3 board pointer](docs/lane-boards.md#b3-types-and-values) |
 | B4 | Transport, guard, audit, SSH, rollback and acceptance: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage, the [B4 board pointer](docs/lane-boards.md#b4-transport-and-sessions) |
-| UX | App layer (`apps/linux/`), packaging, CI and the lab, the ledger index, and shared documentation. UX also runs the Forgejo gate for every pull request that is green on GitHub and merges it once both agree |
-| Cursor | Documentation and tests only. UX reviews its test pull requests; the maintainer merges its documentation pull requests, which need no Forgejo run |
+| UX | App layer (`apps/linux/`), packaging, repository automation, the ledger index, and shared documentation |
+| Cursor | Documentation and tests only. UX reviews test pull requests; the maintainer reviews documentation pull requests |
 | Maintainer | Decisions and anything needing a person or a real desktop |
 
 - To work in another lane's files, first record the handoff on the GitHub issue (and update the project **Lane** / `lane:*` label plus the [ledger index](docs/known-issues.md) Lane column) in the same commit as the first change.
@@ -47,12 +47,14 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 1. Write the failing test first, then the fix, in one commit.
 2. Run the checks in [Validation](#validation) locally. Run each script directly; piping `bash scripts/preflight.sh` through `tail` reports `tail`'s status, not the script's.
 3. Merge the latest BookiE `linux` branch from GitHub `cozyGarage/BookiE` into the branch (do not rebase a shared branch). Resolve generated files such as `Cargo.lock` by regenerating them.
-4. **Gate on Forgejo during the staged CI migration:** `bash scripts/forgejo-gate.sh <branch> [remote-branch]`. It pushes the named branch to Forgejo, waits for that run and lists jobs that did not pass. Forgejo remains the acceptance gate for the remaining merge tier. GitHub pull requests now also run the Driver TLS fixture; `Linux PR readiness` requires that result on the exact PR head.
-5. Open the GitHub pull request against `linux`, merge it when the Forgejo gate is green (squash, subject `<type>(<scope>): <summary> (#N)`; the `PR title` check requires the pull request title to follow this form), then sync Forgejo's `linux` to GitHub's with `bash scripts/forgejo-gate.sh <local branch at GitHub linux> linux`, which fast-forwards under the gate lock. The UX lane gates and merges every pull request that is green on GitHub, using `--match-head-commit`. A push that only merges `linux` into a branch, does not need a new gate: compare the pull request's own diff against BookiE `linux` for the gated head and the current head (`git diff <bookie-remote>/linux...<head> -- crates scripts`, where `<bookie-remote>` is the remote that tracks `cozyGarage/BookiE`), and merge when it is unchanged. Re-gate when the pull request's own code or tests changed. Say in the report that the comparison was made. Ready PRs may instead be included in one aggregate train PR under [ADR 0020](docs/decisions/0020-aggregate-forgejo-trains.md): verify the pinned manifest and GitHub checks before gating, gate the exact aggregate head once, verify freshness and the successful run before merging, then verify the resulting tree. This replaces separate Forgejo gates for those constituents. Close their PRs as included only after aggregate verification, and close issues only when their acceptance is satisfied.
-6. **Documentation-only changes skip CI.** A change that touches only `*.md` files and `docs/` is pushed straight to `linux` after `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check` pass. The heavy GitHub workflows ignore such pushes; the cheap `linux-ci-contracts` harness still checks them on GitHub. `forgejo-gate.sh` runs the same checks and exits without queueing a run. Do not use a Forgejo `paths-ignore` filter: Forgejo reads the changed files of a merge commit as none, so every branch that merged `linux` would silently get no run. Do not push a documentation-only tip to Forgejo's `linux`; the next code merge carries it. A change that touches any other file takes the full path above.
-7. **One job per execution VM.** Each runner has capacity one. Workflow concurrency is scoped to its workflow/run identity, so queued jobs from another run may use an idle eligible worker. Keep fixture state, display sessions, checkout directories and artifact identity isolated per job/run. The gate script locks each remote target branch separately; synchronization of Forgejo `linux` remains serialized by that target lock. Never start duplicate gates for the same head to speed up a run. A single failed job can be re-run from its Forgejo run page. An overlapping-run failure is inconclusive until fixture and resource isolation have been checked.
-8. **Move CI tiers to GitHub in verified steps.** GitHub runs the cheap tier, security, Flatpak, workflow and harness contracts, and the Driver TLS fixture on pull requests. The remaining acceptance tiers stay on Forgejo until each has a green GitHub PR result and its exact-head check is required by `Linux PR readiness`. Branch pushes to `linux` or `main` do not run the heavy GitHub tiers. Keep the temporary Driver TLS overlap until the migration owner removes Forgejo's duplicate. Do not trust a skipped GitHub job as a pass. CodeQL and SonarCloud run on GitHub as reference scans, not gates: fix real findings in small pull requests and mark wrong ones "False positive" or "Won't fix" with a reason (see validation-playbook, SonarCloud triage).
-9. **Merge only on GitHub.** Forgejo is the gate, not the merge target: never merge a pull request on Forgejo or push to its `linux` branch. Manual changes can bypass the serialized gate or make the branches diverge and stop fast-forward sync. GitHub's `linux` refuses force-pushes and deletion for everyone (ruleset `protect linux`). When a push to it is rejected as non-fast-forward, merge the latest `linux` and push again; never force it.
+4. **Required checks.** Every pull request must pass the required checks for its exact source revision. Missing, skipped, cancelled or failed checks are not passes; maintainers confirm acceptance before merging.
+5. **Pull requests and merge.** Open pull requests against `linux`. Merge only after required checks and lane review pass for the reviewed source.
+6. **Documentation-only changes.** Run `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check`. Changes to code, workflows or packages require the applicable full validation.
+
+7. **Isolated test inputs.** Keep mutable fixtures, display sessions and build inputs isolated between test runs. Check isolation before attributing overlapping-run failures to product code.
+8. **Required check status.** Check results must apply to the exact proposed revision. Skipped checks do not pass. CodeQL and SonarCloud are reference scans, not gates.
+9. **Protected branch.** Merge only through the protected `linux` branch. Do not force-push or delete it. Resolve a non-fast-forward rejection by including the latest base before retrying.
+
 10. Never leave a background job, container or temporary resource running that you did not start, and never stop one you did not start. On shared systems, stop only resources you own.
 
 ## Principles
@@ -136,7 +138,7 @@ Rules for pull requests that add tests (any agent, including Cursor):
 - Merge the latest BookiE `linux` branch into the branch and run `scripts/preflight.sh` before opening the pull request.
 - Do not edit ledger rows, sprint text or files that another lane owns (for example `policy/src/rules.rs`, owned by B4 in the lane table); those edits are what conflict.
 - Check the open pull requests for the same files first. When two change the same map or sentinel (for example `change-test-map.json`), say which one lands first and rebase the other.
-- Say in the pull request when it needs the Forgejo gate; the maintainer or the UX lane gates the exact head, since these agents cannot reach Forgejo.
+- Say in the pull request which validation layers apply; maintainers confirm the exact-head acceptance results.
 
 Every test belongs to one tier with one script and one gate. Use the [validation playbook](docs/validation-playbook.md) to pick layers and `python3 scripts/run-test-layer.py --list` to discover commands.
 
@@ -151,7 +153,7 @@ Every test belongs to one tier with one script and one gate. Use the [validation
 | keyring | `#[ignore]` tests listed under `keyring`, after those under `keyring-fresh` (run before any default keyring exists) | `scripts/test-secret-service.sh` |
 | gtk | `apps/linux/app/tests/gtk_safety.py` on an installed build | `scripts/test-gtk-safety.sh` |
 
-All tiers run on Forgejo (`.forgejo/workflows/ci.yml` and `nightly.yml`). New gtk-widgets and keyring tests must be added to `isolated-tests.json`, and the ignored-test inventory regenerated, or the tier fails. A new crate goes into the crate lists in `preflight.sh` and `test-sandbox.sh`.
+CI runs these tiers according to the change and acceptance requirements. New gtk-widgets and keyring tests must be added to `isolated-tests.json`, and the ignored-test inventory regenerated, or the tier fails. A new crate goes into the crate lists in `preflight.sh` and `test-sandbox.sh`.
 
 ## Validation
 
@@ -162,7 +164,6 @@ bash scripts/preflight.sh            # size, panic, bounded-operation and crate-
 bash scripts/test-gtk-widgets.sh     # when GTK code changed
 python3 scripts/check-known-issues.py && python3 scripts/check-doc-links.py   # when docs changed
 cargo deny check                           # from the repository root, when dependencies changed
-bash scripts/forgejo-gate.sh <branch>
 ```
 
 Driver integration tests need Docker. If a prerequisite is missing, say which check could not run and why.

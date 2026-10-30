@@ -58,6 +58,10 @@ pub enum SshError {
     #[error("authentication failed")]
     Auth,
     #[error(
+        "the server closed the connection after refusing {refused} of the {total} keys held by the SSH agent; its limit on authentication attempts is probably lower than that. Remove keys you do not need from the agent (ssh-add -d) or use a key file"
+    )]
+    AgentKeyLimit { refused: usize, total: usize },
+    #[error(
         "the server accepts only keyboard-interactive authentication, which this client does not support; use a password or a key instead"
     )]
     KeyboardInteractiveUnsupported,
@@ -647,11 +651,16 @@ async fn authenticate_with_agent(
         return Err(SshError::Agent("the agent holds no keys".into()));
     }
     let hash = session.best_supported_rsa_hash().await?.flatten();
-    for key in keys {
-        let result = session
+    let total = keys.len();
+    for (refused, key) in keys.into_iter().enumerate() {
+        let result = match session
             .authenticate_publickey_with(username, key, hash, &mut agent)
             .await
-            .map_err(|error| agent_error(&error))?;
+        {
+            Ok(result) => result,
+            Err(_) if refused > 0 => return Err(SshError::AgentKeyLimit { refused, total }),
+            Err(error) => return Err(agent_error(&error)),
+        };
         if result.success() {
             return Ok(result);
         }

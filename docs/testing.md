@@ -46,7 +46,7 @@ A proxy fault checks BookiE's response to a broken network path; it does not tes
 
 ## Why B3 tests values beyond the driver
 
-B3 covers the value path from the native driver through each relevant consumer, such as result display, grid editing, parameter binding, and export. Driver decoding alone cannot show that later code preserves the value. JSON or formatted text can display a value while hiding distinctions such as BSON integer width, exact decimal precision, or SQL `NULL` versus an empty value. This does not imply that another database client loses those distinctions; a correct-looking display alone does not establish round-trip fidelity.
+B3 covers the value path from the native driver through each relevant consumer, such as result display, grid editing, parameter binding, and export. Driver decoding alone cannot show that later code preserves the value. JSON or formatted text can display a value while hiding distinctions such as BSON integer width, exact decimal precision, or SQL `NULL` versus an empty value. A correct-looking display alone does not establish round-trip fidelity.
 
 [ADR 0007](decisions/0007-type-and-value-preservation.md) defines the outcomes: exact typed support, exact text fallback, explicit refusal, or untested. B3 is a data-correctness contract, not a requirement for one universal cross-engine type system. Use the selected case and its concrete consumer to decide what must be proven.
 
@@ -54,9 +54,9 @@ B3 covers the value path from the native driver through each relevant consumer, 
 
 The sandbox tier selects `--test '*'` so every integration target in its crate list is discovered, including new files. Library and binary unit tests belong to the unit tier; Cargo's broader `--tests` flag also selects those targets and would execute them twice.
 
-The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release, checks its SHA-256 and caches it under `~/.cache/bookie-tools` locally or the configured shared tools cache in CI; `.config/nextest.toml` requires that version. Both profiles keep `retries = 0`, so a flaky test fails instead of passing on a hidden retry, and stop a test that runs for five minutes. The `ci` profile also writes `target/nextest/ci/junit.xml`. The completed [#892 pilot](https://github.com/cozyGarage/BookiE/issues/892) qualified the unit and sandbox selections. Compare test names and source revisions rather than copying historical totals; parent-launched subprocess helpers can affect displayed counts. Driver, release, GTK and keyring tiers remain on `cargo test`. Moving a shared database fixture to one process per test requires separate ownership and isolation qualification; the headless pilot did not qualify that migration. `scripts/ci-local.sh full` runs its unit tier through the same nextest command as the Forgejo `unit` job, so local CI and CI use one runner. Doc tests are not part of these tiers.
+The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release and verifies its SHA-256. `.config/nextest.toml` disables retries so flaky tests fail instead of passing on a hidden retry, and stops a test that runs for five minutes. The unit and sandbox selections were qualified in [#892](https://github.com/cozyGarage/BookiE/issues/892). Compare test names and source revisions rather than copying historical totals; parent-launched subprocess helpers can affect displayed counts. Driver, release, GTK and keyring tiers remain on `cargo test`. Moving a shared database fixture to one process per test requires separate ownership and isolation qualification; the headless pilot did not qualify that migration. `scripts/ci-local.sh full` uses the same unit and sandbox commands as automated checks. Doc tests are not part of these tiers.
 
-Container images are not part of that retry rule: a dropped image download is not a flaky test. The Forgejo `driver` and `driver-tls` jobs, and the GitHub `Fast checks (GTK)` job before its app-server tests, run `scripts/prepull-test-images.sh <group>`, which pulls the images listed for that group in `ci/test-images.txt` (skipping any already on the host) with three attempts and a growing pause, and fails the step naming the image if none works. Each group must list exactly the images its tests start, including the default image a testcontainers module uses when a test sets no tag; `scripts/tests/test_prepull_test_images.py` fails when a group and its tests differ. When you add a fixture or change an image tag, update the group in the same change.
+Container images are not part of that retry rule: a dropped image download is not a flaky test. Before running a test group that uses containers, use `scripts/prepull-test-images.sh <group>` to fetch the images listed for it in `ci/test-images.txt`. Each group must list exactly the images its tests start, including the default image a testcontainers module uses when a test sets no tag; `scripts/tests/test_prepull_test_images.py` fails when a group and its tests differ. When you add a fixture or change an image tag, update the group in the same change.
 
 ## Local checks and fixtures
 
@@ -124,15 +124,11 @@ This gate also runs the MCP MongoDB Extended JSON target and PostgreSQL policy s
 python3 scripts/run-test-layer.py app-server
 ```
 
-The GTK fast CI job runs the app-server registry with the host Docker socket. Testcontainers resolves the Docker bridge gateway from inside the job container. The local release gate uses the same registration.
-
 The exact driver list and supplementary targets are owned by [`ci-local.sh::run_integration`](../scripts/ci-local.sh). It includes six network drivers, MCP BSON, policy PostgreSQL sessions, Unix sockets and SSH. Reuse that script rather than a copied list that can omit newly registered targets.
 
 To find UI-thread stalls while profiling or testing by hand, set `TABLEPRO_UI_STALL_MS=50` (any positive number of milliseconds). The app then logs a `UI thread stalled` warning with the stall length whenever the GTK main loop is late by at least that long. It is off by default and logs no content. It reports that a stall happened, not its cause; pair it with a profiler.
 
 Every clickable control on the SQL editor screen must have a registered keyboard path in `apps/linux/app/tests/keyboard_paths.py`: a shortcut, a menu entry, a tab stop, or a `gap:` entry naming what is missing. The GTK scenario `sql_editor_clickables_all_have_a_keyboard_path` fails when a new button appears without an entry. Add an entry rather than widening a pattern.
-
-The Forgejo driver matrix sets `TABLEPRO_TEST_RUN_ID` and runs each complete integration binary serially. PostgreSQL, MySQL and MariaDB fixtures reuse one primary server per engine and recreate the `test` database before each test; filtered and exact selectors start their own server. Deliberate restart tests also start a separate server. So a full-suite runtime estimate should count those cases rather than multiply every test by a database startup.
 
 Disposable PostgreSQL fixtures use tmpfs and disable `fsync`, `synchronous_commit` and `full_page_writes`. MySQL and MariaDB use tmpfs and disable transaction-log, doublewrite and binlog syncing; SQL Server uses tmpfs with writable permissions for its non-root service account. Lost-ack, crash and restart cases use durable containers so they still exercise persistent storage. The Docker tests assert the database settings and mounted filesystem.
 
@@ -178,7 +174,7 @@ For the backup and restore runner:
 ./scripts/test-pg-dump.sh
 ```
 
-It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through wrappers, so the host needs Docker but no PostgreSQL client. Set `TABLEPRO_PG_DUMP_IMAGE` to test another client version. Forgejo runs it as the `pg-dump` job.
+It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through wrappers, so the host needs Docker but no PostgreSQL client. Set `TABLEPRO_PG_DUMP_IMAGE` to test another client version.
 
 ## Manual verification
 
@@ -186,7 +182,7 @@ The [manual checklist](manual-verification-0.2-features.md) records installed GT
 
 ## Regression case selection
 
-The [historical test record](archive/testing-history.md#upstream-test-suite-parity) preserves the original cases and counts. The [scenario survey](archive/b3-test-scenario-survey.md) is a dated source study, not a current backlog; current B3 case status belongs to the board and [value-contract index](value-contracts.md). Failure reports are hypotheses, not confirmed BookiE defects; the active checklist is [#790](https://github.com/cozyGarage/BookiE/issues/790). Trace the matching BookiE path and reproduce a candidate against current source before changing code; a historical claim of zero tests does not establish a current coverage gap.
+Current B3 case status belongs to the board and [value-contract index](value-contracts.md). Failure reports are hypotheses, not confirmed BookiE defects; the active checklist is [#790](https://github.com/cozyGarage/BookiE/issues/790). Trace the matching BookiE path and reproduce a candidate against current source before changing code; a historical claim of zero tests does not establish a current coverage gap.
 
 ## File-size guard
 
@@ -207,11 +203,3 @@ When inline unit tests push a production module over the soft limit, move them t
 - [GTK tests](testing-gtk.md)
 - [CI tests and gates](testing-ci.md)
 - [Test quality and performance contracts](testing-quality-and-performance.md)
-
-## Reusable executable bundles
-
-Forgejo's desktop-build jobs compile source-pinned default and DuckDB variants, plus the native scenario app and release package. Test jobs on any-host workers fetch immutable bundles from the Forgejo generic package registry. Every bundle records application, test-suite and recipe revisions, build group, image, compiler and file digests. Missing or mismatched bundles fail the job; execution VMs do not compile a replacement.
-
-`bash scripts/build-test-bundles.sh OUTPUT_DIRECTORY [default|duckdb|both]` runs inside the qualified Debian build environment; `both` is the default for GitHub's reusable artifacts. Forgejo publishes the default bundle before building the DuckDB variant, so jobs using default executables can start while DuckDB compiles. The generic registry stores level-one gzip tar archives to reduce transfer time. `scripts/ci-bundle-registry.py publish` uploads the archive before its completion manifest. `scripts/prepare-test-bundle.sh` downloads and verifies the matching revision before exporting its location to the job environment. Unit and sandbox tiers use the bundled nextest archive. Driver integration binaries retain their existing single-process fixture lifetime. GTK/keyring registry entries still execute separately and require an exact observed test result.
-
-GitHub Build Linux publishes equivalent source-pinned test bundles on non-PR runs for 14 days. Import requires the Forgejo secret `BOOKIE_GITHUB_ARTIFACT_TOKEN` with GitHub Actions read access. Only successful runs at the exact requested source revision are eligible. Downloads verify GitHub's archive digest, the bundle index and each payload. An imported test bundle does not replace missing native app/package builds or desktop analysis jobs. Full unattended failover of those producer jobs is not implemented.

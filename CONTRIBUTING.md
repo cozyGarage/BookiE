@@ -23,7 +23,7 @@ cargo run -p tablepro-app
 
 ## Validation
 
-Use the [validation playbook](docs/validation-playbook.md) to select local checks for your change. It explains which checks run on GitHub and which require the Forgejo acceptance gate. Do not treat a skipped check as a pass.
+Use the [validation playbook](docs/validation-playbook.md) to select local checks for your change and identify the applicable required checks. Do not treat a skipped check as a pass.
 
 ## Reporting bugs
 
