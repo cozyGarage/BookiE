@@ -81,4 +81,4 @@ Add or update one named case on the owning GitHub issue with the ADR 0007 outcom
 
 Some historical `target/quality` paths may be missing from a fresh clone. Retained hashes and summaries cannot recover missing raw logs. Retrieve exact-SHA artifacts or rerun the owning gate before using unavailable proof for acceptance. Native fixtures, hosted CI, installed GTK, package rollback and Wayland/soak remain separately attributed.
 
-The PostgreSQL 1,024-level shadowed-search-path domain case has one reported Forgejo failure at SQLx's type-resolution boundary, followed by repeated passes. The current failure analysis and next step are tracked in [#858](https://github.com/cozyGarage/BookiE/issues/858); do not treat the isolated run as a confirmed driver regression or change the contract without a maintainer decision.
+The PostgreSQL 1,024-level shadowed-search-path domain case has one reported type-resolution failure followed by repeated passes. The current analysis and next step are tracked in [#858](https://github.com/cozyGarage/BookiE/issues/858); do not treat the isolated run as a confirmed driver regression or change the contract without a maintainer decision.
