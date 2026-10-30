@@ -45,7 +45,6 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [Code and UI audit, October 18](../archive/code-and-ui-audit-2026-10-18.md): dated source evidence for pending-state cues, high contrast and responsiveness.
 - [Capability review](../capability-review.md): general evaluation method and BookiE's current technical boundaries.
 - Database-client architecture, CI and operation-outcome review, October 15: source-specific evidence is preserved in the dated archive; current general evaluation criteria are in the [capability review](../capability-review.md).
-- [Issue-derived database-client regression patterns, October 20](../archive/tablepro-issue-review-2026-10-20.md): dated source references and BookiE checks; use the [capability review](../capability-review.md) for current general guidance.
 - [Peer-review delivery tracker](https://github.com/cozyGarage/BookiE/issues/1026) and its lane-owned slices are the current work queue for the review below.
 - [Linux documentation update plan and peer review, October 16](../archive/linux-peer-review-2026-10-16.md): source reconciliation, architecture boundaries, and regression candidates.
 - [Linux peer review, October 17](../archive/linux-peer-review-2026-10-17.md): dated source checks and applicable regression-test lessons.

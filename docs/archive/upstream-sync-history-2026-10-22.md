@@ -1,6 +1,6 @@
 # Upstream reference review history through 2026-10-22
 
-This archive preserves dated source, release, issue and pull request snapshots. They prove only what was recorded at their source pins. Current review guidance is in [upstream-sync](../upstream-sync.md); the current external review index is in the [feature comparison](../0.2-feature-comparison.md).
+This archive preserves dated source, release, issue and pull request snapshots. They prove only what was recorded at their source pins. Adopted-code attribution is in [upstream-sync](../upstream-sync.md); current feature selection is on the backlog and Project #3.
 
 BookiE reviews shared Rust/Linux foundations and portable behavior under the accepted decisions. The [completion page](../bookie-0.2-sprint.md) records milestone status; Apple source trees remain excluded.
 

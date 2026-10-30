@@ -114,7 +114,7 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | tablepro-dbx-review-2026-10-20/d-dbx-features.md | 212 | 3 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | tablepro-dbx-review-2026-10-20/e-dbx-backend-fixes.md | 175 | 110 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | tablepro-dbx-review-2026-10-20/f-dbx-ux-fixes.md | 86 | 35 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-issue-review-2026-10-20.md](../../archive/tablepro-issue-review-2026-10-20.md) | 46 | 0 | 0 closed / 1 open | Historical record; no current runtime claim |
+| `tablepro-issue-review-2026-10-20.md` | 46 | 0 | 0 closed / 1 open | Historical record; migrated out of the public repository after this inventory; no current runtime claim |
 | [testing-history.md](../../archive/testing-history.md) | 98 | 10 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [third-party-notice-inventory-2026-10-19.md](../../archive/third-party-notice-inventory-2026-10-19.md) | 21 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [type-contract-history.md](../../archive/type-contract-history.md) | 1768 | 45 | No explicit BookiE issue URL | Source traced; historical runtime scope |

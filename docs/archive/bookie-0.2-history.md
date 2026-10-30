@@ -2390,9 +2390,8 @@ matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
 and B7 remain open as listed above; keep the sequence B3 → B4 → installed
 Arch/Wayland → Debian/GNOME → B7. The merged baseline is not release-qualified.
 
-Feature gaps against other clients are in
-[the feature comparison](../0.2-feature-comparison.md); none is a 0.2 blocker unless
-the maintainer adds it.
+The dated peer feature comparison was later moved to the private research archive;
+none of its candidates was a 0.2 blocker unless the maintainer added it.
 
 ## Historical continuation snapshot: 2026-10-08
 
