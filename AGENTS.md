@@ -164,6 +164,7 @@ bash scripts/preflight.sh            # size, panic, bounded-operation and crate-
 bash scripts/test-gtk-widgets.sh     # when GTK code changed
 python3 scripts/check-known-issues.py && python3 scripts/check-doc-links.py   # when docs changed
 cargo deny check                           # from the repository root, when dependencies changed
+bash scripts/forgejo-gate.sh <branch>      # when the change requires Forgejo acceptance
 ```
 
 Driver integration tests need Docker. If a prerequisite is missing, say which check could not run and why.

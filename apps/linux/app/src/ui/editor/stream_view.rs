@@ -119,9 +119,8 @@ pub(super) fn install_page_loader(
     identity: super::StatementIdentity,
     sender: &relm4::ComponentSender<super::SqlEditor>,
 ) {
-    let Some(spool) = result.spool.clone() else {
-        return;
-    };
+    let spool = result.spool.clone();
+    let resident_pages = result.resident_pages.clone();
     let columns = result.columns.clone();
     let generation = result.generation;
     let sender = sender.clone();
@@ -153,6 +152,25 @@ pub(super) fn install_page_loader(
             return;
         };
         placeholder.add_css_class("tp-stream-page-loading");
+        if let Some(page) = resident_pages.get(index) {
+            if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+                status.set_description(Some(&crate::tr!("Restoring this result page from memory…")));
+            }
+            sender.input(super::SqlEditorInput::Stream(super::streaming::Input::PageLoaded {
+                generation,
+                index,
+                identity,
+                result: Ok(page),
+            }));
+            return;
+        }
+        let Some(spool) = spool.clone() else {
+            if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+                status.set_title(&crate::tr!("This result page is no longer available"));
+            }
+            placeholder.remove_css_class("tp-stream-page-loading");
+            return;
+        };
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
             status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
         }
@@ -160,7 +178,7 @@ pub(super) fn install_page_loader(
             generation,
             index,
             identity,
-            spool: spool.clone(),
+            spool,
             columns: columns.clone(),
         }));
     });
@@ -170,12 +188,16 @@ fn retire_previous_page(pages: &gtk::Stack, generation: u64, previous: Option<u6
     if let Some(previous) = previous
         && Some(previous) != current
         && let Some(previous_page) = pages.child_by_name(&page_widget_name(generation, previous))
-        && !previous_page.has_css_class("tp-stream-page-ram-resident")
     {
-        let title = pages.page(&previous_page).title().unwrap_or_default().to_string();
-        let placeholder = stream_page_placeholder_with_title(title);
-        if let Ok(previous_page) = previous_page.downcast::<gtk::Box>() {
-            replace_stream_page_content(&previous_page, &placeholder);
+        if let Some(current_page) = previous_page.first_child()
+            && (!current_page.has_css_class("tp-stream-page-placeholder")
+                || current_page.has_css_class("tp-stream-page-loading"))
+        {
+            let title = pages.page(&previous_page).title().unwrap_or_default().to_string();
+            let placeholder = stream_page_placeholder_with_title(title);
+            if let Ok(previous_page) = previous_page.downcast::<gtk::Box>() {
+                replace_stream_page_content(&previous_page, &placeholder);
+            }
         }
     }
 }

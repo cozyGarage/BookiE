@@ -1,5 +1,5 @@
 use super::*;
-use crate::ui::editor::stream_pages::StreamTerminal;
+use crate::ui::editor::stream_pages::{ResidentPageStore, StreamPageCache, StreamTerminal};
 use crate::ui::editor::{StatementIdentity, StatementOutcomeKind};
 use std::sync::Arc;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
@@ -66,6 +66,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
         })
         .collect();
     let columns = pages.first().map_or_else(Vec::new, |page| page.columns.clone());
+    let resident_pages = ResidentPageStore::from_pages(indices.iter().copied().zip(pages.iter().cloned()));
     let result = StreamedResult {
         pages,
         page_indices: indices.to_vec(),
@@ -77,6 +78,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
         export: None,
         generation: 0,
         spool: None,
+        resident_pages,
     };
     let outcome = StatementOutcome {
         identity: StatementIdentity::default(),
@@ -284,6 +286,106 @@ fn hidden_stream_pages_build_their_grid_only_when_selected() {
     pages.set_visible_child(&pages.first_child().unwrap());
     while context.iteration(false) {}
     assert_eq!(named::<gtk::ColumnView>(&first, "GtkColumnView"), Some(grid));
+    window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
+    relm4::adw::init().unwrap();
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let mut cache = StreamPageCache::default();
+    let cached_input = page(&[1, 2]);
+    cache.append(0, cached_input).unwrap();
+    cache.append(1, page(&[3, 4])).unwrap();
+    let result = cache.snapshot(StreamTerminal::Loading, None);
+    let resident_pages = result.resident_pages.clone();
+    let original = result.pages[0].clone();
+    let original_weak = Arc::downgrade(&original);
+    let outcome = StatementOutcome {
+        identity: StatementIdentity::default(),
+        sql_preview: "SELECT id FROM items".into(),
+        elapsed_ms: 0,
+        kind: StatementOutcomeKind::Streamed(Box::new(result.clone())),
+        pinned: false,
+    };
+    let settings_store = LocalResultSettingsStore::default();
+    let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());
+    let (sender, _receiver) = relm4::channel::<GridMsg>();
+    super::super::outcomes::render_outcomes(
+        &holder,
+        &[outcome],
+        &sender,
+        None,
+        database.clone(),
+        settings_store.clone(),
+        None,
+    );
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let pages = named::<gtk::Stack>(&root, LIVE_PAGES).unwrap();
+    let first_page = pages.first_child().unwrap();
+    let window = gtk::Window::builder()
+        .default_width(900)
+        .default_height(600)
+        .child(&holder)
+        .build();
+    window.present();
+    let context = gtk::glib::MainContext::default();
+    while context.iteration(false) {}
+    pages.set_visible_child(&first_page);
+    let old_grid_widget = wait_for_grid(&first_page.clone().upcast());
+    old_grid_widget.model().unwrap().select_item(1, false);
+    let old_grid = old_grid_widget.downgrade();
+    drop(old_grid_widget);
+    drop(result);
+    drop(original);
+
+    pages.set_visible_child(&pages.last_child().unwrap());
+    retire_previous_page(&pages, 0, Some(0), Some(1));
+    while context.iteration(false) {}
+
+    assert!(
+        old_grid.upgrade().is_none(),
+        "a hidden cached page must release its GTK grid"
+    );
+    let cached = resident_pages.get(0).expect("decoded page remains in cache");
+    assert!(Arc::ptr_eq(&cached, &original_weak.upgrade().unwrap()));
+    assert!(
+        first_page
+            .first_child()
+            .is_some_and(|child| child.has_css_class("tp-stream-page-placeholder"))
+    );
+
+    first_page
+        .first_child()
+        .unwrap()
+        .add_css_class("tp-stream-page-loading");
+    complete_page_load(
+        PageLoadContext {
+            holder: &holder,
+            generation: 0,
+            index: 0,
+            identity: StatementIdentity::default(),
+            grid_sender: &sender,
+            connection_id: None,
+            database,
+            settings_store,
+        },
+        Ok(cached.clone()),
+    );
+    pages.set_visible_child(&first_page);
+    let new_grid = wait_for_grid(&first_page.clone().upcast());
+    assert!(old_grid.upgrade().is_none());
+    assert_eq!(cached.rows, vec![vec![Value::Int(1)], vec![Value::Int(2)]]);
+    assert!(new_grid.model().unwrap().is_selected(1));
+    assert!(new_grid.is_mapped());
+
+    let mut oversized = page(&[0]).as_ref().clone();
+    oversized.rows = vec![vec![Value::Bytes(vec![0; 65 * 1024 * 1024])]];
+    cache.append(2, Arc::new(oversized)).unwrap();
+    assert!(resident_pages.get(0).is_none());
+    assert!(resident_pages.get(1).is_none());
+    assert!(resident_pages.get(2).is_some());
     window.destroy();
 }
 #[test]

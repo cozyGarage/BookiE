@@ -740,6 +740,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::stream_view::tests::navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::stream_view::tests::a_terminal_status_keeps_retained_grids_unbuilt_until_selected"
     ],
     [
