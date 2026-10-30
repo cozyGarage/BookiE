@@ -56,7 +56,7 @@ fn page(values: &[i64]) -> Arc<QueryResult> {
 }
 
 fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) -> (StatementOutcome, StreamedResult) {
-    let page_row_counts = (0..indices.last().map_or(0, |last| *last + 1))
+    let page_row_counts: Vec<usize> = (0..indices.last().map_or(0, |last| *last + 1))
         .map(|index| {
             indices
                 .iter()
@@ -66,10 +66,13 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
         })
         .collect();
     let columns = pages.first().map_or_else(Vec::new, |page| page.columns.clone());
+    let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let result = StreamedResult {
         pages,
         page_indices: indices.to_vec(),
+        page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
+        retained_rows,
         columns,
         total_pages: indices.last().map_or(0, |last| last + 1),
         total_rows,
@@ -154,6 +157,7 @@ fn a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown() {
 fn short_retained_pages_use_received_row_positions_after_eviction() {
     let (_, mut result) = streamed(&[5, 6], vec![page(&[105, 106]), page(&[107])], 7);
     result.page_row_counts = vec![1, 1, 1, 1, 0, 2, 1];
+    result.page_row_starts = super::super::stream_pages::page_row_starts_from_counts(&result.page_row_counts);
     assert_eq!(stream_page_label(&result, 5), "Rows 5-6");
     assert_eq!(stream_page_label(&result, 6), "Rows 7-7");
     assert_eq!(

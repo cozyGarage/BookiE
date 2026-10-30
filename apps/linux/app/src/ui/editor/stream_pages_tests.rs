@@ -43,6 +43,33 @@ fn retains_all_small_pages_within_the_byte_budget_and_counts_all_delivered_rows(
     let snapshot = cache.snapshot(StreamTerminal::Complete, None);
     assert_eq!(snapshot.total_pages, 20);
     assert_eq!(snapshot.page_indices, (0..20).collect::<Vec<_>>());
+    assert_eq!(snapshot.page_row_starts, (1..=20).collect::<Vec<_>>());
+    assert_eq!(snapshot.retained_rows, 20);
+}
+
+#[test]
+fn page_row_starts_keep_short_and_empty_page_offsets() {
+    assert_eq!(page_row_starts_from_counts(&[2, 0, 1, 3]), vec![1, 3, 3, 4]);
+}
+
+#[test]
+fn cache_keeps_row_offsets_across_an_empty_page() {
+    let mut cache = StreamPageCache::default();
+    cache.append(0, page(&["id"], &[1, 2])).unwrap();
+    cache.append(1, page(&["id"], &[])).unwrap();
+    cache.append(2, page(&["id"], &[3])).unwrap();
+
+    let snapshot = cache.snapshot(StreamTerminal::Complete, None);
+
+    assert_eq!(snapshot.page_row_counts, vec![2, 0, 1]);
+    assert_eq!(snapshot.page_row_starts, vec![1, 3, 3]);
+    assert_eq!(snapshot.total_rows, 3);
+    assert_eq!(snapshot.retained_rows, 3);
+}
+
+#[test]
+fn page_row_starts_saturate_when_cumulative_rows_reach_the_type_limit() {
+    assert_eq!(page_row_starts_from_counts(&[usize::MAX, 1]), vec![1, usize::MAX]);
 }
 
 #[test]
@@ -65,6 +92,7 @@ fn wide_pages_evict_by_bytes_before_the_page_count_limit() {
     assert_eq!(snapshot.total_rows, 3);
     assert_eq!(snapshot.total_pages, 3);
     assert_eq!(snapshot.page_row_counts, vec![1, 1, 1]);
+    assert_eq!(snapshot.retained_rows, 2);
     assert_eq!(snapshot.pages[0].rows[0][0], Value::Text("x".repeat(24 * 1024 * 1024)));
 }
 
@@ -78,10 +106,12 @@ fn the_newest_page_is_kept_even_when_it_alone_exceeds_the_byte_budget() {
     cache.append(0, result).unwrap();
     assert_eq!(cache.pages().len(), 1);
     assert_eq!(cache.total_rows(), 1);
+    assert_eq!(cache.snapshot(StreamTerminal::Complete, None).retained_rows, 1);
     cache.append(1, page(&["payload"], &[2])).unwrap();
     assert!(retired.upgrade().is_none());
     assert_eq!(cache.first_page(), 1);
     assert_eq!(cache.total_rows(), 2);
+    assert_eq!(cache.snapshot(StreamTerminal::Complete, None).retained_rows, 1);
 }
 
 #[test]
