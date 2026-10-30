@@ -1162,6 +1162,10 @@ mod lexing_tests;
 mod tests;
 
 #[cfg(test)]
+#[path = "outcomes/stream_page_label_tests.rs"]
+mod stream_page_label_tests;
+
+#[cfg(test)]
 #[path = "outcomes/result_tab_icon_tests.rs"]
 mod result_tab_icon_tests;
 

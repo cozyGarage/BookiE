@@ -9,10 +9,13 @@ fn streamed_progress_pluralizes_rows_and_pages_independently() {
         (2, 1, "Received 2 rows · 1 page"),
         (2, 2, "Received 2 rows · 2 pages"),
     ] {
+        let page_row_counts = vec![rows / pages.max(1) as usize; pages as usize];
+        let page_row_starts = super::super::super::stream_pages::page_row_starts_from_counts(&page_row_counts);
         let result = super::super::super::StreamedResult {
             pages: vec![std::sync::Arc::new(cursor_page(&vec![1; rows], false).result)],
             page_indices: vec![pages.saturating_sub(1)],
-            page_row_counts: vec![rows / pages.max(1) as usize; pages as usize],
+            page_row_counts,
+            page_row_starts,
             columns: Vec::new(),
             total_pages: pages,
             total_rows: rows,
