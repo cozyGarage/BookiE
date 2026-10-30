@@ -65,8 +65,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 
 ## Archive starting points
 
-[Workspace recovery, October 26](evidence/workspace-recovery-2026-10-26/README.md) records branch preservation, recovered work, validation and remaining acceptance boundaries.
-
 [archive/](archive/) holds dated reviews, audits, inventories and long histories. They are source-pinned evidence, not instructions; open items from them live on [Project #3](https://github.com/users/cozyGarage/projects/3). Use the archive starting points below to locate a record, then verify current behavior and status in active docs and issues.
 
 - [Historical 0.2 development record](archive/bookie-0.2-history.md) (brief archive link; see the active sprint for current status)
