@@ -68,9 +68,9 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/docs/testing.md](../testing.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/toolchains.md](../platforms.md#rust-toolchain) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/type-contract-strategy.md](../lane-boards.md#b3-types-and-values) | reference/guide | Screened; retain stated scope, no exhaustive claim |
-| [linux/docs/upstream-adoption.md](upstream-adoption.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [linux/docs/upstream-main-review-2026-10-03-inventory.md](upstream-main-review-2026-10-03-inventory.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
-| [linux/docs/upstream-main-review-2026-10-03.md](upstream-main-review-2026-10-03.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
+| `linux/docs/upstream-adoption.md` | dated comparative review; migrated to private research archive |
+| `linux/docs/upstream-main-review-2026-10-03-inventory.md` | dated evidence inventory; migrated to private research archive |
+| `linux/docs/upstream-main-review-2026-10-03.md` | dated source review; migrated to private research archive |
 | [linux/docs/upstream-sync.md](../upstream-sync.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/upstream-u1-sql-server-2026-10-03.md](upstream-u1-sql-server-2026-10-03.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/validation-playbook.md](../validation-playbook.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
