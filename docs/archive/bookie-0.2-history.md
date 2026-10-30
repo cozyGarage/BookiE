@@ -33,7 +33,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 
 ## October 3 review handoff
 
-Source/document checkpoint: `4b7814f5e` on `linux`. The [architecture and evidence consistency review](architecture-consistency-review-2026-10-03.md) inventories all tracked Markdown/evidence and reconciles document authority. The [older app-release review](upstream-older-releases-review-2026-10-03.md) screens all 128 app releases and adds O1–O3 reproduction candidates under existing B3/B4 ownership. U1 is implemented in `6822efa42` with [native evidence](upstream-u1-sql-server-2026-10-03.md); U2–U6 remain open. The [B4 integration checkpoint](b4-history.md#october-3-integration-checkpoint) records already merged policy/editor/daemon work; source integration does not close runtime or installed acceptance. Continue B3 → B4 → Arch/Wayland → Debian/GNOME.
+Source/document checkpoint: `4b7814f5e` on `linux`. The [architecture and evidence consistency review](architecture-consistency-review-2026-10-03.md) inventories all tracked Markdown/evidence and reconciles document authority. The October 3 comparative reviews were moved to the private research archive. U1 is implemented in `6822efa42` with [native evidence](upstream-u1-sql-server-2026-10-03.md); U2–U6 were open at this checkpoint. The [B4 integration checkpoint](b4-history.md#october-3-integration-checkpoint) records already merged policy/editor/daemon work; source integration does not close runtime or installed acceptance. Continue B3 → B4 → Arch/Wayland → Debian/GNOME.
 
 ## Current continuation plan: 2026-10-02
 
@@ -49,13 +49,10 @@ This section supersedes their next-task order and desktop-target requirements.
 
 ### Priority and desktop scope
 
-The [October 3 macOS main review](upstream-main-review-2026-10-03.md)
-adds bounded correctness packets U1–U6 for the current B3/B4 lanes. Start with
-remaining identity Copy as SQL work after the implemented U1 metadata fix, then resolve qualified
-autocomplete identity. Coordinate reconnect and client-certificate work with
-the B4 board; MongoDB collection-wide export coverage reuses the open B3 scope.
-These are source-review findings and reproduction tasks, with no new runtime
-acceptance or milestone closure.
+The October 3 macOS source review and its bounded follow-up list were moved to
+the private research archive. The U1 implementation remains documented below;
+other items were source-review candidates, not runtime acceptance or milestone
+closure.
 
 The [U1 SQL Server follow-up](upstream-u1-sql-server-2026-10-03.md) now fixes
 server-owned column metadata and verifies the two INSERT builders against a
@@ -507,8 +504,8 @@ Upstream force-pushed its `linux` branch after this table was written, so the
 Upstream Linux pin no longer resolves and `807d28094` is no longer an ancestor of
 `origin/linux`. That pin's commit is now `f3cbf7361 fix(linux): rebuild the
 GSettings schema when it changes and cover SQLite in dev-env`. The
-[2026-09-19 re-survey](upstream-sync-history-2026-10-22.md#2026-09-19-re-survey-after-upstream-rewrote-its-linux-branch) re-establishes the boundary and lists
-what is genuinely new.
+The September 19 source re-survey, now in the private research archive,
+re-established the boundary and listed what was new at that date.
 
 [Build Linux](https://github.com/cozyGarage/TablePro/actions/runs/34802088529)
 and [Flatpak Linux](https://github.com/cozyGarage/TablePro/actions/runs/34802088530)
@@ -576,8 +573,9 @@ client panics and parser DoS need 0.62.4 or newer.
 
 ## Upstream feature adoption, September 2026
 
-Eleven of the thirteen features the [2026-09-19 re-survey](upstream-sync-history-2026-10-22.md#2026-09-19-re-survey-after-upstream-rewrote-its-linux-branch) found
-missing are merged; the other two already existed here in a different shape. The work
+Eleven of thirteen items in the September 19 source re-survey were merged; the
+other two already existed here in a different shape. The review was moved to
+the private research archive. The work
 ran as five parallel worktree branches and is recorded in `CHANGELOG.md` under
 `[Unreleased]`.
 
