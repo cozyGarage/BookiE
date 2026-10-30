@@ -15,5 +15,5 @@
   "profile": "dev",
   "native_wayland": "not tested",
   "independent_review": "not performed; self-review only",
-  "forgejo": "pending"
+  "remote_ci": "pending"
 }

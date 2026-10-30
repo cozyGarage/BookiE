@@ -22,4 +22,4 @@ The fix moves transaction-aware catalog tracking to GTK-free `tablepro-app-servi
 - Strict application Clippy passed: `cargo clippy -p tablepro-app --all-targets -- -D warnings`.
 - Documentation checks passed: `check-known-issues.py`, `check-doc-links.py`, and `inventory-ignored-tests.py --check`.
 
-This is local installed evidence on SQLite, not native Wayland, a system package, a multi-engine transaction guarantee, GitHub PR acceptance, or the maintainer-owned Forgejo gate. The regression code and tests landed together; no existing tests were removed or weakened.
+This is local installed evidence on SQLite, not native Wayland, a system package, a multi-engine transaction guarantee, GitHub PR acceptance, or the maintainer-owned remote CI gate. The regression code and tests landed together; no existing tests were removed or weakened.

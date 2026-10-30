@@ -71,6 +71,5 @@ This page points to Project #3 and the ledger for current work.
 | PostgreSQL, SSH and audit release checks at `1ff2ff9c` | [2026-10-13 results](evidence/b4-current-linux-1ff2ff9c-2026-10-13/README.md) |
 | AUD-2 MySQL approval denial and approval workflow | [2026-10-13 results](evidence/aud2-mysql-approval-6c777a0d-2026-10-13/README.md) |
 | B4-11 MySQL-family rollback matrix at `ecdc8568` | [2026-10-13 manifest](evidence/b4-mysql-atomic-linux-ecdc8568-2026-10-13/manifest.json) |
-| Focused release triage | [evidence/b4-release-triage-2026-10-11/triage.md](evidence/b4-release-triage-2026-10-11/triage.md) |
 | Bounded mutation survivor triage | [evidence/b4-mutation-triage-2026-10-12/README.md](evidence/b4-mutation-triage-2026-10-12/README.md) |
 | Frozen-candidate local TEST-15 checks | [evidence/test15-bbdc39a/manifest.json](evidence/test15-bbdc39a/manifest.json) |

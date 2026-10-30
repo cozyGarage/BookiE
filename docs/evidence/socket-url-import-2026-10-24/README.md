@@ -14,7 +14,7 @@ The first probe incorrectly expected a connected window after an import-only res
 
 ## Remaining acceptance
 
-Native desktop acceptance and the Forgejo gate remain separate. The issue stays open until that acceptance is satisfied.
+Native desktop acceptance and the remote CI gate remain separate. The issue stays open until that acceptance is satisfied.
 
 Local preflight also passed: 2,073 unit tests, 2,086 sandbox tests and the separate Redis cancellation check. The scenario itself ran on the unchanged executable identified above; no GTK widget production code changed.
 

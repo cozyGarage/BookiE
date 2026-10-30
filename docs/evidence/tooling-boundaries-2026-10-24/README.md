@@ -25,7 +25,7 @@ The tests cover checksum rejection before extraction, archive destination contai
 | `scripts/vendor-patches.py` | 91% |
 | Combined | 93% |
 
-These whole-file local percentages are not Sonar new-code coverage. A published-branch analysis is required to establish any quality-gate improvement. Forgejo acceptance and independent review are pending.
+These whole-file local percentages are not Sonar new-code coverage. A published-branch analysis is required to establish any quality-gate improvement. Remote CI acceptance and independent review are pending.
 
 ## Current reference-scan findings
 

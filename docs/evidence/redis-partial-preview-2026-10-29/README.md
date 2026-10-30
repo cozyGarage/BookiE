@@ -18,4 +18,4 @@ Stored marker-shaped text remains ordinary text. A binary prefix is an explicit 
 - The complete isolated GTK widget suite passed: 211 tests.
 - Published validation head: `afa97c9f5`. The following evidence-only commit does not change tested code.
 
-The unchanged collection previews remain unbounded by member bytes. HSCAN/SSCAN count hints do not establish a hard memory limit, and lists or sorted sets can contain large elements. This correction does not resolve that separate finding. Native Wayland and Forgejo acceptance were not run.
+The unchanged collection previews remain unbounded by member bytes. HSCAN/SSCAN count hints do not establish a hard memory limit, and lists or sorted sets can contain large elements. This correction does not resolve that separate finding. Native Wayland and remote CI acceptance were not run.

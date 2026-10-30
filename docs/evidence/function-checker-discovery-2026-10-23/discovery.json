@@ -24,6 +24,6 @@
     "sandbox_tests": 2086,
     "redis_cancellation_tests": 1,
     "debian_package_validation": "skipped: dpkg-deb unavailable",
-    "forgejo": "pending"
+    "remote_ci": "pending"
   }
 }
