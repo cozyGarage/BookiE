@@ -902,6 +902,7 @@ fn merge_without_downgrade(local: &SavedConnection, incoming: SavedConnection) -
         environment: higher_environment(local.environment, incoming.environment),
         use_tls: tls_mode.encrypts(),
         tls_mode: Some(tls_mode),
+        tls_root_cert: local.tls_root_cert.clone().or(incoming.tls_root_cert.clone()),
         last_opened_at: local.last_opened_at,
         connect_timeout_secs: local.connect_timeout_secs,
         query_timeout_secs: local.query_timeout_secs,
