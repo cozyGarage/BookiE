@@ -711,10 +711,8 @@ Moved from [b4-task-board.md](../lane-boards.md#b4-transport-and-sessions). Thes
 
 This table is the October 3 integration snapshot with later evidence links added
 where useful. The current merged state is summarized below; merges do not imply
-fresh hosted results. Historical reports and original packets are preserved in
-[B4 history](b4-history.md); missing worktree/cache paths remain
-unavailable evidence. The broad release audit is dated
-[October 3](release-audit-2026-10-03.md).
+fresh hosted results. Historical reports and original packets remain in this
+archive; missing worktree/cache paths remain unavailable evidence.
 
 ## Latest merged slices (checked 2026-10-07)
 

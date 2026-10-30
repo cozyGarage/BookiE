@@ -77,7 +77,6 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 - [Multi-editor stream ownership profile, October 26](evidence/stream-retention-multi-owner-2026-10-26/README.md): synthetic two-editor and cancelled export-page sample, with the RSS/allocator limitation stated.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
 - [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
-- [Release audit, October 3](archive/release-audit-2026-10-03.md)
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
 
 ## Keep context bounded
