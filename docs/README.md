@@ -51,8 +51,6 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | Run-specific proof (manifests, focused logs) | `evidence/<topic>[-<sha>]-<YYYY-MM-DD>/` | A `manifest.json` or concise `README.md`, with only the artifacts needed to check the claim; link it from the owning row or board |
 | A finished review, audit or long history | [archive/](archive/) | Dated file name; corrections to links or neutral wording must preserve the recorded evidence, dates and decisions |
 
-Internal runner deployment, CI performance and evidence lifecycle research is maintained in the private project archive. Public CI behavior and contributor requirements are described in [testing and CI](testing-ci.md) and the [validation playbook](validation-playbook.md).
-
 ## Adding a document
 
 - Look for the owner in the table above first; most new facts are a row, a section or an ADR, not a new file.
@@ -87,7 +85,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
 - [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
-- Dated database-client and app-layer comparisons are held in the private research archive; current behavior and architecture live in the capability specs, ADRs and source.
 
 ## Keep context bounded
 

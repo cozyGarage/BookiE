@@ -2,7 +2,7 @@
 
 Open work lives on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3). Filter by the **Lane** field (B3, B4, UX, Maintainer) or the matching `lane:*` label. Status (Backlog, Ready, In progress, In review, Done) is owned there.
 
-This page is an index of ledger IDs to issues. Do not track evidence, owners or status here. The frozen pre-migration ledger is in the private research archive. Accepted product limits stay in [known-limitations.md](known-limitations.md).
+This page is an index of ledger IDs to issues. Do not track evidence, owners or status here. Accepted product limits stay in [known-limitations.md](known-limitations.md).
 
 ## Open work index
 
