@@ -16,6 +16,11 @@ Source: `linux` at `5a9cb8e92`. Read-only review of `app-services`, `policy`, `m
 | A write preview ran when the connection's engine could not be identified | [#2067](https://github.com/cozyGarage/BookiE/pull/2067) |
 | A named pipe at a TLS client certificate or key path blocked the connect | [#2070](https://github.com/cozyGarage/BookiE/pull/2070) |
 | The SSH forwarding loop stopped on a transient `accept` error while the tunnel reported healthy | [#2071](https://github.com/cozyGarage/BookiE/pull/2071) |
+| Query history had no row cap and unbounded error text | [#2072](https://github.com/cozyGarage/BookiE/pull/2072) |
+| An unanswered SSH host-key or password prompt never timed out | [#2073](https://github.com/cozyGarage/BookiE/pull/2073) |
+| Malformed and unknown MCP tool calls did not count against the rate limit | [#2074](https://github.com/cozyGarage/BookiE/pull/2074) |
+
+The audit journal never rotates; [ADR 0026](../decisions/0026-audit-journal-segments.md) proposes size-rotated, chained segments and is waiting for acceptance.
 
 Tests added without product changes: the agent denial matrix and script splitting ([#2068](https://github.com/cozyGarage/BookiE/pull/2068)); result spool, enum input, reconnect and editor limit edge cases ([#2069](https://github.com/cozyGarage/BookiE/pull/2069)).
 
@@ -36,12 +41,8 @@ Bugs and risks:
 
 1. `core/src/sql_lex.rs:21`: the legacy splitter ignores SQLite backtick and bracket quoting.
 2. `ssh/src/lib.rs:749`: `channel_open_direct_tcpip` has no timeout and no cap on accepted connections.
-3. `ssh/src/handshake.rs:15`: the handshake clock stops during a prompt with no maximum.
-4. `storage/src/audit_journal.rs:354`: the whole journal is read at start and never rotates.
-5. `storage/src/query_history.rs:319,475`: no row cap, unbounded error text, one bound variable per id.
-6. `mcp/src/tools.rs:58`: cheap malformed calls run before the rate limit and take a blocking lock.
-7. `app-services/src/named_filter_presets.rs:85`: the preset cap and duplicate check run outside the update.
-8. `app-services/src/column_widths.rs:132`: `forget_connection` stops at the first failed update; the files have no caps.
+3. `app-services/src/named_filter_presets.rs:85`: the preset cap and duplicate check run outside the update.
+4. `app-services/src/column_widths.rs:132`: `forget_connection` stops at the first failed update; the files have no caps.
 
 Missing tests: see the reviewers' lists in the pull request descriptions as each fix lands; the highest value ones are locking reads on every driver, keyset NULL boundaries per driver, sqlite splitter quoting, spool page above 64 KiB, bundle bounds and depth limits, and torn audit journal tails.
 
