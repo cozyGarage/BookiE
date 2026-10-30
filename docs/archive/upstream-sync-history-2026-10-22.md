@@ -30,7 +30,7 @@ BookiE reviews shared Rust/Linux foundations and portable behavior under the acc
 
 ## Current upstream reference and adoption
 
-The [October 23 database-client refresh](../archive/database-client-review-2026-10-23.md) is the newest cross-product review. It records current source/release pins, superseded pagination advice and existing BookiE issue ownership. Earlier entries below remain dated evidence.
+The October 23 database-client refresh is the newest cross-product review. It records current source/release pins, superseded pagination advice and existing BookiE issue ownership. Earlier entries below remain dated evidence.
 
 The [October 21 adoption and collaboration review](../archive/tablepro-collaboration-2026-10-21.md) records its inspected pin, Linux changes, open upstream work and contribution candidates. Its [source inventory](evidence/tablepro-collaboration-2026-10-21/README.md) preserves the commit range. These are dated findings; the backlog and owning issue still select implementation.
 
@@ -328,4 +328,4 @@ The editor now uses the imported planner for execution and run-at-cursor as well
 
 ## GPUI client inspection, October 22
 
-The [focused GPUI client review](../archive/gpui-client-review-2026-10-22.md) records visible-row rendering, PostgreSQL cancellation, result-warning and work-admission lessons, with a [pinned source manifest](evidence/gpui-client-review-2026-10-22/manifest.json). It proposes checks within the existing GTK architecture; no framework migration or code reuse was approved.
+The focused GPUI client review records visible-row rendering, PostgreSQL cancellation, result-warning and work-admission lessons, with a pinned source manifest. It proposes checks within the existing GTK architecture; no framework migration or code reuse was approved.

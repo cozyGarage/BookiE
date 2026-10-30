@@ -44,6 +44,14 @@ These were seen on `65befe8aa`. None has been filed from this run; the rows belo
 - The Pin results button sits where the Session button moves when the transaction banner appears, so a second click lands on Pin results.
 - With a pending edit open, a wrong path typed into the portal file chooser opens an error dialog that does not show in screenshots and blocks the chooser until it is closed with `hyprctl`.
 
+## Findings after the first push
+
+- Redis 7.4.11: "Filter by This Value" on a Key cell adds `Key equals a` and the tab then fails with "Redis bound reads support the Value column for one key". The filter persists with the tab across a restart until Clear all is used.
+- SQL Server: the sidebar and Catalog list no views, triggers or sequences outside tables (see the application checklist).
+- Connection bundles drop configured SQLite attachments (source read, see the connections checklist).
+- The ER diagram zoom label stays at 100% while the canvas zooms.
+- SQLite views are listed in the sidebar on `e226d3f5c`; they were missing on `65befe8aa`.
+
 ## Not run
 
 Orca and any screen reader, a language input method, DuckDB, MariaDB and Kerberos fixtures, the `.deb`, Flatpak and AppImage packages, ProxyJump and system OpenSSH password cases, local-socket MySQL, a contrast-ratio measurement, a system high-contrast setting, scale 1.25 and 2, enlarged desktop text, and opening the `.xlsx` in LibreOffice (not installed). An Excel export above the row limit cannot be reached from the browse scope, which refuses all rows first.
@@ -81,3 +89,36 @@ After merging `linux` at `0a46b6bd0` (the commit `df1996177` that added enum met
 ## Contrast sample
 
 Measured from full-resolution captures on the grid, not from class names. Light header text is 2.28:1 and dark header text is 3.76:1; both are below 4.5:1. Other sampled text is 7:1 or higher. The values are on the [application checklist](../manual-verification-app.md#visual-audit-matrix).
+
+## Fix branches and what was driven
+
+Each branch was built and driven in the app after its tests passed. None is merged and none has been through the Forgejo gate.
+
+| Branch | Change | Driven result |
+|---|---|---|
+| `fix/bundle-attached-databases` | Bundles carry SQLite attachments, and an in-place import keeps local ones | Export of 15 connections carried both attachments; import into an empty second profile wrote them |
+| `feat/mssql-non-dbo-catalog` (existing branch, `1d007e1f1`) | Added SQL Server views to the existing catalog work | Sidebar shows `sales > Views > v_orders`; Catalog lists triggers (with `(disabled)`), sequences and types |
+| `fix/diagram-zoom-label` | The ER diagram zoom label follows keys, scroll, fit and buttons | Label tracked every action from 75% to 200% |
+| `fix/redis-filter-by-value` | New `supports_browse_filters` driver capability; Redis declares false, the app hides the filter actions | Redis menu, Filter button and Ctrl+F no longer offer filtering; PostgreSQL filtering unchanged |
+
+The SQL Server work was added to the existing branch because open work already covered the same checklist item. The other three had no existing branch.
+
+## Existing UI fix branches, built and driven
+
+These five branches were open when the run started and none has merged. Each was built, driven on native Wayland and compared with `linux` where it mattered. The checklist items they touch stay unticked until the branches land.
+
+| Branch | Result |
+|---|---|
+| `fix/tab-context-menu-actions` | Close Tabs to the Right and Close Other Tabs work on the clicked tab, and a pending edit still prompts Save, Discard or Cancel |
+| `fix/inspector-shortcut` | Saved Queries opens with Ctrl+Shift+B; delete works; a confirmed rename was not verified |
+| `fix/dismiss-editor-completion` | The completion list no longer stays over the result after a run; `linux` still shows it |
+| `fix/connection-popover-position` | The popover fits at 700 px, but `linux` also fits there, so the original clipping was not reproduced |
+| `fix/progress-dialog-title` | The backup progress window now names its operation; `linux` shows only a spinner |
+
+## System OpenSSH with a jump host
+
+Driven on `018779bd5` against a two-hop chain of containers (jump host, target host, PostgreSQL) with a scratch `~/.ssh` bound over the real one with `bwrap`. The app never reads a jump hop from the saved form for system OpenSSH, so the chain comes from `ProxyJump` in that config.
+
+- **Passed:** the ProxyJump route connects; each hop asks for its own host-key approval and a declined hop writes nothing; no `ssh -M` is left after closing; Verify Full through the tunnel verifies the database name.
+- **Not resolved:** a jump host asking for a password got its own dialog rather than the saved target password, but the connection never completed. Every attempt that took longer than about 10 seconds to answer the dialogs ended with "Connection timed out during banner exchange". With both trust dialogs answered within two seconds the same chain connected. The 10 s `ConnectTimeout` therefore covers the time a person takes to answer the dialogs, which may be worth a separate look.
+- **Setup note:** the jump host and the target needed their `sshd` restarted after repeated failed attempts, because their pre-auth connections were being dropped.

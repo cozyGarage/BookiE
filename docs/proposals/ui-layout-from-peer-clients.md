@@ -1,6 +1,6 @@
 # UI layout changes drawn from peer clients
 
-Proposed; nothing here is accepted or scheduled. It turns the [October 28 side-by-side capture and its 1,400 px addendum](../archive/tablepro-dbx-review-2026-10-20/g-side-by-side-capture-2026-10-28.md) and the maintainer's preferences into small slices for [#1862](https://github.com/cozyGarage/BookiE/issues/1862), [#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1864](https://github.com/cozyGarage/BookiE/issues/1864) and [#1867](https://github.com/cozyGarage/BookiE/issues/1867). The maintainer picks the order and what to drop.
+Proposed; nothing here is accepted or scheduled. It turns an October 28 side-by-side capture at 920 and 1,400 px and the maintainer's preferences into small slices for [#1862](https://github.com/cozyGarage/BookiE/issues/1862), [#1863](https://github.com/cozyGarage/BookiE/issues/1863), [#1864](https://github.com/cozyGarage/BookiE/issues/1864) and [#1867](https://github.com/cozyGarage/BookiE/issues/1867). The maintainer picks the order and what to drop.
 
 ## What was checked first
 

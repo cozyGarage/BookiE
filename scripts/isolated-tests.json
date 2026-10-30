@@ -1165,12 +1165,32 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::history_dialog::lifetime_tests::history_filter_popover_stays_inside_narrow_windows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
     ],
     [
       "tablepro-app",
       "--lib",
       "ui::row_inspector::tests::markup_like_values_and_names_are_shown_as_typed"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::app::init_workspace::tests::saved_connections_popover_stays_inside_narrow_windows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::structure_tab::columns::tests::a_comment_row_is_shown_only_for_engines_that_can_store_one"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
     ],
     [
       "tablepro-app",
@@ -1186,6 +1206,11 @@
       "tablepro-app",
       "--lib",
       "ui::diagram::canvas::tests::zoom_steps_stay_within_the_limits_and_fit_restores_the_whole_diagram"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::canvas::tests::every_way_of_zooming_reports_the_new_level"
     ],
     [
       "tablepro-app",
