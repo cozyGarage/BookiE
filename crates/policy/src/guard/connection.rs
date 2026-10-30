@@ -125,8 +125,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH COLUMNS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH COLUMNS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -144,8 +143,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<Vec<ColumnInfo>, DriverError> {
         check_pre_dispatch(control)?;
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH COLUMNS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH COLUMNS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -167,8 +165,7 @@ impl Connection for PolicyGuard {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH ROWS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH ROWS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -189,8 +186,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         check_pre_dispatch(control)?;
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH ROWS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH ROWS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -555,8 +551,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH INDEXES", vec![target]);
+        let operation = self.table_metadata_operation("FETCH INDEXES", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -574,8 +569,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<Vec<IndexInfo>, DriverError> {
         check_pre_dispatch(control)?;
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH INDEXES", vec![target]);
+        let operation = self.table_metadata_operation("FETCH INDEXES", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -591,12 +585,30 @@ impl Connection for PolicyGuard {
     }
 
     async fn fetch_foreign_keys(&self, schema: Option<&str>, table: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH FOREIGN KEYS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH FOREIGN KEYS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
             .caught_read("FETCH FOREIGN KEYS", self.inner.fetch_foreign_keys(schema, table))
+            .await;
+        let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
+        self.audit_read_result(&operation, start, &result, rows).await?;
+        result
+    }
+
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let operation = self.table_metadata_operation("FETCH INBOUND FOREIGN KEYS", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH INBOUND FOREIGN KEYS",
+                self.inner.fetch_inbound_foreign_keys(schema, table),
+            )
             .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
@@ -644,14 +656,35 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         check_pre_dispatch(control)?;
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH FOREIGN KEYS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH FOREIGN KEYS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
             .caught_read(
                 "FETCH FOREIGN KEYS",
                 self.inner.fetch_foreign_keys_controlled(schema, table, control),
+            )
+            .await;
+        let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
+        self.audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
+    async fn fetch_inbound_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.table_metadata_operation("FETCH INBOUND FOREIGN KEYS", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH INBOUND FOREIGN KEYS",
+                self.inner.fetch_inbound_foreign_keys_controlled(schema, table, control),
             )
             .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);

@@ -25,6 +25,21 @@ Distinguish "no item stored" from "keyring unavailable, locked or cancelled", an
 
 ## Core concepts
 
+```mermaid
+flowchart TD
+    Request[Request Credential for Connection] --> QueryKeyring[Query Secret Service via oo7]
+    QueryKeyring --> EvalOutcome{Keyring Result}
+    EvalOutcome -->|Item Found| ReturnSecret[Return secrecy::SecretString]
+    EvalOutcome -->|No Item Found| ReturnNone[Return Ok None: Prompt User for Password]
+    EvalOutcome -->|Keyring Locked| ReturnLocked[Error: KeyringLocked]
+    EvalOutcome -->|Unlock Cancelled| ReturnCancelled[Error: UnlockCancelled]
+    EvalOutcome -->|Service Unavailable| ReturnUnavail[Error: KeyringUnavailable]
+
+    ReturnLocked --> FailClosed[Transport Refuses Connection Assembly]
+    ReturnCancelled --> FailClosed
+    ReturnUnavail --> FailClosed
+```
+
 - **Absent vs failed.** `Ok(None)` means no matching item. `Err(StorageError::Keyring(_))` means the service could not be used.
 - **Profile identity.** Development builds use `com.tablepro.linux.Devel.Password`; release builds use `com.tablepro.linux.Password`.
 

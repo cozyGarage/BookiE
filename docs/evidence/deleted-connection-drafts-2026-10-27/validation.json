@@ -23,5 +23,16 @@
     "result": "passed on expanded test head"
   },
   "writer_filter_negative_control": "failed when only the writer filter was removed; fixed code restored",
-  "unrelated_connection": "passed: cloned store ignores deleted UUID and persists updated draft for another UUID"
+  "unrelated_connection": "passed: cloned store ignores deleted UUID and persists updated draft for another UUID",
+  "source_commits": {
+    "crates/app-services/src/workspace_state.rs": "dc43afe42510bb58db05ae06aaaf28390692b5cc",
+    "crates/app-services/src/workspace_state/tests.rs": "890ea376b33e2914f4d1783882bc5966787da5f7"
+  },
+  "provenance_review": {
+    "status": "run_snapshot_unrecorded",
+    "review_source": "d7f9273be1002766f621f876630369231a432e50",
+    "file_mappings": "Matched recorded file hashes to Git blobs reachable from BookiE GitHub remote refs; these mappings do not establish the complete executed run tree.",
+    "unmapped_source_paths": [],
+    "limitation": "The original record has no exact source_commit/base_commit for the executed run. Existing result claims are retained as historical reports, not current-source acceptance."
+  }
 }

@@ -31,6 +31,7 @@ fn verifying_options(fixture: &Fixture) -> tablepro_core::ConnectOptions {
         application_name: None,
         connect_timeout_secs: None,
         read_only: false,
+        attached_databases: Vec::new(),
     }
 }
 

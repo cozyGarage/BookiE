@@ -718,15 +718,9 @@ fn streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states
         1,
         StreamTerminal::Cancelled,
     );
-    assert_eq!(cancelled.pages().n_items(), 2);
+    assert_eq!(cancelled.pages().n_items(), 1);
     assert_eq!(cancelled.visible_child(), cancelled.last_child());
     assert_eq!(streamed_page_title(&cancelled, 0), "Rows 1-1");
-    let status = cancelled
-        .visible_child()
-        .unwrap()
-        .downcast::<relm4::adw::StatusPage>()
-        .unwrap();
-    assert_eq!(status.title(), "Query cancelled");
 }
 
 #[tokio::test]

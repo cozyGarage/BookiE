@@ -1,94 +1,121 @@
 .tp-stale-results {
-                opacity: 0.55;
+  opacity: 0.55;
+}
+
+/* Streaming view pagination and spool states */
+.tp-stream-page-placeholder {
+  opacity: 0.75;
+}
+
+.tp-stream-page-loading {
+  opacity: 0.45;
 }
 
 .tp-production {
-                background: alpha(@error_color, 0.22);
-            }
-            .tp-cell-modified {
-                background: alpha(@warning_color, 0.18);
-                border-bottom: 2px solid @warning_color;
-            }
-            image.tp-structure-expander-arrow:dir(ltr) {
-                margin-left: 6px;
-            }
-            image.tp-structure-expander-arrow:dir(rtl) {
-                margin-right: 6px;
-            }
-            .tp-row-pending-insert {
-                background: alpha(@success_color, 0.16);
-                border-left: 3px solid @success_color;
-            }
-            .tp-row-pending-delete {
-                text-decoration: line-through;
-                color: alpha(@error_color, 0.7);
-                background: alpha(@error_color, 0.10);
-                border-left: 3px solid @error_color;
-            }
-            /* NULL sentinel: italic only — opacity already comes
-               from the `dim-label` Adwaita class added alongside.
-            */
-            label.tp-null-sentinel {
-                font-style: italic;
-            }
-            /* Cell focus ring. GtkColumnView's default focus chevron
-               on cells is a 1px outline that disappears against the
-               selected-row highlight. A 2px inset accent ring is the
-               spreadsheet-standard focus-cell signal. Selectors are
-               explicit to avoid stacking on `GtkCheckButton`, which
-               already paints its own focus indicator.
-            */
-            columnview > listview > row > cell:focus-within > label,
-            columnview > listview > row > cell:focus-within > .tp-cell-editor {
-                box-shadow: inset 0 0 0 2px @accent_color;
-                border-radius: 2px;
-            }
-            /* One-shot flash on the row that produced a failing
-               commit statement. Animation fades the red overlay
-               to transparent over ~1.8s; the bind callback
-               re-applies the class until the BrowseTab clears
-               tracker.error_row. No leftmost ribbon — the row's
-               background already turns red via the animation,
-               matching the pending-state row tints which are
-               themselves background-only (no extra gutter).
-            */
-            @keyframes tp-flash-error {
-                0%   { background: alpha(@error_color, 0.55); }
-                100% { background: alpha(@error_color, 0); }
-            }
-            .tp-row-leftmost-error-flash {
-                animation: tp-flash-error 1.8s ease-out;
-            }
-            .tp-env-swatch {
-                min-width: 6px;
-                border-radius: 3px;
-                margin-top: 8px;
-                margin-bottom: 8px;
-            }
-            .tp-env-local { background-color: @success_color; }
-            .tp-env-dev { background-color: @accent_color; }
-            .tp-env-staging { background-color: @warning_color; }
-            .tp-env-prod { background-color: @error_color; }
-            .tp-color-swatch {
-                min-width: 10px;
-                min-height: 10px;
-                border-radius: 5px;
-                margin-top: 12px;
-                margin-bottom: 12px;
-            }
-            .tp-color-blue { background-color: #3584e4; }
-            .tp-color-teal { background-color: #2190a4; }
-            .tp-color-green { background-color: #3a944a; }
-            .tp-color-yellow { background-color: #c88800; }
-            .tp-color-orange { background-color: #ed5b00; }
-            .tp-color-red { background-color: #e62d42; }
-            .tp-color-purple { background-color: #9141ac; }
-            .tp-color-brown { background-color: #986a44; }
-            .tp-strip-blue { box-shadow: inset 0 3px #3584e4; }
-            .tp-strip-teal { box-shadow: inset 0 3px #2190a4; }
-            .tp-strip-green { box-shadow: inset 0 3px #3a944a; }
-            .tp-strip-yellow { box-shadow: inset 0 3px #c88800; }
-            .tp-strip-orange { box-shadow: inset 0 3px #ed5b00; }
-            .tp-strip-red { box-shadow: inset 0 3px #e62d42; }
-            .tp-strip-purple { box-shadow: inset 0 3px #9141ac; }
-            .tp-strip-brown { box-shadow: inset 0 3px #986a44; }
+  background: alpha(@error_color, 0.22);
+}
+
+.tp-cell-modified {
+  background: alpha(@warning_color, 0.18);
+  border-bottom: 2px solid @warning_color;
+}
+
+image.tp-structure-expander-arrow:dir(ltr) {
+  margin-left: 6px;
+}
+
+image.tp-structure-expander-arrow:dir(rtl) {
+  margin-right: 6px;
+}
+
+.tp-row-pending-insert {
+  background: alpha(@success_color, 0.16);
+  border-left: 3px solid @success_color;
+}
+
+.tp-row-pending-delete {
+  text-decoration: line-through;
+  color: alpha(@error_color, 0.7);
+  background: alpha(@error_color, 0.10);
+  border-left: 3px solid @error_color;
+}
+
+/* NULL sentinel: italic only — opacity already comes
+   from the `dim-label` Adwaita class added alongside.
+*/
+label.tp-null-sentinel {
+  font-style: italic;
+}
+
+/* Cell focus ring. GtkColumnView's default focus chevron
+   on cells is a 1px outline that disappears against the
+   selected-row highlight. A 2px inset accent ring is the
+   spreadsheet-standard focus-cell signal. Selectors are
+   explicit to avoid stacking on `GtkCheckButton`, which
+   already paints its own focus indicator.
+*/
+columnview > listview > row > cell:focus-within > label,
+columnview > listview > row > cell:focus-within > .tp-cell-editor {
+  box-shadow: inset 0 0 0 2px @accent_color;
+  border-radius: 2px;
+}
+
+/* One-shot flash on the row that produced a failing
+   commit statement. Animation fades the red overlay
+   to transparent over ~1.8s; the bind callback
+   re-applies the class until the BrowseTab clears
+   tracker.error_row. No leftmost ribbon — the row's
+   background already turns red via the animation,
+   matching the pending-state row tints which are
+   themselves background-only (no extra gutter).
+*/
+@keyframes tp-flash-error {
+  0%   { background: alpha(@error_color, 0.55); }
+  100% { background: alpha(@error_color, 0); }
+}
+
+.tp-row-leftmost-error-flash {
+  animation: tp-flash-error 1.8s ease-out;
+}
+
+.tp-env-swatch {
+  min-width: 6px;
+  border-radius: 3px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.tp-env-local { background-color: @success_color; }
+.tp-env-dev { background-color: @accent_color; }
+.tp-env-staging { background-color: @warning_color; }
+.tp-env-prod { background-color: @error_color; }
+
+.tp-color-swatch {
+  min-width: 10px;
+  min-height: 10px;
+  border-radius: 5px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.tp-color-blue { background-color: #3584e4; }
+.tp-color-teal { background-color: #2190a4; }
+.tp-color-green { background-color: #3a944a; }
+.tp-color-yellow { background-color: #c88800; }
+.tp-color-orange { background-color: #ed5b00; }
+.tp-color-red { background-color: #e62d42; }
+.tp-color-purple { background-color: #9141ac; }
+.tp-color-brown { background-color: #986a44; }
+
+.tp-strip-blue { box-shadow: inset 0 3px #3584e4; }
+.tp-strip-teal { box-shadow: inset 0 3px #2190a4; }
+.tp-strip-green { box-shadow: inset 0 3px #3a944a; }
+.tp-strip-yellow { box-shadow: inset 0 3px #c88800; }
+.tp-strip-orange { box-shadow: inset 0 3px #ed5b00; }
+.tp-strip-red { box-shadow: inset 0 3px #e62d42; }
+.tp-strip-purple { box-shadow: inset 0 3px #9141ac; }
+.tp-strip-brown { box-shadow: inset 0 3px #986a44; }
+
+.tp-cell-editor text {
+  padding: 2px 4px;
+}

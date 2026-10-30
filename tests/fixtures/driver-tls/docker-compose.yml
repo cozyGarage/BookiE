@@ -366,6 +366,7 @@ services:
       interval: 3s
       timeout: 5s
       retries: 60
+      start_period: 240s
     ports:
       - "127.0.0.1:3308:3306"
     networks:
