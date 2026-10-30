@@ -2,7 +2,7 @@
 
 The shared standard is [ADR 0007](decisions/0007-type-and-value-preservation.md). [The B3 board](lane-boards.md#b3-types-and-values) owns remaining tasks. This page is a bounded entry into case evidence, not another conversion policy or aggregate support claim. Reviewed 2026-10-24 for index wording; manifests record a historical source snapshot when that identity is available, and none alone proves current acceptance. Some linked packets lack complete source identity, focused logs or matching artifact digests.
 
-Case narratives that previously lived above and below the Scope table are in [value-contract history](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2). Prefer the Scope table and evidence manifests; do not copy counts into the sprint or B3 board. Open acceptance gaps stay on [Project #3](https://github.com/users/cozyGarage/projects/3) (Lane B3); the dated retest table is in the [archived B3 board](archive/type-contract-strategy-pre-project-migration-2026-10-12.md#retest-indicators).
+Case narratives that previously lived above and below the Scope table are in [value-contract history](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2). Prefer the Scope table and evidence manifests; do not copy counts into the sprint or B3 board. Open B3 acceptance gaps and status are on [Project #3](https://github.com/users/cozyGarage/projects/3); each issue owns acceptance.
 
 The rules these cases protect are grouped by type in [value contract rules](value-contract-rules.md).
 
