@@ -73,7 +73,6 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 - [Workspace unit coverage at `d2166fd`, October 24](evidence/workspace-unit-coverage-d2166fd-2026-10-24/README.md) and [at `583c244`](evidence/workspace-unit-coverage-583c244-2026-10-24/README.md): recovered historical reports for two distinct source revisions.
 - [Workspace unit coverage, October 24](evidence/workspace-unit-coverage-9d61c7a-2026-10-24/README.md): 61.42% line coverage on Linux `9d61c7a` against the 59% floor, with the command and its scope.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
-- [Value-contract narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 
 ## Keep context bounded
 

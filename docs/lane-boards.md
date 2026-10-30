@@ -22,16 +22,16 @@ The maintainer accepted these named, tested refusals out of scope for 0.2.0. The
 
 | ID | Accepted gap | Evidence |
 | --- | --- | --- |
-| B3-OOS-PG-1 | Built-in ranges/multiranges other than `int4range` and `int8range`, geometric values other than `point`, named composites and native `money` (`int4range`, `int8range` and `point` read as server text since #694) | [Ranges](archive/value-contract-history.md#postgresql-built-in-range-family-refusal), [geometry](archive/value-contract-history.md#postgresql-geometric-types-exact-server-oracle-and-visible-refusal), [composites](archive/value-contract-history.md#postgresql-composite-explicit-refusal), [money](archive/value-contract-history.md#postgresql-money-safe-refusal) |
-| B3-OOS-PG-2 | Closed by #694: `json[]`/`jsonb[]` read as the server text and are written through text. The refusal history is kept | [JSON array contracts](archive/value-contract-history.md#postgresql-array-checkpoint) |
-| B3-OOS-DUCK-1 | Named nested collection shapes containing unsigned values outside decoder support | [Nested unsigned values](archive/value-contract-history.md#duckdb-nested-uhugeint-refusal-boundaries-2026-09-30) |
-| B3-OOS-DUCK-2 | Sub-microsecond edits to lower-precision temporal columns | [Edit precision refusal](archive/value-contract-history.md#duckdb-timestamptz-grid-edit-precision-boundary) |
-| B3-OOS-MYSQL-1 | Spatial and too-wide `BIT(64)` values as editable grid cells | [Spatial](archive/value-contract-history.md#mysql-spatial-bytes-in-the-gtk-grid), [BIT](archive/value-contract-history.md#mysql-signed-and-unsigned-integer-grid-parser-2026-09-30) |
-| B3-OOS-MYSQL-2 | MySQL `TIMESTAMP` instant decoding in a non-UTC dedicated session | [Session contract](archive/value-contract-history.md#mysql-native-time-zero-date-and-year-checkpoint) |
-| B3-OOS-MSSQL-1 | `money`/`smallmoney` and exact per-cell `sql_variant` base-type preservation | [Variant](archive/value-contract-history.md#sql-server-sql_variant-metadata-refusal), [money](archive/value-contract-history.md#sql-server-money-float-decoding-refusal) |
-| B3-OOS-CH-1 | Tested ambiguous/out-of-range `DateTime64` values and nested shapes refused by type-less consumers | [Nested consumers](archive/value-contract-history.md#clickhouse-nested-value-consumer-boundary-2026-09-30), [DateTime64 bounds](archive/value-contract-history.md#clickhouse-datetime649-server-boundary-behavior-2026-09-29) |
-| B3-OOS-MONGO-1 | BSON DateTime grid edits finer than one millisecond | [DateTime precision](archive/value-contract-history.md#mongodb-bson-datetime-grid-edit-precision) |
-| B3-OOS-REDIS-1 | Pub/Sub, `MONITOR` and `CLIENT TRACKING` through the one-shot query interface | [Redis refusals](archive/value-contract-history.md#redis-pubsub-and-monitor-stream-refusal-2026-09-29) |
+| B3-OOS-PG-1 | Built-in ranges/multiranges other than `int4range` and `int8range`, geometric values other than `point`, named composites and native `money` (`int4range`, `int8range` and `point` read as server text since #694) | [Case index](value-contracts.md) |
+| B3-OOS-PG-2 | Closed by #694: `json[]`/`jsonb[]` read as server text and are written through text. | [Case index](value-contracts.md) |
+| B3-OOS-DUCK-1 | Named nested collection shapes containing unsigned values outside decoder support | [Case index](value-contracts.md) |
+| B3-OOS-DUCK-2 | Sub-microsecond edits to lower-precision temporal columns | [Case index](value-contracts.md) |
+| B3-OOS-MYSQL-1 | Spatial and too-wide `BIT(64)` values as editable grid cells | [Case index](value-contracts.md) |
+| B3-OOS-MYSQL-2 | MySQL `TIMESTAMP` instant decoding in a non-UTC dedicated session | [Case index](value-contracts.md) |
+| B3-OOS-MSSQL-1 | `money`/`smallmoney` and exact per-cell `sql_variant` base-type preservation | [Case index](value-contracts.md) |
+| B3-OOS-CH-1 | Tested ambiguous/out-of-range `DateTime64` values and nested shapes refused by type-less consumers | [Case index](value-contracts.md) |
+| B3-OOS-MONGO-1 | BSON DateTime grid edits finer than one millisecond | [Case index](value-contracts.md) |
+| B3-OOS-REDIS-1 | Pub/Sub, `MONITOR` and `CLIENT TRACKING` through the one-shot query interface | [Case index](value-contracts.md) |
 
 ### Bounded case record
 
