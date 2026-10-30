@@ -218,7 +218,7 @@ At this checkpoint, `-J` hops ran a separate `ssh` that received none of Bookie'
 
 `55528b854` now applies and is covered: BookiE has an askpass bridge (`crates/ssh/src/openssh/askpass_bridge.rs`), and `crates/ssh/src/openssh/prompt.rs` matches the host-key prompt of both OpenSSH 9 and 10, with a 9.6 prompt test beside the bridge. Rechecked 2026-10-20.
 
-One older commit deserves a separate check rather than a claim. `92aea7112 fix(core): export values at the precision their column declares` sits below the boundary, inside the 60 the sprint plan already dispositioned, under "converge serializers". That row records an intention, not a verification, so whether BookiE's exporter matches the declared precision is still unconfirmed. The [October 20 fix review](../archive/tablepro-dbx-review-2026-10-20/b-tablepro-fixes.md) settles it from source: JSON numbers and decimal scale are covered, and the remaining timestamp fraction padding difference is cosmetic.
+One older commit deserves a separate check rather than a claim. `92aea7112 fix(core): export values at the precision their column declares` sits below the boundary, inside the 60 the sprint plan already dispositioned, under "converge serializers". That row records an intention, not a verification, so whether BookiE's exporter matches the declared precision is still unconfirmed. The October 20 fix review settles it from source: JSON numbers and decimal scale are covered, and the remaining timestamp fraction padding difference is cosmetic.
 
 ### Imported parser provenance
 

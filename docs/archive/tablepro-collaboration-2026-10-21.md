@@ -1,6 +1,6 @@
 # TablePro adoption and collaboration review, October 21
 
-Completed source review; implementation proposals are not completed work. This extends the [October 20 analysis](upstream-main-analysis-2026-10-20.md), its [follow-up](upstream-next-slices-2026-10-20.md) and the [deep feature review](tablepro-dbx-review-2026-10-20/README.md). Current order belongs to the [backlog](../backlog.md).
+Completed source review; implementation proposals are not completed work. This extends the [October 20 analysis](upstream-main-analysis-2026-10-20.md), its [follow-up](upstream-next-slices-2026-10-20.md) and the deep feature review. Current order belongs to the [backlog](../backlog.md).
 
 ## Scope and recommendation
 
