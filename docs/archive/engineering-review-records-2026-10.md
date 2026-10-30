@@ -43,11 +43,9 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - Transaction-control proposal review, October 22: completed DBF-5 verification against existing shared-connection and owned-session guards.
 - [Grid search focus, October 22](../evidence/grid-search-focus-2026-10-22/README.md): owned focus restoration and keyboard regression coverage for large and wide results.
 
-- [Editor bottom panel desktop acceptance, October 22](../evidence/editor-bottom-panel-2026-10-22/README.md): source-built native Wayland, keyboard/pointer, error/timeout and layout evidence; package and Forgejo gates stay separate.
 - [Selection statistics resource investigation, October 22](../evidence/selection-statistics-2026-10-22/README.md): borrowed-cell computation, numeric behavior tests and matched headless heap profiles.
 - [Inspector preview resource investigation, October 22](../evidence/inspector-preview-2026-10-22/README.md): borrowed-cell previews, preserved field semantics and matched headless heap/timing measurements.
 - [Browse inspector callback lifetime, October 22](evidence/inspector-cycle-2026-10-22/README.md): failing then passing GTK weak-reference regression for a selection-to-inspector ownership cycle.
-- [Editor error navigation, October 22](../evidence/editor-error-navigation-2026-10-22/README.md): structured positions, exact statement origins, stale-action refusal and native PostgreSQL pointer/keyboard acceptance.
 
 - [Query row decoding budget, October 22](../evidence/query-row-budget-2026-10-22/README.md): pre-decode row checks, measured PostgreSQL client RSS reduction and remaining allocation limits.
 - [Borrowed row identity checks, October 22](../evidence/row-key-borrowing-2026-10-22/README.md): reduced copying during stale-edit validation, with key contract tests and allocation measurements.

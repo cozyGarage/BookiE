@@ -92,7 +92,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 Source tests and native acceptance for this change are recorded in its PR and linked evidence; the checklist is not automatically satisfied by Xvfb.
 
-The [October 22 source-built desktop matrix](evidence/editor-bottom-panel-2026-10-22/README.md) covers these panel interactions on Arch/Hyprland. Packaged acceptance and broader accessibility qualification remain separate.
+Repeat these checks on the target desktop and release package; Xvfb coverage does not replace native interaction or accessibility checks.
 
 ## Editor error navigation
 
@@ -101,4 +101,4 @@ The [October 22 source-built desktop matrix](evidence/editor-bottom-panel-2026-1
 - [x] Use Go to error from the Errors view. Edit the query and retry the old action; the caret stays put and a fresh run is requested. A unique database row confirms navigation never reruns the script.
 - [x] Reach the action by mouse in a 1,200 px dark window and an 802 px light window with 20-point SQL text. Error controls remain visible above scrollable text.
 
-The [source-built acceptance record](evidence/editor-error-navigation-2026-10-22/README.md) pins the executable and screenshots. New-run and closed/replaced-connection refusal, invalid positions and rewritten parameters have separate source regressions. Release packages, distro-floor runs and Orca remain separate acceptance.
+New-run and closed/replaced-connection refusal, invalid positions and rewritten parameters have separate source regressions. Release packages, distro-floor runs and Orca remain separate acceptance.
