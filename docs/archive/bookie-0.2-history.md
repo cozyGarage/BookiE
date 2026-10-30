@@ -33,7 +33,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 
 ## October 3 review handoff
 
-Source/document checkpoint: `4b7814f5e` on `linux`. The [architecture and evidence consistency review](architecture-consistency-review-2026-10-03.md) inventories all tracked Markdown/evidence and reconciles document authority. The [older app-release review](upstream-older-releases-review-2026-10-03.md) screens all 128 app releases and adds O1–O3 reproduction candidates under existing B3/B4 ownership. U1 is implemented in `6822efa42` with [native evidence](upstream-u1-sql-server-2026-10-03.md); U2–U6 remain open. The [B4 integration checkpoint](b4-history.md#october-3-integration-checkpoint) records already merged policy/editor/daemon work; source integration does not close runtime or installed acceptance. Continue B3 → B4 → Arch/Wayland → Debian/GNOME.
+Source/document checkpoint: `4b7814f5e` on `linux`. The [architecture and evidence consistency review](architecture-consistency-review-2026-10-03.md) inventories all tracked Markdown/evidence and reconciles document authority. The October 3 comparative reviews were moved to the private research archive. U1 is implemented in `6822efa42` with [native evidence](upstream-u1-sql-server-2026-10-03.md); U2–U6 were open at this checkpoint. The [B4 integration checkpoint](b4-history.md#october-3-integration-checkpoint) records already merged policy/editor/daemon work; source integration does not close runtime or installed acceptance. Continue B3 → B4 → Arch/Wayland → Debian/GNOME.
 
 ## Current continuation plan: 2026-10-02
 
@@ -49,13 +49,10 @@ This section supersedes their next-task order and desktop-target requirements.
 
 ### Priority and desktop scope
 
-The [October 3 macOS main review](upstream-main-review-2026-10-03.md)
-adds bounded correctness packets U1–U6 for the current B3/B4 lanes. Start with
-remaining identity Copy as SQL work after the implemented U1 metadata fix, then resolve qualified
-autocomplete identity. Coordinate reconnect and client-certificate work with
-the B4 board; MongoDB collection-wide export coverage reuses the open B3 scope.
-These are source-review findings and reproduction tasks, with no new runtime
-acceptance or milestone closure.
+The October 3 macOS source review and its bounded follow-up list were moved to
+the private research archive. The U1 implementation remains documented below;
+other items were source-review candidates, not runtime acceptance or milestone
+closure.
 
 The [U1 SQL Server follow-up](upstream-u1-sql-server-2026-10-03.md) now fixes
 server-owned column metadata and verifies the two INSERT builders against a
@@ -143,7 +140,7 @@ carry detailed native-type targets. Do not rebuild completed scalar/BSON/export 
 
 | Packet | Scope / files to inspect | Deliverable and completion evidence |
 | --- | --- | --- |
-| B3-P1: reconcile coverage | `docs/type-contract-strategy.md`, `docs/b3-test-scenario-survey.md`, `docs/value-contracts.md`; inspect corresponding tests | October 2 pass selected direct PostgreSQL scalar-enum projection as the smallest missing permanent boundary assertion; the exact test and SQLx outcome are recorded in the type/value ledgers. Keep reconciling the remaining rows as bounded cases close. |
+| B3-P1: reconcile coverage | `docs/type-contract-strategy.md`, the private October test-source survey, `docs/value-contracts.md`; inspect corresponding tests | October 2 pass selected direct PostgreSQL scalar-enum projection as the smallest missing permanent boundary assertion; the exact test and SQLx outcome are recorded in the type/value ledgers. Keep reconciling the remaining rows as bounded cases close. |
 | B3-P2: PostgreSQL boundary | `crates/drivers/postgres/{src,tests}`, affected core literal/parser path only | One calendar/array/native-type gap from P1, with an independent native wire/server oracle and a consumer round trip. Record baseline failure or already-covered result; add no type abstraction without a caller. |
 | B3-P3: consumer parity | One format in `crates/core/src/export/`, affected driver test and existing value corpus | One missing empty/NULL, float/subnormal, delimiter/newline, temporal or nested case. Parse output and compare exact value/type; verify destination preservation on refusal. |
 | B3-P4: grid edit / bind | One driver plus `crates/app/src/ui/browse_tab/value_parse.rs` and existing edit/parser tests as needed | One mixed-storage/BSON or exact numeric edit gap. Assert original row identity and native persisted value. Ranges beyond safe support must refuse visibly without a lossy write. |
@@ -473,7 +470,7 @@ fe22716459c242b350bf34e7070dde19bba184ba. Record any newer commits or local edit
 Task: B3-P1 only. Reconcile remaining type/consumer coverage against current code
 and the archived September 26–28 review. Update the three B3 evidence documents.
 Allowed edits: linux/docs/type-contract-strategy.md,
-linux/docs/b3-test-scenario-survey.md, linux/docs/value-contracts.md.
+the private B3 test-source survey, and linux/docs/value-contracts.md.
 Return a concrete smallest next case, exact test command, existing evidence SHA,
 and open gaps. Do not claim new runtime passes from inspecting test source.
 No GNOME/Debian VM setup, production-code edits, release, push or publication.
@@ -507,8 +504,8 @@ Upstream force-pushed its `linux` branch after this table was written, so the
 Upstream Linux pin no longer resolves and `807d28094` is no longer an ancestor of
 `origin/linux`. That pin's commit is now `f3cbf7361 fix(linux): rebuild the
 GSettings schema when it changes and cover SQLite in dev-env`. The
-[2026-09-19 re-survey](upstream-sync-history-2026-10-22.md#2026-09-19-re-survey-after-upstream-rewrote-its-linux-branch) re-establishes the boundary and lists
-what is genuinely new.
+The September 19 source re-survey, now in the private research archive,
+re-established the boundary and listed what was new at that date.
 
 [Build Linux](https://github.com/cozyGarage/TablePro/actions/runs/34802088529)
 and [Flatpak Linux](https://github.com/cozyGarage/TablePro/actions/runs/34802088530)
@@ -576,8 +573,9 @@ client panics and parser DoS need 0.62.4 or newer.
 
 ## Upstream feature adoption, September 2026
 
-Eleven of the thirteen features the [2026-09-19 re-survey](upstream-sync-history-2026-10-22.md#2026-09-19-re-survey-after-upstream-rewrote-its-linux-branch) found
-missing are merged; the other two already existed here in a different shape. The work
+Eleven of thirteen items in the September 19 source re-survey were merged; the
+other two already existed here in a different shape. The review was moved to
+the private research archive. The work
 ran as five parallel worktree branches and is recorded in `CHANGELOG.md` under
 `[Unreleased]`.
 
@@ -738,9 +736,9 @@ editing. B4–B6 acceptance follows B3; their boxes remain open.
 
 ### B3 regression research: 2026-09-26
 
-The [external scenario survey](b3-test-scenario-survey.md) pins test sources from
-DBeaver, Beekeeper Studio, pgcli and SQLFluff. Use their scenarios and issue-linked
-regressions to find gaps, reproduce failures locally, and retain permanent tests.
+The October external scenario survey, now in the private research archive, pinned
+test sources from DBeaver, Beekeeper Studio, pgcli and SQLFluff. Its reviewed
+scenarios informed gap screening and regression work.
 Common PostgreSQL scalar arrays now preserve their elements and dimensions
 through SQL export/re-import. Temporal/nested values, unsupported array element
 types and remaining consumer parity stay next. Secure transport and authorization scenarios feed B4 acceptance;
@@ -1010,10 +1008,8 @@ backup bytes, but an installed-package rollback is still a release gate.
   `linux`. Also added `libsqlite3-dev` to every CI job that builds the sqlite
   driver or the app crate — missing before, and a certain CI failure once system
   SQLite linking landed, independent of the GNOME 50 question.
-- 2026-09-16/17: reviewed the macOS `main` branch's Swift test suite (~1,300
-  files) for adoptable test cases against `linux`'s own logic, tracked in
-  [docs/testing.md](../testing.md)'s "Upstream test-suite parity" section.
-  Ported 5 items — SSH (host-key/socket-path/connect-error edge cases),
+- 2026-09-16/17: a test-gap pass added 5 BookiE regression groups — SSH
+  (host-key/socket-path/connect-error edge cases),
   cell/value display (binary edge cases; surfaced but did not fix an
   `is_cell_editable` type-affinity gap needing GTK visual verification), row
   copy/paste (TSV escaping, paste normalization), storage (existing migration coverage; a gap in query-history export
@@ -2390,9 +2386,8 @@ matrix and TEST-2 mutation triage, then complete installed grid acceptance. B4
 and B7 remain open as listed above; keep the sequence B3 → B4 → installed
 Arch/Wayland → Debian/GNOME → B7. The merged baseline is not release-qualified.
 
-Feature gaps against other clients are in
-[the feature comparison](../0.2-feature-comparison.md); none is a 0.2 blocker unless
-the maintainer adds it.
+The dated peer feature comparison was later moved to the private research archive;
+none of its candidates was a 0.2 blocker unless the maintainer added it.
 
 ## Historical continuation snapshot: 2026-10-08
 

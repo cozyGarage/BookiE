@@ -42,9 +42,9 @@ These rows remained open after the 0.2.0 delivery decision and are now part of t
 
 Continue existing dependency chains after those fixes: object write capabilities #1065 before shared grid guards #1031, and bounded server messages #1033 before the GTK consumer #1034. Edit ownership #1029 and stream-retention acceptance #1032 remain open; large-query CPU/RSS follow-up is tracked separately in #1272. New features remain selected separately; issue status and lane belong to Project #3.
 
-## Upstream-client review defects
+## Tracked defects
 
-The [October 20 TablePro and dbx review](archive/tablepro-dbx-review-2026-10-20/README.md) found these through upstream fixes. Each is source reading only: start with the failing regression test, and close the issue with that test as evidence if current code already passes. Two further findings went to existing issues: the ClickHouse `readonly=1` connect path is tracked in [#983](https://github.com/cozyGarage/BookiE/issues/983); the version mismatch was tracked in [#1146](https://github.com/cozyGarage/BookiE/issues/1146), which is closed. The review's unselected feature waves are listed in [feature candidates](0.2-feature-comparison.md).
+The following candidates require verification against current code: start with the failing regression test, and close the issue with that test as evidence if current code already passes. Two further findings went to existing issues: the ClickHouse `readonly=1` connect path is tracked in [#983](https://github.com/cozyGarage/BookiE/issues/983); the version mismatch was tracked in [#1146](https://github.com/cozyGarage/BookiE/issues/1146), which is closed.
 
 | ID / issue | Defect | Lane | Acceptance focus |
 |---|---|---|---|
@@ -58,11 +58,11 @@ The [October 20 TablePro and dbx review](archive/tablepro-dbx-review-2026-10-20/
 | RV-10 / [#1180](https://github.com/cozyGarage/BookiE/issues/1180) | Redis browse loads whole values | B3 | Bounded previews and memory on large keys |
 | RV-11 / [#1181](https://github.com/cozyGarage/BookiE/issues/1181) | TLS material files, `CLONE` history, MCP lockout, system trust store | B4 | One failing test per finding |
 
-The [newest-code follow-up](archive/upstream-next-slices-2026-10-20.md) records the native PostgreSQL and failure-report probes behind RV-14 to RV-16, the latest Apple-side upstream lessons, and a proposed sequence before server notices and PostgreSQL extension work. Its candidate order does not add a release commitment.
+RV-14 through RV-16 retain their acceptance scope on their owning issues. No release commitment is implied by their order in this backlog.
 
-## Audit and dbflux follow-ups
+## Database and transport follow-ups
 
-From the 2026-10-22 dbflux review and the audit of closed issues. Each is an issue with its own acceptance; none is a release commitment. Start with the failing regression test where a defect is suspected.
+Each item is an issue with its own acceptance; none is a release commitment. Start with the failing regression test where a defect is suspected.
 
 | ID / issue | Item | Lane |
 |---|---|---|
@@ -70,7 +70,7 @@ From the 2026-10-22 dbflux review and the audit of closed issues. Each is an iss
 | DBF-2 to DBF-4 / [#1356](https://github.com/cozyGarage/BookiE/issues/1356), [#1357](https://github.com/cozyGarage/BookiE/issues/1357), [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | Measure PostgreSQL row-cap drain, SQLite early cancel, verify-ca hostname per engine | B3 / B4 |
 | B4-24 / [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Decide the TLS fingerprint pin | B4 |
 
-The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain related dbflux design notes in their comments. Vendored dependency patches: see [upstream patches](proposals/upstream-patches.md); `mongodb` SCRAM hunk can be dropped after the release containing [mongo-rust-driver#1833](https://github.com/mongodb/mongo-rust-driver/pull/1833).
+The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain driver-specific design notes in their comments. Vendored dependency patches: see [upstream patches](proposals/upstream-patches.md); `mongodb` SCRAM hunk can be dropped after the release containing [mongo-rust-driver#1833](https://github.com/mongodb/mongo-rust-driver/pull/1833).
 
 ## Feature candidates
 
@@ -114,7 +114,7 @@ The native workflow improvements are tracked by [UI-44 / #1349](https://github.c
 
 ## Peer-review delivery
 
-The [peer-review tracker #1026](https://github.com/cozyGarage/BookiE/issues/1026) and its child issues own the sequence, dependencies, lane and acceptance for the [October 16 review](archive/linux-peer-review-2026-10-16.md). Check the live project and issue before selecting work; this page does not duplicate child-issue status.
+The [peer-review tracker #1026](https://github.com/cozyGarage/BookiE/issues/1026) and its child issues own the sequence, dependencies, lane and acceptance for the October review. The comparative review records are in the private research archive. Check the live project and issue before selecting work; this page does not duplicate child-issue status.
 
 ## Development tooling
 

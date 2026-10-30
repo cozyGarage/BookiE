@@ -78,7 +78,7 @@ Historical run results remain in the archive. These environment-specific accepta
 | TEST-31 intermittent Forgejo GTK / distro-floor failures | UX / lab | The startup restore layout abort was fixed in [#821](https://github.com/cozyGarage/BookiE/pull/821). The issue remains open for intermittent failures and the required consecutive full-run evidence; inspect its latest updates before qualifying a candidate ([#556](https://github.com/cozyGarage/BookiE/issues/556)) |
 
 
-Feature gaps against other clients are in [the feature comparison](../0.2-feature-comparison.md); none is a 0.2 blocker unless the maintainer adds it.
+The dated peer feature comparison was moved to the private research archive; none of its candidates was a 0.2 blocker unless the maintainer added it.
 
 ## Technical decisions
 
@@ -140,7 +140,7 @@ Use [ADR 0007](../decisions/0007-type-and-value-preservation.md) for the standar
 | B3-P6 mutation | One relevant survivor/timeout group; independent assertions and scoped rerun; unavailable output stays unproven |
 
 
-R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix stay open. U1 server-owned columns have native consumer coverage for metadata, grid editability, CSV import, Copy as SQL and SQL export replay (`value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers`); the grid assertion is helper-level, while installed GTK interaction remains part of release acceptance. U2–U6 and older-release O1–O3 are mapped in [main review](upstream-main-review-2026-10-03.md) and [older-release review](upstream-older-releases-review-2026-10-03.md). Reuse these owners; do not create a second completion cache, exporter or type policy.
+R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix stay open. U1 server-owned columns have native consumer coverage for metadata, grid editability, CSV import, Copy as SQL and SQL export replay (`value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers`); the grid assertion is helper-level, while installed GTK interaction remains part of release acceptance. The October 3 comparative review packets were moved to the private research archive. Reuse the existing owners; do not create a second completion cache, exporter or type policy.
 
 ## Arch / Omarchy / Wayland UI packets
 

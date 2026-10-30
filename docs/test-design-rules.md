@@ -23,10 +23,10 @@ Rules that earlier audits paid for. Each one names the failure it prevents. The 
 
 ## Escaping and decoding
 
-- **Every dialect's literal rendering needs a hostile-value test.** A rendered INSERT that escaped only quotes let a value ending in a backslash close the literal early on MySQL and ClickHouse, and MySQL evaluated the rest as SQL ([upstream sync history, 2026-08-22](archive/upstream-sync-history-2026-10-22.md)). Test backslashes, quotes and each dialect's escape modes against a real server.
+- **Every dialect's literal rendering needs a hostile-value test.** A rendered INSERT that escaped only quotes let a value ending in a backslash close the literal early on MySQL and ClickHouse, and MySQL evaluated the rest as SQL. Test backslashes, quotes and each dialect's escape modes against a real server.
 - **Fix a loss at its source, not by accepting the symptom.** Every SQLite column with no declared type once decoded as NULL, so expressions such as `count(*)` showed an empty cell (same record). Do not make a test pass by treating the empty result as expected.
 
 ## Changing a test or guard
 
-- **Do not delete a test that pins a wrong expectation.** Amend it, and say in the commit why the expectation changed. Write the failing regression first. For example, the crate-boundary check must keep permitted dev edges (driver to policy) distinct from forbidden GUI edges ([Linux peer review, 2026-10-16](archive/linux-peer-review-2026-10-16.md), finding 2).
+- **Do not delete a test that pins a wrong expectation.** Amend it, and say in the commit why the expectation changed. Write the failing regression first. Crate-boundary checks must keep permitted dev edges (driver to policy) distinct from forbidden GUI edges.
 - **Weakening a contract guardrail needs the contract owner's agreement** ([AGENTS.md](../AGENTS.md)).

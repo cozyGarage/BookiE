@@ -20,7 +20,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [CONTRIBUTING.md](../../CONTRIBUTING.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [PLAN.md](https://github.com/cozyGarage/BookiE/blob/f7a985ef2fe9c65e4ac5307d52e0d0185978631d/PLAN.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [README.md](../../README.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [external-audit-2026-10-06.md](external-audit-2026-10-06.md) | archived dated review (moved from repo root 2026-10-10) | Corrected authority, source drift or evidence qualification |
+| `external-audit-2026-10-06.md` | dated cross-client audit; migrated to private research archive |
 | [linux/ARCHITECTURE.md](../../ARCHITECTURE.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/CHANGELOG.md](../../CHANGELOG.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/CONTRIBUTING.md](../../CONTRIBUTING.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
@@ -30,7 +30,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/docs/accessibility.md](../platforms.md#accessibility) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/adding-drivers.md](../adding-drivers.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/b3-review-2026-10-01.md](b3-review-2026-10-01.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
-| [linux/docs/b3-test-scenario-survey.md](b3-test-scenario-survey.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
+| `linux/docs/b3-test-scenario-survey.md` | comparative test-source survey; migrated to private research archive |
 | [linux/docs/b4-task-board.md](../lane-boards.md#b4-transport-and-sessions) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/baseline-review-2026-09-17.md](baseline-review-2026-09-17.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
 | `linux/docs/bookie-0.1.1-plan.md` (retired after this inventory) | dated plan | Superseded by the active 0.2 sprint; see the [archived changelog history](changelog-history-0.1.x-2026-10-23.md#bookie-01x-implementation-history) |
@@ -68,9 +68,9 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/docs/testing.md](../testing.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/toolchains.md](../platforms.md#rust-toolchain) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/type-contract-strategy.md](../lane-boards.md#b3-types-and-values) | reference/guide | Screened; retain stated scope, no exhaustive claim |
-| [linux/docs/upstream-adoption.md](upstream-adoption.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [linux/docs/upstream-main-review-2026-10-03-inventory.md](upstream-main-review-2026-10-03-inventory.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
-| [linux/docs/upstream-main-review-2026-10-03.md](upstream-main-review-2026-10-03.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
+| `linux/docs/upstream-adoption.md` | dated comparative review; migrated to private research archive |
+| `linux/docs/upstream-main-review-2026-10-03-inventory.md` | dated evidence inventory; migrated to private research archive |
+| `linux/docs/upstream-main-review-2026-10-03.md` | dated source review; migrated to private research archive |
 | [linux/docs/upstream-sync.md](../upstream-sync.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/upstream-u1-sql-server-2026-10-03.md](upstream-u1-sql-server-2026-10-03.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/validation-playbook.md](../validation-playbook.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
