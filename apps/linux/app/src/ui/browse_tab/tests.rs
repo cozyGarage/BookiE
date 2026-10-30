@@ -1114,6 +1114,7 @@ fn a_page_sql_export_leaves_out_columns_the_server_fills() {
     table[2].is_generated = true;
     table[3].is_generated = true;
     let mut page = vec![plain("id"), plain("qty"), plain("total"), plain("version")];
+    page[1].data_type = "NULL".into();
 
     super::with_table_ownership(&mut page, &table);
 
@@ -1123,6 +1124,7 @@ fn a_page_sql_export_leaves_out_columns_the_server_fills() {
         "INSERT INTO [dbo].[orders] ([qty]) VALUES (2);"
     );
     assert!(page[0].primary_key);
+    assert_eq!(page[1].data_type, "int");
 }
 
 #[test]

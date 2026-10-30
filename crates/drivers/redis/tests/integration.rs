@@ -61,6 +61,14 @@ async fn connection_loss_while_building_a_browse_page_fails_the_whole_page() {
                     match args.first().map(String::as_str) {
                         Some("CLIENT") => write.write_all(b"+OK\r\n").await.expect("reply CLIENT metadata"),
                         Some("SELECT") => write.write_all(b"+OK\r\n").await.expect("reply SELECT"),
+                        Some("MULTI") => write.write_all(b"+OK\r\n").await.expect("start Redis transaction"),
+                        Some("STRLEN" | "GETRANGE") => {
+                            write.write_all(b"+QUEUED\r\n").await.expect("queue Redis preview command")
+                        }
+                        Some("EXEC") => write
+                            .write_all(b"*2\r\n:5\r\n$5\r\nvalue\r\n")
+                            .await
+                            .expect("reply to Redis preview transaction"),
                         Some("SCAN") => write
                             .write_all(b"*2\r\n:0\r\n*1\r\n$11\r\nfixture:key\r\n")
                             .await

@@ -35,6 +35,9 @@ pub(super) fn columns_for_browse_page(
 pub(super) fn with_table_ownership(columns: &mut [ColumnInfo], table: &[ColumnInfo]) {
     for column in columns {
         if let Some(known) = table.iter().find(|known| known.name == column.name) {
+            if column.data_type == "NULL" {
+                column.data_type.clone_from(&known.data_type);
+            }
             column.is_generated |= known.is_generated;
             column.is_auto_increment |= known.is_auto_increment;
             column.primary_key |= known.primary_key;
