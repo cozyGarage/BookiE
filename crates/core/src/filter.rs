@@ -281,10 +281,10 @@ fn build_rule_sql(
             params.push(Value::Text(pattern));
             // Case-sensitive on all drivers. The user picks Ilike
             // explicitly when they want case-insensitive matching.
-            let escape = if like_needs_escape_clause(driver_id) {
-                " ESCAPE '\\'"
-            } else {
-                ""
+            let escape = match driver_id {
+                "mysql" => " ESCAPE '|'",
+                _ if like_needs_escape_clause(driver_id) => " ESCAPE '\\'",
+                _ => "",
             };
             Ok(format!("{pattern_sql} LIKE {ph}{escape}"))
         }
@@ -423,6 +423,9 @@ fn like_needs_escape_clause(driver_id: &str) -> bool {
 }
 
 fn escape_like(driver_id: &str, s: &str) -> String {
+    if driver_id == "mysql" {
+        return s.replace('|', "||").replace('%', "|%").replace('_', "|_");
+    }
     let escaped = s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
     if driver_id == "mssql" {
         escaped.replace('[', "\\[")
@@ -480,7 +483,7 @@ fn parse_value_for(col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterErr
 }
 
 fn parse_filter_value(driver_id: &str, col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterError> {
-    let value = parse_value_for(col, text)?;
+    let value = crate::numeric_input::widened_single_precision(driver_id, col, &parse_value_for(col, text)?);
     if driver_id != "duckdb" {
         return Ok(value);
     }

@@ -4,7 +4,7 @@
   "repository": "cozyGarage/BookiE",
   "source_commit": "bbdc39a430ede9382bc5dfa7164e51a065e2bd88",
   "candidate_designation": "Maintainer confirmed this as the frozen candidate SHA on 2026-10-12.",
-  "scope": "Local frozen-candidate TEST-15 and bounded B4 regression checks. This is not Forgejo, nightly, installed-package, native Wayland or release acceptance.",
+  "scope": "Local frozen-candidate TEST-15 and bounded B4 regression checks. This is not remote CI, nightly, installed-package, native Wayland or release acceptance.",
   "environment": {
     "rust_toolchain": "1.98.0",
     "cargo_target_dir": "Shared local build cache",
@@ -122,8 +122,8 @@
     }
   ],
   "not_established": [
-    "Forgejo driver and PostgreSQL release layers at this exact SHA",
-    "Full Forgejo nightly and retry-free soak",
+    "remote CI driver and PostgreSQL release layers at this exact SHA",
+    "Full remote CI nightly and retry-free soak",
     "Installed Arch package and native Hyprland acceptance for AUD-2, B4-7, B4-16 and B4-22",
     "Power-loss persistence or parent-directory sync fault injection",
     "Re-execution of every historical mutation mutant"

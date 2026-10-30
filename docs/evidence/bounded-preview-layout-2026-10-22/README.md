@@ -4,7 +4,7 @@ The maintainer approved limiting oversized, non-inline-editable text and JSON ce
 
 Two regressions failed before the correction: an 8 KiB Text/JsonText sample still produced an 8 KiB label, and a multibyte sample included characters beyond the chosen limit. The correction chooses a UTF-8 boundary after 512 Unicode scalar values, then applies the existing visible NUL substitution to that prefix. Binary previews and ordinary inline-editable cells are unchanged. This branch includes the preceding NUL-preview fix #1314 and should be reviewed after that dependency.
 
-The motivation is the [stream-cache comparison in PR #1322](https://github.com/cozyGarage/BookiE/pull/1322) recorded on a separate branch under [#1032](https://github.com/cozyGarage/BookiE/issues/1032): a smaller retained window reduced memory but increased CPU; perf attributed most work to GTK text layout. Attribution to a specific UI transition is not established. All 31 non-ignored display tests, all 103 isolated GTK cases, full preflight and app all-target Clippy passed. The optimized follow-up below completed; native visual acceptance and Forgejo acceptance remain pending.
+The motivation is the [stream-cache comparison in PR #1322](https://github.com/cozyGarage/BookiE/pull/1322) recorded on a separate branch under [#1032](https://github.com/cozyGarage/BookiE/issues/1032): a smaller retained window reduced memory but increased CPU; perf attributed most work to GTK text layout. Attribution to a specific UI transition is not established. All 31 non-ignored display tests, all 103 isolated GTK cases, full preflight and app all-target Clippy passed. The optimized follow-up below completed; native visual acceptance and remote CI acceptance remain pending.
 
 ## Optimized follow-up
 
@@ -26,7 +26,7 @@ Browse grids enable long-value previews only when primary-key indices are presen
 
 ## Current Linux refresh
 
-Merged Linux through `c3b2a054e`, including the accepted PostgreSQL terminal-page metadata fix and nonblocking GTK stderr capture. Full preflight and all 103 registered GTK widget tests passed again at merge head `bca4ef6876dce2bc64d00e2c0fa263d10e552f4a`. Documentation links, issue ledger and ignored-test inventory checks also passed. The owning issue remains open for the remaining resource scenarios and keyless browse coverage. Forgejo acceptance is pending; the retained-byte change must be accepted together with bounded preview layout.
+Merged Linux through `c3b2a054e`, including the accepted PostgreSQL terminal-page metadata fix and nonblocking GTK stderr capture. Full preflight and all 103 registered GTK widget tests passed again at merge head `bca4ef6876dce2bc64d00e2c0fa263d10e552f4a`. Documentation links, issue ledger and ignored-test inventory checks also passed. The owning issue remains open for the remaining resource scenarios and keyless browse coverage. Remote CI acceptance is pending; the retained-byte change must be accepted together with bounded preview layout.
 
 ## Inspector regression found during aggregate validation
 

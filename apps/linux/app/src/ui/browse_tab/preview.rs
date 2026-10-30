@@ -36,19 +36,24 @@ fn value_text(driver_id: &str, value: &Value) -> String {
     format!("{shown}… ({} more characters)", total - MAX_VALUE_CHARS)
 }
 
-pub(super) fn present(parent: &impl IsA<gtk::Widget>, text: &str) {
+fn preview_view(text: &str) -> gtk::TextView {
     let buffer = gtk::TextBuffer::new(Some(&gtk::TextTagTable::new()));
     buffer.set_text(text);
-    let view = gtk::TextView::builder()
+    gtk::TextView::builder()
         .buffer(&buffer)
         .editable(false)
+        .cursor_visible(false)
         .monospace(true)
         .wrap_mode(gtk::WrapMode::WordChar)
         .top_margin(12)
         .bottom_margin(12)
         .left_margin(12)
         .right_margin(12)
-        .build();
+        .build()
+}
+
+pub(super) fn present(parent: &impl IsA<gtk::Widget>, text: &str) {
+    let view = preview_view(text);
     let scrolled = gtk::ScrolledWindow::builder().vexpand(true).child(&view).build();
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&adw::HeaderBar::new());
@@ -80,6 +85,15 @@ mod tests {
             text,
             "UPDATE \"t\" SET \"name\" = $1 WHERE \"id\" = $2;\n-- values, in order\n  1: 'it''s'\n  2: 7\n\nDELETE FROM \"t\" WHERE \"id\" = $1;\n-- values, in order\n  1: 9"
         );
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_preview_is_read_only_and_shows_no_blinking_caret() {
+        gtk::init().unwrap();
+        let view = preview_view("UPDATE t SET a = 1;");
+        assert!(!view.is_editable());
+        assert!(!view.is_cursor_visible(), "a read-only view must not blink a caret");
     }
 
     #[test]

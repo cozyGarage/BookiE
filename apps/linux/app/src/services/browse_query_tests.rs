@@ -86,6 +86,7 @@ async fn sqlite_hidden_projection_keeps_the_primary_key_and_leaves_hidden_values
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: Some(&hidden),
+        long_text_preview: false,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("expected projected SQL")
@@ -158,6 +159,7 @@ async fn sqlite_value_query_refetches_the_exact_blob_for_a_composite_key() {
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     let query = target
         .value_query(2, &[Value::Text(tenant.into()), Value::Int(7)])
@@ -216,6 +218,7 @@ async fn mysql_value_query_refetches_the_exact_blob_for_a_composite_key() {
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     let query = target.value_query(2, &[Value::Bytes(tenant), Value::Int(7)]).unwrap();
     let fetched = connection
@@ -256,6 +259,7 @@ async fn value_contract_duckdb_guarded_value_query_refetches_exact_blob() {
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     let query = target
         .value_query(2, &[Value::Text(tenant.into()), Value::Int(7)])
@@ -373,6 +377,7 @@ async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     let query = target
         .value_query(2, &[Value::Text(tenant.into()), Value::Int(7)])
@@ -552,6 +557,7 @@ async fn postgres_value_query_refetches_by_enum_and_domain_composite_key() {
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     let query = target
         .value_query(
@@ -611,6 +617,7 @@ async fn mssql_value_query_refetches_the_exact_blob_for_a_composite_key() {
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     let query = target.value_query(2, &[Value::Bytes(tenant), Value::Int(7)]).unwrap();
     let fetched = connection

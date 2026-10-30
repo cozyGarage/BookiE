@@ -21,4 +21,4 @@ The PostgreSQL release tests include read-scoped plan denial, `EXPLAIN ANALYZE` 
 
 The run used a Linux host with Docker and rustc 1.98.1. GTK ran using the script's isolated D-Bus, Xvfb and AT-SPI setup. After all seven scenarios passed, shutdown printed `A connection to the bus can't be made`; the script exited with status 0.
 
-This is local source-build evidence at the stated SHA. It does not establish frozen-candidate, Forgejo, installed-package, native Wayland, bundle-import, or nightly-soak acceptance. The tested SHA is newer than the maintainer-designated frozen candidate `bbdc39a430ede9382bc5dfa7164e51a065e2bd88`.
+This is local source-build evidence at the stated SHA. It does not establish frozen-candidate, remote CI, installed-package, native Wayland, bundle-import, or nightly-soak acceptance. The tested SHA is newer than the maintainer-designated frozen candidate `bbdc39a430ede9382bc5dfa7164e51a065e2bd88`.

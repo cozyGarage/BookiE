@@ -8,7 +8,7 @@ use serde_json::json;
 use drivers_mysql::MysqlDriver;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use testcontainers::ImageExt;
-use testcontainers::core::{IntoContainerPort, Mount};
+use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
@@ -25,15 +25,16 @@ mod read_only_session;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
-#[path = "support/result_sets.rs"]
-mod result_sets;
-
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;
 #[path = "shared/mysql_trigger_errors.rs"]
 mod mysql_trigger_errors;
+#[path = "support/result_sets.rs"]
+mod result_sets;
 #[path = "support/schema_introspection.rs"]
 mod schema_introspection;
+#[path = "support/views.rs"]
+mod views;
 
 #[path = "shared/mysql_atomic_assertions.rs"]
 mod mysql_atomic_assertions;
@@ -57,39 +58,8 @@ async fn an_unavailable_mysql_server_is_classified_as_connection_refused() {
         .expect("MySQL setup refusal remains distinct from established disconnect");
 }
 
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn mysql_accepts_a_query_through_a_local_socket_file() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let socket_directory = tempfile::tempdir().expect("socket directory");
-    std::fs::set_permissions(socket_directory.path(), std::fs::Permissions::from_mode(0o777))
-        .expect("make socket directory accessible to the container");
-    let image = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
-        .with_mount(Mount::bind_mount(
-            socket_directory.path().to_string_lossy().to_string(),
-            "/var/run/mysqld",
-        ));
-    let container = image.start().await.expect("start mysql container");
-    let options = ConnectOptions {
-        local_socket_path: Some(socket_directory.path().join("mysqld.sock")),
-        database: "mysql".into(),
-        username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        ..Default::default()
-    };
-
-    let connection = MysqlDriver
-        .connect(options)
-        .await
-        .expect("connect through local socket");
-    let result = connection.query("SELECT 1").await.expect("query through local socket");
-    assert_eq!(result.rows.len(), 1);
-    connection.close().await.expect("close local socket connection");
-    container.stop().await.expect("stop mysql container");
-}
+#[path = "support/local_socket.rs"]
+mod local_socket;
 
 async fn start_mysql() -> (shared_container::TestDatabase, ConnectOptions) {
     shared_container::start_mysql().await
@@ -620,6 +590,20 @@ async fn value_roundtrip_all_types() {
         v => panic!("expected json, got {v:?}"),
     }
     assert_eq!(row[15], Value::Null);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn explain_returns_its_plan_rows() {
+    let (_c, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+
+    conn.execute("CREATE TABLE plan_src (i int PRIMARY KEY)").await.unwrap();
+    conn.execute("INSERT INTO plan_src VALUES (1),(2)").await.unwrap();
+
+    let plan = conn.query("EXPLAIN SELECT * FROM plan_src WHERE i = 1").await.unwrap();
+    assert!(!plan.columns.is_empty());
+    assert_eq!(plan.rows.len(), 1);
 }
 
 #[tokio::test]

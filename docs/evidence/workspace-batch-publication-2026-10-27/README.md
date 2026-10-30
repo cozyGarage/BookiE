@@ -10,6 +10,6 @@ All 14 public persistence tests and 11 workspace disk tests passed. Coverage inc
 
 The final source at `2169db0c4` passed five rebuilt installed scenarios without retries: restart restoration, save-and-close of a file tab, reimported connection persistence, preservation of an unreadable draft while deleting another connection, and restoration of a healthy connection alongside an unreadable draft. The prerequisite merge at `8234d5b82` has an identical tree, verified with `git diff --exit-code 2169db0c4 8234d5b82`. The installed scenario durations were 27.438, 8.522, 21.829, 8.587 and 7.094 seconds respectively. These are acceptance durations under concurrent local builds, not performance benchmarks.
 
-Full preflight passed: Clippy, 2,231 unit tests, 296 sandbox tests and the isolated Redis cancellation test. Size, whitespace and documentation guards passed. Forgejo acceptance and native Wayland checks remain unverified.
+Full preflight passed: Clippy, 2,231 unit tests, 296 sandbox tests and the isolated Redis cancellation test. Size, whitespace and documentation guards passed. Remote CI acceptance and native Wayland checks remain unverified.
 
 Metadata I/O errors can leave unreferenced versions for recovery until a subsequent save. A failed metadata operation is not proof that its rename did not occur. These tests establish filesystem-error behavior, not power-cut fault injection or a universal rollback guarantee for storage hardware failures.

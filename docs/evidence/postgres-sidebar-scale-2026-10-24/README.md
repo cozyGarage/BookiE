@@ -29,4 +29,4 @@ The optimized parent indexes follow only nodes present in the tree. This keeps t
 
 ## Local validation
 
-At `646fe4b5f`, `bash scripts/preflight.sh` passed 406 harness tests, 2,077 unit tests, 2,090 sandbox tests, the separate Redis cancellation test and the repository guards. `bash scripts/test-gtk-widgets.sh` passed all 163 isolated GTK tests. The focused sidebar tests passed 18/18. These local results do not establish Forgejo acceptance or native desktop acceptance.
+At `646fe4b5f`, `bash scripts/preflight.sh` passed 406 harness tests, 2,077 unit tests, 2,090 sandbox tests, the separate Redis cancellation test and the repository guards. `bash scripts/test-gtk-widgets.sh` passed all 163 isolated GTK tests. The focused sidebar tests passed 18/18. These local results do not establish remote CI acceptance or native desktop acceptance.

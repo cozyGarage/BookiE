@@ -1,3 +1,0 @@
-Command: rtk proxy python3 scripts/inventory-ignored-tests.py --check
-Result: ignored-test inventory and isolated registrations are OK.
-Inventory: 494 declarations; Driver tier 361.

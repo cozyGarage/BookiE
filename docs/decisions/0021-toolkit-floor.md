@@ -6,7 +6,7 @@
 
 ## Context
 
-[ADR 0002](0002-rust-gtk4-libadwaita.md) defined two native-library floors: a Cargo compile and CI floor at the Ubuntu 24.04 stack (GTK 4.14, libadwaita 1.5, GtkSourceView 5.12) and a GNOME 50 Meson and package line (GTK 4.22, libadwaita 1.9, GtkSourceView 5.18). CI ran on Ubuntu 24.04 and Debian 13 containers and on runner hosts with their own toolkits.
+[ADR 0002](0002-rust-gtk4-libadwaita.md) defined two native-library floors: a Cargo compile floor at the Ubuntu 24.04 stack (GTK 4.14, libadwaita 1.5, GtkSourceView 5.12) and a GNOME 50 Meson and package line (GTK 4.22, libadwaita 1.9, GtkSourceView 5.18).
 
 Older toolkits cost UI work that newer releases no longer need:
 
@@ -36,7 +36,7 @@ The floor is enforced in three places:
 
 The current gtk-rs features match the toolkit floor: GTK compiles at `gnome_50` plus `v4_24`, libadwaita at `v1_10`, GtkSourceView at `v5_22`, and GLib at `v2_88`. The shortcuts window now uses `AdwShortcutsDialog`.
 
-The distro-floor CI job builds and tests on `debian:testing` only. No job tests an older toolkit, and fixes are not backported to older toolkits.
+CI validates the selected toolkit floor. Compatibility with older toolkit versions is not tested, and fixes are not backported to them.
 
 ## Rationale
 
@@ -46,7 +46,7 @@ One floor removes per-version branches from the app and the test tier and makes 
 
 - Ubuntu 26.04 LTS (GTK 4.22.4, GtkSourceView 5.18.0, libadwaita 1.9.1), Debian 13 (GTK 4.18.6, GtkSourceView 5.16.0, libadwaita 1.7.6) and Ubuntu 24.04 (GTK 4.14.5, GtkSourceView 5.12.0, libadwaita 1.5.0) are unsupported. The Debian package does not install there and a source build exits at startup.
 - Flatpak on the GNOME 51 runtime is the intended path for those distributions. Flathub publication remains PKG-4 and PKG-8.
-- Every Forgejo runner that runs GTK jobs must have GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 before this change merges. Existing runners on Debian 13 and Ubuntu 24.04 were below the floor at the time of the decision; Debian testing ("forky") supplied the reference stack. Runner labels stay unchanged, and the native Ubuntu nightly job is removed.
+- CI and native packages must use the selected toolkit floor.
 - When a newer toolkit becomes the stable line on the reference distributions, the floor moves with it by a new decision.
 
 ## Alternatives considered
