@@ -348,7 +348,7 @@ impl SshTunnel {
     /// hop. A caller can poll this to reconnect a lost tunnel instead of
     /// waiting for a database driver's own timeout to notice.
     pub fn is_closed(&self) -> bool {
-        self.session.is_closed()
+        self.cancel.is_cancelled() || self.session.is_closed()
     }
 }
 
@@ -692,6 +692,17 @@ fn unknown_host_key(host: &str, port: u16, fingerprint: String, known_hosts: &Pa
     }
 }
 
+const ACCEPT_RETRY_DELAY: Duration = Duration::from_millis(100);
+
+fn is_transient_accept_error(error: &std::io::Error) -> bool {
+    use std::io::ErrorKind;
+    matches!(error.kind(), ErrorKind::ConnectionAborted | ErrorKind::Interrupted)
+        || matches!(
+            error.raw_os_error(),
+            Some(code) if [libc::EMFILE, libc::ENFILE, libc::ENOBUFS, libc::ENOMEM].contains(&code)
+        )
+}
+
 async fn forwarder_loop(
     listener: LocalListener,
     session: Arc<Handle<ClientHandler>>,
@@ -724,8 +735,13 @@ async fn forwarder_loop(
                         }
                     });
                 }
+                Err(e) if is_transient_accept_error(&e) => {
+                    tracing::warn!(error = %e, "ssh listener accept failed; retrying");
+                    tokio::time::sleep(ACCEPT_RETRY_DELAY).await;
+                }
                 Err(e) => {
                     tracing::warn!(error = %e, "ssh listener accept failed");
+                    cancel.cancel();
                     return;
                 }
             },
