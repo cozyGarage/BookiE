@@ -20,7 +20,7 @@ Decision: [ADR 0012](0012-sidebar-object-tree.md).
 
 ### Implementation status
 
-The UI-11 slice implements collapsible Tables and Views groups, per-connection collapse state, and search expansion using the existing `GtkListBox` and explicit tree-node model. It does not implement the `GtkTreeListModel` migration or lazy in-place loading of Routines, Sequences and Types. The completed UI-11 record is in the [archived pre-migration ledger](../archive/known-issues-pre-project-migration-2026-10-12.md); those partial results do not mean every part of this decision has shipped. The remaining UI-23 catalog work is tracked in [issue #552](https://github.com/cozyGarage/BookiE/issues/552).
+The UI-11 slice implements collapsible Tables and Views groups, per-connection collapse state, and search expansion using the existing `GtkListBox` and explicit tree-node model. It does not implement the `GtkTreeListModel` migration or lazy in-place loading of Routines, Sequences and Types. Those partial results do not mean every part of this decision has shipped. The remaining UI-23 catalog work is tracked in [issue #552](https://github.com/cozyGarage/BookiE/issues/552).
 
 ## ADR 0017: Official Rust MCP SDK behind the governed seam
 
