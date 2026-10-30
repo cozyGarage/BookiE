@@ -65,7 +65,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 
 [archive/](archive/) holds dated reviews, audits, inventories and long histories. They are source-pinned evidence, not instructions; open items from them live on [Project #3](https://github.com/users/cozyGarage/projects/3). Use the archive starting points below to locate a record, then verify current behavior and status in active docs and issues.
 
-- [Historical 0.2 development record](archive/bookie-0.2-history.md) (brief archive link; see the active sprint for current status)
+- [Historical 0.2 development record](archive/bookie-0.2-history.md) (brief stable archive link; see the completion page for delivery status and Project #3 for open work)
 - [Archived evidence packets](archive/evidence/) (dated artifacts retained after reference triage)
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
