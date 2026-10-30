@@ -103,6 +103,14 @@ fn build(title: &str, token: &CancellationToken) -> Ui {
     stack.add_named(&loading_page(&progress, &dialog, token), Some("loading"));
     stack.add_named(&failure, Some("failure"));
     stack.add_named(&ready_page(&banner, &list, &canvas), Some("ready"));
+    canvas.connect_zoom_changed({
+        let zoom_label = zoom_label.downgrade();
+        move |level| {
+            if let Some(zoom_label) = zoom_label.upgrade() {
+                zoom_label.set_text(&format!("{}%", zoom::percent(level)));
+            }
+        }
+    });
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&header(&canvas, &zoom_label));
     toolbar.set_content(Some(&stack));

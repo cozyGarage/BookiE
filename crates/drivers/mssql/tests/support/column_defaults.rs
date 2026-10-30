@@ -6,6 +6,8 @@ use tablepro_core::sql_ddl::{DraftColumn, diff_to_ops, materialize_ops};
 
 #[path = "masked_column_alter.rs"]
 mod masked_column_alter;
+#[path = "optimistic_collation.rs"]
+mod optimistic_collation;
 
 #[tokio::test]
 #[ignore = "requires docker"]
