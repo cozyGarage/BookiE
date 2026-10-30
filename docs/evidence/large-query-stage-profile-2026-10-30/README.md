@@ -55,6 +55,20 @@ index bcf7d734d..d2d92d7c8 100644
 
 ```
 
+## Stream snapshot metadata follow-up
+
+A release-mode unit microprofile on `ux/stream-outcome-clones` at `9c8ec1388` exercised the current `StreamPageCache` by appending one small page and taking then dropping a snapshot after every append. The snapshot creates page-reference, page-index and row-count vectors. The temporary test counted their element payload bytes and timed append plus snapshot; it did not include allocator metadata, GTK, database work, page contents, or first paint. The test was removed after the run.
+
+| Pages | Snapshot metadata entries copied cumulatively | Modeled vector payload bytes | Elapsed |
+| ---: | ---: | ---: | ---: |
+| 128 | 24,768 | 198,144 | 0 ms |
+| 512 | 393,984 | 3,151,872 | 1 ms |
+| 1,024 | 1,574,400 | 12,595,200 | 3 ms |
+| 2,048 | 6,294,528 | 50,356,224 | 14 ms |
+| 4,096 | 25,171,968 | 201,375,744 | 56 ms |
+
+The model is `3 × pages × (pages + 1) ÷ 2` entries, at 8 bytes per entry on this host. For the earlier 400-data-page workload this projects to 240,600 entries or 1,924,800 bytes (about 1.84 MiB) of cumulative vector payload, excluding allocator overhead. The microprofile shows quadratic allocation churn at the maximum page count, but not a material explanation for the earlier roughly two-second aggregate UI acceptance interval at 400 pages. No snapshot ownership redesign is justified by this measurement alone. It does not measure end-to-end query time, peak memory, paint latency, or cancellation and spool correctness; those remain separate acceptance requirements.
+
 ## Decoder sampling follow-up
 
 A separate instrumented release binary (SHA-256 `08f8b7a1c031737003e568d88a6d7d9b88e0b4e6618aaad624e30707c7f41120`) sampled one row in 128 within each page. One two-million-row run completed in 10.634 seconds and passed the pager probe. Across 16,000 sampled rows, timers summed to 25.687 ms for raw payload inspection and 50.713 ms for decoding plus budget admission. These are sampled wall-clock intervals from a separate run, not CPU measurements or an estimate of the whole query. Timing overhead, scheduling and sampling can skew them; do not scale these numbers to claim a share of the earlier fetch interval.
