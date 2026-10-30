@@ -13,7 +13,7 @@ Check Project #3 for the live issue order and lane before starting work; issue b
 
 ## Current correctness review
 
-The [October 27 code audit](archive/current-code-correctness-audit-2026-10-27.md) records the findings at its pinned source. This table reflects the current Linux source: a merged fix does not by itself complete the acceptance recorded on its issue.
+This table reflects the current Linux source: a merged fix does not by itself complete the acceptance recorded on its issue. The linked issues own current findings and acceptance.
 
 | Finding | Tracking | Lane | Current Linux status |
 | --- | --- | --- | --- |
