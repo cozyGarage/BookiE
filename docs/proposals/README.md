@@ -4,9 +4,6 @@ Proposals record designs that have not become accepted decisions. They do not se
 
 | Proposal | Current boundary |
 |---|---|
-| [Import into existing rows](import-existing-rows.md) | Unscheduled candidate; no behavior is implemented. |
-| [Statement effects and joined verdict](policy-effects-and-verdict.md) | Behavioral defects are closed; only the post-0.2.0 single-AST-walk consolidation remains in #571. |
-| [SSH jump-chain editor](ui-1b-ssh-jump-chain-editor.md) | Backend support is merged; form editing and installed acceptance remain under #548. |
 | [Local dependency patches](upstream-patches.md) | Removal criteria and patch provenance; verify current upstream releases before changing vendored code. |
 
 Use the current [validation playbook](../validation-playbook.md) for test tiers and commands.
