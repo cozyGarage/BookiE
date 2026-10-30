@@ -32,7 +32,7 @@ BookiE reviews shared Rust/Linux foundations and portable behavior under the acc
 
 The October 23 database-client refresh is the newest cross-product review. It records current source/release pins, superseded pagination advice and existing BookiE issue ownership. Earlier entries below remain dated evidence.
 
-The [October 21 adoption and collaboration review](../archive/tablepro-collaboration-2026-10-21.md) records its inspected pin, Linux changes, open upstream work and contribution candidates. Its [source inventory](evidence/tablepro-collaboration-2026-10-21/README.md) preserves the commit range. These are dated findings; the backlog and owning issue still select implementation.
+The October 21 adoption and collaboration review and its source inventory were moved to the private research archive. Its source findings were dated; the backlog and owning issue select implementation.
 
 Since 2026-10-18, TablePro Linux lives under `linux/` on `TableProApp/TablePro` **main**; the old Linux branch was deleted after [#3541](https://github.com/TableProApp/TablePro/pull/3541). Use a pinned main SHA for new reviews. Earlier sections below remain dated evidence of their old refs.
 
