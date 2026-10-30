@@ -1179,6 +1179,11 @@
     ],
     [
       "tablepro-app",
+      "--test=cli_info",
+      "information_flags_exit_without_display_or_profile_access"
+    ],
+    [
+      "tablepro-app",
       "--lib",
       "ui::row_inspector::tests::markup_like_values_and_names_are_shown_as_typed"
     ],
