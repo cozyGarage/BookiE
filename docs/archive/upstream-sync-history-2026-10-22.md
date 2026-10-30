@@ -1,6 +1,6 @@
 # Upstream reference review history through 2026-10-22
 
-This archive preserves dated source, release, issue and pull request snapshots. They prove only what was recorded at their source pins. Current review guidance is in [upstream-sync](../upstream-sync.md); the current external review index is in the [feature comparison](../0.2-feature-comparison.md).
+This archive preserves dated source, release, issue and pull request snapshots. They prove only what was recorded at their source pins. Adopted-code attribution is in [upstream-sync](../upstream-sync.md); current feature selection is on the backlog and Project #3.
 
 BookiE reviews shared Rust/Linux foundations and portable behavior under the accepted decisions. The [completion page](../bookie-0.2-sprint.md) records milestone status; Apple source trees remain excluded.
 
@@ -32,7 +32,7 @@ BookiE reviews shared Rust/Linux foundations and portable behavior under the acc
 
 The October 23 database-client refresh is the newest cross-product review. It records current source/release pins, superseded pagination advice and existing BookiE issue ownership. Earlier entries below remain dated evidence.
 
-The [October 21 adoption and collaboration review](../archive/tablepro-collaboration-2026-10-21.md) records its inspected pin, Linux changes, open upstream work and contribution candidates. Its [source inventory](evidence/tablepro-collaboration-2026-10-21/README.md) preserves the commit range. These are dated findings; the backlog and owning issue still select implementation.
+The October 21 adoption and collaboration review and its source inventory were moved to the private research archive. Its source findings were dated; the backlog and owning issue select implementation.
 
 Since 2026-10-18, TablePro Linux lives under `linux/` on `TableProApp/TablePro` **main**; the old Linux branch was deleted after [#3541](https://github.com/TableProApp/TablePro/pull/3541). Use a pinned main SHA for new reviews. Earlier sections below remain dated evidence of their old refs.
 
@@ -218,7 +218,7 @@ At this checkpoint, `-J` hops ran a separate `ssh` that received none of Bookie'
 
 `55528b854` now applies and is covered: BookiE has an askpass bridge (`crates/ssh/src/openssh/askpass_bridge.rs`), and `crates/ssh/src/openssh/prompt.rs` matches the host-key prompt of both OpenSSH 9 and 10, with a 9.6 prompt test beside the bridge. Rechecked 2026-10-20.
 
-One older commit deserves a separate check rather than a claim. `92aea7112 fix(core): export values at the precision their column declares` sits below the boundary, inside the 60 the sprint plan already dispositioned, under "converge serializers". That row records an intention, not a verification, so whether BookiE's exporter matches the declared precision is still unconfirmed. The [October 20 fix review](../archive/tablepro-dbx-review-2026-10-20/b-tablepro-fixes.md) settles it from source: JSON numbers and decimal scale are covered, and the remaining timestamp fraction padding difference is cosmetic.
+One older commit deserves a separate check rather than a claim. `92aea7112 fix(core): export values at the precision their column declares` sits below the boundary, inside the 60 the sprint plan already dispositioned, under "converge serializers". That row records an intention, not a verification, so whether BookiE's exporter matches the declared precision is still unconfirmed. The October 20 fix review settles it from source: JSON numbers and decimal scale are covered, and the remaining timestamp fraction padding difference is cosmetic.
 
 ### Imported parser provenance
 

@@ -67,9 +67,9 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 
 | Archived document | Baseline lines | Current declaration matches | Explicit BookiE issue state | Disposition |
 | --- | ---: | ---: | --- | --- |
-| [2026-10-15-dbx-review.md](../../archive/2026-10-15-dbx-review.md) | 194 | 0 | 5 closed / 3 open | Historical record; no current runtime claim |
+| 2026-10-15-dbx-review.md | 194 | 0 | 5 closed / 3 open | Historical record; no current runtime claim |
 | [2026-10-15-postgresql-client-research/review.md](../../archive/2026-10-15-postgresql-client-research/review.md) | 154 | 1 | 8 closed / 4 open | Source traced; historical runtime scope |
-| [agent-tooling-review-2026-10-20.md](../../archive/agent-tooling-review-2026-10-20.md) | 63 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
+| `agent-tooling-review-2026-10-20.md` | 63 | 0 | No explicit BookiE issue URL | Historical record; migrated out of the public repository after this inventory; no current runtime claim |
 | [app-layer-external-audit-2026-10-06.md](../../archive/app-layer-external-audit-2026-10-06.md) | 263 | 1 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [architecture-consistency-2026-10-03-inventory.md](../../archive/architecture-consistency-2026-10-03-inventory.md) | 137 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [architecture-consistency-review-2026-10-03.md](../../archive/architecture-consistency-review-2026-10-03.md) | 147 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
@@ -107,14 +107,14 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | [sprint-2026-09-14.md](../../archive/sprint-2026-09-14.md) | 110 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [sprint-review-2026-09-28.md](../../archive/sprint-review-2026-09-28.md) | 191 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [stabilization-2026-09.md](../../archive/stabilization-2026-09.md) | 87 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [tablepro-dbx-review-2026-10-20/README.md](../../archive/tablepro-dbx-review-2026-10-20/README.md) | 181 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/a-tablepro-linux-features.md](../../archive/tablepro-dbx-review-2026-10-20/a-tablepro-linux-features.md) | 251 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/b-tablepro-fixes.md](../../archive/tablepro-dbx-review-2026-10-20/b-tablepro-fixes.md) | 119 | 31 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/c-tablepro-macos-ux.md](../../archive/tablepro-dbx-review-2026-10-20/c-tablepro-macos-ux.md) | 369 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/d-dbx-features.md](../../archive/tablepro-dbx-review-2026-10-20/d-dbx-features.md) | 212 | 3 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/e-dbx-backend-fixes.md](../../archive/tablepro-dbx-review-2026-10-20/e-dbx-backend-fixes.md) | 175 | 110 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/f-dbx-ux-fixes.md](../../archive/tablepro-dbx-review-2026-10-20/f-dbx-ux-fixes.md) | 86 | 35 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-issue-review-2026-10-20.md](../../archive/tablepro-issue-review-2026-10-20.md) | 46 | 0 | 0 closed / 1 open | Historical record; no current runtime claim |
+| tablepro-dbx-review-2026-10-20/README.md | 181 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/a-tablepro-linux-features.md | 251 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/b-tablepro-fixes.md | 119 | 31 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/c-tablepro-macos-ux.md | 369 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/d-dbx-features.md | 212 | 3 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/e-dbx-backend-fixes.md | 175 | 110 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/f-dbx-ux-fixes.md | 86 | 35 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| `tablepro-issue-review-2026-10-20.md` | 46 | 0 | 0 closed / 1 open | Historical record; migrated out of the public repository after this inventory; no current runtime claim |
 | [testing-history.md](../../archive/testing-history.md) | 98 | 10 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [third-party-notice-inventory-2026-10-19.md](../../archive/third-party-notice-inventory-2026-10-19.md) | 21 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [type-contract-history.md](../../archive/type-contract-history.md) | 1768 | 45 | No explicit BookiE issue URL | Source traced; historical runtime scope |
@@ -123,7 +123,7 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | [upstream-adoption.md](../../archive/upstream-adoption.md) | 73 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [upstream-linux-adoption-2026-10-18.md](../../archive/upstream-linux-adoption-2026-10-18.md) | 84 | 0 | 9 closed / 1 open | Historical record; no current runtime claim |
 | [upstream-linux-movement-2026-10-18.md](../../archive/upstream-linux-movement-2026-10-18.md) | 227 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [upstream-main-analysis-2026-10-20.md](../../archive/upstream-main-analysis-2026-10-20.md) | 125 | 2 | 0 closed / 1 open | Research complete; selected claims rerun above; implementation open |
+| `upstream-main-analysis-2026-10-20.md` | 125 | 2 | 0 closed / 1 open | Historical source review; migrated out of the public repository after this inventory |
 | [upstream-main-review-2026-10-03-inventory.md](../../archive/upstream-main-review-2026-10-03-inventory.md) | 275 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [upstream-main-review-2026-10-03.md](../../archive/upstream-main-review-2026-10-03.md) | 218 | 7 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [upstream-older-releases-2026-10-03-inventory.md](../../archive/upstream-older-releases-2026-10-03-inventory.md) | 146 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
@@ -134,4 +134,4 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 
 ## Limits and next work
 
-No application feature was changed by this contribution. Historical GTK, Wayland, Secret Service, non-PostgreSQL drivers, extension matrices, crash-save, retained-memory limits, distribution floors, package installation, advisory scans and mutation totals were not rerun. Their archived passes, failures, cancellations and uncertainty remain intact. The [workstation plan](../../archive/workstation-test-reuse-2026-10-20.md) and [nightly recovery inventory](../nightly-778-selective-rerun-2026-10-20/README.md) preserve the reuse and selective rerun records. This documentation update starts no new heavy gate.
+No application feature was changed by this contribution. Historical GTK, Wayland, Secret Service, non-PostgreSQL drivers, extension matrices, crash-save, retained-memory limits, distribution floors, package installation, advisory scans and mutation totals were not rerun. Their archived passes, failures, cancellations and uncertainty remain intact. The workstation plan and nightly recovery inventory were moved to the private research archive. This documentation update starts no new heavy gate.

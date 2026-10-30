@@ -17,7 +17,7 @@ Fetched BookiE and both TablePro branches without changing the shared checkout. 
 
 Inspected BookiE manifests, guards, streaming, editing, ordering, MongoDB metadata and PostgreSQL cancellation paths. Read selected upstream PR explanations and source patches, the newest TablePro Linux grid and dependency diffs, and pinned dbx architecture, manifests, dependency guard, issue form and query-message buffer. PR-reported test results remain their authors' evidence. The isolated boundary-check probe below was executed locally; no reference-project was built or benchmarked.
 
-The [October 15 dbx review](2026-10-15-dbx-review.md), [PostgreSQL research](2026-10-15-postgresql-client-research/review.md), [upstream intake](upstream-sync-history-2026-10-22.md) and [#983](https://github.com/cozyGarage/BookiE/issues/983) already own substantial overlap. Keep their dated findings intact and update current owners instead of rewriting historical evidence.
+The October 15 dbx review, [PostgreSQL research](2026-10-15-postgresql-client-research/review.md), [upstream intake](upstream-sync-history-2026-10-22.md) and [#983](https://github.com/cozyGarage/BookiE/issues/983) already own substantial overlap. Keep their dated findings intact and update current owners instead of rewriting historical evidence.
 
 ## Findings in current BookiE
 
@@ -26,7 +26,7 @@ The [October 15 dbx review](2026-10-15-dbx-review.md), [PostgreSQL research](202
 Confirmed against the reviewed source:
 
 - `ARCHITECTURE.md`, its SQL editor row, and ADR 0011's implementation status say the editor does not use cursors. PR #908 is merged. PostgreSQL editor streaming retains four pages, with a 5,000-row fetch size. Other engines retain the materialized path.
-- `docs/0.2-feature-comparison.md` says credential-bearing history is still saved (#967). PR #988 is merged and #967 is closed. It also calls streaming wholly open.
+- The dated feature comparison said credential-bearing history was still saved (#967). PR #988 is merged and #967 is closed. It also called streaming wholly open. The comparison was later moved to the private research archive.
 - That comparison combines **TablePlus and TablePro**, attributing TablePlus release numbers and features to one row. These are separate products. TablePro's inspected main tip is v0.81.0. Split their identities and sources before using the page to choose parity work.
 - `docs/backlog.md` calls full-value editing an active #610 PR. #610 is a closed issue; its implementation landed through #939. The user guide already describes it.
 - `ARCHITECTURE.md` omits `tablepro-dump`, although the workspace, boundary allowlist and preflight list include it. ADR 0019 is accepted. Vendor-tool foundations (#999), SSH endpoint assembly (#1005), and administrative guard operations (#1008) are merged; the user-facing PostgreSQL backup/restore PR #1017 remains open. Neither foundations nor an open PR prove the UI shipped.

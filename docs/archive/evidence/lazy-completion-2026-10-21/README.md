@@ -1,6 +1,6 @@
 # Lazy completion proposals, October 21
 
-Related work: [#580](https://github.com/cozyGarage/BookiE/issues/580). Source rationale: [October 21 TablePro review](../../tablepro-collaboration-2026-10-21.md#2-large-catalog-responsiveness-with-lazy-sidebar-and-completion-rows). Base: `ec6f5b0f3`. This is an independent adaptation of the lazy-model technique, using the existing application RowStore and GListModel conventions; no upstream implementation file was copied.
+Related work: [#580](https://github.com/cozyGarage/BookiE/issues/580). Base: `ec6f5b0f3`. The implementation uses the existing application RowStore and GListModel conventions; no external implementation file was copied.
 
 ## Scope
 

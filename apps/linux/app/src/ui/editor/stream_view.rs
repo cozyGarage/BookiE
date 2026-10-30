@@ -23,13 +23,21 @@ pub(super) fn page_widget_name(generation: u64, page_index: u64) -> String {
     format!("{PAGE_PREFIX}{generation}-{page_index}")
 }
 
+#[cfg(test)]
+thread_local! { static NAMED_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+
 fn named<T: IsA<gtk::Widget>>(root: &gtk::Widget, name: &str) -> Option<T> {
     let mut pending = vec![root.clone()];
     while let Some(widget) = pending.pop() {
+        #[cfg(test)]
+        NAMED_VISITS.with(|count| count.set(count.get() + 1));
         if widget.widget_name() == name
             && let Ok(found) = widget.clone().downcast::<T>()
         {
             return Some(found);
+        }
+        if name == LIVE_PROGRESS && widget.widget_name() == LIVE_PAGES && widget.is::<gtk::Stack>() {
+            continue;
         }
         let mut child = widget.first_child();
         while let Some(next) = child {
