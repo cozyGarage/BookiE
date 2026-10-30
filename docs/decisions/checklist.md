@@ -55,7 +55,7 @@ Last full review against the ADR index, code and living docs: 2026-10-20. The re
 | CI/CD & environments | Decided | Required checks cover fast feedback and acceptance validation. [AGENTS](../../AGENTS.md), [validation playbook](../validation-playbook.md#ci-tiers). |
 | Feature-flagging & rollout | Decided | No account, license or remote entitlement flags. [AGENTS](../../AGENTS.md), [PRODUCT.md](../../PRODUCT.md). |
 | Changelog & release notes | Decided | `Release-Note:` trailers on squash commits, assembled at release. [ADR 0022](0022-release-notes-from-merge-commits.md). |
-| Externally-owned release gate | Undecided | See the open fork below; distribution work remains in the [backlog](../backlog.md). |
+| Externally-owned release gate | Undecided | See the open fork below; distribution acceptance is tracked in the owning issues. |
 | Native library floors | Decided | One floor: GTK 4.24, libadwaita 1.10, GtkSourceView 5.22. [ADR 0021](0021-toolkit-floor.md), [platforms](../platforms.md). |
 
 ## Product
@@ -83,13 +83,13 @@ Last full review against the ADR index, code and living docs: 2026-10-20. The re
 | Sidebar object tree | [ADR 0012](0012-sidebar-object-tree.md) |
 | Multiple result sets | [ADR 0013](0013-multiple-query-result-sets.md) |
 | Full-table export read snapshot | [ADR 0014](0014-full-table-export-snapshot.md) (not the same as ADR 0015) |
-| Database clone / restore snapshots | [ADR 0015](0015-database-snapshots.md) (accepted design; implementation is post-0.2.0 backlog work, with no release target) |
+| Database clone / restore snapshots | [ADR 0015](0015-database-snapshots.md) (accepted design; not available in the current application) |
 | Bundle admin audit | [ADR 0010](0010-administrative-action-audit.md) |
 | Official Rust MCP SDK behind the governed seam | [ADR 0017](0017-mcp-sdk-behind-the-governed-seam.md) (accepted direction; production remains hand-written, with an optional stdio prototype) |
 | System OpenSSH askpass and transport boundaries | [ADR 0023](0023-system-openssh-transport-boundaries.md) |
 | Stale grid edits and deletes | [ADR 0024](0024-keyed-grid-writes-check-what-they-overwrite.md) |
 | Headless application-services crate | [ADR 0018](0018-headless-app-services-crate.md) (accepted; staged module moves continue under APP-MOD) |
-| File conversion, schema migrations, logical backup | [ADR 0019](0019-database-tooling-without-sidecars.md) (accepted design; implementation status varies by tool, with remaining work post-0.2.0) |
+| File conversion, schema migrations, logical backup | [ADR 0019](0019-database-tooling-without-sidecars.md) (accepted design and tool boundaries) |
 
 ## Declined or out-of-scope directions
 

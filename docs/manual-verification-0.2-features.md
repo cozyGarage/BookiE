@@ -1,6 +1,6 @@
 # Manual verification checklist
 
-This checklist describes installed and native desktop scenarios that automated GTK tests cannot fully establish. It is not milestone status; release scope is recorded in the [sprint](bookie-0.2-sprint.md), and subsequent work is tracked in the [backlog](backlog.md). The checkboxes summarize the recorded state at this snapshot.
+This checklist describes installed and native desktop scenarios that automated GTK tests cannot fully establish. It is not milestone status; the completed release boundary is recorded in the [sprint](bookie-0.2-sprint.md), and open work is tracked in [Project #3](https://github.com/users/cozyGarage/projects/3). The checkboxes summarize the recorded state at this snapshot.
 
 Test native Wayland separately from Xvfb; an Xvfb pass does not establish native Wayland behavior.
 

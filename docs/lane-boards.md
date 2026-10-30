@@ -1,10 +1,10 @@
 # Lane boards: B3 and B4
 
-Both boards are pointers. [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) owns status and lane, the [post-release backlog](backlog.md) owns selected work order, and each issue owns acceptance. This page keeps what the project cannot: the B3 accepted-refusal list and case record, and the B4 map to its evidence. Use [AGENTS.md](../AGENTS.md#lanes-and-ownership) for lane ownership.
+Both boards are pointers. [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) owns selected work order, status and lane, and each issue owns acceptance. This page keeps what the project cannot: the B3 accepted-refusal list and case record, and the B4 map to its evidence. Use [AGENTS.md](../AGENTS.md#lanes-and-ownership) for lane ownership.
 
 ## B3: types and values
 
-The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md). Open B3 work lives on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) with **Lane = B3** (label `lane:b3`). The [post-release backlog](backlog.md) owns selected work order; Project #3 owns status and lane, and each issue owns acceptance. Case proof lookup is [value-contracts.md](value-contracts.md).
+The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md). Open B3 work lives on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) with **Lane = B3** (label `lane:b3`); Project #3 owns selected work order, status and lane, and each issue owns acceptance. Case proof lookup is [value-contracts.md](value-contracts.md).
 
 This page keeps the accepted-refusal list and the bounded case record. Task status and acceptance are on Project #3 and its issues. Earlier implementation narrative is in [archive/type-contract-history.md](archive/type-contract-history.md).
 
@@ -56,7 +56,7 @@ New engines are later driver projects (Oracle and Cassandra are out of scope, [A
 
 ## B4: transport and sessions
 
-Open B4 work lives on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) with **Lane = B4** (label `lane:b4`). The [post-release backlog](backlog.md) owns selected work order; Project #3 owns status and lane, and each issue owns acceptance. [ADR 0008](decisions/0008-connection-and-session-ownership.md) and [ADR 0016](decisions/0016-governed-consumer-seam.md) own the decisions.
+Open B4 work lives on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) with **Lane = B4** (label `lane:b4`); Project #3 owns selected work order, status and lane, and each issue owns acceptance. [ADR 0008](decisions/0008-connection-and-session-ownership.md) and [ADR 0016](decisions/0016-governed-consumer-seam.md) own the decisions.
 
 This page points to Project #3 and the ledger for current work.
 
@@ -66,7 +66,7 @@ This page points to Project #3 and the ledger for current work.
 | --- | --- |
 | Open B4 issues and status | [Project #3](https://github.com/users/cozyGarage/projects/3) filtered by Lane B4 |
 | Ledger ID to issue map | [known-issues.md](known-issues.md) |
-| Post-release scope and selected work order | [Backlog](backlog.md), [0.2.0 delivery boundary](bookie-0.2-sprint.md#delivery-boundary) |
+| Selected work order | [Project #3](https://github.com/users/cozyGarage/projects/3), [0.2.0 delivery boundary](bookie-0.2-sprint.md#delivery-boundary) |
 | Earlier B4 local recheck at `472a50be` | [2026-10-13 results](evidence/b4-current-linux-472a50be-2026-10-13/README.md) |
 | PostgreSQL, SSH and audit release checks at `1ff2ff9c` | [2026-10-13 results](evidence/b4-current-linux-1ff2ff9c-2026-10-13/README.md) |
 | AUD-2 MySQL approval denial and approval workflow | [2026-10-13 results](evidence/aud2-mysql-approval-6c777a0d-2026-10-13/README.md) |
