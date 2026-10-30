@@ -16,7 +16,7 @@ Version persisted formats and validate supported versions. Before upgrading pref
 
 GSettings preferences/geometry retain their JSON fallback and rollback mirrors. Whole-document `StateFile` and locked per-connection `WorkspaceStore` merges remain different writer contracts. Coalescing must preserve ordering and settle flush waiters; a whole-map replacement must not lose another window's entries. Shutdown must flush persistence and settle governed operations.
 
-Operational restoration steps belong in [storage](../storage.md) and [state management](../state-management.md). Native installed upgrade and rollback acceptance remains open under [PKG-1 / #574](../backlog.md#post-release-acceptance-follow-ups); a published tag does not prove it.
+Operational restoration steps belong in [storage](../storage.md) and [state management](../state-management.md). Native installed upgrade and rollback acceptance remains open under [PKG-1 / #574](https://github.com/cozyGarage/BookiE/issues/574); a published tag does not prove it.
 
 ## Rationale
 

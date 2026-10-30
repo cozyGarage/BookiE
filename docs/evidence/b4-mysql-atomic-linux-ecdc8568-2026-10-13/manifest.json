@@ -26,7 +26,7 @@
   ],
   "not_established": [
     "Other optional or vendor-specific engines and side-effect classes remain open.",
-    "Frozen-candidate, package-installed, GitHub acceptance beyond the applicable check tiers, and Forgejo acceptance remain separate."
+    "Frozen-candidate, package-installed, GitHub acceptance beyond the applicable check tiers, and remote CI acceptance remain separate."
   ],
   "result_log": "result.txt",
   "result_log_sha256": "c620bf16852d7d9db98a5458ef7c84d10a3dfcd7efdab2bd984801ab06ad9b96"

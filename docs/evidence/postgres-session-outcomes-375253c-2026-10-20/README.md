@@ -8,7 +8,7 @@ Implementation evidence for [#1186](https://github.com/cozyGarage/BookiE/issues/
 - UI regression before fix: `b27f59e8b`, with the savepoint audit fix already applied.
 - Fixed code: `375253c0a`.
 - Local Linux desktop. Driver tests used isolated PostgreSQL 16 containers; GTK tests used the existing PostgreSQL 17 fixture, private D-Bus and Xvfb.
-- These runs establish local behavior. Forgejo acceptance and merge status remain on the PR.
+- These runs establish local behavior. Remote CI acceptance and merge status remain on the PR.
 
 ## Failing before
 

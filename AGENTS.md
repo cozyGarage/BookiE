@@ -14,11 +14,11 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 ## Where to start
 
 1. [docs/README.md](docs/README.md): the documentation map and where each fact belongs.
-2. [Completion and continuation](docs/bookie-0.2-sprint.md): the maintainer marked 0.2.0 delivery complete, and the release was published on 2026-10-23. The same page records the delivery boundary; the [backlog](docs/backlog.md) owns subsequent work, and [known limitations](docs/known-limitations.md) says what the application cannot do. No 0.2.1 or 0.3 scope is committed yet; select work from the backlog and define each release scope separately.
+2. [Completion and continuation](docs/bookie-0.2-sprint.md): the maintainer marked 0.2.0 delivery complete, and the release was published on 2026-10-23. The same page records the delivery boundary; [Project #3](https://github.com/users/cozyGarage/projects/3) owns selected work, status and lane, and [known limitations](docs/known-limitations.md) says what the application cannot do. The maintainer defines each release scope before qualification.
 3. [Bookie Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (B3, B4, UX, Maintainer).
 4. The ADR that governs your change ([index](docs/decisions/README.md)). Every type or value change follows [ADR 0007](docs/decisions/0007-type-and-value-preservation.md).
 
-Accepted ADRs constrain architecture. The completion page records milestone status, the backlog owns subsequent sequencing and each issue owns its acceptance. Dated reviews and archives prove their recorded source only; they do not override current decisions.
+Accepted ADRs constrain architecture. The completion page records milestone status, Project #3 owns selected work order and each issue owns its acceptance. Dated reviews and archives prove their recorded source only; they do not override current decisions.
 
 ## Product context and specs
 

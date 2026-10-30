@@ -1,11 +1,11 @@
 # Documentation map
 
-Read this page before loading long plans or evidence. Rules for agents and contributors are in the repository [AGENTS.md](../AGENTS.md). The completion page records milestone status and the backlog sets subsequent work order; accepted ADRs set technical rules. A dated result proves only its recorded source, environment and consumer.
+Read this page before loading evidence. Rules for agents and contributors are in the repository [AGENTS.md](../AGENTS.md). The completion page records milestone status and Project #3 owns selected work; accepted ADRs set technical rules. A dated result proves only its recorded source, environment and consumer.
 
 ## Minimum context for a task
 
 1. [AGENTS.md](../AGENTS.md).
-2. [Completion and continuation](bookie-0.2-sprint.md), then the selected [post-0.2.0 backlog](backlog.md) issue.
+2. [Completion and continuation](bookie-0.2-sprint.md), then the selected issue in [Project #3](https://github.com/users/cozyGarage/projects/3).
 3. Your lane's issues on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) (filter by **Lane**). The [ledger index](known-issues.md) maps ledger IDs to issues.
 4. The governing [ADR](decisions/README.md); for every type or value change, [ADR 0007](decisions/0007-type-and-value-preservation.md).
 5. The affected checks in the [validation playbook](validation-playbook.md).
@@ -21,9 +21,9 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | Contributors writing code | [AGENTS.md](../AGENTS.md), [architecture](../ARCHITECTURE.md) (including [where new code goes](../ARCHITECTURE.md#where-new-code-goes) and the boundary checklist), [code conventions](code-conventions.md), [adding drivers](adding-drivers.md), [static driver capabilities](adding-drivers.md#static-driver-capabilities), [state management](state-management.md), [value contract rules](value-contract-rules.md), [connections](connections.md), [disconnection contracts](disconnection-contracts.md), [storage](storage.md), [error handling](error-handling.md) |
 | Releases | [Release process](release-process.md): tags, packages, release notes |
 | Contributors testing | [Validation playbook](validation-playbook.md) (including [CI tiers](validation-playbook.md#ci-tiers)), [testing](testing.md) ([GTK](testing-gtk.md), [CI](testing-ci.md), [quality and performance](testing-quality-and-performance.md)), [test design rules](test-design-rules.md), [performance and acceptance scenarios](performance-acceptance-scenarios.md), [test-oracle review](oracle-review.md), ignored-test inventory (`scripts/inventory-ignored-tests.py`, generated, not committed), [manual verification](manual-verification-0.2-features.md) |
-| Planning and status | [0.2.0 completion and continuation](bookie-0.2-sprint.md), [backlog](backlog.md), [known limitations](known-limitations.md), [Project #3](https://github.com/users/cozyGarage/projects/3), [ledger index](known-issues.md), [B3 board pointer](lane-boards.md#b3-types-and-values), [B4 board pointer](lane-boards.md#b4-transport-and-sessions), [value evidence index](value-contracts.md), [changelog](../CHANGELOG.md) |
+| Planning and status | [0.2.0 completion and continuation](bookie-0.2-sprint.md), [work selection](backlog.md), [known limitations](known-limitations.md), [Project #3](https://github.com/users/cozyGarage/projects/3), [ledger index](known-issues.md), [B3 board pointer](lane-boards.md#b3-types-and-values), [B4 board pointer](lane-boards.md#b4-transport-and-sessions), [value evidence index](value-contracts.md), [changelog](../CHANGELOG.md) |
 | Product context and specs | [PRODUCT.md](../PRODUCT.md), [user contexts](personas.md), [PRINCIPLES.md](../PRINCIPLES.md), [SECURITY.md](../SECURITY.md), [capability specs](../specs/README.md) (descriptive drafts until architect review; AGENTS and ADRs rank above them) |
-| Decisions | [ADRs](decisions/README.md), [decision checklist](decisions/checklist.md), [proposal index](proposals/README.md) |
+| Decisions | [ADRs](decisions/README.md), [proposal index](proposals/README.md) |
 | Proof and history | [evidence](evidence/), [archive](archive/), [adopted-code attribution](upstream-sync.md) |
 
 ## Where each fact belongs
@@ -33,11 +33,10 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | A rule for every change | [AGENTS.md](../AGENTS.md) | One copy; tool-specific files point to it |
 | Product constraints, users and outcomes | [PRODUCT.md](../PRODUCT.md), [personas](personas.md), [PRINCIPLES.md](../PRINCIPLES.md) | Keep aligned with shipped behaviour; product constraints are not implementation status |
 | Current capability behaviour extracted from code | [specs/](../specs/README.md) | Descriptive only; when a spec and the code disagree, fix the spec |
-| An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR; keep the [checklist](decisions/checklist.md) row in sync |
-| Which forks already have an answer | The [decision checklist](decisions/checklist.md) | Link, N/A, or open item; do not invent a decision to fill a cell |
+| An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR |
 | A design not yet decided | [proposal index](proposals/README.md) | Becomes an accepted decision or is removed from active proposals |
 | An open issue, its status and lane | [Project #3](https://github.com/users/cozyGarage/projects/3); ID map in the [ledger index](known-issues.md) | Status and Lane on the project; keep the index ID→issue→Lane table in sync; `scripts/check-known-issues.py` checks format offline, while `scripts/check-github-issue-status.py` reports live issue state |
-| Milestone completion and subsequent order | [Completion and scope](bookie-0.2-sprint.md), [backlog](backlog.md) | Record maintainer completion separately from publication; keep issue acceptance on Project #3 and dated proof in the archive |
+| Milestone completion and subsequent order | [Completion and scope](bookie-0.2-sprint.md), [Project #3](https://github.com/users/cozyGarage/projects/3) | Record maintainer completion separately from publication; keep issue acceptance on Project #3 and dated proof in the archive |
 | B3 remaining work | Project #3 Lane B3; [B3 board pointer](lane-boards.md#b3-types-and-values) | Issues on the project; pointer keeps accepted refusals and the case record |
 | B4 implementation and acceptance | Project #3 Lane B4; [B4 board pointer](lane-boards.md#b4-transport-and-sessions) | Issues on the project; acceptance checklists stay in the archived board |
 | Type and consumer proof lookup | The [value evidence index](value-contracts.md) | Link to the case; detailed logs belong in evidence or history |
@@ -65,7 +64,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 
 [archive/](archive/) holds dated reviews, audits, inventories and long histories. They are source-pinned evidence, not instructions; open items from them live on [Project #3](https://github.com/users/cozyGarage/projects/3). Use the archive starting points below to locate a record, then verify current behavior and status in active docs and issues.
 
-- [Historical 0.2 development record](archive/bookie-0.2-history.md) (brief archive link; see the active sprint for current status)
+- [Historical 0.2 development record](archive/bookie-0.2-history.md) (brief stable archive link; see the completion page for delivery status and Project #3 for open work)
 - [Archived evidence packets](archive/evidence/) (dated artifacts retained after reference triage)
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
@@ -74,7 +73,6 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 - [Workspace unit coverage at `d2166fd`, October 24](evidence/workspace-unit-coverage-d2166fd-2026-10-24/README.md) and [at `583c244`](evidence/workspace-unit-coverage-583c244-2026-10-24/README.md): recovered historical reports for two distinct source revisions.
 - [Workspace unit coverage, October 24](evidence/workspace-unit-coverage-9d61c7a-2026-10-24/README.md): 61.42% line coverage on Linux `9d61c7a` against the 59% floor, with the command and its scope.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
-- [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 
 ## Keep context bounded
 

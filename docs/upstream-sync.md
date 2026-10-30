@@ -1,6 +1,6 @@
 # Adopted-code attribution
 
-This file records source attribution for code adopted into BookiE. It does not define product behavior, architecture, or release scope; those are owned by the [ADRs](decisions/README.md), [backlog](backlog.md), and [BookiE source](../ARCHITECTURE.md).
+This file records source attribution for code adopted into BookiE. It does not define product behavior, architecture, or release scope; those are owned by the [ADRs](decisions/README.md), [Project #3](https://github.com/users/cozyGarage/projects/3), and [BookiE source](../ARCHITECTURE.md).
 
 ## Adopted source
 

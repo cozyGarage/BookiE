@@ -16,6 +16,6 @@
   "preview_matrix": "passed",
   "app_clippy": "passed",
   "gtk_isolated": 161,
-  "forgejo": "pending",
+  "remote_ci": "pending",
   "native_wayland": "not tested"
 }
