@@ -93,7 +93,7 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | [external-audit-2026-10-06.md](../../archive/external-audit-2026-10-06.md) | 430 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [external-audit-client-review-2026-10-06.md](../../archive/external-audit-client-review-2026-10-06.md) | 222 | 4 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [grid-memory-and-fetch-action-plan-2026-10-07.md](../../archive/grid-memory-and-fetch-action-plan-2026-10-07.md) | 157 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [known-issues-pre-project-migration-2026-10-12.md](../../archive/known-issues-pre-project-migration-2026-10-12.md) | 295 | 125 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| `known-issues-pre-project-migration-2026-10-12.md` | 295 | 125 | No explicit BookiE issue URL | Frozen internal issue/status ledger; migrated to private research archive after this inventory |
 | [linux-peer-review-2026-10-16.md](../../archive/linux-peer-review-2026-10-16.md) | 189 | 3 | 0 closed / 4 open | Source traced; historical runtime scope |
 | [linux-peer-review-2026-10-17.md](../../archive/linux-peer-review-2026-10-17.md) | 78 | 2 | 1 closed / 3 open | Source traced; historical runtime scope |
 | [mongodb-consistency-2026-10-03.md](../../archive/mongodb-consistency-2026-10-03.md) | 35 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
