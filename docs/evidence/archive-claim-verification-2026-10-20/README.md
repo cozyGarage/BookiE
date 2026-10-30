@@ -107,13 +107,13 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | [sprint-2026-09-14.md](../../archive/sprint-2026-09-14.md) | 110 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [sprint-review-2026-09-28.md](../../archive/sprint-review-2026-09-28.md) | 191 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [stabilization-2026-09.md](../../archive/stabilization-2026-09.md) | 87 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [tablepro-dbx-review-2026-10-20/README.md](../../archive/tablepro-dbx-review-2026-10-20/README.md) | 181 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/a-tablepro-linux-features.md](../../archive/tablepro-dbx-review-2026-10-20/a-tablepro-linux-features.md) | 251 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/b-tablepro-fixes.md](../../archive/tablepro-dbx-review-2026-10-20/b-tablepro-fixes.md) | 119 | 31 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/c-tablepro-macos-ux.md](../../archive/tablepro-dbx-review-2026-10-20/c-tablepro-macos-ux.md) | 369 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/d-dbx-features.md](../../archive/tablepro-dbx-review-2026-10-20/d-dbx-features.md) | 212 | 3 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/e-dbx-backend-fixes.md](../../archive/tablepro-dbx-review-2026-10-20/e-dbx-backend-fixes.md) | 175 | 110 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [tablepro-dbx-review-2026-10-20/f-dbx-ux-fixes.md](../../archive/tablepro-dbx-review-2026-10-20/f-dbx-ux-fixes.md) | 86 | 35 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/README.md | 181 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/a-tablepro-linux-features.md | 251 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/b-tablepro-fixes.md | 119 | 31 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/c-tablepro-macos-ux.md | 369 | 2 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/d-dbx-features.md | 212 | 3 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/e-dbx-backend-fixes.md | 175 | 110 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| tablepro-dbx-review-2026-10-20/f-dbx-ux-fixes.md | 86 | 35 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [tablepro-issue-review-2026-10-20.md](../../archive/tablepro-issue-review-2026-10-20.md) | 46 | 0 | 0 closed / 1 open | Historical record; no current runtime claim |
 | [testing-history.md](../../archive/testing-history.md) | 98 | 10 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [third-party-notice-inventory-2026-10-19.md](../../archive/third-party-notice-inventory-2026-10-19.md) | 21 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |

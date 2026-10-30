@@ -44,7 +44,7 @@ Continue existing dependency chains after those fixes: object write capabilities
 
 ## Upstream-client review defects
 
-The [October 20 TablePro and dbx review](archive/tablepro-dbx-review-2026-10-20/README.md) found these through upstream fixes. Each is source reading only: start with the failing regression test, and close the issue with that test as evidence if current code already passes. Two further findings went to existing issues: the ClickHouse `readonly=1` connect path is tracked in [#983](https://github.com/cozyGarage/BookiE/issues/983); the version mismatch was tracked in [#1146](https://github.com/cozyGarage/BookiE/issues/1146), which is closed. The review's unselected feature waves are listed in [feature candidates](0.2-feature-comparison.md).
+The following candidates require verification against current code: start with the failing regression test, and close the issue with that test as evidence if current code already passes. Two further findings went to existing issues: the ClickHouse `readonly=1` connect path is tracked in [#983](https://github.com/cozyGarage/BookiE/issues/983); the version mismatch was tracked in [#1146](https://github.com/cozyGarage/BookiE/issues/1146), which is closed. The review's unselected feature waves are listed in [feature candidates](0.2-feature-comparison.md).
 
 | ID / issue | Defect | Lane | Acceptance focus |
 |---|---|---|---|

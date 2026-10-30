@@ -1,6 +1,6 @@
 # Agent tooling review: TablePro and dbx, October 20
 
-Dated review of how TablePro and dbx set up coding agents, and what BookiE adopts. Pins: TablePro `main` `3222542a4`, dbx `main` `d1e88ab4b`, BookiE `linux` after the [TablePro and dbx deep review](tablepro-dbx-review-2026-10-20/README.md). Files were read, not run.
+Dated review of how TablePro and dbx set up coding agents, and what BookiE adopts. Pins: TablePro `main` `3222542a4`, dbx `main` `d1e88ab4b`, BookiE `linux` after the TablePro and dbx deep review. Files were read, not run.
 
 BookiE keeps its lanes as defined in [AGENTS.md](../../AGENTS.md#lanes-and-ownership). Nothing here changes lane ownership.
 
