@@ -37,7 +37,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/docs/bookie-0.2-sprint.md](../bookie-0.2-sprint.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/bug-consistency-2026-09.md](bug-consistency-2026-09.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/capability-evidence.md](capability-evidence-2026-09-07.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [linux/docs/ci-audit-2026-09-27.md](ci-audit-2026-09-27.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
+| [linux/docs/ci-audit-2026-09-27.md](https://github.com/cozyGarage/BookiE/blob/8d0d9550544afaea70b229c820f7e78e268a5ec5/docs/archive/ci-audit-2026-09-27.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
 | [linux/docs/code-conventions.md](../code-conventions.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/connections.md](../connections.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/decisions/0001-no-plugin-system.md](../decisions/0001-no-plugin-system.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |

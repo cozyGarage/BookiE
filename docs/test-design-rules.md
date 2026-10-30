@@ -1,10 +1,10 @@
 # Test design rules
 
-Rules that earlier audits paid for. Each one names the failure it prevents. The dated evidence stays in the [archive](archive/); the layers and gates are in the [validation playbook](validation-playbook.md) and [testing](testing.md).
+Rules that earlier audits paid for. Each one names the failure it prevents. The test layers and gates are in the [validation playbook](validation-playbook.md) and [testing](testing.md).
 
 ## Ownership and execution
 
-- **An ignored or isolated test has an owner.** Registering it in the inventory is not enough: a job must run it. When adding or auditing an `#[ignore]` test, name the script and CI job that executes it, and keep a workflow regression that fails if the runner is disconnected. Eight SSH and agent-auth tests once sat in no job while the suite was green ([CI audit, 2026-09-27](archive/ci-audit-2026-09-27.md)).
+- **An ignored or isolated test has an owner.** Registering it in the inventory is not enough: a job must run it. When adding or auditing an `#[ignore]` test, name the script and CI job that executes it, and keep a workflow regression that fails if the runner is disconnected.
 - **A green workflow proves only its own scope.** A packaging run that builds both profiles and runs no regression suite says nothing about behaviour. Say which suite ran when quoting a result.
 
 ## Runners and evidence parsers
