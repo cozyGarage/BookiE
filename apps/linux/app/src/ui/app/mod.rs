@@ -909,13 +909,7 @@ impl SimpleComponent for App {
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
             AppMsg::SidebarSearchChanged => self.sync_sidebar_expansion(),
-            AppMsg::RefreshSidebar => {
-                if let Some(origin) =
-                    crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database)
-                {
-                    self.on_schema_changed(origin, None, None, sender);
-                }
-            }
+            AppMsg::RefreshSidebar => self.refresh_sidebar(sender),
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
             AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),
             AppMsg::ShowSidebarSchema(schema) => self.show_sidebar_schema(&schema, &sender),

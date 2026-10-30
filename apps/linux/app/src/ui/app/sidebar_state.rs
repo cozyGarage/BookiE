@@ -55,6 +55,12 @@ pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std:
 }
 
 impl App {
+    pub(super) fn refresh_sidebar(&self, sender: relm4::ComponentSender<App>) {
+        if let Some(origin) = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database) {
+            self.on_schema_changed(origin, None, None, sender);
+        }
+    }
+
     pub(super) fn show_sidebar_for_new_connection(&self) {
         self.set_sidebar_connected(true);
         reveal_sidebar_unless_overlay(&self.split_view, &self.sidebar_reveal);
