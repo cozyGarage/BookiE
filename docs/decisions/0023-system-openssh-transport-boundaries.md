@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-24
-- **Origin**: Extracted from the 2026-09-25 system OpenSSH port recorded in the [upstream sync history](../archive/upstream-sync-history-2026-10-22.md). The code was checked against it on the extraction date. [ADR 0008](0008-connection-and-session-ownership.md) sets the trust rules (ask before accepting a host key, no silent backend switch); this record covers how the transport is built.
+- **Origin**: Extracted from the 2026-09-25 system OpenSSH port; the code was checked on the extraction date. [ADR 0008](0008-connection-and-session-ownership.md) sets the trust rules (ask before accepting a host key, no silent backend switch); this record covers how the transport is built.
 
 ## Context
 
