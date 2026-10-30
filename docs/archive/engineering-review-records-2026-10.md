@@ -70,12 +70,10 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 
 - [Export snapshot allocation probe, October 23](../evidence/export-snapshot-sharing-2026-10-23/allocation-probe/README.md): matched synthetic allocation measurements for the merged snapshot-sharing repair.
 - [Grid factory realization, October 23](evidence/grid-factory-realization-2026-10-23/README.md): initial layout, teardown, vertical bounds and scroll-rebinding counters.
-- [Editor scrolling resources, October 23](../evidence/editor-scroll-resources-2026-10-23/README.md): actual visible row traversal and process RSS, with exact artifact identity.
 - Historical October 22 probes: [large result scrolling](evidence/large-result-profile-2026-10-22/README.md) and [post-decode byte-budget overshoot](evidence/query-result-byte-budget-2026-10-22/README.md). These preserve older source observations; they do not supersede later repairs or measurements.
 
 - [Pull request maintenance, October 22](evidence/pr-maintenance-2026-10-22/README.md): historical source inventory, prepared refreshes and validation limits.
 
-- [Workspace restoration and cleanup privacy train, October 23](evidence/forgejo-train-1518-2026-10-23/README.md): exact-head Forgejo run 925, required GitHub checks and documentation-only post-merge source verification.
 
 - [Read-only label selection cost, October 23](../evidence/grid-label-selection-cost-2026-10-23/README.md): controlled allocation experiment and the interaction/accessibility constraints on a future optimization.
 
