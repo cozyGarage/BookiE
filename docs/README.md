@@ -89,7 +89,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [Editor buffer and input-context teardown, October 26](evidence/editor-buffer-release-2026-10-26/README.md): object retention with the default input method, heap allocation reports and editor shutdown regressions.
 - [Editor lifetime acceptance, October 26](evidence/editor-lifetime-acceptance-2026-10-26/README.md): experimental-fix keyboard, scale-2 and repeated Vim editor-close checks, with source and binary identity.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
-- [GitHub merge-order screening, October 25](evidence/merge-order-audit-2026-10-25/README.md): a dated 190-PR screen for merge-before-check completion, with exact observed candidate timestamps and limitations; it does not establish Forgejo outcomes.
 - [Capability evidence audit](archive/capability-evidence-2026-09-07.md) (historical September snapshot; current behavior is in [features](features.md) and [known limitations](known-limitations.md), with selected work in the backlog and Project #3)
 - [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 - [Release audit, October 3](archive/release-audit-2026-10-03.md)
