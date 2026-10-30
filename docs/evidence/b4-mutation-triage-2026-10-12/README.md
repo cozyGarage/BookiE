@@ -21,4 +21,4 @@ The two new regressions pass without mutations. The mutation runs are targeted p
 
 ## Remaining acceptance
 
-This evidence does not close frozen-candidate or installed Arch/Hyprland acceptance for AUD-2, B4-7, B4-16 or B4-22. It also does not replace the maintainer's Forgejo driver and PostgreSQL release layers, nightly, or power-loss testing. The six TEST-15 selectors and their independent state/request-count evidence are recorded separately in [the candidate manifest](../test15-bbdc39a/manifest.json).
+This evidence does not close frozen-candidate or installed Arch/Hyprland acceptance for AUD-2, B4-7, B4-16 or B4-22. It also does not replace the maintainer's remote CI driver and PostgreSQL release layers, nightly, or power-loss testing. The six TEST-15 selectors and their independent state/request-count evidence are recorded separately in [the candidate manifest](../test15-bbdc39a/manifest.json).

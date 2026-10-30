@@ -35,7 +35,7 @@ The release also includes an Arch debug package, `bookie.pot` and `SHA256SUMS`. 
 
 GitHub published `linux-v0.2.0` as a non-prerelease on 2026-10-23. The `linux-v0.2.0` tag and already-published assets retain the AppStream entry that shipped with that source (`development`, dated 2026-10-21). The current `linux` branch corrects that entry to `stable`, dated 2026-10-23. This source correction affects future builds from `linux`; it does not move the tag or replace published assets.
 
-The 0.2.0 release did not publish a Fedora package, AUR package, Flathub listing, 32-bit package or ARM package. The published AppImage's `AppRun` sources a GTK hook that defaults to `GDK_BACKEND=wayland,x11`; its exact-asset Wayland behavior remains unverified because the recorded desktop run used a different PR artifact ([manual verification](archive/manual-verification-runs-2026-10-21.md#appimage-run-on-2026-10-21)). Published artifacts prove availability, not installation or desktop acceptance on every distribution; see PKG-1 and PKG-2 below.
+The 0.2.0 release did not publish a Fedora package, AUR package, Flathub listing, 32-bit package or ARM package. The published AppImage's `AppRun` sources a GTK hook that defaults to `GDK_BACKEND=wayland,x11`; its exact-asset Wayland behavior remains unverified because the available desktop run used a different PR artifact with a modified launch hook. Published artifacts prove availability, not installation or desktop acceptance on every distribution; see PKG-1 and PKG-2 below.
 
 The release tag used the GNOME 50 native-library line (GTK 4.22, GLib 2.88, libadwaita 1.9 and GtkSourceView 5.18). [ADR 0021](decisions/0021-toolkit-floor.md) raised the current branch floor after publication. Do not treat the 0.2.0 package as a build of the current `linux` tree.
 
@@ -78,7 +78,7 @@ The 0.2.0 release includes a Flatpak bundle, but BookiE is not listed on Flathub
 
 The current manifests allow network and IPC, X11/Wayland display and graphics access, home-directory access, read-only host configuration, the Kerberos credential-cache socket, `org.freedesktop.secrets`, and the SSH-agent socket. Home-directory access versus portal-only access is the decision recorded under PKG-8. The `ssh-auth` socket supports the built-in client's agent authentication. The system OpenSSH option needs a host `ssh` executable and must refuse explicitly in the sandbox instead of falling back to the built-in client.
 
-A manual run on a Debian 13 guest on October 7–8, 2026 verified building, installing, launching, uninstalling and showing the default manifest's window ([archived PKG-4 record](archive/known-issues-pre-project-migration-2026-10-12.md#packaging-and-qualification)). This is historical packaging evidence, not release qualification for the current source. Flathub submission and screenshots are tracked under PKG-4.
+A manual run on a Debian 13 guest on October 7–8, 2026 verified building, installing, launching, uninstalling and showing the default manifest's window. This is historical packaging evidence, not release qualification for the current source. Flathub submission and screenshots are tracked under PKG-4.
 
 ## Accessibility
 

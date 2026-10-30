@@ -299,7 +299,7 @@ async fn fetch_page(
     offset: u64,
     limit: u64,
 ) -> Result<QueryResult, DriverError> {
-    let keys = scan_keys(conn, "*", (offset + limit) as usize).await?;
+    let keys = scan_keys(conn, "*", scan_target(offset, limit)?).await?;
     let skip = offset as usize;
     let page: Vec<Vec<u8>> = keys.into_iter().skip(skip).take(limit as usize).collect();
     let mut rows = Vec::with_capacity(page.len());
@@ -313,6 +313,19 @@ async fn fetch_page(
     })
 }
 
+fn extend_unique(keys: &mut Vec<Vec<u8>>, seen: &mut std::collections::HashSet<Vec<u8>>, batch: Vec<Vec<u8>>) {
+    keys.extend(batch.into_iter().filter(|key| seen.insert(key.clone())));
+}
+
+fn scan_target(offset: u64, limit: u64) -> Result<usize, DriverError> {
+    offset
+        .checked_add(limit)
+        .and_then(|end| usize::try_from(end).ok())
+        .ok_or_else(|| {
+            DriverError::Unsupported("the requested page lies beyond what Redis browsing can address".into())
+        })
+}
+
 async fn scan_keys(
     conn: &mut redis::aio::MultiplexedConnection,
     pattern: &str,
@@ -320,6 +333,7 @@ async fn scan_keys(
 ) -> Result<Vec<Vec<u8>>, DriverError> {
     let mut cursor: u64 = 0;
     let mut keys = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     loop {
         let (next, batch): (u64, Vec<Vec<u8>>) = redis::cmd("SCAN")
             .arg(cursor)
@@ -330,7 +344,7 @@ async fn scan_keys(
             .query_async(conn)
             .await
             .map_err(map_redis_error)?;
-        keys.extend(batch);
+        extend_unique(&mut keys, &mut seen, batch);
         cursor = next;
         if cursor == 0 || keys.len() >= limit {
             break;
@@ -340,16 +354,45 @@ async fn scan_keys(
     Ok(keys)
 }
 
+const PREVIEW_BYTES: isize = 4096;
+const PREVIEW_ITEMS: usize = 20;
+
+async fn string_preview(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Result<Value, DriverError> {
+    let (length, bytes): (u64, Vec<u8>) = redis::pipe()
+        .atomic()
+        .cmd("STRLEN")
+        .arg(key)
+        .cmd("GETRANGE")
+        .arg(key)
+        .arg(0)
+        .arg(PREVIEW_BYTES - 1)
+        .query_async(conn)
+        .await
+        .map_err(map_redis_error)?;
+    if length <= PREVIEW_BYTES as u64 {
+        return Ok(bytes_to_value(bytes));
+    }
+    let prefix = match String::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(error) => format!("{:?}", error.into_bytes()),
+    };
+    Ok(tablepro_core::partial_value(length, &prefix))
+}
+
 async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Result<Vec<Value>, DriverError> {
     let key_type: String = conn.key_type(key).await.map_err(map_redis_error)?;
     let ttl: i64 = conn.ttl(key).await.map_err(map_redis_error)?;
     let preview = match key_type.as_str() {
-        "string" => {
-            let v: Vec<u8> = conn.get(key).await.map_err(map_redis_error)?;
-            bytes_to_value(v)
-        }
+        "string" => string_preview(conn, key).await?,
         "hash" => {
-            let v: Vec<(String, String)> = conn.hgetall(key).await.map_err(map_redis_error)?;
+            let (_, v): (u64, Vec<(String, String)>) = redis::cmd("HSCAN")
+                .arg(key)
+                .arg(0)
+                .arg("COUNT")
+                .arg(PREVIEW_ITEMS)
+                .query_async(conn)
+                .await
+                .map_err(map_redis_error)?;
             Value::Text(format!("{v:?}"))
         }
         "list" => {
@@ -357,7 +400,14 @@ async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Re
             Value::Text(format!("{v:?}"))
         }
         "set" => {
-            let v: Vec<String> = conn.smembers(key).await.map_err(map_redis_error)?;
+            let (_, v): (u64, Vec<String>) = redis::cmd("SSCAN")
+                .arg(key)
+                .arg(0)
+                .arg("COUNT")
+                .arg(PREVIEW_ITEMS)
+                .query_async(conn)
+                .await
+                .map_err(map_redis_error)?;
             Value::Text(format!("{v:?}"))
         }
         "zset" => {

@@ -1,6 +1,6 @@
 # Adding a database driver
 
-Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md). The [0.2.0 completion page](bookie-0.2-sprint.md) records delivered engine scope; the [backlog](backlog.md) and owning boards set post-release sequencing and acceptance. Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common type/value and native proof standard. The [documentation entry point](README.md) identifies the owning boards and selective evidence lookup. Recheck the current traits and implementations before using this checklist; the workspace manifests are authoritative for dependency versions.
+Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md). The [0.2.0 completion page](bookie-0.2-sprint.md) records delivered engine scope; Project #3 and issue-owned acceptance define selected post-release work. Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common type/value and native proof standard. The [documentation entry point](README.md) identifies the owning boards and selective evidence lookup. Recheck the current traits and implementations before using this checklist; the workspace manifests are authoritative for dependency versions.
 
 ## Contracts and crate boundaries
 
@@ -50,8 +50,8 @@ Review engine/library proposals against [driver maturity](adding-drivers.md#orde
 6. Keep dial endpoints separate from TLS/Kerberos service identity. Test wrong CA/hostname, no plaintext fallback and tunneled verification per engine. Initialize the shared crypto provider in test composition roots that link multiple TLS drivers. Do not load saved secrets inside a driver.
 7. Add the workspace member and dependencies in both composition roots. Register in [app::build_registry](../apps/linux/app/src/lib.rs) and [agentd::build_registry](../crates/agentd/src/main.rs). Apply matching feature gates where native build cost requires them.
 8. Update maturity/connection documentation and the user-facing changelog. Register tests and runner ownership before claiming integration.
-9. Test each server flavour on a real server. MariaDB 10.2.7 and later reports a column default as the SQL that defines it and a missing default as the text `NULL`, so re-quoting it would have created a default of `'NULL'`; only a real MariaDB container caught it ([sprint history](archive/bookie-0.2-history.md)). Detect flavour from the server's reported version, not from the driver name.
-10. Do not let an engine-specific input parser bypass the shared edit rules. `parse_input_for_column` decides empty input (nullable becomes `Null`, required refuses) before any driver parser runs; a driver parser that runs first can turn an empty cell into a zero write (a MongoDB decimal once did, [B3 review](archive/b3-review-2026-10-01.md)). Test empty input for nullable, defaulted and required columns of every type the driver parses.
+9. Test each server flavour on a real server. MariaDB 10.2.7 and later reports a column default as the SQL that defines it and a missing default as the text `NULL`, so re-quoting it would create a default of `'NULL'`. Detect flavour from the server's reported version, not from the driver name.
+10. Do not let an engine-specific input parser bypass the shared edit rules. `parse_input_for_column` decides empty input (nullable becomes `Null`, required refuses) before any driver parser runs; otherwise an engine parser can turn empty input into a zero write. Test empty input for nullable, defaulted and required columns of every type the driver parses.
 
 ## Tests and evidence
 
@@ -141,7 +141,7 @@ When migrating another consumer, preserve the existing refusal and unsupported b
 
 ## Driver maturity
 
-Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`). The Connect dialog shows Experimental as a subtitle so users are not surprised by missing write or transaction paths. These are driver declarations, not release approval; see the [post-release backlog](backlog.md) and issue-owned acceptance criteria.
+Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`). The Connect dialog shows Experimental as a subtitle so users are not surprised by missing write or transaction paths. These are driver declarations, not release approval; see Project #3 and issue-owned acceptance criteria.
 
 | Driver | Maturity | Connect | Browse | Query | Writes | Params | `begin` / MCP preview | Notes |
 |---|---|---|---|---|---|---|---|---|

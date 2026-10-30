@@ -128,7 +128,11 @@ impl RowObject {
     }
 
     pub fn cell_is_loaded(&self, idx: usize) -> bool {
-        self.with_cell_value(idx, |_| ()).is_some()
+        self.with_cell_value(idx, |value| !is_partial(value)) == Some(true)
+    }
+
+    pub fn cell_is_partial(&self, idx: usize) -> bool {
+        self.with_cell_value(idx, is_partial) == Some(true)
     }
 
     pub(crate) fn with_cell_value<R>(&self, idx: usize, f: impl FnOnce(&Value) -> R) -> Option<R> {
@@ -202,14 +206,20 @@ impl RowObject {
     pub fn complete_cells(&self) -> Option<Vec<Value>> {
         let len = self.imp().cells.borrow().len();
         (0..len)
-            .map(|index| self.with_cell_value(index, Clone::clone))
+            .map(|index| {
+                self.with_cell_value(index, Clone::clone)
+                    .filter(|value| !is_partial(value))
+            })
             .collect()
     }
 
     pub fn loaded_cells(&self) -> Vec<Option<Value>> {
         let len = self.imp().cells.borrow().len();
         (0..len)
-            .map(|index| self.with_cell_value(index, Clone::clone))
+            .map(|index| {
+                self.with_cell_value(index, Clone::clone)
+                    .filter(|value| !is_partial(value))
+            })
             .collect()
     }
 
@@ -257,8 +267,19 @@ impl RowObject {
     }
 }
 
+fn is_partial(value: &Value) -> bool {
+    matches!(value, Value::Undecodable(type_name) if tablepro_app_services::browse_query::parse_partial(type_name).is_some())
+}
+
 fn preview_value(value: &Value) -> Option<CellPreview> {
     match value {
+        Value::Undecodable(type_name) => {
+            let (bytes, prefix) = tablepro_app_services::browse_query::parse_partial(type_name)?;
+            Some(CellPreview {
+                value: Value::Text(prefix.to_owned()),
+                byte_count: usize::try_from(bytes).ok()?,
+            })
+        }
         Value::Text(text) if text.len() > PREVIEW_BYTES => Some(CellPreview {
             value: Value::Text(text[..text.floor_char_boundary(PREVIEW_BYTES)].to_owned()),
             byte_count: text.len(),
