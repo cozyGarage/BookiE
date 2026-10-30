@@ -2219,8 +2219,8 @@ The composed parser-to-server test passed against the PostgreSQL 16 Docker fixtu
 
 ## PostgreSQL array checkpoint
 
-Scenario B3-1 follows the DBeaver array distinctions recorded in the migrated
-private scenario survey. The first real-server regression
+Scenario B3-1 checks that PostgreSQL array values preserve element text and
+distinguish quoted `NULL` from SQL NULL. The first real-server regression
 failed on an empty int4 array, which returned Undecodable. No external fixture
 or source code was copied.
 

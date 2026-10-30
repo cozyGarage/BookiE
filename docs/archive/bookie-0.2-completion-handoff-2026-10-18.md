@@ -167,4 +167,4 @@ Use the [agent task template](../validation-playbook.md#agent-task-template): on
 
 ## History lookup
 
-[Sprint history](bookie-0.2-history.md) preserves original scope, dated progress, commit tables, build-cache measurements and rollback details. Read a relevant section only. New current work updates this sprint/owning board; new case results update the value ledger, with links here instead of copied logs/counts.
+Current work updates the sprint and owning board; new case results update the value ledger, with links here instead of copied logs or counts.

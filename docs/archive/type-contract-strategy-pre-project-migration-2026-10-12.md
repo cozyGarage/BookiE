@@ -6,7 +6,7 @@ Detailed case narrative formerly on this page is in [type-contract history](../a
 
 ## Retest indicators
 
-Keep these open until re-proven on a current SHA. Full wording is in the archived narrative and the [archived sprint checkpoint](bookie-0.2-history.md#archived-from-active-sprint-on-2026-10-09-consolidation).
+Keep these open until re-proven on a current SHA. Full wording is in the archived narrative. This dated strategy snapshot does not set current work order.
 
 | Signal | Owner | Note |
 | --- | --- | --- |
