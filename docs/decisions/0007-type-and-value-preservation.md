@@ -61,4 +61,4 @@ Support is tracked by type and consumer, not a driver-wide green badge. Exact te
 
 ## Type-specific rules
 
-The per-type choices that follow from this record are in [value contract rules](../value-contract-rules.md). The B3 type model keeps the column collation only: a separate declared-type field waits for a consumer, and schema columns keep the declared spelling in `data_type` ([sprint history](../archive/bookie-0.2-history.md)). Revisit a separate declared-type field when a consumer needs both the declared spelling and a normalized classification.
+The per-type choices that follow from this record are in [value contract rules](../value-contract-rules.md). The B3 type model keeps the column collation only: a separate declared-type field waits for a consumer, and schema columns keep the declared spelling in `data_type`. Revisit a separate declared-type field when a consumer needs both the declared spelling and a normalized classification.
