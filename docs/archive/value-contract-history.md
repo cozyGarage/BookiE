@@ -270,8 +270,8 @@ suite but be excluded from this focused layer.
 
 ## CSV regression audit, 2026-09-29
 
-The [regression audit](regression-audit-2026-09-29.md) reproduced two missing
-consumer cases. Formula-safe negative decimal imports rounded values beyond
+Earlier regression testing reproduced two missing consumer cases. Formula-safe
+negative decimal imports rounded values beyond
 Decimal's exact scale, and binary CSV exports used a `\x` prefix the importer
 did not accept. The shared parsers now refuse excess decimal precision and
 accept that binary prefix. Ordinary hex and SQL-style prefixes remain supported.
