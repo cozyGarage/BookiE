@@ -160,7 +160,6 @@ impl McpBridge {
     pub async fn list_connections(&self, token: &McpToken) -> Result<Vec<SavedConnection>, String> {
         let control = self.operation_control();
         authorize_scopes(token.permissions, McpScope::ToolsRead)?;
-        self.check_rate(token)?;
         if token.connection_allowlist.is_empty() {
             return Ok(Vec::new());
         }
@@ -196,7 +195,6 @@ impl McpBridge {
     ) -> Result<OperationControl, String> {
         let control = self.operation_control();
         authorize_scopes(token.permissions, McpScope::ToolsRead)?;
-        self.check_rate(token)?;
         self.ensure_connection_allowed(token, connection_id)?;
         Ok(control)
     }
