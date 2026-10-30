@@ -58,7 +58,7 @@ New engines are later driver projects (Oracle and Cassandra are out of scope, [A
 
 Open B4 work lives on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) with **Lane = B4** (label `lane:b4`). The [post-release backlog](backlog.md) owns selected work order; Project #3 owns status and lane, and each issue owns acceptance. [ADR 0008](decisions/0008-connection-and-session-ownership.md) and [ADR 0016](decisions/0016-governed-consumer-seam.md) own the decisions.
 
-This page points to Project #3 and the ledger for current work. Earlier implementation and evidence history is in [archive/b4-history.md](archive/b4-history.md).
+This page points to Project #3 and the ledger for current work.
 
 ### Where to work on B4
 

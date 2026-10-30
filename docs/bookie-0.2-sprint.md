@@ -63,7 +63,7 @@ Release-note boundary: summarize user-visible behavior since 0.2.0, grouped by a
 | Cursor results and full exports | ADRs [0011](decisions/0011-paged-query-results.md), [0014](decisions/0014-full-table-export-snapshot.md) |
 | Shared governed consumer path and headless services | ADRs [0016](decisions/0016-governed-consumer-seam.md), [0018](decisions/0018-headless-app-services-crate.md) |
 
-The remaining accepted decisions are in the [ADR index](decisions/README.md). Upstream source reuse does not change these contracts implicitly.
+The remaining accepted decisions are in the [ADR index](decisions/README.md). Code reuse does not change these contracts implicitly.
 
 ## Working on the next packet
 
