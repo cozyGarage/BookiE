@@ -68,7 +68,7 @@ One typed handle covers every consumer. A new surface inherits classify, approva
 - **Copy a plugin or agent driver host for modularity.** Rejected in [ADR 0001](0001-no-plugin-system.md). Seams are crates and traits.
 - **A second statement classifier or editor permission engine** (for example an editor "Safe Mode" classifier in `core`). Rejected. Shared lexical facts may inform the existing classifier, but one authorization path stays authoritative.
 - **Treat a classification failure as a safe read.** Rejected. An unparseable statement keeps governed approval or refusal.
-- **Masking by extending a list of serialization-function names.** Rejected as the only defence. Unknown source lineage is handled conservatively (redacted), with allowed simple-column cases ([B4 wrap-up review](../archive/b4-release-wrapup-review-2026-10-11.md), AUD-9).
+- **Masking by extending a list of serialization-function names.** Rejected as the only defence. Unknown source lineage is redacted, while allowed simple-column cases retain the value.
 - **A read-only wrapper or a rollback around generated work as a policy substitute.** Rejected. It does not replace classification, approval, masking or the durable terminal audit.
 - **Scripting hooks (Bash, Python, Lua) on connection lifecycle.** Declined. They would add an execution surface outside the guard.
 - **A timed write unlock for production connections.** Not decided. The production marker is a display cue only. A timed unlock would change this safety contract, so it needs an amendment here first.
