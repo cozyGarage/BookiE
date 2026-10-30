@@ -14,10 +14,17 @@ Source: `linux` at `5a9cb8e92`. Read-only review of `app-services`, `policy`, `m
 | A bundle import could drop or swap a pinned certificate authority | [#2065](https://github.com/cozyGarage/BookiE/pull/2065) |
 | UPDATE and DELETE listed only their first table, so approvals, audit targets and the MyISAM preview check missed joined tables | [#2066](https://github.com/cozyGarage/BookiE/pull/2066) |
 | A write preview ran when the connection's engine could not be identified | [#2067](https://github.com/cozyGarage/BookiE/pull/2067) |
+| A named pipe at a TLS client certificate or key path blocked the connect | [#2070](https://github.com/cozyGarage/BookiE/pull/2070) |
+| The SSH forwarding loop stopped on a transient `accept` error while the tunnel reported healthy | [#2071](https://github.com/cozyGarage/BookiE/pull/2071) |
 
 Tests added without product changes: the agent denial matrix and script splitting ([#2068](https://github.com/cozyGarage/BookiE/pull/2068)); result spool, enum input, reconnect and editor limit edge cases ([#2069](https://github.com/cozyGarage/BookiE/pull/2069)).
 
 ## Findings revised after checking
+
+- `app-services/src/database_backup.rs:60`: the secret is read before the guard, but a test with a refused restore could not tell the order apart, because a missing keyring entry becomes an empty password and the SSH key file is read later. No change made.
+- `app-services/src/filter_settings.rs:53`: the stored raw filter is text the user typed into a field that is meant to take raw SQL, so a size cap is a product choice rather than a defect.
+- `storage/src/query_history.rs:475`: `delete_many` and `fetch_by_ids` handled 40,000 ids in a test; the bundled SQLite allows more bound variables than the reviewer assumed.
+- `policy/src/guard.rs:290`: the unbounded approval wait applies only to callers that pass no control object, which are interactive GUI approvals; a default timeout there is a product choice.
 
 - `mcp/src/bridge.rs:333`: the row cap is applied after the driver returns, but drivers already stop at `MAX_QUERY_ROWS` (1,000,000) and the result byte budget. Memory is bounded, only wasteful; lower priority.
 - `core/src/pagination.rs:81`: keyset paging runs on primary-key columns only, which cannot be NULL outside SQLite, so the other drivers' NULL ordering is not reachable today.
