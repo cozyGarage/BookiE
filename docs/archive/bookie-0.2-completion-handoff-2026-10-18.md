@@ -78,7 +78,7 @@ Historical run results remain in the archive. These environment-specific accepta
 | TEST-31 intermittent Forgejo GTK / distro-floor failures | UX / lab | The startup restore layout abort was fixed in [#821](https://github.com/cozyGarage/BookiE/pull/821). The issue remains open for intermittent failures and the required consecutive full-run evidence; inspect its latest updates before qualifying a candidate ([#556](https://github.com/cozyGarage/BookiE/issues/556)) |
 
 
-Feature gaps against other clients are in [the feature comparison](../0.2-feature-comparison.md); none is a 0.2 blocker unless the maintainer adds it.
+The dated peer feature comparison was moved to the private research archive; none of its candidates was a 0.2 blocker unless the maintainer added it.
 
 ## Technical decisions
 

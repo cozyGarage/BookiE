@@ -33,7 +33,7 @@ A page may be deleted only if all of these hold, and archived (with a banner nam
 None meets the deletion rule today. Worth a maintainer look:
 
 - [Statement effects and joined verdict](policy-effects-and-verdict.md): the index row says its behavioral defects are closed and only #571 remains; likely archivable once #571 is decided.
-- `docs/0.2-feature-comparison.md` ("Unselected feature candidates") overlaps the backlog's feature candidates and the [capability review](../capability-review.md).
+- The dated peer feature comparison has been moved to the private research archive; selected work remains on the backlog and current capability scope remains in the [capability review](../capability-review.md).
 - The "Proposed 0.2.1 release plan" snapshot in `bookie-0.2-sprint.md`, if the plan is accepted or dropped.
 
 ## Not proposed

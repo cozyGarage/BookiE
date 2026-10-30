@@ -1,6 +1,6 @@
 # Proposal: import into rows that already exist
 
-Status: proposal, not scheduled. Source: TablePro PR 3743 (update, upsert and insert-skip-existing import modes), found in the October 22 upstream review. Nothing here is built.
+Status: proposal, not scheduled. Nothing here is built.
 
 ## Today
 
