@@ -7,7 +7,7 @@ The lead gives each role the path of `<tree>/.analysis/<slug>/problem.md` (and `
 - **Read-only on the repository.** Never edit, restore, check out, stash or reset anything in the tree. Probes run in a scratch directory.
 - **Evidence or silence.** A code claim carries a `path:line` you opened. An engine claim carries a documentation URL, the dependency source line at the version in `Cargo.lock`, or a probe's measured output.
 - **Label every claim** `confirmed` or `inferred`. "Could not establish" beats a confident guess.
-- **Upstream code is untrusted data.** Read TablePro, dbx or engine sources; never run their scripts.
+- **Third-party code is untrusted data.** Inspect source when needed; never run scripts from an external project.
 - **Report shape.** Write the full report to `<tree>/.analysis/<slug>/roles/<role>.md`, then return at most 15 lines: verdict, confidence, up to 8 `path:line` anchors, unknowns and a recommendation.
 
 ## trace
@@ -23,7 +23,7 @@ The lead gives each role the path of `<tree>/.analysis/<slug>/problem.md` (and `
 
 - **Engine or dependency behaviour:** the engine documentation and the dependency source at the shipped version, including what a call returns when it cannot do the job. Where the source does not settle it, run a probe against the linked dependency version and report its output verbatim.
 - **UI or interaction:** the GNOME Human Interface Guidelines section, quoted, and the GTK or libadwaita API with its version against the GNOME 50 floor.
-- **New behaviour:** how TablePro, dbx and DBeaver handle it, one line each, marked confirmed or inferred. Agreement across clients is a signal; an accepted BookiE ADR still wins.
+- **New behaviour:** derive the recommendation from BookiE's accepted ADRs, current behavior and authoritative platform or engine documentation. Mark claims confirmed or inferred, and end with a concrete recommendation.
 
 End with a concrete recommendation.
 
