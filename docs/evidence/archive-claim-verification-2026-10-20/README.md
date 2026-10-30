@@ -68,7 +68,7 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | Archived document | Baseline lines | Current declaration matches | Explicit BookiE issue state | Disposition |
 | --- | ---: | ---: | --- | --- |
 | 2026-10-15-dbx-review.md | 194 | 0 | 5 closed / 3 open | Historical record; no current runtime claim |
-| [2026-10-15-postgresql-client-research/review.md](../../archive/2026-10-15-postgresql-client-research/review.md) | 154 | 1 | 8 closed / 4 open | Source traced; historical runtime scope |
+| `2026-10-15-postgresql-client-research/review.md` | 154 | 1 | 8 closed / 4 open | Historical client-comparison research; migrated to private research archive after this inventory |
 | `agent-tooling-review-2026-10-20.md` | 63 | 0 | No explicit BookiE issue URL | Historical record; migrated out of the public repository after this inventory; no current runtime claim |
 | [app-layer-external-audit-2026-10-06.md](../../archive/app-layer-external-audit-2026-10-06.md) | 263 | 1 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [architecture-consistency-2026-10-03-inventory.md](../../archive/architecture-consistency-2026-10-03-inventory.md) | 137 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
@@ -119,15 +119,15 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | [third-party-notice-inventory-2026-10-19.md](../../archive/third-party-notice-inventory-2026-10-19.md) | 21 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [type-contract-history.md](../../archive/type-contract-history.md) | 1768 | 45 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [type-contract-strategy-pre-project-migration-2026-10-12.md](../../archive/type-contract-strategy-pre-project-migration-2026-10-12.md) | 83 | 14 | No explicit BookiE issue URL | Source traced; historical runtime scope |
-| [ui-refresh-upstream-review-2026-10-14.md](../../archive/ui-refresh-upstream-review-2026-10-14.md) | 43 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [upstream-adoption.md](../../archive/upstream-adoption.md) | 73 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [upstream-linux-adoption-2026-10-18.md](../../archive/upstream-linux-adoption-2026-10-18.md) | 84 | 0 | 9 closed / 1 open | Historical record; no current runtime claim |
-| [upstream-linux-movement-2026-10-18.md](../../archive/upstream-linux-movement-2026-10-18.md) | 227 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
+| `ui-refresh-upstream-review-2026-10-14.md` | 43 | 0 | No explicit BookiE issue URL | Historical comparative UI review; migrated to private research archive after this inventory |
+| `upstream-adoption.md` | 73 | 0 | No explicit BookiE issue URL | Historical record; migrated to private research archive after this inventory; no current runtime claim |
+| `upstream-linux-adoption-2026-10-18.md` | 84 | 0 | 9 closed / 1 open | Historical source-comparison research; migrated to private research archive after this inventory |
+| `upstream-linux-movement-2026-10-18.md` | 227 | 0 | No explicit BookiE issue URL | Historical source and CI research; migrated to private research archive after this inventory |
 | `upstream-main-analysis-2026-10-20.md` | 125 | 2 | 0 closed / 1 open | Historical source review; migrated out of the public repository after this inventory |
-| [upstream-main-review-2026-10-03-inventory.md](../../archive/upstream-main-review-2026-10-03-inventory.md) | 275 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [upstream-main-review-2026-10-03.md](../../archive/upstream-main-review-2026-10-03.md) | 218 | 7 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| `upstream-main-review-2026-10-03-inventory.md` | 275 | 0 | No explicit BookiE issue URL | Historical record; migrated to private research archive after this inventory; no current runtime claim |
+| `upstream-main-review-2026-10-03.md` | 218 | 7 | No explicit BookiE issue URL | Historical source review; migrated to private research archive after this inventory |
 | [upstream-older-releases-2026-10-03-inventory.md](../../archive/upstream-older-releases-2026-10-03-inventory.md) | 146 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [upstream-older-releases-review-2026-10-03.md](../../archive/upstream-older-releases-review-2026-10-03.md) | 125 | 1 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| `upstream-older-releases-review-2026-10-03.md` | 125 | 1 | No explicit BookiE issue URL | Historical source review; migrated to private research archive after this inventory |
 | [upstream-u1-sql-server-2026-10-03.md](../../archive/upstream-u1-sql-server-2026-10-03.md) | 103 | 1 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | [validation-history.md](../../archive/validation-history.md) | 49 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [value-contract-history.md](../../archive/value-contract-history.md) | 6492 | 49 | No explicit BookiE issue URL | Source traced; historical runtime scope |

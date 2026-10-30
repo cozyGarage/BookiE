@@ -60,7 +60,7 @@ its F4/F9 open-state wording after PR #20 merged. Retain its recorded evidence s
 
 Reviewed `linux` at `4b7814f5e1f586c3761c1454e66d3394ad2c9609`. The isolated-worktree progress below is historical; do not reapply those patches as unmerged work. Main-branch history now includes F1/F3 (`7054a7867`, #13), daemon cache refusal (`d80bade4c` / `768188734`, #14/#17), shared transaction policy (`ad807c61b`, #18), awaited editor cleanup (`7b08dd478`, #16), and editor retirement (`4b7814f5e`, #19). The current retirement path refuses further session dispatch and requires reopening Session. This checkpoint traces source integration; it does not rerun the older branch reports or certify hosted/installed acceptance. F4/F9, F8 and wider B4 acceptance stay open.
 
-The [consistency review](architecture-consistency-review-2026-10-03.md) records remaining panic/headless-retirement risks. The [older-release review](upstream-older-releases-review-2026-10-03.md) adds transition and result-contract reproducers under existing owners, avoiding a second lifecycle engine.
+The [consistency review](architecture-consistency-review-2026-10-03.md) records remaining panic/headless-retirement risks. The older-release comparison was moved to the private research archive; its transition and result-contract cases remained under existing owners.
 
 ## October 2 review and dispatch plan
 
@@ -90,7 +90,7 @@ to `linux/` unless stated otherwise.
 | F8 | `policy/src/audit.rs::AuditState` contains a shared disabling flag; guard/session/bulk paths all set it. | Split connection uncertainty from journal-wide failure without relaxing fail-closed behavior. |
 | G3 | `agentd/src/lib.rs::connection_for` returns a cached connection on initial digest failure and retains the old digest on post-connect failure. | Cover both fallbacks and dispose of unverified new handles. |
 | C6/G5 | TLS engine fixtures, PostgreSQL SSH/release fixtures and unattended OpenSSH setup already exist. | Reuse fixtures; transport success alone cannot certify engine TLS or actual daemon wiring. |
-| I1/I3 | Debian rules build/install app and agentd only; the [upstream review history](upstream-sync-history-2026-10-22.md#2026-09-19-re-survey-after-upstream-rewrote-its-linux-branch) records both adopted OpenSSH evidence and the earlier no-askpass finding. | Fix Debian in the required later phase; preserve the dated finding and its later correction. |
+| I1/I3 | Debian rules build/install app and agentd only; the dated source review recorded both OpenSSH integration evidence and the earlier no-askpass finding. | Fix Debian in the required later phase; preserve the dated finding and its later correction. |
 
 Source entries abbreviate `crates/` for readability. These observations are
 not failing runtime reproductions. Every implementer must recheck the current
@@ -675,7 +675,7 @@ Files: driver `src/lib.rs` and tests for the engines named.
 |---|---|---|
 | I1 | `packaging/debian/rules` does not build/install `tablepro-askpass`, although `scripts/build-deb.sh` already does. Fix the rules recipe and validator check in the required GNOME/Debian phase after Arch. | packaging |
 | I2 | Flatpak OpenSSH behavior, and reconcile `connections.md` with the sprint doc. Decision 2. | unit, docs |
-| I3 | Resolved by the October 20 source review: the [upstream history](upstream-sync-history-2026-10-22.md#2026-09-19-re-survey-after-upstream-rewrote-its-linux-branch) now records the askpass bridge and OpenSSH 9 prompt support. The separate distinction between SSH transport/auth fixtures and per-driver TLS-through-SSH evidence remains relevant; the drivers layer invoking the SSH runner does not prove every driver uses a tunnel. | docs |
+| I3 | Resolved by the October 20 source review: the askpass bridge and OpenSSH 9 prompt support were recorded. SSH transport/auth fixtures remain distinct from per-driver TLS-through-SSH evidence; the drivers layer invoking the SSH runner does not prove every driver uses a tunnel. | docs |
 | I4 | Done in the September 28 documentation review: manual checks now cover Stop/timeout, failed COMMIT retry, close/Disconnect, retired sessions and connection-specific write blocking. Runtime boxes remain unchecked. | docs |
 | I5 | Audit record for tunnel setup and host-key refusal. Decision 6. | unit |
 
