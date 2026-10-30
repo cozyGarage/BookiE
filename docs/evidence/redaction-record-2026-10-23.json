@@ -51,18 +51,6 @@
       "redaction": "local home-directory path removed; pinned public links retained"
     },
     {
-      "path": "docs/evidence/local-resource-profiling-2026-10-23/file-allocation-report.txt",
-      "original_sha256": "f8fdc277e7b451c4b40ad1d66ecb10c511e10a125bd74543c8e2f729d08b6ebf",
-      "redacted_sha256": "0006c9e6990a9e27f2a3df50d8f8c6a6e1fbb3576586f9ff5627bfad8b3c8e4b",
-      "redaction": "local home-directory prefix replaced with $HOME"
-    },
-    {
-      "path": "docs/evidence/local-resource-profiling-2026-10-23/shutdown-regression.json",
-      "original_sha256": "5e06875f31185900bf1386b5ab64e3bbccac96aac209ee17f433aed941ea44ed",
-      "redacted_sha256": "06b66fe1b72b4595f5e11c70e09586bfdcb253b36d045809212de40d38cda3c2",
-      "redaction": "local home-directory prefix replaced with $HOME"
-    },
-    {
       "path": "docs/evidence/postgres-optimized-stream-2026-10-23/initial-failure.log",
       "original_sha256": "b4fb8ecb8887075ce3bc3a915fbf5c0480fc5da54501f639da9a36a7a7745599",
       "redacted_sha256": "7eaef4b1792422468a59e8ac4d3bf705f56fbb21f536b93b0e1fd0454bca3b8d",
@@ -124,8 +112,6 @@
     }
   ],
   "unredacted_linux_artifacts_present_in_pr_1532_head": [
-    "docs/evidence/local-resource-profiling-2026-10-23/file-allocation-report.txt",
-    "docs/evidence/local-resource-profiling-2026-10-23/shutdown-regression.json",
     "docs/evidence/stream-page-realization-2026-10-23/completion-acceptance.json",
     "docs/evidence/stream-page-realization-2026-10-23/heap-five-allocations.txt",
     "docs/evidence/stream-page-realization-2026-10-23/heap-five-outstanding.txt"
