@@ -20,7 +20,7 @@ good/1: /usr/bin/python3 -c print('done')
 Ran 112 tests in 3.147s
 
 OK
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /tmp/bookie-candidate-test-3x3_ly0l/bookie-0.1.1-1-x86_64.pkg.tar.zst
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /tmp/worktree-candidate-test-3x3_ly0l/bookie-0.1.1-1-x86_64.pkg.tar.zst
 candidate archive and rejection checks passed
 Debian package validation skipped: dpkg-deb is unavailable
 function-size checker: OK
