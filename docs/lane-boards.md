@@ -6,7 +6,7 @@ Both boards are pointers. [Bookie Project #3](https://github.com/users/cozyGarag
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md). Open B3 work lives on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3) with **Lane = B3** (label `lane:b3`); Project #3 owns selected work order, status and lane, and each issue owns acceptance. Case proof lookup is [value-contracts.md](value-contracts.md).
 
-This page keeps the accepted-refusal list and the bounded case record. Task status and acceptance are on Project #3 and its issues. Earlier implementation narrative is in [archive/type-contract-history.md](archive/type-contract-history.md).
+This page keeps the accepted-refusal list and the bounded case record. Task status and acceptance are on Project #3 and its issues.
 
 ### Where to work on B3
 
