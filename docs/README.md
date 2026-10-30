@@ -65,13 +65,9 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 
 ## Archive starting points
 
-[Workspace recovery, October 26](evidence/workspace-recovery-2026-10-26/README.md) records branch preservation, recovered work, validation and remaining acceptance boundaries.
-
 [archive/](archive/) holds dated reviews, audits, inventories and long histories. They are source-pinned evidence, not instructions; open items from them live on [Project #3](https://github.com/users/cozyGarage/projects/3). Use the archive starting points below to locate a record, then verify current behavior and status in active docs and issues.
 
-[Archive claim verification, October 20](evidence/archive-claim-verification-2026-10-20/README.md) records an inventory baseline for archived Markdown at that review, with an October 21 supplement. It traces explicit BookiE issue links and source symbols and lists the focused current-source tests rerun then; later archive additions are outside its inventory. Research completion, issue closure and runtime acceptance are separate claims.
-
-- [Sprint history](archive/bookie-0.2-history.md) (includes 2026-10-08/09 continuation snapshots)
+- [Historical 0.2 development record](archive/bookie-0.2-history.md) (brief archive link; see the active sprint for current status)
 - [0.1.x implementation history](archive/changelog-history-0.1.x-2026-10-23.md) (archived from the changelog to keep it focused on release notes)
 - [B4 history](archive/b4-history.md) (includes superseded tip checkpoints, [completed local slices](archive/b4-history.md#archived-completed-local-slices-2026-10-10-consolidation) and [remaining-task prose](archive/b4-history.md#archived-remaining-task-prose-2026-10-10-pass-4))
 - [Evidence directory index](archive/evidence-index-2026-10-10.md) (October 10 historical snapshot)
@@ -79,7 +75,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
 - [Non-UI code audit, October 29](archive/non-ui-code-audit-2026-10-29.md): read-only review of every crate below `apps/linux` at `e207862cc`, with verified findings, standing baseline debt and what was not reviewed.
 - [Backend code review, October 30](archive/backend-code-review-2026-10-30.md): second review of the crates from `app-services` down, with the fixes opened as pull requests and the open findings by priority.
-- [Current code correctness audit, October 27](archive/current-code-correctness-audit-2026-10-27.md): four failing diagnostic probes, configured-policy and evidence-discovery risks, corrected current claims and Project reconciliation.
 - [Installed native Wayland run, October 23](evidence/installed-wayland-0.2.0-2026-10-23/README.md): oracle-checked end-to-end flows on Hyprland and the defects filed from them.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
 - [Installed Arch profile, October 24](evidence/installed-arch-profile-2026-10-24/README.md): package integrity, automated test results, native PostgreSQL UI checks and resource samples.
@@ -94,7 +89,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [Editor buffer and input-context teardown, October 26](evidence/editor-buffer-release-2026-10-26/README.md): object retention with the default input method, heap allocation reports and editor shutdown regressions.
 - [Editor lifetime acceptance, October 26](evidence/editor-lifetime-acceptance-2026-10-26/README.md): experimental-fix keyboard, scale-2 and repeated Vim editor-close checks, with source and binary identity.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
-- [GitHub merge-order screening, October 25](evidence/merge-order-audit-2026-10-25/README.md): a dated 190-PR screen for merge-before-check completion, with exact observed candidate timestamps and limitations; it does not establish Forgejo outcomes.
 - [Capability evidence audit](archive/capability-evidence-2026-09-07.md) (historical September snapshot; current behavior is in [features](features.md) and [known limitations](known-limitations.md), with selected work in the backlog and Project #3)
 - [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 - [Release audit, October 3](archive/release-audit-2026-10-03.md)
@@ -102,7 +96,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [Offline release input audit, October 19](archive/offline-release-input-audit-2026-10-19.md) (current Arch candidate evidence and remaining offline inputs)
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
 - [Changelog fragment evaluation, October 19](archive/changelog-fragment-evaluation-2026-10-19.md) (kept the current workflow because commit volume did not establish conflict cost)
-- [Development feedback-loop proposal, October 23](archive/devops-feedback-loop-2026-10-23.md) (dated proposal snapshot; active work and priority live in the backlog and Project #3)
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md) and its [inventory companion](archive/architecture-consistency-2026-10-03-inventory.md)
 - [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
