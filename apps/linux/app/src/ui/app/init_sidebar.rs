@@ -71,6 +71,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
             SidebarRowOutput::DropTable { schema, name } => AppMsg::DropTablePrompt { schema, table: name },
             SidebarRowOutput::NewTable { schema } => AppMsg::NewTableTab { schema },
             SidebarRowOutput::TableFromCsv { schema } => AppMsg::CreateTableFromCsv { schema },
+            SidebarRowOutput::ShowDiagram { schema } => AppMsg::ShowErDiagram { schema },
             SidebarRowOutput::HideSchema(schema) => AppMsg::HideSidebarSchema(schema),
         });
 
@@ -96,6 +97,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
                     open_mode: OpenMode::SwitchOrAppend,
                 });
             }
+            NodeKind::Catalog(kind) => activate_sender.input(AppMsg::ShowCatalogKind(*kind)),
             NodeKind::Schema | NodeKind::Group(_) => {
                 activate_sender.input(AppMsg::ToggleSidebarGroup(node.key.clone()));
             }
@@ -138,7 +140,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
         .icon_name("view-list-symbolic")
         .title(crate::tr!("No tables"))
         .description(crate::tr!(
-            "Nothing matches the current search, or this connection has no tables yet."
+            "Nothing matches the current search, or this connection has no tables yet. Use Refresh tables to check again."
         ))
         .build();
     sidebar_placeholder.add_css_class("compact");

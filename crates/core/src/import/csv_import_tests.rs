@@ -304,6 +304,22 @@ fn a_mapping_matches_on_name_whatever_the_case_or_spacing() {
 }
 
 #[test]
+fn exact_header_names_take_precedence_over_case_insensitive_matches() {
+    let headers = vec!["name".to_owned(), "Name".to_owned()];
+    let columns = vec![column("Name", "text"), column("name", "text")];
+
+    assert_eq!(suggest_mapping(&headers, &columns), vec![Some(1), Some(0)]);
+}
+
+#[test]
+fn a_case_insensitive_match_does_not_consume_an_exact_match_header() {
+    let headers = vec!["Name".to_owned()];
+    let columns = vec![column("name", "text"), column("Name", "text")];
+
+    assert_eq!(suggest_mapping(&headers, &columns), vec![None, Some(0)]);
+}
+
+#[test]
 fn quote_character_can_be_single_or_absent() {
     let single = CsvImportOptions {
         quote: CsvImportQuote::Single,

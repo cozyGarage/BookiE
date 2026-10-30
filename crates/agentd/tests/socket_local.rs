@@ -39,6 +39,7 @@ async fn saved_socket_is_available_through_the_agent_provider() {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     };
     save_connections(std::slice::from_ref(&saved))
         .await

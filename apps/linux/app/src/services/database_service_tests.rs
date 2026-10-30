@@ -3,6 +3,8 @@ use tablepro_core::DatabaseDriver;
 
 #[path = "database_service/tests/identity_tests.rs"]
 mod identity_tests;
+#[path = "database_service/tests/policy_failure_tests.rs"]
+mod policy_failure_tests;
 
 #[test]
 fn policy_file_is_read_from_the_build_profile_config_directory() {
@@ -17,6 +19,14 @@ fn a_missing_policy_file_uses_defaults_and_an_invalid_one_is_an_error() {
     let path = dir.path().join("policy.toml");
     assert!(load_policy_file(&path).is_ok());
     std::fs::write(&path, "[environments.nowhere]\n").unwrap();
+    assert!(load_policy_file(&path).is_err());
+}
+
+#[test]
+fn a_dangling_policy_link_is_an_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("policy.toml");
+    std::os::unix::fs::symlink(dir.path().join("missing.toml"), &path).unwrap();
     assert!(load_policy_file(&path).is_err());
 }
 
@@ -283,7 +293,8 @@ async fn candidate_catalog_reads_use_the_durable_policy_audit_journal() {
     };
     let guard = service
         .candidate_guard_factory()
-        .guard(connection, &metadata, Principal::human_gui());
+        .guard(connection, &metadata, Principal::human_gui())
+        .unwrap();
 
     guard.list_tables().await.expect("guarded table listing");
     guard.list_views().await.expect("guarded view listing");
@@ -409,7 +420,8 @@ async fn candidate_metadata_read_refuses_when_its_audit_intent_cannot_be_written
     };
     let guard = service
         .candidate_guard_factory()
-        .guard(connection, &metadata, Principal::human_gui());
+        .guard(connection, &metadata, Principal::human_gui())
+        .unwrap();
 
     let result = guard.list_tables().await;
     assert!(matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))));
