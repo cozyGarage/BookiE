@@ -47,7 +47,6 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - The October 15 PostgreSQL client comparison and probe packet was moved to the private research archive. Current BookiE contracts are summarized in the [capability review](../capability-review.md).
 
 
-- [CI build speed proposal](../proposals/ci-build-speed.md): where Forgejo gate time goes, a `ci` build profile for GUI scenario jobs and sharded distro-floor scenarios, ordered after the ADR 0021 runner upgrade.
 
 - Zed editor and panel review, October 22: completed research, existing PR dependencies and issue-owned results/error/message panel follow-ups.
 - GPUI client review, October 22: completed source research including dbdelve; open adoption proposals remain on their issues.
@@ -72,7 +71,6 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [Completion popup initialization, October 22](../evidence/completion-popup-initialization-2026-10-22/README.md): reproduced missing GtkSourceView initialization, independent probe and startup regression.
 - [Owned GTK process checks, October 22](../evidence/owned-gtk-process-2026-10-22/README.md): fixture PID/lifetime ownership for memory sampling and second launch, with two-process regressions and targeted GTK acceptance.
 
-- [Evidence branch migration proposal](../proposals/evidence-branch.md): gradual artifact relocation, immutable source identity and a separately tested CI publisher.
 
 - [Toolkit startup ordering, October 23](../evidence/toolkit-startup-2026-10-23/README.md): fresh-process regression for GTK initialization before library version checks.
 

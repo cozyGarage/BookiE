@@ -11,7 +11,7 @@ Headless driver, TLS, PostgreSQL release and dump, and socket/SSH jobs start aft
 
 Forgejo CI and nightly runs use a run-scoped concurrency key with cancellation disabled. Separate runs can overlap, and each job is eligible to take any matching free runner; queue order is best effort.
 
-Every job in the Forgejo merge workflow has an explicit timeout. Checkout credentials are supplied to Git as a host-scoped HTTP authorization header for the clone step; they are not embedded in the clone URL or saved in the checkout's `origin` URL. This reduces accidental exposure through process arguments and `.git/config`, but it does not isolate workflow code. `any-host` runners execute branch code on shared hosts with Docker access, so only trusted branch writers may trigger these workflows until a dedicated isolated runner is deployed and accepted. See the [runner maintenance and isolation proposal](proposals/runner-maintenance-and-isolation.md) for the pending deployment work.
+Every job in the Forgejo merge workflow has an explicit timeout. Checkout credentials are supplied to Git as a host-scoped HTTP authorization header for the clone step; they are not embedded in the clone URL or saved in the checkout's `origin` URL. This reduces accidental exposure through process arguments and `.git/config`, but it does not isolate workflow code. `any-host` runners execute branch code on shared hosts with Docker access, so only trusted branch writers may trigger these workflows until a dedicated isolated runner is deployed and accepted. Dedicated-runner deployment and acceptance are tracked outside this public repository.
 
 ### Shared native GTK artifact
 
