@@ -3831,9 +3831,7 @@ ambiguous-time refusal. ClickHouse's local text and either valid fold epoch are
 checked independently; result decoding, SQL literal and parameter consumers
 refuse the ambiguous value. The focused unit and Docker contracts passed, then
 the strict GTK+DuckDB values layer passed all 190 tests across 11 suites and the
-local quick gate passed. The run reused all 747 Cargo artifacts. See the
-[review manifest](../evidence/b3-review-2026-10-01/manifest.json) for reports and
-hosted CI status.
+local quick gate passed. The run reused all 747 Cargo artifacts.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --lib temporal::tests::named_datetime_zones_decode_instants_and_refuse_dst_ambiguity -- --exact --test-threads=1
