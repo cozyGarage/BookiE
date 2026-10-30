@@ -4,6 +4,19 @@ These documents record the reasons behind major technical choices. Accepted deci
 
 Which forks already have an answer (and which are still open) is listed in the [decision checklist](checklist.md). Prefer a link there over inventing a second record for the same choice. Closures and decisions that were later corrected are recorded in [decision lessons](lessons.md).
 
+## Lifecycle
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Proposed: Author new decision
+    Proposed --> Accepted: Maintainer review & approval
+    Accepted --> Superseded: Replaced by subsequent ADR (e.g. 0002 -> 0021)
+    Accepted --> Deprecated: Capability or architectural path retired
+    Superseded --> [*]
+    Deprecated --> [*]
+```
+
 ## Format
 
 ```markdown
@@ -62,6 +75,7 @@ Other options and why they were rejected.
 | [0023](0023-system-openssh-transport-boundaries.md) | System OpenSSH transport boundaries | Accepted | Askpass answers only exact prompts, forced client options, no global state, and no `core` dependency in the ssh crate. |
 | [0024](0024-keyed-grid-writes-check-what-they-overwrite.md) | Keyed grid writes check what they overwrite | Accepted | Relational updates compare edited columns' original values and must affect exactly one row; MongoDB guards by field and row; deletes and ABA are limits. |
 | [0025](0025-transient-result-page-spool.md) | Keep fetched result pages in a transient spool | Accepted | A private, bounded, encrypted spool makes every fetched PostgreSQL page revisitable without retaining all rows in RAM or rerunning SQL. |
+| [0026](0026-audit-journal-segments.md) | Rotate the audit journal into verified segments | Proposed | A size-rotated, hash-chained set of segments bounds start-up and verification cost without dropping audit records. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

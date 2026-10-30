@@ -1,6 +1,8 @@
 use super::*;
 
-use tablepro_core::{CatalogObject, CatalogObjectKind, ColumnInfo, ForeignKeyInfo, IndexInfo, TableInfo};
+use tablepro_core::{
+    CatalogObject, CatalogObjectKind, ColumnInfo, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, TableInfo,
+};
 
 struct FakeTx {
     calls: Arc<AtomicUsize>,
@@ -81,6 +83,13 @@ impl Connection for CatalogConn {
         self.answer(Vec::new())
     }
     async fn fetch_foreign_keys(&self, _: Option<&str>, _: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
+        self.answer(Vec::new())
+    }
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        _: Option<&str>,
+        _: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
         self.answer(Vec::new())
     }
     async fn fetch_enum_labels(&self, _: &str, _: &str) -> Result<Vec<String>, DriverError> {
@@ -184,6 +193,8 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
             .fetch_indexes_controlled(schema, "t", c)),
         read!(guard.fetch_foreign_keys(schema, "t"), |c| guard
             .fetch_foreign_keys_controlled(schema, "t", c)),
+        read!(guard.fetch_inbound_foreign_keys(schema, "t"), |c| guard
+            .fetch_inbound_foreign_keys_controlled(schema, "t", c)),
         read!(guard.fetch_enum_labels("public", "mood"), |c| guard
             .fetch_enum_labels_controlled("public", "mood", c)),
         guard.server_version().await.map(|_| ()),

@@ -112,6 +112,104 @@ async fn a_single_precision_float_cell_can_be_edited_after_it_was_read() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mariadb_empty_text_edits_survive_the_empty_string_is_null_mode() {
+    let (_container, options) = super::start_mariadb().await;
+    let setup = connect(options.clone()).await;
+    setup
+        .execute("CREATE TABLE notes (id INT PRIMARY KEY, note VARCHAR(20) NOT NULL, tag VARCHAR(20))")
+        .await
+        .unwrap();
+    setup
+        .execute("INSERT INTO notes VALUES (1, 'kept', 'x'), (2, 'kept', '')")
+        .await
+        .unwrap();
+    setup
+        .execute("SET GLOBAL sql_mode = 'EMPTY_STRING_IS_NULL'")
+        .await
+        .unwrap();
+    setup.close().await.unwrap();
+    let connection = connect(options).await;
+    let columns = [
+        column("id", "int", true),
+        column("note", "varchar(20)", false),
+        column("tag", "varchar(20)", false),
+    ];
+    let edit = |id: i64, column_index: usize, old: Value, new: &str| {
+        build_optimistic_keyed_update(
+            "mysql",
+            None,
+            "notes",
+            &columns,
+            &[(column_index, old, Value::Text(new.into()))],
+            &[Value::Int(id)],
+        )
+        .unwrap()
+    };
+
+    let to_empty = connection
+        .execute_in_transaction_checked(&[edit(1, 2, Value::Text("x".into()), "")], &[0])
+        .await
+        .expect("an edit to empty text is stored as empty text");
+    let from_empty = connection
+        .execute_in_transaction_checked(&[edit(2, 2, Value::Text(String::new()), "filled")], &[0])
+        .await
+        .expect("an edit of an empty cell finds the row");
+
+    assert_eq!((to_empty, from_empty), (vec![1], vec![1]));
+    let stored = connection
+        .query("SELECT id, tag IS NULL, HEX(tag) FROM notes ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.rows,
+        vec![
+            vec![Value::Int(1), Value::Int(0), Value::Text(String::new())],
+            vec![Value::Int(2), Value::Int(0), Value::Text("66696C6C6564".into())],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_empty_original_does_not_overwrite_a_concurrent_space() {
+    let (_container, options) = super::start_mariadb().await;
+    let setup = connect(options.clone()).await;
+    setup
+        .execute("SET GLOBAL sql_mode = 'EMPTY_STRING_IS_NULL'")
+        .await
+        .unwrap();
+    setup.close().await.unwrap();
+    let connection = connect(options).await;
+    connection
+        .execute("CREATE TABLE notes (id INT PRIMARY KEY, tag VARCHAR(20))")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO notes VALUES (1, SPACE(1))")
+        .await
+        .unwrap();
+    let columns = [column("id", "int", true), column("tag", "varchar(20)", false)];
+    let statement = build_optimistic_keyed_update(
+        "mysql",
+        None,
+        "notes",
+        &columns,
+        &[(1, Value::Text(String::new()), Value::Text("replacement".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    let result = connection.execute_in_transaction_checked(&[statement], &[0]).await;
+    assert!(
+        matches!(result, Err(DriverError::Transaction { source, .. }) if matches!(source.as_ref(), DriverError::ConcurrentModification))
+    );
+    assert_eq!(
+        connection.query("SELECT HEX(tag) FROM notes").await.unwrap().rows,
+        vec![vec![Value::Text("20".into())]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn filtering_a_float_column_by_its_own_value_finds_the_row() {
     use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
 
