@@ -675,3 +675,43 @@ fn a_key_that_scan_returns_twice_is_kept_once_in_first_seen_order() {
 
     assert_eq!(keys, vec![b"a".to_vec(), b"b".to_vec(), b"c".to_vec()]);
 }
+
+#[test]
+fn a_page_end_beyond_the_address_space_is_refused_instead_of_wrapping() {
+    assert_eq!(scan_target(10, 5).unwrap(), 15);
+    assert!(scan_target(u64::MAX - 1, 10).is_err());
+    assert!(scan_target(u64::MAX, u64::MAX).is_err());
+}
+
+#[test]
+fn a_host_that_would_change_the_url_is_refused() {
+    for host in [
+        "cache#insecure",
+        "user@cache",
+        "cache/1",
+        "cache?x=1",
+        "cache name",
+        "a,b",
+        "",
+    ] {
+        let opts = ConnectOptions {
+            host: host.into(),
+            ..Default::default()
+        };
+        assert!(connection_url(&opts).is_err(), "host must be refused: {host:?}");
+    }
+}
+
+#[test]
+fn ordinary_hosts_build_the_expected_url() {
+    let mut opts = ConnectOptions {
+        host: "cache.internal".into(),
+        port: 6380,
+        ..Default::default()
+    };
+    assert_eq!(connection_url(&opts).unwrap(), "redis://cache.internal:6380/0");
+    opts.host = "::1".into();
+    assert_eq!(connection_url(&opts).unwrap(), "redis://[::1]:6380/0");
+    opts.host = "[::1]".into();
+    assert_eq!(connection_url(&opts).unwrap(), "redis://[::1]:6380/0");
+}

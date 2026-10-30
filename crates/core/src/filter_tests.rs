@@ -460,6 +460,31 @@ fn ilike_keeps_postgres_native_keyword() {
 }
 
 #[test]
+fn ilike_uses_the_native_keyword_on_engines_that_have_it() {
+    let cols = vec![col("name", "text")];
+    let set = FilterSet {
+        combinator: Combinator::And,
+        rules: vec![rule(
+            "name",
+            FilterOp::Ilike,
+            Some(FilterValue::Single("%alice%".into())),
+        )],
+        extra_sql: None,
+    };
+    for driver in ["postgres", "duckdb", "clickhouse"] {
+        let (sql, _) = build_filter_where(driver, &cols, &set).unwrap().unwrap();
+        assert!(
+            sql.contains(" ILIKE "),
+            "{driver} has a native case-insensitive LIKE: {sql}"
+        );
+    }
+    for driver in ["mysql", "sqlite", "mssql"] {
+        let (sql, _) = build_filter_where(driver, &cols, &set).unwrap().unwrap();
+        assert!(!sql.contains("ILIKE"), "{driver} has no ILIKE: {sql}");
+    }
+}
+
+#[test]
 fn ilike_falls_back_to_like_on_mysql() {
     let cols = vec![col("name", "text")];
     let set = FilterSet {
