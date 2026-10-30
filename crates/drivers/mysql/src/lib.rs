@@ -12,6 +12,7 @@ use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statem
 use futures::stream::StreamExt;
 
 mod attributes;
+mod catalog;
 mod decode;
 mod spatial;
 use decode::extract_value;
@@ -160,22 +161,11 @@ impl Connection for MysqlConnection {
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        let rows = sqlx::query(
-            "SELECT CAST(table_schema AS CHAR), CAST(table_name AS CHAR)
-             FROM information_schema.tables
-             WHERE table_schema = DATABASE()
-             ORDER BY table_name",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| TableInfo {
-                schema: Some(r.get::<String, _>(0)),
-                name: r.get::<String, _>(1),
-            })
-            .collect())
+        catalog::list_relations(&self.pool, None).await
+    }
+
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        catalog::list_relations(&self.pool, Some("VIEW")).await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {

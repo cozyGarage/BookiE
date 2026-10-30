@@ -416,3 +416,22 @@ fn a_timed_out_stream_keeps_its_last_data_page_and_shows_a_notice() {
         .unwrap();
     assert!(!next.is_sensitive());
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn live_progress_lookup_does_not_walk_result_pages() {
+    relm4::adw::init().unwrap();
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let progress = gtk::Label::new(None);
+    progress.set_widget_name(LIVE_PROGRESS);
+    let pages = gtk::Stack::new();
+    pages.set_widget_name(LIVE_PAGES);
+    for _ in 0..200 {
+        pages.add_child(&gtk::Label::new(None));
+    }
+    holder.append(&progress);
+    holder.append(&pages);
+    NAMED_VISITS.with(|count| count.set(0));
+    assert!(named::<gtk::Label>(&holder.upcast::<gtk::Widget>(), LIVE_PROGRESS).is_some());
+    assert!(NAMED_VISITS.with(|count| count.get()) < 10);
+}
