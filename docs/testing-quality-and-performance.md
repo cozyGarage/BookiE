@@ -60,7 +60,7 @@ These structural guards do not bound total process RSS, allocator caches, driver
 
 ## Completion host profile
 
-`cargo run --release -p tablepro-app-services --example completion_benchmark` prints one JSON array with the minimum, median and mean time of one completion lookup over catalogs of 1,000 to 100,000 names and scripts of 16 KB to 3.6 MB. It is a host sample, not a gate: the work contracts above are what fail a build. The [2026-10-28 profile](evidence/completion-keystroke-profile-2026-10-28/README.md) records a before and after run and the host it ran on.
+`cargo run --release -p tablepro-app-services --example completion_benchmark` prints one JSON array with the minimum, median and mean time of one completion lookup over catalogs of 1,000 to 100,000 names and scripts of 16 KB to 3.6 MB. Treat elapsed time as a host sample, not a gate; the deterministic work contracts above are the regression checks.
 
 ## Browse performance
 
