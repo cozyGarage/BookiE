@@ -54,3 +54,52 @@ index bcf7d734d..d2d92d7c8 100644
              finish_stream_cursor(cursor, true).await;
 
 ```
+
+## Decoder sampling follow-up
+
+A separate instrumented release binary (SHA-256 `08f8b7a1c031737003e568d88a6d7d9b88e0b4e6618aaad624e30707c7f41120`) sampled one row in 128 within each page. One two-million-row run completed in 10.634 seconds and passed the pager probe. Across 16,000 sampled rows, timers summed to 25.687 ms for raw payload inspection and 50.713 ms for decoding plus budget admission. These are sampled wall-clock intervals from a separate run, not CPU measurements or an estimate of the whole query. Timing overhead, scheduling and sampling can skew them; do not scale these numbers to claim a share of the earlier fetch interval.
+
+The source inspects the raw payload before decoding and then estimates the decoded row for budget admission. Those checks protect bounded memory and exact values. A per-column decoder plan or a combined accounting pass could be investigated with a representative isolated benchmark and full value-contract tests, but this sample does not establish a speedup or justify removing either safety check.
+
+The additional temporary sampling patch was:
+
+```diff
+diff --git i/crates/drivers/postgres/src/query.rs w/crates/drivers/postgres/src/query.rs
+index 123150c67..d3c1c1eb9 100644
+--- i/crates/drivers/postgres/src/query.rs
++++ w/crates/drivers/postgres/src/query.rs
+@@ -428,6 +428,9 @@ async fn collect_query_rows<S>(
+     let mut rows = Vec::new();
+     let mut budget = QueryResultBudget::default();
+     let mut truncated = false;
++    let mut sampled_payload_ns = 0u128;
++    let mut sampled_decode_ns = 0u128;
++    let mut sampled_rows = 0usize;
+     while let Some(row_result) = stream.next().await {
+         let row = row_result.map_err(|error| {
+             if rows.is_empty() {
+@@ -447,7 +450,11 @@ async fn collect_query_rows<S>(
+             column_origins = metadata.column_origins;
+             type_names = metadata.type_names;
+         }
++        let sampled = rows.len() % 128 == 0;
++        let stage_started = sampled.then(std::time::Instant::now);
+         let payload_bytes = pg_row_payload_bytes(&row).unwrap_or(usize::MAX);
++        if let Some(started) = stage_started { sampled_payload_ns += started.elapsed().as_nanos(); }
++        let stage_started = sampled.then(std::time::Instant::now);
+         let Some(values) = budget.decode_and_admit_row(row.len(), payload_bytes, || {
+             type_names
+                 .iter()
+@@ -459,8 +466,10 @@ async fn collect_query_rows<S>(
+             truncated = true;
+             break;
+         };
++        if let Some(started) = stage_started { sampled_decode_ns += started.elapsed().as_nanos(); sampled_rows += 1; }
+         rows.push(values);
+     }
++    eprintln!("BOOKIE_PROFILE_DECODE {} {sampled_rows} {sampled_payload_ns} {sampled_decode_ns}", rows.len());
+     Ok((
+         QueryResult {
+             columns,
+
+```
