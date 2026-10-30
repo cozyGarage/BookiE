@@ -70,7 +70,7 @@ Each item is an issue with its own acceptance; none is a release commitment. Sta
 | DBF-2 to DBF-4 / [#1356](https://github.com/cozyGarage/BookiE/issues/1356), [#1357](https://github.com/cozyGarage/BookiE/issues/1357), [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | Measure PostgreSQL row-cap drain, SQLite early cancel, verify-ca hostname per engine | B3 / B4 |
 | B4-24 / [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Decide the TLS fingerprint pin | B4 |
 
-The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain driver-specific design notes in their comments. Vendored dependency patch requirements and removal criteria are recorded in [dependency patches](proposals/upstream-patches.md); verify the current release and local contract tests before removing a patch.
+The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain driver-specific design notes in their comments. Vendored dependency patch requirements and removal criteria are recorded in [dependency patches](proposals/dependency-patches.md); verify the current release and local contract tests before removing a patch.
 
 ## Feature candidates
 

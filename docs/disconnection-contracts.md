@@ -43,5 +43,3 @@ cargo test --locked -p tablepro-driver-mongodb --test integration a_cancelled_mo
 ```
 
 These suites are separate from the strict shared value-contract filter. A green value layer alone does not prove disconnect, cancellation, or reconnect behavior.
-
-Historical full-layer runs from October 1 are listed in the [archived verification record](archive/disconnection-contracts-history-2026-10-01.md). They are not current acceptance evidence.

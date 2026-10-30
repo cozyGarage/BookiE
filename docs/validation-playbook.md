@@ -155,7 +155,7 @@ An agent must read `AGENTS.md`, inspect status and confirm the SHA before editin
 
 ## Turn every finding into a regression
 
-1. Record origin: user report, upstream issue/commit, mutation, fuzz case or CI run.
+1. Record origin: user report, external issue or commit, mutation, fuzz case or CI run.
 2. State the invariant and smallest input; record engine/version and expected type as well as value. Preserve a minimized sanitized fixture, never customer data.
 3. Add the lowest-tier reproducer and demonstrate failure before changing code.
 4. Fix the cause; cover valid, invalid and exact-boundary neighbors. Test each affected consumer: decode, binding, formatting, grid editing, export and re-import.

@@ -6,7 +6,7 @@ The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/Bo
 
 ### Independence and stable system identifiers
 
-BookiE is completely decoupled from any external upstream projects and operates independently. To ensure seamless continuity for users, desktop environments, and Linux package maintainers, low-level system and storage identifiers remain stable:
+BookiE is completely decoupled from any external projects and operates independently. To ensure seamless continuity for users, desktop environments, and Linux package maintainers, low-level system and storage identifiers remain stable:
 - **Crate & binary names**: Workspace crates and Cargo binaries use `tablepro-*`, `tablepro-app`, and `tablepro-agentd`.
 - **Packaging names**: The user-facing binaries installed by Meson and distro packages are `bookie` and `bookie-agentd` (with `tablepro*` symlink aliases for launcher compatibility).
 - **Application ID & D-Bus**: `com.tablepro.linux`
