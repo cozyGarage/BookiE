@@ -2,12 +2,14 @@
 
 Open work lives on [Bookie Project #3](https://github.com/users/cozyGarage/projects/3). Filter by the **Lane** field (B3, B4, UX, Maintainer) or the matching `lane:*` label. Status (Backlog, Ready, In progress, In review, Done) is owned there.
 
-This page is an index of ledger IDs to issues. Do not track evidence, owners or status here. The full pre-migration ledger is in [archive/known-issues-pre-project-migration-2026-10-12.md](archive/known-issues-pre-project-migration-2026-10-12.md). Accepted product limits stay in [known-limitations.md](known-limitations.md).
+This page is an index of ledger IDs to issues. Do not track evidence, owners or status here. Accepted product limits stay in [known-limitations.md](known-limitations.md).
 
 ## Open work index
 
 | ID | Issue | Lane |
 | --- | --- | --- |
+| UI-47 | [#1998](https://github.com/cozyGarage/BookiE/issues/1998) | UX |
+| UI-46 | [#1966](https://github.com/cozyGarage/BookiE/issues/1966) | UX |
 | UI-41 | [#1333](https://github.com/cozyGarage/BookiE/issues/1333) | UX |
 | UI-42 | [#1332](https://github.com/cozyGarage/BookiE/issues/1332) | UX |
 | PEER-4 | [#1026](https://github.com/cozyGarage/BookiE/issues/1026) | UX |
@@ -24,7 +26,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | RV-6 | [#1176](https://github.com/cozyGarage/BookiE/issues/1176) | B3 |
 | RV-7 | [#1177](https://github.com/cozyGarage/BookiE/issues/1177) | B3 |
 | RV-9 | [#1179](https://github.com/cozyGarage/BookiE/issues/1179) | B4 |
-| RV-10 | [#1180](https://github.com/cozyGarage/BookiE/issues/1180) | B3 |
+| RV-10 | [#1180](https://github.com/cozyGarage/BookiE/issues/1180) | UX |
 | RV-11 | [#1181](https://github.com/cozyGarage/BookiE/issues/1181) | B4 |
 | UP-2 | [#1140](https://github.com/cozyGarage/BookiE/issues/1140) | B3 |
 | UP-4 | [#1142](https://github.com/cozyGarage/BookiE/issues/1142) | B4 |
@@ -62,7 +64,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | PERF-3 | [#555](https://github.com/cozyGarage/BookiE/issues/555) | B3 |
 | PERF-4 | [#550](https://github.com/cozyGarage/BookiE/issues/550) | B3 |
 | PERF-9 | [#596](https://github.com/cozyGarage/BookiE/issues/596) | B3 |
-| PERF-10 | [#597](https://github.com/cozyGarage/BookiE/issues/597) | B3 |
+| PERF-10 | [#597](https://github.com/cozyGarage/BookiE/issues/597) | UX |
 | AUD-2 | [#598](https://github.com/cozyGarage/BookiE/issues/598) | B4 |
 | AUD-5 | [#563](https://github.com/cozyGarage/BookiE/issues/563) | UX |
 | AUD-9 | [#600](https://github.com/cozyGarage/BookiE/issues/600) | B4 |

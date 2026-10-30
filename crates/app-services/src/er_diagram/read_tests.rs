@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
@@ -17,6 +18,7 @@ struct Calls {
     keys: AtomicUsize,
     cancel_at: AtomicUsize,
     cancellation: CancellationToken,
+    column_schemas: Mutex<Vec<Option<String>>>,
 }
 
 struct Catalog {
@@ -48,13 +50,25 @@ fn table(name: &str) -> TableInfo {
     }
 }
 
+fn table_in(schema: Option<&str>, name: &str) -> TableInfo {
+    TableInfo {
+        schema: schema.map(str::to_string),
+        name: name.to_string(),
+    }
+}
+
 #[async_trait]
 impl Connection for Catalog {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         Ok(Vec::new())
     }
 
-    async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+    async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        self.calls
+            .column_schemas
+            .lock()
+            .unwrap()
+            .push(schema.map(str::to_string));
         let seen = self.calls.columns.fetch_add(1, Ordering::SeqCst) + 1;
         if seen == self.calls.cancel_at.load(Ordering::SeqCst) {
             self.calls.cancellation.cancel();
@@ -143,6 +157,29 @@ async fn every_table_is_read_in_name_order_with_progress() {
     assert!(read.foreign_keys_supported);
     assert!(read.skipped.is_empty());
     assert!(!read.truncated());
+}
+
+#[tokio::test]
+async fn an_all_tables_diagram_reads_each_table_from_its_own_schema() {
+    let calls = Arc::new(Calls::default());
+    let connection = catalog(&calls, Vec::new());
+
+    let read = read_schema(
+        &connection,
+        None,
+        &[table_in(None, "items"), table_in(Some("aux"), "items")],
+        capabilities(true),
+        &control(&calls),
+        |_, _| {},
+    )
+    .await
+    .unwrap();
+
+    let mut schemas = calls.column_schemas.lock().unwrap().clone();
+    schemas.sort();
+    assert_eq!(schemas, [None, Some("aux".into())]);
+    assert!(read.reads.iter().any(|table| table.schema.is_none()));
+    assert!(read.reads.iter().any(|table| table.schema.as_deref() == Some("aux")));
 }
 
 #[tokio::test]

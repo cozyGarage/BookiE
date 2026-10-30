@@ -18,7 +18,7 @@ Drivers must drain the full response and surface late server errors. A query tha
 
 ## Consequences
 
-PR #228 implements this decision. The SQL Server batch API collects ordered sets under one shared budget; the guard, editor, MCP and JSON export retain the sets, while CSV refuses multi-set output. Docker tests cover ordering, an empty first set, late errors, truncation and connection reuse. The completed TEST-10 record remains in the [archived pre-migration ledger](../archive/known-issues-pre-project-migration-2026-10-12.md).
+PR #228 implements this decision. The SQL Server batch API collects ordered sets under one shared budget; the guard, editor, MCP and JSON export retain the sets, while CSV refuses multi-set output. Docker tests cover ordering, an empty first set, late errors, truncation and connection reuse.
 
 - Existing browse, paging and single-result consumers keep using `QueryResult`.
 - Existing query callers retain their first-set behavior; callers that need all sets opt into the batch API.
@@ -31,4 +31,4 @@ PR #228 implements this decision. The SQL Server batch API collects ordered sets
 - Keep the first set and drain the rest: this is the current data-loss behavior.
 - Flatten all rows: sets may have different column counts and types, so flattening corrupts boundaries and metadata.
 - Replace `QueryResult` with a collection everywhere: that forces unrelated browse and paging APIs to model a capability they do not use and causes a larger migration than the additive batch method.
-- Change one driver's return type, or apply one aggregate row or byte cap across unrelated statements. Draining the extra sets is protocol cleanup, not multi-result behaviour, so core, driver, guard, MCP and GUI change together ([upstream older releases review](../archive/upstream-older-releases-review-2026-10-03.md), O3).
+- Change one driver's return type, or apply one aggregate row or byte cap across unrelated statements. Draining the extra sets is protocol cleanup, not multi-result behaviour, so core, driver, guard, MCP and GUI change together.

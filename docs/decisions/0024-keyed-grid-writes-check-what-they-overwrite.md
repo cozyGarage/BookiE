@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-25
-- **Origin**: The R1 finding of the [external client review](../archive/external-audit-client-review-2026-10-06.md), the MongoDB checkpoints of 2026-10-04 in the [value contract history](../archive/value-contract-history.md), and the code at the extraction date.
+- **Basis**: MongoDB value-contract checkpoints from 2026-10-04 and the code at the extraction date.
 
 ## Context
 

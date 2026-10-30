@@ -171,8 +171,7 @@ impl PolicyGuard {
         {
             return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
-        self.authorize_with_bound(sql, analysis, None, control, Some(Counter::Transaction(counter)))
-            .await
+        self.authorize_with_bound(sql, analysis, None, control, Some(Counter::Transaction(counter))).await
     }
 
     async fn authorize_classified(

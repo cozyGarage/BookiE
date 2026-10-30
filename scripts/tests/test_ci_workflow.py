@@ -200,18 +200,13 @@ class CiWorkflowTests(unittest.TestCase):
         )
 
     def test_forgejo_workflows_do_not_block_other_runs(self):
-        groups = []
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             match = re.search(r"^concurrency:\n((?:[ \t]+[^\n]*\n)+)", workflow, re.MULTILINE)
             self.assertIsNotNone(match, name)
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
-            group = settings["group"].strip()
-            self.assertTrue(group, name)
-            self.assertEqual(group, "bookie-lab-${{ github.workflow }}-${{ github.run_id }}", name)
+            self.assertNotIn("group", settings, name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
-            groups.append(group)
-        self.assertEqual(groups[0], groups[1])
         gate = (ROOT / "scripts/forgejo-gate.sh").read_text()
         self.assertIn('printf \'%s/%s\' "$remote" "$target" | sha256sum', gate)
 
@@ -808,10 +803,6 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', script)
         self.assertIn('"$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"', script)
         self.assertLess(script.index("xvfb-run --auto-servernum"), script.index('dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh"'))
-        profile = (ROOT / "docs/evidence/postgres-stream-heap-profile-2026-10-25/run.sh").read_text()
-        self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', profile)
-        self.assertIn('"$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"', profile)
-        self.assertLess(profile.index("xvfb-run --auto-servernum"), profile.index('dbus-run-session -- bash "$RUNTIME/run-inner.sh"'))
 
     def test_distro_package_builder_uses_a_distinct_image_tag(self):
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()

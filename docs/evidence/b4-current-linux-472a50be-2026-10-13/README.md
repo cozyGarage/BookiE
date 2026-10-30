@@ -3,7 +3,7 @@
 Date: 2026-10-13
 Source: `472a50be84aa7c981abcb316950e21eba2158c24` (`fork/linux`)
 
-These local runs recheck B4 scenarios against the current Linux tip. They do not replace a Forgejo gate, frozen-candidate acceptance, installed Arch/Hyprland acceptance, or the nightly soak.
+These local runs recheck B4 scenarios against the current Linux tip. They do not replace a remote CI gate, frozen-candidate acceptance, installed Arch/Hyprland acceptance, or the nightly soak.
 
 ## Results
 
@@ -19,4 +19,4 @@ The PostgreSQL release scenarios included the read-scoped plan refusal, `EXPLAIN
 
 The GTK scenarios ran with the script's isolated D-Bus, Xvfb and AT-SPI setup. The release script's first two attempts stopped before product assertions because a long temporary-directory path made the OpenSSH control socket exceed the Unix socket path limit. The successful run used a short-lived runtime-directory symlink to a temporary directory; both were removed after the run.
 
-These are source-build local results on the current tip. They are not evidence for the older frozen candidate `bbdc39a430ede9382bc5dfa7164e51a065e2bd88`, and they do not establish Forgejo, installed-package, native Wayland, or power-loss acceptance.
+These are source-build local results on the current tip. They are not evidence for the older frozen candidate `bbdc39a430ede9382bc5dfa7164e51a065e2bd88`, and they do not establish remote CI, installed-package, native Wayland, or power-loss acceptance.

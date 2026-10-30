@@ -16,7 +16,7 @@ Exit code 0. The `mysql_unparseable_routine_dialog_denial_preserves_database` sc
 
 After the pass line, shutdown printed `A connection to the bus can't be made`. The script still exited with status 0.
 
-This is source-build Xvfb evidence on the current Linux tip. It does not establish frozen-candidate, installed Arch/Hyprland, native Wayland, Forgejo or nightly acceptance. The installed AUD-2 timeout path and its audit result remain unverified here.
+This is source-build Xvfb evidence on the current Linux tip. It does not establish frozen-candidate, installed Arch/Hyprland, native Wayland, remote CI or nightly acceptance. The installed AUD-2 timeout path and its audit result remain unverified here.
 
 ## Approval helper unit checks
 
