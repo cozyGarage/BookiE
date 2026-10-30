@@ -3,7 +3,6 @@
 This dated catalog preserves evidence links from the October 2026 review cycle. It is historical navigation, not current task status. See the [current documentation map](../README.md), [completion page](../bookie-0.2-sprint.md) and [backlog](../backlog.md) for current direction.
 
 
-- [Saved connection row layouts, October 23](../evidence/saved-connection-row-2026-10-23/README.md): light/dark narrow/normal widget captures, allocation checks and the remaining GTK measurement warning.
 
 - [Merge baseline validation, October 23](evidence/merge-baseline-validation-2026-10-23/README.md): workspace-test compile repair, scoped local validation and the independent completion-popup timeout.
 
