@@ -4,7 +4,6 @@ Proposals record designs that have not become accepted decisions. They do not se
 
 | Proposal | Current boundary |
 |---|---|
-| [CI hardening](ci-hardening-from-upstream.md) | Proposed; the low-risk items and the release-cache question are done; three questions are open. |
 | [Import into existing rows](import-existing-rows.md) | Unscheduled candidate; no behavior is implemented. |
 | [Statement effects and joined verdict](policy-effects-and-verdict.md) | Behavioral defects are closed; only the post-0.2.0 single-AST-walk consolidation remains in #571. |
 | [UI layout changes](ui-layout-from-peer-clients.md) | Proposed; seven slices for the result strip, filter row, editor toolbar, large results, sidebar tree, ER diagram and row density; none selected. |
