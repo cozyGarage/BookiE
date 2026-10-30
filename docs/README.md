@@ -69,8 +69,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 
 [archive/](archive/) holds dated reviews, audits, inventories and long histories. They are source-pinned evidence, not instructions; open items from them live on [Project #3](https://github.com/users/cozyGarage/projects/3). Use the archive starting points below to locate a record, then verify current behavior and status in active docs and issues.
 
-[Archive claim verification, October 20](evidence/archive-claim-verification-2026-10-20/README.md) records an inventory baseline for archived Markdown at that review, with an October 21 supplement. It traces explicit BookiE issue links and source symbols and lists the focused current-source tests rerun then; later archive additions are outside its inventory. Research completion, issue closure and runtime acceptance are separate claims.
-
 - [Sprint history](archive/bookie-0.2-history.md) (includes 2026-10-08/09 continuation snapshots)
 - [0.1.x implementation history](archive/changelog-history-0.1.x-2026-10-23.md) (archived from the changelog to keep it focused on release notes)
 - [B4 history](archive/b4-history.md) (includes superseded tip checkpoints, [completed local slices](archive/b4-history.md#archived-completed-local-slices-2026-10-10-consolidation) and [remaining-task prose](archive/b4-history.md#archived-remaining-task-prose-2026-10-10-pass-4))
