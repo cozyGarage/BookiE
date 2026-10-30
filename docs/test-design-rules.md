@@ -11,13 +11,13 @@ Rules that earlier audits paid for. Each one names the failure it prevents. The 
 
 - **A runner test must reject wrong input.** Cover a wrong test name, repeated output, an ignored count, a nonzero exit and a registration that never ran. An isolated runner once accepted the first registered test's output for every registration ([regression audit, 2026-09-29](archive/regression-audit-2026-09-29.md), R4).
 - **Parse stdout and stderr separately.** Retain both; parse only the test's stdout. Driver and graphics diagnostics interleave with unfinished lines and break a strict parser (same audit, R11).
-- **Never mark an unavailable path as passed.** If raw evidence is missing, retrieve the exact-SHA artifact or rerun the gate. A hash cannot recover missing output, and a passing diagnostic probe is not a passing regression ([architecture consistency review](archive/architecture-consistency-review-2026-10-03.md)).
+- **Never mark an unavailable path as passed.** If raw evidence is missing, retrieve the exact-SHA artifact or rerun the gate. A hash cannot recover missing output, and a passing diagnostic probe is not a passing regression.
 
 ## Oracles and assertions
 
 - **A parser is not its own oracle.** Testing a lexer or decoder only against itself hides shared mistakes. Take expected values from the engine or another independent source ([ADR 0007](decisions/0007-type-and-value-preservation.md), [oracle review](oracle-review.md)).
-- **Assert concrete boundaries and both branches.** Mutation checks exposed symbolic constants in assertions and tests that exercised only one branch. Use the literal boundary value, and test the refusal as well as the accepted case ([baseline review, 2026-09-17](archive/baseline-review-2026-09-17.md)).
-- **Unviable mutants are not catches.** A mutant that does not compile is neither a coverage success nor an equivalent mutant; report it separately, and report a missing mutation report as unavailable, not as zeros ([bug consistency review](archive/bug-consistency-2026-09.md), B9).
+- **Assert concrete boundaries and both branches.** Mutation checks exposed symbolic constants in assertions and tests that exercised only one branch. Use the literal boundary value, and test the refusal as well as the accepted case.
+- **Unviable mutants are not catches.** A mutant that does not compile is neither a coverage success nor an equivalent mutant; report it separately, and report a missing mutation report as unavailable, not as zeros.
 - **A negative test proves a trusted control first.** For TLS and similar failures, show the same setup succeeds, then assert the specific error. `is_err()` lets an unrelated failure pass.
 - **Test the race, not only the error.** For cancellation and similar features, cover caller drop, a deadline during dispatch, a delayed stop after completion, a transport failure, pool reuse and shutdown, and assert the server's behaviour as well as the returned error ([ADR 0005](decisions/0005-server-side-cancellation.md)).
 

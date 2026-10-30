@@ -23,10 +23,10 @@ The registered isolated GTK regression invokes the production startup helper and
 From this directory, compile each variant with the installed development libraries:
 
 ```bash
-cc probe.c -o /tmp/bookie-completion-initialized $(pkg-config --cflags --libs gtksourceview-5 libadwaita-1)
-cc probe-without-init.c -o /tmp/bookie-completion-uninitialized $(pkg-config --cflags --libs gtksourceview-5 libadwaita-1)
-G_DEBUG=fatal-criticals GDK_BACKEND=x11 GSK_RENDERER=cairo GTK_A11Y=none GIO_USE_VFS=local dbus-run-session -- xvfb-run -a /tmp/bookie-completion-initialized
-G_DEBUG=fatal-criticals GDK_BACKEND=x11 GSK_RENDERER=cairo GTK_A11Y=none GIO_USE_VFS=local dbus-run-session -- xvfb-run -a /tmp/bookie-completion-uninitialized
+cc probe.c -o /tmp/worktree-completion-initialized $(pkg-config --cflags --libs gtksourceview-5 libadwaita-1)
+cc probe-without-init.c -o /tmp/worktree-completion-uninitialized $(pkg-config --cflags --libs gtksourceview-5 libadwaita-1)
+G_DEBUG=fatal-criticals GDK_BACKEND=x11 GSK_RENDERER=cairo GTK_A11Y=none GIO_USE_VFS=local dbus-run-session -- xvfb-run -a /tmp/worktree-completion-initialized
+G_DEBUG=fatal-criticals GDK_BACKEND=x11 GSK_RENDERER=cairo GTK_A11Y=none GIO_USE_VFS=local dbus-run-session -- xvfb-run -a /tmp/worktree-completion-uninitialized
 ```
 
 The second command is expected to abort on the affected uninitialized stack. The original host used GTK 4.24.1, GtkSourceView 5.22.0 and libadwaita 1.10.0 on Arch Linux under Xvfb. The tests use disposable windows and sessions and do not alter desktop configuration.

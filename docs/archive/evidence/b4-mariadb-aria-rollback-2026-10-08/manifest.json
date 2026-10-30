@@ -36,7 +36,7 @@
     "b4_rollback_job_conclusion": "success",
     "note": "The hosted B4 rollback acceptance selector passed on c3122d9 after the Aria trigger test was merged; the selected mysql_atomic integration tests include mariadb_aria_nontransactional_effects_survive_failed_batches."
   },
-  "local_report": "/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
+  "local_report": "/tmp/worktree-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
   "summary": {
     "path": "focused.txt",
     "sha256": "0205b325462f53beee18764694ab86a02b6a29fe4f869bbe391bc06bddaaf50d"
@@ -76,5 +76,5 @@
     "b4_rollback_job": "success",
     "note": "Full workflow passed, but the B4 rollback job predates the Aria trigger regression."
   },
-  "local_report_current_tip": "/tmp/bookie-ui-1b/linux/target/quality/20261008T132136234214Z-layers/report.json"
+  "local_report_current_tip": "/tmp/worktree-ui-1b/linux/target/quality/20261008T132136234214Z-layers/report.json"
 }

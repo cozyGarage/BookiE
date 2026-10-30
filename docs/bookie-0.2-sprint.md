@@ -77,4 +77,4 @@ Broader type/consumer matrices, mutation triage, Debian/GNOME desktop work, Flat
 
 ## History
 
-The [completion handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md) preserves the immediately preceding scope, qualification recipes and packet lists. The [test and validation summary](archive/bookie-0.2-test-records-2026-10-23.md) collects historical coverage records. Dated plans do not override current decisions or scheduling.
+The [completion handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md) preserves the immediately preceding scope, qualification recipes and packet lists. Dated plans do not override current decisions or scheduling.

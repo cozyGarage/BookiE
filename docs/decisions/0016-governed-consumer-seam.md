@@ -45,11 +45,9 @@ These stay rejected:
 - JSON or string cells as the value contract ([ADR 0007](0007-type-and-value-preservation.md)).
 - Any execute path that skips `PolicyGuard`.
 
-The [statement-effects proposal](../proposals/policy-effects-and-verdict.md) is not accepted here. Rule join and a single AST walk stay a proposal until a later ADR accepts them.
-
 ## Rationale
 
-One typed handle covers every consumer. A new surface inherits classify, approval, masking and audit without a separate checklist. Capability flags and a shared facade let the product take useful UI and paging ideas without copying another client's plugin host or value model.
+One typed handle covers every consumer. A new surface inherits classify, approval, masking and audit without a separate checklist. Capability flags and a shared facade let the product expose useful UI and paging behavior while preserving the governed execution path and typed value contract.
 
 ## Consequences
 
