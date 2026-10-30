@@ -4,7 +4,7 @@ Part of [testing](testing.md), which holds the test tiers, runner and fixtures.
 
 ## Measuring how good the tests are
 
-The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests, intentional exclusions and packaging-only green runs. Mutation and coverage run on a schedule. The unit-tier line-coverage score has its own ratcheted floor in `baselines/coverage-floor.txt` (59%; 59.41% measured on 2026-10-11). The nightly workflow separately measures Docker suites for PostgreSQL, MySQL, SQLite, MongoDB, Redis and ClickHouse against `baselines/coverage-floors-crates.txt`. Installed GTK is outside both coverage reports. These floors do not measure every crate or prove assertion quality; the current manual measurements and unmeasured areas are recorded in [#782](https://github.com/cozyGarage/BookiE/issues/782). Mutation survivors need investigation. Dated first-run mutation notes are in [testing history](archive/testing-history.md#historical-mutation-first-run-notes-2026-08-22).
+A green check proves only the checks it ran; it does not establish that skipped or unconfigured tests ran. Coverage floors do not measure every crate or prove assertion quality. Current manual measurements and unmeasured areas are recorded in [#782](https://github.com/cozyGarage/BookiE/issues/782). Mutation survivors need investigation.
 
 ### Mutation testing
 
@@ -14,7 +14,7 @@ cargo mutants --package tablepro-core --test-tool cargo -- --lib
 cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --test-tool cargo -- --lib
 ```
 
-Prefer `core` and `policy`. GitHub's Linux test quality workflow mutates `core`, `policy`, `ssh`, Redis and selected PostgreSQL decoders. The Forgejo nightly also mutates `agentd`, `transport` and `app-services`; agentd mutations run against its library, binaries and integration tests, including saved-connection lookup. Forgejo compares missed mutants with per-package baselines and fails on unaccepted survivors; GitHub reports survivors for review. The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders with unit tests; Docker-backed value regressions stay in the driver layers. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](lane-boards.md#b3-types-and-values). Equivalent mutants and timeout findings are discussed in the archived first-run notes above.
+Prefer `core` and `policy`. Include driver-backed value regressions in the relevant driver layer. Follow [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](lane-boards.md#b3-types-and-values).
 
 ### Coverage
 
@@ -54,16 +54,16 @@ Run the non-display application checks locally with:
     cargo test --locked -p tablepro-app --lib preview_matrix
     cargo test --locked -p tablepro-app-services --lib completion
 
-Run display-dependent contracts with bash scripts/test-gtk-widgets.sh. Fast preflight excludes application library tests; a preflight pass alone is not evidence that these application contracts passed. Forgejo's existing unit job includes application library tests, and widgets runs registered display tests. No new CI job or nightly-only dependency is needed.
+Run display-dependent contracts with `bash scripts/test-gtk-widgets.sh`. A preflight pass alone is not evidence that these application contracts passed.
 
 These structural guards do not bound total process RSS, allocator caches, driver buffers, GPU resources or arbitrarily long sessions. Measure those separately on the changed workload and display backend. A watchdog around an asynchronous lifecycle test is not a throughput target.
 
 ## Completion host profile
 
-`cargo run --release -p tablepro-app-services --example completion_benchmark` prints one JSON array with the minimum, median and mean time of one completion lookup over catalogs of 1,000 to 100,000 names and scripts of 16 KB to 3.6 MB. It is a host sample, not a gate: the work contracts above are what fail a build. The [2026-10-28 profile](evidence/completion-keystroke-profile-2026-10-28/README.md) records a before and after run and the host it ran on.
+`cargo run --release -p tablepro-app-services --example completion_benchmark` prints one JSON array with the minimum, median and mean time of one completion lookup over catalogs of 1,000 to 100,000 names and scripts of 16 KB to 3.6 MB. Treat elapsed time as a host sample, not a gate; the deterministic work contracts above are the regression checks.
 
 ## Browse performance
 
-See [the September measurements](archive/performance-2026-09.md) and the `browse_benchmark` example in the release-test crate. One warm-up plus five measured samples cover first, filtered, deep, wide and capped result sets. Run each case in a separate process against a disposable fixture, with builds complete before measuring. Report memory improvements and latency regressions separately.
+Use the `browse_benchmark` example in the release-test crate. One warm-up plus five measured samples cover first, filtered, deep, wide and capped result sets. Run each case in a separate process against a disposable fixture, with builds complete before measuring. Report memory improvements and latency regressions separately.
 
-The [bug and consistency audit](archive/bug-consistency-2026-09.md) records the newer targeted mutation findings. cargo-mutants creates its report beneath `<output>/mutants.out/`; CI summaries distinguish missing reports from zero findings and retain the measurement step outcome.
+cargo-mutants creates its report beneath `<output>/mutants.out/`; CI summaries distinguish missing reports from zero findings and retain the measurement step outcome.

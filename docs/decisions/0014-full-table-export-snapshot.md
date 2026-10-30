@@ -33,4 +33,4 @@ An exported file is a data result users may save or share. Silently mixing multi
 
 ## Export file staging
 
-An export writes to an exclusive, unique, private temporary file in the destination's directory and replaces the destination only after a successful write, flush and sync. A shared `<destination>.tablepro-part` name let one writer rename another's file and let a symlink redirect writes. Concurrent successful exports use last-completed replacement, and the rule gives no directory-fsync durability after power loss and no database snapshot ([bug consistency review](../archive/bug-consistency-2026-09.md), B4).
+An export writes to an exclusive, unique, private temporary file in the destination's directory and replaces the destination only after a successful write, flush and sync. A shared `<destination>.tablepro-part` name let one writer rename another's file and let a symlink redirect writes. Concurrent successful exports use last-completed replacement, and the rule gives no directory-fsync durability after power loss and no database snapshot.

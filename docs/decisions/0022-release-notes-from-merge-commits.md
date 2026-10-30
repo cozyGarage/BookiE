@@ -3,14 +3,14 @@
 - **Status**: Accepted
 - **Date**: 2026-10-24
 - **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0022-release-notes-come-from-merge-commits)
-- **Supersedes**: the 2026-10-19 [changelog fragment evaluation](../archive/changelog-fragment-evaluation-2026-10-19.md), which kept a shared `CHANGELOG.md` and named its own revisit trigger.
+- **Supersedes**: the shared `CHANGELOG.md` release-note workflow.
 - **Clarified**: 2026-10-25 for implementation status. The pull-request body validation workflow has landed; the release workflow still reads `CHANGELOG.md`.
 
 ## Context
 
-Every pull request edited the `[Unreleased]` section of `CHANGELOG.md`. Between 2026-10-10 and 2026-10-24, 284 of 1,071 commits on `linux` touched that one file, and concurrent pull requests conflicted in it. The October 19 evaluation declined Towncrier fragments because conflict cost was unmeasured, and asked to reopen if conflicts recurred. They did.
+Every pull request edited the `[Unreleased]` section of `CHANGELOG.md`. Concurrent pull requests conflicted in that shared section.
 
-Release notes are release output. A file that every change rewrites puts generated-looking content in the source tree and makes the aggregate train PRs of [ADR 0020](0020-aggregate-forgejo-trains.md) combine edits by hand.
+Release notes are release output. A file that every change rewrites puts generated-looking content in the source tree and makes concurrent changes harder to reconcile.
 
 ## Decision
 
@@ -22,13 +22,13 @@ Release-Note: none
 ```
 
 1. Categories are the Keep a Changelog 1.1.0 headings: Added, Changed, Deprecated, Removed, Fixed, Security. A change may carry several lines. `none` is explicit and cannot be combined with other lines. The wording rules of AGENTS.md are unchanged: user impact, no paths, type or function names, no `Fixed` for a defect introduced and fixed before release.
-2. The pull request body carries the same lines, so a check can validate them before merge. The repository's squash-merge defaults are set to the PR title and the PR body (`squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=PR_BODY`, changed on 2026-10-24 from `COMMIT_OR_PR_TITLE` and `COMMIT_MESSAGES`), so every merge carries the lines without anyone remembering to copy them. A merger who wants a shorter body can pass only the lines: `gh pr view N --json body -q .body | python3 scripts/release-notes.py trailers - > body.txt`, then `gh pr merge N --squash --body-file body.txt`. An aggregate train PR carries the lines of every constituent, and `scripts/check-forgejo-train.py` refuses to gate or merge a train whose body omits one.
+2. The pull request body carries the same lines, so a check can validate them before merge. The repository's squash-merge defaults are set to the PR title and the PR body (`squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=PR_BODY`, changed on 2026-10-24 from `COMMIT_OR_PR_TITLE` and `COMMIT_MESSAGES`), so every merge carries the lines without anyone remembering to copy them. A merger who wants a shorter body can pass only the lines: `gh pr view N --json body -q .body | python3 scripts/release-notes.py trailers - > body.txt`, then `gh pr merge N --squash --body-file body.txt`.
 3. `scripts/release-notes.py check` validates a body or message. `scripts/release-notes.py assemble --since <previous tag>` builds the release notes from the commit range, refuses a commit with no line unless told otherwise, and appends the pull request number from the squash subject. The output is a build artifact and the body of the GitHub Release.
 4. `CHANGELOG.md` stops growing. Its `[Unreleased]` entries stay until the first release cut after this decision. That release's notes are those entries plus the `Release-Note:` lines of the pull requests merged after the guard landed in `669635a06`, combined by hand into the version's `CHANGELOG.md` section (`assemble --since 669635a06`). Until the Release workflow reads trailers it still reads that section, so `CHANGELOG.md` must exist when the tag is pushed. After that release is published, a follow-up change copies the whole file unchanged to `docs/archive/changelog-through-<version>-<date>.md`, removes `CHANGELOG.md` and repoints its references. The 0.1.x record is already archived.
 
 ## Rationale
 
-The squash commit is the unit that reaches `linux` and the one thing every merge path shares, including trains. It cannot conflict, adds no per-PR file, and keeps the note next to the change it describes. A required line, even `none`, replaces the unenforced habit of remembering to edit the changelog.
+The squash commit is the unit that reaches `linux` and the common merge record. It cannot conflict, adds no per-PR file, and keeps the note next to the change it describes. A required line, even `none`, replaces the unenforced habit of remembering to edit the changelog.
 
 ## Consequences
 

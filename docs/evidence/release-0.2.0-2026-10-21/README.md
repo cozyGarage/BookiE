@@ -4,7 +4,7 @@
 
 Tag `linux-v0.2.0` identifies `bd31a1d8b3dc83200c324b9f37fa83f3660d8aab`. The dated changelog contains the 0.2.0 notes. The [candidate workflow](https://github.com/cozyGarage/BookiE/actions/runs/39671354230) passed version checks and Debian, Arch, AppImage and Flatpak builds. The [tag workflow](https://github.com/cozyGarage/BookiE/actions/runs/39674240261) is a separate build; candidate hashes below do not identify its final assets. All four tag package jobs subsequently passed. Draft creation failed while looking for `bookie.pot` instead of `translations/bookie.pot`; [#1300](https://github.com/cozyGarage/BookiE/issues/1300) and [#1301](https://github.com/cozyGarage/BookiE/pull/1301) own recovery. Recovery [run 39683269960](https://github.com/cozyGarage/BookiE/actions/runs/39683269960) subsequently succeeded after #1301 merged. The draft contains all six checksummed assets, and GitHub attestations verified for the four main package formats. Attestations identify finalizer workflow commit `faea584d1c151295583840c2af2d2467e7647c21`; the Arch build-input manifest separately identifies original package source `bd31a1d8b`. At this candidate checkpoint the release was still a draft; the publication follow-up below records the later release.
 
-The preceding accepted runtime baseline passed all 29 Forgejo jobs; see the [PostgreSQL gate repair](../postgres-gate-repair-2026-10-21/README.md). The release-tip change only removes a duplicated changelog entry.
+The release-tip change only removes a duplicated changelog entry; runtime code is unchanged from the preceding baseline.
 
 ## Publication follow-up, October 23
 

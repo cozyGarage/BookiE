@@ -1,3 +1,21 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 11782a8..76677e1 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -111,6 +111,13 @@ optional = true
+ version = "2.4"
+ default-features = false
+ 
++[dependencies.socket2]
++version = "0.6"
++
++[dependencies.tokio]
++version = "1"
++features = ["net"]
++
+ [dependencies.byteorder]
+ version = "1.4.3"
+ features = ["std"]
 diff --git a/src/connection/describe.rs b/src/connection/describe.rs
 index f08e213..8ceccd6 100755
 --- a/src/connection/describe.rs
@@ -271,6 +289,33 @@ index e8a1aed..77882a9 100755
      pub(crate) async fn send<T>(&mut self, message: T) -> Result<(), Error>
      where
          T: FrontendMessage,
+diff --git a/src/connection/tls.rs b/src/connection/tls.rs
+index a49c9ca..e9b9595 100755
+--- a/src/connection/tls.rs
++++ b/src/connection/tls.rs
+@@ -11,6 +11,7 @@ impl WithSocket for MaybeUpgradeTls<'_> {
+     type Output = crate::Result<Box<dyn Socket>>;
+ 
+     async fn with_socket<S: Socket>(self, socket: S) -> Self::Output {
++        crate::connection::tls::enable_tcp_keepalive(&socket);
+         maybe_upgrade(socket, self.0).await
+     }
+ }
+@@ -98,3 +99,14 @@ async fn request_upgrade(
+         )),
+     }
+ }
++
++pub(crate) fn enable_tcp_keepalive<S: 'static>(socket: &S) {
++    let any: &dyn std::any::Any = socket;
++    let Some(stream) = any.downcast_ref::<tokio::net::TcpStream>() else {
++        return;
++    };
++    let keepalive = socket2::TcpKeepalive::new()
++        .with_time(std::time::Duration::from_secs(30))
++        .with_interval(std::time::Duration::from_secs(10));
++    let _ = socket2::SockRef::from(stream).set_tcp_keepalive(&keepalive);
++}
 diff --git a/src/lib.rs b/src/lib.rs
 index f68c928..c59eb43 100755
 --- a/src/lib.rs
