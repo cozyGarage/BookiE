@@ -3,7 +3,6 @@
 This dated catalog preserves evidence links from the October 2026 review cycle. It is historical navigation, not current task status. See the [current documentation map](../README.md), [completion page](../bookie-0.2-sprint.md) and [backlog](../backlog.md) for current direction.
 
 
-- [Saved connection row layouts, October 23](../evidence/saved-connection-row-2026-10-23/README.md): light/dark narrow/normal widget captures, allocation checks and the remaining GTK measurement warning.
 
 - [Merge baseline validation, October 23](evidence/merge-baseline-validation-2026-10-23/README.md): workspace-test compile repair, scoped local validation and the independent completion-popup timeout.
 
@@ -15,7 +14,7 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 
 - [0.2.0 release qualification, October 21](../evidence/release-0.2.0-2026-10-21/README.md): candidate package checks, functional and profiling observations, with final publication and desktop acceptance recorded separately.
 
-- [PostgreSQL gate repair, October 21](../evidence/postgres-gate-repair-2026-10-21/README.md): deterministic pooled-reset regression, installed retired-session acceptance and the successful 29-job gate.
+- [PostgreSQL session and pool behavior, October 21](../evidence/postgres-gate-repair-2026-10-21/README.md): pooled connection reset, retired-session refusal and PgBouncer prepared-statement behavior.
 
 - [Large SQL editor analysis, October 21](../evidence/large-sql-editor-analysis-2026-10-21/README.md): bounded advisory snapshots, deferred diagnostics and remaining full-document costs.
 - [Large-query rendering, October 21](../evidence/large-query-rendering-2026-10-21/README.md): deferred hidden grids and the local grid lifecycle regression.
@@ -71,27 +70,22 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 
 - [Export snapshot allocation probe, October 23](../evidence/export-snapshot-sharing-2026-10-23/allocation-probe/README.md): matched synthetic allocation measurements for the merged snapshot-sharing repair.
 - [Grid factory realization, October 23](evidence/grid-factory-realization-2026-10-23/README.md): initial layout, teardown, vertical bounds and scroll-rebinding counters.
-- [Editor scrolling resources, October 23](../evidence/editor-scroll-resources-2026-10-23/README.md): actual visible row traversal and process RSS, with exact artifact identity.
 - Historical October 22 probes: [large result scrolling](evidence/large-result-profile-2026-10-22/README.md) and [post-decode byte-budget overshoot](evidence/query-result-byte-budget-2026-10-22/README.md). These preserve older source observations; they do not supersede later repairs or measurements.
 
 - [Pull request maintenance, October 22](evidence/pr-maintenance-2026-10-22/README.md): historical source inventory, prepared refreshes and validation limits.
 
-- [Workspace restoration and cleanup privacy train, October 23](evidence/forgejo-train-1518-2026-10-23/README.md): exact-head Forgejo run 925, required GitHub checks and documentation-only post-merge source verification.
 
 - [Read-only label selection cost, October 23](../evidence/grid-label-selection-cost-2026-10-23/README.md): controlled allocation experiment and the interaction/accessibility constraints on a future optimization.
 
-- [Keyboard menu routing acceptance, October 23](../evidence/grid-keyboard-routing-acceptance-2026-10-23/README.md): exact-head Forgejo run 926 and post-merge source comparison for #1519.
 
 - [Shared grid pointer routing, October 23](../evidence/grid-pointer-routing-2026-10-23/README.md): controlled allocation measurements and local interaction checks, with [gate acceptance](evidence/grid-pointer-routing-acceptance-2026-10-23/README.md).
 - [Optimized PostgreSQL streaming investigation, October 23](../evidence/postgres-optimized-stream-2026-10-23/README.md): two explicit timeout observations, bounded retained rows, sampled RSS and a limited psql control.
 
 - [Compact multiline previews, October 23](../evidence/compact-multiline-preview-2026-10-23/README.md): failing height regression and read-only cell layout correction with exact-text checks.
 - [Stream page realization, October 23](../evidence/stream-page-realization-2026-10-23/README.md): optimized two-million-row comparisons and retained-page navigation checks.
-- [Local resource profiling, October 23](../evidence/local-resource-profiling-2026-10-23/README.md): repeated query/close cycles, large saved SQL files, allocation tracing and paired early-close measurements.
 
 - [Function-size regression discovery, October 23](../evidence/function-checker-discovery-2026-10-23/README.md): existing checker cases made discoverable by the coverage workflow, with unchanged assertions and explicit coverage limits.
 
-- [X11 popup targeting, October 23](../evidence/x11-popup-target-2026-10-23/README.md): pointer and resize boundary regressions and a disposable Xvfb window experiment for GTK harness reliability.
 - [Floor image APT network bounds, October 23](../evidence/floor-apt-network-bounds-2026-10-23/README.md): download retry and HTTP/HTTPS timeout configuration with image-contract coverage.
 - [Published AppImage resources, October 23](../evidence/appimage-resource-check-2026-10-23/README.md): verified the published package loads bundled GtkSourceView language and style resources; rendering and clean-container launch remain unverified.
 - [Dirty-file discard and final-tab recheck, October 23](../evidence/tab-close-recheck-2026-10-23/README.md): pinned-release Xvfb checks for discard, final-tab close, opening a fresh editor and narrow-toolbar widths; native Wayland freeze remains unresolved.

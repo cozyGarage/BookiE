@@ -1,6 +1,6 @@
 # Query result byte-budget profile, October 22
 
-This is a historical measurement of the recorded source, not current acceptance. Later driver repairs and PostgreSQL measurements are recorded in [query row decoding budget](../../../evidence/query-row-budget-2026-10-22/README.md); later editor-scroll measurements are recorded in [editor scrolling resources](../../../evidence/editor-scroll-resources-2026-10-23/README.md).
+This is a historical measurement of the recorded source, not current acceptance. Later driver repairs and PostgreSQL measurements are recorded in [query row decoding budget](../../../evidence/query-row-budget-2026-10-22/README.md); later editor-scroll measurements are recorded in editor-scroll measurements are outside this historical packet.
 
 Tracker: [#1382](https://github.com/cozyGarage/BookiE/issues/1382). Source: Linux `ad9bb1447163c848919616773ab0971c5a2d2135`, with the committed workspace `Cargo.lock`.
 
