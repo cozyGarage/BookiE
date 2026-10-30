@@ -130,58 +130,88 @@ pub(super) fn install_page_loader(
             .and_then(|child| page_index_from_name(&child, generation)),
     ));
     pages.connect_visible_child_notify(move |pages| {
-        let Some(container) = pages.visible_child() else {
-            return;
-        };
-        let current_index = page_index_from_name(&container, generation);
-        retire_previous_page(pages, generation, previous_index.replace(current_index), current_index);
-        let Some(placeholder) = container.first_child() else {
-            return;
-        };
-        if !placeholder.has_css_class("tp-stream-page-placeholder")
-            || placeholder.has_css_class("tp-stream-page-loading")
-        {
-            return;
-        }
-        let Some(index) = container
-            .widget_name()
-            .strip_prefix(PAGE_PREFIX)
-            .and_then(|name| name.rsplit_once('-'))
-            .and_then(|(_, index)| index.parse::<u64>().ok())
-        else {
-            return;
-        };
-        placeholder.add_css_class("tp-stream-page-loading");
-        if let Some(page) = resident_pages.get(index) {
-            if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-                status.set_description(Some(&crate::tr!("Restoring this result page from memory…")));
-            }
-            sender.input(super::SqlEditorInput::Stream(super::streaming::Input::PageLoaded {
-                generation,
-                index,
-                identity,
-                result: Ok(page),
-            }));
-            return;
-        }
-        let Some(spool) = spool.clone() else {
-            if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-                status.set_title(&crate::tr!("This result page is no longer available"));
-            }
-            placeholder.remove_css_class("tp-stream-page-loading");
-            return;
-        };
+        handle_visible_child_change(
+            pages,
+            generation,
+            identity,
+            &resident_pages,
+            spool.as_ref(),
+            &columns,
+            &sender,
+            &previous_index,
+        );
+    });
+}
+
+fn handle_visible_child_change(
+    pages: &gtk::Stack,
+    generation: u64,
+    identity: super::StatementIdentity,
+    resident_pages: &super::stream_pages::ResidentPageStore,
+    spool: Option<&tablepro_app_services::stream_result_spool::StreamResultSpool>,
+    columns: &[tablepro_core::ColumnInfo],
+    sender: &relm4::ComponentSender<super::SqlEditor>,
+    previous_index: &std::cell::Cell<Option<u64>>,
+) {
+    let Some(container) = pages.visible_child() else {
+        return;
+    };
+    let current_index = page_index_from_name(&container, generation);
+    retire_previous_page(pages, generation, previous_index.replace(current_index), current_index);
+    load_visible_placeholder(pages, generation, identity, resident_pages, spool, columns, sender);
+}
+
+fn load_visible_placeholder(
+    pages: &gtk::Stack,
+    generation: u64,
+    identity: super::StatementIdentity,
+    resident_pages: &super::stream_pages::ResidentPageStore,
+    spool: Option<&tablepro_app_services::stream_result_spool::StreamResultSpool>,
+    columns: &[tablepro_core::ColumnInfo],
+    sender: &relm4::ComponentSender<super::SqlEditor>,
+) {
+    let Some(container) = pages.visible_child() else {
+        return;
+    };
+    let Some(placeholder) = container.first_child() else {
+        return;
+    };
+    if !placeholder.has_css_class("tp-stream-page-placeholder") || placeholder.has_css_class("tp-stream-page-loading") {
+        return;
+    }
+    let Some(index) = page_index_from_name(&container, generation) else {
+        return;
+    };
+    placeholder.add_css_class("tp-stream-page-loading");
+    if let Some(page) = resident_pages.get(index) {
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-            status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
+            status.set_description(Some(&crate::tr!("Restoring this result page from memory…")));
         }
-        sender.input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
+        sender.input(super::SqlEditorInput::Stream(super::streaming::Input::PageLoaded {
             generation,
             index,
             identity,
-            spool,
-            columns: columns.clone(),
+            result: Ok(page),
         }));
-    });
+        return;
+    }
+    let Some(spool) = spool.cloned() else {
+        if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+            status.set_title(&crate::tr!("This result page is no longer available"));
+        }
+        placeholder.remove_css_class("tp-stream-page-loading");
+        return;
+    };
+    if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+        status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
+    }
+    sender.input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
+        generation,
+        index,
+        identity,
+        spool,
+        columns: columns.to_vec(),
+    }));
 }
 
 fn retire_previous_page(pages: &gtk::Stack, generation: u64, previous: Option<u64>, current: Option<u64>) {
