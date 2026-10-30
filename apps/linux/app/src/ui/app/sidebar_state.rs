@@ -523,7 +523,7 @@ mod sidebar_label_tests {
             .unwrap();
 
         assert_eq!(sidebar_group_label(group), crate::tr!("Catalog").to_string());
-        let init = row_for(entry, &Default::default(), false, None);
+        let init = row_for(entry, &Default::default(), false, false, None);
         assert_eq!(init.kind, SidebarObjectKind::Catalog);
         let group_init = init.group.unwrap();
         assert!(group_init.entry);
