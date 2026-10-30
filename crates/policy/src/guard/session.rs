@@ -248,7 +248,10 @@ impl Session for PolicySession {
                 )
                 .await;
         }
-        let authorization = self.guard.authorize_classified(sql, analysis, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_classified(sql, analysis, Some(control), None)
+            .await?;
         let audit = CursorAudit {
             operation_id: Uuid::new_v4(),
             batch_id: batch.id,
@@ -645,7 +648,10 @@ impl PolicySession {
                 .refuse(sql, "read_only_snapshot_refusal", DriverError::ReadOnly)
                 .await;
         }
-        let authorization = self.guard.authorize_classified(sql, analysis, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_classified(sql, analysis, Some(control), Some(&mut *self.inner))
+            .await?;
         let writes = authorization.analysis.facts.writes();
         let rolls_back_to_savepoint = authorization.analysis.rolls_back_to_savepoint;
         let result = match self.batch {

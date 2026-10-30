@@ -126,6 +126,10 @@ pub fn build_optimistic_keyed_update(
     let mut params = Vec::with_capacity(edits.len() * 3 + pk_values.len());
     for (col_idx, _, new_value) in edits {
         let name = quote_ident(driver_id, &columns[*col_idx].name);
+        if is_mysql_empty_text(driver_id, new_value) {
+            assignments.push(format!("{name} = SPACE(0)"));
+            continue;
+        }
         let placeholder = placeholder_for(driver_id, params.len());
         let value_sql = if driver_id == "postgres" {
             postgres_text_cast_type(&columns[*col_idx], new_value)
@@ -176,6 +180,16 @@ fn is_geometric(data_type: &str) -> bool {
     )
 }
 
+fn is_mysql_empty_text(driver_id: &str, value: &Value) -> bool {
+    driver_id == "mysql" && matches!(value, Value::Text(text) if text.is_empty())
+}
+
+fn is_mssql_character_type(data_type: &str) -> bool {
+    let base = data_type.trim().to_ascii_lowercase();
+    let base = base.split('(').next().unwrap_or_default().trim();
+    matches!(base, "char" | "varchar" | "nchar" | "nvarchar")
+}
+
 fn optimistic_predicate(
     driver_id: &str,
     name: &str,
@@ -183,7 +197,13 @@ fn optimistic_predicate(
     old_value: &Value,
     params: &mut Vec<Value>,
 ) -> Result<String, BuildSqlError> {
+    if is_mysql_empty_text(driver_id, old_value) {
+        return Ok(format!(
+            "CAST(CONVERT({name} USING utf8mb4) AS BINARY) <=> CAST(SPACE(0) AS BINARY)"
+        ));
+    }
     let placeholder = placeholder_for(driver_id, params.len());
+    let old_value = &crate::numeric_input::widened_single_precision(driver_id, column, old_value);
     let predicate = match driver_id {
         "postgres" if matches!(column.data_type.trim().to_ascii_lowercase().as_str(), "real" | "float4") => {
             format!("{name} IS NOT DISTINCT FROM {placeholder}::real")
@@ -205,14 +225,23 @@ fn optimistic_predicate(
             let value_sql = text_cast_placeholder(column, old_value, placeholder);
             format!("{name} IS NOT DISTINCT FROM {value_sql}")
         }
-        "sqlite" | "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
+        "sqlite" => format!("{name} COLLATE BINARY IS NOT DISTINCT FROM {placeholder}"),
+        "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
+        "mysql" if matches!(old_value, Value::Text(_)) => {
+            format!("CONVERT({name} USING utf8mb4) COLLATE utf8mb4_bin <=> {placeholder}")
+        }
         "mysql" => format!("{name} <=> {placeholder}"),
         "mssql" => {
             let next = placeholder_for(driver_id, params.len() + 1);
             params.push(old_value.clone());
             params.push(old_value.clone());
+            let compared = if matches!(old_value, Value::Text(_)) && is_mssql_character_type(&column.data_type) {
+                format!("{name} COLLATE Latin1_General_100_BIN2")
+            } else {
+                name.to_string()
+            };
             return Ok(format!(
-                "({name} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
+                "({compared} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
             ));
         }
         _ => return Err(BuildSqlError::UnsupportedDriver(driver_id.into())),

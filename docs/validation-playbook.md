@@ -1,10 +1,10 @@
 # Validation playbook
 
-Use this page to select checks, hand off work, and review evidence. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures; the [completion page](bookie-0.2-sprint.md) records 0.2.0, while the [backlog](backlog.md) and owning issues set subsequent order and acceptance. A green layer certifies only its named scope.
+Use this page to select checks, hand off work, and review evidence. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures; the [completion page](bookie-0.2-sprint.md) records 0.2.0, while [Project #3](https://github.com/users/cozyGarage/projects/3) and owning issues set selected work and acceptance. A green layer certifies only its named scope.
 
 ## Current desktop target
 
-The [sprint](bookie-0.2-sprint.md) records the maintainer's 2026-10-18 completion decision; use the release page linked there for current publication status. The [backlog](backlog.md) orders subsequent work; each selected issue names its acceptance layers. Debian/GNOME installed-package expansion remains later work. GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
+The [sprint](bookie-0.2-sprint.md) records the maintainer's 2026-10-18 completion decision; use the release page linked there for current publication status. Project #3 orders selected work; each issue names its acceptance layers. GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
 
 ## Start here
 
@@ -108,18 +108,16 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Scope | Entry point | Completion evidence |
 | --- | --- | --- |
 | Optional DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus app feature build |
-| Mutation | GitHub Linux test quality; Forgejo nightly; [local instructions](testing-quality-and-performance.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON; Forgejo also checks missed mutants against package baselines |
-| Coverage | Linux test quality; [local instructions](testing-quality-and-performance.md#coverage) | LCOV, exclusions and summary; this report has no threshold. Forgejo nightly separately enforces the unit-tier and per-crate floors. |
-| Flatpak | Flatpak Linux (packaging only) | Pull requests build the default profile; push and `workflow_dispatch` also build development; not regression acceptance |
+| Mutation | [Local instructions](testing-quality-and-performance.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON |
+| Coverage | [Local instructions](testing-quality-and-performance.md#coverage) | LCOV, exclusions and summary; use the configured coverage floor checks when qualifying a change |
+| Flatpak | Flatpak packaging scripts | Package build only; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
-| GTK soak | GTK Safety Soak | Five independent retry-free attempts per run at one resolved SHA. The 30-attempt/six-run threshold is in the [archived 0.2.0 handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md), not a default for future releases; current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
+| GTK soak | `bash scripts/test-gtk-safety.sh` | Record the tested revision and outcomes. Current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
 | Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) and issue acceptance criteria | VM/desktop version, Wayland session, package checksum, steps, result and screenshots |
 
 ## Hosted checks
 
-Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier. Accepted aggregate trains follow [ADR 0020](decisions/0020-aggregate-forgejo-trains.md) and the [train procedure](testing-ci.md#aggregate-train-acceptance): one gate on the exact aggregate PR head replaces constituent Forgejo gates only after manifest, freshness and merge-tree verification. A standalone `forgejo-train.sh` preflight is not aggregate acceptance. The current workflow files and [AGENTS.md](../AGENTS.md) define which checks run for each change and where acceptance happens. Forgejo workflows use per-ref concurrency groups with cancellation disabled: PR branches can run concurrently, while CI and nightly runs on `linux` remain serialized. Each execution runner has capacity one, so jobs from different refs can use separate idle workers without sharing a fixture process or display session. The gate script locks callers targeting the same remote branch; final `linux` synchronization stays serialized.
-
-The gate reports both the browser run number and the API run ID. They can differ. The train verifier's `--run` argument takes the API ID; task reporting uses the browser run number and the tested revision. Do not substitute one identifier for the other.
+Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier.
 
 Treat static-analysis findings as evidence to review. Fix valid findings in a focused change. For a confirmed false positive or accepted exception, record a short reason in the tool; keep a reusable explanation here only when it helps other contributors.
 
@@ -157,7 +155,7 @@ An agent must read `AGENTS.md`, inspect status and confirm the SHA before editin
 
 ## Turn every finding into a regression
 
-1. Record origin: user report, upstream issue/commit, mutation, fuzz case or CI run.
+1. Record origin: user report, external issue or commit, mutation, fuzz case or CI run.
 2. State the invariant and smallest input; record engine/version and expected type as well as value. Preserve a minimized sanitized fixture, never customer data.
 3. Add the lowest-tier reproducer and demonstrate failure before changing code.
 4. Fix the cause; cover valid, invalid and exact-boundary neighbors. Test each affected consumer: decode, binding, formatting, grid editing, export and re-import.
@@ -166,7 +164,7 @@ An agent must read `AGENTS.md`, inspect status and confirm the SHA before editin
 7. Run focused mutation checks with a nonzero selected count and independent expected values. Document each equivalent survivor with a concrete argument; leave unresolved survivors/timeouts open.
 8. Update scenario evidence and the owning issue or board. Keep the test with the fix.
 
-Use [value contracts](value-contracts.md) and the B3 board as the current case backlog. The [scenario survey](archive/b3-test-scenario-survey.md) records dated research patterns and source provenance. Current examples:
+Use [value contracts](value-contracts.md) and the B3 board as the current case backlog. Apply the [test design rules](test-design-rules.md) to each regression. Current examples:
 
 | Encountered scenario | Permanent regression home | Next edge to investigate |
 | --- | --- | --- |
@@ -182,7 +180,7 @@ Secure connection coverage is engine-specific. Track valid auth, rejected auth, 
 
 ## Release qualification
 
-For a future candidate, B3 requires closed correctness findings and their regressions. B4–B6 also require the planned installed-package, Wayland, upgrade/rollback and candidate soak evidence. Docker supplies deterministic servers and Xvfb supplies automated GTK interaction. The 0.2.0 release is already published; these criteria do not reopen that milestone. Arch/Omarchy under native Wayland is the selected 0.2.0 desktop target. Debian/GNOME VM qualification remains post-release backlog work. Xvfb and widget passes cannot certify a native Wayland target. No workflow here automatically publishes a release or waives an acceptance gate.
+For each release candidate, maintainers select the applicable platform checks. B3 qualification requires closed correctness findings and their regressions; installed-package, Wayland, upgrade/rollback and soak claims require evidence from those environments. Docker supplies deterministic servers and Xvfb supplies automated GTK interaction. The 0.2.0 release is already published; these criteria do not reopen that milestone. Xvfb and widget passes cannot certify native desktop behavior. All required release checks must pass before publication.
 
 ## Static-analysis triage
 
@@ -202,13 +200,13 @@ Disposition: confirmed framework-specific false positives from the web CSS analy
 
 ## CI tiers
 
-CI is split into fast feedback and slower integration or acceptance checks. Read the workflow definitions and [AGENTS.md](../AGENTS.md) for current triggers, required gates and ownership. A pull request is ready only when its required checks pass at the current head SHA. Skipped, cancelled, timed-out or unavailable checks are not passes. Scheduled runs and local results can add evidence, but do not replace a required check on the reviewed commit.
+CI is split into fast feedback and slower integration or acceptance checks. Read [AGENTS.md](../AGENTS.md) for current requirements. A pull request is ready only when its required checks pass at the current head SHA. Skipped, cancelled, timed-out or unavailable checks are not passes. Scheduled runs and local results can add evidence, but do not replace a required check on the reviewed commit.
 
 ### Pull request hygiene checks
 
-These small GitHub checks run on every pull request to `linux` and need no database or GTK. They make the squash commit and the workflows safe to merge; the Forgejo gate remains the acceptance record.
+These pull-request checks provide fast feedback for the exact revision and need no database or GTK. Passing them does not certify acceptance tiers they did not run.
 
-`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a GitHub readiness report, not Forgejo evidence; it blocks merging only if the repository ruleset is configured to require its stable check context.
+`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a readiness report, not a substitute for required check results; it blocks merging only if the repository ruleset is configured to require its stable check context.
 
 | Check | What it enforces |
 |---|---|

@@ -1,6 +1,6 @@
 # Decision lessons
 
-Reversed or corrected decisions and closures, each with what was assumed, the evidence that showed otherwise and what changed. Add a row when a closure is reopened or an ADR is superseded. This page records facts; it sets no rule ([documentation lifecycle proposal](../proposals/doc-lifecycle.md)).
+Reversed or corrected decisions and closures, each with what was assumed, the evidence that showed otherwise and what changed. Add a row when a closure is reopened or an ADR is superseded. This page records facts; it sets no rule.
 
 | Date | Item | Assumed | Evidence | What changed |
 | --- | --- | --- | --- | --- |

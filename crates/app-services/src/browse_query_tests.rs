@@ -71,6 +71,7 @@ fn hidden_filter_column_stays_in_predicate_but_not_projection() {
         columns: &columns,
         filter: &filter,
         hidden_columns: Some(&hidden),
+        long_text_preview: false,
     };
 
     let PageQuery::Sql(page) = target.page(0, 100, None, None).unwrap() else {
@@ -101,6 +102,7 @@ fn hidden_sort_column_stays_in_order_clause_and_composite_keys_stay_projected() 
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: Some(&hidden),
+        long_text_preview: false,
     };
 
     let PageQuery::Sql(page) = target.page(0, 100, Some((3, true)), None).unwrap() else {
@@ -125,6 +127,7 @@ fn hidden_projection_falls_back_without_a_key() {
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: Some(&hidden),
+        long_text_preview: false,
     };
     assert_eq!(target.projected_columns(), None);
 }
@@ -141,6 +144,7 @@ fn hidden_projection_stays_disabled_when_no_non_key_column_is_hidden() {
             columns: &columns,
             filter: &FilterSet::default(),
             hidden_columns: Some(&hidden),
+            long_text_preview: false,
         };
         assert_eq!(target.projected_columns(), None);
     }
@@ -158,6 +162,7 @@ fn hidden_projection_stays_disabled_for_native_document_and_key_browsing() {
             columns: &columns,
             filter: &FilterSet::default(),
             hidden_columns: Some(&hidden),
+            long_text_preview: false,
         };
         assert_eq!(target.projected_columns(), None);
         assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
@@ -179,6 +184,7 @@ fn hidden_raw_filter_column_stays_in_sql_but_not_projection() {
         columns: &columns,
         filter: &filter,
         hidden_columns: Some(&hidden),
+        long_text_preview: false,
     };
 
     let PageQuery::Sql(page) = target.page(0, 100, None, None).unwrap() else {
@@ -199,6 +205,7 @@ fn value_query_fetches_one_column_by_primary_key() {
         columns: &columns,
         filter: &FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     let query = target
         .value_query(2, &[Value::Text("acme".into()), Value::Int(7)])
@@ -222,7 +229,77 @@ fn unfiltered_unsorted_non_sql_fetch_stays_native_with_a_primary_key() {
             columns: &columns,
             filter: &FilterSet::default(),
             hidden_columns: None,
+            long_text_preview: false,
         };
         assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
     }
+}
+
+#[test]
+fn preview_projection_is_opt_in_and_per_engine() {
+    let columns = [column("id", true), column("body", false)];
+    let filter = FilterSet::default();
+    let target = |driver_id, long_text_preview| BrowseTarget {
+        driver_id,
+        schema: None,
+        table: "notes",
+        columns: &columns,
+        filter: &filter,
+        hidden_columns: None,
+        long_text_preview,
+    };
+    let PageQuery::Sql(on) = target("postgres", true).page(0, 10, None, None).unwrap() else {
+        panic!("preview pages run as SQL")
+    };
+    assert!(on.sql.contains("octet_length(\"body\") > 1048576"), "{}", on.sql);
+    for (driver, preview) in [("postgres", false), ("mysql", true), ("sqlite", true)] {
+        if let PageQuery::Sql(other) = target(driver, preview).page(0, 10, None, None).unwrap() {
+            assert!(!other.sql.contains("octet_length"), "{driver} {preview}: {}", other.sql);
+        }
+    }
+}
+
+#[test]
+fn only_a_well_formed_marker_becomes_a_partial_cell() {
+    let mut result = tablepro_core::QueryResult {
+        columns: (0..7).map(|index| column(&index.to_string(), false)).collect(),
+        rows: vec![vec![
+            Value::Text("\u{1}bookie-partial:2097152\u{1}xxxx".into()),
+            Value::Text("\u{1}bookie-partial:not-a-number\u{1}x".into()),
+            Value::Text("plain".into()),
+            Value::Null,
+            Value::Json(Box::new(serde_json::json!("\u{1}bookie-partial:5\u{1}{}"))),
+            Value::Int(1),
+            Value::Int(1),
+        ]],
+        truncated: false,
+    };
+    mark_partial_cells(&mut result, &[0, 4]);
+    assert_eq!(result.columns.len(), 5);
+    assert_eq!(result.rows[0].len(), 5);
+    assert_eq!(
+        result.rows[0][0],
+        Value::Undecodable("partial 2097152 bytes\u{1}xxxx".into())
+    );
+    assert_eq!(
+        parse_partial("partial 2097152 bytes\u{1}xxxx"),
+        Some((2_097_152, "xxxx"))
+    );
+    assert_eq!(parse_partial("partial lots"), None);
+    assert!(matches!(&result.rows[0][1], Value::Text(_)));
+    assert_eq!(result.rows[0][2], Value::Text("plain".into()));
+    assert_eq!(result.rows[0][3], Value::Null);
+    assert_eq!(result.rows[0][4], Value::Undecodable("partial 5 bytes\u{1}{}".into()));
+}
+
+#[test]
+fn ordinary_marker_shaped_text_is_preserved() {
+    let stored = Value::Text("\u{1}bookie-partial:2097152\u{1}xxxx".into());
+    let mut result = tablepro_core::QueryResult {
+        columns: vec![],
+        rows: vec![vec![stored.clone()]],
+        truncated: false,
+    };
+    mark_partial_cells(&mut result, &[]);
+    assert_eq!(result.rows[0][0], stored);
 }

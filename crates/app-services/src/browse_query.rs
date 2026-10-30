@@ -4,9 +4,12 @@ use tablepro_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build
 
 use order::resolved_order_by;
 
+mod long_text;
 mod mongodb;
 mod order;
 mod redis;
+
+pub use long_text::{mark_partial_cells, parse_partial};
 
 pub struct BrowseTarget<'a> {
     pub driver_id: &'a str,
@@ -15,6 +18,7 @@ pub struct BrowseTarget<'a> {
     pub columns: &'a [ColumnInfo],
     pub filter: &'a FilterSet,
     pub hidden_columns: Option<&'a HashSet<String>>,
+    pub long_text_preview: bool,
 }
 
 #[derive(Debug)]
@@ -23,6 +27,7 @@ pub struct BoundQuery {
     pub params: Vec<Value>,
     pub projected_columns: Option<Vec<usize>>,
     pub reverse_rows: bool,
+    pub preview_columns: Vec<usize>,
 }
 
 #[derive(Debug)]
@@ -51,6 +56,7 @@ impl BrowseTarget<'_> {
             params: Vec::new(),
             projected_columns: None,
             reverse_rows: false,
+            preview_columns: Vec::new(),
         };
         if let Some((clause, params)) = filter {
             query.sql.push_str(" WHERE ");
@@ -85,6 +91,7 @@ impl BrowseTarget<'_> {
             params,
             projected_columns: None,
             reverse_rows: false,
+            preview_columns: Vec::new(),
         })
     }
 
@@ -131,9 +138,19 @@ impl BrowseTarget<'_> {
         row_id_order: bool,
         direction: PageDirection,
     ) -> Result<PageQuery, String> {
-        let (projection, projected) = self.projection();
+        let (mut projection, projected) = self.projection();
+        let previewing = match long_text::projection(self).filter(|_| projected.is_none()) {
+            Some(preview) => {
+                projection = preview;
+                true
+            }
+            None => false,
+        };
         let mut query = self.filtered_query(&projection)?;
         query.projected_columns = projected;
+        if previewing {
+            query.preview_columns = long_text::preview_columns(self);
+        }
         let order = if sort.is_none() && matches!(self.driver_id, "mongodb" | "redis") {
             None
         } else {
@@ -165,7 +182,7 @@ impl BrowseTarget<'_> {
         let actual_offset = if seek_last || cursor_applied {
             0
         } else {
-            if self.filter.is_empty() && order.is_none() {
+            if self.filter.is_empty() && order.is_none() && !previewing {
                 return Ok(PageQuery::Native);
             }
             offset
