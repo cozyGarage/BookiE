@@ -1180,6 +1180,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::preview::tests::the_preview_is_read_only_and_shows_no_blinking_caret"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::row_inspector::tests::markup_like_values_and_names_are_shown_as_typed"
     ],
     [
