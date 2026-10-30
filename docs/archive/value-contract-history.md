@@ -2729,7 +2729,7 @@ rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutan
 rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --ignored --test-threads=1
 ```
 
-The [CI audit](ci-audit-2026-09-27.md) found nine survivors in the broader hosted
+The [CI audit at its recorded source](https://github.com/cozyGarage/BookiE/blob/8d0d9550544afaea70b229c820f7e78e268a5ec5/docs/archive/ci-audit-2026-09-27.md) found nine survivors in the broader hosted
 PostgreSQL mutation run. New regressions use an independent 16,777,216-byte limit,
 test exact quoted-output and raw-element boundaries, check dimension rejection
 before decoding, reject fractional groups beyond declared scale and preserve
