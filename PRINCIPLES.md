@@ -12,6 +12,6 @@ The standing principles. An explicit edit to this file is the only way to change
 - **Fix the cause.** Reproduce or trace a defect before changing code. Every testable behaviour change needs a regression test in the lowest tier that can show it.
 - **Protect resource bounds.** Performance fixes preserve tested limits on retention, ownership and work. Use reproducible measurements for latency and process memory; passing functional tests does not establish either.
 - **Small, reviewable changes.** One concern per change. Do not mix unrelated cleanup into a fix.
-- **Forgejo is the merge gate.** GitHub jobs may advise. Do not silence a Forgejo merge tier to land other work.
+- **Required checks must pass.** Do not bypass a required check to land other work.
 
 Operational rules, lanes and commands live in [AGENTS.md](AGENTS.md).

@@ -4,6 +4,6 @@ Proposals record designs that have not become accepted decisions. They do not se
 
 | Proposal | Current boundary |
 |---|---|
-| [Local dependency patches](upstream-patches.md) | Removal criteria and patch provenance; verify current upstream releases before changing vendored code. |
+| [Local dependency patches](dependency-patches.md) | Local behavior and removal criteria; verify released dependency behavior before changing vendored code. |
 
 Use the current [validation playbook](../validation-playbook.md) for test tiers and commands.

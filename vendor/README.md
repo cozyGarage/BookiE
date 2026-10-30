@@ -18,5 +18,5 @@ changing a vendored file by hand, run `python3 scripts/vendor-patches.py generat
 | `mongodb` | 3.9.1 | Reject SCRAM iteration counts above 100,000 and check the server nonce by prefix. Let the TLS layer verify a hostname different from the one it dials. |
 | `redis` | 1.7.0 | Let a TLS connection verify a hostname different from the one it dials, so a certificate check survives an SSH tunnel's loopback dial address. Benchmarks, examples, tests, the changelog and `release.toml` are not vendored; the licence file is. |
 
-Upstreaming these patches would let the copies be dropped; see
-[the dependency review](../docs/proposals/upstream-patches.md).
+A released dependency version with these behaviors would let the local copies be dropped; see
+[the dependency patch guide](../docs/proposals/dependency-patches.md).
