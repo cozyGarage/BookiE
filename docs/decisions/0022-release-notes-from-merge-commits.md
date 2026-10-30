@@ -3,12 +3,12 @@
 - **Status**: Accepted
 - **Date**: 2026-10-24
 - **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0022-release-notes-come-from-merge-commits)
-- **Supersedes**: the 2026-10-19 [changelog fragment evaluation](../archive/changelog-fragment-evaluation-2026-10-19.md), which kept a shared `CHANGELOG.md` and named its own revisit trigger.
+- **Supersedes**: the shared `CHANGELOG.md` release-note workflow.
 - **Clarified**: 2026-10-25 for implementation status. The pull-request body validation workflow has landed; the release workflow still reads `CHANGELOG.md`.
 
 ## Context
 
-Every pull request edited the `[Unreleased]` section of `CHANGELOG.md`. Between 2026-10-10 and 2026-10-24, 284 of 1,071 commits on `linux` touched that one file, and concurrent pull requests conflicted in it. The October 19 evaluation declined Towncrier fragments because conflict cost was unmeasured, and asked to reopen if conflicts recurred. They did.
+Every pull request edited the `[Unreleased]` section of `CHANGELOG.md`. Concurrent pull requests conflicted in that shared section.
 
 Release notes are release output. A file that every change rewrites puts generated-looking content in the source tree and makes the aggregate train PRs of [ADR 0020](0020-aggregate-forgejo-trains.md) combine edits by hand.
 

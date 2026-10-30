@@ -92,7 +92,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [Remaining-gap acceptance, October 15](archive/remaining-gaps-2026-10-15.md) (dated evidence for completed distro, SQL proposal and disconnect-cache findings)
 - [Offline release input audit, October 19](archive/offline-release-input-audit-2026-10-19.md) (current Arch candidate evidence and remaining offline inputs)
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
-- [Changelog fragment evaluation, October 19](archive/changelog-fragment-evaluation-2026-10-19.md) (kept the current workflow because commit volume did not establish conflict cost)
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md) and its [inventory companion](archive/architecture-consistency-2026-10-03-inventory.md)
 - [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
