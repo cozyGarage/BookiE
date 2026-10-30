@@ -30,13 +30,13 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 
 - [Public documentation language review, October 21](evidence/public-documentation-language-2026-10-21/README.md): repository-wide Markdown screening, neutral wording corrections and independent adoption criteria.
 
-- [Beekeeper Studio live UX observation, October 22](../archive/beekeeper-studio-live-ux-observation-2026-10-22.md): connection form, filter modes, schema/type presentation, sidebar affordances and export scope, compared with current BookiE behavior.
+- Competitor UX observations and comparisons were moved to the private research archive; current BookiE controls are documented in the user guide and capability specs.
 
 - dbx architecture and regression follow-up, October 21: changes since the prior pin, PostgreSQL session/restore lessons, current architecture guards and qualified regression candidates.
 
 - TablePro and dbx deep review, October 20: full feature, architecture and fix-commit mapping of TablePro `3222542a4` and dbx `d1e88ab4b` against BookiE `7c4cb3929`, with Wave 0 defects to confirm and a ranked roadmap of candidates.
 
-- [Linux code adoption and development workflow](../archive/upstream-linux-adoption-2026-10-18.md), with the [source movement audit](../archive/upstream-linux-movement-2026-10-18.md): code, CI, conventions and closed post-0.2.0 tracker [#1149](https://github.com/cozyGarage/BookiE/issues/1149).
+- The October 18 upstream Linux adoption and source movement audits were moved to the private research archive; accepted BookiE decisions and shipped behavior remain documented in ADRs and capability specs.
 - [0.2.0 completion handoff](../archive/bookie-0.2-completion-handoff-2026-10-18.md): maintainer completion statement, publication boundary and previous scope/sprint snapshots.
 
 - [Code and UI audit, October 18](../archive/code-and-ui-audit-2026-10-18.md): dated source evidence for pending-state cues, high contrast and responsiveness.
@@ -45,7 +45,7 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [Peer-review delivery tracker](https://github.com/cozyGarage/BookiE/issues/1026) and its lane-owned slices are the current work queue for the review below.
 - [Linux documentation update plan and peer review, October 16](../archive/linux-peer-review-2026-10-16.md): source reconciliation, architecture boundaries, and regression candidates.
 - [Linux peer review, October 17](../archive/linux-peer-review-2026-10-17.md): dated source checks and applicable regression-test lessons.
-- [PostgreSQL edge-case research archive](../archive/2026-10-15-postgresql-client-research/review.md), with its [scenario catalogue](../archive/2026-10-15-postgresql-client-research/cases.csv) and [probe evidence](../archive/2026-10-15-postgresql-client-research/manifest.json). These are dated source-comparison records; current BookiE contracts are summarized in the [capability review](../capability-review.md).
+- The October 15 PostgreSQL client comparison and probe packet was moved to the private research archive. Current BookiE contracts are summarized in the [capability review](../capability-review.md).
 
 
 - [CI build speed proposal](../proposals/ci-build-speed.md): where Forgejo gate time goes, a `ci` build profile for GUI scenario jobs and sharded distro-floor scenarios, ordered after the ADR 0021 runner upgrade.
