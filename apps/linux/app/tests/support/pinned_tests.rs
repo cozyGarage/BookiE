@@ -80,6 +80,32 @@ fn nothing_is_pinned_until_asked() {
 }
 
 #[test]
+fn live_stream_updates_store_latest_and_only_clone_when_a_display_list_is_needed() {
+    let mut cache = super::super::stream_pages::StreamPageCache::default();
+    let page = page(&[1]);
+    cache.append(0, page.clone()).unwrap();
+    let outcome = StatementOutcome {
+        kind: StatementOutcomeKind::Streamed(Box::new(
+            cache.snapshot(super::super::stream_pages::StreamTerminal::Loading, None),
+        )),
+        ..rows("SELECT 1")
+    };
+    let page_owners_before = Arc::strong_count(&page);
+    let mut pins = PinnedResults::default();
+
+    pins.set_latest(outcome);
+    assert_eq!(Arc::strong_count(&page), page_owners_before);
+    assert_eq!(pins.latest().len(), 1);
+    assert!(!pins.has_results());
+
+    let displayed = pins.displayed();
+    assert_eq!(Arc::strong_count(&page), page_owners_before + 1);
+    drop(displayed);
+
+    assert_eq!(Arc::strong_count(&page), page_owners_before);
+}
+
+#[test]
 fn pinned_results_stay_ahead_of_the_next_run() {
     let mut pins = PinnedResults::default();
     pins.show(vec![rows("SELECT 1"), failed("SELECT x")]);
