@@ -353,7 +353,15 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
         settings_store: LocalResultSettingsStore::default(),
     };
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let (first, _) = streamed(&[0], vec![page(&[1, 2])], 2);
+    let original = page(&[1, 2]);
+    let retired = Arc::downgrade(&original);
+    let columns = original.columns.clone();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    runtime.block_on(spool.append_page(0, original.clone())).unwrap();
+    let (first, _) = streamed(&[0], vec![original.clone()], 2);
     super::super::outcomes::render_outcomes(
         &holder,
         std::slice::from_ref(&first),
@@ -363,6 +371,8 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
         LocalResultSettingsStore::default(),
         None,
     );
+    drop(first);
+    drop(original);
     let root = holder.clone().upcast::<gtk::Widget>();
     let pages = named::<gtk::Stack>(&root, LIVE_PAGES).unwrap();
     let first_page = pages.first_child().unwrap();
@@ -385,6 +395,10 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
             .first_child()
             .is_some_and(|child| child.has_css_class("tp-stream-page-placeholder"))
     );
+    while gtk::glib::MainContext::default().iteration(false) {}
+    assert!(retired.upgrade().is_none(), "retired page must release its result");
+    let reloaded = runtime.block_on(spool.load_page(0, columns)).unwrap();
+    assert_eq!(reloaded.rows, vec![vec![Value::Int(1)], vec![Value::Int(2)]]);
 }
 
 #[test]
