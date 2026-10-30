@@ -67,7 +67,7 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 
 | Archived document | Baseline lines | Current declaration matches | Explicit BookiE issue state | Disposition |
 | --- | ---: | ---: | --- | --- |
-| [2026-10-15-dbx-review.md](../../archive/2026-10-15-dbx-review.md) | 194 | 0 | 5 closed / 3 open | Historical record; no current runtime claim |
+| 2026-10-15-dbx-review.md | 194 | 0 | 5 closed / 3 open | Historical record; no current runtime claim |
 | [2026-10-15-postgresql-client-research/review.md](../../archive/2026-10-15-postgresql-client-research/review.md) | 154 | 1 | 8 closed / 4 open | Source traced; historical runtime scope |
 | [agent-tooling-review-2026-10-20.md](../../archive/agent-tooling-review-2026-10-20.md) | 63 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [app-layer-external-audit-2026-10-06.md](../../archive/app-layer-external-audit-2026-10-06.md) | 263 | 1 | No explicit BookiE issue URL | Source traced; historical runtime scope |
