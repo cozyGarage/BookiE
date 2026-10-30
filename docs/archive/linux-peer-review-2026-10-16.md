@@ -26,7 +26,7 @@ The October 15 dbx review, [PostgreSQL research](2026-10-15-postgresql-client-re
 Confirmed against the reviewed source:
 
 - `ARCHITECTURE.md`, its SQL editor row, and ADR 0011's implementation status say the editor does not use cursors. PR #908 is merged. PostgreSQL editor streaming retains four pages, with a 5,000-row fetch size. Other engines retain the materialized path.
-- `docs/0.2-feature-comparison.md` says credential-bearing history is still saved (#967). PR #988 is merged and #967 is closed. It also calls streaming wholly open.
+- The dated feature comparison said credential-bearing history was still saved (#967). PR #988 is merged and #967 is closed. It also called streaming wholly open. The comparison was later moved to the private research archive.
 - That comparison combines **TablePlus and TablePro**, attributing TablePlus release numbers and features to one row. These are separate products. TablePro's inspected main tip is v0.81.0. Split their identities and sources before using the page to choose parity work.
 - `docs/backlog.md` calls full-value editing an active #610 PR. #610 is a closed issue; its implementation landed through #939. The user guide already describes it.
 - `ARCHITECTURE.md` omits `tablepro-dump`, although the workspace, boundary allowlist and preflight list include it. ADR 0019 is accepted. Vendor-tool foundations (#999), SSH endpoint assembly (#1005), and administrative guard operations (#1008) are merged; the user-facing PostgreSQL backup/restore PR #1017 remains open. Neither foundations nor an open PR prove the UI shipped.
