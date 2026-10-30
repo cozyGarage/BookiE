@@ -1,8 +1,8 @@
 dbus-daemon[2359486]: [session uid=1000 pid=2359486 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1000 pid=2359514 comm="gdbus call --session --dest org.a11y.Bus --object-")
 dbus-daemon[2359486]: [session uid=1000 pid=2359486 pidfd=5] Successfully activated service 'org.a11y.Bus'
-   Compiling tablepro-app v0.1.5 (/tmp/bookie-b4-i5/linux/crates/app)
+   Compiling tablepro-app v0.1.5 (/tmp/worktree-b4-i5/linux/crates/app)
     Finished `release` profile [optimized] target(s) in 31.31s
-dbus-daemon[2359525]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=2359682 comm="python3 /tmp/bookie-b4-i5/linux/crates/app/tests/g")
+dbus-daemon[2359525]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=2359682 comm="python3 /tmp/worktree-b4-i5/linux/crates/app/tests/g")
 dbus-daemon[2359525]: Successfully activated service 'org.a11y.atspi.Registry'
 SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
 dbus-daemon[2359486]: [session uid=1000 pid=2359486 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.7' (uid=1000 pid=2359683 comm="[user-home]/Projects/tablepro/linux/target/install")

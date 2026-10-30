@@ -35,11 +35,21 @@ pub(super) fn columns_for_browse_page(
 pub(super) fn with_table_ownership(columns: &mut [ColumnInfo], table: &[ColumnInfo]) {
     for column in columns {
         if let Some(known) = table.iter().find(|known| known.name == column.name) {
+            if column.data_type.is_empty() || column.data_type.eq_ignore_ascii_case("NULL") {
+                column.data_type.clone_from(&known.data_type);
+            }
             column.is_generated |= known.is_generated;
             column.is_auto_increment |= known.is_auto_increment;
             column.primary_key |= known.primary_key;
         }
     }
+}
+
+fn merge_table_columns(result: &mut QueryResult, table: &[ColumnInfo]) {
+    if result.columns.is_empty() && !table.is_empty() {
+        result.columns = table.to_vec();
+    }
+    with_table_ownership(&mut result.columns, table);
 }
 
 fn projection_for_loaded_page(result: &QueryResult, projection: Option<Vec<usize>>) -> Option<Vec<usize>> {
@@ -89,6 +99,7 @@ pub struct BrowseTab {
     /// `current_columns`. Drives the cell value picker; empty for a
     /// driver that doesn't report foreign keys or a table with none.
     foreign_keys: Vec<ForeignKeyInfo>,
+    inbound_foreign_keys: Vec<tablepro_core::InboundForeignKeyInfo>,
     choice_labels: crate::ui::grid::ChoiceMap,
     current_result: Option<std::sync::Arc<QueryResult>>,
     current_projection: Option<Vec<usize>>,
@@ -104,6 +115,7 @@ pub struct BrowseTab {
     page_requests: PageRequestTracker,
     row_count_requests: RowCountRequestTracker,
     cell_value_requests: CellValueRequestTracker,
+    pending_cell_edit: std::cell::RefCell<Option<(BrowseCellValueRequest, u32, Vec<Value>)>>,
 
     inner_stack: gtk::Stack,
     grid_holder: gtk::Box,
@@ -630,6 +642,7 @@ impl SimpleComponent for BrowseTab {
             current_filter: initial_filter,
             current_columns: Vec::new(),
             foreign_keys: Vec::new(),
+            inbound_foreign_keys: Vec::new(),
             choice_labels: Default::default(),
             current_result: None,
             current_projection: None,
@@ -643,6 +656,7 @@ impl SimpleComponent for BrowseTab {
             page_requests: PageRequestTracker::default(),
             row_count_requests: RowCountRequestTracker::default(),
             cell_value_requests: CellValueRequestTracker::default(),
+            pending_cell_edit: std::cell::RefCell::new(None),
             inner_stack,
             grid_holder,
             current_column_view: None,
@@ -741,9 +755,7 @@ impl SimpleComponent for BrowseTab {
                 // so the headers render even when the page is empty.
                 let projected_columns = projection_for_loaded_page(&result, projected_columns);
                 let mut result = result;
-                if result.columns.is_empty() && !self.current_columns.is_empty() {
-                    result.columns = self.current_columns.clone();
-                }
+                merge_table_columns(&mut result, &self.current_columns);
                 self.current_columns = columns_for_browse_page(&self.driver_id, &self.current_columns, Some(&result));
                 self.keyset_cursor =
                     extract_keyset_cursor(&self.current_columns, &result, projected_columns.as_deref());
@@ -773,10 +785,8 @@ impl SimpleComponent for BrowseTab {
                 // driver derives it from the first row), refill it now
                 // so the upcoming `render_grid_if_ready` builds headers
                 // against the real schema instead of an empty list.
-                if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut)
-                    && result.columns.is_empty()
-                {
-                    result.columns = columns.clone();
+                if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut) {
+                    merge_table_columns(result, &self.current_columns);
                 }
                 self.refresh_crud_buttons();
                 // Filter strip rebuilds against the new schema —
@@ -796,6 +806,13 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::ForeignKeysLoaded(foreign_keys) => {
                 if self.foreign_keys != foreign_keys {
                     self.foreign_keys = foreign_keys;
+                    self.current_column_view = None;
+                    self.render_grid_if_ready(sender);
+                }
+            }
+            BrowseTabInput::InboundForeignKeysLoaded(inbound) => {
+                if self.inbound_foreign_keys != inbound {
+                    self.inbound_foreign_keys = inbound;
                     self.current_column_view = None;
                     self.render_grid_if_ready(sender);
                 }
@@ -866,6 +883,7 @@ impl SimpleComponent for BrowseTab {
             }
             BrowseTabInput::FilterByValue { column, value } => self.filter_by_value(&column, &value, &sender),
             BrowseTabInput::GoToReference { column, row } => self.go_to_reference(&column, &row, &sender),
+            BrowseTabInput::ShowReferencingRows { row } => self.show_referencing_rows(&row, &sender),
             BrowseTabInput::ToggleFilterStrip => {
                 if let Some(strip) = self.filter_strip.as_ref() {
                     strip.toggle();
@@ -999,7 +1017,8 @@ impl SimpleComponent for BrowseTab {
                 col_index,
                 column_name,
                 row_key,
-            } => self.request_cell_value(col_index, column_name, row_key, sender),
+                edit_row_position,
+            } => self.request_cell_value(col_index, column_name, row_key, edit_row_position, sender),
             BrowseTabInput::CellValueLoaded {
                 request,
                 col_index,

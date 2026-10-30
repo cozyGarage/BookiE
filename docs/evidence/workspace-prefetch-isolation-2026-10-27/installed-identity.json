@@ -1,0 +1,8 @@
+{
+  "source_commit": "c53e606dc",
+  "profile": "ci",
+  "binary_sha256": "7b97a3739eaa4f3712416e818c9d0eb29e6db402034953590dff1056738f8193",
+  "scenario_count": 2,
+  "retries": 0,
+  "exit_code": 0
+}

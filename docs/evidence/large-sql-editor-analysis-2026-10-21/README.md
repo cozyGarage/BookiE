@@ -20,7 +20,7 @@ The completion refresh helper moves into the existing completion provider module
 
 An isolated GTK test fails against the original unbounded extraction after an ASCII buffer exceeds the budget. The fixed test also covers an exact-size ASCII document, multibyte UTF-8 below and above the byte limit, and preservation of the complete buffer text. Existing normal completion activation and statement-band cases remain registered. Fresh preflight, all 95 isolated GTK cases, app all-target Clippy and documentation/inventory checks passed on the recorded base. The completion integration case verifies that proposals return and activate after a large buffer is replaced by a small query. The band case verifies clearing after growth past the limit. Native end-to-end profiling remains unverified.
 
-The [pinned TablePro guidance](https://github.com/TableProApp/TablePro/blob/8085bff2dd87d80ab1ca29a550e347e749fa2985/CLAUDE.md) identifies repeated whole-string traversal and eager layout as historical performance hazards. The local source trace and regression establish the mechanism here; no upstream code is copied. Separate query rendering and resource acceptance remain under [#1272](https://github.com/cozyGarage/BookiE/issues/1272).
+The local source trace and regression establish the mechanism and the scope of this change. Separate query rendering and resource acceptance remain under [#1272](https://github.com/cozyGarage/BookiE/issues/1272).
 
 ## Remaining limits
 

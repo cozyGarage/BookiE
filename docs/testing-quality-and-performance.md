@@ -4,7 +4,7 @@ Part of [testing](testing.md), which holds the test tiers, runner and fixtures.
 
 ## Measuring how good the tests are
 
-The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests, intentional exclusions and packaging-only green runs. Mutation and coverage run on a schedule. The unit-tier line-coverage score has its own ratcheted floor in `baselines/coverage-floor.txt` (59%; 59.41% measured on 2026-10-11). The nightly workflow separately measures Docker suites for PostgreSQL, MySQL, SQLite, MongoDB, Redis and ClickHouse against `baselines/coverage-floors-crates.txt`. Installed GTK is outside both coverage reports. These floors do not measure every crate or prove assertion quality; the current manual measurements and unmeasured areas are recorded in [#782](https://github.com/cozyGarage/BookiE/issues/782). Mutation survivors need investigation. Dated first-run mutation notes are in [testing history](archive/testing-history.md#mutation-first-run-notes-2026-08-22).
+A green workflow proves only that its configured jobs succeeded; it does not establish that skipped or unconfigured tests ran. Mutation and coverage run on a schedule. The unit-tier line-coverage score has its own ratcheted floor in `baselines/coverage-floor.txt` (59%; 59.41% measured on 2026-10-11). The nightly workflow separately measures Docker suites for PostgreSQL, MySQL, SQLite, MongoDB, Redis and ClickHouse against `baselines/coverage-floors-crates.txt`. Installed GTK is outside both coverage reports. These floors do not measure every crate or prove assertion quality; the current manual measurements and unmeasured areas are recorded in [#782](https://github.com/cozyGarage/BookiE/issues/782). Mutation survivors need investigation. Dated first-run mutation notes are in [testing history](archive/testing-history.md#historical-mutation-first-run-notes-2026-08-22).
 
 ### Mutation testing
 
@@ -60,10 +60,10 @@ These structural guards do not bound total process RSS, allocator caches, driver
 
 ## Completion host profile
 
-`cargo run --release -p tablepro-app-services --example completion_benchmark` prints one JSON array with the minimum, median and mean time of one completion lookup over catalogs of 1,000 to 100,000 names and scripts of 16 KB to 3.6 MB. It is a host sample, not a gate: the work contracts above are what fail a build. The [2026-10-28 profile](evidence/completion-keystroke-profile-2026-10-28/README.md) records a before and after run and the host it ran on.
+`cargo run --release -p tablepro-app-services --example completion_benchmark` prints one JSON array with the minimum, median and mean time of one completion lookup over catalogs of 1,000 to 100,000 names and scripts of 16 KB to 3.6 MB. Treat elapsed time as a host sample, not a gate; the deterministic work contracts above are the regression checks.
 
 ## Browse performance
 
-See [the September measurements](archive/performance-2026-09.md) and the `browse_benchmark` example in the release-test crate. One warm-up plus five measured samples cover first, filtered, deep, wide and capped result sets. Run each case in a separate process against a disposable fixture, with builds complete before measuring. Report memory improvements and latency regressions separately.
+Use the `browse_benchmark` example in the release-test crate. One warm-up plus five measured samples cover first, filtered, deep, wide and capped result sets. Run each case in a separate process against a disposable fixture, with builds complete before measuring. Report memory improvements and latency regressions separately.
 
-The [bug and consistency audit](archive/bug-consistency-2026-09.md) records the newer targeted mutation findings. cargo-mutants creates its report beneath `<output>/mutants.out/`; CI summaries distinguish missing reports from zero findings and retain the measurement step outcome.
+cargo-mutants creates its report beneath `<output>/mutants.out/`; CI summaries distinguish missing reports from zero findings and retain the measurement step outcome.

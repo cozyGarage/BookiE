@@ -176,6 +176,7 @@ impl App {
             columns: &columns,
             filter: &filter,
             hidden_columns: Some(&hidden_columns),
+            long_text_preview: columns.iter().any(|column| column.primary_key),
         };
         let row_id_order = self.relation_is_ordinary_table(schema.as_deref(), &table);
         let page = if reverse_page {
@@ -218,10 +219,11 @@ impl App {
                         ),
                         PageQuery::Sql(query) => {
                             let projected_columns = query.projected_columns.clone();
-                            (
-                                conn.query_params_controlled(&query.sql, &query.params, &control).await,
-                                projected_columns,
-                            )
+                            let mut page = conn.query_params_controlled(&query.sql, &query.params, &control).await;
+                            if let Ok(rows) = page.as_mut() {
+                                crate::services::browse_query::mark_partial_cells(rows, &query.preview_columns);
+                            }
+                            (page, projected_columns)
                         }
                     };
                     match result {
@@ -317,6 +319,13 @@ impl App {
                     {
                         sender_clone.input(AppMsg::ForeignKeysLoaded(tab_id, foreign_keys));
                     }
+                    if let Ok(inbound) = conn
+                        .fetch_inbound_foreign_keys_controlled(schema.as_deref(), &table, &control)
+                        .await
+                        && !control.cancellation_token().is_cancelled()
+                    {
+                        sender_clone.input(AppMsg::InboundForeignKeysLoaded(tab_id, inbound));
+                    }
                 })
                 .drop_on_shutdown()
         });
@@ -350,6 +359,7 @@ impl App {
             columns: &columns,
             filter: &filter,
             hidden_columns: None,
+            long_text_preview: false,
         };
         let query = match target.count() {
             Ok(query) => query,
@@ -438,6 +448,14 @@ impl App {
 
     pub(super) fn on_browse_foreign_keys_loaded(&self, tab_id: Uuid, foreign_keys: Vec<tablepro_core::ForeignKeyInfo>) {
         self.dispatch_to_tab(tab_id, BrowseTabInput::ForeignKeysLoaded(foreign_keys));
+    }
+
+    pub(super) fn on_browse_inbound_foreign_keys_loaded(
+        &self,
+        tab_id: Uuid,
+        inbound: Vec<tablepro_core::InboundForeignKeyInfo>,
+    ) {
+        self.dispatch_to_tab(tab_id, BrowseTabInput::InboundForeignKeysLoaded(inbound));
     }
 
     pub(super) fn on_browse_rows_loaded(
@@ -744,6 +762,7 @@ fn browse_cell_value_query(
         columns,
         filter: &tablepro_core::FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     }
     .value_query(col_index, row_key)
 }

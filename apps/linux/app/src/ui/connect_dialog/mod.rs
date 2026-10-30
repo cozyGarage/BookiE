@@ -42,6 +42,7 @@ pub struct ConnectDialog {
     tls_client_cert: adw::EntryRow,
     tls_client_key: adw::EntryRow,
     read_only: adw::SwitchRow,
+    connect_timeout_row: adw::ActionRow,
     connect_timeout: gtk::SpinButton,
     query_timeout: gtk::SpinButton,
     environment: AccessibleChoice,
@@ -97,7 +98,7 @@ mod error_tests;
 pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
 use form::{default_driver_row, test_result_text};
-use identity::{ConnectionIdentity, find_existing, saved_connection_name};
+use identity::{ConnectionIdentity, find_existing, preserve_attached_databases, saved_connection_name};
 pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
 
 pub struct ConnectDialogInit {
@@ -389,6 +390,7 @@ impl Component for ConnectDialog {
             tls_client_cert,
             tls_client_key,
             read_only,
+            connect_timeout_row,
             connect_timeout,
             query_timeout,
             environment,
@@ -630,7 +632,11 @@ impl Component for ConnectDialog {
                                                 &metadata,
                                                 tablepro_policy::Principal::human_gui(),
                                             );
-                                            match guarded.list_tables_controlled(&control).await {
+                                            let listed = match guarded {
+                                                Ok(guarded) => guarded.list_tables_controlled(&control).await,
+                                                Err(error) => Err(tablepro_core::DriverError::PolicyDenied(error)),
+                                            };
+                                            match listed {
                                                 Ok(tables) => Ok(tables.len()),
                                                 Err(error) => Err(crate::services::error_text::driver_message(&error)),
                                             }
@@ -815,6 +821,7 @@ impl ConnectDialog {
         self.apply_socket_visibility(endpoint);
         self.tls_row.set_visible(network);
         self.auth_group.set_visible(!self.form.file_based);
+        self.connect_timeout_row.set_visible(!self.form.file_based);
         self.ssh.set_visible(network);
         if socket {
             self.tls_mode.set_selected(TlsMode::Disabled.index());
@@ -827,39 +834,6 @@ impl ConnectDialog {
         let credentials = self.form.shows_credentials();
         self.username.set_visible(credentials);
         self.password.set_visible(credentials);
-    }
-
-    fn collect_options(&self, driver: &dyn tablepro_core::DatabaseDriver) -> ConnectOptions {
-        let socket = self.uses_local_socket();
-        let (local_socket_dir, local_socket_path) =
-            self.selected_socket_options(self.form.local_socket_path_kind(), socket);
-        let (username, password) = if self.form.shows_credentials() {
-            let entered = self.username.text().trim().to_string();
-            let username = if socket && entered.is_empty() {
-                whoami::username().unwrap_or_default()
-            } else {
-                entered
-            };
-            (username, self.password.text().to_string())
-        } else {
-            (String::new(), String::new())
-        };
-        ConnectOptions {
-            host: self.host.text().trim().to_string(),
-            port: self.port.value() as u16,
-            database: form::typed_database(&self.database.text()),
-            auth_source: auth_source::value(&self.auth_source),
-            username,
-            password: SecretString::new(password.into()),
-            tls: self.tls_config_for(driver),
-            auth_mode: self.form.mode(),
-            local_socket_dir,
-            local_socket_path,
-            application_name: Some("BookiE".into()),
-            connect_timeout_secs: timeout_value(self.connect_timeout.value()),
-            read_only: self.read_only.is_active(),
-            ..Default::default()
-        }
     }
 
     fn endpoint_state(&self) -> crate::services::connection_form::EndpointFormState {
@@ -969,7 +943,7 @@ async fn open_candidate(
         conn.clone(),
         bootstrap.metadata,
         tablepro_policy::Principal::human_gui(),
-    );
+    )?;
     let server_version = match guarded.server_version().await {
         Ok(version) => version,
         Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
@@ -1010,6 +984,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         query_timeout_secs,
         cancel,
     } = request;
+    let mut opts = opts;
     let stored_password: SecretString = opts.password.clone();
     let ssh_for_establish = ssh.as_ref().map(SshInputs::route).transpose()?;
     let opts_clone = opts.clone();
@@ -1022,6 +997,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         ssh: ssh.as_ref(),
     };
     let existing = find_existing(&identity).await;
+    preserve_attached_databases(&driver_id, existing.as_ref(), &mut opts);
     let id = existing
         .as_ref()
         .map(|connection| connection.id)
@@ -1095,6 +1071,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         connect_timeout_secs: opts_clone.connect_timeout_secs,
         query_timeout_secs,
         auth_source: opts_clone.auth_source.clone(),
+        attached_databases: opts.attached_databases.clone(),
     };
 
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;

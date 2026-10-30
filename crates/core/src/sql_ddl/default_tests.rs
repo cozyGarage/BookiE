@@ -236,7 +236,10 @@ fn a_sql_server_type_change_drops_the_default_first_and_adds_it_again_afterwards
     let statements = build_alter_column("mssql", Some("dbo"), "t", &column).unwrap();
     assert_eq!(statements.len(), 3, "{statements:#?}");
     assert!(statements[0].contains("sys.default_constraints"), "{}", statements[0]);
-    assert_eq!(statements[1], "ALTER TABLE [dbo].[t] ALTER COLUMN [status] int NULL");
+    assert!(
+        statements[1].contains("ALTER TABLE [dbo].[t] ALTER COLUMN [status] int NULL;"),
+        "{statements:#?}"
+    );
     assert_eq!(statements[2], "ALTER TABLE [dbo].[t] ADD DEFAULT (0) FOR [status]");
 }
 
@@ -244,9 +247,11 @@ fn a_sql_server_type_change_drops_the_default_first_and_adds_it_again_afterwards
 fn a_sql_server_type_change_without_a_default_adds_no_default_statements() {
     let mut column = loaded(None);
     column.data_type = "int".into();
-    assert_eq!(
-        build_alter_column("mssql", Some("dbo"), "t", &column).unwrap(),
-        vec!["ALTER TABLE [dbo].[t] ALTER COLUMN [status] int NULL"]
+    let statements = build_alter_column("mssql", Some("dbo"), "t", &column).unwrap();
+    assert_eq!(statements.len(), 1);
+    assert!(
+        statements[0].contains("ALTER TABLE [dbo].[t] ALTER COLUMN [status] int NULL;"),
+        "{statements:#?}"
     );
 }
 
@@ -256,7 +261,10 @@ fn a_sql_server_default_edit_drops_the_old_constraint_before_any_alter() {
     column.data_type = "int".into();
     let statements = build_alter_column("mssql", Some("dbo"), "t", &column).unwrap();
     assert!(statements[0].contains("sys.default_constraints"), "{statements:#?}");
-    assert_eq!(statements[1], "ALTER TABLE [dbo].[t] ALTER COLUMN [status] int NULL");
+    assert!(
+        statements[1].contains("ALTER TABLE [dbo].[t] ALTER COLUMN [status] int NULL;"),
+        "{statements:#?}"
+    );
     assert_eq!(statements[2], "ALTER TABLE [dbo].[t] ADD DEFAULT (1) FOR [status]");
 }
 

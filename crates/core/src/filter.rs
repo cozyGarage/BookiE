@@ -281,10 +281,10 @@ fn build_rule_sql(
             params.push(Value::Text(pattern));
             // Case-sensitive on all drivers. The user picks Ilike
             // explicitly when they want case-insensitive matching.
-            let escape = if like_needs_escape_clause(driver_id) {
-                " ESCAPE '\\'"
-            } else {
-                ""
+            let escape = match driver_id {
+                "mysql" => " ESCAPE '|'",
+                _ if like_needs_escape_clause(driver_id) => " ESCAPE '\\'",
+                _ => "",
             };
             Ok(format!("{pattern_sql} LIKE {ph}{escape}"))
         }
@@ -307,12 +307,7 @@ fn build_rule_sql(
             let ph = placeholder_for(driver_id, *placeholder_idx);
             *placeholder_idx += 1;
             params.push(Value::Text(raw.clone()));
-            // PG has native ILIKE. MySQL's default `utf8mb4_general_ci`
-            // collation already lowercases ASCII for LIKE; SQLite's
-            // LIKE is ASCII-case-insensitive by default. Mapping
-            // ILIKE→LIKE on the latter two is the closest equivalent
-            // without a dialect-specific function call.
-            let op_sql = if driver_id == "postgres" { "ILIKE" } else { "LIKE" };
+            let op_sql = if has_native_ilike(driver_id) { "ILIKE" } else { "LIKE" };
             Ok(format!("{pattern_sql} {op_sql} {ph}"))
         }
 
@@ -349,6 +344,10 @@ fn build_rule_sql(
             Ok(format!("{col_sql} {kw} ({})", placeholders.join(", ")))
         }
     }
+}
+
+fn has_native_ilike(driver_id: &str) -> bool {
+    matches!(driver_id, "postgres" | "duckdb" | "clickhouse")
 }
 
 fn filter_placeholder(driver_id: &str, col: &ColumnInfo, index: usize) -> String {
@@ -424,6 +423,9 @@ fn like_needs_escape_clause(driver_id: &str) -> bool {
 }
 
 fn escape_like(driver_id: &str, s: &str) -> String {
+    if driver_id == "mysql" {
+        return s.replace('|', "||").replace('%', "|%").replace('_', "|_");
+    }
     let escaped = s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
     if driver_id == "mssql" {
         escaped.replace('[', "\\[")
@@ -481,7 +483,7 @@ fn parse_value_for(col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterErr
 }
 
 fn parse_filter_value(driver_id: &str, col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterError> {
-    let value = parse_value_for(col, text)?;
+    let value = crate::numeric_input::widened_single_precision(driver_id, col, &parse_value_for(col, text)?);
     if driver_id != "duckdb" {
         return Ok(value);
     }

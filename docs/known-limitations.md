@@ -12,42 +12,7 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   page or a loaded query result instead. A per-engine consistent export path is
   an unselected future candidate; database snapshots for backup and restore are
   a separate feature with an accepted design and no release target ([ADR 0015](decisions/0015-database-snapshots.md)).
-- **Large results still have materialization limits** ([#1272](https://github.com/cozyGarage/BookiE/issues/1272)). Materialized
-  results stop at 1 million rows, 10 million cells or 64 MiB estimated size.
-  Single-statement PostgreSQL `SELECT`s in the SQL editor stream cursor pages
-  through Core and PolicyGuard, retaining them while estimated row storage stays
-  within 64 MiB and always keeping the newest page, even if it alone exceeds the
-  estimate. A process-local encrypted spool ([#1660](https://github.com/cozyGarage/BookiE/pull/1660)) with a shared 1 GiB
-  quota and a 4,096-page per-result cap keeps fetched pages revisitable
-  after leaving the RAM cache without rerunning SQL. A storage, quota or page-cap
-  refusal stops the stream as incomplete; pages already stored remain available
-  while their result owners stay open. The installed 100,000-row PostgreSQL GTK
-  scenario and refreshed local preflight passed. The spool design is recorded in
-  [ADR 0025](decisions/0025-transient-result-page-spool.md).
-  The received-row summary identifies the retained
-  range; row ranges are positions in the result, not database row identifiers.
-  Incoming decoding, concurrent snapshots, pins, widgets and allocator retention
-  remain outside this cache estimate, which is not a process-memory ceiling.
-  An October 16 synthetic stress profile at source `9c23bc80` allocated about
-  1.28 GiB across four pinned results and one active stream, reaching 1,325 MiB
-  RSS ([record](evidence/stream-retention-synthetic-2026-10-16/README.md)).
-  Paging and ownership code changed after that run, so it is historical evidence,
-  not a current memory bound. An October 24 installed Omarchy profile from
-  package build source `d9b5aaca` navigated a narrow 100,000-row result back to
-  rows 1–5,000. A result with 2,048 text characters per row retained only rows
-  70,001–100,000; Previous could not reach earlier rows before the spool landed.
-  Peak process RSS was
-  145,216 KiB for the narrow query and 298,024 KiB for the wide query in their
-  respective samples. The [installed profile](evidence/native-wayland-profile-2026-10-24/README.md)
-  records the binary hash, environment, page screenshots and sampling limits.
-  A source-built release profile on native Wayland then received 2 million rows
-  and retained rows 1,855,001–2,000,000; earlier rows were unavailable in that
-  pre-spool build. This is
-  not installed-package acceptance. See the [October 25 profile](evidence/postgres-stream-native-wayland-2026-10-25/README.md).
-  This single-query result does not measure the pinned-stream stress case, normal
-  workloads or the complete process ceiling. Other engines and unsupported
-  statement shapes remain materialized. Broader resource and lifecycle acceptance
-  remains under [#1272](https://github.com/cozyGarage/BookiE/issues/1272) (ADR 0011). Separate GUI stream ownership, aggregate retention and export/cancellation work remain open under [#1032](https://github.com/cozyGarage/BookiE/issues/1032); that issue does not claim an already-established process-memory bound.
+- **Large results have materialization limits** ([#1272](https://github.com/cozyGarage/BookiE/issues/1272)). Materialized results stop at 1 million rows, 10 million cells, or 64 MiB estimated size. Single-statement PostgreSQL `SELECT`s stream cursor pages through `PolicyGuard`, retaining them within an estimated 64 MiB row budget while keeping the newest page and the page being read. A process-local encrypted spool ([#1660](https://github.com/cozyGarage/BookiE/pull/1660), [ADR 0025](decisions/0025-transient-result-page-spool.md)) with a shared 1 GiB quota and a 4,096-page cap per result keeps evicted pages navigable via **Previous page** without re-executing SQL. Other statement shapes and engines remain materialized. The cache and spool budgets bound retained data, not total process memory. GUI stream ownership and aggregate retention work remain open under [#1032](https://github.com/cozyGarage/BookiE/issues/1032).
 - **SQL result filters apply only to loaded rows.** Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **File exports use text markers for undecodable cells** ([#883](https://github.com/cozyGarage/BookiE/issues/883)). CSV, JSON, Markdown, HTML, XML, Excel, copied text and MCP CSV content use a visible `<undecodable TYPE>` string; these text representations do not retain a separate typed marker, so a real text value with the same spelling is ambiguous. SQL export refuses the value. MCP JSON retains an explicit tagged `undecodable` value.
 - **Long cells are shown as a preview** (PERF-10). Values over 8 KiB show a typed
@@ -69,9 +34,12 @@ This page records current branch behavior, including changes made after 0.2.0 wa
   acceptance does not establish this behavior.
 - **A table without a primary key cannot be deleted from the grid** (TEST-14). There
   is no all-column fallback, by design.
+- **Busy PostgreSQL and MySQL pools:** a health ping skips a pool already saturated when it starts. If the pool becomes saturated while the ping waits, it may still be reported as disconnected; reconnecting can replace the old SSH tunnel ([#1735](https://github.com/cozyGarage/BookiE/issues/1735)). This timing race remains source-based and needs a reproduction.
+- **ClickHouse nested values:** JSON, CSV and spreadsheet exports can retain nested values in JSON form. SQL literal export and parameter binding refuse nested values when the required type metadata is unavailable; they do not silently coerce them.
 - **ClickHouse ambiguous local times:** a `DateTime64` that falls in a repeated or
   missing daylight-saving hour is shown as undecodable and is never turned into a
   literal, because the instant cannot be known.
+- **MySQL generated columns:** Structure edits do not preserve every generation expression. Expressions rejected by the metadata safety filter, including some with string literals or quoted identifiers, can retain the earlier failure or loss behavior ([#1248](https://github.com/cozyGarage/BookiE/issues/1248)). Avoid altering those columns in the Structure tab until this is resolved.
 - **SQLite real numbers:** negative zero and NaN cannot be bound as parameters.
 - **SQLite views are not listed.** The sidebar lists tables only; a view exists and can be queried in the SQL editor, but it does not appear for browsing.
 - **SQLite JSON aggregates can return malformed text on older system libraries** (TEST-25 /
@@ -127,8 +95,7 @@ This page records current branch behavior, including changes made after 0.2.0 wa
 
 ## Known bugs and unresolved outcomes
 
-- **Workspace failure recovery has remaining gaps.** A failed multi-draft save can replace an earlier draft before publishing metadata ([#1821](https://github.com/cozyGarage/BookiE/issues/1821)). An unreadable draft can block restoring unrelated connections ([#1822](https://github.com/cozyGarage/BookiE/issues/1822)); a late preload can also recache a deleted connection ([#1730](https://github.com/cozyGarage/BookiE/issues/1730)). The [October 27 audit](archive/current-code-correctness-audit-2026-10-27.md) records deterministic service-level reproductions.
-- **Unavailable configured policy can fall back to defaults in the GUI** ([#1823](https://github.com/cozyGarage/BookiE/issues/1823)). A dangling policy symlink is treated as an absent file and leaves policy marked available. A readable malformed policy disables MCP and imports, but local SQL still uses defaults. `bookie-agentd` has a separate stricter startup path.
+- The October 27 audit's workspace and policy-loading findings have source fixes in Linux: stale workspace saves and preloads are rejected ([#1798](https://github.com/cozyGarage/BookiE/pull/1798), [#1827](https://github.com/cozyGarage/BookiE/pull/1827)), draft batches preserve the previously published state on failure ([#1829](https://github.com/cozyGarage/BookiE/pull/1829)), unreadable drafts are isolated to their requested connection ([#1826](https://github.com/cozyGarage/BookiE/pull/1826)), and policy-load errors refuse database access ([#1832](https://github.com/cozyGarage/BookiE/pull/1832)). Their issues remain open for acceptance tracking in the [backlog](backlog.md); this is not evidence of installed-package or Forgejo acceptance.
 
 - **PostgreSQL transaction outcome can remain unknown after session loss.** A disconnected session cannot confirm whether its transaction committed, so BookiE records an unknown outcome and blocks governed writes for that connection. The editor closes the unusable session without sending ROLLBACK through it; that teardown fix was merged in [#1086](https://github.com/cozyGarage/BookiE/pull/1086). A follow-up initially found that the new session could not end its read-only snapshot because ROLLBACK was blocked. [#1106](https://github.com/cozyGarage/BookiE/pull/1106) fixed that path, and the tunnel-loss release scenario passed on Forgejo run 679; [#1016](https://github.com/cozyGarage/BookiE/issues/1016) records the verification and is closed. The PostgreSQL release regression in [#998](https://github.com/cozyGarage/BookiE/pull/998) also checks that reconnecting never reuses a new backend as the old session. A fresh session may run reads and end its read-only snapshot with ROLLBACK. Commits and other governed writes remain blocked until the unresolved outcome is reconciled; the app has no in-app reconciliation action yet ([#947](https://github.com/cozyGarage/BookiE/issues/947)).
 - **Two installed launches were reported to abort inside BookiE** ([#666](https://github.com/cozyGarage/BookiE/issues/666)); consult the issue for diagnosis and current status.

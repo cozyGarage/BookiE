@@ -6,7 +6,7 @@ The choices behind [ADR 0007](decisions/0007-type-and-value-preservation.md), gr
 
 - **Typed first, exact text only past the carrier.** Keep the typed value while the carrier holds it. Fall back to exact text only when the value is real and the carrier cannot represent it, for example a decimal wider than Rust `Decimal`.
 - **Refuse over a wrong value.** A cell the driver cannot decode exactly becomes `Undecodable`, not a rounded or guessed value. Refusal also covers the write side: a writer that cannot hold a value says so, naming the row and column, and leaves the destination untouched.
-- **Never substitute a different literal.** An SQL export that writes `/* ... omitted */ NULL` for a value it cannot represent produces executable SQL with a different value. Refuse instead ([upstream movement review](archive/upstream-linux-movement-2026-10-18.md), section 7).
+- **Never substitute a different literal.** An SQL export that writes `/* ... omitted */ NULL` for a value it cannot represent produces executable SQL with a different value. Refuse instead.
 - **Absent is not null.** A missing source field stays distinguishable from an explicit NULL, and a distinguishable cell cannot be rebound as an explicit null.
 - **Empty text follows the SQL mode.** Any path that restores a value (CSV import, keyed grid edit, SQL-file export) must write empty text as empty, not NULL, in every supported mode. MariaDB's `EMPTY_STRING_IS_NULL` mode needs `SPACE(0)` for empty ENUM, SET and character columns.
 - **Display is never the source of truth.** A truncated or labelled display value is not read back for editing ([state management](state-management.md#anti-patterns-to-flag-in-review)).
@@ -35,13 +35,14 @@ The choices behind [ADR 0007](decisions/0007-type-and-value-preservation.md), gr
 
 ## SQLite
 
+- **Declared temporal affinity does not determine the stored value.** Decode SQLite `DATE`, `TIME`, `DATETIME` and `TIMESTAMP` according to the runtime storage class. Preserve INTEGER, REAL and BLOB as their native `Value` kinds; preserve offset-bearing temporal TEXT exactly because the shared naive temporal variants cannot retain its offset. Plain supported temporal TEXT may use the existing typed variants.
 - **A STRICT `ANY` edit keeps the cell's runtime kind.** The grid parses an edit with the existing cell's kind: INTEGER stays integer, REAL stays real, TEXT stays text. A new or NULL cell stores nonempty input as TEXT, even when numeric-looking, because there is nothing to preserve and the grid must not guess a conversion. Clearing existing TEXT stores empty TEXT, not NULL.
 
 ## MongoDB
 
 - **A missing field is `Undecodable("missing BSON field")`, not `Null`.** No general missing-value type was added ([history, October 3](archive/value-contract-history.md#mongodb-missing-fields-remain-distinct-from-bson-null-october-3)).
 
-- **A sample is not a census.** MongoDB sampled metadata and type merging over fetched pages do not prove collection-wide export coverage. Verify late fields across export boundaries before claiming it ([upstream main review](archive/upstream-main-review-2026-10-03.md), U6).
+- **A sample is not a census.** MongoDB sampled metadata and type merging over fetched pages do not prove collection-wide export coverage. Verify late fields across export boundaries before claiming it.
 
 ## When you add a rule
 

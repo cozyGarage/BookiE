@@ -6,11 +6,33 @@ Design rules distilled from past audits (test ownership, runner parsers, oracles
 
 ## Executable gates
 
+```mermaid
+flowchart TD
+    subgraph Tiers ["BookiE Validation Tiers"]
+        Installed["Installed GTK & Wayland Suite<br/>(scripts/test-gtk-safety.sh)"]
+        Keyring["Keyring & Secret Service<br/>(scripts/test-secret-service.sh)"]
+        Widgets["GTK Widgets Isolated<br/>(scripts/test-gtk-widgets.sh)"]
+        Release["PostgreSQL Release Fixture<br/>(scripts/test-postgres-release.sh)"]
+        TLS["Driver TLS Fixture<br/>(scripts/test-driver-tls.sh)"]
+        Drivers["Driver Integration (Docker)<br/>(scripts/ci-local.sh integration)"]
+        Sandbox["Sandbox Integration (No DB/Display)<br/>(scripts/test-sandbox.sh)"]
+        Unit["Unit Tier (nextest)<br/>(scripts/preflight.sh)"]
+    end
+
+    Unit --> Sandbox
+    Sandbox --> Drivers
+    Drivers --> TLS
+    TLS --> Release
+    Release --> Widgets
+    Widgets --> Keyring
+    Keyring --> Installed
+```
+
 `scripts/ci-local.sh` remains the shared local/CI entry for full, widgets and integration modes. Registrations for isolated GTK and keyring tests live in `scripts/isolated-tests.json`; zero selected tests is a failure. Each run saves its HEAD, worktree status, tracked diff digest, untracked input paths and digest, tool versions and logs under `target/quality/`. The runner hashes non-ignored untracked file paths and contents; Git-ignored build outputs are excluded. A clean tree skips the untracked scan. Reports still do not archive untracked file contents, so commit tested changes before handing them off for exact-source acceptance. Release mode does not certify package installation, Wayland, upgrade/rollback or retry-free candidate soak. See the [packaging guide](../apps/linux/packaging/README.md) and [manual checklist](manual-verification-0.2-features.md).
 
 The script harness checks selected documented Rust declarations against source and generates the gettext template in memory and fails if extraction breaks. The template (`bookie.pot`) and `POTFILES.in` are build outputs, ignored by git; run `python3 scripts/update-translations.py` to write them. The catalog check needs GNU `xgettext` and does not load GTK GIR bindings or a desktop session.
 
-`scripts/validate-evidence.py` distinguishes `run-test-layer.py` execution reports from evidence manifests. It checks a report's commit, worktree field, tracked-diff digest and any untracked-input paths and digest. It does not treat a dirty report as a clean checkout or rewrite its provenance. Durable evidence manifests keep their separate `source_commit` or `base_commit` contract. When hashed files came from different revisions, `source_commits` can map individual paths to the commits whose Git blobs match those hashes; the validator supports the historical `linux/` tree prefix and limits each manifest to 128 per-file commit mappings. For schema-v1 manifests that retain older nested `source` or `regression_test` path/hash fields, or a `source` map of paths to hashes, the validator checks those fingerprints through the same per-file mapping. These file-level hashes do not establish a complete run snapshot. The validator reports current-checkout drift when recorded source bytes do not match, and flags an unmapped source path that is no longer present. Strict validation fails when a per-file commit cannot verify its recorded source hash or an unmapped source path is missing; a current-checkout hash mismatch remains a warning because evidence can describe an older source tree. The normal harness scan discovers only files named `manifest.json`; within those files it includes schema-v1 manifests and checks source provenance in unversioned legacy packets that declare `source_sha256`. Supported records under other names, including `validation.json`, require explicit paths and are currently omitted from default discovery ([#1824](https://github.com/cozyGarage/BookiE/issues/1824)); it does not validate other legacy fields or treat an unversioned packet as a complete evidence record. Unrelated unversioned JSON and manifests with unsupported explicit schema versions remain skipped.
+`scripts/validate-evidence.py` distinguishes `run-test-layer.py` execution reports from evidence manifests. It checks a report's commit, worktree field, tracked-diff digest and any untracked-input paths and digest. It does not treat a dirty report as a clean checkout or rewrite its provenance. Durable evidence manifests keep their separate `source_commit` or `base_commit` contract. When hashed files came from different revisions, `source_commits` can map individual paths to the commits whose Git blobs match those hashes; the validator supports the historical `linux/` tree prefix and limits each manifest to 128 per-file commit mappings. For schema-v1 manifests that retain older nested `source` or `regression_test` path/hash fields, or a `source` map of paths to hashes, the validator checks those fingerprints through the same per-file mapping. These file-level hashes do not establish a complete run snapshot. The validator reports current-checkout drift when recorded source bytes do not match, and flags an unmapped source path that is no longer present. Strict validation fails when a per-file commit cannot verify its recorded source hash or an unmapped source path is missing; a current-checkout hash mismatch remains a warning because evidence can describe an older source tree. The normal harness scan always checks `manifest.json` files and also discovers supported records under other JSON filenames: declared source evidence, execution reports, and unversioned legacy packets with `source_sha256`. Conventional `validation.json` files with malformed JSON are reported, while unrelated arrays and objects and unsupported explicit schema versions stay outside discovery. Legacy packets still validate only source provenance; discovery does not turn their other fields into a complete evidence record. Recovered per-file mappings prove recorded bytes at their Git commits, not the identity of an unrecorded full run. Missing run identity remains a warning in the historical scan and fails strict validation. Unrelated unversioned JSON and manifests with unsupported explicit schema versions remain skipped.
 
 ## What a container run proves
 
@@ -102,15 +124,11 @@ This gate also runs the MCP MongoDB Extended JSON target and PostgreSQL policy s
 python3 scripts/run-test-layer.py app-server
 ```
 
-The GTK fast CI job runs the app-server registry with the host Docker socket. Testcontainers resolves the Docker bridge gateway from inside the job container. The local release gate uses the same registration.
-
 The exact driver list and supplementary targets are owned by [`ci-local.sh::run_integration`](../scripts/ci-local.sh). It includes six network drivers, MCP BSON, policy PostgreSQL sessions, Unix sockets and SSH. Reuse that script rather than a copied list that can omit newly registered targets.
 
 To find UI-thread stalls while profiling or testing by hand, set `TABLEPRO_UI_STALL_MS=50` (any positive number of milliseconds). The app then logs a `UI thread stalled` warning with the stall length whenever the GTK main loop is late by at least that long. It is off by default and logs no content. It reports that a stall happened, not its cause; pair it with a profiler.
 
 Every clickable control on the SQL editor screen must have a registered keyboard path in `apps/linux/app/tests/keyboard_paths.py`: a shortcut, a menu entry, a tab stop, or a `gap:` entry naming what is missing. The GTK scenario `sql_editor_clickables_all_have_a_keyboard_path` fails when a new button appears without an entry. Add an entry rather than widening a pattern.
-
-The Forgejo driver matrix sets `TABLEPRO_TEST_RUN_ID` and runs each complete integration binary serially. PostgreSQL, MySQL and MariaDB fixtures reuse one primary server per engine and recreate the `test` database before each test; filtered and exact selectors start their own server. Deliberate restart tests also start a separate server. So a full-suite runtime estimate should count those cases rather than multiply every test by a database startup.
 
 Disposable PostgreSQL fixtures use tmpfs and disable `fsync`, `synchronous_commit` and `full_page_writes`. MySQL and MariaDB use tmpfs and disable transaction-log, doublewrite and binlog syncing; SQL Server uses tmpfs with writable permissions for its non-root service account. Lost-ack, crash and restart cases use durable containers so they still exercise persistent storage. The Docker tests assert the database settings and mounted filesystem.
 
@@ -164,7 +182,7 @@ The [manual checklist](manual-verification-0.2-features.md) records installed GT
 
 ## Regression case selection
 
-The [historical test record](archive/testing-history.md#upstream-test-suite-parity) preserves the original cases and counts. The [scenario survey](archive/b3-test-scenario-survey.md) is a dated source study, not a current backlog; current B3 case status belongs to the board and [value-contract index](value-contracts.md). Failure reports are hypotheses, not confirmed BookiE defects; the active checklist is [#790](https://github.com/cozyGarage/BookiE/issues/790). Trace the matching BookiE path and reproduce a candidate against current source before changing code; a historical claim of zero tests does not establish a current coverage gap.
+Current B3 case status belongs to the board and [value-contract index](value-contracts.md). Failure reports are hypotheses, not confirmed BookiE defects; the active checklist is [#790](https://github.com/cozyGarage/BookiE/issues/790). Trace the matching BookiE path and reproduce a candidate against current source before changing code; a historical claim of zero tests does not establish a current coverage gap.
 
 ## File-size guard
 
@@ -185,11 +203,3 @@ When inline unit tests push a production module over the soft limit, move them t
 - [GTK tests](testing-gtk.md)
 - [CI tests and gates](testing-ci.md)
 - [Test quality and performance contracts](testing-quality-and-performance.md)
-
-## Reusable executable bundles
-
-Forgejo's desktop-build jobs compile source-pinned default and DuckDB variants, plus the native scenario app and release package. Test jobs on any-host workers fetch immutable bundles from the Forgejo generic package registry. Every bundle records application, test-suite and recipe revisions, build group, image, compiler and file digests. Missing or mismatched bundles fail the job; execution VMs do not compile a replacement.
-
-`bash scripts/build-test-bundles.sh OUTPUT_DIRECTORY [default|duckdb|both]` runs inside the qualified Debian build environment; `both` is the default for GitHub's reusable artifacts. Forgejo publishes the default bundle before building the DuckDB variant, so jobs using default executables can start while DuckDB compiles. The generic registry stores level-one gzip tar archives to reduce transfer time. `scripts/ci-bundle-registry.py publish` uploads the archive before its completion manifest. `scripts/prepare-test-bundle.sh` downloads and verifies the matching revision before exporting its location to the job environment. Unit and sandbox tiers use the bundled nextest archive. Driver integration binaries retain their existing single-process fixture lifetime. GTK/keyring registry entries still execute separately and require an exact observed test result.
-
-GitHub Build Linux publishes equivalent source-pinned test bundles on non-PR runs for 14 days. Import requires the Forgejo secret `BOOKIE_GITHUB_ARTIFACT_TOKEN` with GitHub Actions read access. Only successful runs at the exact requested source revision are eligible. Downloads verify GitHub's archive digest, the bundle index and each payload. An imported test bundle does not replace missing native app/package builds or desktop analysis jobs. Full unattended failover of those producer jobs is not implemented.

@@ -135,7 +135,7 @@
     "completed_scenarios": [],
     "stopped_at": "bundle_export_records_sanitized_audit_outcome",
     "observation": "The initial probe exposed the Export connections alert without a Choose File button. PR 387 adds a test-harness fallback that invokes the alert default.activate action; a focused Xvfb export scenario passed with the fallback, and a native Wayland probe exercised it and advanced to file-chooser discovery. The portal chooser did not appear on the isolated D-Bus session; the headless wrapper could not start because gnome-shell is absent, and a separate desktop-bus attempt could not connect to its AT-SPI socket. These are environment-limited probes, not product failure or native acceptance.",
-    "artifacts": "/tmp/bookie-b4-wayland-bundle-evidence/",
+    "artifacts": "/tmp/worktree-b4-wayland-bundle-evidence/",
     "followup_harness_commit": "c52242762f8764f07e3e69db5891dbbc9fbfdece",
     "followup_merged_commit": "b4dd2b4b1f25d8096d73067dffe2350719558208",
     "focused_xvfb_export_scenario": "passed"
@@ -200,7 +200,7 @@
     "test_commit": "5211e6a33187c4e4499fe192399361e063d1c852",
     "merged_commit": "26d13552ed83924aefd8e0d7cd9c7d7cd770e253",
     "pull_request": 383,
-    "local_report": "/tmp/bookie-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
+    "local_report": "/tmp/worktree-ui-1b/linux/target/quality/20261008T123520080194Z-layers/report.json",
     "local_result": "passed; the test is the sole tracked source modification in the report",
     "previous_hosted_rollback": "passed on 30f9d37; run predates this test",
     "current_hosted_acceptance": "B4 rollback job passed on c3122d9 in Build Linux run 37797466945 with the merged Aria trigger regression included; the full Build Linux run completed successfully."

@@ -106,5 +106,5 @@ For ordinary UI changes, test the affected flow manually and include before and 
 
 ## Lessons that shape GTK tests
 
-- **Replacing a selected model's contents in one remove-and-add notification makes GTK scan every inserted row.** Deselect, then send the removal, then the insertion. Assert the number of row objects constructed, which is deterministic, not wall-clock time ([TablePro collaboration review](archive/tablepro-collaboration-2026-10-21.md)).
-- **A scenario is promoted only after 30 consecutive attempts across at least six runs, and adding a scenario restarts that ledger** ([production audit](archive/production-audit.md)). A diagnostic probe that passes is not a product regression.
+- **Replacing a selected model's contents in one remove-and-add notification makes GTK scan every inserted row.** Deselect, then send the removal, then the insertion. Assert the number of row objects constructed, which is deterministic, not wall-clock time.
+- **A scenario is promoted only after 30 consecutive attempts across at least six runs, and adding a scenario restarts that ledger.** A diagnostic probe that passes is not a product regression.

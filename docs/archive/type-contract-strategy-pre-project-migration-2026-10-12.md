@@ -6,7 +6,7 @@ Detailed case narrative formerly on this page is in [type-contract history](../a
 
 ## Retest indicators
 
-Keep these open until re-proven on a current SHA. Full wording is in the archived narrative and the [archived sprint checkpoint](bookie-0.2-history.md#archived-from-active-sprint-on-2026-10-09-consolidation).
+Keep these open until re-proven on a current SHA. Full wording is in the archived narrative. This dated strategy snapshot does not set current work order.
 
 | Signal | Owner | Note |
 | --- | --- | --- |
@@ -74,7 +74,7 @@ Smallest remaining gap / next action; affected files and layer ownership:
 Status: open | reproduced | fixed with named proof | blocked/unrun acceptance
 ```
 
-Use [the scenario survey](../archive/b3-test-scenario-survey.md) for candidate boundaries and [the validation playbook](../validation-playbook.md#turn-every-finding-into-a-regression) for execution. A defect needs initial failure, narrow correction and valid/ invalid neighbors. Native tests assert stored kind/value and unchanged siblings. Register selectors/fixture ownership and preserve sanitized evidence. Keep unavailable reports and mutation uncertainty explicit.
+Use the [validation playbook](../validation-playbook.md#turn-every-finding-into-a-regression) for execution. A defect needs initial failure, narrow correction and valid/invalid neighbors. Native tests assert stored kind/value and unchanged siblings. Register selectors/fixture ownership and preserve sanitized evidence. Keep unavailable reports and mutation uncertainty explicit. The comparative scenario survey used at that time is now in the private research archive.
 
 Oracle/new engines are later driver projects. They must follow ADR 0007 with their own native semantics; another engine's fixtures are not their proof.
 

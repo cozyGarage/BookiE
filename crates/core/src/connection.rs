@@ -10,7 +10,8 @@ use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
 use crate::operation::{OperationControl, run_controlled};
 use crate::query::{
-    ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo, Value,
+    ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo,
+    Value,
 };
 use crate::tls::TlsConfig;
 use crate::transaction::Transaction;
@@ -21,6 +22,21 @@ pub enum AuthMode {
     #[default]
     Password,
     Kerberos,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct AttachedDatabase {
+    pub name: String,
+    pub path: String,
+}
+
+impl AttachedDatabase {
+    pub fn new(name: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            path: path.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +58,7 @@ pub struct ConnectOptions {
     pub connect_timeout_secs: Option<u32>,
     pub read_only: bool,
     pub auth_source: Option<String>,
+    pub attached_databases: Vec<AttachedDatabase>,
 }
 
 pub fn bare_host(host: &str) -> &str {
@@ -52,7 +69,33 @@ pub fn bare_host(host: &str) -> &str {
         .unwrap_or(trimmed)
 }
 
+pub fn uri_host(host: &str) -> Option<String> {
+    let raw_host = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host);
+    if raw_host.is_empty()
+        || raw_host.chars().any(|ch| {
+            ch.is_control() || ch.is_whitespace() || matches!(ch, '/' | '?' | '#' | '@' | '%' | ',' | '\\' | '[' | ']')
+        })
+    {
+        return None;
+    }
+    if raw_host.parse::<std::net::Ipv6Addr>().is_ok() {
+        return Some(format!("[{raw_host}]"));
+    }
+    if host.starts_with('[') || raw_host.contains(':') {
+        return None;
+    }
+    Some(raw_host.to_owned())
+}
+
 impl ConnectOptions {
+    pub fn pool_acquire_timeout(&self) -> std::time::Duration {
+        let configured = self.connect_timeout_secs.unwrap_or(0).max(5);
+        std::time::Duration::from_secs(u64::from(configured))
+    }
+
     pub fn service_address(&self) -> (&str, u16) {
         self.service_endpoint
             .as_ref()
@@ -132,6 +175,7 @@ impl Default for ConnectOptions {
             connect_timeout_secs: None,
             read_only: false,
             auth_source: None,
+            attached_databases: Vec::new(),
         }
     }
 }
@@ -358,6 +402,21 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         run_controlled(self.fetch_foreign_keys(schema, table), control).await
+    }
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        _schema: Option<&str>,
+        _table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        Ok(Vec::new())
+    }
+    async fn fetch_inbound_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        run_controlled(self.fetch_inbound_foreign_keys(schema, table), control).await
     }
     async fn fetch_enum_labels(&self, _schema: &str, _name: &str) -> Result<Vec<String>, DriverError> {
         Ok(Vec::new())
@@ -758,6 +817,19 @@ mod tests {
     }
 
     #[test]
+    fn a_uri_host_is_a_plain_name_or_an_address_that_cannot_alter_the_url() {
+        for host in [
+            "", "db/x", "db?x", "db#x", "u@db", "db%2f", "a,b", "db\\x", "db name", "[bad]", "a:b",
+        ] {
+            assert_eq!(uri_host(host), None, "{host:?}");
+        }
+        assert_eq!(uri_host("db.internal").as_deref(), Some("db.internal"));
+        assert_eq!(uri_host("127.0.0.1").as_deref(), Some("127.0.0.1"));
+        assert_eq!(uri_host("::1").as_deref(), Some("[::1]"));
+        assert_eq!(uri_host("[::1]").as_deref(), Some("[::1]"));
+    }
+
+    #[test]
     fn a_bracketed_ipv6_host_dials_the_bare_address() {
         for (typed, dialled) in [
             ("[::1]", "::1"),
@@ -868,5 +940,17 @@ mod tests {
         };
 
         assert_eq!(options.service_address(), ("sql.corp.example", 1433));
+    }
+
+    #[test]
+    fn a_pool_checkout_waits_at_least_as_long_as_the_saved_connect_timeout() {
+        let mut opts = ConnectOptions::default();
+        assert_eq!(opts.pool_acquire_timeout(), std::time::Duration::from_secs(5));
+        opts.connect_timeout_secs = Some(0);
+        assert_eq!(opts.pool_acquire_timeout(), std::time::Duration::from_secs(5));
+        opts.connect_timeout_secs = Some(2);
+        assert_eq!(opts.pool_acquire_timeout(), std::time::Duration::from_secs(5));
+        opts.connect_timeout_secs = Some(45);
+        assert_eq!(opts.pool_acquire_timeout(), std::time::Duration::from_secs(45));
     }
 }
