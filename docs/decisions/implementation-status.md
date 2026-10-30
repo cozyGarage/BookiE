@@ -50,7 +50,7 @@ Decision: [ADR 0018](0018-headless-app-services-crate.md).
 
 ### Implementation status (2026-10-26)
 
-Several GTK-free service modules have moved to `crates/app-services`; the crate has no GTK, libadwaita, glib or Relm4 dependencies. The headless tab model and workspace persistence live in `crates/app-services/src/workspace.rs` and `workspace_state.rs`. Completion metadata cache, request deduplication, connection-aware result application and cancellation state live in `crates/app-services/src/completion.rs`, which also performs the controlled column read. Named-parameter binding and local database-file classification/saved-record construction were added in aggregate [#1663](https://github.com/cozyGarage/BookiE/pull/1663). Driver-error classification now lives in GTK-free app-services through [#1683](https://github.com/cozyGarage/BookiE/pull/1683); the GTK app retains Relm4 task dispatch and localized error rendering. The connection dialog's auth/endpoint visibility state and typed local-socket path selection are in `crates/app-services/src/connection_form.rs` on [#1686](https://github.com/cozyGarage/BookiE/pull/1686), with widget updates and path display remaining in GTK. SQL editor text budgets, UTF-8 boundary checks and dropped-text validation are being moved to `crates/app-services/src/sql_text.rs` under [#1299](https://github.com/cozyGarage/BookiE/issues/1299); the GTK adapter retains buffer-position extraction and localized refusal messages. File-open signals/dialogs/toasts, driver lookup, and routing results to the shared index also remain in the GTK app. GTK page handling remains in `apps/linux/app/src/ui/app/workspace_tabs.rs`. The staged migration remains active under APP-MOD in the [post-0.2.0 backlog](../backlog.md).
+Several GTK-free service modules have moved to `crates/app-services`; the crate has no GTK, libadwaita, glib or Relm4 dependencies. The headless tab model and workspace persistence live in `crates/app-services/src/workspace.rs` and `workspace_state.rs`. Completion metadata cache, request deduplication, connection-aware result application and cancellation state live in `crates/app-services/src/completion.rs`, which also performs the controlled column read. Named-parameter binding and local database-file classification/saved-record construction were added in aggregate [#1663](https://github.com/cozyGarage/BookiE/pull/1663). Driver-error classification now lives in GTK-free app-services through [#1683](https://github.com/cozyGarage/BookiE/pull/1683); the GTK app retains Relm4 task dispatch and localized error rendering. The connection dialog's auth/endpoint visibility state and typed local-socket path selection are in `crates/app-services/src/connection_form.rs` on [#1686](https://github.com/cozyGarage/BookiE/pull/1686), with widget updates and path display remaining in GTK. SQL editor text budgets, UTF-8 boundary checks and dropped-text validation are being moved to `crates/app-services/src/sql_text.rs` under [#1299](https://github.com/cozyGarage/BookiE/issues/1299); the GTK adapter retains buffer-position extraction and localized refusal messages. File-open signals/dialogs/toasts, driver lookup, and routing results to the shared index also remain in the GTK app. GTK page handling remains in `apps/linux/app/src/ui/app/workspace_tabs.rs`. The staged migration is tracked on [Project #3](https://github.com/users/cozyGarage/projects/3).
 
 ## ADR 0022: Release notes come from merge commits
 
@@ -66,7 +66,7 @@ Decision: [ADR 0015](0015-database-snapshots.md).
 
 ### Clarification (2026-10-20)
 
-This ADR records a design, not a release commitment. Snapshot implementation is post-0.2.0 backlog work tracked by [#547](https://github.com/cozyGarage/BookiE/issues/547); no release target is set. The context predates PostgreSQL logical backup and restore in ADR 0019. Those portable dump tools do not implement this snapshot design or provide the same database-state semantics.
+Snapshots are not implemented. The accepted design is separate from PostgreSQL logical backup and restore in ADR 0019; those portable dump tools do not provide the same database-state semantics.
 
 ## ADR 0019: Database tooling without sidecars
 
@@ -74,7 +74,7 @@ Decision: [ADR 0019](0019-database-tooling-without-sidecars.md).
 
 ### Clarification (2026-10-20)
 
-The accepted decision does not set a release target for the remaining tools. PostgreSQL backup and restore are implemented; follow-up work remains subject to post-0.2.0 selection and acceptance.
+PostgreSQL backup and restore are implemented. Current tool behavior and acceptance remain tracked in the owning issues.
 
 The implementation uses the shared transport and SSH route to create the client-tool endpoint, then supervises the vendor process in `crates/dump`; it is not specific to the system OpenSSH backend. The current process does not apply Landlock, so the conditional filesystem restriction in Decision 3 is not implemented and must not be treated as a shipped security boundary.
 

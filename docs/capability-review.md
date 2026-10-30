@@ -1,6 +1,6 @@
 # Database client capability review
 
-This page describes the engineering checks used to assess database-client capabilities and records BookiE's current boundaries. It is not a product ranking or a release commitment. The [backlog](backlog.md) and [Project #3](https://github.com/users/cozyGarage/projects/3) own selected work; [known limitations](known-limitations.md) describes user-visible restrictions.
+This page describes the engineering checks used to assess database-client capabilities and records BookiE's current boundaries. It is not a product ranking or a release commitment. [Project #3](https://github.com/users/cozyGarage/projects/3) owns selected work; [known limitations](known-limitations.md) describes user-visible restrictions.
 
 ## How to evaluate a capability
 
@@ -53,6 +53,6 @@ Promote a candidate only when it has a user task, a code owner, an acceptance la
 - Large PostgreSQL catalogs belong to [#580](https://github.com/cozyGarage/BookiE/issues/580).
 - PostgreSQL extension values should be qualified one type and consumer path at a time under the B3 type contract.
 - Broader result memory, cancellation and transaction outcomes remain with their existing performance and B4 owners.
-- UI capability requests belong in the backlog only after checking the shipped behavior and known limitations against current source.
+- UI capability requests belong on Project #3 only after checking shipped behavior and known limitations against current source.
 
 Reports and release notes do not establish a defect in BookiE. Trace the corresponding BookiE path and reproduce the behavior before filing or changing code.

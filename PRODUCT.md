@@ -4,7 +4,7 @@
 
 BookiE is an independent native Linux database client for local database work. It provides saved connections, optional SSH transport, database browsing, SQL editing, and guarded access for both the desktop application and the local `bookie-agentd` MCP process.
 
-Every shipped feature works without an account, license key, subscription, paid tier, or remote entitlement check. Database and SSH credentials use the system Secret Service. Database operations from the GUI, MCP, and agent process use the same policy and audit boundary. BookiE is a fully autonomous project with its own architecture, governance, and development roadmap.
+Every shipped feature works without an account, license key, subscription, paid tier, or remote entitlement check. Database and SSH credentials use the system Secret Service. Database operations from the GUI, MCP, and agent process use the same policy and audit boundary. BookiE is an independent project with its own architecture and governance.
 
 ```mermaid
 flowchart TD
@@ -33,7 +33,7 @@ The [personas](docs/personas.md) describe the main usage contexts. The common wo
 
 ## Capability and delivery status
 
-The [architecture](ARCHITECTURE.md) describes crate boundaries and data flow. The [capability review](docs/capability-review.md) records current technical limits. The [0.2.0 completion status](docs/bookie-0.2-sprint.md), [backlog](docs/backlog.md), and [known limitations](docs/known-limitations.md) own delivery status, selected work, and user-visible gaps respectively. Those pages are the source for changing implementation status; this overview states product constraints only.
+The [architecture](ARCHITECTURE.md) describes crate boundaries and data flow. The [capability review](docs/capability-review.md) records current technical limits. The [0.2.0 completion status](docs/bookie-0.2-sprint.md), [Project #3](https://github.com/users/cozyGarage/projects/3), and [known limitations](docs/known-limitations.md) own delivery status, selected work, and user-visible gaps respectively. Those pages are the source for changing implementation status; this overview states product constraints only.
 
 ## Product outcomes
 

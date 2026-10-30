@@ -1,10 +1,10 @@
 # Validation playbook
 
-Use this page to select checks, hand off work, and review evidence. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures; the [completion page](bookie-0.2-sprint.md) records 0.2.0, while the [backlog](backlog.md) and owning issues set subsequent order and acceptance. A green layer certifies only its named scope.
+Use this page to select checks, hand off work, and review evidence. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures; the [completion page](bookie-0.2-sprint.md) records 0.2.0, while [Project #3](https://github.com/users/cozyGarage/projects/3) and owning issues set selected work and acceptance. A green layer certifies only its named scope.
 
 ## Current desktop target
 
-The [sprint](bookie-0.2-sprint.md) records the maintainer's 2026-10-18 completion decision; use the release page linked there for current publication status. The [backlog](backlog.md) orders subsequent work; each selected issue names its acceptance layers. Debian/GNOME installed-package expansion remains later work. GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
+The [sprint](bookie-0.2-sprint.md) records the maintainer's 2026-10-18 completion decision; use the release page linked there for current publication status. Project #3 orders selected work; each issue names its acceptance layers. GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
 
 ## Start here
 
@@ -180,7 +180,7 @@ Secure connection coverage is engine-specific. Track valid auth, rejected auth, 
 
 ## Release qualification
 
-For a future candidate, B3 requires closed correctness findings and their regressions. B4–B6 also require the planned installed-package, Wayland, upgrade/rollback and candidate soak evidence. Docker supplies deterministic servers and Xvfb supplies automated GTK interaction. The 0.2.0 release is already published; these criteria do not reopen that milestone. Arch/Omarchy under native Wayland is the selected 0.2.0 desktop target. Debian/GNOME VM qualification remains post-release backlog work. Xvfb and widget passes cannot certify a native Wayland target. No workflow here automatically publishes a release or waives an acceptance gate.
+For each release candidate, maintainers select the applicable platform checks. B3 qualification requires closed correctness findings and their regressions; installed-package, Wayland, upgrade/rollback and soak claims require evidence from those environments. Docker supplies deterministic servers and Xvfb supplies automated GTK interaction. The 0.2.0 release is already published; these criteria do not reopen that milestone. Xvfb and widget passes cannot certify native desktop behavior. All required release checks must pass before publication.
 
 ## Static-analysis triage
 

@@ -76,7 +76,7 @@ On Arch or Omarchy, install the local harness dependencies with:
 sudo pacman -S --needed dbus xorg-server-xvfb at-spi2-core python-atspi
 ```
 
-Current GTK reliability and native Wayland acceptance remain in TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)) in the [backlog](backlog.md). Service-level tests still cover pure state and policy behavior, but they do not replace these cross-layer tests.
+Current GTK reliability and native Wayland acceptance remain in TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). Service-level tests still cover pure state and policy behavior, but they do not replace these cross-layer tests.
 
 SQLite integration regressions also distinguish NULL from zero, false, empty text, and empty blobs in declared columns, and preserve binary values despite declared-type affinity mismatches. Export unit tests overlap writers deterministically and check that pre-existing temporary symlinks cannot redirect writes. Workspace tests preserve active-tab identity when unknown records are removed.
 
