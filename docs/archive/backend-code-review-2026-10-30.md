@@ -34,19 +34,14 @@ Tests added without product changes: the agent denial matrix and script splittin
 
 Bugs and risks:
 
-1. `policy/src/guard.rs:290`: an approval with no control object has no timeout.
-2. `app-services/src/database_backup.rs:60`: the keyring secret and SSH route are read before the policy guard; failures there write no audit record.
-3. `app-services/src/filter_settings.rs:53`: stored `extra_sql` has no size or count cap, unlike named presets.
-4. `core/src/sql_lex.rs:21`: the legacy splitter ignores SQLite backtick and bracket quoting.
-5. `transport/src/lib.rs:295`: client certificate and key files are opened without `O_NONBLOCK`; a FIFO blocks the task.
-6. `ssh/src/lib.rs:728`: the forwarder loop exits on a transient `accept` error while the tunnel still reports healthy.
-7. `ssh/src/lib.rs:749`: `channel_open_direct_tcpip` has no timeout and no cap on accepted connections.
-8. `ssh/src/handshake.rs:15`: the handshake clock stops during a prompt with no maximum.
-9. `storage/src/audit_journal.rs:354`: the whole journal is read at start and never rotates.
-10. `storage/src/query_history.rs:319,475`: no row cap, unbounded error text, one bound variable per id.
-11. `mcp/src/tools.rs:58`: cheap malformed calls run before the rate limit and take a blocking lock.
-12. `app-services/src/named_filter_presets.rs:85`: the preset cap and duplicate check run outside the update.
-13. `app-services/src/column_widths.rs:132`: `forget_connection` stops at the first failed update; the files have no caps.
+1. `core/src/sql_lex.rs:21`: the legacy splitter ignores SQLite backtick and bracket quoting.
+2. `ssh/src/lib.rs:749`: `channel_open_direct_tcpip` has no timeout and no cap on accepted connections.
+3. `ssh/src/handshake.rs:15`: the handshake clock stops during a prompt with no maximum.
+4. `storage/src/audit_journal.rs:354`: the whole journal is read at start and never rotates.
+5. `storage/src/query_history.rs:319,475`: no row cap, unbounded error text, one bound variable per id.
+6. `mcp/src/tools.rs:58`: cheap malformed calls run before the rate limit and take a blocking lock.
+7. `app-services/src/named_filter_presets.rs:85`: the preset cap and duplicate check run outside the update.
+8. `app-services/src/column_widths.rs:132`: `forget_connection` stops at the first failed update; the files have no caps.
 
 Missing tests: see the reviewers' lists in the pull request descriptions as each fix lands; the highest value ones are locking reads on every driver, keyset NULL boundaries per driver, sqlite splitter quoting, spool page above 64 KiB, bundle bounds and depth limits, and torn audit journal tails.
 
