@@ -105,7 +105,7 @@ Recorded so a contributor does not reopen them without new evidence. Each row ci
 | Second SQL classifier, permissive fail-open classification, lifecycle scripting hooks | Declined | [ADR 0016](0016-governed-consumer-seam.md). |
 | Connection-wide commit switch; automatic retry of failed statements | Declined | [ADR 0008](0008-connection-and-session-ownership.md). |
 | `LIMIT`/`OFFSET` paging; unbounded page retention | Declined | [ADR 0011](0011-paged-query-results.md). |
-| Keyless edits through `ctid` or another physical locator | Declined | Keyless-write refusal stays; source: [dbx follow-up](../archive/dbx-follow-up-2026-10-21.md). |
+| Keyless edits through `ctid` or another physical locator | Declined | Keyless-write refusal stays because physical row locators are not stable logical keys. |
 | Apple-only services, license-gated features, Sparkle or AppleScript, iCloud-synced icons | Out of scope | [PRODUCT.md](../../PRODUCT.md) for the no-license rule; the rest from [feature comparison](../0.2-feature-comparison.md#explicitly-out-of-scope-unless-product-goals-change). |
 | dbx's cell and error model: cells as `serde_json::Value`, binary as `"0x…"` text, user WHERE or edits spliced into SQL, a regex production-safety unlock, passwords as plain strings across the UI | Declined | [ADR 0007](0007-type-and-value-preservation.md) and bound values; source: [application-layer audit](../archive/app-layer-external-audit-2026-10-06.md). |
 | Trusted production mutations, unattended MCP writes, a public package | Not approved (SEC-8) | [ADR 0016](0016-governed-consumer-seam.md). |
