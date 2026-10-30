@@ -75,7 +75,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
 - [Installed native Wayland run, October 23](evidence/installed-wayland-0.2.0-2026-10-23/README.md): oracle-checked end-to-end flows on Hyprland and the defects filed from them.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
-- [Installed Arch profile, October 24](evidence/installed-arch-profile-2026-10-24/README.md): package integrity, automated test results, native PostgreSQL UI checks and resource samples.
 - [PostgreSQL restricted-role catalog visibility, October 24](evidence/postgres-catalog-visibility-2026-10-24/README.md): the original isolated SQL probe and its metadata-visibility limits.
 - [PostgreSQL driver coverage, October 24](evidence/postgres-driver-coverage-2026-10-24/README.md): the recovered integration-coverage report at source `d2166fd`.
 - [Workspace unit coverage at `d2166fd`, October 24](evidence/workspace-unit-coverage-d2166fd-2026-10-24/README.md) and [at `583c244`](evidence/workspace-unit-coverage-583c244-2026-10-24/README.md): recovered historical reports for two distinct source revisions.
