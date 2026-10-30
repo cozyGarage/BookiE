@@ -106,9 +106,8 @@ The [runner maintenance and isolation proposal](proposals/runner-maintenance-and
 - [Development feedback-loop proposal, October 23](archive/devops-feedback-loop-2026-10-23.md) (dated proposal snapshot; active work and priority live in the backlog and Project #3)
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md) and its [inventory companion](archive/architecture-consistency-2026-10-03-inventory.md)
 - [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
-- [App layer audit](archive/app-layer-external-audit-2026-10-06.md): UI layering, request ownership and test-boundary findings
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
-- [External audit and post-0.2 plan](archive/external-audit-2026-10-06.md) and its [implementation review](archive/external-audit-client-review-2026-10-06.md)
+- Dated database-client and app-layer comparisons are held in the private research archive; current behavior and architecture live in the capability specs, ADRs and source.
 
 ## Keep context bounded
 

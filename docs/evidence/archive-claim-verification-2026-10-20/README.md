@@ -70,7 +70,7 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | 2026-10-15-dbx-review.md | 194 | 0 | 5 closed / 3 open | Historical record; no current runtime claim |
 | `2026-10-15-postgresql-client-research/review.md` | 154 | 1 | 8 closed / 4 open | Historical client-comparison research; migrated to private research archive after this inventory |
 | `agent-tooling-review-2026-10-20.md` | 63 | 0 | No explicit BookiE issue URL | Historical record; migrated out of the public repository after this inventory; no current runtime claim |
-| [app-layer-external-audit-2026-10-06.md](../../archive/app-layer-external-audit-2026-10-06.md) | 263 | 1 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| `app-layer-external-audit-2026-10-06.md` | 263 | 1 | No explicit BookiE issue URL | Historical cross-client UX review; migrated to private research archive after this inventory |
 | [architecture-consistency-2026-10-03-inventory.md](../../archive/architecture-consistency-2026-10-03-inventory.md) | 137 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [architecture-consistency-review-2026-10-03.md](../../archive/architecture-consistency-review-2026-10-03.md) | 147 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [b3-review-2026-10-01.md](../../archive/b3-review-2026-10-01.md) | 425 | 16 | No explicit BookiE issue URL | Source traced; historical runtime scope |
@@ -90,8 +90,8 @@ These rows are navigation and evidence disposition, not a blanket behavioral cer
 | [disconnection-contracts-history-2026-10-01.md](../../archive/disconnection-contracts-history-2026-10-01.md) | 12 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [duckdb-read-only-aud10-2026-10-10.md](../../archive/duckdb-read-only-aud10-2026-10-10.md) | 19 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [evidence-index-2026-10-10.md](../../archive/evidence-index-2026-10-10.md) | 67 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [external-audit-2026-10-06.md](../../archive/external-audit-2026-10-06.md) | 430 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
-| [external-audit-client-review-2026-10-06.md](../../archive/external-audit-client-review-2026-10-06.md) | 222 | 4 | No explicit BookiE issue URL | Source traced; historical runtime scope |
+| `external-audit-2026-10-06.md` | 430 | 0 | No explicit BookiE issue URL | Historical cross-client architecture review; migrated to private research archive after this inventory |
+| `external-audit-client-review-2026-10-06.md` | 222 | 4 | No explicit BookiE issue URL | Historical client comparison and implementation review; migrated to private research archive after this inventory |
 | [grid-memory-and-fetch-action-plan-2026-10-07.md](../../archive/grid-memory-and-fetch-action-plan-2026-10-07.md) | 157 | 0 | No explicit BookiE issue URL | Historical record; no current runtime claim |
 | [known-issues-pre-project-migration-2026-10-12.md](../../archive/known-issues-pre-project-migration-2026-10-12.md) | 295 | 125 | No explicit BookiE issue URL | Source traced; historical runtime scope |
 | `linux-peer-review-2026-10-16.md` | 189 | 3 | 0 closed / 4 open | Historical cross-client source review; migrated to private research archive after this inventory |
