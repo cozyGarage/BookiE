@@ -14,7 +14,7 @@ rewrite an earlier result as proof for a later source tree.
 
 # Value preservation tests
 
-Evidence availability checked October 3: some dated `target/quality` links below are unavailable in this checkout. They remain historical references, not current passes. See [the evidence consistency review](architecture-consistency-review-2026-10-03.md#evidence-audit) and its inventory for exact paths; retrieve exact-SHA artifacts or rerun before using missing raw proof for acceptance.
+Evidence availability checked October 3: some dated `target/quality` links below are unavailable in this checkout. They remain historical references, not current passes. Retrieve exact-SHA artifacts or rerun before using missing raw proof for acceptance.
 
 
 B3 uses a shared boundary corpus at `testdata/value-contract.json`. Tests must
