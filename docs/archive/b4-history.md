@@ -17,7 +17,6 @@ separate agents can take in parallel.
 - [B4 continuation status (October 3)](#b4-continuation-status-october-3)
 - [October 3 integration checkpoint](#october-3-integration-checkpoint)
 - [October 2 review and dispatch plan](#october-2-review-and-dispatch-plan)
-- [September 28 continuation (historical evidence)](#september-28-continuation-historical-evidence)
 - [Rules for every task](#rules-for-every-task)
 - [Decisions](#decisions)
 - Lane A: built-in SSH — implementation delivered; A5 monitor follow-up open
@@ -521,18 +520,6 @@ candidate, followed by the required Debian phase and the existing B7 process.
 - [ ] Integrated affected gates pass on the recorded candidate; completed A/B/C/D/G/H regressions remain retained.
 - [ ] Installed Arch native Wayland qualification and upgrade/rollback recorded.
 - [ ] I1 and required Debian/GNOME qualification and upgrade/rollback recorded.
-
-## September 28 continuation (historical evidence)
-
-Reviewed at `85fecbe0b`. See the [commit archive](sprint-review-2026-09-28.md)
-and [active B4 acceptance work](b4-task-board-pre-project-migration-2026-10-12.md#next-b4-acceptance-run).
-A/B, C1–C5, D, G1/G2/G4 and H have recorded implementation/regression evidence;
-B4 remains open for C6, E, F, G3/G5 and active I tasks. A5's monitor follow-up is F9.
-Existing results apply to their recorded revisions; this review reran no tests.
-
-Current UI target: Arch/Omarchy/Hyprland native Wayland. GNOME desktop and Debian
-installed acceptance, including I1, are the required next phase after Arch. The GTK/libadwaita build stack
-remains. Use one bounded task per Luna handoff and serialize shared editor files.
 
 ## Rules for every task
 
