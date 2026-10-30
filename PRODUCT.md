@@ -13,7 +13,7 @@ flowchart TD
         P2["PolicyGuard Governance<br/>Local safety rules & audit journal"]
         P3["Zero Accounts / Free<br/>No subscriptions · No remote gates · AGPL-3.0"]
         P4["Type & Value Fidelity<br/>Lossless integers · Exact decimals · Keyset seeks"]
-        P5["Autonomous & Independent<br/>Self-contained codebase · Zero upstream locks"]
+        P5["Independent Project<br/>Own architecture · Own roadmap"]
     end
 ```
 
@@ -21,7 +21,7 @@ flowchart TD
 
 - Native GTK4 and libadwaita interface on Linux.
 - Database drivers are linked at build time and implement shared Rust contracts.
-- Fully independent, self-contained architecture with zero external telemetry, no remote entitlement checks, and no upstream project dependencies.
+- Self-contained desktop client with no external telemetry or remote entitlement checks.
 - The GUI and MCP consumers do not receive raw driver connections.
 - SQL parameters are bound, identifiers are dialect-quoted, and untrusted input is validated at the boundary.
 - Unsupported values and uncertain operation outcomes remain explicit; the client does not silently turn them into NULL or success.
