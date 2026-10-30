@@ -1,6 +1,6 @@
 # Connection handling
 
-[ADR 0008](decisions/0008-connection-and-session-ownership.md) owns identity and trust; [ADR 0005](decisions/0005-server-side-cancellation.md) owns cancellation. The B4 lane on [Project #3](https://github.com/users/cozyGarage/projects/3) owns remaining acceptance. This guide describes current contracts; check the code and owning issue before relying on a time-sensitive acceptance claim. The [September connection audit](archive/connections-history.md) is historical evidence only.
+[ADR 0008](decisions/0008-connection-and-session-ownership.md) owns identity and trust; [ADR 0005](decisions/0005-server-side-cancellation.md) owns cancellation. The B4 lane on [Project #3](https://github.com/users/cozyGarage/projects/3) owns remaining acceptance. This guide describes current contracts; check the code and owning issue before relying on a time-sensitive acceptance claim.
 
 ## Shared assembly and ownership
 
@@ -38,6 +38,6 @@ Use the current B4 task IDs in [Project #3](https://github.com/users/cozyGarage/
 
 ## Daemon session cache and DuckDB flat files
 
-A `bookie-agentd` session key includes the saved transport fields plus a digest of Secret Service secret values and SSH private-key, TLS CA, and TLS client certificate and private-key contents. Rotating any of them opens a new session. Handles already issued keep the session they hold until released. If a secret or material file cannot be read, a new open is refused instead of serving the cache ([bug consistency review](archive/bug-consistency-2026-09.md)).
+A `bookie-agentd` session key includes the saved transport fields plus a digest of Secret Service secret values and SSH private-key, TLS CA, and TLS client certificate and private-key contents. Rotating any of them opens a new session. Handles already issued keep the session they hold until released. If a secret or material file cannot be read, a new open is refused instead of serving the cache.
 
 For a DuckDB flat-file connection the driver pins the checked file before DuckDB opens it: it opens the path with `O_PATH` and `O_NOFOLLOW`, checks identity, reopens through the descriptor with `O_NONBLOCK` so a replaced FIFO cannot hang setup, makes a private same-filesystem hard link, and allows only that alias. If pinning cannot be applied, setup fails closed. This is a DuckDB-level path restriction, not an operating-system sandbox ([DuckDB read-only record](archive/duckdb-read-only-aud10-2026-10-10.md)).

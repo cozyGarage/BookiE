@@ -51,8 +51,6 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | Run-specific proof (manifests, focused logs) | `evidence/<topic>[-<sha>]-<YYYY-MM-DD>/` | A `manifest.json` or concise `README.md`, with only the artifacts needed to check the claim; link it from the owning row or board |
 | A finished review, audit or long history | [archive/](archive/) | Dated file name; corrections to links or neutral wording must preserve the recorded evidence, dates and decisions |
 
-Internal runner deployment, CI performance and evidence lifecycle research is maintained in the private project archive. Public CI behavior and contributor requirements are described in [testing and CI](testing-ci.md) and the [validation playbook](validation-playbook.md).
-
 ## Adding a document
 
 - Look for the owner in the table above first; most new facts are a row, a section or an ADR, not a new file.
@@ -78,27 +76,16 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [PostgreSQL driver coverage, October 24](evidence/postgres-driver-coverage-2026-10-24/README.md): the recovered integration-coverage report at source `d2166fd`.
 - [Workspace unit coverage at `d2166fd`, October 24](evidence/workspace-unit-coverage-d2166fd-2026-10-24/README.md) and [at `583c244`](evidence/workspace-unit-coverage-583c244-2026-10-24/README.md): recovered historical reports for two distinct source revisions.
 - [Workspace unit coverage, October 24](evidence/workspace-unit-coverage-9d61c7a-2026-10-24/README.md): 61.42% line coverage on Linux `9d61c7a` against the 59% floor, with the command and its scope.
-- [Current Linux PostgreSQL streaming workload, October 24](evidence/postgres-stream-current-2026-10-24/README.md): exact-head ten-column query, repeated bounded-memory measurements, and cancellation/session-recovery outcomes.
 - [Multi-editor stream ownership profile, October 26](evidence/stream-retention-multi-owner-2026-10-26/README.md): synthetic two-editor and cancelled export-page sample, with the RSS/allocator limitation stated.
-- [File chooser action race, October 26](evidence/file-chooser-action-race-2026-10-26/README.md): bounded retry and keyboard fallback when a transient accessibility action disappears.
-- [Editor buffer teardown, October 26](evidence/editor-buffer-release-2026-10-26/README.md): shutdown behavior and regression coverage for editor views and text buffers.
-- [Editor lifetime acceptance, October 26](evidence/editor-lifetime-acceptance-2026-10-26/README.md): experimental-fix keyboard, scale-2 and repeated Vim editor-close checks, with source and binary identity.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
-- [Capability evidence audit](archive/capability-evidence-2026-09-07.md) (historical September snapshot; current behavior is in [features](features.md) and [known limitations](known-limitations.md), with selected work in the backlog and Project #3)
 - [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 - [Release audit, October 3](archive/release-audit-2026-10-03.md)
 - [Remaining-gap acceptance, October 15](archive/remaining-gaps-2026-10-15.md) (dated evidence for completed distro, SQL proposal and disconnect-cache findings)
 - [Offline release input audit, October 19](archive/offline-release-input-audit-2026-10-19.md) (current Arch candidate evidence and remaining offline inputs)
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
-- [Architecture review](archive/architecture-consistency-review-2026-10-03.md) and its [inventory companion](archive/architecture-consistency-2026-10-03-inventory.md)
 - [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
-- Dated database-client and app-layer comparisons are held in the private research archive; current behavior and architecture live in the capability specs, ADRs and source.
 
 ## Keep context bounded
 
 Record a rule once in an ADR and a task once on Project #3. Do not copy old test counts into a current claim. Keep ignored `target/quality` paths as plain text, and when output is unavailable, say so instead of leaving a dead link.
-
-## Engineering review records
-
-The dated October 2026 engineering catalog is preserved in the [archive](archive/engineering-review-records-2026-10.md). The archived records prove only their recorded source and environment.

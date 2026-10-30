@@ -1,4 +1,4 @@
-fixture materials already present in /tmp/bookie-b4-i5/linux/tests/fixtures/postgres-release/materials
+fixture materials already present in /tmp/worktree-b4-i5/linux/tests/fixtures/postgres-release/materials
  Image tablepro-postgres-release-relay Building
  Image tablepro-postgres-release-db Building
  Image tablepro-postgres-release-bastion Building
@@ -312,7 +312,7 @@ test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.32s
 dbus-daemon[2402075]: [session uid=1000 pid=2402075 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1000 pid=2402216 comm="gdbus call --session --dest org.a11y.Bus --object-")
 dbus-daemon[2402075]: [session uid=1000 pid=2402075 pidfd=5] Successfully activated service 'org.a11y.Bus'
-dbus-daemon[2402227]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=2402239 comm="python3 /tmp/bookie-b4-i5/linux/crates/app/tests/g")
+dbus-daemon[2402227]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=2402239 comm="python3 /tmp/worktree-b4-i5/linux/crates/app/tests/g")
 dbus-daemon[2402227]: Successfully activated service 'org.a11y.atspi.Registry'
 SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
 dbus-daemon[2402075]: [session uid=1000 pid=2402075 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.10' (uid=1000 pid=2402255 comm="[user-home]/Projects/tablepro/linux/target/debug/t")

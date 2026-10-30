@@ -60,7 +60,7 @@ its F4/F9 open-state wording after PR #20 merged. Retain its recorded evidence s
 
 Reviewed `linux` at `4b7814f5e1f586c3761c1454e66d3394ad2c9609`. The isolated-worktree progress below is historical; do not reapply those patches as unmerged work. Main-branch history now includes F1/F3 (`7054a7867`, #13), daemon cache refusal (`d80bade4c` / `768188734`, #14/#17), shared transaction policy (`ad807c61b`, #18), awaited editor cleanup (`7b08dd478`, #16), and editor retirement (`4b7814f5e`, #19). The current retirement path refuses further session dispatch and requires reopening Session. This checkpoint traces source integration; it does not rerun the older branch reports or certify hosted/installed acceptance. F4/F9, F8 and wider B4 acceptance stay open.
 
-The [consistency review](architecture-consistency-review-2026-10-03.md) records remaining panic/headless-retirement risks. The older-release comparison was moved to the private research archive; its transition and result-contract cases remained under existing owners.
+The older-release comparison is held in the private research archive; current panic, headless-retirement and result-contract work remains with its issue owners.
 
 ## October 2 review and dispatch plan
 
