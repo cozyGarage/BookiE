@@ -67,7 +67,7 @@ Last full review against the ADR index, code and living docs: 2026-10-20. The re
 | Data retention & compliance | Undecided | No retention period recorded. Do not invent one here. |
 | SLAs & support | N/A | Desktop client. No uptime SLA. |
 | Vendor / platform lock-in | Decided | GTK / libadwaita and Secret Service are accepted costs. [ADR 0002](0002-rust-gtk4-libadwaita.md), [ADR 0004](0004-libsecret-secret-storage.md). |
-| Positioning & messaging | Partial | Free / no-account and Linux-native bet live in PRODUCT; market one-liner not separately recorded. |
+| Positioning & messaging | Defined in PRODUCT | BookiE's purpose, product constraints and user workflows are recorded in [PRODUCT.md](../../PRODUCT.md) and [personas](../personas.md). |
 | Product outcome measures | Defined | Product outcomes are acceptance statements; the application has no telemetry or KPI collection system. [PRODUCT.md](../../PRODUCT.md). |
 | Analytics tracking plan | N/A | No product telemetry pipeline. |
 | Flathub as primary distribution | N/A | Flathub is not selected as the primary channel; the artifacts recorded in [platforms](../platforms.md) are from GitHub Releases. Verify the release page for current publication status. |
