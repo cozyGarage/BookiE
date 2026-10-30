@@ -1,0 +1,3 @@
+{"application_pid": 1932165, "application_start_ticks": 1574174, "cycle": 1, "file_bytes": 8388608, "rss_before_kib": 176700, "rss_after_kib": 177536, "peak_rss_kib": 177536, "chooser_to_refusal_seconds": 1.0010755980001704}
+{"application_pid": 1932165, "application_start_ticks": 1574174, "cycle": 2, "file_bytes": 8388608, "rss_before_kib": 177776, "rss_after_kib": 177792, "peak_rss_kib": 177792, "chooser_to_refusal_seconds": 0.8688485599996056}
+{"application_pid": 1932165, "application_start_ticks": 1574174, "cycle": 3, "file_bytes": 8388608, "rss_before_kib": 177804, "rss_after_kib": 177980, "peak_rss_kib": 177980, "chooser_to_refusal_seconds": 0.8643067089997203}

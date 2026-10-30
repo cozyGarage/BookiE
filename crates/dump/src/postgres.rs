@@ -47,6 +47,7 @@ pub async fn pg_dump(
     }
     let partial = partial_path(request.output);
     let _cleanup = RemoveOnDrop(partial.clone());
+    create_private_file(&partial).await?;
     let args = dump_args(request.format, &partial);
     run_pg_tool(tool, request.options, args, runtime_dir, cancel, None).await?;
     tokio::fs::rename(&partial, request.output).await?;
@@ -124,6 +125,16 @@ fn restore_args(input: &Path) -> Vec<OsString> {
     .map(OsString::from)
     .chain([input.as_os_str().to_owned()])
     .collect()
+}
+
+async fn create_private_file(path: &Path) -> Result<(), DumpError> {
+    tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+        .await?;
+    Ok(())
 }
 
 fn partial_path(output: &Path) -> PathBuf {

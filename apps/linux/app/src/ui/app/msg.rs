@@ -29,6 +29,7 @@ pub enum AppMsg {
     FetchBrowseEnumLabels(Uuid, Vec<(String, tablepro_core::QualifiedTypeName)>),
     EnumLabelsLoaded(Uuid, Vec<(String, Vec<String>)>),
     ForeignKeysLoaded(Uuid, Vec<ForeignKeyInfo>),
+    InboundForeignKeysLoaded(Uuid, Vec<tablepro_core::InboundForeignKeyInfo>),
     RowsLoaded(
         Uuid,
         crate::ui::browse_tab::BrowsePageRequest,
@@ -139,6 +140,11 @@ pub enum AppMsg {
     ShowAuditLog,
     ShowAuditOperation(Uuid),
     ShowCatalog,
+    ShowErDiagram {
+        schema: Option<String>,
+    },
+    ShowCatalogKind(tablepro_core::CatalogObjectKind),
+    ToggleAllSidebarGroups,
     ExplainActiveQuery,
     ShowPreferences,
     NewWindow,
@@ -210,6 +216,7 @@ pub enum AppMsg {
     ShowToast(String),
     BrowseTabDirtyChanged(Uuid, bool),
     ToggleSidebarGroup(String),
+    RefreshSidebar,
     RevealInSidebar,
     HideSidebarSchema(String),
     ShowSidebarSchema(String),

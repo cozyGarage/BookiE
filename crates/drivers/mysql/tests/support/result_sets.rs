@@ -1,3 +1,5 @@
+#[path = "column_on_update.rs"]
+mod column_on_update;
 #[path = "optimistic_collation.rs"]
 mod optimistic_collation;
 pub(crate) use super::{connect, start_mariadb, start_mysql};

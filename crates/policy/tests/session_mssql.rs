@@ -11,6 +11,7 @@ use tablepro_policy::{
     AuditTransactionOutcome, AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal, StatementClass,
     classify,
 };
+use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mssql_server::MssqlServer;
 use uuid::Uuid;
@@ -38,7 +39,12 @@ async fn run_session(
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn sql_server_tran_forms_are_refused_shared_and_tracked_in_sessions() {
-    let container = MssqlServer::default().with_accept_eula().start().await.unwrap();
+    let container = MssqlServer::default()
+        .with_accept_eula()
+        .with_startup_timeout(Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
     let connection = MssqlDriver
         .connect(ConnectOptions {
             host: container.get_host().await.unwrap().to_string(),
@@ -113,7 +119,12 @@ async fn sql_server_tran_forms_are_refused_shared_and_tracked_in_sessions() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn sql_server_batches_with_mutations_are_classified_and_denied_before_dispatch() {
-    let container = MssqlServer::default().with_accept_eula().start().await.unwrap();
+    let container = MssqlServer::default()
+        .with_accept_eula()
+        .with_startup_timeout(Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
     let connection = MssqlDriver
         .connect(ConnectOptions {
             host: container.get_host().await.unwrap().to_string(),
