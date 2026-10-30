@@ -3,8 +3,6 @@
 This dated catalog preserves evidence links from the October 2026 review cycle. It is historical navigation, not current task status. See the [current documentation map](../README.md), [completion page](../bookie-0.2-sprint.md) and [backlog](../backlog.md) for current direction.
 
 
-- Database-client refresh, October 23: all 14 named clients, source/release pins, pagination reversal, FK comparison semantics and ranked BookiE follow-ups.
-
 - [Saved connection row layouts, October 23](../evidence/saved-connection-row-2026-10-23/README.md): light/dark narrow/normal widget captures, allocation checks and the remaining GTK measurement warning.
 
 - [Merge baseline validation, October 23](evidence/merge-baseline-validation-2026-10-23/README.md): workspace-test compile repair, scoped local validation and the independent completion-popup timeout.
@@ -32,10 +30,6 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 
 - Competitor UX observations and comparisons were moved to the private research archive; current BookiE controls are documented in the user guide and capability specs.
 
-- dbx architecture and regression follow-up, October 21: changes since the prior pin, PostgreSQL session/restore lessons, current architecture guards and qualified regression candidates.
-
-- TablePro and dbx deep review, October 20: full feature, architecture and fix-commit mapping of TablePro `3222542a4` and dbx `d1e88ab4b` against BookiE `7c4cb3929`, with Wave 0 defects to confirm and a ranked roadmap of candidates.
-
 - The October 18 upstream Linux adoption and source movement audits were moved to the private research archive; accepted BookiE decisions and shipped behavior remain documented in ADRs and capability specs.
 - [0.2.0 completion handoff](../archive/bookie-0.2-completion-handoff-2026-10-18.md): maintainer completion statement, publication boundary and previous scope/sprint snapshots.
 
@@ -48,8 +42,6 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 
 
 
-- Zed editor and panel review, October 22: completed research, existing PR dependencies and issue-owned results/error/message panel follow-ups.
-- GPUI client review, October 22: completed source research including dbdelve; open adoption proposals remain on their issues.
 - Transaction-control proposal review, October 22: completed DBF-5 verification against existing shared-connection and owned-session guards.
 - [Grid search focus, October 22](../evidence/grid-search-focus-2026-10-22/README.md): owned focus restoration and keyboard regression coverage for large and wide results.
 
