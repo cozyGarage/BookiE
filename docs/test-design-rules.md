@@ -9,8 +9,8 @@ Rules that earlier audits paid for. Each one names the failure it prevents. The 
 
 ## Runners and evidence parsers
 
-- **A runner test must reject wrong input.** Cover a wrong test name, repeated output, an ignored count, a nonzero exit and a registration that never ran. An isolated runner once accepted the first registered test's output for every registration ([regression audit, 2026-09-29](archive/regression-audit-2026-09-29.md), R4).
-- **Parse stdout and stderr separately.** Retain both; parse only the test's stdout. Driver and graphics diagnostics interleave with unfinished lines and break a strict parser (same audit, R11).
+- **A runner test must reject wrong input.** Cover a wrong test name, repeated output, an ignored count, a nonzero exit and a registration that never ran.
+- **Parse stdout and stderr separately.** Retain both; parse only the test's stdout. Driver and graphics diagnostics can interleave with unfinished lines and break a strict parser.
 - **Never mark an unavailable path as passed.** If raw evidence is missing, retrieve the exact-SHA artifact or rerun the gate. A hash cannot recover missing output, and a passing diagnostic probe is not a passing regression.
 
 ## Oracles and assertions

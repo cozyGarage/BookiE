@@ -1,6 +1,6 @@
 # Backlog after 0.2.0
 
-The [0.2.0 sprint and publication are complete](bookie-0.2-sprint.md); remaining work from that period stays in the existing issue backlog below. This page orders post-0.2.0 work and holds candidates for future releases. Neither the 0.2.1 nor 0.3 scope is committed here: Project #3 and the owning issues keep status and acceptance, and each release scope should be set from selected issues before qualification. The [completion handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md) preserves the former release checklist.
+The [0.2.0 sprint and publication are complete](bookie-0.2-sprint.md); remaining work from that period stays in the existing issue backlog below. This page orders post-0.2.0 work and holds candidates for future releases. Neither the 0.2.1 nor 0.3 scope is committed here: Project #3 and the owning issues keep status and acceptance, and each release scope should be set from selected issues before qualification.
 
 The [capability review](capability-review.md) records general evaluation
 criteria and current technical boundaries. An item becomes backlog work only
@@ -70,7 +70,7 @@ Each item is an issue with its own acceptance; none is a release commitment. Sta
 | DBF-2 to DBF-4 / [#1356](https://github.com/cozyGarage/BookiE/issues/1356), [#1357](https://github.com/cozyGarage/BookiE/issues/1357), [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | Measure PostgreSQL row-cap drain, SQLite early cancel, verify-ca hostname per engine | B3 / B4 |
 | B4-24 / [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Decide the TLS fingerprint pin | B4 |
 
-The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain driver-specific design notes in their comments. Vendored dependency patches: see [upstream patches](proposals/upstream-patches.md); `mongodb` SCRAM hunk can be dropped after the release containing [mongo-rust-driver#1833](https://github.com/mongodb/mongo-rust-driver/pull/1833).
+The keyring prompt in [#1327](https://github.com/cozyGarage/BookiE/issues/1327) is closed. Open issues [#1333](https://github.com/cozyGarage/BookiE/issues/1333), [#1180](https://github.com/cozyGarage/BookiE/issues/1180) and [#1251](https://github.com/cozyGarage/BookiE/issues/1251) retain driver-specific design notes in their comments. Vendored dependency patch requirements and removal criteria are recorded in [dependency patches](proposals/upstream-patches.md); verify the current release and local contract tests before removing a patch.
 
 ## Feature candidates
 

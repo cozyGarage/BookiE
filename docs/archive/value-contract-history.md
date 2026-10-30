@@ -270,8 +270,8 @@ suite but be excluded from this focused layer.
 
 ## CSV regression audit, 2026-09-29
 
-The [regression audit](regression-audit-2026-09-29.md) reproduced two missing
-consumer cases. Formula-safe negative decimal imports rounded values beyond
+Earlier regression testing reproduced two missing consumer cases. Formula-safe
+negative decimal imports rounded values beyond
 Decimal's exact scale, and binary CSV exports used a `\x` prefix the importer
 did not accept. The shared parsers now refuse excess decimal precision and
 accept that binary prefix. Ordinary hex and SQL-style prefixes remain supported.
@@ -3831,9 +3831,7 @@ ambiguous-time refusal. ClickHouse's local text and either valid fold epoch are
 checked independently; result decoding, SQL literal and parameter consumers
 refuse the ambiguous value. The focused unit and Docker contracts passed, then
 the strict GTK+DuckDB values layer passed all 190 tests across 11 suites and the
-local quick gate passed. The run reused all 747 Cargo artifacts. See the
-[review manifest](../evidence/b3-review-2026-10-01/manifest.json) for reports and
-hosted CI status.
+local quick gate passed. The run reused all 747 Cargo artifacts.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --lib temporal::tests::named_datetime_zones_decode_instants_and_refuse_dst_ambiguity -- --exact --test-threads=1
