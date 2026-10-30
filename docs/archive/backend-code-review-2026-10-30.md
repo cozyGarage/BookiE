@@ -29,7 +29,7 @@ Tests added without product changes: the agent denial matrix and script splittin
 - `app-services/src/database_backup.rs:60`: the secret is read before the guard, but a test with a refused restore could not tell the order apart, because a missing keyring entry becomes an empty password and the SSH key file is read later. No change made.
 - `app-services/src/filter_settings.rs:53`: the stored raw filter is text the user typed into a field that is meant to take raw SQL, so a size cap is a product choice rather than a defect.
 - `storage/src/query_history.rs:475`: `delete_many` and `fetch_by_ids` handled 40,000 ids in a test; the bundled SQLite allows more bound variables than the reviewer assumed.
-- `policy/src/guard.rs:290`: the unbounded approval wait applies only to callers that pass no control object, which are interactive GUI approvals; a default timeout there is a product choice.
+- `policy/src/guard.rs:290`: the guard itself waited for an approval without a limit when no operation control was passed. The GUI dialog and the `bookie-agentd` prompt already deny after 120 seconds, so the wait was bounded in practice; [#2075](https://github.com/cozyGarage/BookiE/pull/2075) adds a 10 minute backstop in the guard.
 
 - `mcp/src/bridge.rs:333`: the row cap is applied after the driver returns, but drivers already stop at `MAX_QUERY_ROWS` (1,000,000) and the result byte budget. Memory is bounded, only wasteful; lower priority.
 - `core/src/pagination.rs:81`: keyset paging runs on primary-key columns only, which cannot be NULL outside SQLite, so the other drivers' NULL ordering is not reachable today.
