@@ -6,9 +6,9 @@ Issue [#575](https://github.com/cozyGarage/BookiE/issues/575) was opened when th
 
 The 0.2.0 desktop target was **Arch Linux / Omarchy / Hyprland, native Wayland**. Debian and Ubuntu GNOME desktop acceptance is tracked under PKG-2. Use the [recorded UI packets](archive/bookie-0.2-completion-handoff-2026-10-18.md#arch-omarchy-wayland-ui-packets) for release-era results; Xvfb success does not establish native Wayland behavior.
 
-The source-matched installed GTK safety run passed 93 scenarios under Xvfb/AT-SPI on 2026-10-21; see its [package identity, result and limitations](evidence/installed-gtk-0.2.0-2026-10-21/README.md). It does not close the native Wayland visual checklist below.
+The source-matched installed GTK safety run passed 93 scenarios under Xvfb/AT-SPI on 2026-10-21. It does not close the native Wayland visual checklist below.
 
-Native Wayland observations are recorded separately for the [October 22 release run](evidence/installed-wayland-0.2.0-2026-10-22/README.md) and the [October 23 source build](evidence/installed-wayland-0.2.0-2026-10-23/README.md). They cover different binaries and checks; a later result supersedes only the specific observation it repeats. The October 22 run verified system appearance restoration and test-profile cleanup. An unchecked item has no complete current result unless one is recorded beside it.
+Native Wayland observations from the October 22 release build and October 23 source build cover different binaries and checks; a later result supersedes only the specific observation it repeats. The October 22 run verified system appearance restoration and test-profile cleanup. An unchecked item has no complete current result unless one is recorded beside it.
 
 Record the full binary/package SHA, package checksum when installed, GTK backend, OS/Hyprland/GTK/libadwaita versions, display scale, light/dark mode, result and screenshot paths. Test both normal size and a narrow/resized window, keyboard focus, clipboard and popover/dialog placement. Mark blocked and not-run items explicitly.
 
