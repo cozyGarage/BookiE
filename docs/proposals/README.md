@@ -15,4 +15,4 @@ Proposals record designs that have not become accepted decisions. They do not se
 | [SSH jump-chain editor](ui-1b-ssh-jump-chain-editor.md) | Backend support is merged; form editing and installed acceptance remain under #548. |
 | [Local dependency patches](upstream-patches.md) | Removal criteria and patch provenance; verify current upstream releases before changing vendored code. |
 
-The completed workstation reuse pilot and its dated execution plan are in the [archive](../archive/workstation-test-reuse-2026-10-20.md). Use the current [validation playbook](../validation-playbook.md) for test tiers and commands.
+Use the current [validation playbook](../validation-playbook.md) for test tiers and commands.
