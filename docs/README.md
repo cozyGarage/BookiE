@@ -80,7 +80,6 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 - [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 - [Release audit, October 3](archive/release-audit-2026-10-03.md)
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
-- [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
 
 ## Keep context bounded
