@@ -19,7 +19,7 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [PostgreSQL gate repair, October 21](../evidence/postgres-gate-repair-2026-10-21/README.md): deterministic pooled-reset regression, installed retired-session acceptance and the successful 29-job gate.
 
 - [Large SQL editor analysis, October 21](../evidence/large-sql-editor-analysis-2026-10-21/README.md): bounded advisory snapshots, deferred diagnostics and remaining full-document costs.
-- [Large-query rendering, October 21](../evidence/large-query-rendering-2026-10-21/README.md): deferred hidden grids, lifecycle regression and external rendering lessons.
+- [Large-query rendering, October 21](../evidence/large-query-rendering-2026-10-21/README.md): deferred hidden grids and the local grid lifecycle regression.
 
 - [Bounded SQL result pager, October 21](../evidence/stream-result-pager-2026-10-21/README.md): retained-page navigation, row-range regression and remaining visual acceptance.
 

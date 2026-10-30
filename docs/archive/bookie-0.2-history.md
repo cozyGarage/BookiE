@@ -736,9 +736,9 @@ editing. B4–B6 acceptance follows B3; their boxes remain open.
 
 ### B3 regression research: 2026-09-26
 
-The October external scenario survey, now in the private research archive, pinned
-test sources from DBeaver, Beekeeper Studio, pgcli and SQLFluff. Its reviewed
-scenarios informed gap screening and regression work.
+The October external scenario survey is retained in the private research archive.
+Its scenarios informed gap screening and regression work; they are an initial
+sample, not evidence that any project passes every scenario.
 Common PostgreSQL scalar arrays now preserve their elements and dimensions
 through SQL export/re-import. Temporal/nested values, unsupported array element
 types and remaining consumer parity stay next. Secure transport and authorization scenarios feed B4 acceptance;
