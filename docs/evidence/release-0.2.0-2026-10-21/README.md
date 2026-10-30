@@ -29,7 +29,7 @@ A native Wayland attempt passed malformed-statement refusal and pinned-result or
 
 ## CPU and memory
 
-The [environment record](environment.json) identifies the workstation and native libraries. Standard GTK-script SQLite runs use a 1280×1024 Xvfb screen. The custom file and PostgreSQL probes initially inherited the installed xvfb-run default of 640×480; their narrow-layout costs must not be treated as normal-width results.
+The workstation environment inventory is retained privately. Standard GTK-script SQLite runs use a 1280×1024 Xvfb screen. The custom file and PostgreSQL probes initially inherited the installed xvfb-run default of 640×480; their narrow-layout costs must not be treated as normal-width results.
 
 Measurements use the exact launched process, executable verification and a PID file. A 0.5-second sampler records RSS, PSS, private memory, CPU time and available host memory. The owned app is stopped at 4 GiB RSS or below 8 GiB available host memory. Raw captures remain outside the repository in the dated local release-artifact directory.
 
