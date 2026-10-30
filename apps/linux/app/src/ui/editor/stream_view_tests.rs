@@ -378,6 +378,13 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
             .is_some_and(|child| !child.has_css_class("tp-stream-page-placeholder")),
         "the page the user is reading must not be swapped for a placeholder"
     );
+    pages.set_visible_child(&pages.last_child().unwrap());
+    retire_previous_page(&pages, 0, Some(0), Some(2));
+    assert!(
+        first_page
+            .first_child()
+            .is_some_and(|child| child.has_css_class("tp-stream-page-placeholder"))
+    );
 }
 
 #[test]

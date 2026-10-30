@@ -84,6 +84,7 @@ pub(super) fn update_live_stream(
             break;
         }
         if pages.visible_child().as_ref() == Some(&page) {
+            page.remove_css_class("tp-stream-page-ram-resident");
             continue;
         }
         if let Some(current) = page.first_child()
@@ -134,17 +135,7 @@ pub(super) fn install_page_loader(
             return;
         };
         let current_index = page_index_from_name(&container, generation);
-        if let Some(previous) = previous_index.replace(current_index)
-            && Some(previous) != current_index
-            && let Some(previous_page) = pages.child_by_name(&page_widget_name(generation, previous))
-            && !previous_page.has_css_class("tp-stream-page-ram-resident")
-        {
-            let title = pages.page(&previous_page).title().unwrap_or_default().to_string();
-            let placeholder = stream_page_placeholder_with_title(title);
-            if let Ok(previous_page) = previous_page.downcast::<gtk::Box>() {
-                replace_stream_page_content(&previous_page, &placeholder);
-            }
-        }
+        retire_previous_page(pages, generation, previous_index.replace(current_index), current_index);
         let Some(placeholder) = container.first_child() else {
             return;
         };
@@ -173,6 +164,20 @@ pub(super) fn install_page_loader(
             columns: columns.clone(),
         }));
     });
+}
+
+fn retire_previous_page(pages: &gtk::Stack, generation: u64, previous: Option<u64>, current: Option<u64>) {
+    if let Some(previous) = previous
+        && Some(previous) != current
+        && let Some(previous_page) = pages.child_by_name(&page_widget_name(generation, previous))
+        && !previous_page.has_css_class("tp-stream-page-ram-resident")
+    {
+        let title = pages.page(&previous_page).title().unwrap_or_default().to_string();
+        let placeholder = stream_page_placeholder_with_title(title);
+        if let Ok(previous_page) = previous_page.downcast::<gtk::Box>() {
+            replace_stream_page_content(&previous_page, &placeholder);
+        }
+    }
 }
 
 fn page_index_from_name(widget: &gtk::Widget, generation: u64) -> Option<u64> {
