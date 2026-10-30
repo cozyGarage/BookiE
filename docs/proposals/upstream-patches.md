@@ -1,35 +1,26 @@
-# Proposal: maintain local dependency patches
+# Dependency patches
 
-BookiE carries patches for selected database-driver dependencies under `vendor/`. Each patch addresses a boundary needed by the application, such as hostile-server resource limits, TLS identity, or exact native-value preservation. Patch files are checked by `scripts/vendor-patches.py check`.
+BookiE maintains patched dependency snapshots under `vendor/`, applied through the workspace `[patch.crates-io]` entries. Each snapshot contains the upstream crate and the corresponding patch file. `python3 scripts/vendor-patches.py check` verifies the snapshot against the registry crate plus the recorded patch.
 
-## Removal rule
+## Local behavior
 
-Keep a local patch until a released dependency version contains the required behavior and the replacement passes BookiE's contract tests. Before removing it:
+| Dependency | Behavior required by BookiE |
+|---|---|
+| PostgreSQL driver | Bound SCRAM work; preserve quoted text `NULL` in arrays; recognize multirange metadata for explicit refusal; resolve nested type metadata within a bound; support selected server-formatted text results; support protocol cancellation; expose session parameters used by SQL lexing. |
+| MySQL driver | Preserve `ENUM` and `SET` text under binary collation; report `SET` column names; reject malformed or oversized packets with protocol errors. |
+| MongoDB driver | Bound SCRAM work and verify the server nonce; preserve TLS hostname verification when connecting through a tunnel. |
+| Redis driver | Preserve TLS hostname verification when connecting through a tunnel. |
 
-1. Verify the exact released version and source change.
-2. Compare edge-case behavior with the local patch, including failure handling.
-3. Update the dependency and lockfile.
-4. Run the focused unit and real-engine layers that exercise the contract.
-5. Remove only the patch and vendor override that are no longer required.
+The patch contents and their base crate versions are listed in [`vendor/README.md`](../../vendor/README.md). Value behavior follows [ADR 0007](../decisions/0007-type-and-value-preservation.md); TLS identity and cancellation follow the local transport and driver contracts.
 
-An external issue or pull request is provenance, not evidence that the behavior has shipped in a release. Recheck its current status before acting.
+## Updating a patch
 
-## Patch inventory
+Keep each patch until a released dependency version provides the required behavior and BookiE's contract tests pass against it. Before updating a vendored crate:
 
-| Behavior | Dependency | Reference or local contract |
-|---|---|---|
-| Bound SCRAM iteration cost and validate server nonces | PostgreSQL and MongoDB drivers | [SQLx report](https://github.com/transact-rs/sqlx/issues/4451), [MongoDB driver report](https://github.com/mongodb/mongo-rust-driver/issues/1819), [RUSTSEC-2026-0179](https://rustsec.org/advisories/RUSTSEC-2026-0179.html) |
-| Preserve database service identity separately from a tunnel's dial address | MongoDB and Redis drivers | Local transport contract and TLS regression fixtures |
-| Preserve quoted text `NULL` separately from SQL NULL in PostgreSQL arrays | PostgreSQL driver | [SQLx report](https://github.com/transact-rs/sqlx/issues/4452); ADR 0007 |
-| Decode PostgreSQL multirange type codes | PostgreSQL driver | Local value contract and PostgreSQL oracle |
-| Resolve deeply nested PostgreSQL domains and enum types | PostgreSQL driver | Local decoder regression cases |
-| Preserve MySQL `ENUM` and `SET` text under binary collation | MySQL driver | [SQLx report](https://github.com/transact-rs/sqlx/issues/4453); ADR 0007 |
-| Refuse malformed MySQL server packets instead of panicking or allocating without bound | MySQL driver | [SQLx pull request 4458](https://github.com/launchbadge/sqlx/pull/4458), merged on `main` 2026-10-16 and absent from 0.9.0; the hostile-server handshake test |
+1. Verify the released crate version and required behavior.
+2. Compare edge cases and failure handling with BookiE's local contract.
+3. Refresh the vendored snapshot and update the lockfile.
+4. Run `python3 scripts/vendor-patches.py check` and the focused unit and real-engine tests.
+5. Remove a patch only when its behavior is covered by the released crate and the tests pass.
 
-The MongoDB SCRAM change merged upstream as [#1833](https://github.com/mongodb/mongo-rust-driver/pull/1833) on 2026-10-21. Rechecked on 2026-10-27, MongoDB 3.9.1 remains the latest published crate ([release](https://docs.rs/crate/mongodb/latest)), so it does not contain that later merge and the vendored hunk remains required. SQLx 0.9.0 remains the latest published release ([release](https://docs.rs/crate/sqlx/latest)); its [PostgreSQL SCRAM](https://github.com/transact-rs/sqlx/issues/4451), [quoted NULL array](https://github.com/transact-rs/sqlx/issues/4452) and [binary-collation ENUM/SET](https://github.com/transact-rs/sqlx/issues/4453) reports were still open in the live issue tracker on 2026-10-27. Recheck release contents before removing any patch.
-
-The links preserve issue provenance only. Current release status, patch contents, dependency versions and test selectors must be checked before changing `vendor/`.
-
-An October 28 trial of DuckDB 2.0 compiled on Linux and passed 64 of 67 driver tests. Three TIMESTAMPTZ tests failed because the ICU extension was unavailable with external downloads disabled. Enabling bundled ICU requires CMake in the build environments and packaging. The trial did not change the selected dependency version.
-
-On 2026-10-28 two other unreleased SQLx changes were reviewed and not vendored. [Pull request 4394](https://github.com/launchbadge/sqlx/pull/4394) (a transaction cancelled during `BEGIN`) does not reach BookiE: its pool runs `DISCARD ALL` on release, which fails inside a transaction and closes the connection. [Pull request 4289](https://github.com/launchbadge/sqlx/pull/4289) (a pool maintenance CPU spin) changes `sqlx-core`, which BookiE does not vendor. Revisit both when SQLx publishes a release that contains them.
+An issue or proposed change alone does not establish that the behavior is present in a released dependency.
