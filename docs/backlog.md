@@ -114,7 +114,7 @@ The native workflow improvements are tracked by [UI-44 / #1349](https://github.c
 
 ## Peer-review delivery
 
-The [peer-review tracker #1026](https://github.com/cozyGarage/BookiE/issues/1026) and its child issues own the sequence, dependencies, lane and acceptance for the October review. The comparative review records are in the private research archive. Check the live project and issue before selecting work; this page does not duplicate child-issue status.
+The [peer-review tracker #1026](https://github.com/cozyGarage/BookiE/issues/1026) and its child issues own the sequence, dependencies, lane and acceptance for the October review. Check the live project and issue before selecting work; this page does not duplicate child-issue status.
 
 ## Development tooling
 

@@ -10,6 +10,4 @@ Proposals record designs that have not become accepted decisions. They do not se
 | [SSH jump-chain editor](ui-1b-ssh-jump-chain-editor.md) | Backend support is merged; form editing and installed acceptance remain under #548. |
 | [Local dependency patches](upstream-patches.md) | Removal criteria and patch provenance; verify current upstream releases before changing vendored code. |
 
-Internal CI performance, runner operations, evidence migration and documentation lifecycle proposals are maintained in the private project archive.
-
 Use the current [validation playbook](../validation-playbook.md) for test tiers and commands.
