@@ -73,8 +73,6 @@ Internal runner deployment, CI performance and evidence lifecycle research is ma
 - [Evidence directory index](archive/evidence-index-2026-10-10.md) (October 10 historical snapshot)
 - [Archived evidence packets](archive/evidence/) (dated artifacts retained after reference triage)
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
-- [Non-UI code audit, October 29](archive/non-ui-code-audit-2026-10-29.md): read-only review of every crate below `apps/linux` at `e207862cc`, with verified findings, standing baseline debt and what was not reviewed.
-- [Backend code review, October 30](archive/backend-code-review-2026-10-30.md): second review of the crates from `app-services` down, with the fixes opened as pull requests and the open findings by priority.
 - [Installed native Wayland run, October 23](evidence/installed-wayland-0.2.0-2026-10-23/README.md): oracle-checked end-to-end flows on Hyprland and the defects filed from them.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
 - [Installed Arch profile, October 24](evidence/installed-arch-profile-2026-10-24/README.md): package integrity, automated test results, native PostgreSQL UI checks and resource samples.
