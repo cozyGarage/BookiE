@@ -27,7 +27,7 @@ This matrix reuses existing tests and defines performance acceptance scenarios t
 
 ## Current selection
 
-Use deterministic contracts in the normal Forgejo unit and gtk-widgets tiers. Use the existing synthetic profile when comparing grid changes. Run PostgreSQL, multi-cycle lifecycle and installed Wayland scenarios as explicit investigations until a maintained fixture command, correctness oracle and reviewable evidence record exist. Do not add a nightly job just to collect noisy resource numbers.
+Use deterministic contracts in the unit and gtk-widgets tiers. Use the existing synthetic profile when comparing grid changes. Run PostgreSQL, multi-cycle lifecycle and installed Wayland scenarios as explicit investigations until a maintained fixture command, correctness oracle and reviewable evidence record exist. Do not add a scheduled job just to collect noisy resource numbers.
 
 The measured large-query issues remain separate work items: [#1272](https://github.com/cozyGarage/BookiE/issues/1272) and [#1523](https://github.com/cozyGarage/BookiE/issues/1523) concern PostgreSQL streaming; [#1299](https://github.com/cozyGarage/BookiE/issues/1299) concerns large SQL editor input; [#1032](https://github.com/cozyGarage/BookiE/issues/1032) tracks broader retained-owner limits. Other engines and unsupported query shapes remain materialized and need separately scoped driver work.
 

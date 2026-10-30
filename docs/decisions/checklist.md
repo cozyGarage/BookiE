@@ -51,8 +51,8 @@ Last full review against the ADR index, code and living docs: 2026-10-20. The re
 | Fork | Status | Where it lives |
 | --- | --- | --- |
 | Branching & release strategy | Decided | Work on `linux`. Maintainer cuts releases. Release notes from commit trailers ([ADR 0022](0022-release-notes-from-merge-commits.md)). [AGENTS](../../AGENTS.md). |
-| Integration method & history shape | Decided | Squash-merge on GitHub; Forgejo is the acceptance gate, not the merge target. [AGENTS](../../AGENTS.md#workflow). |
-| CI/CD & environments | Decided | GitHub cheap tier; Forgejo merge tiers. [AGENTS](../../AGENTS.md), [validation playbook](../validation-playbook.md#ci-tiers). |
+| Integration method & history shape | Decided | Squash-merge pull requests into the protected `linux` branch after required checks pass. [AGENTS](../../AGENTS.md#workflow). |
+| CI/CD & environments | Decided | Required checks cover fast feedback and acceptance validation. [AGENTS](../../AGENTS.md), [validation playbook](../validation-playbook.md#ci-tiers). |
 | Feature-flagging & rollout | Decided | No account, license or remote entitlement flags. [AGENTS](../../AGENTS.md), [PRODUCT.md](../../PRODUCT.md). |
 | Changelog & release notes | Decided | `Release-Note:` trailers on squash commits, assembled at release. [ADR 0022](0022-release-notes-from-merge-commits.md). |
 | Externally-owned release gate | Undecided | See the open fork below; distribution work remains in the [backlog](../backlog.md). |

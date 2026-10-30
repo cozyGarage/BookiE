@@ -51,7 +51,7 @@ This page is the one-page map. Accepted [ADRs](docs/decisions/README.md) constra
 | Desktop | `bookie` (`tablepro-app`) | GTK on the GLib main context; DB work on Tokio via Relm4 commands |
 | Headless MCP | `bookie-agentd` (`tablepro-agentd`) | Same static drivers and `PolicyGuard` path; no GTK |
 | Development profile | Either binary with `TABLEPRO_PROFILE=development` | Uses `tablepro-devel` XDG paths and a separate keyring schema |
-| Validation | Scripts under `scripts/` | Cheap tier locally / on GitHub; merge tier on Forgejo ([playbook](docs/validation-playbook.md#ci-tiers)) |
+| Validation | Scripts under `scripts/` | Local checks and required CI checks ([playbook](docs/validation-playbook.md#ci-tiers)) |
 
 The native library floor (GTK 4.24, libadwaita 1.10, GtkSourceView 5.22) is in [ADR 0021](docs/decisions/0021-toolkit-floor.md) and [platforms](docs/platforms.md).
 
@@ -448,7 +448,7 @@ Config and history live under `$XDG_CONFIG_HOME/tablepro/` (or `tablepro-devel` 
 
 ## Build and validation
 
-Default workspace Clippy/unit checks exclude optional DuckDB. GitHub runs the cheap tier; merge acceptance is the Forgejo gate. Commands and CI split: [AGENTS.md](./AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
+Default workspace Clippy/unit checks exclude optional DuckDB. Required checks and local commands are listed in [AGENTS.md](./AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
 
 ## Deliberate limits
 

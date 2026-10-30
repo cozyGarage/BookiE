@@ -200,13 +200,13 @@ Disposition: confirmed framework-specific false positives from the web CSS analy
 
 ## CI tiers
 
-CI is split into fast feedback and slower integration or acceptance checks. Read the workflow definitions and [AGENTS.md](../AGENTS.md) for current triggers, required gates and ownership. A pull request is ready only when its required checks pass at the current head SHA. Skipped, cancelled, timed-out or unavailable checks are not passes. Scheduled runs and local results can add evidence, but do not replace a required check on the reviewed commit.
+CI is split into fast feedback and slower integration or acceptance checks. Read [AGENTS.md](../AGENTS.md) for current requirements. A pull request is ready only when its required checks pass at the current head SHA. Skipped, cancelled, timed-out or unavailable checks are not passes. Scheduled runs and local results can add evidence, but do not replace a required check on the reviewed commit.
 
 ### Pull request hygiene checks
 
-These small GitHub checks run on every pull request to `linux` and need no database or GTK. They make the squash commit and the workflows safe to merge; the Forgejo gate remains the acceptance record.
+These pull-request checks provide fast feedback for the exact revision and need no database or GTK. Passing them does not certify acceptance tiers they did not run.
 
-`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a GitHub readiness report, not Forgejo evidence; it blocks merging only if the repository ruleset is configured to require its stable check context.
+`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a readiness report, not a substitute for required check results; it blocks merging only if the repository ruleset is configured to require its stable check context.
 
 | Check | What it enforces |
 |---|---|
