@@ -91,7 +91,6 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 
 - [Function-size regression discovery, October 23](../evidence/function-checker-discovery-2026-10-23/README.md): existing checker cases made discoverable by the coverage workflow, with unchanged assertions and explicit coverage limits.
 
-- [X11 popup targeting, October 23](../evidence/x11-popup-target-2026-10-23/README.md): pointer and resize boundary regressions and a disposable Xvfb window experiment for GTK harness reliability.
 - [Floor image APT network bounds, October 23](../evidence/floor-apt-network-bounds-2026-10-23/README.md): download retry and HTTP/HTTPS timeout configuration with image-contract coverage.
 - [Published AppImage resources, October 23](../evidence/appimage-resource-check-2026-10-23/README.md): verified the published package loads bundled GtkSourceView language and style resources; rendering and clean-container launch remain unverified.
 - [Dirty-file discard and final-tab recheck, October 23](../evidence/tab-close-recheck-2026-10-23/README.md): pinned-release Xvfb checks for discard, final-tab close, opening a fresh editor and narrow-toolbar widths; native Wayland freeze remains unresolved.
