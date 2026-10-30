@@ -66,11 +66,13 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
         })
         .collect();
     let columns = pages.first().map_or_else(Vec::new, |page| page.columns.clone());
+    let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let result = StreamedResult {
         pages,
         page_indices: indices.to_vec(),
         page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
+        retained_rows,
         columns,
         total_pages: indices.last().map_or(0, |last| last + 1),
         total_rows,

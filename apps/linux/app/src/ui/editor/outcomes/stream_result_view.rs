@@ -130,12 +130,22 @@ pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> St
     let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages)
         .replace("{pages}", &result.total_pages.to_string());
     let received = format!("{rows} · {pages}");
-    let retained: usize = result.pages.iter().map(|page| page.rows.len()).sum();
-    if retained == result.total_rows {
+    if stream_retained_rows(result) == result.total_rows {
         return received;
     }
     let notice = crate::tr!("Earlier pages can be loaded from temporary storage.");
     format!("{received}\n{notice}")
+}
+
+fn stream_retained_rows(result: &StreamedResult) -> usize {
+    #[cfg(test)]
+    RETAINED_ROW_COUNT_LOOKUPS.with(|visits| visits.set(visits.get() + 1));
+    result.retained_rows
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(super) static RETAINED_ROW_COUNT_LOOKUPS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 pub(in crate::ui::editor) fn stream_page_label(result: &StreamedResult, page_index: usize) -> String {

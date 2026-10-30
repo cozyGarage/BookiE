@@ -631,11 +631,13 @@ fn streamed_result_pages(
             }
         })
         .collect();
+    let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let streamed = StreamedResult {
         pages,
         page_indices,
         page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
+        retained_rows,
         columns,
         total_pages,
         total_rows,
@@ -1003,6 +1005,7 @@ fn streamed_kind(terminal: StreamTerminal) -> StatementOutcomeKind {
         page_indices: Vec::new(),
         page_row_counts: Vec::new(),
         page_row_starts: Vec::new(),
+        retained_rows: 0,
         columns: Vec::new(),
         total_pages: 0,
         total_rows: 0,
