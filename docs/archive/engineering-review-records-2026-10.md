@@ -59,7 +59,6 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [Dedicated-session opening guard, October 22](../evidence/session-opening-guard-2026-10-22/README.md): standalone held-open regression and current-Linux source checks.
 
 - [Completion popup initialization, October 22](../evidence/completion-popup-initialization-2026-10-22/README.md): reproduced missing GtkSourceView initialization, independent probe and startup regression.
-- [Owned GTK process checks, October 22](../evidence/owned-gtk-process-2026-10-22/README.md): fixture PID/lifetime ownership for memory sampling and second launch, with two-process regressions and targeted GTK acceptance.
 
 
 - [Toolkit startup ordering, October 23](../evidence/toolkit-startup-2026-10-23/README.md): fresh-process regression for GTK initialization before library version checks.
