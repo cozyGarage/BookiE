@@ -140,7 +140,7 @@ carry detailed native-type targets. Do not rebuild completed scalar/BSON/export 
 
 | Packet | Scope / files to inspect | Deliverable and completion evidence |
 | --- | --- | --- |
-| B3-P1: reconcile coverage | `docs/type-contract-strategy.md`, `docs/b3-test-scenario-survey.md`, `docs/value-contracts.md`; inspect corresponding tests | October 2 pass selected direct PostgreSQL scalar-enum projection as the smallest missing permanent boundary assertion; the exact test and SQLx outcome are recorded in the type/value ledgers. Keep reconciling the remaining rows as bounded cases close. |
+| B3-P1: reconcile coverage | `docs/type-contract-strategy.md`, the private October test-source survey, `docs/value-contracts.md`; inspect corresponding tests | October 2 pass selected direct PostgreSQL scalar-enum projection as the smallest missing permanent boundary assertion; the exact test and SQLx outcome are recorded in the type/value ledgers. Keep reconciling the remaining rows as bounded cases close. |
 | B3-P2: PostgreSQL boundary | `crates/drivers/postgres/{src,tests}`, affected core literal/parser path only | One calendar/array/native-type gap from P1, with an independent native wire/server oracle and a consumer round trip. Record baseline failure or already-covered result; add no type abstraction without a caller. |
 | B3-P3: consumer parity | One format in `crates/core/src/export/`, affected driver test and existing value corpus | One missing empty/NULL, float/subnormal, delimiter/newline, temporal or nested case. Parse output and compare exact value/type; verify destination preservation on refusal. |
 | B3-P4: grid edit / bind | One driver plus `crates/app/src/ui/browse_tab/value_parse.rs` and existing edit/parser tests as needed | One mixed-storage/BSON or exact numeric edit gap. Assert original row identity and native persisted value. Ranges beyond safe support must refuse visibly without a lossy write. |
@@ -470,7 +470,7 @@ fe22716459c242b350bf34e7070dde19bba184ba. Record any newer commits or local edit
 Task: B3-P1 only. Reconcile remaining type/consumer coverage against current code
 and the archived September 26–28 review. Update the three B3 evidence documents.
 Allowed edits: linux/docs/type-contract-strategy.md,
-linux/docs/b3-test-scenario-survey.md, linux/docs/value-contracts.md.
+the private B3 test-source survey, and linux/docs/value-contracts.md.
 Return a concrete smallest next case, exact test command, existing evidence SHA,
 and open gaps. Do not claim new runtime passes from inspecting test source.
 No GNOME/Debian VM setup, production-code edits, release, push or publication.
@@ -736,9 +736,9 @@ editing. B4–B6 acceptance follows B3; their boxes remain open.
 
 ### B3 regression research: 2026-09-26
 
-The [external scenario survey](b3-test-scenario-survey.md) pins test sources from
-DBeaver, Beekeeper Studio, pgcli and SQLFluff. Use their scenarios and issue-linked
-regressions to find gaps, reproduce failures locally, and retain permanent tests.
+The October external scenario survey, now in the private research archive, pinned
+test sources from DBeaver, Beekeeper Studio, pgcli and SQLFluff. Its reviewed
+scenarios informed gap screening and regression work.
 Common PostgreSQL scalar arrays now preserve their elements and dimensions
 through SQL export/re-import. Temporal/nested values, unsupported array element
 types and remaining consumer parity stay next. Secure transport and authorization scenarios feed B4 acceptance;
@@ -1008,10 +1008,8 @@ backup bytes, but an installed-package rollback is still a release gate.
   `linux`. Also added `libsqlite3-dev` to every CI job that builds the sqlite
   driver or the app crate — missing before, and a certain CI failure once system
   SQLite linking landed, independent of the GNOME 50 question.
-- 2026-09-16/17: reviewed the macOS `main` branch's Swift test suite (~1,300
-  files) for adoptable test cases against `linux`'s own logic, tracked in
-  [docs/testing.md](../testing.md)'s "Upstream test-suite parity" section.
-  Ported 5 items — SSH (host-key/socket-path/connect-error edge cases),
+- 2026-09-16/17: a test-gap pass added 5 BookiE regression groups — SSH
+  (host-key/socket-path/connect-error edge cases),
   cell/value display (binary edge cases; surfaced but did not fix an
   `is_cell_editable` type-affinity gap needing GTK visual verification), row
   copy/paste (TSV escaping, paste normalization), storage (existing migration coverage; a gap in query-history export

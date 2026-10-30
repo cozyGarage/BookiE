@@ -29,7 +29,7 @@ upgrade/rollback and soak gates remain open.
 | --- | --- |
 | Compact B4 board; original packets in [B4 history](b4-history.md) | Stop merged F6/F8 and other delivered tasks being dispatched again; retain original SHAs/reports |
 | Current [connections](../connections.md); September claims in [history](connections-history.md) | Remove obsolete silent host learning, missing SQL Server TLS fixtures and backend fallback claims from the operational guide |
-| [Testing](../testing.md) references the executable driver list; adoption narrative in [history](testing-history.md) | Copied commands omitted MongoDB/MCP/policy/SSH; historical counts do not prove current gaps |
+| [Testing](../testing.md) references the executable driver list; mutation notes remain in [history](testing-history.md) | Copied commands omitted MongoDB/MCP/policy/SSH; historical counts do not prove current gaps; comparative test-suite research moved to private archive |
 | [Validation playbook](../validation-playbook.md) separates commands from [historical results](validation-history.md) | Reuse this checkout/cache; give each runtime result one owner |
 | ADR 0004 distinguishes absent items from typed keyring failure | Match storage/transport refusal and recovery behavior |
 | ADRs 0006/0008 and [conventions](../code-conventions.md) agree on privacy and uncertainty | Logging level never permits secrets; GUI F8 is merged but headless parity is incomplete |
