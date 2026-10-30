@@ -14,7 +14,7 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 
 - [0.2.0 release qualification, October 21](../evidence/release-0.2.0-2026-10-21/README.md): candidate package checks, functional and profiling observations, with final publication and desktop acceptance recorded separately.
 
-- [PostgreSQL gate repair, October 21](../evidence/postgres-gate-repair-2026-10-21/README.md): deterministic pooled-reset regression, installed retired-session acceptance and the successful 29-job gate.
+- [PostgreSQL session and pool behavior, October 21](../evidence/postgres-gate-repair-2026-10-21/README.md): pooled connection reset, retired-session refusal and PgBouncer prepared-statement behavior.
 
 - [Large SQL editor analysis, October 21](../evidence/large-sql-editor-analysis-2026-10-21/README.md): bounded advisory snapshots, deferred diagnostics and remaining full-document costs.
 - [Large-query rendering, October 21](../evidence/large-query-rendering-2026-10-21/README.md): deferred hidden grids and the local grid lifecycle regression.
