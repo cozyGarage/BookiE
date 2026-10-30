@@ -208,7 +208,7 @@ class CiWorkflowTests(unittest.TestCase):
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
             group = settings["group"].strip()
             self.assertTrue(group, name)
-            self.assertEqual(group, "bookie-lab-${{ github.workflow }}-${{ github.run_id }}", name)
+            self.assertEqual(group, "bookie-lab-${{ forgejo.workflow }}-${{ forgejo.run_id }}", name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
             groups.append(group)
         self.assertEqual(groups[0], groups[1])
