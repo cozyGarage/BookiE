@@ -2,7 +2,7 @@
 
 Status: historical local integration of [PR 1529](https://github.com/cozyGarage/BookiE/pull/1529) and [PR 1530](https://github.com/cozyGarage/BookiE/pull/1530), not Forgejo acceptance. [Inputs](inputs.json) pin the actual merged source heads. The two fixes change separate editor lifecycle and result presentation paths. Only additive documentation-index conflicts required resolution; both entries were preserved.
 
-The [editor investigation](../local-resource-profiling-2026-10-23/README.md) and [stream investigation](../stream-page-realization-2026-10-23/README.md) own their separate measurements. This record owns checks performed with both changes present. Do not treat separate-head results as combined acceptance.
+This record owns checks performed with both changes present. Do not treat single-change measurements as combined acceptance.
 
 The saved-script probe now permits a UTF-8 workload with `TABLEPRO_PROFILE_UTF8=1`. Generated content is bounded by encoded byte count; accessibility character-count checks remain based on Unicode characters. This is workspace restoration backed by an actual file, not file-chooser acceptance. The completed local checks and optimized workload results are recorded below.
 
