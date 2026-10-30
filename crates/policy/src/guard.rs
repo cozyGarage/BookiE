@@ -28,6 +28,7 @@ use crate::rules::{
 };
 
 const BLAST_RADIUS_TIMEOUT: Duration = Duration::from_secs(30);
+const APPROVAL_WAIT_LIMIT: Duration = Duration::from_secs(600);
 
 #[derive(Clone)]
 pub struct GuardContext {
@@ -303,7 +304,9 @@ impl PolicyGuard {
                         },
                         outcome = &mut approval => Ok(outcome),
                     },
-                    None => Ok(approval.await),
+                    None => tokio::time::timeout(APPROVAL_WAIT_LIMIT, &mut approval)
+                        .await
+                        .map_err(|_| DriverError::TimedOut),
                 };
                 let preview_state = match preview {
                     Some(value) => AuditPreviewState::Available(value.clone()),
