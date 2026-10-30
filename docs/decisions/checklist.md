@@ -76,7 +76,6 @@ Last full review against the ADR index, code and living docs: 2026-10-20. The re
 
 | Topic | Record |
 | --- | --- |
-| Aggregate Forgejo acceptance and merge trains | [ADR 0020](0020-aggregate-forgejo-trains.md) |
 | Secret Service credentials | [ADR 0004](0004-libsecret-secret-storage.md), [secret-storage spec](../../specs/secret-storage/spec.md) (draft) |
 | Governed consumer seam (`PolicyGuard`) | [ADR 0016](0016-governed-consumer-seam.md), [governed SQL spec](../../specs/governed-sql/spec.md) (draft) |
 | Server-side cancellation | [ADR 0005](0005-server-side-cancellation.md) |
@@ -98,18 +97,18 @@ Recorded so a contributor does not reopen them without new evidence. Each row ci
 
 | Direction | Status | Record |
 | --- | --- | --- |
-| In-app AI client or chat | Out of scope | The governed MCP server is the agent interface ([ADR 0017](0017-mcp-sdk-behind-the-governed-seam.md), [ADR 0016](0016-governed-consumer-seam.md)); source: [feature comparison](../0.2-feature-comparison.md#explicitly-out-of-scope-unless-product-goals-change). |
-| Upstream TablePro as a merge target | Declined | BookiE is fully detached and autonomous; external projects are peer references only with no upstream tracking or merge obligations. [peer review](../upstream-sync.md), [capability review](../capability-review.md). |
+| In-app AI client or chat | Out of scope | The governed MCP server is the agent interface ([ADR 0017](0017-mcp-sdk-behind-the-governed-seam.md), [ADR 0016](0016-governed-consumer-seam.md)). |
+| Merge or synchronization obligation with another product | Declined | BookiE maintains its own architecture and release decisions. Source attribution for adopted code is recorded in [source attribution](../upstream-sync.md). |
 | Oracle, Cassandra and runtime-bridge engines | Out of scope | [ADR 0001](0001-no-plugin-system.md). |
-| Importing dbx crates | Declined | [ADR 0018](0018-headless-app-services-crate.md). |
+| Runtime-loaded database-driver crates | Declined | Drivers are static workspace crates under [ADR 0001](0001-no-plugin-system.md). |
 | Second SQL classifier, permissive fail-open classification, lifecycle scripting hooks | Declined | [ADR 0016](0016-governed-consumer-seam.md). |
 | Connection-wide commit switch; automatic retry of failed statements | Declined | [ADR 0008](0008-connection-and-session-ownership.md). |
 | `LIMIT`/`OFFSET` paging; unbounded page retention | Declined | [ADR 0011](0011-paged-query-results.md). |
-| Keyless edits through `ctid` or another physical locator | Declined | Keyless-write refusal stays; source: [dbx follow-up](../archive/dbx-follow-up-2026-10-21.md). |
-| Apple-only services, license-gated features, Sparkle or AppleScript, iCloud-synced icons | Out of scope | [PRODUCT.md](../../PRODUCT.md) for the no-license rule; the rest from [feature comparison](../0.2-feature-comparison.md#explicitly-out-of-scope-unless-product-goals-change). |
-| dbx's cell and error model: cells as `serde_json::Value`, binary as `"0x…"` text, user WHERE or edits spliced into SQL, a regex production-safety unlock, passwords as plain strings across the UI | Declined | [ADR 0007](0007-type-and-value-preservation.md) and bound values; source: [application-layer audit](../archive/app-layer-external-audit-2026-10-06.md). |
+| Keyless edits through `ctid` or another physical locator | Declined | Keyless-write refusal stays because physical row locators are not stable logical keys. |
+| Apple-only services, license-gated features, Sparkle or AppleScript, iCloud-synced icons | Out of scope | BookiE is a Linux-only client; shipped features require no account, license or remote entitlement ([PRODUCT.md](../../PRODUCT.md)). |
+| Untyped values, SQL text interpolation for edits, or plain-text secret propagation | Declined | Preserve typed values under [ADR 0007](0007-type-and-value-preservation.md), bind values, and keep secrets in the storage and secret types required by [AGENTS.md](../../AGENTS.md#security-invariants). |
 | Trusted production mutations, unattended MCP writes, a public package | Not approved (SEC-8) | [ADR 0016](0016-governed-consumer-seam.md). |
-| A YAML driver capability manifest or runtime-loaded engine descriptors | Declined | Capabilities are compile-time Rust types on the driver contract ([ADR 0001](0001-no-plugin-system.md)); the proposed direction is one static `DriverCapabilities` struct replacing the `supports_*` methods; source: [dbx features review](../archive/tablepro-dbx-review-2026-10-20/d-dbx-features.md). |
+| A YAML driver capability manifest or runtime-loaded engine descriptors | Declined | Capabilities are compile-time Rust types on the driver contract ([ADR 0001](0001-no-plugin-system.md)); the proposed direction is one static `DriverCapabilities` struct replacing the `supports_*` methods. |
 | Result charts, facet charts, theme editor or theme sync | Out of scope | Not in product goals. |
 
 ## Open forks (do not invent answers here)
@@ -121,8 +120,8 @@ Recorded so a contributor does not reopen them without new evidence. Each row ci
 | Accessibility / WCAG claim | Maintainer | Ledger DOC-3; do not claim AA from Adwaita alone |
 | Other data retention | Product | Query-result spool retention is defined in [ADR 0025](0025-transient-result-page-spool.md); resolve any remaining retention policy with legal or product |
 | Timed write unlock for production connections | Architect | Needs an amendment to [ADR 0016](0016-governed-consumer-seam.md) before any work; the production marker stays a display cue |
-| SOCKS5 proxy for database connections | Product | Adapt only, low priority. Needs a threat review and a DNS-leak rule first ([dbx features review](../archive/tablepro-dbx-review-2026-10-20/d-dbx-features.md)) |
-| SQLite loadable extensions | Architect | Security-sensitive; needs an explicit extension-loading decision before exposure ([feature comparison](../0.2-feature-comparison.md)) |
-| Multi-session strip (several live sessions in one window) | Product | Not copied from TablePro without a product decision; one active connection window today |
+| SOCKS5 proxy for database connections | Product | Adapt only, low priority. Needs a threat review and a DNS-leak rule first |
+| SQLite loadable extensions | Architect | Security-sensitive; needs an explicit extension-loading decision before exposure |
+| Several live sessions in one window | Product | Not selected; each window currently represents one active connection |
 | Performance budget ADR | Architect | Optional; PERF-* ledger rows may stay sufficient |
 | Flathub / distro as external release gate | Architect / packaging | Decide whether external review is a release gate before planning a Flathub or distro submission. The published 0.2.0 includes a GNOME 50 Flatpak bundle but has no Flathub listing. |

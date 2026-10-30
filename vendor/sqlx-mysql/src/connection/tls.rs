@@ -100,3 +100,14 @@ impl WithSocket for MapStream {
         }
     }
 }
+
+pub(crate) fn enable_tcp_keepalive<S: 'static>(socket: &S) {
+    let any: &dyn std::any::Any = socket;
+    let Some(stream) = any.downcast_ref::<tokio::net::TcpStream>() else {
+        return;
+    };
+    let keepalive = socket2::TcpKeepalive::new()
+        .with_time(std::time::Duration::from_secs(30))
+        .with_interval(std::time::Duration::from_secs(10));
+    let _ = socket2::SockRef::from(stream).set_tcp_keepalive(&keepalive);
+}

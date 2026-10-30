@@ -4,8 +4,6 @@
 
 The maintainer marked 0.2.0 delivery complete, and the release was published on 2026-10-23. The [platform guide](platforms.md#published-020-release) records its assets and package names. Remaining work and candidate order for future releases are in the [backlog](backlog.md).
 
-The previous scope, blocker table and sprint checklists are kept in the [history](#history). They are historical checklists, not fresh test, installed-package or soak evidence, and their open rows do not reopen 0.2.0.
-
 ## Delivery boundary
 
 0.2.0 is the Linux release for the Arch/Hyprland target, with hotfixes to follow from use:
@@ -65,7 +63,7 @@ Release-note boundary: summarize user-visible behavior since 0.2.0, grouped by a
 | Cursor results and full exports | ADRs [0011](decisions/0011-paged-query-results.md), [0014](decisions/0014-full-table-export-snapshot.md) |
 | Shared governed consumer path and headless services | ADRs [0016](decisions/0016-governed-consumer-seam.md), [0018](decisions/0018-headless-app-services-crate.md) |
 
-The remaining accepted decisions are in the [ADR index](decisions/README.md). Upstream source reuse does not change these contracts implicitly.
+The remaining accepted decisions are in the [ADR index](decisions/README.md). Code reuse does not change these contracts implicitly.
 
 ## Working on the next packet
 
@@ -74,7 +72,3 @@ Choose one lane-owned issue and refresh its source pins and competing PRs. State
 Use the existing [validation tiers](validation-playbook.md), with one failing-before regression for a changed behavior. Driver contracts need real-engine outcomes; visual or package claims need their installed checks. Keep GitHub cheap checks and the Forgejo merge gate under the current worker-isolation rules in [AGENTS.md](../AGENTS.md#workflow). Record skipped, blocked and unrun checks explicitly.
 
 Broader type/consumer matrices, mutation triage, Debian/GNOME desktop work, Flatpak and new features continue under their existing backlog owners. See [known limitations](known-limitations.md) for user-visible restrictions and the [value evidence index](value-contracts.md) for case-specific proof.
-
-## History
-
-The [completion handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md) preserves the immediately preceding scope, qualification recipes and packet lists. The [test and validation summary](archive/bookie-0.2-test-records-2026-10-23.md) collects historical coverage records. The older [sprint history](archive/bookie-0.2-history.md) holds earlier implementation records. Read the case needed; dated plans do not override current decisions or scheduling.

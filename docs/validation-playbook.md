@@ -112,14 +112,12 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Coverage | Linux test quality; [local instructions](testing-quality-and-performance.md#coverage) | LCOV, exclusions and summary; this report has no threshold. Forgejo nightly separately enforces the unit-tier and per-crate floors. |
 | Flatpak | Flatpak Linux (packaging only) | Pull requests build the default profile; push and `workflow_dispatch` also build development; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
-| GTK soak | GTK Safety Soak | Five independent retry-free attempts per run at one resolved SHA. The 30-attempt/six-run threshold is in the [archived 0.2.0 handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md), not a default for future releases; current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
+| GTK soak | GTK Safety Soak | Five independent retry-free attempts per run at one resolved SHA. Current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
 | Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) and issue acceptance criteria | VM/desktop version, Wayland session, package checksum, steps, result and screenshots |
 
 ## Hosted checks
 
-Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier. Accepted aggregate trains follow [ADR 0020](decisions/0020-aggregate-forgejo-trains.md) and the [train procedure](testing-ci.md#aggregate-train-acceptance): one gate on the exact aggregate PR head replaces constituent Forgejo gates only after manifest, freshness and merge-tree verification. A standalone `forgejo-train.sh` preflight is not aggregate acceptance. The current workflow files and [AGENTS.md](../AGENTS.md) define which checks run for each change and where acceptance happens. Forgejo workflows use per-ref concurrency groups with cancellation disabled: PR branches can run concurrently, while CI and nightly runs on `linux` remain serialized. Each execution runner has capacity one, so jobs from different refs can use separate idle workers without sharing a fixture process or display session. The gate script locks callers targeting the same remote branch; final `linux` synchronization stays serialized.
-
-The gate reports both the browser run number and the API run ID. They can differ. The train verifier's `--run` argument takes the API ID; task reporting uses the browser run number and the tested revision. Do not substitute one identifier for the other.
+Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier.
 
 Treat static-analysis findings as evidence to review. Fix valid findings in a focused change. For a confirmed false positive or accepted exception, record a short reason in the tool; keep a reusable explanation here only when it helps other contributors.
 
@@ -166,7 +164,7 @@ An agent must read `AGENTS.md`, inspect status and confirm the SHA before editin
 7. Run focused mutation checks with a nonzero selected count and independent expected values. Document each equivalent survivor with a concrete argument; leave unresolved survivors/timeouts open.
 8. Update scenario evidence and the owning issue or board. Keep the test with the fix.
 
-Use [value contracts](value-contracts.md) and the B3 board as the current case backlog. The [scenario survey](archive/b3-test-scenario-survey.md) records dated research patterns and source provenance. Current examples:
+Use [value contracts](value-contracts.md) and the B3 board as the current case backlog. Apply the [test design rules](test-design-rules.md) to each regression. Current examples:
 
 | Encountered scenario | Permanent regression home | Next edge to investigate |
 | --- | --- | --- |
