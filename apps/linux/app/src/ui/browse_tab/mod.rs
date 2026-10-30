@@ -35,7 +35,7 @@ pub(super) fn columns_for_browse_page(
 pub(super) fn with_table_ownership(columns: &mut [ColumnInfo], table: &[ColumnInfo]) {
     for column in columns {
         if let Some(known) = table.iter().find(|known| known.name == column.name) {
-            if column.data_type == "NULL" {
+            if column.data_type.is_empty() || column.data_type.eq_ignore_ascii_case("NULL") {
                 column.data_type.clone_from(&known.data_type);
             }
             column.is_generated |= known.is_generated;
@@ -43,6 +43,13 @@ pub(super) fn with_table_ownership(columns: &mut [ColumnInfo], table: &[ColumnIn
             column.primary_key |= known.primary_key;
         }
     }
+}
+
+fn merge_table_columns(result: &mut QueryResult, table: &[ColumnInfo]) {
+    if result.columns.is_empty() && !table.is_empty() {
+        result.columns = table.to_vec();
+    }
+    with_table_ownership(&mut result.columns, table);
 }
 
 fn projection_for_loaded_page(result: &QueryResult, projection: Option<Vec<usize>>) -> Option<Vec<usize>> {
@@ -748,9 +755,7 @@ impl SimpleComponent for BrowseTab {
                 // so the headers render even when the page is empty.
                 let projected_columns = projection_for_loaded_page(&result, projected_columns);
                 let mut result = result;
-                if result.columns.is_empty() && !self.current_columns.is_empty() {
-                    result.columns = self.current_columns.clone();
-                }
+                merge_table_columns(&mut result, &self.current_columns);
                 self.current_columns = columns_for_browse_page(&self.driver_id, &self.current_columns, Some(&result));
                 self.keyset_cursor =
                     extract_keyset_cursor(&self.current_columns, &result, projected_columns.as_deref());
@@ -780,10 +785,8 @@ impl SimpleComponent for BrowseTab {
                 // driver derives it from the first row), refill it now
                 // so the upcoming `render_grid_if_ready` builds headers
                 // against the real schema instead of an empty list.
-                if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut)
-                    && result.columns.is_empty()
-                {
-                    result.columns = columns.clone();
+                if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut) {
+                    merge_table_columns(result, &self.current_columns);
                 }
                 self.refresh_crud_buttons();
                 // Filter strip rebuilds against the new schema —

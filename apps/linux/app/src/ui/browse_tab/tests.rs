@@ -1094,7 +1094,7 @@ fn same_count_type_change_invalidates_cached_grid_factories() {
 }
 
 #[test]
-fn a_page_sql_export_leaves_out_columns_the_server_fills() {
+fn a_page_with_unknown_column_types_uses_table_metadata_for_exports() {
     let plain = |name: &str| ColumnInfo {
         name: name.into(),
         data_type: "int".into(),
@@ -1113,18 +1113,23 @@ fn a_page_sql_export_leaves_out_columns_the_server_fills() {
     table[0].is_auto_increment = true;
     table[2].is_generated = true;
     table[3].is_generated = true;
-    let mut page = vec![plain("id"), plain("qty"), plain("total"), plain("version")];
-    page[1].data_type = "NULL".into();
+    let mut result = QueryResult {
+        columns: vec![plain("id"), plain("qty"), plain("total"), plain("version")],
+        rows: Vec::new(),
+        truncated: false,
+    };
+    result.columns[1].data_type = "NULL".into();
 
-    super::with_table_ownership(&mut page, &table);
+    super::merge_table_columns(&mut result, &table);
 
     let row = [Value::Int(1), Value::Int(2), Value::Int(4), Value::Int(9)];
     assert_eq!(
-        tablepro_core::sql_literal::build_insert_literal("mssql", Some("dbo"), "orders", &page, &row).unwrap(),
+        tablepro_core::sql_literal::build_insert_literal("mssql", Some("dbo"), "orders", &result.columns, &row)
+            .unwrap(),
         "INSERT INTO [dbo].[orders] ([qty]) VALUES (2);"
     );
-    assert!(page[0].primary_key);
-    assert_eq!(page[1].data_type, "int");
+    assert!(result.columns[0].primary_key);
+    assert_eq!(result.columns[1].data_type, "int");
 }
 
 #[test]
