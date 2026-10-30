@@ -56,7 +56,7 @@ One typed handle covers every consumer. A new surface inherits classify, approva
 - Cross-surface features (GUI and agent) change the guarded path once and update both callers.
 - Performance work bounds pages and bytes through the guard. It does not remove classify or audit to go faster.
 
-- An MCP request deadline bounds driver work, authorization and rollback, but not the durable audit append: abandoning it could leave an unconfirmed terminal state, so policy stays fail-closed while the request waits ([production audit](../archive/production-audit.md), known limits).
+- An MCP request deadline bounds driver work, authorization and rollback, but not the durable audit append: abandoning it could leave an unconfirmed terminal state, so policy stays fail-closed while the request waits.
 - Trusted production mutations, unattended MCP writes and a public package are not approved. Do not build them without amending this record.
 
 ## Alternatives considered
