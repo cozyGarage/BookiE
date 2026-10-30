@@ -23,7 +23,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | Contributors testing | [Validation playbook](validation-playbook.md) (including [CI tiers](validation-playbook.md#ci-tiers)), [testing](testing.md) ([GTK](testing-gtk.md), [CI](testing-ci.md), [quality and performance](testing-quality-and-performance.md)), [test design rules](test-design-rules.md), [performance and acceptance scenarios](performance-acceptance-scenarios.md), [test-oracle review](oracle-review.md), ignored-test inventory (`scripts/inventory-ignored-tests.py`, generated, not committed), [manual verification](manual-verification-0.2-features.md) |
 | Planning and status | [0.2.0 completion and continuation](bookie-0.2-sprint.md), [work selection](backlog.md), [known limitations](known-limitations.md), [Project #3](https://github.com/users/cozyGarage/projects/3), [ledger index](known-issues.md), [B3 board pointer](lane-boards.md#b3-types-and-values), [B4 board pointer](lane-boards.md#b4-transport-and-sessions), [value evidence index](value-contracts.md), [changelog](../CHANGELOG.md) |
 | Product context and specs | [PRODUCT.md](../PRODUCT.md), [user contexts](personas.md), [PRINCIPLES.md](../PRINCIPLES.md), [SECURITY.md](../SECURITY.md), [capability specs](../specs/README.md) (descriptive drafts until architect review; AGENTS and ADRs rank above them) |
-| Decisions | [ADRs](decisions/README.md), [decision checklist](decisions/checklist.md), [proposal index](proposals/README.md) |
+| Decisions | [ADRs](decisions/README.md), [proposal index](proposals/README.md) |
 | Proof and history | [evidence](evidence/), [archive](archive/), [adopted-code attribution](upstream-sync.md) |
 
 ## Where each fact belongs
@@ -33,8 +33,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | A rule for every change | [AGENTS.md](../AGENTS.md) | One copy; tool-specific files point to it |
 | Product constraints, users and outcomes | [PRODUCT.md](../PRODUCT.md), [personas](personas.md), [PRINCIPLES.md](../PRINCIPLES.md) | Keep aligned with shipped behaviour; product constraints are not implementation status |
 | Current capability behaviour extracted from code | [specs/](../specs/README.md) | Descriptive only; when a spec and the code disagree, fix the spec |
-| An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR; keep the [checklist](decisions/checklist.md) row in sync |
-| Which forks already have an answer | The [decision checklist](decisions/checklist.md) | Link, N/A, or open item; do not invent a decision to fill a cell |
+| An architecture or behaviour decision | An [ADR](decisions/README.md) | Proposed, then Accepted by the maintainer; change a decision explicitly in a new or amended ADR |
 | A design not yet decided | [proposal index](proposals/README.md) | Becomes an accepted decision or is removed from active proposals |
 | An open issue, its status and lane | [Project #3](https://github.com/users/cozyGarage/projects/3); ID map in the [ledger index](known-issues.md) | Status and Lane on the project; keep the index ID→issue→Lane table in sync; `scripts/check-known-issues.py` checks format offline, while `scripts/check-github-issue-status.py` reports live issue state |
 | Milestone completion and subsequent order | [Completion and scope](bookie-0.2-sprint.md), [Project #3](https://github.com/users/cozyGarage/projects/3) | Record maintainer completion separately from publication; keep issue acceptance on Project #3 and dated proof in the archive |

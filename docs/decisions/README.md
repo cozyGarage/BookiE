@@ -2,7 +2,7 @@
 
 These documents record the reasons behind major technical choices. Accepted decisions stay stable. A later decision may supersede an earlier one by linking to it explicitly.
 
-Which forks already have an answer (and which are still open) is listed in the [decision checklist](checklist.md). Prefer a link there over inventing a second record for the same choice. Closures and decisions that were later corrected are recorded in [decision lessons](lessons.md).
+Proposed decisions are listed in the [proposal index](../proposals/README.md). Closures and decisions that were later corrected are recorded in [decision lessons](lessons.md).
 
 ## Lifecycle
 
@@ -86,8 +86,7 @@ Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepte
 2. Copy the format above into a lowercase dash-separated filename.
 3. Keep the document focused on one decision.
 4. Add it to the index in the same change.
-5. Update the [checklist](checklist.md) row for that fork (Decided with a link, or leave Open).
-6. Submit it through the normal review process.
-7. Record every rejected alternative with its reason under **Alternatives considered**, including options a review or comparison document turned down. A dated review that declines something is not a decision record until it is here.
-8. A limitation entry never overrides an accepted ADR. If shipped behaviour differs from an ADR, fix the behaviour or record a new ADR that supersedes it.
-9. After acceptance, edit an ADR only to clarify its wording. Progress, partial implementation, measurements and acceptance results go in [implementation status](implementation-status.md) or on the owning issue. Do not add an "Implementation status" section to an ADR.
+5. Submit it through the normal review process.
+6. Record every rejected alternative with its reason under **Alternatives considered**. A dated review that declines something is not a decision record until it is here.
+7. A limitation entry never overrides an accepted ADR. If shipped behaviour differs from an ADR, fix the behaviour or record a new ADR that supersedes it.
+8. After acceptance, edit an ADR only to clarify its wording. Progress, partial implementation, measurements and acceptance results go in [implementation status](implementation-status.md) or on the owning issue. Do not add an "Implementation status" section to an ADR.

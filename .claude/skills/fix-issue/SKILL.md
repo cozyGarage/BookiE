@@ -61,7 +61,7 @@ A related defect outside your lane is filed as its own issue with that lane's la
 Write `<tree>/.analysis/<slug>/plan.md`, under 80 lines:
 
 - the root cause as a mechanism, and refactor or patch with the reason;
-- the governing ADR (every type or value change follows ADR 0007) and the [decision checklist](../../../docs/decisions/checklist.md) row;
+- the governing ADR (every type or value change follows ADR 0007);
 - files in order, each inside your lane;
 - the failing test, its tier from `AGENTS.md`, Tests, and the [validation playbook](../../../docs/validation-playbook.md) layers to run;
 - the changelog line if the change is user-facing, and the docs the change makes stale.
