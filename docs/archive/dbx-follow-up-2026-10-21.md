@@ -1,6 +1,6 @@
 # dbx architecture and regression follow-up, October 21
 
-Dated source review. This supplements the [October 20 deep review](tablepro-dbx-review-2026-10-20/README.md) and [October 15 architecture review](2026-10-15-dbx-review.md). It does not amend accepted ADRs or select work ahead of the [backlog](../backlog.md).
+Dated source review. This supplements the October 20 deep review and [October 15 architecture review](2026-10-15-dbx-review.md). It does not amend accepted ADRs or select work ahead of the [backlog](../backlog.md).
 
 ## Evidence and limits
 

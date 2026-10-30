@@ -36,7 +36,7 @@ This dated catalog preserves evidence links from the October 2026 review cycle. 
 - [dbx architecture and regression follow-up, October 21](../archive/dbx-follow-up-2026-10-21.md): changes since the prior pin, PostgreSQL session/restore lessons, current architecture guards and qualified regression candidates.
 
 - [Newest-code and upstream follow-up, October 20](../archive/upstream-next-slices-2026-10-20.md): PostgreSQL transaction outcome gaps, native/savepoint and CI diagnostic probes, current upstream changes and proposed next slices.
-- [TablePro and dbx deep review, October 20](../archive/tablepro-dbx-review-2026-10-20/README.md): full feature, architecture and fix-commit mapping of TablePro `3222542a4` and dbx `d1e88ab4b` against BookiE `7c4cb3929`, with Wave 0 defects to confirm and a ranked roadmap of candidates.
+- TablePro and dbx deep review, October 20: full feature, architecture and fix-commit mapping of TablePro `3222542a4` and dbx `d1e88ab4b` against BookiE `7c4cb3929`, with Wave 0 defects to confirm and a ranked roadmap of candidates.
 - [Upstream main analysis, October 20](../archive/upstream-main-analysis-2026-10-20.md): pinned Linux and Apple changes, current adoption status, transferable regression cases and integration costs.
 
 - [Linux code adoption and development workflow](../archive/upstream-linux-adoption-2026-10-18.md), with the [source movement audit](../archive/upstream-linux-movement-2026-10-18.md): code, CI, conventions and closed post-0.2.0 tracker [#1149](https://github.com/cozyGarage/BookiE/issues/1149).
