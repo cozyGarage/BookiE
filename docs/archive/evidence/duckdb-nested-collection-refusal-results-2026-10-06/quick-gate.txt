@@ -19,7 +19,7 @@ good/1: /usr/bin/python3 -c print('done')
 Ran 70 tests in 2.034s
 
 OK
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /tmp/bookie-candidate-test-hwmpywfr/bookie-0.1.1-1-x86_64.pkg.tar.zst
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /tmp/worktree-candidate-test-hwmpywfr/bookie-0.1.1-1-x86_64.pkg.tar.zst
 candidate archive and rejection checks passed
 ✔ Validation was successful.
 Debian package symlink validation passed

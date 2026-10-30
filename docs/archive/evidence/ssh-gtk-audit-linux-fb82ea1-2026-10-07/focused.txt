@@ -1,4 +1,4 @@
-wrote fixture materials to /tmp/bookie-b4-16-current/linux/tests/fixtures/postgres-release/materials
+wrote fixture materials to /tmp/worktree-b4-16-current/linux/tests/fixtures/postgres-release/materials
 the SSH host key changed; the release script uses a fixture-local known_hosts file
  Image tablepro-postgres-release-db Building 
  Image tablepro-postgres-release-bastion Building 
@@ -171,28 +171,28 @@ the SSH host key changed; the release script uses a fixture-local known_hosts fi
  Container tablepro-postgres-release-db-1 Healthy 
  Container tablepro-postgres-release-relay-1 Healthy 
  Container tablepro-postgres-release-toxiproxy-1 Healthy 
-   Compiling tablepro-ssh v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/ssh)
+   Compiling tablepro-ssh v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/ssh)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.55s
-   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/core)
-   Compiling sqlx-mysql v0.9.0 (/tmp/bookie-b4-16-current/linux/vendor/sqlx-mysql)
-   Compiling sqlx-postgres v0.9.0 (/tmp/bookie-b4-16-current/linux/vendor/sqlx-postgres)
-   Compiling tablepro-ssh v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/ssh)
-   Compiling mongodb v3.9.1 (/tmp/bookie-b4-16-current/linux/vendor/mongodb)
-   Compiling redis v1.7.0 (/tmp/bookie-b4-16-current/linux/vendor/redis)
-   Compiling tablepro-policy v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/policy)
-   Compiling tablepro-driver-clickhouse v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/clickhouse)
-   Compiling tablepro-driver-mssql v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/mssql)
+   Compiling tablepro-core v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/core)
+   Compiling sqlx-mysql v0.9.0 (/tmp/worktree-b4-16-current/linux/vendor/sqlx-mysql)
+   Compiling sqlx-postgres v0.9.0 (/tmp/worktree-b4-16-current/linux/vendor/sqlx-postgres)
+   Compiling tablepro-ssh v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/ssh)
+   Compiling mongodb v3.9.1 (/tmp/worktree-b4-16-current/linux/vendor/mongodb)
+   Compiling redis v1.7.0 (/tmp/worktree-b4-16-current/linux/vendor/redis)
+   Compiling tablepro-policy v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/policy)
+   Compiling tablepro-driver-clickhouse v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/clickhouse)
+   Compiling tablepro-driver-mssql v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/mssql)
    Compiling sqlx v0.9.0
-   Compiling tablepro-driver-postgres v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/postgres)
-   Compiling tablepro-driver-mysql v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/mysql)
-   Compiling tablepro-driver-sqlite v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/sqlite)
-   Compiling tablepro-storage v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/storage)
-   Compiling tablepro-transport v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/transport)
-   Compiling tablepro-mcp v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/mcp)
-   Compiling tablepro-driver-redis v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/redis)
-   Compiling tablepro-release-tests v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/release-tests)
-   Compiling tablepro-driver-mongodb v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/mongodb)
-   Compiling tablepro-agentd v0.1.5 (/tmp/bookie-b4-16-current/linux/crates/agentd)
+   Compiling tablepro-driver-postgres v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/postgres)
+   Compiling tablepro-driver-mysql v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/mysql)
+   Compiling tablepro-driver-sqlite v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/sqlite)
+   Compiling tablepro-storage v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/storage)
+   Compiling tablepro-transport v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/transport)
+   Compiling tablepro-mcp v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/mcp)
+   Compiling tablepro-driver-redis v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/redis)
+   Compiling tablepro-release-tests v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/release-tests)
+   Compiling tablepro-driver-mongodb v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/mongodb)
+   Compiling tablepro-agentd v0.1.5 (/tmp/worktree-b4-16-current/linux/crates/agentd)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 25.72s
      Running tests/g5_system_openssh.rs ([user-home]/Projects/tablepro/linux/target/debug/deps/g5_system_openssh-9c81bffc98a03c13)
 
@@ -201,7 +201,7 @@ test agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_
 
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
 
-   Compiling tablepro-agentd v0.1.5 (/tmp/bookie-b4-16-current/linux/crates/agentd)
+   Compiling tablepro-agentd v0.1.5 (/tmp/worktree-b4-16-current/linux/crates/agentd)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 1.27s
      Running tests/mtls.rs ([user-home]/Projects/tablepro/linux/target/debug/deps/mtls-a12fe4285917ca3b)
 
@@ -212,16 +212,16 @@ test agentd_uses_a_saved_client_certificate_through_its_saved_ssh_route ... ok
 
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
 
-   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/core)
-   Compiling sqlx-postgres v0.9.0 (/tmp/bookie-b4-16-current/linux/vendor/sqlx-postgres)
-   Compiling tablepro-ssh v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/ssh)
-   Compiling tablepro-policy v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/policy)
+   Compiling tablepro-core v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/core)
+   Compiling sqlx-postgres v0.9.0 (/tmp/worktree-b4-16-current/linux/vendor/sqlx-postgres)
+   Compiling tablepro-ssh v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/ssh)
+   Compiling tablepro-policy v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/policy)
    Compiling sqlx v0.9.0
-   Compiling tablepro-driver-postgres v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/postgres)
-   Compiling tablepro-storage v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/storage)
-   Compiling tablepro-transport v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/transport)
-   Compiling tablepro-mcp v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/mcp)
-   Compiling tablepro-release-tests v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/release-tests)
+   Compiling tablepro-driver-postgres v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/postgres)
+   Compiling tablepro-storage v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/storage)
+   Compiling tablepro-transport v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/transport)
+   Compiling tablepro-mcp v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/mcp)
+   Compiling tablepro-release-tests v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/release-tests)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 13.56s
      Running unittests src/lib.rs ([user-home]/Projects/tablepro/linux/target/debug/deps/tablepro_release_tests-afd251b201610dc7)
 
@@ -348,28 +348,28 @@ test verify_full_through_ssh_uses_the_original_database_hostname ... ok
 
 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
 
-   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/core)
-   Compiling sqlx-mysql v0.9.0 (/tmp/bookie-b4-16-current/linux/vendor/sqlx-mysql)
-   Compiling sqlx-postgres v0.9.0 (/tmp/bookie-b4-16-current/linux/vendor/sqlx-postgres)
-   Compiling tablepro-app v0.1.5 (/tmp/bookie-b4-16-current/linux/crates/app)
-   Compiling redis v1.7.0 (/tmp/bookie-b4-16-current/linux/vendor/redis)
-   Compiling mongodb v3.9.1 (/tmp/bookie-b4-16-current/linux/vendor/mongodb)
-   Compiling tablepro-policy v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/policy)
-   Compiling tablepro-driver-mssql v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/mssql)
-   Compiling tablepro-driver-clickhouse v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/clickhouse)
+   Compiling tablepro-core v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/core)
+   Compiling sqlx-mysql v0.9.0 (/tmp/worktree-b4-16-current/linux/vendor/sqlx-mysql)
+   Compiling sqlx-postgres v0.9.0 (/tmp/worktree-b4-16-current/linux/vendor/sqlx-postgres)
+   Compiling tablepro-app v0.1.5 (/tmp/worktree-b4-16-current/linux/crates/app)
+   Compiling redis v1.7.0 (/tmp/worktree-b4-16-current/linux/vendor/redis)
+   Compiling mongodb v3.9.1 (/tmp/worktree-b4-16-current/linux/vendor/mongodb)
+   Compiling tablepro-policy v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/policy)
+   Compiling tablepro-driver-mssql v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/mssql)
+   Compiling tablepro-driver-clickhouse v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/clickhouse)
    Compiling sqlx v0.9.0
-   Compiling tablepro-driver-postgres v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/postgres)
-   Compiling tablepro-driver-sqlite v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/sqlite)
-   Compiling tablepro-driver-mysql v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/mysql)
-   Compiling tablepro-storage v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/storage)
-   Compiling tablepro-driver-redis v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/redis)
-   Compiling tablepro-mcp v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/mcp)
-   Compiling tablepro-transport v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/transport)
-   Compiling tablepro-driver-mongodb v0.1.0 (/tmp/bookie-b4-16-current/linux/crates/drivers/mongodb)
+   Compiling tablepro-driver-postgres v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/postgres)
+   Compiling tablepro-driver-sqlite v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/sqlite)
+   Compiling tablepro-driver-mysql v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/mysql)
+   Compiling tablepro-storage v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/storage)
+   Compiling tablepro-driver-redis v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/redis)
+   Compiling tablepro-mcp v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/mcp)
+   Compiling tablepro-transport v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/transport)
+   Compiling tablepro-driver-mongodb v0.1.0 (/tmp/worktree-b4-16-current/linux/crates/drivers/mongodb)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 36.19s
 dbus-daemon[3486044]: [session uid=1000 pid=3486044 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1000 pid=3486166 comm="gdbus call --session --dest org.a11y.Bus --object-")
 dbus-daemon[3486044]: [session uid=1000 pid=3486044 pidfd=5] Successfully activated service 'org.a11y.Bus'
-dbus-daemon[3486177]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=3486189 comm="python3 /tmp/bookie-b4-16-current/linux/crates/app")
+dbus-daemon[3486177]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=3486189 comm="python3 /tmp/worktree-b4-16-current/linux/crates/app")
 dbus-daemon[3486177]: Successfully activated service 'org.a11y.atspi.Registry'
 SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
 dbus-daemon[3486044]: [session uid=1000 pid=3486044 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.10' (uid=1000 pid=3486205 comm="[user-home]/Projects/tablepro/linux/target/release")

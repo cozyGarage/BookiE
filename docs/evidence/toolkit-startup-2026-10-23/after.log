@@ -1,4 +1,4 @@
-   Compiling tablepro-app v0.2.0 (/tmp/bookie-ux-startup-version/apps/linux/app)
+   Compiling tablepro-app v0.2.0 (/tmp/worktree-ux-startup-version/apps/linux/app)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 32.41s
      Running unittests src/lib.rs ($HOME/Projects/bookie/target/debug/deps/tablepro_app-0697f3ed2e86ab6c)
 
