@@ -24,7 +24,7 @@ Add an optional driver capability that opens a forward-only cursor over a single
 ## Alternatives considered
 
 - **Re-run the statement with `LIMIT` and `OFFSET`.** Rejected; see Context. It rewrites user SQL, can repeat or miss rows, and re-evaluates the statement per page.
-- **Append every page forever.** Rejected. Memory is still unbounded ([grid memory plan](../archive/grid-memory-and-fetch-action-plan-2026-10-07.md)).
+- **Append every page forever.** Rejected. Memory is still unbounded.
 - **A page-count cache limit.** Rejected for an estimated-byte limit (see the October 22 and 24 clarification). A fixed page count can exceed any byte budget when rows are large.
 - **Strong, permanent row objects.** Rejected. Memory grew with scrolling. Row slots hold weak references plus a source index, and draft rows stay strong. Identity must not become a bare row position, because inserts, removals and sorting move positions.
 - **ODBC columnar fetch.** Rejected; see [ADR 0001](0001-no-plugin-system.md).

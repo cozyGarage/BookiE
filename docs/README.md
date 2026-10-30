@@ -66,9 +66,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 [archive/](archive/) holds dated reviews, audits, inventories and long histories. They are source-pinned evidence, not instructions; open items from them live on [Project #3](https://github.com/users/cozyGarage/projects/3). Use the archive starting points below to locate a record, then verify current behavior and status in active docs and issues.
 
 - [Historical 0.2 development record](archive/bookie-0.2-history.md) (brief archive link; see the active sprint for current status)
-- [0.1.x implementation history](archive/changelog-history-0.1.x-2026-10-23.md) (archived from the changelog to keep it focused on release notes)
 - [B4 history](archive/b4-history.md) (includes superseded tip checkpoints, [completed local slices](archive/b4-history.md#archived-completed-local-slices-2026-10-10-consolidation) and [remaining-task prose](archive/b4-history.md#archived-remaining-task-prose-2026-10-10-pass-4))
-- [Evidence directory index](archive/evidence-index-2026-10-10.md) (October 10 historical snapshot)
 - [Archived evidence packets](archive/evidence/) (dated artifacts retained after reference triage)
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
@@ -76,15 +74,9 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 - [PostgreSQL driver coverage, October 24](evidence/postgres-driver-coverage-2026-10-24/README.md): the recovered integration-coverage report at source `d2166fd`.
 - [Workspace unit coverage at `d2166fd`, October 24](evidence/workspace-unit-coverage-d2166fd-2026-10-24/README.md) and [at `583c244`](evidence/workspace-unit-coverage-583c244-2026-10-24/README.md): recovered historical reports for two distinct source revisions.
 - [Workspace unit coverage, October 24](evidence/workspace-unit-coverage-9d61c7a-2026-10-24/README.md): 61.42% line coverage on Linux `9d61c7a` against the 59% floor, with the command and its scope.
-- [Multi-editor stream ownership profile, October 26](evidence/stream-retention-multi-owner-2026-10-26/README.md): synthetic two-editor and cancelled export-page sample, with the RSS/allocator limitation stated.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
 - [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
-- [Release audit, October 3](archive/release-audit-2026-10-03.md)
-- [Remaining-gap acceptance, October 15](archive/remaining-gaps-2026-10-15.md) (dated evidence for completed distro, SQL proposal and disconnect-cache findings)
-- [Offline release input audit, October 19](archive/offline-release-input-audit-2026-10-19.md) (current Arch candidate evidence and remaining offline inputs)
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
-- [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
-- [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
 
 ## Keep context bounded
 
