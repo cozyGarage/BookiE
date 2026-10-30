@@ -2219,8 +2219,8 @@ The composed parser-to-server test passed against the PostgreSQL 16 Docker fixtu
 
 ## PostgreSQL array checkpoint
 
-Scenario B3-1 follows the DBeaver array distinctions recorded in the
-[external survey](b3-test-scenario-survey.md). The first real-server regression
+Scenario B3-1 checks that PostgreSQL array values preserve element text and
+distinguish quoted `NULL` from SQL NULL. The first real-server regression
 failed on an empty int4 array, which returned Undecodable. No external fixture
 or source code was copied.
 
@@ -2613,8 +2613,8 @@ also passed. Installed desktop acceptance remains a later gate.
 
 ## PostgreSQL time checkpoint
 
-B3-2 adopts the temporal-boundary scenarios from the
-[external survey](b3-test-scenario-survey.md). The new server regression first
+B3-2 adopts the temporal-boundary scenarios from the migrated private survey.
+The new server regression first
 failed because `24:00:00` was decoded as midnight: exported wire bytes changed
 from `000000141dd76000` to `0000000000000000`.
 
@@ -2729,7 +2729,7 @@ rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutan
 rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --ignored --test-threads=1
 ```
 
-The [CI audit](ci-audit-2026-09-27.md) found nine survivors in the broader hosted
+The [CI audit at its recorded source](https://github.com/cozyGarage/BookiE/blob/8d0d9550544afaea70b229c820f7e78e268a5ec5/docs/archive/ci-audit-2026-09-27.md) found nine survivors in the broader hosted
 PostgreSQL mutation run. New regressions use an independent 16,777,216-byte limit,
 test exact quoted-output and raw-element boundaries, check dimension rejection
 before decoding, reject fractional groups beyond declared scale and preserve

@@ -14,6 +14,7 @@ fn unfiltered_native_browsing_needs_no_gui_or_sql_execution() {
             columns: &[],
             filter: &filter,
             hidden_columns: None,
+            long_text_preview: false,
         };
         assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
     }

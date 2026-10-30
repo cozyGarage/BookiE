@@ -37,7 +37,7 @@ it does not close B3, B4 or approve a release.
 | Maintenance | ClickHouse helper split, MongoDB module split and function-size refactors | Requalify affected behavior; refactoring is not additional feature acceptance |
 
 Detailed historical evidence remains in [value contracts](../value-contracts.md),
-[CI audit](ci-audit-2026-09-27.md), [B4 board](../lane-boards.md#b4-transport-and-sessions) and
+[CI audit at its recorded source](https://github.com/cozyGarage/BookiE/blob/8d0d9550544afaea70b229c820f7e78e268a5ec5/docs/archive/ci-audit-2026-09-27.md), [B4 board](../lane-boards.md#b4-transport-and-sessions) and
 [September 26 reconciliation](reconciliation-2026-09-26.md).
 
 ## Findings that affect the next plan

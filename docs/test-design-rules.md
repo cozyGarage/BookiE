@@ -1,10 +1,10 @@
 # Test design rules
 
-Rules that earlier audits paid for. Each one names the failure it prevents. The dated evidence stays in the [archive](archive/); the layers and gates are in the [validation playbook](validation-playbook.md) and [testing](testing.md).
+Rules that earlier audits paid for. Each one names the failure it prevents. The test layers and gates are in the [validation playbook](validation-playbook.md) and [testing](testing.md).
 
 ## Ownership and execution
 
-- **An ignored or isolated test has an owner.** Registering it in the inventory is not enough: a job must run it. When adding or auditing an `#[ignore]` test, name the script and CI job that executes it, and keep a workflow regression that fails if the runner is disconnected. Eight SSH and agent-auth tests once sat in no job while the suite was green ([CI audit, 2026-09-27](archive/ci-audit-2026-09-27.md)).
+- **An ignored or isolated test has an owner.** Registering it in the inventory is not enough: a job must run it. When adding or auditing an `#[ignore]` test, name the script and CI job that executes it, and keep a workflow regression that fails if the runner is disconnected.
 - **A green workflow proves only its own scope.** A packaging run that builds both profiles and runs no regression suite says nothing about behaviour. Say which suite ran when quoting a result.
 
 ## Runners and evidence parsers
@@ -28,5 +28,5 @@ Rules that earlier audits paid for. Each one names the failure it prevents. The 
 
 ## Changing a test or guard
 
-- **Do not delete a test that pins a wrong expectation.** Amend it, and say in the commit why the expectation changed. Write the failing regression first. For example, the crate-boundary check must keep permitted dev edges (driver to policy) distinct from forbidden GUI edges ([Linux peer review, 2026-10-16](archive/linux-peer-review-2026-10-16.md), finding 2).
+- **Do not delete a test that pins a wrong expectation.** Amend it, and say in the commit why the expectation changed. Write the failing regression first. Crate-boundary checks must keep permitted dev edges (driver to policy) distinct from forbidden GUI edges.
 - **Weakening a contract guardrail needs the contract owner's agreement** ([AGENTS.md](../AGENTS.md)).

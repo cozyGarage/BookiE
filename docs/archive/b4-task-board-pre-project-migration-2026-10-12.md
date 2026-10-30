@@ -4,7 +4,7 @@ Base scope: `aeac107a4`, branch `linux`, reviewed 2026-10-03. The active B4 inte
 
 ## Release wrap-up review (2026-10-11)
 
-[The source and worktree review](../archive/b4-release-wrapup-review-2026-10-11.md) records the integrated branches, the finite finish order and the scope conflicts. It reproduced an AUD-9 named derived-projection leak and a missing terminal audit outcome for a write refused inside a read-only snapshot. The old code branches are merged. Their unique historical evidence was preserved in `63f6d2eb3`, and the 16 old worktrees were retired without deleting the shared build cache. This review does not establish candidate acceptance.
+[The source and worktree review](https://github.com/cozyGarage/BookiE/blob/3db4bfd469a874721c1592ed4ec059e7ea90eaa7/docs/archive/b4-release-wrapup-review-2026-10-11.md) records the integrated branches, the finite finish order and the scope conflicts. It reproduced an AUD-9 named derived-projection leak and a missing terminal audit outcome for a write refused inside a read-only snapshot. The old code branches are merged. Their unique historical evidence was preserved in `63f6d2eb3`, and the 16 old worktrees were retired without deleting the shared build cache. This review does not establish candidate acceptance.
 
 ### Finite code finish and candidate handoff
 

@@ -24,7 +24,7 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | Planning and status | [0.2.0 completion and continuation](bookie-0.2-sprint.md), [backlog](backlog.md), [known limitations](known-limitations.md), [Project #3](https://github.com/users/cozyGarage/projects/3), [ledger index](known-issues.md), [B3 board pointer](lane-boards.md#b3-types-and-values), [B4 board pointer](lane-boards.md#b4-transport-and-sessions), [value evidence index](value-contracts.md), [changelog](../CHANGELOG.md) |
 | Product context and specs | [PRODUCT.md](../PRODUCT.md), [user contexts](personas.md), [PRINCIPLES.md](../PRINCIPLES.md), [SECURITY.md](../SECURITY.md), [capability specs](../specs/README.md) (descriptive drafts until architect review; AGENTS and ADRs rank above them) |
 | Decisions | [ADRs](decisions/README.md), [decision checklist](decisions/checklist.md), [proposal index](proposals/README.md) |
-| Proof and history | [evidence](evidence/), [archive](archive/), [evidence branch migration proposal](proposals/evidence-branch.md), [adopted-code attribution](upstream-sync.md) |
+| Proof and history | [evidence](evidence/), [archive](archive/), [adopted-code attribution](upstream-sync.md) |
 
 ## Where each fact belongs
 
@@ -51,66 +51,46 @@ Do not load archives as mandatory context. Look up the heading, test selector or
 | Run-specific proof (manifests, focused logs) | `evidence/<topic>[-<sha>]-<YYYY-MM-DD>/` | A `manifest.json` or concise `README.md`, with only the artifacts needed to check the claim; link it from the owning row or board |
 | A finished review, audit or long history | [archive/](archive/) | Dated file name; corrections to links or neutral wording must preserve the recorded evidence, dates and decisions |
 
-The [runner maintenance and isolation proposal](proposals/runner-maintenance-and-isolation.md) records repository safeguards and the remaining deployment and isolated-runner acceptance under #573. It does not describe a deployed environment.
+Internal runner deployment, CI performance and evidence lifecycle research is maintained in the private project archive. Public CI behavior and contributor requirements are described in [testing and CI](testing-ci.md) and the [validation playbook](validation-playbook.md).
 
 ## Adding a document
 
 - Look for the owner in the table above first; most new facts are a row, a section or an ADR, not a new file.
 - A new reference document goes in `docs/` with a lowercase, hyphenated name and a line in the audience table above. Keep it under about 3,000 words and split by concern before it grows past that. A single-audience reference that is read top to bottom, such as the [user guide](user-guide.md) and the [validation playbook](validation-playbook.md), may run to about 4,000 words, because splitting it would scatter one path across files.
 - Number ADRs sequentially (`decisions/NNNN-title.md`) and add them to the ADR index with their status.
-- New evidence directories are named `<topic>[-<sha>]-<YYYY-MM-DD>` and hold only what a reviewer needs to check a claim. Use a manifest for structured evidence or a concise README for a focused local report. Keep large or raw logs in the PR or CI run. Keep current acceptance evidence at stable paths until the [proposed evidence-branch migration](proposals/evidence-branch.md) passes its retrieval pilot. Obsolete historical packets with no current test, code or acceptance consumer may move to `archive/evidence/` after all narrative links are updated; preserve their bytes and source identity.
+- New evidence directories are named `<topic>[-<sha>]-<YYYY-MM-DD>` and hold only what a reviewer needs to check a claim. Use a manifest for structured evidence or a concise README for a focused local report. Keep large or raw logs in the PR or CI run. Keep current acceptance evidence at stable paths. Obsolete historical packets with no current test, code or acceptance consumer may move to `archive/evidence/` after all narrative links are updated; preserve their bytes and source identity.
 - A packet whose source identity cannot be proven from retained runner records or reachable Git history carries `"source_status": "unpinned-historical"` and no `source_commit` or `base_commit`. It is historical context, not acceptance proof; do not infer a commit from its date, branch label or the current checkout. Replace the label with a source commit only when the exact source is independently verified. `scripts/validate-evidence.py` rejects the label on a packet that records a source identity. A packet whose recorded source hashes match no available snapshot carries `"source_status": "unverified-source"`: the recorded hashes stay exactly as written and are not overwritten with the current file's hash, and the packet does not prove the source files it names.
 - When a document stops being current, move it to `archive/` with its date in the name, update links (`scripts/check-doc-links.py` finds the broken ones) and leave its open items on Project #3.
 - Do not move or rename a current document casually: scripts, CI and other lanes link to these paths.
 
 ## Archive starting points
 
-[Workspace recovery, October 26](evidence/workspace-recovery-2026-10-26/README.md) records branch preservation, recovered work, validation and remaining acceptance boundaries.
-
 [archive/](archive/) holds dated reviews, audits, inventories and long histories. They are source-pinned evidence, not instructions; open items from them live on [Project #3](https://github.com/users/cozyGarage/projects/3). Use the archive starting points below to locate a record, then verify current behavior and status in active docs and issues.
 
-[Archive claim verification, October 20](evidence/archive-claim-verification-2026-10-20/README.md) records an inventory baseline for archived Markdown at that review, with an October 21 supplement. It traces explicit BookiE issue links and source symbols and lists the focused current-source tests rerun then; later archive additions are outside its inventory. Research completion, issue closure and runtime acceptance are separate claims.
-
-- [Sprint history](archive/bookie-0.2-history.md) (includes 2026-10-08/09 continuation snapshots)
+- [Historical 0.2 development record](archive/bookie-0.2-history.md) (brief archive link; see the active sprint for current status)
 - [0.1.x implementation history](archive/changelog-history-0.1.x-2026-10-23.md) (archived from the changelog to keep it focused on release notes)
 - [B4 history](archive/b4-history.md) (includes superseded tip checkpoints, [completed local slices](archive/b4-history.md#archived-completed-local-slices-2026-10-10-consolidation) and [remaining-task prose](archive/b4-history.md#archived-remaining-task-prose-2026-10-10-pass-4))
-- [Evidence directory index](archive/evidence-index-2026-10-10.md) (October 10 snapshot; current inventory and migration status are in the [evidence-branch proposal](proposals/evidence-branch.md))
-- [Archived evidence packets](archive/evidence/) (dated artifacts retained after reference triage; the separate-branch migration remains a [proposal](proposals/evidence-branch.md), and these files remain in Git)
+- [Evidence directory index](archive/evidence-index-2026-10-10.md) (October 10 historical snapshot)
+- [Archived evidence packets](archive/evidence/) (dated artifacts retained after reference triage)
 - [PostgreSQL session outcome regressions, October 20](evidence/postgres-session-outcomes-375253c-2026-10-20/README.md): audit, typed commit and GTK evidence for #1186 and #1187.
-- [Non-UI code audit, October 29](archive/non-ui-code-audit-2026-10-29.md): read-only review of every crate below `apps/linux` at `e207862cc`, with verified findings, standing baseline debt and what was not reviewed.
-- [Backend code review, October 30](archive/backend-code-review-2026-10-30.md): second review of the crates from `app-services` down, with the fixes opened as pull requests and the open findings by priority.
-- [Current code correctness audit, October 27](archive/current-code-correctness-audit-2026-10-27.md): four failing diagnostic probes, configured-policy and evidence-discovery risks, corrected current claims and Project reconciliation.
-- [Performance review and first phases, October 22–23](archive/performance-review-2026-10-23.md): measured changes that landed, the remaining performance plan and follow-ups.
-- [Installed native Wayland run, October 23](evidence/installed-wayland-0.2.0-2026-10-23/README.md): oracle-checked end-to-end flows on Hyprland and the defects filed from them.
 - [AppImage SQL highlighting, October 26](evidence/appimage-sql-highlighting-2026-10-26/README.md): a clean Debian runtime comparison, AppImage and GtkSourceView library hashes, and the missing language schema root cause.
-- [Installed Arch profile, October 24](evidence/installed-arch-profile-2026-10-24/README.md): package integrity, automated test results, native PostgreSQL UI checks and resource samples.
 - [PostgreSQL restricted-role catalog visibility, October 24](evidence/postgres-catalog-visibility-2026-10-24/README.md): the original isolated SQL probe and its metadata-visibility limits.
 - [PostgreSQL driver coverage, October 24](evidence/postgres-driver-coverage-2026-10-24/README.md): the recovered integration-coverage report at source `d2166fd`.
 - [Workspace unit coverage at `d2166fd`, October 24](evidence/workspace-unit-coverage-d2166fd-2026-10-24/README.md) and [at `583c244`](evidence/workspace-unit-coverage-583c244-2026-10-24/README.md): recovered historical reports for two distinct source revisions.
 - [Workspace unit coverage, October 24](evidence/workspace-unit-coverage-9d61c7a-2026-10-24/README.md): 61.42% line coverage on Linux `9d61c7a` against the 59% floor, with the command and its scope.
 - [Current Linux PostgreSQL streaming workload, October 24](evidence/postgres-stream-current-2026-10-24/README.md): exact-head ten-column query, repeated bounded-memory measurements, and cancellation/session-recovery outcomes.
-- [Native Wayland PostgreSQL streaming profile, October 25](evidence/postgres-stream-native-wayland-2026-10-25/README.md): source-built release run on Omarchy, memory samples, and the observed retained-row range.
 - [Multi-editor stream ownership profile, October 26](evidence/stream-retention-multi-owner-2026-10-26/README.md): synthetic two-editor and cancelled export-page sample, with the RSS/allocator limitation stated.
-- [File chooser action race, October 26](evidence/file-chooser-action-race-2026-10-26/README.md): bounded retry and keyboard fallback when a transient accessibility action disappears.
-- [Editor buffer and input-context teardown, October 26](evidence/editor-buffer-release-2026-10-26/README.md): object retention with the default input method, heap allocation reports and editor shutdown regressions.
-- [Editor lifetime acceptance, October 26](evidence/editor-lifetime-acceptance-2026-10-26/README.md): experimental-fix keyboard, scale-2 and repeated Vim editor-close checks, with source and binary identity.
 - [SQL line-boundary profile, October 26](evidence/sql-line-current-linux-2026-10-26/README.md): three repeated 8 MiB file refusals at the recorded source, with memory samples and acceptance limits.
-- [GitHub merge-order screening, October 25](evidence/merge-order-audit-2026-10-25/README.md): a dated 190-PR screen for merge-before-check completion, with exact observed candidate timestamps and limitations; it does not establish Forgejo outcomes.
 - [Capability evidence audit](archive/capability-evidence-2026-09-07.md) (historical September snapshot; current behavior is in [features](features.md) and [known limitations](known-limitations.md), with selected work in the backlog and Project #3)
 - [B3 board narrative](archive/type-contract-history.md#archived-b3-board-narrative-2026-10-09-consolidation-pass-2) and [value-contracts narrative](archive/value-contract-history.md#archived-value-contracts-narrative-2026-10-09-consolidation-pass-2) (2026-10-09 pass 2)
 - [Release audit, October 3](archive/release-audit-2026-10-03.md)
 - [Remaining-gap acceptance, October 15](archive/remaining-gaps-2026-10-15.md) (dated evidence for completed distro, SQL proposal and disconnect-cache findings)
 - [Offline release input audit, October 19](archive/offline-release-input-audit-2026-10-19.md) (current Arch candidate evidence and remaining offline inputs)
 - [Third-party notice inventory, October 19](archive/third-party-notice-inventory-2026-10-19.md) (dated package inventory and generator requirements)
-- [Changelog fragment evaluation, October 19](archive/changelog-fragment-evaluation-2026-10-19.md) (kept the current workflow because commit volume did not establish conflict cost)
-- [Development feedback-loop proposal, October 23](archive/devops-feedback-loop-2026-10-23.md) (dated proposal snapshot; active work and priority live in the backlog and Project #3)
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md) and its [inventory companion](archive/architecture-consistency-2026-10-03-inventory.md)
 - [AUD-10 DuckDB read-only file access](archive/duckdb-read-only-aud10-2026-10-10.md)
-- [App layer audit](archive/app-layer-external-audit-2026-10-06.md): UI layering, request ownership and test-boundary findings
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md)
-- [Settings and icon review, October 14](archive/ui-refresh-upstream-review-2026-10-14.md)
-- [Upstream main](archive/upstream-main-review-2026-10-03.md) ([inventory](archive/upstream-main-review-2026-10-03-inventory.md)) and [older releases](archive/upstream-older-releases-review-2026-10-03.md) ([inventory](archive/upstream-older-releases-2026-10-03-inventory.md))
-- [External audit and post-0.2 plan](archive/external-audit-2026-10-06.md) and its [implementation review](archive/external-audit-client-review-2026-10-06.md)
+- Dated database-client and app-layer comparisons are held in the private research archive; current behavior and architecture live in the capability specs, ADRs and source.
 
 ## Keep context bounded
 

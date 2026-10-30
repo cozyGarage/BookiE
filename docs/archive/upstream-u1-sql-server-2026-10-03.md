@@ -1,9 +1,6 @@
-# U1 handoff: SQL Server server-owned columns
+# SQL Server server-owned columns: implementation handoff
 
-Date: 2026-10-03. Branch: `linux`. Upstream reference:
-[#3231 / ff80b43a9d](https://github.com/TableProApp/TablePro/commit/ff80b43a9d).
-Parent code baseline: `7b08dd4786db22ac38bc341f29d0f350412af82d`.
-Review documentation commit: `5cdb2eeadaa747b3b8d7724a20205862d945d6a0`.
+Implementation record, 2026-10-03. Source baseline: `7b08dd4786db22ac38bc341f29d0f350412af82d`.
 
 ## What changed and why
 
