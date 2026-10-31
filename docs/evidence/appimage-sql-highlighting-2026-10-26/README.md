@@ -14,7 +14,7 @@ The previous `linux-v0.2.0` AppImage rendered the same probe as plain text. The 
 - The AppImage SHA256 is `4b9b49fb64eab16f1f331564612cf210cda07b9519f5e1ae8bbb3758ddb025f1`.
 - Debian's `libgtksourceview-5-common` supplies `language-specs/language.rng`. GtkSourceView logged that it could not load the embedded SQL language specification when this schema was absent, even though its library and language resource were present.
 - The build workflow now installs that package, and `build-appimage.sh` stages `/usr/share/gtksourceview-5` and fails if `language.rng` is missing.
-- The test container had no host GtkSourceView data directory. `/proc/<pid>/maps` showed GtkSourceView loaded from the extracted AppImage; see [the process map](sourceview-library-map.txt).
+- The test container had no host GtkSourceView data directory. `/proc/<pid>/maps` showed GtkSourceView loaded from the extracted AppImage.
 - The fixed run log had no `GtkSourceView-WARNING` messages.
 
 ## Screenshots
