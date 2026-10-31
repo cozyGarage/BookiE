@@ -75,6 +75,16 @@ impl std::fmt::Debug for CsvImportPlanPreparation {
 }
 
 impl App {
+    fn begin_csv_import_preparation(&mut self, label: &str) -> Option<CancellationToken> {
+        if self.csv_import_progress.is_some() {
+            return None;
+        }
+        self.csv_import_progress = Some(crate::ui::import_dialog::present_preparing(&self.window, label));
+        self.csv_import_progress
+            .as_ref()
+            .map(crate::ui::import_dialog::ImportProgress::cancel_token)
+    }
+
     fn close_csv_import_progress(&mut self) {
         if let Some(progress) = self.csv_import_progress.take() {
             progress.close();
@@ -179,10 +189,9 @@ impl App {
         let Some(conn) = self.database.get(connection_id) else {
             return;
         };
-        if self.csv_import_progress.is_some() {
+        let Some(cancellation) = self.begin_csv_import_preparation("CSV file") else {
             return;
-        }
-        self.csv_import_progress = Some(crate::ui::import_dialog::present_preparing(&self.window, "CSV file"));
+        };
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let database = self
@@ -195,7 +204,7 @@ impl App {
         sender.clone().command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, cancellation);
                     match prepare_import(
                         conn,
                         &control,
@@ -307,10 +316,9 @@ impl App {
         let (Some(connection_id), Some(driver_id)) = (self.connection_id, self.current_driver_id.clone()) else {
             return;
         };
-        if self.csv_import_progress.is_some() {
+        if self.begin_csv_import_preparation(&choice.table).is_none() {
             return;
         }
-        self.csv_import_progress = Some(crate::ui::import_dialog::present_preparing(&self.window, &choice.table));
         let worker_driver_id = driver_id.clone();
         sender.clone().command(move |_, shutdown| {
             shutdown
@@ -652,6 +660,9 @@ async fn prepare_import(
     let bytes = tokio::task::spawn_blocking(move || read_file(&path))
         .await
         .map_err(|_| crate::tr!("The import file could not be prepared."))??;
+    if control.cancellation_token().is_cancelled() {
+        return Err(crate::tr!("Import preparation was cancelled."));
+    }
     let format = detect_format(&bytes);
     let columns = match &prepare.table {
         None => Vec::new(),
