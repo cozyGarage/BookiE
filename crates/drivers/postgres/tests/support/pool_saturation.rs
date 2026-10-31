@@ -19,5 +19,10 @@ async fn a_health_ping_does_not_report_a_disconnect_while_every_pooled_connectio
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_health_ping_still_reports_a_pool_that_cannot_reach_its_server() {
-    contract::a_ping_still_reports_a_server_that_cannot_be_reached(start_pg, connect).await;
+    contract::a_ping_still_reports_a_server_that_cannot_be_reached(
+        super::shared_container::start_pg_durable,
+        connect,
+        |server| server.stop(),
+    )
+    .await;
 }

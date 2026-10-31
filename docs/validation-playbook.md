@@ -1,10 +1,10 @@
 # Validation playbook
 
-Use this page to select checks, hand off work, and review evidence. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures; the [completion page](bookie-0.2-sprint.md) records 0.2.0, while the [backlog](backlog.md) and owning issues set subsequent order and acceptance. A green layer certifies only its named scope.
+Use this page to select checks and hand off work. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures. A green layer certifies only its named scope.
 
 ## Current desktop target
 
-The [sprint](bookie-0.2-sprint.md) records the maintainer's 2026-10-18 completion decision; use the release page linked there for current publication status. The [backlog](backlog.md) orders subsequent work; each selected issue names its acceptance layers. Debian/GNOME installed-package expansion remains later work. GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
+GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep automated Linux checks and record unavailable environments in private verification records.
 
 ## Start here
 
@@ -30,11 +30,11 @@ python3 scripts/run-test-layer.py full app-server values drivers b4-rollback tls
 bash scripts/test-pg-dump.sh
 ```
 
-This covers the fast workspace gate, app-server and cross-driver value contracts, Docker driver/rollback/TLS/PostgreSQL/SSH fixtures, keyring and dependency policy checks, plus the PostgreSQL dump/restore fixture. The named layers run sequentially and save the source revision, worktree state, tracked-diff digest and logs under `target/quality/`; `test-pg-dump.sh` runs separately. This does not cover the distro-floor matrix, installed-package upgrade/rollback, nightly mutation or soak runs, or the opt-in Kerberos and specialized GTK database fixtures. Those remain separate acceptance checks. The [completion page](bookie-0.2-sprint.md) records 0.2.0 status; current work and acceptance criteria live on the owning boards. Dated release audits and validation history are source-pinned records, not current status.
+This covers the fast workspace gate, app-server and cross-driver value contracts, Docker driver/rollback/TLS/PostgreSQL/SSH fixtures, keyring and dependency policy checks, plus the PostgreSQL dump/restore fixture. The named layers run sequentially and save the source revision, worktree state, tracked-diff digest and logs under `target/quality/`; `test-pg-dump.sh` runs separately. This does not cover the distro-floor matrix, installed-package upgrade/rollback, nightly mutation or soak runs, or the opt-in Kerberos and specialized GTK database fixtures. Those remain separate checks. Store dated run records outside the public source tree.
 
 Before opening a pull request, also run `bash scripts/preflight.sh` as required by `AGENTS.md`. It repeats unit and sandbox tests but adds the crate-boundary and comment-line checks that `ci-local.sh full` does not run.
 
-Run `quick` for a short edit loop. Run the pre-push gate after changes that touch shared core/value paths or before handing a B3 slice to review. Keep the hosted workflow as the recorded platform/packaging check.
+Run `quick` for a short edit loop. Run the pre-push gate after changes that touch shared core/value paths or before handing shared core or value work to review. Keep the hosted workflow as the recorded platform/packaging check.
 
 ```bash
 python3 scripts/run-test-layer.py --list
@@ -108,24 +108,22 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Scope | Entry point | Completion evidence |
 | --- | --- | --- |
 | Optional DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus app feature build |
-| Mutation | GitHub Linux test quality; Forgejo nightly; [local instructions](testing-quality-and-performance.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON; Forgejo also checks missed mutants against package baselines |
-| Coverage | Linux test quality; [local instructions](testing-quality-and-performance.md#coverage) | LCOV, exclusions and summary; this report has no threshold. Forgejo nightly separately enforces the unit-tier and per-crate floors. |
-| Flatpak | Flatpak Linux (packaging only) | Pull requests build the default profile; push and `workflow_dispatch` also build development; not regression acceptance |
+| Mutation | The configured mutation workflow | Review selected, caught, missed, timed-out and unviable mutants for the exact source revision |
+| Coverage | The configured coverage workflow | Review the report and configured coverage floor for the exact source revision |
+| Flatpak | Flatpak packaging scripts | Package build only; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
-| GTK soak | GTK Safety Soak | Five independent retry-free attempts per run at one resolved SHA. The 30-attempt/six-run threshold is in the [archived 0.2.0 handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md), not a default for future releases; current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
-| Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) and issue acceptance criteria | VM/desktop version, Wayland session, package checksum, steps, result and screenshots |
+| GTK soak | `bash scripts/test-gtk-safety.sh` | Record the tested revision and outcomes in a private verification record. |
+| Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) | VM/desktop version, Wayland session, package checksum, steps, result and screenshots in a private verification record |
 
 ## Hosted checks
 
-Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier. Accepted aggregate trains follow [ADR 0020](decisions/0020-aggregate-forgejo-trains.md) and the [train procedure](testing-ci.md#aggregate-train-acceptance): one gate on the exact aggregate PR head replaces constituent Forgejo gates only after manifest, freshness and merge-tree verification. A standalone `forgejo-train.sh` preflight is not aggregate acceptance. The current workflow files and [AGENTS.md](../AGENTS.md) define which checks run for each change and where acceptance happens. Forgejo workflows use per-ref concurrency groups with cancellation disabled: PR branches can run concurrently, while CI and nightly runs on `linux` remain serialized. Each execution runner has capacity one, so jobs from different refs can use separate idle workers without sharing a fixture process or display session. The gate script locks callers targeting the same remote branch; final `linux` synchronization stays serialized.
-
-The gate reports both the browser run number and the API run ID. They can differ. The train verifier's `--run` argument takes the API ID; task reporting uses the browser run number and the tested revision. Do not substitute one identifier for the other.
+Check every required result against the exact commit under review. A skipped check is not a pass, and a green fast tier does not certify tests that only run in a separate acceptance tier.
 
 Treat static-analysis findings as evidence to review. Fix valid findings in a focused change. For a confirmed false positive or accepted exception, record a short reason in the tool; keep a reusable explanation here only when it helps other contributors.
 
 ### Live issue-state report
 
-Run `python3 scripts/check-github-issue-status.py` when reconciling the open-work index with GitHub. It requires an authenticated `gh` CLI and makes an explicit network request. It reports closed or unverified issue entries but never edits the ledger or Project #3. This point-in-time report is separate from offline `check-known-issues.py` and does not run in preflight or CI. Authentication, network, timeout, or API-shape failures mean the live state is unavailable, not that an issue is closed.
+Run `python3 scripts/check-github-issue-status.py` when reconciling the open-work index with the issue tracker. It requires an authenticated `gh` CLI and makes an explicit network request. It reports closed or unverified entries but does not edit the ledger. This live report is separate from offline `check-known-issues.py` and does not run in preflight or CI. Authentication, network, timeout, or API-shape failures mean the live state is unavailable, not that an issue is closed.
 
 Use isolated fixtures with synthetic data and credentials. Do not put credentials, customer data, personal file paths, internal host names or machine-specific instructions in source, test output or committed evidence. Keep untrusted change validation isolated from production data and personal sessions.
 
@@ -157,7 +155,7 @@ An agent must read `AGENTS.md`, inspect status and confirm the SHA before editin
 
 ## Turn every finding into a regression
 
-1. Record origin: user report, upstream issue/commit, mutation, fuzz case or CI run.
+1. Record origin: user report, external issue or commit, mutation, fuzz case or CI run.
 2. State the invariant and smallest input; record engine/version and expected type as well as value. Preserve a minimized sanitized fixture, never customer data.
 3. Add the lowest-tier reproducer and demonstrate failure before changing code.
 4. Fix the cause; cover valid, invalid and exact-boundary neighbors. Test each affected consumer: decode, binding, formatting, grid editing, export and re-import.
@@ -166,7 +164,7 @@ An agent must read `AGENTS.md`, inspect status and confirm the SHA before editin
 7. Run focused mutation checks with a nonzero selected count and independent expected values. Document each equivalent survivor with a concrete argument; leave unresolved survivors/timeouts open.
 8. Update scenario evidence and the owning issue or board. Keep the test with the fix.
 
-Use [value contracts](value-contracts.md) and the B3 board as the current case backlog. The [scenario survey](archive/b3-test-scenario-survey.md) records dated research patterns and source provenance. Current examples:
+Use current source behavior and the change acceptance criteria to select value cases. Apply the [test design rules](test-design-rules.md) to each regression. Examples:
 
 | Encountered scenario | Permanent regression home | Next edge to investigate |
 | --- | --- | --- |
@@ -175,14 +173,14 @@ Use [value contracts](value-contracts.md) and the B3 board as the current case b
 | BC/year 10000 SQL export failed | Core SQL literal unit and PostgreSQL date round-trip | Remaining driver-specific calendar limits and non-SQL consumer parity |
 | Decoder and oracle shared the same bug | Array size literal and numeric variant assertions | Independent oracles for other driver decoders |
 | Green CI omitted eight SSH tests | SSH runner, ignored-test inventory and workflow regression | Audit new ignored targets whenever added |
-| Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage survivors and timeouts from the exact run report tracked under [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559); counts vary by source SHA, so do not carry an old total forward |
+| Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage survivors and timeouts from the exact run report; counts vary by source revision, so do not carry an old total forward |
 | Test process failed, hung or never ran | Layer-runner negative tests | Keep adding actual infrastructure failure modes |
 
 Secure connection coverage is engine-specific. Track valid auth, rejected auth, wrong CA/hostname, no plaintext fallback, cancellation during connect/read/write, disconnect/reconnect, pool reuse, partial streams, malformed lengths, NULL/empty distinctions, Unicode/binary boundaries and authorization on every consumer. An unchecked scenario is a backlog item, not an implied capability or a pass.
 
 ## Release qualification
 
-For a future candidate, B3 requires closed correctness findings and their regressions. B4–B6 also require the planned installed-package, Wayland, upgrade/rollback and candidate soak evidence. Docker supplies deterministic servers and Xvfb supplies automated GTK interaction. The 0.2.0 release is already published; these criteria do not reopen that milestone. Arch/Omarchy under native Wayland is the selected 0.2.0 desktop target. Debian/GNOME VM qualification remains post-release backlog work. Xvfb and widget passes cannot certify a native Wayland target. No workflow here automatically publishes a release or waives an acceptance gate.
+For each release candidate, maintainers select the applicable platform checks. Correctness qualification requires regressions for resolved findings; installed-package, Wayland, upgrade/rollback and soak claims require evidence from those environments. Docker supplies deterministic servers and Xvfb supplies automated GTK interaction. Xvfb and widget passes cannot certify native desktop behavior. All required release checks must pass before publication.
 
 ## Static-analysis triage
 
@@ -202,13 +200,13 @@ Disposition: confirmed framework-specific false positives from the web CSS analy
 
 ## CI tiers
 
-CI is split into fast feedback and slower integration or acceptance checks. Read the workflow definitions and [AGENTS.md](../AGENTS.md) for current triggers, required gates and ownership. A pull request is ready only when its required checks pass at the current head SHA. Skipped, cancelled, timed-out or unavailable checks are not passes. Scheduled runs and local results can add evidence, but do not replace a required check on the reviewed commit.
+CI is split into fast feedback and slower integration or acceptance checks. Read [AGENTS.md](../AGENTS.md) for current requirements. A pull request is ready only when its required checks pass at the current head SHA. Skipped, cancelled, timed-out or unavailable checks are not passes. Scheduled runs and local results can add evidence, but do not replace a required check on the reviewed commit.
 
 ### Pull request hygiene checks
 
-These small GitHub checks run on every pull request to `linux` and need no database or GTK. They make the squash commit and the workflows safe to merge; the Forgejo gate remains the acceptance record.
+These pull-request checks provide fast feedback for the exact revision and need no database or GTK. Passing them does not certify acceptance tiers they did not run.
 
-`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a GitHub readiness report, not Forgejo evidence; it blocks merging only if the repository ruleset is configured to require its stable check context.
+`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a readiness report, not a substitute for required check results; it blocks merging only if the repository ruleset is configured to require its stable check context.
 
 | Check | What it enforces |
 |---|---|

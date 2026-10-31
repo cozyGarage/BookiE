@@ -1,7 +1,12 @@
 #[path = "column_on_update.rs"]
 mod column_on_update;
+
 #[path = "exact_grid_original.rs"]
 mod exact_grid_original;
+#[path = "like_escape.rs"]
+mod like_escape;
+#[path = "optimistic_collation.rs"]
+mod optimistic_collation;
 pub(crate) use super::{connect, start_mariadb, start_mysql};
 
 #[path = "mysql_call_results.rs"]

@@ -19,7 +19,6 @@ mod params;
 mod query;
 mod registry;
 mod session;
-mod shortcut_label;
 pub mod sql_credentials;
 pub mod sql_ddl;
 pub mod sql_diagnostics;
@@ -35,7 +34,7 @@ mod transaction;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
-pub use connection::{AttachedDatabase, AuthMode, ConnectOptions, Connection, SocketOrigin, Transport};
+pub use connection::{AttachedDatabase, AuthMode, ConnectOptions, Connection, SocketOrigin, Transport, uri_host};
 pub use driver::{
     ConnectionFormDefaults, DatabaseDriver, DriverCapabilities, DriverMaturity, EnumInputStyle,
     connection_form_defaults, initial_connection_form_defaults,
@@ -61,12 +60,9 @@ pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse
 pub use query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_CURSOR_PAGE_ROWS,
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage,
-    QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value,
+    QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, parse_partial, partial_value,
 };
 pub use registry::DriverRegistry;
 pub use session::{Session, SessionCommitOutcome};
-pub use shortcut_label::{
-    BrowseDrawnShortcuts, BrowseShortcut, browse_drawn_shortcuts, browse_item_accelerator, browse_visible_key,
-};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;

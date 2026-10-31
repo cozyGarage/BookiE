@@ -4,7 +4,7 @@
 
 BookiE is an independent native Linux database client for local database work. It provides saved connections, optional SSH transport, database browsing, SQL editing, and guarded access for both the desktop application and the local `bookie-agentd` MCP process.
 
-Every shipped feature works without an account, license key, subscription, paid tier, or remote entitlement check. Database and SSH credentials use the system Secret Service. Database operations from the GUI, MCP, and agent process use the same policy and audit boundary. BookiE is a fully autonomous project with its own architecture, governance, and development roadmap.
+Every shipped feature works without an account, license key, subscription, paid tier, or remote entitlement check. Database and SSH credentials use the system Secret Service. Database operations from the GUI, MCP, and agent process use the same policy and audit boundary. BookiE is an independent project with its own architecture and governance.
 
 ```mermaid
 flowchart TD
@@ -13,7 +13,7 @@ flowchart TD
         P2["PolicyGuard Governance<br/>Local safety rules & audit journal"]
         P3["Zero Accounts / Free<br/>No subscriptions · No remote gates · AGPL-3.0"]
         P4["Type & Value Fidelity<br/>Lossless integers · Exact decimals · Keyset seeks"]
-        P5["Autonomous & Independent<br/>Self-contained codebase · Zero upstream locks"]
+        P5["Independent Project<br/>Own architecture · Own roadmap"]
     end
 ```
 
@@ -21,7 +21,7 @@ flowchart TD
 
 - Native GTK4 and libadwaita interface on Linux.
 - Database drivers are linked at build time and implement shared Rust contracts.
-- Fully independent, self-contained architecture with zero external telemetry, no remote entitlement checks, and no upstream project dependencies.
+- Self-contained desktop client with no external telemetry or remote entitlement checks.
 - The GUI and MCP consumers do not receive raw driver connections.
 - SQL parameters are bound, identifiers are dialect-quoted, and untrusted input is validated at the boundary.
 - Unsupported values and uncertain operation outcomes remain explicit; the client does not silently turn them into NULL or success.
@@ -33,7 +33,7 @@ The [personas](docs/personas.md) describe the main usage contexts. The common wo
 
 ## Capability and delivery status
 
-The [architecture](ARCHITECTURE.md) describes crate boundaries and data flow. The [capability review](docs/capability-review.md) records current technical limits. The [0.2.0 completion status](docs/bookie-0.2-sprint.md), [backlog](docs/backlog.md), and [known limitations](docs/known-limitations.md) own delivery status, selected work, and user-visible gaps respectively. Those pages are the source for changing implementation status; this overview states product constraints only.
+The [architecture](ARCHITECTURE.md) describes crate boundaries and data flow. [Project #3](https://github.com/users/cozyGarage/projects/3) owns selected work; [known limitations](docs/known-limitations.md) describes user-visible restrictions. This overview states product constraints only.
 
 ## Product outcomes
 

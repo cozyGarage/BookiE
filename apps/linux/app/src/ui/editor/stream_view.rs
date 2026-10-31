@@ -23,13 +23,21 @@ pub(super) fn page_widget_name(generation: u64, page_index: u64) -> String {
     format!("{PAGE_PREFIX}{generation}-{page_index}")
 }
 
+#[cfg(test)]
+thread_local! { static NAMED_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+
 fn named<T: IsA<gtk::Widget>>(root: &gtk::Widget, name: &str) -> Option<T> {
     let mut pending = vec![root.clone()];
     while let Some(widget) = pending.pop() {
+        #[cfg(test)]
+        NAMED_VISITS.with(|count| count.set(count.get() + 1));
         if widget.widget_name() == name
             && let Ok(found) = widget.clone().downcast::<T>()
         {
             return Some(found);
+        }
+        if name == LIVE_PROGRESS && widget.widget_name() == LIVE_PAGES && widget.is::<gtk::Stack>() {
+            continue;
         }
         let mut child = widget.first_child();
         while let Some(next) = child {
@@ -76,6 +84,7 @@ pub(super) fn update_live_stream(
             break;
         }
         if pages.visible_child().as_ref() == Some(&page) {
+            page.remove_css_class("tp-stream-page-ram-resident");
             continue;
         }
         if let Some(current) = page.first_child()
@@ -110,9 +119,8 @@ pub(super) fn install_page_loader(
     identity: super::StatementIdentity,
     sender: &relm4::ComponentSender<super::SqlEditor>,
 ) {
-    let Some(spool) = result.spool.clone() else {
-        return;
-    };
+    let spool = result.spool.clone();
+    let resident_pages = result.resident_pages.clone();
     let columns = result.columns.clone();
     let generation = result.generation;
     let sender = sender.clone();
@@ -122,49 +130,108 @@ pub(super) fn install_page_loader(
             .and_then(|child| page_index_from_name(&child, generation)),
     ));
     pages.connect_visible_child_notify(move |pages| {
-        let Some(container) = pages.visible_child() else {
-            return;
-        };
-        let current_index = page_index_from_name(&container, generation);
-        if let Some(previous) = previous_index.replace(current_index)
-            && Some(previous) != current_index
-            && let Some(previous_page) = pages.child_by_name(&page_widget_name(generation, previous))
-            && !previous_page.has_css_class("tp-stream-page-ram-resident")
-        {
-            let title = pages.page(&previous_page).title().unwrap_or_default().to_string();
-            let placeholder = stream_page_placeholder_with_title(title);
-            if let Ok(previous_page) = previous_page.downcast::<gtk::Box>() {
-                replace_stream_page_content(&previous_page, &placeholder);
-            }
-        }
-        let Some(placeholder) = container.first_child() else {
-            return;
-        };
-        if !placeholder.has_css_class("tp-stream-page-placeholder")
-            || placeholder.has_css_class("tp-stream-page-loading")
-        {
-            return;
-        }
-        let Some(index) = container
-            .widget_name()
-            .strip_prefix(PAGE_PREFIX)
-            .and_then(|name| name.rsplit_once('-'))
-            .and_then(|(_, index)| index.parse::<u64>().ok())
-        else {
-            return;
-        };
-        placeholder.add_css_class("tp-stream-page-loading");
-        if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-            status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
-        }
-        sender.input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
+        let context = VisiblePageLoadContext {
             generation,
-            index,
             identity,
-            spool: spool.clone(),
-            columns: columns.clone(),
-        }));
+            resident_pages: &resident_pages,
+            spool: spool.as_ref(),
+            columns: &columns,
+            sender: &sender,
+        };
+        handle_visible_child_change(pages, &context, &previous_index);
     });
+}
+
+struct VisiblePageLoadContext<'a> {
+    generation: u64,
+    identity: super::StatementIdentity,
+    resident_pages: &'a super::stream_pages::ResidentPageStore,
+    spool: Option<&'a tablepro_app_services::stream_result_spool::StreamResultSpool>,
+    columns: &'a [tablepro_core::ColumnInfo],
+    sender: &'a relm4::ComponentSender<super::SqlEditor>,
+}
+
+fn handle_visible_child_change(
+    pages: &gtk::Stack,
+    context: &VisiblePageLoadContext<'_>,
+    previous_index: &std::cell::Cell<Option<u64>>,
+) {
+    let Some(container) = pages.visible_child() else {
+        return;
+    };
+    let current_index = page_index_from_name(&container, context.generation);
+    retire_previous_page(
+        pages,
+        context.generation,
+        previous_index.replace(current_index),
+        current_index,
+    );
+    load_visible_placeholder(pages, context);
+}
+
+fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext<'_>) {
+    let Some(container) = pages.visible_child() else {
+        return;
+    };
+    let Some(placeholder) = container.first_child() else {
+        return;
+    };
+    if !placeholder.has_css_class("tp-stream-page-placeholder") || placeholder.has_css_class("tp-stream-page-loading") {
+        return;
+    }
+    let Some(index) = page_index_from_name(&container, context.generation) else {
+        return;
+    };
+    placeholder.add_css_class("tp-stream-page-loading");
+    if let Some(page) = context.resident_pages.get(index) {
+        if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+            status.set_description(Some(&crate::tr!("Restoring this result page from memory…")));
+        }
+        context
+            .sender
+            .input(super::SqlEditorInput::Stream(super::streaming::Input::PageLoaded {
+                generation: context.generation,
+                index,
+                identity: context.identity,
+                result: Ok(page),
+            }));
+        return;
+    }
+    let Some(spool) = context.spool.cloned() else {
+        if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+            status.set_title(&crate::tr!("This result page is no longer available"));
+        }
+        placeholder.remove_css_class("tp-stream-page-loading");
+        return;
+    };
+    if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+        status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
+    }
+    context
+        .sender
+        .input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
+            generation: context.generation,
+            index,
+            identity: context.identity,
+            spool,
+            columns: context.columns.to_vec(),
+        }));
+}
+
+fn retire_previous_page(pages: &gtk::Stack, generation: u64, previous: Option<u64>, current: Option<u64>) {
+    if let Some(previous) = previous
+        && Some(previous) != current
+        && let Some(previous_page) = pages.child_by_name(&page_widget_name(generation, previous))
+        && let Some(current_page) = previous_page.first_child()
+        && (!current_page.has_css_class("tp-stream-page-placeholder")
+            || current_page.has_css_class("tp-stream-page-loading"))
+    {
+        let title = pages.page(&previous_page).title().unwrap_or_default().to_string();
+        let placeholder = stream_page_placeholder_with_title(title);
+        if let Ok(previous_page) = previous_page.downcast::<gtk::Box>() {
+            replace_stream_page_content(&previous_page, &placeholder);
+        }
+    }
 }
 
 fn page_index_from_name(widget: &gtk::Widget, generation: u64) -> Option<u64> {

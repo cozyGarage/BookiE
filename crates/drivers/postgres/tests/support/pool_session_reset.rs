@@ -19,7 +19,11 @@ async fn settings_and_temp_tables_do_not_survive_on_a_pooled_connection() {
         .password(opts.password.expose_secret())
         .database(&opts.database)
         .statement_cache_capacity(0);
-    let pool = pool::options().max_connections(1).connect_with(options).await.unwrap();
+    let pool = pool::options(std::time::Duration::from_secs(5))
+        .max_connections(1)
+        .connect_with(options)
+        .await
+        .unwrap();
     let mut connection = pool.acquire().await.unwrap();
     let backend: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
         .fetch_one(&mut *connection)

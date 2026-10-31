@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-03
-- **Origin**: Approved sprint B4 and the seven decisions recorded on its task board on 2026-09-27. Extraction does not close their implementation tasks.
+- **Origin**: Accepted after review.
 
 ## Context
 
@@ -24,7 +24,6 @@ The GUI must ask before accepting an unknown SSH host key on every hop, for buil
 
 An unknown write outcome blocks governed writes for that connection. Recovery uses the approved connection restart path. Journal-wide failure and unresolved durable recovery obligations stay fail-closed. Reconnect cannot erase an audit intent or prove whether the server committed a write. Old-generation callbacks cannot clear or poison a replacement's state. Each live connection owns its audit generation; a shared generation across connections is not this contract.
 
-Remaining transport, audit and installed acceptance live on [the B4 board](../lane-boards.md#b4-transport-and-sessions).
 
 ## Rationale
 
@@ -32,7 +31,7 @@ Explicit owners prevent a saved UUID from authorizing a stale handle or write. R
 
 ## Consequences
 
-Cross-owner changes require coordinated core/policy/transport/daemon/UI work. Tests need stale generations, no dispatch/replay, cleanup and database/audit postconditions. Safe refusal remains until the owning task proves recovery. The [manual checklist](../manual-verification-0.2-features.md) retains installed acceptance. Task completion does not imply B4 or release completion.
+Cross-owner changes require coordinated core/policy/transport/daemon/UI work. Tests need stale generations, no dispatch/replay, cleanup and database/audit postconditions. Safe refusal remains until the owning task proves recovery. Installed desktop scenarios remain documented in the [manual checklist](../manual-verification-0.2-features.md).
 
 ## Alternatives considered
 
@@ -40,7 +39,7 @@ Cross-owner changes require coordinated core/policy/transport/daemon/UI work. Te
 - Pool fallback or retry after session loss: changes state/transaction ownership and risks duplicate writes.
 - Backend/TLS fallback after failure: changes the trust contract without consent.
 - Clear every audit failure on reconnect: loses journal-wide recovery obligations.
-- **One global generation counter for every kind of identity.** Rejected. The saved UUID, the physical connection identity, the editor-session UUID and the selected database or schema are four different identities ([upstream older releases review](../archive/upstream-older-releases-review-2026-10-03.md), O1).
-- **Probing an uncertain write by committing again.** Rejected. After an unknown outcome, never probe by re-commit. A non-transactional DDL engine such as MySQL is reported as possibly mixed, not as rolled back ([dbx features review](../archive/tablepro-dbx-review-2026-10-20/d-dbx-features.md)).
-- **A connection-wide Auto/Manual-Commit switch, or a toolbar Commit/Rollback for the connection.** Rejected. A connection-wide control can target the wrong session. Transactions exist only in a dedicated editor Session that reports "transaction open" and asks commit or roll back when it closes ([Beekeeper Studio observation](../archive/beekeeper-studio-live-ux-observation-2026-10-22.md)).
-- **Automatic retry or replay of a failed statement, or deciding liveness from error text.** Rejected, with two reviewed exceptions: the PostgreSQL stale-type-cache retry and the MySQL parameter-free prepared-protocol fallback. Both fire only on an explicit server rejection, never after a disconnect, timeout or unknown outcome, and an explicit transaction disables the retry. They are reviewed code paths, not proof that an arbitrary routine has no side effects ([B4 task board](../archive/b4-task-board-pre-project-migration-2026-10-12.md), "Allowed retry boundaries"). MongoDB uses one direct endpoint with SDK defaults; its standalone lost-acknowledgement fixture is not proof for replica-set or other topologies. The reason: identical error text can describe a request never sent or a lost response after execution, so a retry of a write can duplicate it. Any retry is limited to a named source/routine pair that is proven to be safe, such as the PostgreSQL `0A000` case in [capability review](../capability-review.md) ([database client review](../archive/database-client-review-2026-10-23.md)).
+- **One global generation counter for every kind of identity.** Rejected. The saved UUID, the physical connection identity, the editor-session UUID and the selected database or schema are four different identities.
+- **Probing an uncertain write by committing again.** Rejected. After an unknown outcome, never probe by re-commit. A non-transactional DDL engine such as MySQL is reported as possibly mixed, not as rolled back.
+- **A connection-wide Auto/Manual-Commit switch, or a toolbar Commit/Rollback for the connection.** Rejected. A connection-wide control can target the wrong session. Transactions exist only in a dedicated editor Session that reports "transaction open" and asks commit or roll back when it closes.
+- **Automatic retry or replay of a failed statement, or deciding liveness from error text.** Rejected, with two reviewed exceptions: the PostgreSQL stale-type-cache retry and the MySQL parameter-free prepared-protocol fallback. Both fire only on an explicit server rejection, never after a disconnect, timeout or unknown outcome, and an explicit transaction disables the retry. They are reviewed code paths, not proof that an arbitrary routine has no side effects. The reason: identical error text can describe a request never sent or a lost response after execution, so a retry of a write can duplicate it. Any retry is limited to a named source/routine pair that is proven safe.

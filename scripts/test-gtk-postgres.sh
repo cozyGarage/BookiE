@@ -41,7 +41,7 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   fi
 done
 
-container="$(docker run --rm --detach --publish 127.0.0.1::5432 \
+container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::5432 \
   --env POSTGRES_PASSWORD=tablepro_test --env POSTGRES_DB=bookie_test \
   postgres:17-alpine)"
 cleanup() {
@@ -89,5 +89,5 @@ TABLEPRO_GTK_POSTGRES_CONTAINER="$container" \
   TABLEPRO_GTK_DBUS_ACTIVE=1 \
   TABLEPRO_GTK_POSTGRES_HOST=127.0.0.1 \
   TABLEPRO_GTK_POSTGRES_PORT="$port" \
-  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_hidden_projection_refresh_and_edit_preserve_hidden_value,postgres_grid_edit_and_delete_commit_to_the_server,postgres_enum_grid_edit_preserves_native_label_and_siblings,postgres_database_switcher_reconnects_to_the_chosen_database,postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit,postgres_large_stream_pages_round_trip_from_spool,postgres_structure_preserves_empty_and_populated_metadata}" \
+  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_hidden_projection_refresh_and_edit_preserve_hidden_value,postgres_grid_edit_and_delete_commit_to_the_server,postgres_enum_grid_edit_preserves_native_label_and_siblings,postgres_database_switcher_reconnects_to_the_chosen_database,postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit,postgres_large_stream_pages_round_trip_from_spool,postgres_visible_evicted_page_can_be_revisited,postgres_structure_preserves_empty_and_populated_metadata}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

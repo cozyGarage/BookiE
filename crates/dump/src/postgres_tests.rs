@@ -91,6 +91,20 @@ fn connections_the_client_tools_cannot_honour_are_refused() {
 }
 
 #[tokio::test]
+async fn a_backup_is_private_while_writing_and_after_completion() {
+    let dir = tempfile::tempdir().unwrap();
+    let tool = fake_tool(dir.path(), r#"out="${3#--file=}"; stat -c '%a' "$out" > "$out""#);
+    let options = options();
+    let output = dir.path().join("appdb.dump");
+    pg_dump(&tool, request(&options, &output), dir.path(), CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(std::fs::read_to_string(&output).unwrap().trim(), "600");
+    assert_eq!(std::fs::metadata(&output).unwrap().permissions().mode() & 0o777, 0o600);
+}
+
+#[tokio::test]
 async fn the_password_reaches_the_tool_only_through_the_passfile() {
     let dir = tempfile::tempdir().unwrap();
     let tool = fake_tool(
@@ -116,6 +130,21 @@ async fn the_password_reaches_the_tool_only_through_the_passfile() {
         .filter(|name| name.contains("pgpass") || name.contains(".partial-"))
         .collect();
     assert!(leftovers.is_empty(), "{leftovers:?}");
+}
+
+#[tokio::test]
+async fn the_finished_dump_is_readable_only_by_its_owner() {
+    let dir = tempfile::tempdir().unwrap();
+    let tool = fake_tool(dir.path(), r#"echo 'table data' > "${3#--file=}""#);
+    let options = options();
+    let output = dir.path().join("appdb.dump");
+
+    pg_dump(&tool, request(&options, &output), dir.path(), CancellationToken::new())
+        .await
+        .unwrap();
+
+    let mode = std::fs::metadata(&output).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "{mode:o}");
 }
 
 #[tokio::test]

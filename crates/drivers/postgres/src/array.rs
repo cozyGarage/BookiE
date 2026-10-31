@@ -73,12 +73,21 @@ fn decode_vector(bytes: &[u8], expected_oid: u32) -> Option<String> {
     if reader.integer()? != 0 {
         return None;
     }
-    let mut elements = Vec::with_capacity(vector_capacity(length, reader.remaining.len())?);
-    for _ in 0..length {
+    vector_capacity(length, reader.remaining.len())?;
+    let mut output = String::new();
+    for index in 0..length {
         let length = reader.integer()?;
-        elements.push(element_text(oid, false, read_bounded_element(&mut reader, length)?)?);
+        let text = element_text(oid, false, read_bounded_element(&mut reader, length)?)?;
+        let separator = usize::from(index > 0);
+        if output.len().checked_add(separator)?.checked_add(text.len())? > MAX_ARRAY_TEXT_BYTES {
+            return None;
+        }
+        if index > 0 {
+            output.push(' ');
+        }
+        output.push_str(&text);
     }
-    reader.remaining.is_empty().then(|| elements.join(" "))
+    reader.remaining.is_empty().then_some(output)
 }
 
 fn vector_capacity(length: usize, payload_bytes: usize) -> Option<usize> {

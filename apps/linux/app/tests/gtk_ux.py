@@ -230,7 +230,7 @@ def scenarios(ui):
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
-        choose_menu_item(9)
+        choose_menu_item(11)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switch = next(
@@ -254,7 +254,12 @@ def scenarios(ui):
             )
 
         start = focused_item()
-        target = (-1 if start is None else start) + position
+        if position == "last":
+            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+            assert items, "the menu has no items"
+            target = len(items) - 1
+        else:
+            target = (-1 if start is None else start) + position
         deadline = time.monotonic() + ui.WAIT_SECONDS
         moves = 0
         while focused_item() != target:
@@ -282,8 +287,8 @@ def scenarios(ui):
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-        assert len(items) >= 10, f"grid menu exposed only {len(items)} actionable items"
-        actions = items[10].queryAction()
+        assert len(items) >= 12, f"grid menu exposed only {len(items)} actionable items"
+        actions = items[11].queryAction()
         click_action = next(
             index for index in range(actions.nActions) if actions.getName(index) == "click"
         )
@@ -1510,15 +1515,9 @@ GLib.MainLoop().run()
             entry = ui.set_visible_editable_within("Export query history", ui.FILE_CHOOSER_ROLES, str(path))
             text = entry.queryText()
             assert text.getText(0, text.characterCount) == str(path), "the chooser did not accept the export path"
-            assert entry.queryComponent().grabFocus(), "the export path cannot receive focus"
             save = ui.find_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON)
             assert save is not None, f"the export chooser has no Save button:\n{ui.accessible_snapshot()}"
-            bounds = save.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
-            x11_click(
-                bounds.x + bounds.width // 2,
-                bounds.y + bounds.height // 2 - ATSPI_WINDOW_Y_OFFSET,
-                button=1,
-            )
+            ui.invoke(save)
             ui.wait_for_node(name="Export query history", role=ui.FILE_CHOOSER_ROLES, present=False)
             deadline = time.monotonic() + ui.WAIT_SECONDS
             while time.monotonic() < deadline and not path.exists():
@@ -1623,6 +1622,47 @@ GLib.MainLoop().run()
         ui.invoke(ui.wait_for_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node_containing("Rows 1-5000", timeout=30)
         ui.wait_for_node(name=first_run_marker, role=pyatspi.ROLE_LABEL, timeout=120)
+
+    def wait_for_visible_marker(name):
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            app = ui.application_node()
+            if app is not None and any(
+                ui.node_name(node) == name and node.getState().contains(pyatspi.STATE_SHOWING)
+                for node in ui.descendants(app)
+            ):
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"{name!r} was not visible")
+
+    def postgres_visible_evicted_page_can_be_revisited(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.run_sql(
+            "SELECT value AS id, 'page-marker-' || value::text AS marker, "
+            "repeat('x', 2048) AS payload "
+            "FROM generate_series(1, 400000) AS value"
+        )
+        ui.wait_for_node(name="page-marker-1", role=pyatspi.ROLE_LABEL, timeout=120)
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            app = ui.application_node()
+            labels = list(ui.descendants(app)) if app is not None else []
+            current = any(ui.node_name(node) == "page-marker-1" and node.getState().contains(pyatspi.STATE_SHOWING) for node in labels)
+            counts = [re.search(r"Received (\d+) rows", ui.node_name(node)) for node in labels]
+            if current and any(match and 40000 <= int(match.group(1)) < 400000 for match in counts):
+                break
+            time.sleep(ui.POLL_SECONDS)
+        else:
+            raise AssertionError("first page was not visible after enough streamed rows to exceed the cache")
+        ui.invoke(ui.wait_for_sensitive_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("Rows 5001-10000", timeout=30)
+        wait_for_visible_marker("page-marker-5001")
+        ui.invoke(ui.wait_for_sensitive_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("Rows 1-5000", timeout=30)
+        wait_for_visible_marker("page-marker-1")
 
     def postgres_hidden_projection_refresh_and_edit_preserve_hidden_value(database, base):
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
@@ -2005,7 +2045,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        choose_menu_item(15)
+        choose_menu_item("last")
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
@@ -2509,6 +2549,7 @@ GLib.MainLoop().run()
         result.append(postgres_reopened_browse_tab_keeps_its_schema_after_switching)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
         result.append(postgres_large_stream_pages_round_trip_from_spool)
+        result.append(postgres_visible_evicted_page_can_be_revisited)
         result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
