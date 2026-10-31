@@ -1,4 +1,5 @@
 import ctypes
+import csv
 import json
 import os
 import re
@@ -862,6 +863,163 @@ GLib.MainLoop().run()
 
     def app_memory_kb():
         return ui.owned_application().memory_kb()
+
+    def app_memory_profile_kb():
+        application = ui.owned_application()
+        application.memory_kb()
+        process = application.process
+        fields = {}
+        with open(f"/proc/{process.pid}/smaps_rollup", encoding="utf-8") as memory:
+            for line in memory:
+                if ":" in line:
+                    name, value = line.split(":", 1)
+                    fields[name] = int(value.split()[0])
+        application.memory_kb()
+        return {
+            "rss_kib": fields["Rss"],
+            "pss_kib": fields["Pss"],
+            "private_kib": fields["Private_Clean"] + fields["Private_Dirty"],
+        }
+
+    def app_cpu_seconds():
+        process = ui.owned_application().process
+        stat = Path(f"/proc/{process.pid}/stat").read_text(encoding="utf-8")
+        fields = stat[stat.rfind(")") + 2 :].split()
+        ticks = int(fields[11]) + int(fields[12])
+        return ticks / os.sysconf("SC_CLK_TCK")
+
+    def verify_profile_csv(path, expected_rows, expected_payload_bytes):
+        count = 0
+        with path.open(newline="", encoding="utf-8") as output:
+            reader = csv.reader(output)
+            assert next(reader) == ["id", *[f"field_{index}" for index in range(1, 9)], "payload"]
+            for count, row in enumerate(reader, 1):
+                assert len(row) == 10 and int(row[0]) == count
+                assert all(value == "y" * 13 for value in row[1:-1])
+                assert len(row[-1].encode("utf-8")) == expected_payload_bytes
+        assert count == expected_rows
+
+    def profile_streamed_pin_retention(database, base):
+        rows = int(os.environ.get("TABLEPRO_PROFILE_STREAM_ROWS", "34000"))
+        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_STREAM_CELL_BYTES", "2048"))
+        repetitions = int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1"))
+        if not 34_000 <= rows <= 40_000 or not 1_024 <= payload_bytes <= 4_096:
+            raise ValueError("stream profile rows or payload size are outside their bounded workload")
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        samples = [{"stage": "baseline", **app_memory_profile_kb()}]
+        runs = []
+        for index in range(5):
+            result_rows = rows + index * 1_000
+            marker = f"retention-{repetitions}-{index + 1}"
+            if index == 0:
+                ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+            else:
+                ui.invoke_accessible_action("win.open-editor")
+            ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+            started = time.monotonic()
+            query = (
+                "SELECT value AS id, "
+                f"'{marker}' AS run_marker, repeat('x', {payload_bytes}) AS payload "
+                f"FROM generate_series(1, {result_rows}) AS value"
+            )
+            ui.set_editor_text(query)
+            ui.invoke(ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name=marker, role=pyatspi.ROLE_LABEL, timeout=180)
+            ui.wait_for_node_containing(f"Received {result_rows} rows", timeout=180)
+            elapsed_seconds = round(time.monotonic() - started, 2)
+            ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
+            sample = {"stage": f"after_streamed_editor_{index + 1}", **app_memory_profile_kb()}
+            samples.append(sample)
+            runs.append({
+                "marker": marker,
+                "rows": result_rows,
+                "payload_bytes": payload_bytes,
+                "run_seconds": elapsed_seconds,
+                "pin_count": 1,
+                **sample,
+            })
+        teardown_samples = []
+        for run in reversed(runs):
+            marker = run["marker"]
+            unpin = ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
+            ui.invoke(unpin)
+            ui.wait_for_node_containing("Pin results", role=pyatspi.ROLE_PUSH_BUTTON)
+            teardown_samples.append({"stage": f"after_unpin_{marker}", **app_memory_profile_kb()})
+            ui.invoke_accessible_action("win.close-current")
+            ui.wait_for_node(name=marker, present=False)
+            teardown_samples.append({"stage": f"after_editor_close_{marker}", **app_memory_profile_kb()})
+        time.sleep(3)
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+        teardown_samples.append({"stage": "after_all_editors_closed_idle_3s", **app_memory_profile_kb()})
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a", encoding="utf-8") as out:
+            out.write(json.dumps({
+                **ui.owned_application().identity(),
+                "profile_mode": "postgres-stream-pin-retention-across-editors",
+                "repetition": repetitions,
+                "configured_rows_per_result": rows,
+                "payload_bytes_per_row": payload_bytes,
+                "result_count": len(runs),
+                "editor_count": len(runs),
+                "pins_per_editor": 1,
+                "runs": runs,
+                "memory_samples": samples,
+                "teardown_samples": teardown_samples,
+            }) + "\n")
+
+    def profile_streamed_result_export(database, base):
+        rows = int(os.environ.get("TABLEPRO_PROFILE_EXPORT_ROWS", "39999"))
+        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_EXPORT_CELL_BYTES", "2048"))
+        repetition = int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1"))
+        if not 34_000 <= rows <= 40_000 or not 1_024 <= payload_bytes <= 4_096:
+            raise ValueError("stream export profile rows or payload size are outside their bounded workload")
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        query_started = time.monotonic()
+        columns = ", ".join(
+            f"repeat('y', 13) AS field_{index}" for index in range(1, 9)
+        )
+        ui.run_sql(
+            f"SELECT value AS id, {columns}, repeat('x', {payload_bytes}) AS payload "
+            f"FROM generate_series(1, {rows}) AS value"
+        )
+        ui.wait_for_node_containing(f"Received {rows} rows", timeout=180)
+        query_seconds = round(time.monotonic() - query_started, 2)
+        ui.invoke(ui.wait_for_node(name="Export all rows…", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Export Results", role=pyatspi.ROLE_DIALOG)
+        ui.invoke(ui.wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
+        chooser = ui.wait_for_node(name="Export Results", role=ui.FILE_CHOOSER_ROLES)
+        path = base / "home" / f"stream-export-{repetition}.csv"
+        ui.set_visible_editable_within("Export Results", ui.FILE_CHOOSER_ROLES, str(path))
+        before = app_memory_profile_kb()
+        cpu_before = app_cpu_seconds()
+        ui.invoke(ui.wait_for_node(name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+        export_started = time.monotonic()
+        deadline = time.monotonic() + 300
+        while not path.is_file() and time.monotonic() < deadline:
+            time.sleep(ui.POLL_SECONDS)
+        assert path.is_file(), f"stream export was not atomically published: {ui.accessible_snapshot()}"
+        export_seconds = round(time.monotonic() - export_started, 2)
+        after = app_memory_profile_kb()
+        cpu_seconds = round(app_cpu_seconds() - cpu_before, 3)
+        verify_profile_csv(path, rows, payload_bytes)
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a", encoding="utf-8") as out:
+            out.write(json.dumps({
+                **ui.owned_application().identity(),
+                "profile_mode": "postgres-streamed-result-csv-export",
+                "repetition": repetition,
+                "rows": rows,
+                "payload_bytes_per_row": payload_bytes,
+                "query_seconds": query_seconds,
+                "export_seconds_after_save": export_seconds,
+                "app_cpu_seconds_during_export": cpu_seconds,
+                "export_bytes": path.stat().st_size,
+                "before_export": before,
+                "after_export": after,
+            }) + "\n")
 
     def a_second_launch_raises_the_window_and_exits_cleanly(database, base):
         result = ui.owned_application().launch_again()
@@ -2552,6 +2710,10 @@ GLib.MainLoop().run()
         result.append(postgres_visible_evicted_page_can_be_revisited)
         result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
+        if os.environ.get("TABLEPRO_PROFILE_STREAM_PINS"):
+            result.append(profile_streamed_pin_retention)
+        if os.environ.get("TABLEPRO_PROFILE_STREAM_EXPORT"):
+            result.append(profile_streamed_result_export)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
         result.append(postgres_saved_mtls_connection_authenticates_and_queries)
         result.append(postgres_structure_tabs_keep_backend_count_bounded)
