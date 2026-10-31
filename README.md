@@ -175,7 +175,7 @@ For manual connection checks across every network driver, use the local-only [ma
 
 If native development packages are unavailable, `scripts/dev-env.sh` can use Debian-family package payloads extracted under `.local-deps/root/`.
 
-GitHub runs the cheap tier only; merge acceptance is the Forgejo gate (`bash scripts/forgejo-gate.sh <branch>`). Details: [AGENTS.md](AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
+Pull requests run the required automated checks for the proposed revision. Maintainers confirm acceptance before merging; details are in [AGENTS.md](AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
 
 ## Packaging
 
@@ -199,7 +199,7 @@ Start at [the documentation map](docs/README.md) for audience and ownership. Com
 
 ## Contributing
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md). Pull requests for current development target the `linux` branch and are accepted on a green Forgejo gate run.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md). Pull requests for current development target the `linux` branch and require all applicable checks before merging.
 
 ## Changelog
 

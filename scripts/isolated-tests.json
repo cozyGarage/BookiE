@@ -540,6 +540,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::stream_view::tests::live_progress_lookup_does_not_walk_result_pages"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
     ],
     [
@@ -731,6 +736,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::stream_view::tests::hidden_stream_pages_build_their_grid_only_when_selected"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::tests::navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable"
     ],
     [
       "tablepro-app",
@@ -1165,12 +1175,42 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::history_dialog::lifetime_tests::history_filter_popover_stays_inside_narrow_windows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
+    ],
+    [
+      "tablepro-app",
+      "--test=cli_info",
+      "information_flags_exit_without_display_or_profile_access"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::preview::tests::the_preview_is_read_only_and_shows_no_blinking_caret"
     ],
     [
       "tablepro-app",
       "--lib",
       "ui::row_inspector::tests::markup_like_values_and_names_are_shown_as_typed"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::app::init_workspace::tests::saved_connections_popover_stays_inside_narrow_windows"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::structure_tab::columns::tests::a_comment_row_is_shown_only_for_engines_that_can_store_one"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
     ],
     [
       "tablepro-app",
@@ -1186,6 +1226,11 @@
       "tablepro-app",
       "--lib",
       "ui::diagram::canvas::tests::zoom_steps_stay_within_the_limits_and_fit_restores_the_whole_diagram"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::diagram::canvas::tests::every_way_of_zooming_reports_the_new_level"
     ],
     [
       "tablepro-app",
@@ -1246,6 +1291,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::choice_editor::tests::the_choice_popover_is_as_wide_as_its_widest_content"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::dispatch_tests::running_a_query_dismisses_the_visible_completion_popup"
     ],
     [
       "tablepro-app",

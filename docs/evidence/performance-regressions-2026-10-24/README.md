@@ -22,4 +22,4 @@ Both trials exited with test failures, not build failures. Their source files we
 
 ## Validation and limits
 
-Full preflight passed: 2,077 unit tests, 2,090 sandbox tests and the separate Redis check. All six added application stream tests and the preview matrix passed after source restoration. Strict application Clippy and all 161 isolated GTK tests passed. Remote Forgejo acceptance is pending. These tests do not establish a process-wide memory ceiling or a general latency bound. Native Wayland, long-session RSS, driver buffers and the large SQL-file layout path require separate measurement. No product behavior or CI workflow is changed.
+Full preflight passed: 2,077 unit tests, 2,090 sandbox tests and the separate Redis check. All six added application stream tests and the preview matrix passed after source restoration. Strict application Clippy and all 161 isolated GTK tests passed. Remote CI acceptance is pending. These tests do not establish a process-wide memory ceiling or a general latency bound. Native Wayland, long-session RSS, driver buffers and the large SQL-file layout path require separate measurement. No product behavior or CI workflow is changed.
