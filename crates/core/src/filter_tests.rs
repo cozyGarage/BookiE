@@ -985,3 +985,19 @@ fn mssql_escapes_the_open_bracket_and_others_do_not() {
         assert_eq!(params, vec![Value::Text("[abc]%".into())], "{driver_id}");
     }
 }
+
+#[test]
+fn a_trailing_line_comment_in_extra_sql_does_not_swallow_the_closing_parenthesis() {
+    let cols = vec![col("id", "integer")];
+    for fragment in ["a > 1 -- note", "a > 1 # note"] {
+        let set = FilterSet {
+            combinator: Combinator::And,
+            rules: vec![rule("id", FilterOp::Gt, Some(FilterValue::Single("10".into())))],
+            extra_sql: Some(fragment.into()),
+        };
+        let (sql, _) = build_filter_where("mysql", &cols, &set).unwrap().unwrap();
+        let closing = sql.rfind(')').unwrap();
+        let last_line = sql[..closing].rsplit('\n').next().unwrap();
+        assert!(!last_line.contains("--") && !last_line.contains('#'), "{sql}");
+    }
+}
