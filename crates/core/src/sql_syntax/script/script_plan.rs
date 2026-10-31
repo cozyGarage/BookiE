@@ -43,14 +43,10 @@ impl ScriptPlan {
         &self.diagnostics
     }
 
-    pub fn tokens(&self, range: Range<usize>) -> impl Iterator<Item = ScriptToken> + '_ {
+    pub fn tokens(&self, range: Range<usize>) -> impl DoubleEndedIterator<Item = ScriptToken> + '_ {
         let first = self.tokens.partition_point(|token| token.range.end <= range.start);
-        self.tokens
-            .get(first..)
-            .unwrap_or_default()
-            .iter()
-            .take_while(move |token| token.range.start < range.end)
-            .cloned()
+        let last = self.tokens.partition_point(|token| token.range.start < range.end);
+        self.tokens.get(first..last).unwrap_or_default().iter().cloned()
     }
 
     pub fn batch_error_policy(&self) -> BatchErrorPolicy {
@@ -216,6 +212,20 @@ impl<'a> Builder<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn token_ranges_can_be_iterated_backwards_without_reordering_the_source() {
+        let sql = "SELECT alpha FROM beta";
+        let plan = ScriptPlan::build(
+            sql,
+            SqlGrammar::PostgreSql,
+            LexicalSettings::default_for(SqlGrammar::PostgreSql),
+        );
+        let forward: Vec<_> = plan.tokens(0..sql.len()).map(|token| token.range).collect();
+        let reverse: Vec<_> = plan.tokens(0..sql.len()).rev().map(|token| token.range).collect();
+
+        assert_eq!(reverse, forward.into_iter().rev().collect::<Vec<_>>());
+    }
 
     #[test]
     fn a_cursor_before_the_first_statement_finds_no_statement() {
