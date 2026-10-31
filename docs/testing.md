@@ -166,6 +166,19 @@ docker compose --project-name bookie-meta-profile --project-directory tests/fixt
 
 `tests/fixtures/postgres-release/README.md` documents the topology, generated materials, and `TABLEPRO_FIXTURE_KEEP_UP=1` for keeping the containers running.
 
+The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connection-to-catalog visibility, accessible sidebar filtering, and the app process memory before and after loading a synthetic catalog. Start a disposable PostgreSQL database containing the named target table, then run:
+
+```bash
+TABLEPRO_GTK_POSTGRES_PORT=15432 \
+TABLEPRO_GTK_CATALOG_TARGET=profile_schema_0001.profile_table_00001 \
+TABLEPRO_GTK_CATALOG_TABLES=1000 \
+TABLEPRO_GTK_PROFILE_OUTPUT="$PWD/target/quality/sidebar-catalog.json" \
+TABLEPRO_GTK_SCENARIO=postgres_sidebar_catalog_profile \
+bash scripts/test-gtk-safety.sh
+```
+
+`TABLEPRO_GTK_CATALOG_TARGET` must use the schema-qualified accessible row name. The memory sample is the BookiE process RSS/PSS and private pages; the GTK scenario runs with AT-SPI enabled, so compare runs under the same test environment. This is an end-to-end GTK measurement and is separate from the driver-only catalog benchmark above.
+
 ## Local PostgreSQL smoke test
 
 For a PostgreSQL server you already run:
