@@ -148,6 +148,22 @@ The script generates fixture certificates and SSH keys, starts PostgreSQL 16 wit
 
 The suite verifies certificate hostname and authority checks, tunnelled access to a database with no published port, that a tunnelled `VerifyFull` verifies the original database hostname while a TCP-forwarded one refuses to verify the local dial address, read-only denial of data-changing CTEs and administrative functions, batch and interactive rollback, activity and blocking-lock queries, and direct and SSH reconnect.
 
+Driver-only PostgreSQL catalog profiles use the release-test examples `column_metadata_benchmark` and `catalog_listing_benchmark`. They emit one JSON object per sample and create and remove their own schema in the disposable fixture. Start a uniquely named fixture project and build the examples:
+
+```bash
+bash tests/fixtures/postgres-release/generate-materials.sh
+docker compose --project-name bookie-meta-profile --project-directory tests/fixtures/postgres-release -f tests/fixtures/postgres-release/docker-compose.yml up -d --build --wait --wait-timeout 300
+export TABLEPRO_FIXTURE_POSTGRES_RELEASE=1
+export TABLEPRO_FIXTURE_MATERIALS="$PWD/tests/fixtures/postgres-release/materials"
+cargo build --release --locked -p tablepro-release-tests --example column_metadata_benchmark --example catalog_listing_benchmark
+```
+
+Run `target/release/examples/column_metadata_benchmark 1024 rich` or `target/release/examples/catalog_listing_benchmark 5000`. These measurements cover driver calls and decoding, not GTK sidebar construction, accessibility or painting. Stop only the fixture project started for the profile:
+
+```bash
+docker compose --project-name bookie-meta-profile --project-directory tests/fixtures/postgres-release -f tests/fixtures/postgres-release/docker-compose.yml down --volumes --remove-orphans
+```
+
 `tests/fixtures/postgres-release/README.md` documents the topology, generated materials, and `TABLEPRO_FIXTURE_KEEP_UP=1` for keeping the containers running.
 
 ## Local PostgreSQL smoke test
