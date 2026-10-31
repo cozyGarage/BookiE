@@ -75,10 +75,10 @@ class PanicSiteModuleResolutionTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_explicit_test_module_path_stays_relative_to_the_declaring_file(self):
+    def test_explicit_test_module_path_with_pub_super_visibility_is_resolved(self):
         result = self.run_guard(
             {
-                "lib.rs": "#[cfg(test)]\n#[path = \"support/guard_tests.rs\"]\nmod tests;\n",
+                "lib.rs": "#[cfg(test)]\n#[path = \"support/guard_tests.rs\"]\npub(super) mod tests;\n",
                 "support/guard_tests.rs": "#[test]\nfn test_case() { panic!(\"test\"); }\n",
             }
         )

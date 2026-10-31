@@ -206,6 +206,7 @@ mod tests {
             jump: jump.map(Box::new),
             client: tablepro_storage::SshClient::Builtin,
             agent: false,
+            agent_identity: None,
         }
     }
 

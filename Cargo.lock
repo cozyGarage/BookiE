@@ -6444,6 +6444,7 @@ dependencies = [
  "rust_decimal",
  "secrecy",
  "serde_json",
+ "socket2",
  "tablepro-core",
  "testcontainers",
  "testcontainers-modules",

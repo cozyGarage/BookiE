@@ -293,9 +293,11 @@ fn an_encrypted_v2_bundle_round_trips_credentials_for_each_ssh_hop() {
             jump: None,
             agent: false,
             client: Default::default(),
+            agent_identity: None,
         })),
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     let connection_id = connection.id;
     let mut secrets = BundleSecrets::new(connection_id, None, None, None);
@@ -345,9 +347,11 @@ fn a_bundle_rejects_duplicate_ssh_hop_identities() {
             jump: None,
             agent: false,
             client: Default::default(),
+            agent_identity: None,
         })),
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     let body = BundleBody {
         connections: vec![BundleConnection::from_saved(&connection)],
@@ -374,6 +378,7 @@ fn a_bundle_rejects_per_hop_secrets_for_legacy_credentials() {
         jump: None,
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     let mut secrets = BundleSecrets::new(connection.id, None, None, None);
     secrets.set_ssh_hop_secrets(vec![hop_secret(
@@ -526,6 +531,7 @@ pub(super) fn ssh_chain(depth: usize) -> SavedSshConfig {
         jump: None,
         client: Default::default(),
         agent: false,
+        agent_identity: None,
     };
     for _ in 1..depth {
         hop = SavedSshConfig {
@@ -538,6 +544,7 @@ pub(super) fn ssh_chain(depth: usize) -> SavedSshConfig {
             jump: Some(Box::new(hop)),
             client: Default::default(),
             agent: false,
+            agent_identity: None,
         };
     }
     hop
@@ -949,6 +956,7 @@ async fn an_export_collects_every_credential_kind_for_a_connection() {
         jump: None,
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     crate::secrets::store_password(id, "db-pw", "bundle-test")
         .await
@@ -1008,9 +1016,11 @@ async fn an_export_collects_each_versioned_ssh_hop_secret() {
             jump: None,
             agent: false,
             client: Default::default(),
+            agent_identity: None,
         })),
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     crate::secrets::store_ssh_hop_password(connection_id, root_id, 2, "root-secret", "bundle-test")
         .await
