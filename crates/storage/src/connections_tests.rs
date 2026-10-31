@@ -590,7 +590,10 @@ async fn the_known_field_list_covers_every_serialized_key() {
     connection.socket_path = Some(PathBuf::from("/run/mysqld/mysqld.sock"));
     connection.tls_root_cert = Some(PathBuf::from("/etc/ca.crt"));
     connection.last_opened_at = Some(Utc::now());
+    connection.connect_timeout_secs = Some(5);
+    connection.query_timeout_secs = Some(30);
     connection.auth_source = Some("admin".into());
+    connection.attached_databases = vec![tablepro_core::AttachedDatabase::new("aux", "/tmp/aux.db")];
     connection.ssh = Some(SavedSshConfig {
         hop_id: Uuid::new_v4(),
         credential_revision: 0,
