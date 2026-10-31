@@ -94,7 +94,6 @@ host-url = "https://sonarcloud.io"
 exclusions = [
     "target/**",
     "vendor/**",
-    "docs/evidence/**",
     "ci/**",
 ]
 "sonar.coverage.exclusions" = [

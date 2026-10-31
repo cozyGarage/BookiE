@@ -1,2 +1,0 @@
-float8[] adjacent value, negative zero, minimum subnormal, NaN, infinities and SQL NULL are unchanged through XLSX, ODS and Calc re-saved XLSX; no formulas
-Preserved 390 text characters

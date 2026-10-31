@@ -184,17 +184,10 @@ fn is_mysql_empty_text(driver_id: &str, value: &Value) -> bool {
     driver_id == "mysql" && matches!(value, Value::Text(text) if text.is_empty())
 }
 
-fn widened_single_precision(driver_id: &str, column: &crate::ColumnInfo, value: &Value) -> Value {
-    let data_type = column.data_type.trim().to_ascii_lowercase();
-    let single = match driver_id {
-        "mysql" => data_type.starts_with("float"),
-        "mssql" => data_type == "real",
-        _ => false,
-    };
-    match value {
-        Value::Float(number) if single => Value::Float(f64::from(*number as f32)),
-        other => other.clone(),
-    }
+fn is_mssql_character_type(data_type: &str) -> bool {
+    let base = data_type.trim().to_ascii_lowercase();
+    let base = base.split('(').next().unwrap_or_default().trim();
+    matches!(base, "char" | "varchar" | "nchar" | "nvarchar")
 }
 
 fn optimistic_predicate(
@@ -210,7 +203,7 @@ fn optimistic_predicate(
         ));
     }
     let placeholder = placeholder_for(driver_id, params.len());
-    let old_value = &widened_single_precision(driver_id, column, old_value);
+    let old_value = &crate::numeric_input::widened_single_precision(driver_id, column, old_value);
     let predicate = match driver_id {
         "postgres" if matches!(column.data_type.trim().to_ascii_lowercase().as_str(), "real" | "float4") => {
             format!("{name} IS NOT DISTINCT FROM {placeholder}::real")
@@ -242,8 +235,13 @@ fn optimistic_predicate(
             let next = placeholder_for(driver_id, params.len() + 1);
             params.push(old_value.clone());
             params.push(old_value.clone());
+            let compared = if matches!(old_value, Value::Text(_)) && is_mssql_character_type(&column.data_type) {
+                format!("{name} COLLATE Latin1_General_100_BIN2")
+            } else {
+                name.to_string()
+            };
             return Ok(format!(
-                "({name} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
+                "({compared} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
             ));
         }
         _ => return Err(BuildSqlError::UnsupportedDriver(driver_id.into())),

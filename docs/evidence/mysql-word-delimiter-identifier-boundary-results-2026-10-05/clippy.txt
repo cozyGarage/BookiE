@@ -1,2 +1,0 @@
-rtk cargo clippy --locked -p tablepro-core -p tablepro-app --all-targets -- -D warnings
-cargo clippy: No issues found

@@ -144,10 +144,35 @@ pub(crate) fn validate_safe_type(s: &str) -> Result<(), BuildDdlError> {
         || s.contains('"')
         || s.contains('`')
         || contains_forbidden_control(s)
+        || !is_single_clause(s)
     {
         return Err(BuildDdlError::UnsafeType(s.into()));
     }
     Ok(())
+}
+
+fn is_single_clause(text: &str) -> bool {
+    let mut depth = 0usize;
+    let mut quote = None;
+    for character in text.chars() {
+        if let Some(open) = quote {
+            if character == open {
+                quote = None;
+            }
+            continue;
+        }
+        match character {
+            '\'' => quote = Some(character),
+            '(' => depth += 1,
+            ')' => match depth.checked_sub(1) {
+                Some(next) => depth = next,
+                None => return false,
+            },
+            ',' if depth == 0 => return false,
+            _ => {}
+        }
+    }
+    depth == 0 && quote.is_none()
 }
 
 /// DEFAULT expressions sit between `DEFAULT` and the next column-def
@@ -160,7 +185,13 @@ pub(crate) fn validate_safe_default(s: &str) -> Result<(), BuildDdlError> {
     if s.len() > MAX_DEFAULT_LEN {
         return Err(BuildDdlError::UnsafeDefault(s.into()));
     }
-    if s.contains(';') || s.contains("--") || s.contains("/*") || s.contains("*/") || contains_forbidden_control(s) {
+    if s.contains(';')
+        || s.contains("--")
+        || s.contains("/*")
+        || s.contains("*/")
+        || contains_forbidden_control(s)
+        || !is_single_clause(s)
+    {
         return Err(BuildDdlError::UnsafeDefault(s.into()));
     }
     Ok(())
@@ -471,7 +502,30 @@ SELECT dc.name FROM sys.default_constraints dc \
 JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id \
 WHERE dc.parent_object_id = OBJECT_ID('{table_literal}') AND c.name = '{column_literal}'); \
 IF @default_constraint IS NOT NULL \
-EXEC('ALTER TABLE {table_literal} DROP CONSTRAINT [' + @default_constraint + ']')"
+EXEC('ALTER TABLE {table_literal} DROP CONSTRAINT ' + QUOTENAME(@default_constraint))"
+    )
+}
+
+pub(crate) fn mssql_alter_column_keeping_mask(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    column: &str,
+    alter: &str,
+) -> String {
+    let qualified = qualified_table(driver_id, schema, table);
+    let table_literal = sql_literal(&qualified);
+    let column_literal = sql_literal(column.trim());
+    let quoted_column = sql_literal(&quote_ident(driver_id, column.trim()));
+    format!(
+        "DECLARE @bookie_mask nvarchar(4000) = (\
+SELECT masking_function FROM sys.masked_columns \
+WHERE object_id = OBJECT_ID(N'{table_literal}') AND name = N'{column_literal}'); \
+{alter}; \
+IF @bookie_mask IS NOT NULL BEGIN \
+DECLARE @bookie_restore nvarchar(max) = N'ALTER TABLE {table_literal} ALTER COLUMN {quoted_column} ADD MASKED WITH (FUNCTION = ''' + REPLACE(@bookie_mask, '''', '''''') + ''')'; \
+EXEC(@bookie_restore); \
+END"
     )
 }
 
