@@ -30,8 +30,8 @@ Lanes keep parallel agents from editing the same files. Pick open work from [Pro
 
 | Lane | Owns |
 | --- | --- |
-| B3 | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display, the [B3 board pointer](docs/lane-boards.md#b3-types-and-values) |
-| B4 | Transport, guard, audit, SSH, rollback and acceptance: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage, the [B4 board pointer](docs/lane-boards.md#b4-transport-and-sessions) |
+| B3 | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display |
+| B4 | Transport, guard, audit, SSH and rollback: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage |
 | UX | App layer (`apps/linux/`), packaging, repository automation, the ledger index, and shared documentation |
 | Cursor | Documentation and tests only. UX reviews test pull requests; the maintainer reviews documentation pull requests |
 | Maintainer | Decisions and anything needing a person or a real desktop |
@@ -183,13 +183,13 @@ Driver integration tests need Docker. If a prerequisite is missing, say which ch
 
 ## Changelog and commits
 
-- Release notes ([ADR 0022](docs/decisions/0022-release-notes-from-merge-commits.md)): do not edit `CHANGELOG.md`. Put one `Release-Note: <Category>: <text>` line per user-facing change (or `Release-Note: none`) in the PR body and the repository's squash-merge default uses the PR title and body, so the lines reach the commit; do not replace the body in the merge box. Categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Each line describes user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; record them on the owning board or in `docs/evidence/`. Do not add `Fixed` for a defect introduced and fixed before release.
+- Release notes ([ADR 0022](docs/decisions/0022-release-notes-from-merge-commits.md)): do not edit `CHANGELOG.md`. Put one `Release-Note: <Category>: <text>` line per user-facing change (or `Release-Note: none`) in the PR body and the repository's squash-merge default uses the PR title and body, so the lines reach the commit; do not replace the body in the merge box. Categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Each line describes user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; keep run-specific reports and research outside the public source tree. Do not add `Fixed` for a defect introduced and fixed before release.
 - Conventional Commits with a single-line subject and no body on branch commits (a squash commit's body is the PR description). Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`, `revert`, `security`. Scopes such as `app`, `core`, `policy`, `mcp`, `agentd`, `storage`, `ssh`, `drivers`, `driver-postgres`.
 - A public API change updates every caller and test in the same commit.
 
 ## Documentation rules
 
-The [documentation map](docs/README.md) says where each fact lives and where a new document goes. In short: decisions in ADRs, open work in the ledger, order and acceptance in the sprint, run-specific proof in `docs/evidence/` or the PR, dated reviews in `docs/archive/`. Write each fact once and link to it. Keep file paths stable; scripts and other lanes depend on them.
+The [documentation map](docs/README.md) says where each fact lives and where a new document goes. In short: decisions in ADRs, open work in Project #3 and the issue ledger, release completion in the sprint, and generic commands and behavior in contributor documentation. Keep run-specific proof and research outside the public source tree. Write each fact once and link to it. Keep file paths stable; scripts and other lanes depend on them.
 
 ## Writing style
 

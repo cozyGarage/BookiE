@@ -38,4 +38,4 @@ Choose one lane-owned issue and refresh its source pins and competing PRs. State
 
 Use the existing [validation tiers](validation-playbook.md), with one failing-before regression for a changed behavior. Driver contracts need real-engine outcomes; visual or package claims need their installed checks. Require exact-revision checks and record skipped, blocked and unrun checks explicitly.
 
-Open work is selected from Project #3 and remains subject to issue-owned acceptance. See [known limitations](known-limitations.md) for user-visible restrictions and the [value evidence index](value-contracts.md) for case-specific proof.
+Open work is selected from Project #3 and remains subject to issue-owned acceptance. See [known limitations](known-limitations.md) for user-visible restrictions and [ADR 0007](decisions/0007-type-and-value-preservation.md) for the value-preservation contract.

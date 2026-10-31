@@ -282,7 +282,7 @@ Rules that keep this sound:
 | A database engine | New `crates/drivers/<engine>` + both composition roots ([adding drivers](docs/adding-drivers.md)) |
 | Architecture or behaviour rule | An [ADR](docs/decisions/README.md); do not invent a parallel rule in a board |
 | Current capability description extracted from code | [`specs/`](specs/README.md) (draft until reviewed; ADRs and AGENTS rank above it) |
-| Open work, evidence, owner | The [ledger](docs/known-issues.md) or the owning B3/B4 board |
+| Open work and owner | The [ledger](docs/known-issues.md) and Project #3 |
 
 Helpers stay in the crate that owns the behaviour. Do not grow a cross-crate “utils” layer to avoid a decision about ownership.
 
@@ -355,7 +355,7 @@ flowchart LR
     local -->|dial| driver["driver"]
 ```
 
-PostgreSQL uses the socket form so the certificate is checked against the real database hostname while traffic crosses the bastion. Unsupported combinations fail closed. See [connections.md](docs/connections.md) and the [current B4 acceptance board](docs/lane-boards.md#b4-transport-and-sessions).
+PostgreSQL uses the socket form so the certificate is checked against the real database hostname while traffic crosses the bastion. Unsupported combinations fail closed. See [connections.md](docs/connections.md) and the current [Project #3 issues](https://github.com/users/cozyGarage/projects/3).
 
 ## Driver contract
 
@@ -439,7 +439,7 @@ flowchart TD
 | Command scope | Component-scoped commands for tab/component lifetime. Detached Relm4 tasks only for independent persistence/cleanup. |
 | Tabs | `AdwTabView` workspaces; Relm4 controllers keyed by tab UUID. |
 | Browse grid | Bounded pages in `RowStore` (`gio::ListModel`); weakly cached `RowObject`s. |
-| SQL editor results | Supported single-statement PostgreSQL `SELECT`s stream guarded cursor pages within a 64 MiB estimated-row budget; a newest page larger than the budget remains. Pins and overlapping snapshots may retain more. Other engines and query shapes use capped materialization; these estimates are not a process-memory ceiling ([ADR 0011](docs/decisions/0011-paged-query-results.md), PERF-2/PERF-8). |
+| SQL editor results | Supported single-statement PostgreSQL `SELECT`s stream guarded cursor pages within a 64 MiB estimated-row budget; a newest page larger than the budget remains. Pins and overlapping snapshots may retain more. Other engines and query shapes use capped materialization; these estimates are not a process-memory ceiling ([ADR 0011](docs/decisions/0011-paged-query-results.md)). |
 | Identity | Sidebar refresh tokens hold a weak session reference. Tab results keep their tab UUID across connection switches. |
 
 ## Persistence
@@ -471,8 +471,8 @@ The workspace graph shows allowed dependency direction. The trait table identifi
 |---|---|
 | Governed SQL / PolicyGuard | [ADR 0016](docs/decisions/0016-governed-consumer-seam.md), [specs/governed-sql](specs/governed-sql/spec.md) |
 | SSH host-key trust | [specs/ssh-transport](specs/ssh-transport/spec.md) |
-| Type and value preservation | [ADR 0007](docs/decisions/0007-type-and-value-preservation.md), [B3 board](docs/lane-boards.md#b3-types-and-values) |
-| Connection and session ownership | [ADR 0008](docs/decisions/0008-connection-and-session-ownership.md), [B4 board](docs/lane-boards.md#b4-transport-and-sessions) |
+| Type and value preservation | [ADR 0007](docs/decisions/0007-type-and-value-preservation.md) |
+| Connection and session ownership | [ADR 0008](docs/decisions/0008-connection-and-session-ownership.md) |
 | Persistence and identity | [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md), [storage.md](docs/storage.md) |
 | Paged query results | [ADR 0011](docs/decisions/0011-paged-query-results.md) |
 | Adding a driver | [adding-drivers.md](docs/adding-drivers.md) |

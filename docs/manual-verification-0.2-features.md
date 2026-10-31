@@ -4,9 +4,9 @@ This checklist describes installed and native desktop scenarios that automated G
 
 Test native Wayland separately from Xvfb; an Xvfb pass does not establish native Wayland behavior.
 
-For each run, record the binary/package identity, GTK backend, OS and toolkit versions, scale, theme, results and screenshots. Test normal and narrow window sizes, keyboard focus, clipboard and popover/dialog placement. Mark blocked and not-run items explicitly. This checklist defines scenarios; record each run separately.
+For each run, record the binary/package identity, GTK backend, OS and toolkit versions, scale, theme, results and screenshots in the private verification record. Test normal and narrow window sizes, keyboard focus, clipboard and popover/dialog placement. Mark blocked and not-run items explicitly. This public checklist defines scenarios; run-specific records stay outside the public source tree.
 
-Independent value checks compare database-native results with the app's display and supported write paths. The [oracle review](oracle-review.md) explains the database-native comparison method.
+Independent value checks compare database-native results with the app's display and supported write paths, using the database as an independent oracle where possible.
 
 ## Areas
 

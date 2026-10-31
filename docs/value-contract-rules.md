@@ -1,6 +1,6 @@
 # Value contract rules by type
 
-These rules apply [ADR 0007](decisions/0007-type-and-value-preservation.md) by value kind. The [value evidence index](value-contracts.md) links to current source tests and retained case evidence. A rule here binds a new driver or consumer the same way ADR 0007 does.
+These rules apply [ADR 0007](decisions/0007-type-and-value-preservation.md) by value kind. A rule here binds a new driver or consumer the same way ADR 0007 does. Current regressions live with their source tests.
 
 ## Rules that apply to every engine
 

@@ -108,8 +108,8 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Scope | Entry point | Completion evidence |
 | --- | --- | --- |
 | Optional DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus app feature build |
-| Mutation | [Local instructions](testing-quality-and-performance.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON |
-| Coverage | [Local instructions](testing-quality-and-performance.md#coverage) | LCOV, exclusions and summary; use the configured coverage floor checks when qualifying a change |
+| Mutation | The configured mutation workflow | Review selected, caught, missed, timed-out and unviable mutants for the exact source revision |
+| Coverage | The configured coverage workflow | Review the report and configured coverage floor for the exact source revision |
 | Flatpak | Flatpak packaging scripts | Package build only; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
 | GTK soak | `bash scripts/test-gtk-safety.sh` | Record the tested revision and outcomes. Current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
@@ -164,7 +164,7 @@ An agent must read `AGENTS.md`, inspect status and confirm the SHA before editin
 7. Run focused mutation checks with a nonzero selected count and independent expected values. Document each equivalent survivor with a concrete argument; leave unresolved survivors/timeouts open.
 8. Update scenario evidence and the owning issue or board. Keep the test with the fix.
 
-Use [value contracts](value-contracts.md) and the B3 board as the current case backlog. Apply the [test design rules](test-design-rules.md) to each regression. Current examples:
+Use current source tests and issue acceptance criteria to select value cases. Apply the [test design rules](test-design-rules.md) to each regression. Examples:
 
 | Encountered scenario | Permanent regression home | Next edge to investigate |
 | --- | --- | --- |
@@ -173,7 +173,7 @@ Use [value contracts](value-contracts.md) and the B3 board as the current case b
 | BC/year 10000 SQL export failed | Core SQL literal unit and PostgreSQL date round-trip | Remaining driver-specific calendar limits and non-SQL consumer parity |
 | Decoder and oracle shared the same bug | Array size literal and numeric variant assertions | Independent oracles for other driver decoders |
 | Green CI omitted eight SSH tests | SSH runner, ignored-test inventory and workflow regression | Audit new ignored targets whenever added |
-| Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage survivors and timeouts from the exact run report tracked under [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559); counts vary by source SHA, so do not carry an old total forward |
+| Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage survivors and timeouts from the exact run report; counts vary by source revision, so do not carry an old total forward |
 | Test process failed, hung or never ran | Layer-runner negative tests | Keep adding actual infrastructure failure modes |
 
 Secure connection coverage is engine-specific. Track valid auth, rejected auth, wrong CA/hostname, no plaintext fallback, cancellation during connect/read/write, disconnect/reconnect, pool reuse, partial streams, malformed lengths, NULL/empty distinctions, Unicode/binary boundaries and authorization on every consumer. An unchecked scenario is a backlog item, not an implied capability or a pass.
