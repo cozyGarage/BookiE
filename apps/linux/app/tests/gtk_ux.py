@@ -892,10 +892,11 @@ GLib.MainLoop().run()
         count = 0
         with path.open(newline="", encoding="utf-8") as output:
             reader = csv.reader(output)
-            assert next(reader) == ["id", "payload"]
+            assert next(reader) == ["id", *[f"field_{index}" for index in range(1, 9)], "payload"]
             for count, row in enumerate(reader, 1):
-                assert len(row) == 2 and int(row[0]) == count
-                assert len(row[1].encode("utf-8")) == expected_payload_bytes
+                assert len(row) == 10 and int(row[0]) == count
+                assert all(value == "y" * 13 for value in row[1:-1])
+                assert len(row[-1].encode("utf-8")) == expected_payload_bytes
         assert count == expected_rows
 
     def profile_streamed_pin_retention(database, base):
@@ -978,9 +979,12 @@ GLib.MainLoop().run()
         ui.invoke(ui.wait_for_node(name="Open SQL editor"))
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         query_started = time.monotonic()
+        columns = ", ".join(
+            f"repeat('y', 13) AS field_{index}" for index in range(1, 9)
+        )
         ui.run_sql(
-            "SELECT value AS id, "
-            f"repeat('x', {payload_bytes}) AS payload FROM generate_series(1, {rows}) AS value"
+            f"SELECT value AS id, {columns}, repeat('x', {payload_bytes}) AS payload "
+            f"FROM generate_series(1, {rows}) AS value"
         )
         ui.wait_for_node_containing(f"Received {rows} rows", timeout=180)
         query_seconds = round(time.monotonic() - query_started, 2)
