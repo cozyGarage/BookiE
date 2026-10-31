@@ -903,6 +903,66 @@ GLib.MainLoop().run()
                 "rss_delta_mb": round(actual_delta_mb, 1),
             }) + "\n")
 
+    def profile_wide_table_browse(database, _base):
+        import sqlite3
+        rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
+        columns = int(os.environ["TABLEPRO_PROFILE_COLUMNS"])
+        if not 1 <= rows <= 100_000 or not 3 <= columns <= 512:
+            raise ValueError("profile row or column count is outside its supported bounds")
+        column_names = ["id", "marker"] + [f"value_{index:03d}" for index in range(columns - 2)]
+        definitions = ["id INTEGER PRIMARY KEY", "marker TEXT NOT NULL"]
+        definitions.extend(f'"{name}" INTEGER NOT NULL' for name in column_names[2:])
+        placeholders = ",".join("?" for _ in column_names)
+        with sqlite3.connect(database) as connection:
+            connection.execute(f'CREATE TABLE profile_wide ({", ".join(definitions)})')
+            connection.executemany(
+                f'INSERT INTO profile_wide ({", ".join(column_names)}) VALUES ({placeholders})',
+                (
+                    (row, f"row-{row:06d}", *(row * columns + index for index in range(columns - 2)))
+                    for row in range(1, rows + 1)
+                ),
+            )
+        ui.invoke(ui.wait_for_node(name="Refresh tables", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="profile_wide", timeout=120)
+        before_rss, _ = app_memory_kb()
+        started = time.monotonic()
+        ui.invoke_named_action_within("profile_wide", "Open profile_wide")
+        open_action_seconds = time.monotonic() - started
+        observation_seconds = int(os.environ.get("TABLEPRO_PROFILE_OBSERVATION_SECONDS", "15"))
+        time.sleep(observation_seconds)
+        screenshot = os.environ.get("TABLEPRO_PROFILE_SCREENSHOT")
+        if screenshot:
+            import subprocess
+            subprocess.run(["import", "-window", "root", screenshot], check=True)
+        after_rss, peak = app_memory_kb()
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+            out.write(json.dumps({
+                **ui.owned_application().identity(),
+                "profile_mode": "wide-table-browse",
+                "rows_requested": rows,
+                "columns_requested": columns,
+                "open_action_seconds": round(open_action_seconds, 3),
+                "observation_seconds_without_accessibility_scan": observation_seconds,
+                "rss_before_mb": round(before_rss / 1024, 1),
+                "rss_after_mb": round(after_rss / 1024, 1),
+                "rss_delta_mb": round((after_rss - before_rss) / 1024, 1),
+                "peak_mb": round(peak / 1024, 1),
+            }) + "\n")
+        if os.environ.get("TABLEPRO_PROFILE_SCAN_ROW_A11Y") == "1":
+            scan_started = time.monotonic()
+            ui.wait_for_node(name="row-000001", role=pyatspi.ROLE_LABEL, timeout=120)
+            scanned_rss, scanned_peak = app_memory_kb()
+            with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+                out.write(json.dumps({
+                    **ui.owned_application().identity(),
+                    "profile_mode": "wide-table-accessibility-scan",
+                    "scan_seconds": round(time.monotonic() - scan_started, 3),
+                    "rss_before_mb": round(after_rss / 1024, 1),
+                    "rss_after_mb": round(scanned_rss / 1024, 1),
+                    "rss_delta_mb": round((scanned_rss - after_rss) / 1024, 1),
+                    "peak_mb": round(scanned_peak / 1024, 1),
+                }) + "\n")
+
     def profile_large_result_in_the_grid(database, base):
         rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
         payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_CELL_BYTES", "0"))
@@ -2533,6 +2593,8 @@ GLib.MainLoop().run()
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)
+    if os.environ.get("TABLEPRO_PROFILE_COLUMNS"):
+        result.append(profile_wide_table_browse)
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
         result.append(mysql_enum_set_grid_edit_preserves_native_values_and_siblings)

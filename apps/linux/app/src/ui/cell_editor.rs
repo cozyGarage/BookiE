@@ -10,11 +10,14 @@
 //! mirrors the stack's `visible-child-name` notify so callers can
 //! snapshot the original text on entry and emit a commit on exit.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 use gtk4::{glib, pango};
+
+type PreeditCallback = Rc<dyn Fn(&str)>;
 
 mod imp {
     use super::*;
@@ -22,7 +25,8 @@ mod imp {
     pub struct CellEditor {
         pub stack: gtk4::Stack,
         pub label: gtk4::Label,
-        pub entry: gtk4::Text,
+        pub entry: RefCell<Option<gtk4::Text>>,
+        pub preedit_callback: RefCell<Option<PreeditCallback>>,
         pub inline_editable: Cell<bool>,
     }
 
@@ -39,7 +43,8 @@ mod imp {
                     .hexpand(true)
                     .ellipsize(pango::EllipsizeMode::End)
                     .build(),
-                entry: gtk4::Text::builder().hexpand(true).build(),
+                entry: RefCell::new(None),
+                preedit_callback: RefCell::new(None),
                 inline_editable: Cell::default(),
             }
         }
@@ -67,58 +72,9 @@ mod imp {
             self.obj().add_css_class("tp-cell-editor");
             let stack = self.stack.clone();
             let label = self.label.clone();
-            let entry = self.entry.clone();
             stack.add_named(&label, Some("display"));
-            stack.add_named(&entry, Some("edit"));
             stack.set_visible_child_name("display");
             stack.set_parent(&*self.obj());
-
-            // Enter commits the edit. `gtk::Text::activate` fires on
-            // Enter / Return / KP_Enter — the canonical "user is done
-            // typing" signal.
-            let weak_for_activate = self.obj().downgrade();
-            entry.connect_activate(move |_| {
-                if let Some(this) = weak_for_activate.upgrade() {
-                    this.stop_editing(true);
-                }
-            });
-
-            // Esc cancels — switch back to the display child without
-            // committing the entry's text. Capture phase so we run
-            // before the inner GtkText handles the key (otherwise
-            // GtkText might consume Escape to clear its own buffer
-            // without us knowing to revert).
-            let key_ctrl = gtk4::EventControllerKey::new();
-            key_ctrl.set_propagation_phase(gtk4::PropagationPhase::Capture);
-            let weak_for_key = self.obj().downgrade();
-            key_ctrl.connect_key_pressed(move |_, keyval, _, _| {
-                if keyval == gtk4::gdk::Key::Escape
-                    && let Some(this) = weak_for_key.upgrade()
-                    && this.is_editing()
-                {
-                    this.stop_editing(false);
-                    return glib::Propagation::Stop;
-                }
-                glib::Propagation::Proceed
-            });
-            entry.add_controller(key_ctrl);
-
-            // Focus-out commits — matches the spreadsheet convention
-            // where moving focus away accepts the value. Without this
-            // an edit would only commit on Enter / Tab. GtkText
-            // flushes any active IME preedit on focus-out before this
-            // fires, so the entry's text holds the final composed
-            // value when stop_editing copies it.
-            let focus_ctrl = gtk4::EventControllerFocus::new();
-            let weak_for_focus = self.obj().downgrade();
-            focus_ctrl.connect_leave(move |_| {
-                if let Some(this) = weak_for_focus.upgrade()
-                    && this.is_editing()
-                {
-                    this.stop_editing(true);
-                }
-            });
-            entry.add_controller(focus_ctrl);
         }
 
         fn dispose(&self) {
@@ -162,7 +118,9 @@ impl CellEditor {
 
     pub fn set_text(&self, s: &str) {
         self.label_widget().set_text(s);
-        self.entry_widget().set_text(s);
+        if let Some(entry) = self.imp().entry.borrow().as_ref() {
+            entry.set_text(s);
+        }
     }
 
     pub fn set_inline_editable(&self, editable: bool) {
@@ -221,13 +179,14 @@ impl CellEditor {
     }
 
     pub fn stop_editing(&self, commit: bool) {
+        let Some(entry) = self.imp().entry.borrow().as_ref().cloned() else {
+            return;
+        };
         if commit {
-            let new_text = self.entry_widget().text();
+            let new_text = entry.text();
             self.label_widget().set_text(&new_text);
         } else {
-            // Revert the entry buffer so a subsequent start_editing
-            // doesn't surface stale aborted text.
-            self.entry_widget().set_text(&self.label_widget().text());
+            entry.set_text(&self.label_widget().text());
         }
         self.stack_widget().set_visible_child_name("display");
     }
@@ -251,6 +210,14 @@ impl CellEditor {
         self.entry_widget()
     }
 
+    pub fn connect_preedit_changed<F: Fn(&str) + 'static>(&self, callback: F) {
+        let callback = Rc::new(callback);
+        *self.imp().preedit_callback.borrow_mut() = Some(callback.clone());
+        if let Some(entry) = self.imp().entry.borrow().as_ref() {
+            entry.connect_preedit_changed(move |_, preedit| callback(preedit));
+        }
+    }
+
     fn stack_widget(&self) -> gtk4::Stack {
         self.imp().stack.clone()
     }
@@ -260,6 +227,88 @@ impl CellEditor {
     }
 
     fn entry_widget(&self) -> gtk4::Text {
-        self.imp().entry.clone()
+        if let Some(entry) = self.imp().entry.borrow().as_ref() {
+            return entry.clone();
+        }
+        let entry = gtk4::Text::builder().hexpand(true).build();
+        self.stack_widget().add_named(&entry, Some("edit"));
+        self.install_entry_handlers(&entry);
+        *self.imp().entry.borrow_mut() = Some(entry.clone());
+        entry
+    }
+
+    fn install_entry_handlers(&self, entry: &gtk4::Text) {
+        let weak_for_activate = self.downgrade();
+        entry.connect_activate(move |_| {
+            if let Some(this) = weak_for_activate.upgrade() {
+                this.stop_editing(true);
+            }
+        });
+
+        let key_ctrl = gtk4::EventControllerKey::new();
+        key_ctrl.set_propagation_phase(gtk4::PropagationPhase::Capture);
+        let weak_for_key = self.downgrade();
+        key_ctrl.connect_key_pressed(move |_, keyval, _, _| {
+            if keyval == gtk4::gdk::Key::Escape
+                && let Some(this) = weak_for_key.upgrade()
+                && this.is_editing()
+            {
+                this.stop_editing(false);
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        entry.add_controller(key_ctrl);
+
+        let focus_ctrl = gtk4::EventControllerFocus::new();
+        let weak_for_focus = self.downgrade();
+        focus_ctrl.connect_leave(move |_| {
+            if let Some(this) = weak_for_focus.upgrade()
+                && this.is_editing()
+            {
+                this.stop_editing(true);
+            }
+        });
+        entry.add_controller(focus_ctrl);
+
+        if let Some(callback) = self.imp().preedit_callback.borrow().as_ref().cloned() {
+            entry.connect_preedit_changed(move |_, preedit| callback(preedit));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn editable_cell_defers_its_text_widget_until_editing() {
+        gtk4::init().unwrap();
+        let cell = CellEditor::new();
+        assert!(cell.stack_widget().child_by_name("edit").is_none());
+        cell.set_text("stored");
+        assert!(cell.stack_widget().child_by_name("edit").is_none());
+
+        let preedit_seen = Rc::new(Cell::new(false));
+        let preedit_seen_by_callback = preedit_seen.clone();
+        cell.connect_preedit_changed(move |preedit| {
+            preedit_seen_by_callback.set(preedit == "draft");
+        });
+        cell.set_inline_editable(true);
+        cell.start_editing();
+        let entry = cell.entry();
+        entry.emit_by_name::<()>("preedit-changed", &[&"draft"]);
+        assert!(preedit_seen.get());
+        assert_eq!(entry.text().as_str(), "stored");
+        entry.set_text("discarded");
+        cell.stop_editing(false);
+        assert_eq!(cell.text().as_str(), "stored");
+
+        cell.start_editing_with("exact value");
+        assert_eq!(cell.entry().text().as_str(), "exact value");
+        cell.stop_editing(true);
+        assert_eq!(cell.text().as_str(), "exact value");
+        assert_eq!(cell.entry(), entry);
     }
 }
