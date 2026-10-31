@@ -2,7 +2,7 @@
 
 These documents record the reasons behind major technical choices. Accepted decisions stay stable. A later decision may supersede an earlier one by linking to it explicitly.
 
-Proposed decisions are listed in the [proposal index](../proposals/README.md). Closures and decisions that were later corrected are recorded in [decision lessons](lessons.md).
+Proposed decisions are listed in the [proposal index](../proposals/README.md).
 
 ## Lifecycle
 

@@ -43,7 +43,7 @@ Accepted:
 
 - A one-off churn of imports and a larger workspace, with its own coverage and size baselines.
 - A boundary that must be kept: reviewers reject a `gtk4` or `glib` import in the new crate.
-- The first stage is mechanical and the third is a real refactor of the code that has produced most of the recent crashes; it needs the installed GTK scenarios as its safety net.
+- The first stage is mechanical and the third is a real refactor of the orchestration layer; it needs focused logic tests and GTK scenarios for the widget boundary.
 
 Gained:
 
@@ -52,7 +52,7 @@ Gained:
 
 ## Alternatives considered
 
-- **Leave the code where it is and add more GTK scenarios.** Scenarios are slow and flaky under load (TEST-31); they are the right net for the widget layer, not the only one for logic.
+- **Leave the code where it is and add more GTK scenarios.** Widget scenarios exercise display integration, but they do not replace display-independent tests for application logic.
 - **Split the UI into many GTK crates instead.** Helps compile parallelism but leaves logic and widgets coupled.
 - **Move everything at once.** Rejected: it would mix a mechanical move with a behavioural refactor in one unreviewable change.
 - **Put application orchestration in the domain or driver crate.** Rejected. `core` stays a domain and driver leaf; a core-to-driver dependency would reverse the driver-to-core boundary. Shared services sit above `core` and the drivers, below consumer roots, with a dependency allowlist. Orchestration lives in this crate behind the guard of [ADR 0016](0016-governed-consumer-seam.md).

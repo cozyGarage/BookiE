@@ -6,7 +6,7 @@
 
 ## Context
 
-The core `QueryResult` describes one tabular result. At the time this decision was written, SQL Server could return several result sets for one batch, but its driver retained only the first while draining the rest. The later data was unavailable to the editor, policy masking, MCP and export consumers (TEST-10).
+The core `QueryResult` describes one tabular result. At the time this decision was written, SQL Server could return several result sets for one batch, but its driver retained only the first while draining the rest. The later data was unavailable to the editor, policy masking, MCP and export consumers.
 
 ## Decision
 
