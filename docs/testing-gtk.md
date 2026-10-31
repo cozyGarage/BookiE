@@ -82,6 +82,14 @@ SQLite integration regressions also distinguish NULL from zero, false, empty tex
 
 For ordinary UI changes, test the affected flow manually and include before and after screenshots. Add deterministic automation when a regression can be reproduced without timing or desktop-session assumptions.
 
+## Large-result grid scroll profiles
+
+Use `bash scripts/profile-grid-scroll-matrix.sh` to profile the GTK grid with 100,000 synthetic SQLite rows. The default matrix runs ordinary XTest wheel input with unique or repeated text and narrow or wide results. Each case runs three times. The wheel profile sends 40 wheel events per direction at 80 ms intervals, records visible row ranges and timing, then uses the accessible scrollbar only to verify the loaded result's end and return-to-top range outside the timed interval. A final query confirms that the Run control and result grid still respond after scrolling.
+
+Set `TABLEPRO_PROFILE_ROWS`, `TABLEPRO_PROFILE_REPETITIONS`, `TABLEPRO_PROFILE_WHEEL_EVENTS`, `TABLEPRO_PROFILE_WHEEL_DELAY_SECONDS`, `TABLEPRO_PROFILE_SCROLL_STEPS` or `TABLEPRO_PROFILE_OUT` to adjust the bounded workload. The scenario also accepts `TABLEPRO_PROFILE_TEXT_MODE=unique|repeated`, `TABLEPRO_PROFILE_LAYOUT=narrow|wide` and `TABLEPRO_PROFILE_INPUT=wheel|scrub`. `TABLEPRO_PROFILE_INCLUDE_SCRUB_REFERENCE=1` adds repeated unique-text narrow scrollbar-scrub runs. `TABLEPRO_PROFILE_MATRIX_FULL=1` adds scrollbar-scrub runs for every text and layout combination. Results are JSON Lines and record the input mode, layout, text mode, requested rows, row-range checks, app CPU and wall time, and process RSS. They are synthetic X11/Xvfb measurements; native Wayland interaction remains a separate acceptance step.
+
+Use `bash scripts/profile-export-dialog.sh` to measure how long the loaded-result CSV export dialog takes to open for a synthetic ten-column SQLite query. It records query time separately from export-dialog wall time and application CPU, plus resident and peak memory. The default uses 39,999 rows with one 2 KiB text cell per row, matching the shape of a locally observed export without copying that data into the repository. Set `TABLEPRO_PROFILE_EXPORT_ROWS`, `TABLEPRO_PROFILE_EXPORT_CELL_BYTES`, `TABLEPRO_PROFILE_EXPORT_TEXT_MODE=unique|repeated`, `TABLEPRO_PROFILE_REPETITIONS` or `TABLEPRO_PROFILE_OUT` to adjust the bounded sample. The script caps the generated text payload at 256 MiB. These figures measure opening the dialog, not writing an export file.
+
 ## Lessons that shape GTK tests
 
 - **Replacing a selected model's contents in one remove-and-add notification makes GTK scan every inserted row.** Deselect, then send the removal, then the insertion. Assert the number of row objects constructed, which is deterministic, not wall-clock time.
