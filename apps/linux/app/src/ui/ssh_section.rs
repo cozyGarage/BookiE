@@ -229,6 +229,7 @@ impl SshSection {
                 } else {
                     tablepro_storage::SshClient::Builtin
                 },
+                agent_identity: None,
             },
             secret_to_store: secret,
         })
