@@ -378,3 +378,17 @@ async fn relay_stops_when_the_local_client_is_dropped_and_the_remote_closes() {
         .unwrap()
         .unwrap();
 }
+
+#[test]
+fn agent_signing_failures_are_not_reported_as_server_attempt_limits() {
+    let error = russh::AgentAuthError::Key(russh::keys::Error::KeyIsEncrypted);
+    assert!(matches!(
+        super::agent_auth_error(error, 2, 8),
+        super::SshError::Agent(_)
+    ));
+    let error = russh::AgentAuthError::Send(russh::SendError {});
+    assert!(matches!(
+        super::agent_auth_error(error, 2, 8),
+        super::SshError::AgentKeyLimit { refused: 2, total: 8 }
+    ));
+}
