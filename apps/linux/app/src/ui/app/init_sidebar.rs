@@ -114,6 +114,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
         sidebar_hidden_schemas.clone(),
     );
     let search_entry = widgets.table_search.clone();
+    let search_sender = sender.clone();
     widgets.table_search.connect_search_changed(move |_| {
         refresh_visible(
             &nodes_for_search,
@@ -123,6 +124,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
             &hidden_for_search,
         );
         listbox_for_invalidate.invalidate_filter();
+        search_sender.input(AppMsg::SidebarSearchChanged);
     });
     widgets.table_search_bar.connect_entry(&widgets.table_search);
     widgets
@@ -140,7 +142,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
         .icon_name("view-list-symbolic")
         .title(crate::tr!("No tables"))
         .description(crate::tr!(
-            "Nothing matches the current search, or this connection has no tables yet."
+            "Nothing matches the current search, or this connection has no tables yet. Use Refresh tables to check again."
         ))
         .build();
     sidebar_placeholder.add_css_class("compact");

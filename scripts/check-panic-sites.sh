@@ -73,7 +73,7 @@ declared_module_files() {
         if (match($0, /"[^"]+"/)) path = substr($0, RSTART + 1, RLENGTH - 2)
         next
       }
-      pending && /^[ \t]*(pub[ \t]+)?mod[ \t]+[A-Za-z0-9_]+[ \t]*;/ {
+      pending && /^[ \t]*(pub([ \t]*\([^)]*\))?[ \t]+)?mod[ \t]+[A-Za-z0-9_]+[ \t]*;/ {
         if (path != "") {
           print "path:" path
         } else if (match($0, /mod[ \t]+[A-Za-z0-9_]+/)) {

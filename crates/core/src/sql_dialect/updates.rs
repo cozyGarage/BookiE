@@ -1,3 +1,8 @@
+#[path = "exact_original.rs"]
+mod exact_original;
+
+use exact_original::exact_original_predicate;
+
 use super::{
     BuildSqlError, build_update, checked_pk_indexes, keyed_where_clause, placeholder_for, postgres_text_cast_type,
     qualified_table, quote_ident, text_cast_placeholder,
@@ -122,21 +127,8 @@ pub fn build_optimistic_keyed_update(
     if edits.iter().any(|(col_idx, _, _)| *col_idx >= columns.len()) {
         return Err(BuildSqlError::StaleColumns);
     }
-    let mut assignments = Vec::with_capacity(edits.len());
     let mut params = Vec::with_capacity(edits.len() * 3 + pk_values.len());
-    for (col_idx, _, new_value) in edits {
-        let name = quote_ident(driver_id, &columns[*col_idx].name);
-        let placeholder = placeholder_for(driver_id, params.len());
-        let value_sql = if driver_id == "postgres" {
-            postgres_text_cast_type(&columns[*col_idx], new_value)
-                .map(|type_name| format!("{placeholder}::text::{type_name}"))
-                .unwrap_or(placeholder)
-        } else {
-            placeholder
-        };
-        assignments.push(format!("{name} = {value_sql}"));
-        params.push(new_value.clone());
-    }
+    let assignments = optimistic_assignments(driver_id, columns, edits, &mut params);
     let mut predicates = vec![keyed_where_clause(
         driver_id,
         columns,
@@ -144,6 +136,13 @@ pub fn build_optimistic_keyed_update(
         pk_values,
         &mut params,
     )];
+    for (&index, original) in pk_indexes.iter().zip(pk_values) {
+        let column = &columns[index];
+        let name = quote_ident(driver_id, &column.name);
+        if let Some(predicate) = exact_original_predicate(driver_id, &name, column, original, &mut params) {
+            predicates.push(predicate);
+        }
+    }
     for (col_idx, old_value, _) in edits {
         if columns[*col_idx].primary_key {
             continue;
@@ -169,11 +168,48 @@ pub fn build_optimistic_keyed_update(
     ))
 }
 
+fn optimistic_assignments(
+    driver_id: &str,
+    columns: &[ColumnInfo],
+    edits: &[(usize, Value, Value)],
+    params: &mut Vec<Value>,
+) -> Vec<String> {
+    let mut assignments = Vec::with_capacity(edits.len());
+    for (col_idx, _, new_value) in edits {
+        let name = quote_ident(driver_id, &columns[*col_idx].name);
+        if is_mysql_empty_text(driver_id, new_value) {
+            assignments.push(format!("{name} = SPACE(0)"));
+            continue;
+        }
+        let placeholder = placeholder_for(driver_id, params.len());
+        let value_sql = if driver_id == "postgres" {
+            postgres_text_cast_type(&columns[*col_idx], new_value)
+                .map(|type_name| format!("{placeholder}::text::{type_name}"))
+                .unwrap_or(placeholder)
+        } else {
+            placeholder
+        };
+        assignments.push(format!("{name} = {value_sql}"));
+        params.push(new_value.clone());
+    }
+    assignments
+}
+
 fn is_geometric(data_type: &str) -> bool {
     matches!(
         data_type.trim().to_ascii_lowercase().as_str(),
         "point" | "line" | "lseg" | "box" | "path" | "polygon" | "circle"
     )
+}
+
+fn is_mysql_empty_text(driver_id: &str, value: &Value) -> bool {
+    driver_id == "mysql" && matches!(value, Value::Text(text) if text.is_empty())
+}
+
+fn is_mssql_character_type(data_type: &str) -> bool {
+    let base = data_type.trim().to_ascii_lowercase();
+    let base = base.split('(').next().unwrap_or_default().trim();
+    matches!(base, "char" | "varchar" | "nchar" | "nvarchar")
 }
 
 fn optimistic_predicate(
@@ -183,7 +219,16 @@ fn optimistic_predicate(
     old_value: &Value,
     params: &mut Vec<Value>,
 ) -> Result<String, BuildSqlError> {
+    if is_mysql_empty_text(driver_id, old_value) {
+        return Ok(format!(
+            "CAST(CONVERT({name} USING utf8mb4) AS BINARY) <=> CAST(SPACE(0) AS BINARY)"
+        ));
+    }
+    if let Some(predicate) = exact_original_predicate(driver_id, name, column, old_value, params) {
+        return Ok(predicate);
+    }
     let placeholder = placeholder_for(driver_id, params.len());
+    let old_value = &crate::numeric_input::widened_single_precision(driver_id, column, old_value);
     let predicate = match driver_id {
         "postgres" if matches!(column.data_type.trim().to_ascii_lowercase().as_str(), "real" | "float4") => {
             format!("{name} IS NOT DISTINCT FROM {placeholder}::real")
@@ -205,14 +250,23 @@ fn optimistic_predicate(
             let value_sql = text_cast_placeholder(column, old_value, placeholder);
             format!("{name} IS NOT DISTINCT FROM {value_sql}")
         }
-        "sqlite" | "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
+        "sqlite" => format!("{name} COLLATE BINARY IS NOT DISTINCT FROM {placeholder}"),
+        "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
+        "mysql" if matches!(old_value, Value::Text(_)) => {
+            format!("CONVERT({name} USING utf8mb4) COLLATE utf8mb4_bin <=> {placeholder}")
+        }
         "mysql" => format!("{name} <=> {placeholder}"),
         "mssql" => {
             let next = placeholder_for(driver_id, params.len() + 1);
             params.push(old_value.clone());
             params.push(old_value.clone());
+            let compared = if matches!(old_value, Value::Text(_)) && is_mssql_character_type(&column.data_type) {
+                format!("{name} COLLATE Latin1_General_100_BIN2")
+            } else {
+                name.to_string()
+            };
             return Ok(format!(
-                "({name} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
+                "({compared} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
             ));
         }
         _ => return Err(BuildSqlError::UnsupportedDriver(driver_id.into())),

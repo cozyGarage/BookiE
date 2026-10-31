@@ -285,9 +285,21 @@ fn is_clickhouse_external_source(lowered: &str) -> bool {
             | "odbc"
             | "sqlite"
             | "azureblobstorage"
+            | "azureblobstoragecluster"
             | "deltalake"
+            | "deltalakecluster"
             | "iceberg"
+            | "icebergcluster"
             | "hudi"
+            | "hudicluster"
+            | "redis"
+            | "executable"
+            | "gcs"
+            | "oss"
+            | "cosn"
+            | "hive"
+            | "arrowflight"
+            | "filecluster"
     )
 }
 

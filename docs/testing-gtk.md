@@ -12,11 +12,7 @@ Run the installed safety suite with:
 
 The script builds `tablepro-app`, always starts a private runtime directory, isolated D-Bus session and Xvfb display, and drives the real application through PyAT-SPI. Each scenario gets temporary XDG directories and a fixture SQLite database. A scenario may mark its saved fixture connection as production to test policy prompts; it never opens a user's saved connection or production database. The runner uses a standalone AT-SPI D-Bus daemon and passes the Xvfb display to D-Bus activation, so it does not reuse desktop accessibility or portal processes. GTK tests exercise the X11/GTK portal path; they do not replace installed Wayland package testing.
 
-The runner refuses an empty scenario selection, including an empty shard, or a negative retry count. When selecting one scenario, clear any shard setting that would exclude it.
-
-After its configured retry a failed scenario is recorded and the runner carries on with the rest. Each failure prints a `FAILED:` line and its assertion text, and the run ends with one line that lists every failed scenario and exits non-zero. A scenario that fails only because an earlier one left a shared fixture in a bad state can still fail alongside it, so read the first failure first.
-
-When `TABLEPRO_GTK_ARTIFACT_DIR` is set, every scenario writes a JSON result and application stderr, including successful scenarios. Failures during the scenario additionally retain the accessibility tree and a screenshot when available. Layout or shutdown failures detected afterwards mark the result as failed and retain their diagnostics; snapshots may be unavailable after the window closes. Successful runs therefore have uploadable evidence; a missing artifact still fails CI. Python regressions exercise both result paths without needing a display.
+The suite reports every failed scenario and exits non-zero. Read the first failure first because later scenarios may be affected by shared fixture state.
 
 The grid-search keyboard scenario checks focused, visible rows across a 5,000-row result after accepting and dismissing both search dialogs. It complements the 300-column alignment scenario. On X11, these scenarios also capture successful scroll positions when an artifact directory and either `scrot` or ImageMagick `import` are available. Screenshots supplement the focus and bounds assertions; they do not establish native desktop or package acceptance.
 
@@ -74,37 +70,18 @@ The Open Quickly scenario waits for the filtered result set before invoking its 
 
 Buttons and rows are invoked through named AT-SPI actions; the harness re-queries the row while waiting up to 15 seconds for its action to appear in the accessibility tree. There is no generic Return-key fallback. Keyboard events exercise shortcuts and the export format combo's navigation. The combo has no AT-SPI click/focus action: its scenario tabs until the named control reports focus, opens its list, navigates to the requested format, and verifies its selected label before exporting. Each denial assertion requires the row count to hold for a settle window rather than matching once.
 
-On Arch or Omarchy, install the harness dependencies with:
+On Arch or Omarchy, install the local harness dependencies with:
 
 ```bash
 sudo pacman -S --needed dbus xorg-server-xvfb at-spi2-core python-atspi
 ```
 
-The Debian testing CI images use `dbus-daemon`, `gnome-keyring`, `xvfb`, `xauth`, `at-spi2-core`, `python3-pyatspi`, and `scrot`. GitHub pull requests run the required GTK fast checks and widget regressions; the installed GTK safety smoke runs only on a schedule or manual dispatch. The separate daily GTK Safety Soak runs five retry-free attempts and uploads stdout, stderr, accessibility snapshots, and screenshots on failure. The archived [0.2.0 handoff](archive/bookie-0.2-completion-handoff-2026-10-18.md) recorded a release-era criterion of 30 consecutive attempts across at least six runs at one SHA. The maintainer later closed 0.2.0 delivery; that historical criterion does not set future release scope. Current GTK reliability and native Wayland acceptance remain in TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)) in the [backlog](backlog.md). Service-level tests still cover pure state and policy behavior, but they do not replace these cross-layer tests.
-
-The nightly workflow runs in stages: unit-tier coverage first, then Docker coverage and mutation jobs in parallel, followed by the soak and package jobs. Docker and mutation matrices run at most two jobs at a time. A red job is a failure to classify, not proof of a product bug; use the job log and the [failure-triage guidance](#reading-a-red-nightly) to distinguish code, test, setup and infrastructure causes. Each driver crate is measured with its Docker suite against `baselines/coverage-floors-crates.txt` (`scripts/check-crate-coverage-floors.py`). Mutation results are compared with `baselines/mutants/<package>.txt` by `scripts/check-mutants-baseline.py`: a missed mutant that is not in the baseline fails the run, and baseline lines that a test now catches are listed for deletion. A missing baseline file means no missed mutant is accepted. The soak is three runs of five attempts each per night.
-
-### Reading a red nightly
-
-Sort each red job before touching code. The class decides what the fix and its regression test are.
-
-| Class | How to recognise it | What to do |
-| --- | --- | --- |
-| Setup failure | The job fails before any test runs: a missing script or path, a wrong binary name, a package missing from an image, a port already in use | Fix the workflow or script, and add a contract test in `scripts/tests/test_ci_workflow.py` or next to the helper. A setup failure hides every later check in that job. |
-| Missed mutant | The log lists `NEW missed mutant` | Write a test that asserts the behaviour the mutant changes. Baseline only a mutant that no test can observe, with the reason in the file header. |
-| Scenario failure | The soak or an installed GTK shard names a scenario and an assertion | Read the assertion first. The runner carries on after a failure and lists every failed scenario at the end, so start with the first one in the list. |
-
-Every nightly finding that is a product or test gap gets a regression test in the lowest tier that can show it, and an issue when the fix is not immediate. Check a mutation change locally with `cargo mutants -p <crate> --file <file>` and then `python3 scripts/check-mutants-baseline.py <package> <output dir> 3`, which uses the nightly's own judgement. Run a few times: a mutant caught by a timing accident shows up as an occasional miss.
-
-A manual dispatch runs the whole nightly, and the soak and package jobs wait for the mutation jobs. A fix to a nightly-only job is therefore proven by the next night. The contract tests cover its static part.
-
-Workflow prerequisites and runner-specific behavior live in `.forgejo/workflows/` and the scripts they invoke. For a distro-floor failure, use the named scenario and assertion in the job output to distinguish setup, infrastructure and product failures.
+Service-level tests cover pure state and policy behavior, but they do not replace cross-layer GTK and native desktop checks.
 
 SQLite integration regressions also distinguish NULL from zero, false, empty text, and empty blobs in declared columns, and preserve binary values despite declared-type affinity mismatches. Export unit tests overlap writers deterministically and check that pre-existing temporary symlinks cannot redirect writes. Workspace tests preserve active-tab identity when unknown records are removed.
 
 For ordinary UI changes, test the affected flow manually and include before and after screenshots. Add deterministic automation when a regression can be reproduced without timing or desktop-session assumptions.
 
-## Lessons that shape GTK tests
+## GTK test design
 
-- **Replacing a selected model's contents in one remove-and-add notification makes GTK scan every inserted row.** Deselect, then send the removal, then the insertion. Assert the number of row objects constructed, which is deterministic, not wall-clock time ([TablePro collaboration review](archive/tablepro-collaboration-2026-10-21.md)).
-- **A scenario is promoted only after 30 consecutive attempts across at least six runs, and adding a scenario restarts that ledger** ([production audit](archive/production-audit.md)). A diagnostic probe that passes is not a product regression.
+Prefer deterministic assertions about visible state, accessibility actions and stored data over wall-clock timing. Keep each scenario isolated from other test profiles and fixture databases.
