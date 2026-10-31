@@ -41,6 +41,21 @@ async fn narrow_queries_stop_at_the_row_limit_and_report_truncation() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_user_format_clause_that_never_ends_a_row_is_refused_with_bounded_memory() {
+    let (_c, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+
+    let error = conn
+        .query("SELECT number FROM numbers(30000000) FORMAT Values")
+        .await
+        .expect_err("a single endless line must not be buffered whole");
+
+    assert!(matches!(error, tablepro_core::DriverError::Unsupported(_)), "{error:?}");
+    assert_eq!(conn.query("SELECT 1").await.unwrap().rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_readonly_user_can_connect_and_a_grid_save_still_waits_for_its_mutation() {
     let (_c, opts) = start_clickhouse().await;
     let admin = connect(opts.clone()).await;

@@ -5,7 +5,7 @@ BookiE is a Linux-only Rust and GTK database client. Current development happens
 ## Start here
 
 - Read [`AGENTS.md`](AGENTS.md) for contributor rules, lane ownership, tests, security, commits and review workflow.
-- Read the [documentation map](docs/README.md) and [0.2.0 completion status](docs/bookie-0.2-sprint.md) before choosing work. It links to the completed delivery boundary, post-release backlog, boards and acceptance criteria.
+- Read the [documentation map](docs/README.md) and choose work from [Project #3](https://github.com/users/cozyGarage/projects/3). Each issue lists its acceptance criteria.
 - The Cargo workspace is at the repository root. [Architecture](ARCHITECTURE.md) explains crate boundaries and data flow.
 
 ## Development setup
@@ -23,7 +23,7 @@ cargo run -p tablepro-app
 
 ## Validation
 
-Use the [validation playbook](docs/validation-playbook.md) to select local checks for your change. It explains which checks run on GitHub and which require the Forgejo acceptance gate. Do not treat a skipped check as a pass.
+Use the [validation playbook](docs/validation-playbook.md) to select local checks for your change and identify the applicable required checks. Do not treat a skipped check as a pass.
 
 ## Reporting bugs
 

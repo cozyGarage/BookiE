@@ -2,31 +2,20 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-12
-- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0017-official-rust-mcp-sdk-behind-the-governed-seam)
-- **Clarified**: 2026-10-15 for status. The Decision is the target; the Implementation status section records that the production MCP server is still the hand-written one.
 
 ## Context
 
-`crates/mcp/src/server.rs` is 996 lines. About half of it is protocol plumbing: JSON-RPC framing for stdio and streamable HTTP, protocol-version negotiation, `initialize`, `tools/list`, `tools/call`, hand-written tool descriptions and JSON schemas, loopback binding and an `Origin` check. The other half is the product: token scopes, connection allowlists, approval, masking, audit, and cancelling an operation when the HTTP caller disconnects. Those live in `McpBridge` and `tablepro-policy`, not in the transport.
-
-The Model Context Protocol changes (the SDK now targets the 2026-07-28 specification), and the maintainer wants room to add resources, prompts and other MCP features later without growing the hand-written layer.
-
-A pilot built outside the repository (`rmcp` 3.5.1, Apache-2.0, minimum Rust 1.88) showed:
-
-- A server over an in-memory pipe negotiated protocol 2025-06-18, listed a tool whose JSON Schema (draft 2020-12) was generated from a Rust struct, returned a tool result, and returned a normal `isError` result for bad arguments.
-- It ships stdio and streamable-HTTP server transports, is built on `tokio`, `http` and `tower`, and the HTTP server feature does not require `axum` (BookiE uses `axum` 0.8, which it also targets).
-- Its own test suite includes the required cancellation case: when a stateless streamable-HTTP client disconnects while a tool handler is still running, the per-request cancellation token fires so the handler can cancel cooperatively.
-- OAuth, `reqwest` and `jsonwebtoken` are optional features the adoption plan would leave disabled.
+The MCP server implements protocol framing, version negotiation, transport handling, tool descriptions and JSON schemas alongside BookiE-specific authorization and execution. The protocol layer can be maintained by the Rust MCP SDK while token scopes, connection allowlists, approval, masking, audit and operation cancellation remain in BookiE. The design must keep those responsibilities at the governed seam.
 
 ## Decision
 
-Replace the protocol, transport and tool-schema layer of `crates/mcp` with `rmcp`. Keep everything that carries a safety decision:
+Use `rmcp` for the protocol, transport and tool-schema layer behind the governed seam. Keep everything that carries a safety decision:
 
 - `McpBridge`, token scopes, connection allowlists, approval, masking and audit stay in BookiE's code and stay the only way a tool reaches a database ([ADR 0016](0016-governed-consumer-seam.md)). A tool handler holds a `PolicyGuard` connection and nothing else.
 - Token and `Origin` checks and loopback-only binding move into `tower` middleware in front of the SDK's streamable-HTTP service. BookiE's token is still presented the way existing clients present it, so existing setups keep working.
 - Tool input types become Rust structs with generated schemas; the hand-written `tool_schema` JSON goes away.
 
-The migration is staged behind the existing MCP tests. The adoption is complete only when every current MCP test passes against the new layer, including the refusal without a token, the bad-token refusal, the disconnect-aware cancellation with no execution after a disconnect during approval, and the shutdown test.
+The target adapter must preserve authentication, authorization, disconnect cancellation and shutdown behavior. The SDK must not gain a path around BookiE policy or audit. The default server currently remains the hand-written implementation; the SDK adapter is an optional prototype. This decision defines the target and does not claim migration completion.
 
 ## Rationale
 
@@ -36,14 +25,13 @@ The protocol layer is maintained by the project that defines the protocol, and t
 
 Accepted:
 
-- A new dependency tree to review under `deny.toml` and the supply-chain job. Only the `server`, `macros`, `schemars` and the two server transports are enabled.
-- `rmcp` is at 3.x and changes between majors; upgrades require an explicit version update and validation.
+- The SDK dependency tree requires license and advisory review under `deny.toml` and the supply-chain checks.
+- Major SDK upgrades require explicit version review and validation.
 - BookiE's token is not an HTTP `Authorization` bearer in all cases today; the middleware must preserve current behaviour rather than silently switching clients to OAuth.
 
 Gained:
 
 - Protocol compliance and future MCP features (resources, prompts, elicitation) come from the SDK.
-- Roughly 400 to 500 lines of transport code leave `crates/mcp`.
 - Schemas are generated from the same types the handlers read.
 
 ## Alternatives considered

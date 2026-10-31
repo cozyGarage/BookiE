@@ -254,7 +254,12 @@ def scenarios(ui):
             )
 
         start = focused_item()
-        target = (-1 if start is None else start) + position
+        if position == "last":
+            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+            assert items, "the menu has no items"
+            target = len(items) - 1
+        else:
+            target = (-1 if start is None else start) + position
         deadline = time.monotonic() + ui.WAIT_SECONDS
         moves = 0
         while focused_item() != target:
@@ -1618,6 +1623,47 @@ GLib.MainLoop().run()
         ui.wait_for_node_containing("Rows 1-5000", timeout=30)
         ui.wait_for_node(name=first_run_marker, role=pyatspi.ROLE_LABEL, timeout=120)
 
+    def wait_for_visible_marker(name):
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            app = ui.application_node()
+            if app is not None and any(
+                ui.node_name(node) == name and node.getState().contains(pyatspi.STATE_SHOWING)
+                for node in ui.descendants(app)
+            ):
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"{name!r} was not visible")
+
+    def postgres_visible_evicted_page_can_be_revisited(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.run_sql(
+            "SELECT value AS id, 'page-marker-' || value::text AS marker, "
+            "repeat('x', 2048) AS payload "
+            "FROM generate_series(1, 400000) AS value"
+        )
+        ui.wait_for_node(name="page-marker-1", role=pyatspi.ROLE_LABEL, timeout=120)
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            app = ui.application_node()
+            labels = list(ui.descendants(app)) if app is not None else []
+            current = any(ui.node_name(node) == "page-marker-1" and node.getState().contains(pyatspi.STATE_SHOWING) for node in labels)
+            counts = [re.search(r"Received (\d+) rows", ui.node_name(node)) for node in labels]
+            if current and any(match and 40000 <= int(match.group(1)) < 400000 for match in counts):
+                break
+            time.sleep(ui.POLL_SECONDS)
+        else:
+            raise AssertionError("first page was not visible after enough streamed rows to exceed the cache")
+        ui.invoke(ui.wait_for_sensitive_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("Rows 5001-10000", timeout=30)
+        wait_for_visible_marker("page-marker-5001")
+        ui.invoke(ui.wait_for_sensitive_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("Rows 1-5000", timeout=30)
+        wait_for_visible_marker("page-marker-1")
+
     def postgres_hidden_projection_refresh_and_edit_preserve_hidden_value(database, base):
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
@@ -1999,7 +2045,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
-        choose_menu_item(17)
+        choose_menu_item("last")
         ui.wait_for_node(name="1 unsaved change")
         assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
@@ -2503,6 +2549,7 @@ GLib.MainLoop().run()
         result.append(postgres_reopened_browse_tab_keeps_its_schema_after_switching)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
         result.append(postgres_large_stream_pages_round_trip_from_spool)
+        result.append(postgres_visible_evicted_page_can_be_revisited)
         result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):

@@ -9,8 +9,12 @@ use rust_decimal::Decimal;
 
 use drivers_mssql::MssqlDriver;
 use shared_container::{assert_tmpfs_data_dir, start_mssql, start_mssql_durable};
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
+use tablepro_core::{
+    CatalogObjectKind, ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value,
+};
 
+#[path = "support/catalog_objects.rs"]
+mod catalog_objects;
 #[path = "support/column_defaults.rs"]
 mod column_defaults;
 #[path = "../../shared/connect_refusal.rs"]
@@ -39,43 +43,6 @@ async fn an_unavailable_sql_server_is_classified_as_connection_refused() {
 
 async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
     MssqlDriver.connect(opts).await.expect("connect")
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn connect_list_tables_pk_and_identity() {
-    let (_c, opts) = start_mssql().await;
-    let conn = connect(opts).await;
-
-    conn.execute(
-        "CREATE TABLE pk_demo (
-            id int IDENTITY(1,1) PRIMARY KEY,
-            name nvarchar(255) NOT NULL,
-            note nvarchar(max) NULL
-        )",
-    )
-    .await
-    .unwrap();
-    conn.execute("INSERT INTO pk_demo (name, note) VALUES (N'a', NULL), (N'b', N'second')")
-        .await
-        .unwrap();
-
-    let tables = conn.list_tables().await.unwrap();
-    assert!(tables.iter().any(|t| t.name == "pk_demo"));
-
-    let cols = conn.fetch_columns(None, "pk_demo").await.unwrap();
-    assert_eq!(cols.len(), 3);
-    let id_col = cols.iter().find(|c| c.name == "id").unwrap();
-    assert!(id_col.primary_key, "id must be detected as primary key");
-    assert!(id_col.is_auto_increment, "IDENTITY must flag auto-increment");
-    assert!(!id_col.nullable);
-    let note_col = cols.iter().find(|c| c.name == "note").unwrap();
-    assert!(!note_col.primary_key);
-    assert!(note_col.nullable);
-
-    let result = conn.fetch_rows(None, "pk_demo", 0, 100).await.unwrap();
-    assert_eq!(result.rows.len(), 2);
-    assert!(!result.truncated);
 }
 
 #[tokio::test]

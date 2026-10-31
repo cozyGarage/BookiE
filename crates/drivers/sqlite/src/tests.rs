@@ -128,6 +128,27 @@ async fn a_value_that_does_not_match_its_declared_column_type_keeps_its_text_ins
 }
 
 #[tokio::test]
+async fn lists_tables_and_views_separately() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("views.db");
+    let conn = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    conn.execute("CREATE TABLE items (id INTEGER)").await.unwrap();
+    conn.execute("CREATE VIEW item_view AS SELECT id FROM items")
+        .await
+        .unwrap();
+    let tables = conn.list_tables().await.unwrap();
+    let views = conn.list_views().await.unwrap();
+    assert_eq!(
+        tables.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
+        ["items"]
+    );
+    assert_eq!(
+        views.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
+        ["item_view"]
+    );
+}
+
+#[tokio::test]
 async fn connect_create_and_list_tables() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("test.db");

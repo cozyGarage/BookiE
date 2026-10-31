@@ -19,6 +19,13 @@ impl CancellableDialog {
             .margin_start(24)
             .margin_end(24)
             .build();
+        content.update_property(&[gtk::accessible::Property::Label(title)]);
+        let heading = gtk::Label::builder()
+            .label(title)
+            .wrap(true)
+            .css_classes(["title-3"])
+            .build();
+        content.append(&heading);
         for widget in body {
             content.append(*widget);
         }
@@ -51,5 +58,36 @@ impl CancellableDialog {
 
     pub(crate) fn close(&self) {
         self.dialog.force_close();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn progress_dialog_displays_and_names_its_operation() {
+        gtk::init().unwrap();
+        adw::init().unwrap();
+        let application = gtk::Application::new(None::<&str>, gtk::gio::ApplicationFlags::NON_UNIQUE);
+        application.register(None::<&gtk::gio::Cancellable>).unwrap();
+        let window = adw::ApplicationWindow::new(&application);
+        window.present();
+        for title in ["Backing up example", "Restoring example", "Importing into example"] {
+            let spinner = gtk::Spinner::new();
+            let progress = CancellableDialog::present(&window, title, &[spinner.upcast_ref()]);
+            let dialog = progress.dialog();
+            let content = dialog.child().unwrap();
+            let first = content.first_child().unwrap();
+            let heading = first.downcast::<gtk::Label>().expect("visible operation title");
+            assert_eq!(heading.label(), title);
+            assert!(gtk::test_accessible_has_property(
+                &content,
+                gtk::AccessibleProperty::Label
+            ));
+            progress.close();
+        }
+        window.close();
     }
 }

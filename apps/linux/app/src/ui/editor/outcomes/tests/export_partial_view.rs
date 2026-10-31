@@ -29,6 +29,7 @@ fn exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values() {
         export: Some(request.clone()),
         generation: 0,
         spool: None,
+        resident_pages: Default::default(),
     };
     let outcome = super::super::StatementOutcome {
         identity: StatementIdentity {

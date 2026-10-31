@@ -12,7 +12,6 @@ REFERENCES = (
     ("AGENTS.md", "scripts/preflight.sh", "preflight.sh", "file"),
     ("AGENTS.md", "scripts/check-doc-links.py", "check-doc-links.py", "file"),
     ("AGENTS.md", "scripts/check-known-issues.py", "check-known-issues.py", "file"),
-    ("AGENTS.md", "scripts/forgejo-gate.sh", "forgejo-gate.sh", "file"),
 )
 
 

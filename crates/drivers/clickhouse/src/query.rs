@@ -1,5 +1,5 @@
 use super::{ROW_FORMAT, map_clickhouse_error};
-use tablepro_core::DriverError;
+use tablepro_core::{DriverError, MAX_QUERY_RESULT_BYTES};
 
 pub(super) enum RowCell {
     StringBytes(Vec<u8>),
@@ -42,12 +42,27 @@ impl LineReader {
                 Some(chunk) => {
                     self.buf.drain(..self.consumed);
                     self.consumed = 0;
-                    self.buf.extend_from_slice(&chunk);
+                    append_chunk(&mut self.buf, &chunk)?;
                 }
                 None => self.eof = true,
             }
         }
     }
+}
+
+pub(super) fn append_chunk(buffer: &mut Vec<u8>, chunk: &[u8]) -> Result<(), DriverError> {
+    check_line_cap(buffer.len().saturating_add(chunk.len()))?;
+    buffer.extend_from_slice(chunk);
+    Ok(())
+}
+
+pub(super) fn check_line_cap(pending_bytes: usize) -> Result<(), DriverError> {
+    if pending_bytes > MAX_QUERY_RESULT_BYTES {
+        return Err(DriverError::Unsupported(
+            "the server sent more than 64 MiB without ending a row; use a row-per-line output format".into(),
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn parse_line<T: serde::de::DeserializeOwned>(line: &[u8]) -> Result<T, DriverError> {

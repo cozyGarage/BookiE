@@ -2,7 +2,6 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-03
-- **Origin**: Approved sprint A4/B2 and its migration/compatibility rules.
 
 ## Context
 
@@ -16,7 +15,7 @@ Version persisted formats and validate supported versions. Before upgrading pref
 
 GSettings preferences/geometry retain their JSON fallback and rollback mirrors. Whole-document `StateFile` and locked per-connection `WorkspaceStore` merges remain different writer contracts. Coalescing must preserve ordering and settle flush waiters; a whole-map replacement must not lose another window's entries. Shutdown must flush persistence and settle governed operations.
 
-Operational restoration steps belong in [storage](../storage.md) and [state management](../state-management.md), with the prior draft restoration procedure retained in [sprint history](../archive/bookie-0.2-history.md#workspace-rollback-procedure). Native installed upgrade and rollback acceptance remains open under [PKG-1 / #574](../backlog.md#post-release-acceptance-follow-ups); a published tag does not prove it.
+Operational restoration steps belong in [storage](../storage.md) and [state management](../state-management.md).
 
 ## Rationale
 
