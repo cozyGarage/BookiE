@@ -466,4 +466,4 @@ fn connections_path() -> Result<PathBuf, StorageError> {
 
 #[cfg(test)]
 #[path = "connections_tests.rs"]
-mod tests;
+pub(super) mod tests;
