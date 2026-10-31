@@ -5,7 +5,7 @@ use tablepro_core::{ColumnInfo, Value};
 use super::context_menu::GridMenus;
 use super::display::{
     COLUMN_SLOT, CellView, FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT,
-    ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view, value_to_full_edit_text,
+    ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view_with_column_editability, value_to_full_edit_text,
 };
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
 pub(super) use super::presentation::column_is_editable as is_cell_editable;
@@ -136,6 +136,7 @@ pub(super) fn build_column(
 
     let editable_for_bind = editable && sender.is_some();
     let column_info = info.clone();
+    let column_is_editable = is_cell_editable(info);
     let tab_ctx_for_bind = tab_ctx.clone();
     factory.connect_bind(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
@@ -172,7 +173,7 @@ pub(super) fn build_column(
         let value = value_for_bind(&row, idx, preview.as_ref(), updated_value);
         let view = match (preview.as_ref(), value.as_ref()) {
             (Some(preview), _) => CellView::from_preview(preview),
-            (None, Some(value)) => cell_view(value, &column_info),
+            (None, Some(value)) => cell_view_with_column_editability(value, &column_info, column_is_editable),
             (None, None) => return,
         };
         let is_null = view.is_null;
