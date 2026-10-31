@@ -66,6 +66,7 @@ async fn mongodb_guarded_refetch_preserves_long_text_and_binary_values() {
         columns: &columns,
         filter: &tablepro_core::FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     assert_refetched_value(
         &target,

@@ -25,14 +25,20 @@ serde_json.workspace = true
 tiberius.workspace = true
 tracing.workspace = true
 tokio.workspace = true
+socket2 = { version = "0.6", features = ["all"] }
 tokio-util = { workspace = true, features = ["compat"] }
 
 [dev-dependencies]
+tablepro-app-services = { path = "../../app-services" }
 secrecy.workspace = true
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mssql_server"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 uuid.workspace = true
+
+# The shared exact-grid test is included by path and imports this crate.
+[package.metadata.cargo-shear]
+ignored = ["tablepro-app-services"]
 
 [lints]
 workspace = true

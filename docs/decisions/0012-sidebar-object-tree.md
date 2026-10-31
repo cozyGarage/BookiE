@@ -2,12 +2,10 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-07
-- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0012-show-database-objects-in-a-collapsible-sidebar-tree)
-- **Clarified**: 2026-10-15 for status. The Decision describes the target design; the Implementation status section records what has shipped. The sidebar still uses a `GtkListBox`.
 
 ## Context
 
-The sidebar is one `GtkListBox` fed by a Relm4 factory. Schema and Views headers are list headers, and each header belongs to the first row below it. Hiding rows with the list filter therefore hides the header and its controls, so groups cannot be collapsed (UI-11). Routines, sequences, types and the other catalog objects are reachable only through the Catalog dialog, and the dialog is a flat list per kind.
+The sidebar is one `GtkListBox` fed by a Relm4 factory. Schema and Views headers are list headers, and each header belongs to the first row below it. Hiding rows with the list filter therefore hides the header and its controls, so groups cannot be collapsed. Routines, sequences, types and the other catalog objects are reachable only through the Catalog dialog, and the dialog is a flat list per kind.
 
 ## Decision
 
@@ -22,17 +20,12 @@ Replace the list with a `GtkListView` over a `GtkTreeListModel`.
 
 ## Alternatives considered
 
-- **Keep the `GtkListBox` and hide rows with the list filter.** Rejected as the target. A header belongs to the first row below it, so filtering hides the header and its controls and groups cannot collapse (UI-11). The shipped slice keeps the `GtkListBox` with an explicit tree-node model as a step, not as the end state.
+- **Keep the `GtkListBox` and hide rows with the list filter.** Rejected as the target. A header belongs to the first row below it, so filtering hides the header and its controls and groups cannot collapse. The current `GtkListBox` implementation does not provide collapsible groups.
 - **Leave catalog objects only in the Catalog dialog.** Rejected. A flat list per kind makes Routines, Sequences and Types unreachable in context.
 - **A generic docking or panel framework.** Not adopted. Add one only when concrete behaviours need it. The existing editor split supports the identified results and error panel work; a generic framework is not required for it.
 
 ## Consequences
 
-- The factory, filter and selection sync are rewritten. The sidebar tests (`sync_sidebar_selection`, the search filter and the header actions) move to the new model first and fail before the swap.
-- AT-SPI sees tree rows and expanders, so the installed scenarios that find sidebar entries by name need their roles updated.
-- Catalog objects become browsable in place, which closes the sidebar half of UI-11 and part of UI-23.
-
-## Open questions
-
-- Whether schemas of a single-schema connection show as a root row or are flattened, as today.
-- Whether grants and roles belong in the tree or stay in the Catalog dialog.
+- Replacing the list requires a tree model, filtering and selection synchronization that preserve existing navigation actions.
+- Accessibility roles and names must continue to describe rows and expanders.
+- Catalog objects become browsable in place, which makes additional catalog objects available in context.

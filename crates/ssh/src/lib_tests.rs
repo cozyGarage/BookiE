@@ -400,3 +400,17 @@ fn only_resource_exhaustion_and_aborted_connections_are_transient_accept_errors(
         assert!(!is_transient_accept_error(&fatal), "{fatal:?}");
     }
 }
+
+#[test]
+fn agent_signing_failures_are_not_reported_as_server_attempt_limits() {
+    let error = russh::AgentAuthError::Key(russh::keys::Error::KeyIsEncrypted);
+    assert!(matches!(
+        super::agent_auth_error(error, 2, 8),
+        super::SshError::Agent(_)
+    ));
+    let error = russh::AgentAuthError::Send(russh::SendError {});
+    assert!(matches!(
+        super::agent_auth_error(error, 2, 8),
+        super::SshError::AgentKeyLimit { refused: 2, total: 8 }
+    ));
+}

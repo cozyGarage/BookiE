@@ -72,8 +72,15 @@ const ADMINISTRATIVE_FUNCTIONS: &[&str] = &[
     "pg_stat_statements_reset",
 ];
 
-const ADMINISTRATIVE_FUNCTION_PREFIXES: &[&str] =
-    &["pg_ls_", "pg_logical_", "pg_replication_", "pg_stat_reset", "crosstab"];
+const ADMINISTRATIVE_FUNCTION_PREFIXES: &[&str] = &[
+    "pg_ls_",
+    "pg_logical_",
+    "pg_replication_",
+    "pg_copy_logical_replication_slot",
+    "pg_copy_physical_replication_slot",
+    "pg_stat_reset",
+    "crosstab",
+];
 
 pub(crate) fn is_administrative_function_name(name: &str) -> bool {
     let lowered = name.to_ascii_lowercase();
