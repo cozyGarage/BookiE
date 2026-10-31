@@ -156,7 +156,18 @@ fn format_explain_result(result: &tablepro_core::QueryResult) -> String {
     if result.rows.is_empty() {
         return String::from("(empty plan)");
     }
-    let mut lines = Vec::with_capacity(result.rows.len());
+    let tabular = result.columns.len() > 1 || result.rows.iter().any(|row| row.len() > 1);
+    let mut lines = Vec::with_capacity(result.rows.len() + usize::from(tabular));
+    if tabular && !result.columns.is_empty() {
+        lines.push(
+            result
+                .columns
+                .iter()
+                .map(|column| column.name.as_str())
+                .collect::<Vec<_>>()
+                .join(" | "),
+        );
+    }
     for row in &result.rows {
         let cells: Vec<String> = row.iter().map(crate::ui::grid::value_to_display_text).collect();
         if cells.len() == 1 {
@@ -171,6 +182,71 @@ fn format_explain_result(result: &tablepro_core::QueryResult) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tablepro_core::{ColumnInfo, QueryResult, Value};
+
+    fn column(name: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: name.into(),
+            data_type: "text".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn a_mysql_explain_text_plan_starts_with_a_column_header_line() {
+        let result = QueryResult {
+            columns: vec![
+                column("id"),
+                column("select_type"),
+                column("table"),
+                column("type"),
+                column("key"),
+                column("rows"),
+                column("Extra"),
+            ],
+            rows: vec![vec![
+                Value::Int(1),
+                Value::Text("SIMPLE".into()),
+                Value::Text("c".into()),
+                Value::Text("const".into()),
+                Value::Text("PRIMARY".into()),
+                Value::Int(1),
+                Value::Text("Using index".into()),
+            ]],
+            truncated: false,
+        };
+        let text = format_explain_result(&result);
+        let mut lines = text.lines();
+        assert_eq!(
+            lines.next(),
+            Some("id | select_type | table | type | key | rows | Extra")
+        );
+        assert_eq!(
+            lines.next(),
+            Some("1 | SIMPLE | c | const | PRIMARY | 1 | Using index")
+        );
+    }
+
+    #[test]
+    fn a_single_column_text_plan_keeps_rows_only() {
+        let result = QueryResult {
+            columns: vec![column("QUERY PLAN")],
+            rows: vec![vec![Value::Text("Seq Scan on t  (cost=0.00..1.00 rows=1)".into())]],
+            truncated: false,
+        };
+        assert_eq!(
+            format_explain_result(&result),
+            "Seq Scan on t  (cost=0.00..1.00 rows=1)"
+        );
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
