@@ -39,6 +39,7 @@ pub(crate) async fn dispatch_structured(
     name: &str,
     args: JsonValue,
 ) -> Result<JsonValue, McpToolError> {
+    bridge.check_rate(token)?;
     match name {
         "list_connections" => {
             let list = bridge.list_connections(token).await?;
