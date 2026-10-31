@@ -863,6 +863,78 @@ GLib.MainLoop().run()
     def app_memory_kb():
         return ui.owned_application().memory_kb()
 
+    def app_memory_profile_kb():
+        application = ui.owned_application()
+        application.memory_kb()
+        process = application.process
+        fields = {}
+        with open(f"/proc/{process.pid}/smaps_rollup", encoding="utf-8") as memory:
+            for line in memory:
+                if ":" in line:
+                    name, value = line.split(":", 1)
+                    fields[name] = int(value.split()[0])
+        application.memory_kb()
+        return {
+            "rss_kib": fields["Rss"],
+            "pss_kib": fields["Pss"],
+            "private_kib": fields["Private_Clean"] + fields["Private_Dirty"],
+        }
+
+    def profile_streamed_pin_retention(database, base):
+        rows = int(os.environ.get("TABLEPRO_PROFILE_STREAM_ROWS", "34000"))
+        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_STREAM_CELL_BYTES", "2048"))
+        repetitions = int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1"))
+        if not 34_000 <= rows <= 40_000 or not 1_024 <= payload_bytes <= 4_096:
+            raise ValueError("stream profile rows or payload size are outside their bounded workload")
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        samples = [{"stage": "baseline", **app_memory_profile_kb()}]
+        runs = []
+        for index in range(5):
+            result_rows = rows + index * 1_000
+            marker = f"retention-{repetitions}-{index + 1}"
+            if index == 0:
+                ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+            else:
+                ui.invoke_accessible_action("win.open-editor")
+            ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+            started = time.monotonic()
+            query = (
+                "SELECT value AS id, "
+                f"'{marker}' AS run_marker, repeat('x', {payload_bytes}) AS payload "
+                f"FROM generate_series(1, {result_rows}) AS value"
+            )
+            ui.set_editor_text(query)
+            ui.invoke(ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name=marker, role=pyatspi.ROLE_LABEL, timeout=180)
+            ui.wait_for_node_containing(f"Received {result_rows} rows", timeout=180)
+            elapsed_seconds = round(time.monotonic() - started, 2)
+            ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
+            sample = {"stage": f"after_streamed_editor_{index + 1}", **app_memory_profile_kb()}
+            samples.append(sample)
+            runs.append({
+                "marker": marker,
+                "rows": result_rows,
+                "payload_bytes": payload_bytes,
+                "run_seconds": elapsed_seconds,
+                "pin_count": 1,
+                **sample,
+            })
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a", encoding="utf-8") as out:
+            out.write(json.dumps({
+                **ui.owned_application().identity(),
+                "profile_mode": "postgres-stream-pin-retention-across-editors",
+                "repetition": repetitions,
+                "configured_rows_per_result": rows,
+                "payload_bytes_per_row": payload_bytes,
+                "result_count": len(runs),
+                "editor_count": len(runs),
+                "pins_per_editor": 1,
+                "runs": runs,
+                "memory_samples": samples,
+            }) + "\n")
+
     def a_second_launch_raises_the_window_and_exits_cleanly(database, base):
         result = ui.owned_application().launch_again()
         assert result.returncode == 0, (result.returncode, result.stderr)
@@ -2552,6 +2624,8 @@ GLib.MainLoop().run()
         result.append(postgres_visible_evicted_page_can_be_revisited)
         result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
+        if os.environ.get("TABLEPRO_PROFILE_STREAM_PINS"):
+            result.append(profile_streamed_pin_retention)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
         result.append(postgres_saved_mtls_connection_authenticates_and_queries)
         result.append(postgres_structure_tabs_keep_backend_count_bounded)
