@@ -25,15 +25,16 @@ mod read_only_session;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
-#[path = "support/result_sets.rs"]
-mod result_sets;
-
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;
 #[path = "shared/mysql_trigger_errors.rs"]
 mod mysql_trigger_errors;
+#[path = "support/result_sets.rs"]
+mod result_sets;
 #[path = "support/schema_introspection.rs"]
 mod schema_introspection;
+#[path = "support/views.rs"]
+mod views;
 
 #[path = "shared/mysql_atomic_assertions.rs"]
 mod mysql_atomic_assertions;
@@ -589,6 +590,20 @@ async fn value_roundtrip_all_types() {
         v => panic!("expected json, got {v:?}"),
     }
     assert_eq!(row[15], Value::Null);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn explain_returns_its_plan_rows() {
+    let (_c, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+
+    conn.execute("CREATE TABLE plan_src (i int PRIMARY KEY)").await.unwrap();
+    conn.execute("INSERT INTO plan_src VALUES (1),(2)").await.unwrap();
+
+    let plan = conn.query("EXPLAIN SELECT * FROM plan_src WHERE i = 1").await.unwrap();
+    assert!(!plan.columns.is_empty());
+    assert_eq!(plan.rows.len(), 1);
 }
 
 #[tokio::test]

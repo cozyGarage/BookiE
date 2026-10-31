@@ -128,7 +128,7 @@ fn optimistic_updates_compare_the_original_value_with_null_safe_dialect_syntax()
     columns[1].nullable = true;
     for (driver, expected) in [
         ("postgres", "\"payload\" IS NOT DISTINCT FROM $3"),
-        ("sqlite", "\"payload\" IS NOT DISTINCT FROM ?"),
+        ("sqlite", "\"payload\" COLLATE BINARY IS NOT DISTINCT FROM ?"),
         ("mysql", "`payload` <=> ?"),
         ("mssql", "([payload] = @P3 OR ([payload] IS NULL AND @P4 IS NULL))"),
     ] {
@@ -239,4 +239,93 @@ fn keyed_value_select_requires_a_primary_key_and_existing_column() {
         build_keyed_value_select("postgres", None, "records", &keyed, 1, &[Value::Int(1)]),
         Err(crate::sql_dialect::BuildSqlError::StaleColumns)
     ));
+}
+
+#[test]
+fn single_precision_original_values_are_widened_the_way_the_server_compares_them() {
+    let mut columns = [column("id", true), column("ratio", false)];
+    for (driver, data_type) in [("mysql", "float"), ("mysql", "float unsigned"), ("mssql", "real")] {
+        columns[1].data_type = data_type.into();
+        let (_, params) = build_optimistic_keyed_update(
+            driver,
+            None,
+            "records",
+            &columns,
+            &[(1, Value::Float(0.1), Value::Float(0.2))],
+            &[Value::Int(7)],
+        )
+        .unwrap();
+        assert_eq!(
+            params.last(),
+            Some(&Value::Float(f64::from(0.1_f32))),
+            "{driver} {data_type}"
+        );
+    }
+    columns[1].data_type = "double".into();
+    let (_, params) = build_optimistic_keyed_update(
+        "mysql",
+        None,
+        "records",
+        &columns,
+        &[(1, Value::Float(0.1), Value::Float(0.2))],
+        &[Value::Int(7)],
+    )
+    .unwrap();
+    assert_eq!(params.last(), Some(&Value::Float(0.1)));
+}
+
+#[test]
+fn mysql_empty_text_is_written_and_compared_as_a_server_expression() {
+    let columns = [column("id", true), column("note", false)];
+    let (sql, params) = build_optimistic_keyed_update(
+        "mysql",
+        None,
+        "records",
+        &columns,
+        &[(1, Value::Text(String::new()), Value::Text(String::new()))],
+        &[Value::Int(7)],
+    )
+    .unwrap();
+    assert_eq!(
+        sql,
+        "UPDATE `records` SET `note` = SPACE(0) WHERE `id` = ? AND CAST(CONVERT(`note` USING utf8mb4) AS BINARY) <=> CAST(SPACE(0) AS BINARY)"
+    );
+    assert_eq!(params, vec![Value::Int(7)]);
+}
+
+#[test]
+fn original_text_keys_are_guarded_without_changing_the_key_lookup() {
+    let columns = [column("id", true), column("payload", false)];
+    for driver in ["postgres", "sqlite", "mysql", "mssql"] {
+        let (sql, params) = build_optimistic_keyed_update(
+            driver,
+            None,
+            "records",
+            &columns,
+            &[(1, Value::Null, Value::Text("edited".into()))],
+            &[Value::Text("Ada".into())],
+        )
+        .unwrap();
+        assert_eq!(params[1], Value::Text("Ada".into()));
+        assert_eq!(params[2], Value::Text("Ada".into()));
+        assert!(!sql.contains("Ada"));
+    }
+}
+
+#[test]
+fn original_postgres_json_text_keeps_source_identity() {
+    let mut columns = [column("id", true), column("payload", false)];
+    columns[1].data_type = "json".into();
+    let original = Value::JsonText("{\"a\":1,\"a\":2}".into());
+    let (sql, params) = build_optimistic_keyed_update(
+        "postgres",
+        None,
+        "records",
+        &columns,
+        &[(1, original.clone(), Value::JsonText("{}".into()))],
+        &[Value::Int(7)],
+    )
+    .unwrap();
+    assert!(!sql.contains("jsonb"));
+    assert_eq!(params.last(), Some(&original));
 }

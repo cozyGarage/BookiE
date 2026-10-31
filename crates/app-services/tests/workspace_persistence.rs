@@ -21,10 +21,7 @@ fn an_explicit_workspace_path_survives_flush_and_a_fresh_store() {
             ..Default::default()
         },
     );
-    assert_eq!(
-        store.flush().recv_timeout(std::time::Duration::from_secs(5)).unwrap(),
-        Ok(())
-    );
+    assert_eq!(flush(&store), Ok(()));
     let restored = WorkspaceStore::new(Some(path.clone()), drafts);
     restored.prefetch_connections(&[id]).unwrap();
     let state = restored.load_connection(id).unwrap();

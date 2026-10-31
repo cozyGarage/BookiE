@@ -394,11 +394,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        let combined = statements
-            .iter()
-            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
-            .collect::<Vec<_>>()
-            .join(";\n");
+        let combined = batch_text(statements);
         let authorization = self.authorize(&combined, true, None).await?;
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
@@ -429,11 +425,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<Vec<u64>, DriverError> {
         check_pre_dispatch(control)?;
-        let combined = statements
-            .iter()
-            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
-            .collect::<Vec<_>>()
-            .join(";\n");
+        let combined = batch_text(statements);
         let authorization = self.authorize(&combined, true, Some(control)).await?;
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
@@ -469,11 +461,7 @@ impl Connection for PolicyGuard {
         if expect_one.is_empty() {
             return self.execute_in_transaction(statements).await;
         }
-        let combined = statements
-            .iter()
-            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
-            .collect::<Vec<_>>()
-            .join(";\n");
+        let combined = batch_text(statements);
         let analysis = self.analyze_statement(&combined);
         let enforced_rows = self.enforced_batch_rows(&analysis, expect_one);
         let authorization = self
@@ -514,11 +502,7 @@ impl Connection for PolicyGuard {
             return self.execute_in_transaction_controlled(statements, control).await;
         }
         check_pre_dispatch(control)?;
-        let combined = statements
-            .iter()
-            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
-            .collect::<Vec<_>>()
-            .join(";\n");
+        let combined = batch_text(statements);
         let analysis = self.analyze_statement(&combined);
         let enforced_rows = self.enforced_batch_rows(&analysis, expect_one);
         let authorization = self
@@ -864,7 +848,7 @@ where
 #[async_trait]
 impl Transaction for PolicyTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -877,7 +861,10 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -890,7 +877,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn query_params(&mut self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -908,7 +895,10 @@ impl Transaction for PolicyTransaction {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -921,7 +911,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -945,7 +935,10 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -972,7 +965,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute_params(&mut self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -1004,7 +997,10 @@ impl Transaction for PolicyTransaction {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -1189,4 +1185,12 @@ impl Transaction for PolicyTransaction {
         pending_write.disarm();
         result
     }
+}
+
+fn batch_text(statements: &[(String, Vec<Value>)]) -> String {
+    statements
+        .iter()
+        .map(|(sql, _)| sql.trim().trim_end_matches(';'))
+        .collect::<Vec<_>>()
+        .join("\n;\n")
 }

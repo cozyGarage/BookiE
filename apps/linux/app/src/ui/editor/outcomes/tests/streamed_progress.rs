@@ -20,6 +20,7 @@ fn streamed_progress_pluralizes_rows_and_pages_independently() {
             export: None,
             generation: 0,
             spool: None,
+            resident_pages: Default::default(),
         };
         let text = super::super::stream_result_view::stream_progress_text(&result);
         assert_eq!(text, expected);

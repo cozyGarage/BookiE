@@ -26,22 +26,23 @@ pub async fn read_schema(
     control: &OperationControl,
     mut progress: impl FnMut(usize, usize),
 ) -> Result<SchemaRead, DriverError> {
-    let mut names: Vec<&str> = tables.iter().map(|table| table.name.as_str()).collect();
-    names.sort_unstable();
-    let total_tables = names.len();
-    names.truncate(MAX_TABLES);
+    let mut tables: Vec<_> = tables.iter().collect();
+    tables.sort_unstable_by(|a, b| a.name.cmp(&b.name).then_with(|| a.schema.cmp(&b.schema)));
+    let total_tables = tables.len();
+    tables.truncate(MAX_TABLES);
     let mut read = SchemaRead {
         total_tables,
         foreign_keys_supported: capabilities.supports_foreign_key_metadata,
         ..SchemaRead::default()
     };
-    let wanted = names.len();
-    for (done, name) in names.into_iter().enumerate() {
+    let wanted = tables.len();
+    for (done, table) in tables.into_iter().enumerate() {
         check_pre_dispatch(control)?;
-        match read_table(connection, schema, name, capabilities, control).await {
+        let table_schema = table.schema.as_deref().or(schema);
+        match read_table(connection, table_schema, &table.name, capabilities, control).await {
             Ok(table) => read.reads.push(table),
             Err(error @ (DriverError::Cancelled | DriverError::TimedOut)) => return Err(error),
-            Err(_) => read.skipped.push(name.to_string()),
+            Err(_) => read.skipped.push(table.name.clone()),
         }
         progress(done + 1, wanted);
     }

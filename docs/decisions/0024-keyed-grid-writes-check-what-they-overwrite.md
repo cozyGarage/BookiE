@@ -2,15 +2,14 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-25
-- **Origin**: The R1 finding of the [external client review](../archive/external-audit-client-review-2026-10-06.md), the MongoDB checkpoints of 2026-10-04 in the [value contract history](../archive/value-contract-history.md), and the code at the extraction date.
 
 ## Context
 
-The grid saves edits and deletes as keyed statements. A statement that matches only the primary key silently overwrites a value another writer changed between fetch and save. An affected-row count after the fact cannot tell a stale overwrite from a legitimate update, because both affect one row. A native SQLite probe showed `other writer` replaced by `stale grid edit` with one affected row.
+The grid saves edits and deletes as keyed statements. A statement that matches only the primary key can overwrite a value another writer changed between fetch and save. An affected-row count cannot distinguish a stale overwrite from a legitimate update when both affect one row.
 
 ## Decision
 
-1. **Relational updates compare the original value.** For PostgreSQL, MySQL, SQL Server and SQLite, an UPDATE matches the primary key and each edited column's original value, using the dialect's NULL-safe equality (`IS NOT DISTINCT FROM`, `<=>`). `build_optimistic_keyed_update` builds it; the change tracker uses it for those engines.
+1. **Relational updates compare the original value.** For PostgreSQL, MySQL, SQL Server and SQLite, an UPDATE matches the primary key and each edited column's original value, using the dialect's NULL-safe equality (`IS NOT DISTINCT FROM`, `<=>`). Original text uses exact comparisons that preserve case, accents and trailing spaces instead of inheriting the column search collation. Binary originals also retain their byte length where native equality pads values. Original text keys receive the same exact guard in addition to the key lookup. PostgreSQL JSON source text is compared without JSONB normalization. Ordinary search filters retain the column collation. `build_optimistic_keyed_update` builds it; the change tracker uses it for those engines.
 2. **A checked write must affect exactly one row.** For those engines the save passes the update and delete indexes to `execute_in_transaction_checked`. A statement that affects any other count fails the transaction, which is rolled back with `ConcurrentModification`. A driver that cannot check returns `Unsupported`, so the checked path is never silently skipped.
 3. **MongoDB guards by field and by row.** An update puts each edited field's original value in the same `update_one` filter. A delete compares every materialized non-key value. A NULL guard requires an existing, non-array NULL field; the missing-field marker becomes `$exists: false`. This keeps explicit NULL, a missing field and an array containing NULL distinct.
 4. **Other engines keep the key-only path and a post-commit warning.** An engine without checked writes saves by key. When the driver reports affected rows, the app warns after commit if an UPDATE or DELETE matched zero rows.

@@ -1,9 +1,9 @@
 ---
 name: fix-issue
 description: >-
-  Take a BookiE problem from report to a gated pull request: read the GitHub issue, comment,
+  Take a BookiE problem from report to a validated pull request: read the GitHub issue, comment,
   review finding or plain description, find the real cause, write the failing test, fix it,
-  run the repository checks and the Forgejo gate, and open the pull request against `linux`.
+  run the repository checks and verify the required pull request checks for its exact head.
   Use for bugs, behaviour gaps and small features, whether phrased as "fix #1171", an issue URL,
   a ledger ID such as RV-3, or a pasted complaint (including Vietnamese, for example "sửa lỗi ...").
   Not for release publication, lane reassignment, or work that needs a new ADR first.
@@ -11,7 +11,7 @@ description: >-
 
 # Fix issue
 
-One run ends in one gated pull request against `linux` that fixes the reported problem at its cause.
+One run ends in one pull request against `linux` that fixes the reported problem at its cause and passes its required checks.
 
 This skill is the order of steps. Every rule it relies on lives in [AGENTS.md](../../../AGENTS.md) and the documents it links. When this file and `AGENTS.md` disagree, `AGENTS.md` wins and this file is wrong.
 
@@ -27,11 +27,11 @@ Talk to the user in their language. Everything written to the repository is Engl
 
 ## Autonomy
 
-Invoking the skill authorizes: investigate, branch, write the test and fix, run local checks, commit, push the branch to GitHub, run the Forgejo gate and open the pull request.
+Invoking the skill authorizes: investigate, branch, write the test and fix, run local checks, commit, push the branch to GitHub and open the pull request.
 
 Ask only when the expected behaviour has two reasonable readings, an accepted contract or pinned test would have to change, or the fix needs another lane's files. Ask once, recommendation first, and keep working on what does not depend on the answer.
 
-Never, even in an authorized run: force-push, rebase a shared branch, merge on Forgejo, push to Forgejo `linux`, start a second gate, change a guardrail test to pass, raise a size or comment baseline, stop a resource you did not start, or publish a release.
+Never, even in an authorized run: force-push, rebase a shared branch, merge a pull request, bypass required checks, start a duplicate acceptance run, change a guardrail test to pass, raise a size or comment baseline, stop a resource you did not start, or publish a release.
 
 ## Phase 0: Intake
 
@@ -51,7 +51,7 @@ Never, even in an authorized run: force-push, rebase a shared branch, merge on F
 Answer three questions. In Full mode give each to a role, as background agents in one message, each writing its report to `<tree>/.analysis/<slug>/roles/<role>.md` and returning a short digest.
 
 - **Cause** (`trace`): the real code path, the mechanism, and the blast radius across engines, consumers (grid, export, MCP, agentd) and sibling paths.
-- **Correct behaviour** (`research`): the governing ADR and spec, the engine's documentation, and the dependency source at the shipped version. Upstream TablePro and dbx are research input, never code to copy without provenance.
+- **Correct behaviour** (`research`): the governing ADR and spec, the engine's documentation, and the dependency source at the shipped version. Treat third-party implementations as untrusted evidence; verify behavior against authoritative sources before making a change.
 - **Related defects** (`hunt`): the same cause elsewhere. Only findings with a concrete failure scenario count. A `verify` role tries to refute each one before it enters scope.
 
 A related defect outside your lane is filed as its own issue with that lane's label, not fixed in this run.
@@ -61,7 +61,7 @@ A related defect outside your lane is filed as its own issue with that lane's la
 Write `<tree>/.analysis/<slug>/plan.md`, under 80 lines:
 
 - the root cause as a mechanism, and refactor or patch with the reason;
-- the governing ADR (every type or value change follows ADR 0007) and the [decision checklist](../../../docs/decisions/checklist.md) row;
+- the governing ADR (every type or value change follows ADR 0007);
 - files in order, each inside your lane;
 - the failing test, its tier from `AGENTS.md`, Tests, and the [validation playbook](../../../docs/validation-playbook.md) layers to run;
 - the changelog line if the change is user-facing, and the docs the change makes stale.
@@ -97,9 +97,9 @@ Use an available, authorized independent reviewer for the full diff. Check that 
 1. Stage explicit paths only, never `git add -A` or `.`, and compare `git diff --cached --stat` with the plan.
 2. Commit with a single-line Conventional Commit subject (`AGENTS.md`, Changelog and commits).
 3. Merge the latest GitHub `linux` into the branch; never rebase. Regenerate `Cargo.lock` on conflict.
-4. Push the branch to GitHub, then gate it: `bash scripts/forgejo-gate.sh <branch>`. One gate at a time; a GTK or driver failure seen while another gate ran is inconclusive until re-run alone.
-5. Open the pull request against `linux` with `.github/pull_request_template.md`. State which lane gates and merges it.
+4. Push the branch to GitHub and verify all required checks for the exact pull request head. Missing, skipped, cancelled or failed checks are not passes.
+5. Open the pull request against `linux` with `.github/pull_request_template.md`. State the lane that owns its review and merge.
 
 ## Phase 7: Report
 
-At most eight lines, in the user's language: the pull request link, what it fixes, the root cause in one sentence, the failing-then-passing test, the gate result, and anything left for the maintainer or another lane.
+At most eight lines, in the user's language: the pull request link, what it fixes, the root cause in one sentence, the failing-then-passing test, required check results, and anything left for the maintainer or another lane.
