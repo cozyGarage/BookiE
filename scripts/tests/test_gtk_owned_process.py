@@ -127,6 +127,15 @@ class OwnedApplicationTests(unittest.TestCase):
     def test_profile_metadata_identifies_the_owned_process_lifetime(self):
         self.assertEqual(self.owner.identity(), {"application_pid": 202, "application_start_ticks": 17})
 
+    def test_cpu_samples_use_the_owned_process_user_and_system_times(self):
+        fields = ["S"] + ["0"] * 19
+        fields[11] = "25"
+        fields[12] = "75"
+        fields[19] = "17"
+        (self.root / "202/stat").write_text("202 (BookiE ) name) " + " ".join(fields))
+        with patch("os.sysconf", return_value=100):
+            self.assertEqual(self.owner.cpu_seconds(), 1.0)
+
     def listener_fixture(self, owner, state="0A"):
         net = self.root / "202/net"
         net.mkdir(exist_ok=True)

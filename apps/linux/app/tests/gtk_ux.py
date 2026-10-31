@@ -104,7 +104,7 @@ def x11_resize_window(width, height):
         x11.XCloseDisplay(display)
 
 
-def x11_click(window_x, window_y, button=3, clicks=1):
+def x11_click(window_x, window_y, button=3, clicks=1, interval=0.08):
     if gtk_input.uses_atspi_input():
         gtk_input.click(window_x, int(window_y) + ATSPI_WINDOW_Y_OFFSET, button, clicks)
         return
@@ -146,7 +146,7 @@ def x11_click(window_x, window_y, button=3, clicks=1):
             xtst.XTestFakeButtonEvent(display, button, 1, 0)
             xtst.XTestFakeButtonEvent(display, button, 0, 0)
             x11.XFlush(display)
-            time.sleep(0.08)
+            time.sleep(interval)
     finally:
         x11.XCloseDisplay(display)
 
@@ -906,26 +906,54 @@ GLib.MainLoop().run()
     def profile_large_result_in_the_grid(database, base):
         rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
         payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_CELL_BYTES", "0"))
+        text_mode = os.environ.get("TABLEPRO_PROFILE_TEXT_MODE", "unique")
+        layout = os.environ.get("TABLEPRO_PROFILE_LAYOUT", "narrow")
+        input_mode = os.environ.get("TABLEPRO_PROFILE_INPUT", "scrub")
+        if text_mode not in ("unique", "repeated") or layout not in ("narrow", "wide"):
+            raise ValueError("profile text mode or layout is unsupported")
+        if input_mode not in ("scrub", "wheel"):
+            raise ValueError("profile input mode is unsupported")
         if rows < 1 or (payload_bytes != 0 and not 8_193 <= payload_bytes <= 8 * 1024 * 1024):
             raise ValueError("profile rows and cell payload size are outside their supported bounds")
         if payload_bytes:
             profile_table_browse_payload(rows, payload_bytes)
             return
 
+        column_count = 6 if layout == "narrow" else 32
+        if rows * column_count > 10_000_000:
+            raise ValueError("profile result exceeds the bounded grid cell budget")
+
         def rss_sample():
             resident, high_water = app_memory_kb()
             return {"rss_mb": round(resident / 1024, 1), "peak_mb": round(high_water / 1024, 1)}
 
+        note_expression = (
+            "'a repeated note value with moderate length for every row'"
+            if text_mode == "repeated"
+            else "'a note of moderate length for row ' || x || ' to give text columns some weight'"
+        )
+        expressions = [
+            "x",
+            "'person-' || x",
+            "x * 1.5",
+            "x % 2",
+            "datetime('2026-01-01', '+' || (x % 100000) || ' seconds')",
+            note_expression,
+        ]
+        for index in range(7, column_count + 1):
+            value = f"'value-{index}-' || x" if text_mode == "unique" else f"'repeated value for column {index}'"
+            expressions.append(f"{value} AS extra_{index}")
         sql = (
             f"WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < {rows}) "
-            "SELECT x, 'person-' || x, x * 1.5, x % 2, datetime('2026-01-01', '+' || (x % 100000) || ' seconds'), "
-            "'a note of moderate length for row ' || x || ' to give text columns some weight' FROM c"
+            f"SELECT {', '.join(expressions)} FROM c"
         )
         before_rss, _ = app_memory_kb()
+        first_result_cpu_start = ui.owned_application().cpu_seconds()
         started = time.monotonic()
         ui.run_sql(sql)
         ui.wait_for_node_containing("done in", timeout=300)
         first_result_seconds = time.monotonic() - started
+        first_result_cpu_seconds = ui.owned_application().cpu_seconds() - first_result_cpu_start
         time.sleep(3)
         after_load = rss_sample()
 
@@ -971,6 +999,7 @@ GLib.MainLoop().run()
         upper = scrollbar.maximumValue
 
         def traverse_to(start_fraction, end_fraction, steps):
+            cpu_started = ui.owned_application().cpu_seconds()
             started_scroll = time.monotonic()
             for step in range(1, steps + 1):
                 fraction = start_fraction + (end_fraction - start_fraction) * step / steps
@@ -980,34 +1009,106 @@ GLib.MainLoop().run()
             sample = rss_sample()
             sample["visible_rows"] = visible_row_range()
             sample["scrollbar_value"] = round(scrollbar.currentValue, 2)
+            sample["cpu_seconds"] = round(ui.owned_application().cpu_seconds() - cpu_started, 3)
             return round(time.monotonic() - started_scroll, 3), sample
 
-        scroll_steps = int(os.environ.get("TABLEPRO_PROFILE_SCROLL_STEPS", str(min(20000, max(1000, rows // 10)))))
-        middle_steps = max(1, scroll_steps // 2)
-        middle_seconds, middle = traverse_to(0.0, 0.5, middle_steps)
-        end_seconds, end = traverse_to(0.5, 1.0, scroll_steps - middle_steps or 1)
-        top_seconds, top = traverse_to(1.0, 0.0, scroll_steps)
+        if input_mode == "scrub":
+            scroll_steps = int(os.environ.get("TABLEPRO_PROFILE_SCROLL_STEPS", str(min(20000, max(1000, rows // 10)))))
+            if not 2 <= scroll_steps <= 20000:
+                raise ValueError("profile scrollbar scrub steps are outside their supported bounds")
+            middle_steps = max(1, scroll_steps // 2)
+            middle_seconds, middle = traverse_to(0.0, 0.5, middle_steps)
+            end_seconds, end = traverse_to(0.5, 1.0, scroll_steps - middle_steps or 1)
+            top_seconds, top = traverse_to(1.0, 0.0, scroll_steps)
+            input_events = scroll_steps * 2
+            scroll_seconds = {"middle": middle_seconds, "end": end_seconds, "top": top_seconds}
+            scroll_cpu_seconds = {
+                "middle": middle["cpu_seconds"], "end": end["cpu_seconds"], "top": top["cpu_seconds"]
+            }
+        else:
+            visible_names = [
+                node for node in ui.descendants(application)
+                if ui.node_name(node) == "person-1"
+            ]
+            assert visible_names, "the first profile row has no accessible text label"
+            bounds = visible_names[0].queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+            assert not gtk_input.uses_atspi_input(), "wheel profile requires the X11/Xvfb input path"
+            pointer_x = int(bounds.x + max(1, bounds.width // 2))
+            pointer_y = int(bounds.y + max(1, bounds.height // 2))
+            wheel_events = int(os.environ.get("TABLEPRO_PROFILE_WHEEL_EVENTS", "40"))
+            wheel_delay = float(os.environ.get("TABLEPRO_PROFILE_WHEEL_DELAY_SECONDS", "0.08"))
+            if not 1 <= wheel_events <= 2000 or not 0 <= wheel_delay <= 0.5:
+                raise ValueError("profile wheel event count or delay is outside its supported bounds")
+            wheel_cpu_start = ui.owned_application().cpu_seconds()
+            wheel_started = time.monotonic()
+            x11_click(pointer_x, pointer_y, button=5, clicks=wheel_events, interval=wheel_delay)
+            time.sleep(1)
+            middle_seconds = round(time.monotonic() - wheel_started, 3)
+            middle_cpu_seconds = round(ui.owned_application().cpu_seconds() - wheel_cpu_start, 3)
+            middle = rss_sample()
+            middle["visible_rows"] = visible_row_range()
+            middle["scrollbar_value"] = round(scrollbar.currentValue, 2)
+            assert middle["visible_rows"] and middle["visible_rows"] != initial_visible, (
+                f"ordinary wheel input did not change visible rows: initial={initial_visible}, "
+                f"after={middle['visible_rows']}"
+            )
+            reverse_cpu_start = ui.owned_application().cpu_seconds()
+            reverse_started = time.monotonic()
+            x11_click(pointer_x, pointer_y, button=4, clicks=wheel_events, interval=wheel_delay)
+            time.sleep(1)
+            top_seconds = round(time.monotonic() - reverse_started, 3)
+            top_cpu_seconds = round(ui.owned_application().cpu_seconds() - reverse_cpu_start, 3)
+            top = rss_sample()
+            top["visible_rows"] = visible_row_range()
+            top["scrollbar_value"] = round(scrollbar.currentValue, 2)
+            scrollbar.set_currentValue(upper)
+            time.sleep(0.5)
+            end = rss_sample()
+            end["visible_rows"] = visible_row_range()
+            end["scrollbar_value"] = round(scrollbar.currentValue, 2)
+            scrollbar.set_currentValue(lower)
+            time.sleep(0.5)
+            top["verification_visible_rows"] = visible_row_range()
+            input_events = wheel_events * 2
+            scroll_seconds = {"wheel_down": middle_seconds, "wheel_up": top_seconds}
+            scroll_cpu_seconds = {"wheel_down": middle_cpu_seconds, "wheel_up": top_cpu_seconds}
         _, peak = app_memory_kb()
         result_status = sorted({
             ui.node_name(node) for node in ui.descendants(application)
             if any(word in ui.node_name(node).lower() for word in ("done in", "truncat"))
         })
+        final_visible_rows = visible_row_range()
+        responsive_probe_started = time.monotonic()
+        ui.run_sql("SELECT 918273 AS profile_responsive_probe")
+        ui.wait_for_node(name="918273", role=ui.pyatspi.ROLE_LABEL, timeout=30)
+        responsive_probe_seconds = round(time.monotonic() - responsive_probe_started, 3)
         line = json.dumps({
             **ui.owned_application().identity(),
+            "source_revision": os.environ.get("TABLEPRO_PROFILE_SOURCE_REVISION", "unknown"),
+            "binary_sha256": os.environ.get("TABLEPRO_PROFILE_BINARY_SHA256", "unknown"),
             "rows_requested": rows,
+            "columns_requested": column_count,
+            "text_mode": text_mode,
+            "layout": layout,
+            "input_mode": input_mode,
+            "input_events": input_events,
             "cell_payload_bytes": payload_bytes,
             "repetition": int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1")),
             "rows_loaded_inferred": end["visible_rows"][1] if end["visible_rows"] else None,
             "truncated_inferred": bool(end["visible_rows"] and end["visible_rows"][1] < rows),
+            "full_range_verified": bool(end["visible_rows"] and end["visible_rows"][1] >= rows),
             "result_status": result_status,
             "first_result_seconds": round(first_result_seconds, 2),
+            "first_result_cpu_seconds": round(first_result_cpu_seconds, 3),
             "rss_before_mb": round(before_rss / 1024, 1),
             "after_load": after_load, "after_middle": middle,
             "after_end": end, "after_return_top": top,
-            "scroll_seconds": {"middle": middle_seconds, "end": end_seconds, "top": top_seconds},
-            "visible_person_rows": visible_row_range(),
+            "scroll_seconds": scroll_seconds,
+            "scroll_cpu_seconds": scroll_cpu_seconds,
+            "visible_person_rows": final_visible_rows,
             "scrollbar_probes": probes,
             "peak_mb": round(peak / 1024, 1),
+            "responsive_run_probe_seconds": responsive_probe_seconds,
         })
         with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
             out.write(line + "\n")

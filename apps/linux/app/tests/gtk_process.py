@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import subprocess
 
@@ -49,6 +50,19 @@ class OwnedApplication:
             raise AssertionError("the owned application memory is unavailable") from None
         self._verify()
         return memory
+
+    def cpu_seconds(self):
+        self._verify()
+        try:
+            fields = (self.proc / "stat").read_text().rsplit(")", 1)[1].split()
+            ticks = int(fields[11]) + int(fields[12])
+            ticks_per_second = os.sysconf("SC_CLK_TCK")
+            if ticks_per_second <= 0:
+                raise ValueError
+        except (OSError, ValueError, IndexError):
+            raise AssertionError("the owned application CPU time is unavailable") from None
+        self._verify()
+        return ticks / ticks_per_second
 
     def identity(self):
         self._verify()
