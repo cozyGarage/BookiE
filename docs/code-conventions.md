@@ -142,6 +142,19 @@ These are the choices that have been made more than once. They are settled. If y
 
 When a question is answered twice in opposite directions, that is the signal to add a row here rather than to argue the third time.
 
+## Agent-facing defaults
+
+These restatements exist because coding agents regress on them; tooling already enforces most.
+
+- One public path per item inside a crate. Do not add a second `pub use` of the same type
+  under a shorter path "for convenience" during a refactor.
+- Tests assert observable behaviour or a real invariant. Do not assert that a constant equals
+  the same literal the production code defines.
+- Prefer `#[expect(lint_name, reason = "...")]` over `#[allow(...)]` when a suppression is
+  unavoidable; remove it when the cause goes. Never silence a lint for a whole crate.
+- After dependency or lock changes, let Cargo rewrite `Cargo.lock`. Do not patch lock entries
+  by hand.
+
 ## Changing a convention
 
 A convention change is its own commit, touching this document and the script that enforces it, with no behaviour change alongside it. A limit is lowered by fixing the code first and lowering the number in the same commit. A limit is not raised; the code is split instead.

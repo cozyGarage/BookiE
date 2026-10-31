@@ -56,6 +56,7 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 9. **Protected branch.** Merge only through the protected `linux` branch. Do not force-push or delete it. Resolve a non-fast-forward rejection by including the latest base before retrying.
 
 10. Never leave a background job, container or temporary resource running that you did not start, and never stop one you did not start. On shared systems, stop only resources you own.
+11. Keep the diff to the requested behaviour. No drive-by refactors, renames, formatting of untouched files, or edits to another lane's ledger/sprint/policy files.
 
 ## Principles
 
@@ -114,6 +115,17 @@ These apply to the GUI, the MCP server and `tablepro-agentd`.
 `rustfmt.toml`, `clippy.toml` and the workspace lints are authoritative; [code conventions](docs/code-conventions.md) settles function length, parameters, naming and extraction.
 
 - Rust edition 2024, Rust 1.98, line width 120.
+- Stack versions (verify in root `Cargo.toml` before calling APIs; do not invent methods):
+  gtk4 0.11, libadwaita 0.9, relm4 0.11, glib 0.22, sourceview5 0.11,
+  sqlx 0.9, russh 0.65, thiserror 2, tokio 1, secrecy 0.10.
+- Prefer borrowing (`&str`, `&[T]`) over owned inputs. Do not add `.clone()`, `Arc`, or `Rc`
+  only to silence the borrow checker; change the signature or stop and ask.
+- Do not erase types to compile (`serde_json::Value` or `Box<dyn Any>` through a typed
+  boundary). Do not invent crate APIs; read this workspace or the installed crate sources.
+- Do not raise size, comment-line or panic-site baselines. Do not add `#[allow(...)]` to
+  dodge Clippy; fix the code. A narrow `#[expect(lint, reason = "...")]` is the last resort.
+- Done means the Validation scripts that apply to the change have been run (or named as
+  blocked). `cargo check` alone is not done. Never hand-edit `Cargo.lock`; regenerate it.
 - No comments or doc comments, except the external-system rule above. A Rust file may not gain comment lines (`check-comment-lines.py`, baselines in `baselines/comment-line-baselines.txt`); after deleting comments run `python3 scripts/check-comment-lines.py --update` to lower them.
 - Early returns; at most three levels of indentation in a function body.
 - A function body is at most 60 lines (`check-function-size.py`, baselines in `baselines/function-size-baselines.txt`: lower a count when you split, never raise one). Rust files stay under 1,200 lines (`check-file-size.sh`, baselines in `baselines/file-size-baselines.txt`: split before growing a listed file).
