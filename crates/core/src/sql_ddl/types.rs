@@ -502,7 +502,10 @@ SELECT dc.name FROM sys.default_constraints dc \
 JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id \
 WHERE dc.parent_object_id = OBJECT_ID('{table_literal}') AND c.name = '{column_literal}'); \
 IF @default_constraint IS NOT NULL \
-EXEC('ALTER TABLE {table_literal} DROP CONSTRAINT ' + QUOTENAME(@default_constraint))"
+BEGIN \
+DECLARE @drop_default_sql nvarchar(max) = N'ALTER TABLE {table_literal} DROP CONSTRAINT ' + QUOTENAME(@default_constraint); \
+EXEC(@drop_default_sql); \
+END"
     )
 }
 

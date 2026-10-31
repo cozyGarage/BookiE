@@ -295,5 +295,10 @@ fn dropping_a_sql_server_column_with_a_default_drops_its_constraint_first() {
 fn a_sql_server_default_constraint_name_is_quoted_by_the_server() {
     let statement = super::types::mssql_drop_default_constraint("mssql", Some("dbo"), "t", "status");
     assert!(statement.contains("QUOTENAME(@default_constraint)"), "{statement}");
+    assert!(
+        statement.contains("DECLARE @drop_default_sql nvarchar(max)"),
+        "{statement}"
+    );
+    assert!(statement.contains("EXEC(@drop_default_sql)"), "{statement}");
     assert!(!statement.contains("[' + @default_constraint"), "{statement}");
 }
