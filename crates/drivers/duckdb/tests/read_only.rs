@@ -222,6 +222,7 @@ async fn a_read_only_duckdb_database_disables_external_access_and_mutations() {
     let dir = tempfile::tempdir().unwrap();
     let database = dir.path().join("data.duckdb");
     let private = dir.path().join("private.txt");
+    drop(duckdb::Connection::open(&database).unwrap());
     std::fs::write(&private, "sibling secret").unwrap();
     let writer = DuckdbDriver
         .connect(ConnectOptions {
