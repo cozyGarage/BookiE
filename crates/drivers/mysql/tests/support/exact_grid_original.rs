@@ -1,5 +1,5 @@
 use tablepro_core::{DatabaseDriver, Value};
-#[path = "../../../shared/exact_grid_original.rs"]
+#[path = "../../../shared/tests/exact_grid_original.rs"]
 mod contract;
 
 #[tokio::test]

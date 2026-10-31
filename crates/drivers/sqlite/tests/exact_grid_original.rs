@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use tablepro_core::{ConnectOptions, DatabaseDriver, Value};
-#[path = "../../shared/exact_grid_original.rs"]
+#[path = "../../shared/tests/exact_grid_original.rs"]
 mod contract;
 
 #[tokio::test]
