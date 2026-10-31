@@ -14,6 +14,7 @@ fn page_label_lookup_uses_a_constant_number_of_page_index_lookups() {
         terminal: StreamTerminal::Loading,
         export: None,
         generation: 0,
+        resident_pages: Default::default(),
         spool: None,
     };
     stream_result_view::PAGE_ROW_INDEX_LOOKUPS.with(|visits| visits.set(0));
@@ -44,6 +45,7 @@ fn progress_text_reads_the_cached_retained_row_count_once() {
         terminal: StreamTerminal::Loading,
         export: None,
         generation: 0,
+        resident_pages: Default::default(),
         spool: None,
     };
     stream_result_view::RETAINED_ROW_COUNT_LOOKUPS.with(|visits| visits.set(0));
