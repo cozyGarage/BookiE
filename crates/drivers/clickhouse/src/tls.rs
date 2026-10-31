@@ -20,6 +20,8 @@ pub(crate) fn https_connector(
 ) -> Result<HttpsConnector<HttpConnector>, DriverError> {
     let mut connector = HttpConnector::new();
     connector.enforce_http(false);
+    connector.set_keepalive(Some(std::time::Duration::from_secs(30)));
+    connector.set_keepalive_interval(Some(std::time::Duration::from_secs(10)));
     Ok(hyper_rustls::HttpsConnectorBuilder::new()
         .with_tls_config(client_config(config)?)
         .https_or_http()
