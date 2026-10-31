@@ -36,6 +36,7 @@ impl App {
             let Some(output) = outcome.ok().and_then(|file| file.path()) else {
                 return;
             };
+            let output = normalize_duplicate_extension(output, "dump");
             sender.input(AppMsg::StartBackupJob(BackupJob::Backup { output }));
         });
     }
@@ -179,4 +180,37 @@ fn archive_filter() -> gtk::FileFilter {
     filter.set_name(Some(&crate::tr!("PostgreSQL backups")));
     filter.add_suffix("dump");
     filter
+}
+
+fn normalize_duplicate_extension(path: PathBuf, extension: &str) -> PathBuf {
+    let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) else {
+        return path;
+    };
+    let duplicate_suffix = format!(".{extension}.{extension}");
+    if !name.ends_with(&duplicate_suffix) {
+        return path;
+    }
+    path.with_file_name(&name[..name.len() - extension.len() - 1])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_duplicate_extension;
+    use std::path::PathBuf;
+
+    #[test]
+    fn a_backup_name_that_already_ends_in_dump_keeps_one_suffix() {
+        assert_eq!(
+            normalize_duplicate_extension(PathBuf::from("/tmp/bk_ssh1.dump.dump"), "dump"),
+            PathBuf::from("/tmp/bk_ssh1.dump")
+        );
+        assert_eq!(
+            normalize_duplicate_extension(PathBuf::from("/tmp/bk_ssh2.dump"), "dump"),
+            PathBuf::from("/tmp/bk_ssh2.dump")
+        );
+        assert_eq!(
+            normalize_duplicate_extension(PathBuf::from("/tmp/bk_ssh3"), "dump"),
+            PathBuf::from("/tmp/bk_ssh3")
+        );
+    }
 }
