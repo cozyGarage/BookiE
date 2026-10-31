@@ -12,14 +12,14 @@ const PREVIEW_BYTES: usize = 8 * 1024;
 pub struct SharedRow {
     result: Weak<QueryResult>,
     source_index: usize,
-    projection: Option<Vec<usize>>,
+    projection: Option<Arc<[Option<usize>]>>,
 }
 
 impl SharedRow {
     fn cell<'a>(&self, result: &'a QueryResult, index: usize) -> Option<&'a Value> {
         let row = result.rows.get(self.source_index)?;
         let source_index = match &self.projection {
-            Some(indices) => indices.iter().position(|mapped| *mapped == index)?,
+            Some(indices) => indices.get(index).copied().flatten()?,
             None => index,
         };
         row.get(source_index)
@@ -90,20 +90,17 @@ impl RowObject {
     pub(crate) fn from_shared(
         result: &Arc<QueryResult>,
         source_index: usize,
-        projection: Option<(Vec<usize>, usize)>,
+        projection: Option<Arc<[Option<usize>]>>,
     ) -> Option<Self> {
         let source_row = result.rows.get(source_index)?;
-        let (indices, width) = match projection {
-            Some((indices, width)) => (Some(indices), width),
-            None => (None, source_row.len()),
-        };
+        let width = projection.as_ref().map_or(source_row.len(), |indices| indices.len());
         let row: Self = glib::Object::new();
         *row.imp().cells.borrow_mut() = vec![None; width];
         *row.imp().previews.borrow_mut() = vec![None; width];
         *row.imp().source.borrow_mut() = Some(SharedRow {
             result: Arc::downgrade(result),
             source_index,
-            projection: indices,
+            projection,
         });
         Some(row)
     }
