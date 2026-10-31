@@ -66,7 +66,7 @@
     "driver-clippy.txt": "4b5a6f0ae3b0fdcb1d823dcadd5cf9b1efbbf330a384afd87331805f06fc221e",
     "driver-focused.txt": "724c9188455ed0a346d60bdb4b235f4abc4cb25196587b8a52b2670005622bce",
     "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "harness.txt": "41e5b5d3191df50433c3ea2cf09aa54abbbe77e986c241167cafbfacd2a999bb",
+    "harness.txt": "b69ec244bfc1250dd982f24b85ae93606ab27dac63a0aac82c3f06fb6df1775b",
     "postgres-array-suite.txt": "fef2b8bc152808b9703df314f59662fb95506a7be506a10ebe5a78bed788aa8d"
   },
   "remaining": [

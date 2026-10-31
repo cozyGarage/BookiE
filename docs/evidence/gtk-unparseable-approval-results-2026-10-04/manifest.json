@@ -20,7 +20,7 @@
     "log": "gtk-safety.txt"
   },
   "log_sha256": {
-    "gtk-safety.txt": "e61c11c4702fbdd4ca5db63296511d9b8df56f1704b3274018d92eb9589c3070"
+    "gtk-safety.txt": "f540001c099fb7474f9aa74f3e6805f488a3cb915246b4dcd511b7251ef661f6"
   },
   "remaining": [
     "The GTK dialog uses a SQLite fixture; approval routing for a MySQL-backed connection and MySQL routine execution remain unverified."
