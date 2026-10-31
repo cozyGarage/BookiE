@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -518,6 +519,20 @@ def application_memory_kib():
         if name in fields and parts:
             values[fields[name]] = int(parts[0])
     return values
+
+
+def application_sidebar_row_construction():
+    process = owned_application().process
+    stderr = process.stderr
+    position = stderr.tell()
+    stderr.seek(0)
+    output = stderr.read()
+    stderr.seek(position)
+    matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
+    if not matches:
+        raise AssertionError("the app did not report sidebar row construction timing")
+    count, elapsed = matches[-1]
+    return int(count), float(elapsed)
 
 
 def wait_for_database_count(path, expected, timeout=WAIT_SECONDS):
@@ -1686,6 +1701,7 @@ def postgres_sidebar_catalog_profile(_database, base):
     wait_for_node_showing(target, True, timeout=120)
     filter_ready = time.monotonic()
     after = application_memory_kib()
+    sidebar_nodes, row_construction_ms = application_sidebar_row_construction()
     profile = {
         "scenario": "postgres_sidebar_catalog_profile",
         "source_commit": os.environ.get("TABLEPRO_GTK_SOURCE_COMMIT"),
@@ -1694,6 +1710,8 @@ def postgres_sidebar_catalog_profile(_database, base):
         "connect_and_catalog_frame_ms": (frame_ready - connect_started) * 1000,
         "catalog_accessible_ms": (catalog_ready - connect_started) * 1000,
         "search_filter_ms": (filter_ready - filter_started) * 1000,
+        "sidebar_nodes": sidebar_nodes,
+        "row_construction_ms": row_construction_ms,
         "memory_before_kib": before,
         "memory_after_kib": after,
     }

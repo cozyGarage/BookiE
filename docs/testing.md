@@ -166,6 +166,17 @@ docker compose --project-name bookie-meta-profile --project-directory tests/fixt
 
 `tests/fixtures/postgres-release/README.md` documents the topology, generated materials, and `TABLEPRO_FIXTURE_KEEP_UP=1` for keeping the containers running.
 
+The CPU-only `tablepro-app-services` sidebar search benchmark measures tree construction and repeated filtering separately from GTK and database access:
+
+```bash
+TABLEPRO_SIDEBAR_PROFILE_OUTPUT="$PWD/target/quality/sidebar-search-5000.jsonl" \
+  cargo bench --locked -p tablepro-app-services --bench sidebar_search -- 5000
+TABLEPRO_SIDEBAR_PROFILE_OUTPUT="$PWD/target/quality/sidebar-search-50000.jsonl" \
+  cargo bench --locked -p tablepro-app-services --bench sidebar_search -- 50000
+```
+
+It runs 101 samples for a specific match, a schema-prefix match, and a broad match. The output includes the number of visible nodes and median/p95 time in nanoseconds. It measures the tree algorithm only; use the GTK profile below to measure widget construction and accessibility costs.
+
 The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connection-to-catalog visibility, accessible sidebar filtering, and the app process memory before and after loading a synthetic catalog. Start a disposable PostgreSQL database containing the named target table, then run:
 
 ```bash
@@ -178,6 +189,7 @@ bash scripts/test-gtk-safety.sh
 ```
 
 `TABLEPRO_GTK_CATALOG_TARGET` must use the schema-qualified accessible row name. The memory sample is the BookiE process RSS/PSS and private pages; the GTK scenario runs with AT-SPI enabled, so compare runs under the same test environment. This is an end-to-end GTK measurement and is separate from the driver-only catalog benchmark above.
+The app also logs the number of sidebar nodes and the time spent constructing their GTK rows at debug level; the GTK scenario records this value in its JSON output.
 
 ## Local PostgreSQL smoke test
 
