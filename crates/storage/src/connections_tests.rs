@@ -698,3 +698,6 @@ async fn concurrent_deletions_do_not_restore_another_deleted_connection() {
     second_result.unwrap();
     assert!(load_from(&path).await.unwrap().is_empty());
 }
+
+#[path = "connections/tests/field_tests.rs"]
+mod field_tests;

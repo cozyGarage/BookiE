@@ -36,12 +36,6 @@ mod socket_tests;
 /// serde_json's default 128-level nesting limit.
 pub(crate) const MAX_SSH_HOPS: usize = 8;
 
-/// Every JSON key `SavedConnection` owns. A key outside this list came
-/// from a newer TablePro (or a hand edit) and is carried through a
-/// rewrite untouched, so downgrading does not silently strip a field
-/// the newer version depends on. Keys inside the list are always taken
-/// from the freshly serialized record — a cleared `Option` must not be
-/// resurrected from the copy on disk.
 pub(crate) const KNOWN_CONNECTION_FIELDS: &[&str] = &[
     "id",
     "name",
