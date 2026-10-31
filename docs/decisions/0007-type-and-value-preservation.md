@@ -6,7 +6,7 @@
 
 ## Context
 
-A successful query or matching display text can hide a changed native type, rounded number, shifted timestamp, altered binary encoding or substituted NULL. The sprint and several evidence ledgers repeated these rules, making it easy for a later session to implement a different conversion policy.
+A successful query or matching display text can hide a changed native type, rounded number, shifted timestamp, altered binary encoding or substituted NULL. A shared rule prevents drivers and consumers from applying different conversion policies.
 
 ## Decision
 

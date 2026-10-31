@@ -7,9 +7,7 @@
 
 ## Context
 
-A SQL editor result is materialized in one pass up to three caps: 1,000,000 rows, 10,000,000 cells and 64 MiB of estimated value bytes. The byte cap binds first. A historical grid profile measured about 2.5 times the driver result; it predates #518’s shared-row path, and no comparable post-change profile establishes a current ratio (PERF-2, PERF-8). At the time of this decision, full-table export paged 5,000 rows through the guard and the grid read shared rows lazily. [ADR 0014](0014-full-table-export-snapshot.md) later required snapshot-safe paging; the current export path refuses full-table export until a driver proves that contract. The remaining editor cost at that point was the single large fetch of an arbitrary query.
-
-Re-running the user's statement with `LIMIT` and `OFFSET` is not an option. It rewrites SQL the user wrote, can repeat or miss rows when data changes, and re-evaluates the whole statement per page. SEC-6 also requires that the cap never appends a `LIMIT`.
+The editor needs to read arbitrary query results incrementally without rewriting user SQL. Re-running a statement with `LIMIT` and `OFFSET` can repeat or miss rows as data changes, and SEC-6 requires that result limits never append a `LIMIT`.
 
 ## Decision
 
@@ -44,4 +42,4 @@ Add an optional driver capability that opens a forward-only cursor over a single
 
 The maintainer selected an estimated-byte retention limit. The UI stream cache retains pages while their estimated row storage stays within the existing 64 MiB query-result budget. It has no separate page-count limit. The newest page is always kept, including a single oversized page. Older pages leave the forward-only RAM window without changing their values or received-row counts. ADR 0025 adds a separate encrypted spool for revisiting fetched PostgreSQL pages while the result owner remains open; its quota and page cap can stop the stream as incomplete.
 
-The estimate reuses core row/value accounting and excludes column metadata, widgets, incoming driver buffers, overlapping result snapshots, other tabs, pins and allocator-retained pages. It is not a process-memory ceiling. The PostgreSQL spool preserves access to pages successfully written within its limits, but a quota, page-cap or storage refusal stops the stream as incomplete. Other engines and unsupported query shapes remain materialized. Broader ownership and profiling acceptance remain under [#1032](https://github.com/cozyGarage/BookiE/issues/1032); installed GTK and release-candidate acceptance remain separate.
+The estimate reuses core row/value accounting and excludes column metadata, widgets, incoming driver buffers, overlapping result snapshots, other tabs, pins and allocator-retained pages. It is not a process-memory ceiling. The PostgreSQL spool preserves access to pages successfully written within its limits, but a quota, page-cap or storage refusal stops the stream as incomplete. Other engines and unsupported query shapes remain materialized. Installed GTK and release-candidate acceptance remain separate.
