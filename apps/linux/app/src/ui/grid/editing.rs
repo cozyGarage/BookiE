@@ -533,10 +533,9 @@ fn popdown_if_alive(popover: &glib::WeakRef<gtk::Popover>) {
 
 fn install_edit_commit_handler(label: &CellEditor, col_index: usize, sender: relm4::Sender<GridMsg>) {
     {
-        let text = label.entry();
         let label_for_preedit = label.downgrade();
         let sender_for_preedit = sender.clone();
-        text.connect_preedit_changed(move |_t, preedit| {
+        label.connect_preedit_changed(move |preedit| {
             let Some(label_for_preedit) = label_for_preedit.upgrade() else {
                 return;
             };

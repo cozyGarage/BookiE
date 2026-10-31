@@ -200,6 +200,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::cell_editor::tests::editable_cell_defers_its_text_widget_until_editing"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::diagram::dialog::lifetime_tests::the_zoom_refresh_tick_does_not_retain_its_dialog_owner"
     ],
     [
