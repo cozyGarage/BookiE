@@ -17,6 +17,8 @@ use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 use gtk4::{glib, pango};
 
+type PreeditCallback = Rc<dyn Fn(&str)>;
+
 mod imp {
     use super::*;
 
@@ -24,7 +26,7 @@ mod imp {
         pub stack: gtk4::Stack,
         pub label: gtk4::Label,
         pub entry: RefCell<Option<gtk4::Text>>,
-        pub preedit_callback: RefCell<Option<Rc<dyn Fn(&str)>>>,
+        pub preedit_callback: RefCell<Option<PreeditCallback>>,
         pub inline_editable: Cell<bool>,
     }
 
@@ -90,42 +92,6 @@ glib::wrapper! {
     pub struct CellEditor(ObjectSubclass<imp::CellEditor>)
         @extends gtk4::Widget,
         @implements gtk4::Accessible, gtk4::Buildable, gtk4::ConstraintTarget;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[ignore = "requires an isolated GTK display"]
-    fn editable_cell_defers_its_text_widget_until_editing() {
-        gtk4::init().unwrap();
-        let cell = CellEditor::new();
-        assert!(cell.stack_widget().child_by_name("edit").is_none());
-        cell.set_text("stored");
-        assert!(cell.stack_widget().child_by_name("edit").is_none());
-
-        let preedit_seen = Rc::new(Cell::new(false));
-        let preedit_seen_by_callback = preedit_seen.clone();
-        cell.connect_preedit_changed(move |preedit| {
-            preedit_seen_by_callback.set(preedit == "draft");
-        });
-        cell.set_inline_editable(true);
-        cell.start_editing();
-        let entry = cell.entry();
-        entry.emit_by_name::<()>("preedit-changed", &[&"draft"]);
-        assert!(preedit_seen.get());
-        assert_eq!(entry.text().as_str(), "stored");
-        entry.set_text("discarded");
-        cell.stop_editing(false);
-        assert_eq!(cell.text().as_str(), "stored");
-
-        cell.start_editing_with("exact value");
-        assert_eq!(cell.entry().text().as_str(), "exact value");
-        cell.stop_editing(true);
-        assert_eq!(cell.text().as_str(), "exact value");
-        assert_eq!(cell.entry(), entry);
-    }
 }
 
 impl Default for CellEditor {
@@ -308,5 +274,41 @@ impl CellEditor {
         if let Some(callback) = self.imp().preedit_callback.borrow().as_ref().cloned() {
             entry.connect_preedit_changed(move |_, preedit| callback(preedit));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn editable_cell_defers_its_text_widget_until_editing() {
+        gtk4::init().unwrap();
+        let cell = CellEditor::new();
+        assert!(cell.stack_widget().child_by_name("edit").is_none());
+        cell.set_text("stored");
+        assert!(cell.stack_widget().child_by_name("edit").is_none());
+
+        let preedit_seen = Rc::new(Cell::new(false));
+        let preedit_seen_by_callback = preedit_seen.clone();
+        cell.connect_preedit_changed(move |preedit| {
+            preedit_seen_by_callback.set(preedit == "draft");
+        });
+        cell.set_inline_editable(true);
+        cell.start_editing();
+        let entry = cell.entry();
+        entry.emit_by_name::<()>("preedit-changed", &[&"draft"]);
+        assert!(preedit_seen.get());
+        assert_eq!(entry.text().as_str(), "stored");
+        entry.set_text("discarded");
+        cell.stop_editing(false);
+        assert_eq!(cell.text().as_str(), "stored");
+
+        cell.start_editing_with("exact value");
+        assert_eq!(cell.entry().text().as_str(), "exact value");
+        cell.stop_editing(true);
+        assert_eq!(cell.text().as_str(), "exact value");
+        assert_eq!(cell.entry(), entry);
     }
 }
