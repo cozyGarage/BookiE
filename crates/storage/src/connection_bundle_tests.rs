@@ -657,6 +657,31 @@ fn an_endpoint_match_ignores_host_case_and_settings() {
 }
 
 #[test]
+fn an_import_cannot_drop_or_swap_a_pinned_certificate_authority() {
+    let mut local = saved("sales");
+    local.tls_mode = Some(TlsMode::VerifyFull);
+    local.tls_root_cert = Some(PathBuf::from("/etc/pki/company-ca.pem"));
+    for incoming_root in [None, Some(PathBuf::from("/tmp/other-ca.pem"))] {
+        let mut incoming = local.clone();
+        incoming.tls_root_cert = incoming_root;
+        let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming])).expect("plan");
+
+        assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
+        assert_eq!(plan.items[0].connection.tls_root_cert, local.tls_root_cert);
+    }
+}
+
+#[test]
+fn an_import_may_add_a_certificate_authority_to_a_connection_without_one() {
+    let local = saved("sales");
+    let mut incoming = local.clone();
+    incoming.tls_root_cert = Some(PathBuf::from("/etc/pki/company-ca.pem"));
+    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming.clone()])).expect("plan");
+
+    assert_eq!(plan.items[0].connection.tls_root_cert, incoming.tls_root_cert);
+}
+
+#[test]
 fn a_different_ssh_hop_chain_is_a_different_endpoint() {
     let local = saved("sales");
     let mut incoming = local.clone();
