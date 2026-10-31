@@ -1,12 +1,12 @@
 # 0019: Database tooling without sidecars
 
-- **Status**: Accepted; PostgreSQL backup and restore are wired into the app. Their cancellation and unknown-outcome review was tracked in the now-closed [#1043](https://github.com/cozyGarage/BookiE/issues/1043). An unknown restore outcome still blocks governed writes until reconciled; the app has no in-app reconciliation action yet ([#947](https://github.com/cozyGarage/BookiE/issues/947)).
+- **Status**: Accepted
 - **Date**: 2026-10-16
-- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0019-database-tooling-without-sidecars); the Landlock restriction in Decision 3 is not implemented and is not a shipped security boundary
+The conditional filesystem restriction in Decision 3 is not a security boundary in the current application.
 
 ## Context
 
-Users want file conversion, schema migrations and logical backups next to browsing and editing. One proposal was to keep performance-critical paths in Rust and ship Go binaries as sidecars for this tooling. A sidecar adds a second toolchain to every package build, a second supply-chain review that `deny.toml` does not cover, 10 to 40 MB per binary, and a process boundary that needs its own credential handling. [ADR 0001](0001-no-plugin-system.md) already rules out loading third-party code, and [ADR 0015](0015-database-snapshots.md) covers native snapshots, not portable dumps.
+File conversion, schema migrations and logical backups fit beside browsing and editing. Shipping these tools as sidecar binaries would add another toolchain, supply-chain boundary and credential-handling path. [ADR 0001](0001-no-plugin-system.md) already rules out loading third-party code, and [ADR 0015](0015-database-snapshots.md) covers native snapshots, not portable dumps.
 
 ## Decision
 

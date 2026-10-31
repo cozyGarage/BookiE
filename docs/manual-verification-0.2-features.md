@@ -1,12 +1,12 @@
 # Manual verification checklist
 
-This checklist describes installed and native desktop scenarios that automated GTK tests cannot fully establish. It is not milestone status; the completed release boundary is recorded in the [sprint](bookie-0.2-sprint.md), and open work is tracked in [Project #3](https://github.com/users/cozyGarage/projects/3). The checkboxes summarize the recorded state at this snapshot.
+This checklist describes installed and native desktop scenarios that automated GTK tests cannot fully establish. Its checkboxes are steps to perform; run-specific outcomes belong in private verification records.
 
 Test native Wayland separately from Xvfb; an Xvfb pass does not establish native Wayland behavior.
 
-For each run, record the binary/package identity, GTK backend, OS and toolkit versions, scale, theme, results and screenshots. Test normal and narrow window sizes, keyboard focus, clipboard and popover/dialog placement. Mark blocked and not-run items explicitly. This checklist defines scenarios; record each run separately.
+For each run, record the binary/package identity, GTK backend, OS and toolkit versions, scale, theme, outcomes and screenshots in a private verification record. Test normal and narrow window sizes, keyboard focus, clipboard and popover/dialog placement. Mark blocked and not-run items explicitly. This public checklist defines scenarios; run-specific records stay outside the public source tree.
 
-Independent value checks compare database-native results with the app's display and supported write paths. The [oracle review](oracle-review.md) explains the database-native comparison method.
+Independent value checks compare database-native results with the app's display and supported write paths, using the database as an independent oracle where possible.
 
 ## Areas
 

@@ -55,7 +55,7 @@ Gained:
 
 **Out-of-process JDBC or JSON-RPC driver agents.** Rejected. A sidecar process is another trust boundary around credentials and sockets, and it makes typed values and policy integration harder to prove in the shipped binary.
 
-**In-process ODBC (`unixODBC`, `odbc-api`) for fetch performance.** Rejected (2026-10-07 grid-memory review). Columnar fetch does not bound memory when rows are collected into a `Vec`, and a generic ODBC layer conflicts with server-side cancellation ([ADR 0005](0005-server-side-cancellation.md)), native value preservation ([ADR 0007](0007-type-and-value-preservation.md)) and session ownership ([ADR 0008](0008-connection-and-session-ownership.md)). Revisit only for a named engine gap, as one scoped driver crate that meets the same contracts.
+**In-process ODBC (`unixODBC`, `odbc-api`) for fetching rows.** Rejected. Columnar fetch does not bound memory when rows are collected into a `Vec`, and a generic ODBC layer conflicts with server-side cancellation ([ADR 0005](0005-server-side-cancellation.md)), native value preservation ([ADR 0007](0007-type-and-value-preservation.md)) and session ownership ([ADR 0008](0008-connection-and-session-ownership.md)). Revisit only for a named engine gap, as one scoped driver crate that meets the same contracts.
 
 **Engine breadth by runtime bridge (Oracle, Cassandra, "100+ engines via JDBC").** Out of scope. Oracle and Cassandra are not planned drivers; a future engine arrives as a static driver crate under the rules above.
 

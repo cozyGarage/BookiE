@@ -79,7 +79,7 @@ Editor failures carry only audit receipts returned by the exact guarded statemen
 
 ## State that does not belong in a component
 
-Some state outlives any single component: open connections, user preferences, query history, the workspace cache and the MCP bridge. The application owns these as `Arc`s and passes them explicitly into each window, tab and dialog that needs them. They were global singletons until the 0.2 sprint, and that is exactly what the `Arc` handles replaced.
+Some state outlives any single component: open connections, user preferences, query history, the workspace cache and the MCP bridge. The application owns these as `Arc`s and passes them explicitly into each window, tab and dialog that needs them. They were global singletons before explicit ownership was introduced, and the `Arc` handles replaced them.
 
 `tablepro-app-services::workspace` owns each window's tab membership, preview status, open-table decisions and save-before-close counters. The collection accepts app-owned payloads; it has no GUI dependency. The GTK adapter owns controllers, page order, dialogs and the `AdwTabView` close handshake. The app adapter writes the existing `services::workspace_state` record format and identifiers.
 

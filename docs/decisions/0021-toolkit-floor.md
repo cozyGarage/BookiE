@@ -2,23 +2,14 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-23
-- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0021-support-only-the-newest-gtk-toolkit)
 
 ## Context
 
-[ADR 0002](0002-rust-gtk4-libadwaita.md) defined two native-library floors: a Cargo compile floor at the Ubuntu 24.04 stack (GTK 4.14, libadwaita 1.5, GtkSourceView 5.12) and a GNOME 50 Meson and package line (GTK 4.22, libadwaita 1.9, GtkSourceView 5.18).
-
-Older toolkits cost UI work that newer releases no longer need:
-
-- [#1445](https://github.com/cozyGarage/BookiE/issues/1445): GTK 4.18 under X11 pops down a one-row completion popup. The completion test was weakened to two proposals and a known limitation was published.
-- [#1416](https://github.com/cozyGarage/BookiE/pull/1416): libadwaita 1.5 on Ubuntu 24.04 does not expose dialogs with an accessible dialog role, so the GTK scenarios skipped dialog waits there and used a separate click offset.
-- [#1388](https://github.com/cozyGarage/BookiE/issues/1388): a completion popup sizing critical on GTK 4.24 under X11. Defects on the current toolkit already compete for the same UI time.
-
-Each workaround needs code, tests, CI capacity and a desktop to reproduce on. The team is small, and newer toolkit releases already fix the old-toolkit bugs.
+[ADR 0002](0002-rust-gtk4-libadwaita.md) set separate compile and package toolkit floors. Maintaining compatibility code for older toolkit lines adds implementation and validation work without changing the product's native UI contracts. This decision sets one supported native-library floor.
 
 ## Decision
 
-The maintainer decided on 2026-10-23 that BookiE supports one toolkit floor, the newest stable line:
+BookiE supports one toolkit floor:
 
 | Library | Minimum |
 |---|---|
@@ -26,7 +17,7 @@ The maintainer decided on 2026-10-23 that BookiE supports one toolkit floor, the
 | libadwaita | 1.10 |
 | GtkSourceView 5 | 5.22 |
 
-This is what Arch Linux and Debian testing ("forky") ship (GTK 4.24.1, libadwaita 1.10.0, GtkSourceView 5.22.0). GLib stays at 2.88. The Flatpak manifests move to the GNOME 51 runtime.
+GLib stays at 2.88. The Flatpak manifests use the GNOME 51 runtime.
 
 The floor is enforced in three places:
 
@@ -44,8 +35,8 @@ One floor removes per-version branches from the app and the test tier and makes 
 
 ## Consequences
 
-- Ubuntu 26.04 LTS (GTK 4.22.4, GtkSourceView 5.18.0, libadwaita 1.9.1), Debian 13 (GTK 4.18.6, GtkSourceView 5.16.0, libadwaita 1.7.6) and Ubuntu 24.04 (GTK 4.14.5, GtkSourceView 5.12.0, libadwaita 1.5.0) are unsupported. The Debian package does not install there and a source build exits at startup.
-- Flatpak on the GNOME 51 runtime is the intended path for those distributions. Flathub publication remains PKG-4 and PKG-8.
+- Older toolkit stacks are unsupported by native builds and packages.
+- Flatpak on the GNOME 51 runtime is the intended path for those distributions.
 - CI and native packages must use the selected toolkit floor.
 - When a newer toolkit becomes the stable line on the reference distributions, the floor moves with it by a new decision.
 

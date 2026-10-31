@@ -1,10 +1,10 @@
 # Validation playbook
 
-Use this page to select checks, hand off work, and review evidence. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures; the [completion page](bookie-0.2-sprint.md) records 0.2.0, while [Project #3](https://github.com/users/cozyGarage/projects/3) and owning issues set selected work and acceptance. A green layer certifies only its named scope.
+Use this page to select checks and hand off work. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures. A green layer certifies only its named scope.
 
 ## Current desktop target
 
-The [sprint](bookie-0.2-sprint.md) records the maintainer's 2026-10-18 completion decision; use the release page linked there for current publication status. Project #3 orders selected work; each issue names its acceptance layers. GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
+GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep automated Linux checks and record unavailable environments in private verification records.
 
 ## Start here
 
@@ -30,11 +30,11 @@ python3 scripts/run-test-layer.py full app-server values drivers b4-rollback tls
 bash scripts/test-pg-dump.sh
 ```
 
-This covers the fast workspace gate, app-server and cross-driver value contracts, Docker driver/rollback/TLS/PostgreSQL/SSH fixtures, keyring and dependency policy checks, plus the PostgreSQL dump/restore fixture. The named layers run sequentially and save the source revision, worktree state, tracked-diff digest and logs under `target/quality/`; `test-pg-dump.sh` runs separately. This does not cover the distro-floor matrix, installed-package upgrade/rollback, nightly mutation or soak runs, or the opt-in Kerberos and specialized GTK database fixtures. Those remain separate acceptance checks. The [completion page](bookie-0.2-sprint.md) records 0.2.0 status; current work and acceptance criteria live on the owning boards. Dated release audits and validation history are source-pinned records, not current status.
+This covers the fast workspace gate, app-server and cross-driver value contracts, Docker driver/rollback/TLS/PostgreSQL/SSH fixtures, keyring and dependency policy checks, plus the PostgreSQL dump/restore fixture. The named layers run sequentially and save the source revision, worktree state, tracked-diff digest and logs under `target/quality/`; `test-pg-dump.sh` runs separately. This does not cover the distro-floor matrix, installed-package upgrade/rollback, nightly mutation or soak runs, or the opt-in Kerberos and specialized GTK database fixtures. Those remain separate checks. Store dated run records outside the public source tree.
 
 Before opening a pull request, also run `bash scripts/preflight.sh` as required by `AGENTS.md`. It repeats unit and sandbox tests but adds the crate-boundary and comment-line checks that `ci-local.sh full` does not run.
 
-Run `quick` for a short edit loop. Run the pre-push gate after changes that touch shared core/value paths or before handing a B3 slice to review. Keep the hosted workflow as the recorded platform/packaging check.
+Run `quick` for a short edit loop. Run the pre-push gate after changes that touch shared core/value paths or before handing shared core or value work to review. Keep the hosted workflow as the recorded platform/packaging check.
 
 ```bash
 python3 scripts/run-test-layer.py --list
@@ -108,12 +108,12 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Scope | Entry point | Completion evidence |
 | --- | --- | --- |
 | Optional DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus app feature build |
-| Mutation | [Local instructions](testing-quality-and-performance.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON |
-| Coverage | [Local instructions](testing-quality-and-performance.md#coverage) | LCOV, exclusions and summary; use the configured coverage floor checks when qualifying a change |
+| Mutation | The configured mutation workflow | Review selected, caught, missed, timed-out and unviable mutants for the exact source revision |
+| Coverage | The configured coverage workflow | Review the report and configured coverage floor for the exact source revision |
 | Flatpak | Flatpak packaging scripts | Package build only; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
-| GTK soak | `bash scripts/test-gtk-safety.sh` | Record the tested revision and outcomes. Current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
-| Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) and issue acceptance criteria | VM/desktop version, Wayland session, package checksum, steps, result and screenshots |
+| GTK soak | `bash scripts/test-gtk-safety.sh` | Record the tested revision and outcomes in a private verification record. |
+| Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) | VM/desktop version, Wayland session, package checksum, steps, result and screenshots in a private verification record |
 
 ## Hosted checks
 
@@ -123,7 +123,7 @@ Treat static-analysis findings as evidence to review. Fix valid findings in a fo
 
 ### Live issue-state report
 
-Run `python3 scripts/check-github-issue-status.py` when reconciling the open-work index with GitHub. It requires an authenticated `gh` CLI and makes an explicit network request. It reports closed or unverified issue entries but never edits the ledger or Project #3. This point-in-time report is separate from offline `check-known-issues.py` and does not run in preflight or CI. Authentication, network, timeout, or API-shape failures mean the live state is unavailable, not that an issue is closed.
+Run `python3 scripts/check-github-issue-status.py` when reconciling the open-work index with the issue tracker. It requires an authenticated `gh` CLI and makes an explicit network request. It reports closed or unverified entries but does not edit the ledger. This live report is separate from offline `check-known-issues.py` and does not run in preflight or CI. Authentication, network, timeout, or API-shape failures mean the live state is unavailable, not that an issue is closed.
 
 Use isolated fixtures with synthetic data and credentials. Do not put credentials, customer data, personal file paths, internal host names or machine-specific instructions in source, test output or committed evidence. Keep untrusted change validation isolated from production data and personal sessions.
 
@@ -164,7 +164,7 @@ An agent must read `AGENTS.md`, inspect status and confirm the SHA before editin
 7. Run focused mutation checks with a nonzero selected count and independent expected values. Document each equivalent survivor with a concrete argument; leave unresolved survivors/timeouts open.
 8. Update scenario evidence and the owning issue or board. Keep the test with the fix.
 
-Use [value contracts](value-contracts.md) and the B3 board as the current case backlog. Apply the [test design rules](test-design-rules.md) to each regression. Current examples:
+Use current source behavior and the change acceptance criteria to select value cases. Apply the [test design rules](test-design-rules.md) to each regression. Examples:
 
 | Encountered scenario | Permanent regression home | Next edge to investigate |
 | --- | --- | --- |
@@ -173,14 +173,14 @@ Use [value contracts](value-contracts.md) and the B3 board as the current case b
 | BC/year 10000 SQL export failed | Core SQL literal unit and PostgreSQL date round-trip | Remaining driver-specific calendar limits and non-SQL consumer parity |
 | Decoder and oracle shared the same bug | Array size literal and numeric variant assertions | Independent oracles for other driver decoders |
 | Green CI omitted eight SSH tests | SSH runner, ignored-test inventory and workflow regression | Audit new ignored targets whenever added |
-| Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage survivors and timeouts from the exact run report tracked under [TEST-2 / #559](https://github.com/cozyGarage/BookiE/issues/559); counts vary by source SHA, so do not carry an old total forward |
+| Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage survivors and timeouts from the exact run report; counts vary by source revision, so do not carry an old total forward |
 | Test process failed, hung or never ran | Layer-runner negative tests | Keep adding actual infrastructure failure modes |
 
 Secure connection coverage is engine-specific. Track valid auth, rejected auth, wrong CA/hostname, no plaintext fallback, cancellation during connect/read/write, disconnect/reconnect, pool reuse, partial streams, malformed lengths, NULL/empty distinctions, Unicode/binary boundaries and authorization on every consumer. An unchecked scenario is a backlog item, not an implied capability or a pass.
 
 ## Release qualification
 
-For each release candidate, maintainers select the applicable platform checks. B3 qualification requires closed correctness findings and their regressions; installed-package, Wayland, upgrade/rollback and soak claims require evidence from those environments. Docker supplies deterministic servers and Xvfb supplies automated GTK interaction. The 0.2.0 release is already published; these criteria do not reopen that milestone. Xvfb and widget passes cannot certify native desktop behavior. All required release checks must pass before publication.
+For each release candidate, maintainers select the applicable platform checks. Correctness qualification requires regressions for resolved findings; installed-package, Wayland, upgrade/rollback and soak claims require evidence from those environments. Docker supplies deterministic servers and Xvfb supplies automated GTK interaction. Xvfb and widget passes cannot certify native desktop behavior. All required release checks must pass before publication.
 
 ## Static-analysis triage
 

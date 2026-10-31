@@ -2,7 +2,6 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-08
-- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0015-database-snapshots-and-restore)
 
 ## Context
 

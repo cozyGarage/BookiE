@@ -1,8 +1,8 @@
 # Testing
 
-The [completion page](bookie-0.2-sprint.md) records 0.2.0 delivery status; current issue acceptance belongs to the owning boards. Start with the [validation playbook](validation-playbook.md) for the executable layer catalog, local commands, CI ownership, agent handoffs and regression intake. Dated audits in [archive](archive/) prove only their recorded source and environment.
+Start with the [validation playbook](validation-playbook.md) for the executable layer catalog, local commands, CI ownership, contributor handoffs and regression intake. Run-specific test records are maintained outside the public source tree.
 
-Design rules distilled from past audits (test ownership, runner parsers, oracles, changing a guard) are in [test design rules](test-design-rules.md).
+Test design rules for ownership, runner parsers, oracles and guard changes are in [test design rules](test-design-rules.md).
 
 ## Executable gates
 
@@ -32,11 +32,11 @@ flowchart TD
 
 The script harness checks selected documented Rust declarations against source and generates the gettext template in memory and fails if extraction breaks. The template (`bookie.pot`) and `POTFILES.in` are build outputs, ignored by git; run `python3 scripts/update-translations.py` to write them. The catalog check needs GNU `xgettext` and does not load GTK GIR bindings or a desktop session.
 
-`scripts/validate-evidence.py` distinguishes `run-test-layer.py` execution reports from evidence manifests. It checks a report's commit, worktree field, tracked-diff digest and any untracked-input paths and digest. It does not treat a dirty report as a clean checkout or rewrite its provenance. Durable evidence manifests keep their separate `source_commit` or `base_commit` contract. When hashed files came from different revisions, `source_commits` can map individual paths to the commits whose Git blobs match those hashes; the validator supports the historical `linux/` tree prefix and limits each manifest to 128 per-file commit mappings. For schema-v1 manifests that retain older nested `source` or `regression_test` path/hash fields, or a `source` map of paths to hashes, the validator checks those fingerprints through the same per-file mapping. These file-level hashes do not establish a complete run snapshot. The validator reports current-checkout drift when recorded source bytes do not match, and flags an unmapped source path that is no longer present. Strict validation fails when a per-file commit cannot verify its recorded source hash or an unmapped source path is missing; a current-checkout hash mismatch remains a warning because evidence can describe an older source tree. The normal harness scan always checks `manifest.json` files and also discovers supported records under other JSON filenames: declared source evidence, execution reports, and unversioned legacy packets with `source_sha256`. Conventional `validation.json` files with malformed JSON are reported, while unrelated arrays and objects and unsupported explicit schema versions stay outside discovery. Legacy packets still validate only source provenance; discovery does not turn their other fields into a complete evidence record. Recovered per-file mappings prove recorded bytes at their Git commits, not the identity of an unrecorded full run. Missing run identity remains a warning in the historical scan and fails strict validation. Unrelated unversioned JSON and manifests with unsupported explicit schema versions remain skipped.
+Test-layer reports are written under the ignored `target/quality/` directory. They capture the tested revision and command outcomes for local diagnosis; they are not committed run records or release evidence. Public CI results are associated with their exact source revision by the hosting service.
 
 ## What a container run proves
 
-Database fixtures, the GTK scenarios and the distro-floor jobs run in containers or virtual displays. A pass there shows the code behaves as designed against a disposable database; it is not acceptance of a connection path. Unix sockets, IPv6 loopback, desktop portals and the Secret Service behave differently across containers and desktop sessions; a container run has already hidden one such difference (Docker does not publish `::1`). Acceptance for those paths is the installed package connecting to a real database in the target native desktop session, on the host or a supported VM, as recorded under PKG-1 and in the [manual checklist](manual-verification-0.2-features.md).
+Database fixtures, GTK scenarios and distro-floor jobs run in containers or virtual displays. A pass there shows behavior against a disposable database; it does not establish a host connection path. Unix sockets, IPv6 loopback, desktop portals and the Secret Service can behave differently across containers and desktop sessions. Verify those paths with an installed package in the target native desktop session and follow the [manual checklist](manual-verification-0.2-features.md).
 
 ## Remote lab and connection-fault checks
 
@@ -44,17 +44,17 @@ Use a separate BookiE profile and disposable database or dataset when checking a
 
 A proxy fault checks BookiE's response to a broken network path; it does not test cluster election or replication. Test real failover only in an isolated cluster using its documented failover procedure. A write whose response is lost may already have committed, so verify the stored result and ensure reconnect does not replay it. Keep such checks on disposable data.
 
-## Why B3 tests values beyond the driver
+## Why value tests extend beyond the driver
 
-B3 covers the value path from the native driver through each relevant consumer, such as result display, grid editing, parameter binding, and export. Driver decoding alone cannot show that later code preserves the value. JSON or formatted text can display a value while hiding distinctions such as BSON integer width, exact decimal precision, or SQL `NULL` versus an empty value. A correct-looking display alone does not establish round-trip fidelity.
+Value tests cover the path from the native driver through each relevant consumer, such as result display, grid editing, parameter binding, and export. Driver decoding alone cannot show that later code preserves the value. JSON or formatted text can display a value while hiding distinctions such as BSON integer width, exact decimal precision, or SQL `NULL` versus an empty value. A correct-looking display alone does not establish round-trip fidelity.
 
-[ADR 0007](decisions/0007-type-and-value-preservation.md) defines the outcomes: exact typed support, exact text fallback, explicit refusal, or untested. B3 is a data-correctness contract, not a requirement for one universal cross-engine type system. Use the selected case and its concrete consumer to decide what must be proven.
+[ADR 0007](decisions/0007-type-and-value-preservation.md) defines the outcomes: exact typed support, exact text fallback, explicit refusal, or untested. This is a data-correctness contract, not a requirement for one universal cross-engine type system. Use the selected case and its concrete consumer to decide what must be proven.
 
 ## Test runner
 
 The sandbox tier selects `--test '*'` so every integration target in its crate list is discovered, including new files. Library and binary unit tests belong to the unit tier; Cargo's broader `--tests` flag also selects those targets and would execute them twice.
 
-The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release and verifies its SHA-256. `.config/nextest.toml` disables retries so flaky tests fail instead of passing on a hidden retry, and stops a test that runs for five minutes. The unit and sandbox selections were qualified in [#892](https://github.com/cozyGarage/BookiE/issues/892). Compare test names and source revisions rather than copying historical totals; parent-launched subprocess helpers can affect displayed counts. Driver, release, GTK and keyring tiers remain on `cargo test`. Moving a shared database fixture to one process per test requires separate ownership and isolation qualification; the headless pilot did not qualify that migration. `scripts/ci-local.sh full` uses the same unit and sandbox commands as automated checks. Doc tests are not part of these tiers.
+The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release and verifies its SHA-256. `.config/nextest.toml` disables retries so flaky tests fail instead of passing on a hidden retry, and stops a test that runs for five minutes. Driver, release, GTK and keyring tiers remain on `cargo test`. Shared database fixtures require explicit ownership and isolation before they can run one process per test. `scripts/ci-local.sh full` uses the same unit and sandbox commands as automated checks. Doc tests are not part of these tiers.
 
 Container images are not part of that retry rule: a dropped image download is not a flaky test. Before running a test group that uses containers, use `scripts/prepull-test-images.sh <group>` to fetch the images listed for it in `ci/test-images.txt`. Each group must list exactly the images its tests start, including the default image a testcontainers module uses when a test sets no tag; `scripts/tests/test_prepull_test_images.py` fails when a group and its tests differ. When you add a fixture or change an image tag, update the group in the same change.
 
@@ -178,11 +178,11 @@ It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through w
 
 ## Manual verification
 
-The [manual checklist](manual-verification-0.2-features.md) records installed GTK workflows and layouts that need visual acceptance. Unit and widget tests do not establish installed desktop behavior. Each unchecked item remains unverified until a result is recorded.
+The [manual checklist](manual-verification-0.2-features.md) records installed GTK workflows and layouts that need visual acceptance. Unit and widget tests do not establish installed desktop behavior. Keep run results in private verification records.
 
 ## Regression case selection
 
-Current B3 case status belongs to the board and [value-contract index](value-contracts.md). Failure reports are hypotheses, not confirmed BookiE defects; the active checklist is [#790](https://github.com/cozyGarage/BookiE/issues/790). Trace the matching BookiE path and reproduce a candidate against current source before changing code; a historical claim of zero tests does not establish a current coverage gap.
+Select regressions from the changed behavior and current known defects. Failure reports are hypotheses, not confirmed product defects. Trace the matching code path and reproduce a candidate against current source before changing code.
 
 ## File-size guard
 
@@ -202,4 +202,3 @@ When inline unit tests push a production module over the soft limit, move them t
 
 - [GTK tests](testing-gtk.md)
 - [CI tests and gates](testing-ci.md)
-- [Test quality and performance contracts](testing-quality-and-performance.md)

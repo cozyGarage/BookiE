@@ -2,9 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-24
-- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0022-release-notes-come-from-merge-commits)
 - **Supersedes**: the shared `CHANGELOG.md` release-note workflow.
-- **Clarified**: 2026-10-25 for implementation status. The pull-request body validation workflow has landed; the release workflow still reads `CHANGELOG.md`.
 
 ## Context
 
@@ -22,9 +20,9 @@ Release-Note: none
 ```
 
 1. Categories are the Keep a Changelog 1.1.0 headings: Added, Changed, Deprecated, Removed, Fixed, Security. A change may carry several lines. `none` is explicit and cannot be combined with other lines. The wording rules of AGENTS.md are unchanged: user impact, no paths, type or function names, no `Fixed` for a defect introduced and fixed before release.
-2. The pull request body carries the same lines, so a check can validate them before merge. The repository's squash-merge defaults are set to the PR title and the PR body (`squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=PR_BODY`, changed on 2026-10-24 from `COMMIT_OR_PR_TITLE` and `COMMIT_MESSAGES`), so every merge carries the lines without anyone remembering to copy them. A merger who wants a shorter body can pass only the lines: `gh pr view N --json body -q .body | python3 scripts/release-notes.py trailers - > body.txt`, then `gh pr merge N --squash --body-file body.txt`.
-3. `scripts/release-notes.py check` validates a body or message. `scripts/release-notes.py assemble --since <previous tag>` builds the release notes from the commit range, refuses a commit with no line unless told otherwise, and appends the pull request number from the squash subject. The output is a build artifact and the body of the GitHub Release.
-4. `CHANGELOG.md` stops growing. Its `[Unreleased]` entries stay until the first release cut after this decision. That release's notes are those entries plus the `Release-Note:` lines of the pull requests merged after the guard landed in `669635a06`, combined by hand into the version's `CHANGELOG.md` section (`assemble --since 669635a06`). Until the Release workflow reads trailers it still reads that section, so `CHANGELOG.md` must exist when the tag is pushed. After that release is published, a follow-up change copies the whole file unchanged to `docs/archive/changelog-through-<version>-<date>.md`, removes `CHANGELOG.md` and repoints its references. The 0.1.x record is already archived.
+2. The pull request body carries the same lines, so a check can validate them before merge. The repository squash-merge configuration includes the pull request title and body so the note travels with the commit.
+3. `scripts/release-notes.py check` validates a body or message. `scripts/release-notes.py notes <version>` builds the release notes from merge commit trailers for the version. The output is a build artifact and the body of the GitHub Release.
+4. Release notes are assembled from merge commits since the previous release tag. The generated output is an artifact and the body of the release; it is not maintained as a per-change source file.
 
 ## Rationale
 

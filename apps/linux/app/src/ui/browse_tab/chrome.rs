@@ -7,7 +7,7 @@ use crate::ui::count_format::format_thousands;
 use super::*;
 
 impl BrowseTab {
-    pub(super) fn build_paginator(sender: ComponentSender<Self>, page_size: u64) -> Paginator {
+    pub(super) fn build_paginator(sender: ComponentSender<Self>, page_size: u64, browse_filters: bool) -> Paginator {
         // First / Last bracket the Prev / Next pair. Tables of
         // millions of rows make Last especially valuable — without
         // it the user has to spam Next to reach the bottom. Same
@@ -177,12 +177,15 @@ impl BrowseTab {
             .build();
         filter_box.append(&filter_label);
         filter_box.append(&filter_badge);
-        let filter_button = gtk::Button::builder()
-            .tooltip_text(crate::tr!("Filter rows (Ctrl+F)"))
-            .action_name("win.open-filter")
-            .child(&filter_box)
-            .build();
+        let filter_button = gtk::Button::builder().child(&filter_box).build();
         filter_button.add_css_class("flat");
+        if browse_filters {
+            filter_button.set_tooltip_text(Some(&crate::tr!("Filter rows (Ctrl+F)")));
+            filter_button.set_action_name(Some("win.open-filter"));
+        } else {
+            filter_button.set_tooltip_text(Some(&crate::tr!("This database cannot filter a table view")));
+            filter_button.set_sensitive(false);
+        }
 
         // First / Prev / Next / Last sit in a `linked` group so they
         // read as one navigation control — same pattern GNOME Files
@@ -362,7 +365,7 @@ impl BrowseTab {
         // or refetch. Re-fetch on identical filter would just
         // duplicate the F5 path, which the user can take
         // explicitly.
-        if set == self.current_filter {
+        if !self.browse_filters || set == self.current_filter {
             return;
         }
         self.current_filter = set.clone();

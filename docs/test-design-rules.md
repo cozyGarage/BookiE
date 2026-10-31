@@ -15,7 +15,7 @@ Rules that earlier audits paid for. Each one names the failure it prevents. The 
 
 ## Oracles and assertions
 
-- **A parser is not its own oracle.** Testing a lexer or decoder only against itself hides shared mistakes. Take expected values from the engine or another independent source ([ADR 0007](decisions/0007-type-and-value-preservation.md), [oracle review](oracle-review.md)).
+- **A parser is not its own oracle.** Testing a lexer or decoder only against itself hides shared mistakes. Take expected values from the engine or another independent source ([ADR 0007](decisions/0007-type-and-value-preservation.md)).
 - **Assert concrete boundaries and both branches.** Mutation checks exposed symbolic constants in assertions and tests that exercised only one branch. Use the literal boundary value, and test the refusal as well as the accepted case.
 - **Unviable mutants are not catches.** A mutant that does not compile is neither a coverage success nor an equivalent mutant; report it separately, and report a missing mutation report as unavailable, not as zeros.
 - **A negative test proves a trusted control first.** For TLS and similar failures, show the same setup succeeds, then assert the specific error. `is_err()` lets an unrelated failure pass.

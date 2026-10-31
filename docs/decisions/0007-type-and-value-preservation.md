@@ -2,15 +2,14 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-03
-- **Origin**: Extraction of the approved B3 sprint and type-contract rules; no new value representation or completed-support claim.
 
 ## Context
 
-A successful query or matching display text can hide a changed native type, rounded number, shifted timestamp, altered binary encoding or substituted NULL. The sprint and several evidence ledgers repeated these rules, making it easy for a later session to implement a different conversion policy.
+A successful query or matching display text can hide a changed native type, rounded number, shifted timestamp, altered binary encoding or substituted NULL. A shared rule prevents drivers and consumers from applying different conversion policies.
 
 ## Decision
 
-This ADR is the shared type/value standard for drivers, core, grid editing, filters, bound parameters, SQL literals, import/export and MCP. Architecture rules live here; open B3 work is on [Project #3](https://github.com/users/cozyGarage/projects/3) (Lane B3), [the B3 board pointer](../lane-boards.md#b3-types-and-values) keeps accepted refusals and the case record, and [the value index](../value-contracts.md) points to case evidence.
+This ADR is the shared type/value standard for drivers, core, grid editing, filters, bound parameters, SQL literals, import/export and MCP.
 
 ### Four explicit outcomes
 
@@ -30,7 +29,7 @@ Refusal is a safety result, not completed support. Text fallback is not proof of
 1. `Value::Null` means a native NULL. Empty text/bytes/collections, a missing source field, a failed decoder and an unsupported non-NULL cell stay distinct. Use `Value::Undecodable(type_name)` or a typed operation error for unsupported decoding. Never turn a failed conversion into NULL, zero, empty text or debug output presented as the original value.
 2. Use the existing [Value and ColumnInfo](../../crates/core/src/query.rs) contracts. Preserve declared schema spelling where the catalog supplies it, nullability, defaults, key components, generated/identity flags and collation needed by consumers. Query-result type metadata may use a different driver vocabulary; record that distinction instead of pretending it is catalog DDL. Preserve column/row order, duplicate aliases, zero-row metadata and explicit truncation. A sampled schema does not prove collection-wide completeness. Each MongoDB browse request reads a stable `_id`-ascending sample of at most 128 documents for column metadata, then reads its requested page separately and merges types observed in that page. This bounded sample is neither a complete collection census nor a point-in-time snapshot: a type outside both reads may remain undiscovered until a later sample or page, and pages may reflect different database states. External changes are incorporated only when a sample or page observes them.
 3. Choose a carrier that can represent the engine's semantics exactly. Do not force every engine into the narrowest shared scalar. Existing exact text, bytes and tagged JSON/Extended JSON fallbacks remain valid when their native semantics and consumer behavior are proven. PostgreSQL `json` uses an exact source-text carrier because decoding through a JSON object can lose duplicate keys, key order, number precision or source whitespace; PostgreSQL `jsonb` keeps its parsed carrier because the server has already normalized those source distinctions. `Value::Int` alone does not preserve BSON Int32/Int64 width; plain JSON does not preserve every BSON kind.
-4. A new declared-type field, variant or abstraction requires a concrete consumer and an atomic caller/wrapper/adaptor review. The sprint's deferred separate declared-type field is not permission to erase existing metadata. Internal type improvements do not authorize a wire/persistence format change.
+4. A new declared-type field, variant or abstraction requires a concrete consumer and an atomic caller/wrapper/adaptor review. A separate declared-type field is not permission to erase existing metadata. Internal type improvements do not authorize a wire/persistence format change.
 
 ### Conversion and mutation
 
@@ -50,7 +49,7 @@ One semantic contract prevents a correct decoder being followed by a lossy grid/
 
 ## Consequences
 
-Support is tracked by type and consumer, not a driver-wide green badge. Exact text and safe refusal may remain necessary while a native representation is unsupported. Changes touch affected consumers together; tests can be larger than a scalar equality assertion. B3 remains open until its scoped acceptance is met. This record does not change production code or existing evidence.
+Support is evaluated by type and consumer, not by a driver-wide status. Exact text and safe refusal may remain necessary while a native representation is unsupported. Changes touch affected consumers together; tests can be larger than a scalar equality assertion.
 
 ## Alternatives considered
 
@@ -61,4 +60,4 @@ Support is tracked by type and consumer, not a driver-wide green badge. Exact te
 
 ## Type-specific rules
 
-The per-type choices that follow from this record are in [value contract rules](../value-contract-rules.md). The B3 type model keeps the column collation only: a separate declared-type field waits for a consumer, and schema columns keep the declared spelling in `data_type`. Revisit a separate declared-type field when a consumer needs both the declared spelling and a normalized classification.
+The per-type choices that follow from this record are in [value contract rules](../value-contract-rules.md). The type model keeps the column collation only: a separate declared-type field waits for a consumer, and schema columns keep the declared spelling in `data_type`. Revisit a separate declared-type field when a consumer needs both the declared spelling and a normalized classification.

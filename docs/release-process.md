@@ -1,41 +1,26 @@
 # Release process
 
-A release is a git tag named `linux-vX.Y.Z` on the `linux` branch. Pushing the tag runs `.github/workflows/release.yml`, which builds every package on GitHub and drafts the release. Nothing is published until a maintainer reviews the draft and presses Publish.
+A release is a tag named `linux-vX.Y.Z` on the protected `linux` branch. The GitHub release workflow validates the source version, assembles notes from squash-merge commit trailers and builds the release artifacts.
 
-## What a release contains
+## Before tagging
 
-| File | Built by | Install |
-|---|---|---|
-| `bookie_X.Y.Z-1_amd64.deb` | `scripts/build-deb.sh` on Debian testing | `sudo apt install ./bookie_X.Y.Z-1_amd64.deb` |
-| `bookie-X.Y.Z-1-x86_64.pkg.tar.zst` | `scripts/build-arch-rc.sh` in an Arch container | `sudo pacman -U bookie-X.Y.Z-1-x86_64.pkg.tar.zst` |
-| `bookie.flatpak` | `flatpak-builder` from `apps/linux/flatpak` | `flatpak install --user bookie.flatpak` |
-| `BookiE-X.Y.Z-x86_64.AppImage` | `scripts/build-appimage.sh` (linuxdeploy with the GTK plugin) | `chmod +x` and run |
-| `bookie.pot` | `scripts/update-translations.py` | gettext template for translators; not committed to the repository |
-| `SHA256SUMS` | the publish job | `sha256sum --check SHA256SUMS` |
+1. Merge the reviewed release change to `linux` with the workspace version, Meson version and newest AppStream entry set to the same `X.Y.Z` value. Run `python3 scripts/check-release-version.py`.
+2. Confirm each user-facing squash commit has a `Release-Note: <Category>: <text>` trailer, or `Release-Note: none`. Do not edit `CHANGELOG.md`; see [ADR 0022](decisions/0022-release-notes-from-merge-commits.md).
+3. Confirm the merge commit is on `linux` and required checks apply to its exact revision.
 
-The published 0.2.0 Debian package retains the legacy `tablepro` name; development-branch builds use `bookie`. The [platform guide](platforms.md#published-020-release) records the release asset names and toolkit boundary.
+## Build and publish
 
-The `.deb`, the Arch package and the AppImage build with the `dist` Cargo profile (thin LTO, one codegen unit). Test package builds may set `BOOKIE_BUILD_PROFILE=release` to avoid thin LTO; `build-deb.sh` and the PKGBUILD accept only `dist` or `release`. The Flatpak manifest still builds with `release`.
+1. Create and push an annotated `linux-vX.Y.Z` tag on the merged `linux` commit.
+2. Wait for the release workflow. It rejects a source version mismatch or incomplete release notes, builds the packages and drafts the GitHub release.
+3. Review the draft and release-note categories. Verify each asset against `SHA256SUMS` and the build provenance. Install and launch at least one package before publishing.
+4. Publish the reviewed draft. Do not substitute pull-request artifacts for tag-run assets.
 
-Every file also has build provenance recorded by GitHub (`gh attestation verify <file> --repo cozyGarage/BookiE`). The workflow marks draft releases for 0.x tags as pre-releases, but the published [`linux-v0.2.0` release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0) is marked as a normal release. For each future tag, review the draft's flag against the maintainer's release decision and change it before publishing when needed; do not assume the workflow default expresses that decision. The AppImage is built on Debian testing, so it needs a distribution with a comparable glibc.
-
-## Cutting a release
-
-1. Preview the notes with `python3 scripts/release-notes.py assemble --since <previous tag>` ([ADR 0022](decisions/0022-release-notes-from-merge-commits.md)); for the first cut use `--since 669635a06`, because earlier commits carry no notes. Until the release workflow reads trailers, the first cut after that ADR moves the `[Unreleased]` entries of `CHANGELOG.md` under the new version with `python3 scripts/release-notes.py cut X.Y.Z YYYY-MM-DD` and adds the assembled trailer notes by hand. Keep `CHANGELOG.md` until the release is published (step 5), because the Release workflow reads its version section. Check that the workspace version in `Cargo.toml`, `meson.build` and the newest `<release>` in `apps/linux/flatpak/com.tablepro.linux.metainfo.xml` all say X.Y.Z (`python3 scripts/check-release-version.py`). Merge the pull request after required checks pass.
-2. Title that pull request `chore(release): X.Y.Z`; only a release pull request may edit `CHANGELOG.md`. Tag the merged commit and push the tag from a checkout of `linux`; the Release workflow refuses a tagged commit that is not on `linux`:
-   `git tag -a linux-vX.Y.Z -m "BookiE X.Y.Z" && git push origin linux-vX.Y.Z`.
-3. Wait for the Release workflow. It refuses a tag that differs from the source version or a version with no changelog section. The release notes are the version's `CHANGELOG.md` section until the workflow is switched to `assemble`.
-4. Open the draft release on GitHub, confirm the pre-release flag, verify every asset against `SHA256SUMS` and the tag-run provenance, install at least one package, then press Publish. Do not substitute artifacts from a pull-request dry run for assets from the tag run.
-5. After publishing, retire the old changelog in a separate docs change: copy `CHANGELOG.md` unchanged to `docs/archive/changelog-through-X.Y.Z-YYYY-MM-DD.md`, remove `CHANGELOG.md`, and repoint the references that `scripts/check-doc-links.py` and `scripts/check-moved-paths.py` report. From the next release the notes come from `release-notes.py assemble --since <previous tag>` ([ADR 0022](decisions/0022-release-notes-from-merge-commits.md)), once the workflow step is switched.
-
-A change to the workflow or the AppImage script builds all packages on the pull request without publishing, so packaging breakage shows up before a tag.
+The Arch, Debian, Flatpak and AppImage artifact names and installation notes are in the [platform guide](platforms.md).
 
 ## Recovering publication after successful package builds
 
-When all four package jobs passed but draft creation failed, the repaired workflow can reuse that tag run. Dispatch `release.yml` from a reviewed workflow revision, with `artifact_run_id` set to the original run number and `release_tag` to its existing `linux-vX.Y.Z` tag. Leave both inputs empty for ordinary package validation.
-
-Recovery checks that the original run was a tag push, used this release workflow, names the exact tagged commit and completed every package job successfully. It downloads only that run, collects its packages and translation template, regenerates checksums and build provenance, then creates the draft. It does not move the tag or rebuild packages. Provenance identifies the workflow revision that finalized the assets; the original package run and tagged build inputs identify their build source. Verify both identities when qualifying recovered assets.
+The release workflow supports recovery when package builds succeed but draft creation fails. Dispatch `release.yml` with `artifact_run_id` and `release_tag` set to the original tag run. The recovery path validates the run and tagged commit, reuses only that run's artifacts, regenerates checksums and provenance, and does not move the tag or rebuild packages. Verify the original build identity and the workflow revision that finalized the assets.
 
 ## Fixing a bad release
 
-Delete the draft (or unpublish), fix on `linux`, and cut the next patch version. Do not move a tag that anyone may have downloaded.
+Delete or unpublish the draft, fix the source on `linux`, and cut the next patch version. Do not move a tag that users may have downloaded.
