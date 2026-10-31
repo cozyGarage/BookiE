@@ -15,10 +15,12 @@ This page records current branch behavior, including changes made after 0.2.0 wa
 - **Large results have materialization limits** ([#1272](https://github.com/cozyGarage/BookiE/issues/1272)). Materialized results stop at 1 million rows, 10 million cells, or 64 MiB estimated size. Single-statement PostgreSQL `SELECT`s stream cursor pages through `PolicyGuard`, retaining them within an estimated 64 MiB row budget while keeping the newest page and the page being read. A process-local encrypted spool ([#1660](https://github.com/cozyGarage/BookiE/pull/1660), [ADR 0025](decisions/0025-transient-result-page-spool.md)) with a shared 1 GiB quota and a 4,096-page cap per result keeps evicted pages navigable via **Previous page** without re-executing SQL. Other statement shapes and engines remain materialized. The cache and spool budgets bound retained data, not total process memory. GUI stream ownership and aggregate retention work remain open under [#1032](https://github.com/cozyGarage/BookiE/issues/1032).
 - **SQL result filters apply only to loaded rows.** Filter and sort actions are local, show the visible and loaded counts, and do not re-run SQL. Clearing a filter restores loaded rows. Settings carry across reruns of the same statement and pin/unpin while the result remains current or pinned. Selection follows source-row identity when the same materialized result is rerendered; a fresh query resets selection. Settings do not survive an app restart.
 - **File exports use text markers for undecodable cells** ([#883](https://github.com/cozyGarage/BookiE/issues/883)). CSV, JSON, Markdown, HTML, XML, Excel, copied text and MCP CSV content use a visible `<undecodable TYPE>` string; these text representations do not retain a separate typed marker, so a real text value with the same spelling is ambiguous. SQL export refuses the value. MCP JSON retains an explicit tagged `undecodable` value.
-- **Long cells are shown as a preview** (PERF-10). Values over 8 KiB show a typed
-  preview and byte count. Oversized text and JSON previews show at most 512
-  Unicode characters before their size suffix. View Value uses the current value,
-  including pending edits and drafts, but displays at most 1 MiB of rendered text or
+- **Grid cells show bounded text**. Text and JSON cells display at most 512 Unicode
+  characters. Text shows the remaining byte count; JSON shows an ellipsis when its
+  bounded serialization stops before the end. This keeps wide result grids from
+  laying out and retaining long text in every visible cell. Use **View Value** for
+  the current full value. Values over 8 KiB also use a typed preview. View Value
+  includes pending edits and drafts, and displays at most 1 MiB of rendered text or
   the first 16 KiB of binary data as hex. It refetches a previewed persisted row by
   primary key; keyless rows use the full value retained with the loaded result.
   Copy Value copies the full current text or JSON value; binary values currently
