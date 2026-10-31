@@ -3,9 +3,11 @@ use tablepro_core::{ConnectOptions, DatabaseDriver, Value};
 
 async fn table_with(rows: u64) -> (tempfile::TempDir, Arc<dyn Connection>) {
     let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("pages.db");
+    std::fs::File::create(&database).unwrap();
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
-            database: directory.path().join("pages.db").to_string_lossy().into_owned(),
+            database: database.to_string_lossy().into_owned(),
             ..Default::default()
         })
         .await

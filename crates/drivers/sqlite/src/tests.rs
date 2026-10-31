@@ -18,11 +18,19 @@ fn opts_for(path: &str) -> ConnectOptions {
     }
 }
 
+fn create_opts_for(path: &str) -> ConnectOptions {
+    let _ = std::fs::File::create(path);
+    opts_for(path)
+}
+
 #[tokio::test]
 async fn a_read_only_connection_cannot_write_even_when_sql_tries() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("ro.db");
-    let writer = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let writer = SqliteDriver
+        .connect(create_opts_for(path.to_str().unwrap()))
+        .await
+        .unwrap();
     writer
         .execute("CREATE TABLE foo (id INTEGER PRIMARY KEY)")
         .await
@@ -76,10 +84,22 @@ async fn driver_metadata() {
 }
 
 #[tokio::test]
+async fn a_read_write_connection_does_not_create_a_missing_file() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("missing_rw.db");
+    let outcome = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await;
+    assert!(outcome.is_err());
+    assert!(!path.exists());
+}
+
+#[tokio::test]
 async fn an_expression_column_decodes_by_its_runtime_type() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("untyped.db");
-    let conn = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = SqliteDriver
+        .connect(create_opts_for(path.to_str().unwrap()))
+        .await
+        .unwrap();
     conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, label TEXT)")
         .await
         .unwrap();
@@ -120,7 +140,10 @@ async fn an_expression_column_decodes_by_its_runtime_type() {
 async fn a_value_that_does_not_match_its_declared_column_type_keeps_its_text_instead_of_becoming_null() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("affinity.db");
-    let conn = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = SqliteDriver
+        .connect(create_opts_for(path.to_str().unwrap()))
+        .await
+        .unwrap();
     conn.execute("CREATE TABLE t (v REAL)").await.unwrap();
     conn.execute("INSERT INTO t (v) VALUES ('not-a-number')").await.unwrap();
     let result = conn.query("SELECT v FROM t").await.unwrap();
@@ -131,6 +154,7 @@ async fn a_value_that_does_not_match_its_declared_column_type_keeps_its_text_ins
 async fn lists_tables_and_views_separately() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("views.db");
+    std::fs::File::create(&path).unwrap();
     let conn = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE items (id INTEGER)").await.unwrap();
     conn.execute("CREATE VIEW item_view AS SELECT id FROM items")
@@ -153,7 +177,7 @@ async fn connect_create_and_list_tables() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("test.db");
     let driver = SqliteDriver;
-    let conn = driver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = driver.connect(create_opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE foo (id INTEGER PRIMARY KEY, name TEXT)")
         .await
         .unwrap();
@@ -177,7 +201,7 @@ async fn fetch_rows_paginates() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("page.db");
     let driver = SqliteDriver;
-    let conn = driver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = driver.connect(create_opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE n (i INTEGER)").await.unwrap();
     for i in 1..=10 {
         conn.execute(&format!("INSERT INTO n VALUES ({i})")).await.unwrap();
@@ -201,7 +225,7 @@ async fn fetch_rows_handles_table_with_embedded_quote() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("hostile.db");
     let driver = SqliteDriver;
-    let conn = driver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = driver.connect(create_opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE \"weird\"\"name\" (i INTEGER)")
         .await
         .unwrap();
@@ -217,7 +241,7 @@ async fn autoincrement_detected_via_sqlite_sequence() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("ai.db");
     let driver = SqliteDriver;
-    let conn = driver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = driver.connect(create_opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)")
         .await
         .unwrap();
@@ -232,7 +256,7 @@ async fn integer_primary_key_no_autoincrement_is_rowid_alias() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("rowid.db");
     let driver = SqliteDriver;
-    let conn = driver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = driver.connect(create_opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
         .await
         .unwrap();
@@ -245,7 +269,7 @@ async fn integer_primary_key_with_default_is_not_auto_increment() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("def.db");
     let driver = SqliteDriver;
-    let conn = driver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = driver.connect(create_opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY DEFAULT 0, name TEXT)")
         .await
         .unwrap();
@@ -258,7 +282,7 @@ async fn composite_primary_key_no_auto_increment() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("composite.db");
     let driver = SqliteDriver;
-    let conn = driver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = driver.connect(create_opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE t (a INTEGER, b TEXT, PRIMARY KEY(a, b))")
         .await
         .unwrap();
@@ -272,7 +296,7 @@ async fn column_named_autoincrement_substring_is_not_flagged() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("substr.db");
     let driver = SqliteDriver;
-    let conn = driver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    let conn = driver.connect(create_opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, autoincrementflag INTEGER)")
         .await
         .unwrap();

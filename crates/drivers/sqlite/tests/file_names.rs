@@ -7,6 +7,7 @@ use tempfile::TempDir;
 async fn a_file_name_with_url_characters_opens_that_exact_file() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("q?a%20b.db");
+    let _ = std::fs::File::create(&path);
     let options = || ConnectOptions {
         database: path.to_string_lossy().to_string(),
         ..Default::default()

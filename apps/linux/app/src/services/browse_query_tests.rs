@@ -57,9 +57,11 @@ async fn sqlite_hidden_projection_keeps_the_primary_key_and_leaves_hidden_values
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
     let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("projection.db");
+    std::fs::File::create(&database).unwrap();
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
-            database: directory.path().join("projection.db").to_string_lossy().into_owned(),
+            database: database.to_string_lossy().into_owned(),
             ..Default::default()
         })
         .await
@@ -110,9 +112,11 @@ async fn sqlite_value_query_refetches_the_exact_blob_for_a_composite_key() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
     let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("value-fetch.db");
+    std::fs::File::create(&database).unwrap();
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
-            database: directory.path().join("value-fetch.db").to_string_lossy().into_owned(),
+            database: database.to_string_lossy().into_owned(),
             ..Default::default()
         })
         .await

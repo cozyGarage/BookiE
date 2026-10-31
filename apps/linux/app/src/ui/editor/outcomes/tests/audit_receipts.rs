@@ -108,9 +108,11 @@ async fn concurrent_sql_failures_keep_their_own_audit_operation_ids() {
 #[tokio::test]
 async fn a_manual_session_failure_keeps_its_audit_operation_id() {
     let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("session.sqlite");
+    std::fs::File::create(&database).unwrap();
     let connection = drivers_sqlite::SqliteDriver
         .connect(tablepro_core::ConnectOptions {
-            database: directory.path().join("session.sqlite").to_string_lossy().into_owned(),
+            database: database.to_string_lossy().into_owned(),
             ..Default::default()
         })
         .await

@@ -77,8 +77,12 @@ async fn a_table_that_only_references_itself_can_be_dropped() {
 #[tokio::test]
 async fn dropping_a_referenced_parent_in_an_attached_database_is_refused() {
     let directory = tempfile::TempDir::new().expect("temp dir");
-    let main = directory.path().join("main.db").to_string_lossy().to_string();
-    let attached = directory.path().join("aux.db").to_string_lossy().to_string();
+    let main = directory.path().join("main.db");
+    let _ = std::fs::File::create(&main);
+    let main = main.to_string_lossy().to_string();
+    let attached = directory.path().join("aux.db");
+    let _ = std::fs::File::create(&attached);
+    let attached = attached.to_string_lossy().to_string();
     let connection = SqliteDriver
         .connect(ConnectOptions {
             database: main,

@@ -58,6 +58,7 @@ async fn guarded_sqlite_file(
 ) -> std::sync::Arc<dyn tablepro_core::Connection> {
     use crate::services::database_service::{ConnectionMetadata, ReconnectParams};
     let driver: std::sync::Arc<dyn DatabaseDriver> = std::sync::Arc::new(drivers_sqlite::SqliteDriver);
+    std::fs::File::create(path).expect("sqlite file fixture");
     let options = ConnectOptions {
         database: path.to_string_lossy().into_owned(),
         ..Default::default()

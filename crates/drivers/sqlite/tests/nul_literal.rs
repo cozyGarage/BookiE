@@ -7,6 +7,7 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn a_text_value_with_a_nul_byte_survives_a_generated_sqlite_literal() {
     let directory = TempDir::new().unwrap();
+    std::fs::File::create(directory.path().join("nul.db")).unwrap();
     let connection = SqliteDriver
         .connect(ConnectOptions {
             database: directory.path().join("nul.db").to_string_lossy().to_string(),

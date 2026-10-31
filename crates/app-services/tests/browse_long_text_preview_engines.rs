@@ -79,6 +79,7 @@ async fn assert_preview_column(
 #[tokio::test]
 async fn sqlite_previews_a_huge_text_cell() {
     let directory = tempfile::TempDir::new().unwrap();
+    std::fs::File::create(directory.path().join("preview.db")).unwrap();
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
             database: directory.path().join("preview.db").to_string_lossy().to_string(),

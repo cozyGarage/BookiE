@@ -6,7 +6,9 @@ use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Val
 use tempfile::TempDir;
 
 async fn connect(directory: &TempDir) -> Arc<dyn Connection> {
-    let path = directory.path().join("checked.db").to_string_lossy().to_string();
+    let path = directory.path().join("checked.db");
+    let _ = std::fs::File::create(&path);
+    let path = path.to_string_lossy().to_string();
     let options = ConnectOptions {
         database: path,
         ..Default::default()

@@ -23,10 +23,11 @@ fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
 #[tokio::test]
 async fn a_stale_edit_is_refused_when_another_writer_changed_only_the_case() {
     let directory = TempDir::new().unwrap();
-    let path = directory.path().join("collation.db").to_string_lossy().to_string();
+    let path = directory.path().join("collation.db");
+    std::fs::File::create(&path).unwrap();
     let connection = SqliteDriver
         .connect(ConnectOptions {
-            database: path,
+            database: path.to_string_lossy().to_string(),
             ..Default::default()
         })
         .await
