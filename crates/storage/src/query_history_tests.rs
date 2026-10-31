@@ -552,3 +552,76 @@ async fn a_history_file_from_a_newer_version_is_refused_and_left_untouched() {
     assert_eq!(user_version(&check).await.unwrap(), newer);
     assert!(!path.with_extension("before-migrations.db").exists());
 }
+
+async fn fill(store: &HistoryStore, rows: i64) -> Vec<i64> {
+    sqlx::query(
+        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?) \
+         INSERT INTO history (query, driver_id, connection_id, connection_name, executed_at, success, pinned) \
+         SELECT 'select ' || i, 'sqlite', '00000000-0000-0000-0000-000000000000', 'test', i, 1, 0 FROM n",
+    )
+    .bind(rows)
+    .execute(&store.pool)
+    .await
+    .unwrap();
+    sqlx::query_scalar::<_, i64>("SELECT id FROM history ORDER BY id")
+        .fetch_all(&store.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn the_row_cap_drops_the_oldest_unpinned_entries_and_keeps_pinned_ones() {
+    let store = fresh_store().await;
+    let ids = fill(&store, 20).await;
+    store.set_pinned(ids[0], true).await.unwrap();
+    store.set_pinned(ids[1], true).await.unwrap();
+
+    let dropped = store.enforce_row_cap(5).await.unwrap();
+
+    assert_eq!(dropped, 13);
+    let kept = sqlx::query_scalar::<_, i64>("SELECT id FROM history ORDER BY id")
+        .fetch_all(&store.pool)
+        .await
+        .unwrap();
+    let mut expected = vec![ids[0], ids[1]];
+    expected.extend_from_slice(&ids[15..]);
+    assert_eq!(kept, expected);
+}
+
+#[tokio::test]
+async fn the_row_cap_does_nothing_below_the_limit() {
+    let store = fresh_store().await;
+    fill(&store, 5).await;
+    assert_eq!(store.enforce_row_cap(5).await.unwrap(), 0);
+    assert_eq!(store.enforce_row_cap(100).await.unwrap(), 0);
+}
+
+#[tokio::test]
+async fn an_error_message_is_stored_within_its_byte_limit_on_a_character_boundary() {
+    let store = fresh_store().await;
+    let message = "é".repeat(MAX_ERROR_BYTES);
+    let id = store
+        .record(NewEntry {
+            query: "select 1".into(),
+            driver_id: "sqlite".into(),
+            connection_id: Uuid::nil(),
+            connection_name: "test".into(),
+            executed_at: SystemTime::now(),
+            duration_ms: Some(1),
+            rows_affected: None,
+            outcome: Outcome::Error(message),
+            source: Source::Editor,
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+    let stored: String = sqlx::query_scalar("SELECT error FROM history WHERE id = ?")
+        .bind(id)
+        .fetch_one(&store.pool)
+        .await
+        .unwrap();
+
+    assert!(stored.len() <= MAX_ERROR_BYTES);
+    assert!(stored.chars().all(|character| character == 'é'));
+}
