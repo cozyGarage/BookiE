@@ -56,11 +56,20 @@ fn parse_sqlite(text: &str) -> Vec<PlanNode> {
     let mut depths: Vec<(u64, usize)> = Vec::new();
     let mut nodes = Vec::new();
     for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
         let parts: Vec<&str> = line.splitn(4, " | ").collect();
         let [id, parent, _, detail] = parts.as_slice() else {
+            if nodes.is_empty() {
+                continue;
+            }
             return Vec::new();
         };
         let (Ok(id), Ok(parent)) = (id.trim().parse::<u64>(), parent.trim().parse::<u64>()) else {
+            if nodes.is_empty() {
+                continue;
+            }
             return Vec::new();
         };
         let depth = depths
@@ -178,10 +187,24 @@ mod tests {
     }
 
     #[test]
+    fn a_sqlite_plan_with_a_column_header_line_still_nests() {
+        let nodes = parse_plan(
+            "id | parent | notused | detail\n2 | 0 | 0 | SCAN orders\n5 | 0 | 0 | SEARCH customers USING INTEGER PRIMARY KEY (rowid=?)\n7 | 5 | 0 | USE TEMP B-TREE FOR ORDER BY",
+        );
+        let depths: Vec<usize> = nodes.iter().map(|node| node.depth).collect();
+        assert_eq!(depths, [0, 0, 1]);
+        assert_eq!(nodes[2].title, "USE TEMP B-TREE FOR ORDER BY");
+    }
+
+    #[test]
     fn text_that_is_not_a_known_plan_stays_text_only() {
         assert!(parse_plan("Seq Scan on a").is_empty());
         assert!(parse_plan("(empty plan)").is_empty());
         assert!(parse_plan("1 | MySQL | table").is_empty());
+        assert!(parse_plan(
+            "id | select_type | table | type\n1 | SIMPLE | c | const"
+        )
+        .is_empty());
         assert!(parse_plan("").is_empty());
     }
 }
