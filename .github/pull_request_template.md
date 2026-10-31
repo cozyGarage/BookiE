@@ -20,6 +20,6 @@ For a behavior change, include the issue's user-visible Given / When / Then scen
 - Tested commit:
 - Local commands and results:
 - Unrun, blocked or pending checks:
-- Forgejo gate required: yes / no
+- Required acceptance checks: pending / complete
 
 For UI findings, include the Linux distribution, desktop and display protocol, BookiE commit and install method, and database/version when relevant. Redact secrets and private data from logs and screenshots.

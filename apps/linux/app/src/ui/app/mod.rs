@@ -107,6 +107,7 @@ pub struct App {
     sidebar_visible: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<usize>>>,
     sidebar_hidden_schemas: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<String>>>,
     schema_filter_button: gtk::MenuButton,
+    sidebar_fold_button: gtk::Button,
     schema_filter_list: gtk::Box,
     sidebar_views: Vec<tablepro_core::TableInfo>,
     sidebar_tables: Vec<tablepro_core::TableInfo>,
@@ -378,10 +379,24 @@ impl SimpleComponent for App {
                                 set_title: &crate::tr!("Tables"),
                             },
 
+                            pack_end = &gtk::Button {
+                                set_icon_name: "view-refresh-symbolic",
+                                set_tooltip_text: Some(crate::tr!("Refresh tables").as_str()),
+                                set_action_name: Some("win.refresh-sidebar"),
+                            },
+
                             #[name = "table_search_toggle"]
                             pack_end = &gtk::ToggleButton {
                                 set_icon_name: "system-search-symbolic",
                                 set_tooltip_text: Some(crate::tr!("Search tables").as_str()),
+                            },
+
+                            #[name = "sidebar_fold_button"]
+                            pack_end = &gtk::Button {
+                                set_icon_name: "go-up-symbolic",
+                                set_tooltip_text: Some(crate::tr!("Collapse all").as_str()),
+                                set_visible: false,
+                                connect_clicked => AppMsg::ToggleAllSidebarGroups,
                             },
 
                             #[name = "schema_filter_button"]
@@ -463,6 +478,9 @@ impl SimpleComponent for App {
         widgets
             .table_search
             .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Search tables"))]);
+        widgets
+            .sidebar_fold_button
+            .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Collapse all"))]);
 
         let schema_filter_list = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
@@ -543,6 +561,7 @@ impl SimpleComponent for App {
             sidebar_visible: sidebar.visible,
             sidebar_hidden_schemas: sidebar.hidden_schemas,
             schema_filter_button: widgets.schema_filter_button.clone(),
+            sidebar_fold_button: widgets.sidebar_fold_button.clone(),
             schema_filter_list,
             sidebar_views: Vec::new(),
             sidebar_tables: Vec::new(),
@@ -748,6 +767,9 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, crate::ui::browse_tab::BrowseTabInput::EnumLabelsLoaded(labels))
             }
             AppMsg::ForeignKeysLoaded(tab_id, foreign_keys) => self.on_browse_foreign_keys_loaded(tab_id, foreign_keys),
+            AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
+                self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound)
+            }
             AppMsg::RowsLoaded(tab_id, request, result, projected_columns) => {
                 self.on_browse_rows_loaded(tab_id, request, result, projected_columns)
             }
@@ -886,6 +908,8 @@ impl SimpleComponent for App {
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
+            AppMsg::SidebarSearchChanged => self.sync_sidebar_expansion(),
+            AppMsg::RefreshSidebar => self.refresh_sidebar(sender),
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
             AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),
             AppMsg::ShowSidebarSchema(schema) => self.show_sidebar_schema(&schema, &sender),
@@ -1018,11 +1042,16 @@ impl SimpleComponent for App {
                     &self.preferences,
                 );
             }
-            AppMsg::ShowCatalog => crate::ui::catalog_dialog::present(
+            AppMsg::ShowCatalog => self.show_catalog(None),
+            AppMsg::ShowCatalogKind(kind) => self.show_catalog(Some(kind)),
+            AppMsg::ToggleAllSidebarGroups => self.toggle_all_sidebar_groups(),
+            AppMsg::ShowErDiagram { schema } => crate::ui::diagram::present(
                 self.window.upcast_ref::<gtk::Window>(),
+                schema,
                 self.connection_id,
                 &self.database,
                 &self.preferences,
+                crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
                 self.catalog_dialog_cancel.borrow().clone(),
             ),
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),

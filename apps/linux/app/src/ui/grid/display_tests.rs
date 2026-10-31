@@ -26,6 +26,87 @@ fn display_text_primitive_variants() {
 }
 
 #[test]
+fn grid_cell_view_borrows_short_text_without_changing_display() {
+    let value = Value::Text("ordinary cell".into());
+    let source = match &value {
+        Value::Text(source) => source.as_ptr(),
+        _ => std::ptr::null(),
+    };
+    let view = cell_view(&value, &metadata("text"));
+    assert_eq!(view.display_text, "ordinary cell");
+    assert!(!source.is_null());
+    assert!(std::ptr::eq(view.display_text.as_ptr(), source));
+}
+
+#[test]
+fn grid_cell_view_borrows_short_utf8_bytes_without_changing_display() {
+    let value = Value::Bytes(b"ordinary cell".to_vec());
+    let source = match &value {
+        Value::Bytes(source) => source.as_ptr(),
+        _ => std::ptr::null(),
+    };
+    let view = cell_view(&value, &metadata("text"));
+    assert_eq!(view.display_text, "ordinary cell");
+    assert!(!source.is_null());
+    assert!(std::ptr::eq(view.display_text.as_ptr(), source));
+}
+
+#[test]
+fn grid_cell_view_bounds_long_text_and_keeps_full_value_formatting_available() {
+    let value = Value::Text("a".repeat(GRID_CELL_DISPLAY_MAX_CHARS + 10));
+    let view = cell_view(&value, &metadata("text"));
+    assert_eq!(
+        view.display_text,
+        format!("{}… (+10 more bytes)", "a".repeat(GRID_CELL_DISPLAY_MAX_CHARS))
+    );
+    assert!(view.truncated);
+    assert_eq!(
+        value_to_display_text(&value),
+        "a".repeat(GRID_CELL_DISPLAY_MAX_CHARS + 10)
+    );
+    assert!(!std::ptr::eq(
+        view.display_text.as_ptr(),
+        match &value {
+            Value::Text(source) => source.as_ptr(),
+            _ => std::ptr::null(),
+        }
+    ));
+}
+
+#[test]
+fn grid_cell_view_counts_remaining_bytes_after_a_unicode_character_limit() {
+    let value = Value::Text("λ".repeat(GRID_CELL_DISPLAY_MAX_CHARS + 3));
+    let view = cell_view(&value, &metadata("text"));
+    assert_eq!(
+        view.display_text,
+        format!("{}… (+6 more bytes)", "λ".repeat(GRID_CELL_DISPLAY_MAX_CHARS))
+    );
+    assert!(view.truncated);
+}
+
+#[test]
+fn grid_cell_view_bounds_serialized_json_without_losing_source_value() {
+    let source = serde_json::Value::String("x".repeat(GRID_CELL_DISPLAY_MAX_CHARS * 2));
+    let value = Value::Json(Box::new(source.clone()));
+    let view = cell_view(&value, &metadata("json"));
+    assert!(view.truncated);
+    assert!(view.display_text.chars().count() <= GRID_CELL_DISPLAY_MAX_CHARS + 32);
+    assert!(view.display_text.ends_with("more bytes)"));
+    assert_eq!(value, Value::Json(Box::new(source)));
+}
+
+#[test]
+fn grid_cell_view_bounds_json_when_serialization_exceeds_its_byte_budget() {
+    let source = serde_json::Value::String("x".repeat(GRID_CELL_DISPLAY_MAX_CHARS * 8));
+    let value = Value::Json(Box::new(source.clone()));
+    let view = cell_view(&value, &metadata("json"));
+    assert!(view.truncated);
+    assert!(view.display_text.chars().count() <= GRID_CELL_DISPLAY_MAX_CHARS + 1);
+    assert!(view.display_text.ends_with('…'));
+    assert_eq!(value, Value::Json(Box::new(source)));
+}
+
+#[test]
 fn display_text_shows_valid_utf8_bytes_as_text() {
     assert_eq!(
         value_to_display_text(&Value::Bytes(b"hello world".to_vec())),
@@ -82,6 +163,20 @@ fn an_undecodable_cell_is_shown_distinctly_from_null_and_is_not_editable() {
 }
 
 #[test]
+fn a_field_a_document_lacks_is_shown_as_missing_and_not_as_a_decoding_failure() {
+    let missing = Value::Undecodable(Value::MISSING_FIELD.into());
+    let shown = value_to_display_text(&missing);
+    assert_eq!(shown, "(missing)");
+    assert!(!shown.contains("undecodable"));
+    assert_ne!(shown, value_to_display_text(&Value::Null));
+    assert_ne!(
+        cell_view(&missing, &metadata("mixed")).text_for_bind(true),
+        editable_null_sentinel()
+    );
+    assert!(!value_is_inline_editable(&missing));
+}
+
+#[test]
 fn bind_text_for_an_undecodable_cell_in_an_editable_column_stays_display_text() {
     let value = Value::Undecodable("NUMERIC".into());
     let view = cell_view(&value, &metadata("NUMERIC"));
@@ -99,7 +194,8 @@ fn the_null_display_style_changes_the_marker_and_never_the_meaning() {
         let null = cell_view(&Value::Null, &metadata("text"));
         assert!(null.is_null);
         assert_eq!(null.text_for_bind(true), editable_null_sentinel());
-        let text = cell_view(&Value::Text(marker.clone()), &metadata("text"));
+        let marker_value = Value::Text(marker.clone());
+        let text = cell_view(&marker_value, &metadata("text"));
         assert!(!text.is_null);
         assert_eq!(text.text_for_bind(true), marker);
     }
@@ -139,7 +235,8 @@ fn cell_view_keeps_null_distinct_from_text_and_obeys_column_editability() {
     assert!(null.inline_editable);
     assert_eq!(null.text_for_bind(true), "<NULL>");
     assert_eq!(null.text_for_bind(false), "NULL");
-    let text_null = cell_view(&Value::Text("NULL".into()), &text_column);
+    let text_value = Value::Text("NULL".into());
+    let text_null = cell_view(&text_value, &text_column);
     assert!(!text_null.is_null);
     assert_eq!(text_null.text_for_bind(true), "NULL");
 

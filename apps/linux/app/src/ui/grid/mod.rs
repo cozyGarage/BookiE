@@ -35,6 +35,7 @@ use crate::ui::row_store::RowStore;
 use column::{build_column, header_column, is_cell_editable};
 use context_menu::install_grid_context_menus;
 
+pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_null_display, value_to_display_text};
 pub(crate) use value_viewer::present as present_value_viewer;
@@ -70,6 +71,7 @@ pub enum GridMsg {
         col_index: usize,
         column_name: String,
         row_key: Vec<tablepro_core::Value>,
+        edit_row_position: Option<u32>,
     },
     IncompleteRowData,
     ProjectionFailure,
@@ -98,6 +100,9 @@ pub enum GridMsg {
         column: String,
         row: Vec<(String, tablepro_core::Value)>,
     },
+    ShowReferencingRows {
+        row: Vec<(String, tablepro_core::Value)>,
+    },
 }
 
 #[derive(Clone, Default)]
@@ -116,6 +121,8 @@ pub struct TabGridContext {
     /// Marks the column header so a reference is visible before the
     /// cell value picker (a later slice) exists.
     pub foreign_key_columns: std::collections::HashSet<String>,
+    pub has_inbound_foreign_keys: bool,
+    pub filters_unavailable: bool,
     pub choices: ChoiceMap,
 }
 
@@ -206,9 +213,10 @@ pub fn build_column_view(
             result.truncated,
             driver_id,
             context_menu::GridMenuOptions {
-                filterable: tab_ctx.tab_id.is_some(),
+                filterable: tab_ctx.tab_id.is_some() && !tab_ctx.filters_unavailable,
                 row_mutations_allowed: tab_ctx.row_mutations_allowed,
                 foreign_key_columns: tab_ctx.foreign_key_columns.clone(),
+                has_inbound_foreign_keys: tab_ctx.has_inbound_foreign_keys,
                 local_result_view: tab_ctx.local_result_view.clone(),
             },
         )

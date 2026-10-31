@@ -9,8 +9,9 @@ use sqlx::{Connection as SqlxConnection, Pool, Postgres, Row};
 use tablepro_core::sql_syntax::script::LexicalSettings;
 use tablepro_core::{
     CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, ConnectOptions, Connection, DatabaseDriver,
-    DriverError, ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName,
-    QueryResult, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    DriverError, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl,
+    QualifiedTypeName, QueryResult, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
+    run_server_cancellable,
 };
 
 mod array;
@@ -19,6 +20,7 @@ mod decode;
 mod numeric;
 mod params;
 mod pool;
+mod pool_saturation;
 mod query;
 mod session;
 mod temporal;
@@ -130,7 +132,7 @@ impl DatabaseDriver for PgDriver {
         }
         pg_opts = pg_opts.statement_cache_capacity(0);
         let session_options = pg_opts.clone();
-        let pool = pool::options()
+        let pool = pool::options(opts.pool_acquire_timeout())
             .connect_with(pg_opts)
             .await
             .map_err(map_sqlx_connect_error)?;
@@ -532,11 +534,21 @@ impl Connection for PgConnection {
 
     async fn fetch_enum_labels(&self, schema: &str, name: &str) -> Result<Vec<String>, DriverError> {
         let rows = sqlx::query(
-            "SELECT e.enumlabel::text
+            "WITH RECURSIVE type_chain(oid, typtype, typbasetype) AS (
+                 SELECT t.oid, t.typtype, t.typbasetype
+                 FROM pg_catalog.pg_type t
+                 JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+                 WHERE n.nspname = $1 AND t.typname = $2
+                 UNION ALL
+                 SELECT base.oid, base.typtype, base.typbasetype
+                 FROM pg_catalog.pg_type base
+                 JOIN type_chain ON base.oid = type_chain.typbasetype
+                 WHERE type_chain.typtype = 'd'
+             )
+             SELECT e.enumlabel::text
              FROM pg_catalog.pg_enum e
-             JOIN pg_catalog.pg_type t ON t.oid = e.enumtypid
-             JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
-             WHERE n.nspname = $1 AND t.typname = $2
+             JOIN type_chain tc ON tc.oid = e.enumtypid
+             WHERE tc.typtype = 'e'
              ORDER BY e.enumsortorder",
         )
         .bind(schema)
@@ -597,11 +609,65 @@ impl Connection for PgConnection {
             .collect())
     }
 
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT
+                c.conname AS fk_name,
+                t_ns.nspname AS source_schema,
+                t.relname AS source_table,
+                array_agg(a.attname ORDER BY kf.ordinality) AS source_columns,
+                array_agg(fa.attname ORDER BY kf.ordinality) AS target_columns
+            FROM pg_catalog.pg_constraint c
+            JOIN pg_catalog.pg_class t ON t.oid = c.conrelid
+            JOIN pg_catalog.pg_namespace t_ns ON t_ns.oid = t.relnamespace
+            JOIN pg_catalog.pg_class fn_class ON fn_class.oid = c.confrelid
+            JOIN pg_catalog.pg_namespace fn_ns ON fn_ns.oid = fn_class.relnamespace
+            JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
+            JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid AND a.attnum = kf.attnum
+            JOIN LATERAL unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
+                ON kfr.ordinality = kf.ordinality
+            JOIN pg_catalog.pg_attribute fa ON fa.attrelid = c.confrelid AND fa.attnum = kfr.attnum
+            WHERE c.contype = 'f'
+              AND (($2::text IS NULL AND fn_class.relname = $1 AND pg_catalog.pg_table_is_visible(fn_class.oid))
+                 OR (fn_ns.nspname = $2 AND fn_class.relname = $1))
+            GROUP BY c.conname, t_ns.nspname, t.relname
+            ORDER BY c.conname",
+        )
+        .bind(table)
+        .bind(schema)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        let mut keys = Vec::with_capacity(rows.len());
+        for row in rows {
+            let name: String = row.get("fk_name");
+            let source_schema: Option<String> = row.try_get("source_schema").ok();
+            let source_table: String = row.get("source_table");
+            let source_columns: Vec<String> = row.get("source_columns");
+            let target_columns: Vec<String> = row.get("target_columns");
+            keys.push(InboundForeignKeyInfo {
+                name,
+                source_schema,
+                source_table,
+                source_columns,
+                target_columns,
+            });
+        }
+        Ok(keys)
+    }
+
     fn supports_server_cancellation(&self) -> bool {
         true
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
+        if pool_saturation::is_saturated(&self.pool) {
+            return Ok(());
+        }
         sqlx::query("SELECT 1")
             .execute(&self.pool)
             .await

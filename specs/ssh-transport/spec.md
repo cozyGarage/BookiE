@@ -1,8 +1,8 @@
 # SSH transport
 
-This specification describes the SSH transport contract. Source and tests are authoritative for implementation details; the completion page and B4 issues record release and acceptance status.
+This specification describes the SSH transport contract. Source and tests are authoritative for implementation details.
 
-**Spec tier:** buildable **Serves:** `Local DBA` **Implementation:** in use; route acceptance tracked separately **Specification:** draft, needs review **Success metric:** A tunnel opens only after the host key is trusted or explicitly learned; TLS still verifies the saved database hostname, not loopback.
+**Spec tier:** buildable **Serves:** `Local DBA` **Specification:** draft **Success metric:** A tunnel opens only after the host key is trusted or explicitly learned; TLS still verifies the saved database hostname, not loopback.
 
 ## Purpose
 
@@ -19,14 +19,27 @@ Turn a saved SSH hop into a local forward, and decide whether an unknown or chan
 ## Out of scope
 
 - What SQL may run after the driver connects ([governed-sql](../governed-sql/spec.md)).
-- Secret Service storage details for hop passwords and key passphrases ([secret-storage](../secret-storage/spec.md), ADR 0004). Jump-chain editing remains incomplete ([#548](https://github.com/cozyGarage/BookiE/issues/548)).
-- Flatpak OpenSSH refuse (I2 / packaging). That is a packaging decision, not this capability's host-key rule.
+- Secret Service storage details for hop passwords and key passphrases ([secret-storage](../secret-storage/spec.md), ADR 0004).
+- Whether a package enables the optional OpenSSH backend.
 
 ## Core concepts
 
+```mermaid
+flowchart TD
+    Start[Assemble SSH Route] --> CheckKnown{Host Key in known_hosts?}
+    CheckKnown -->|Trusted| OpenTunnel[Open Forwarded Socket / Port]
+    CheckKnown -->|Changed / Mismatch| RejectChanged[Reject: Host Key Changed]
+    CheckKnown -->|Unknown| PromptUser{Prompt User: Trust Key?}
+    PromptUser -->|Refuse| Abort[Abort Connection]
+    PromptUser -->|Learn & Trust| SaveKey[Append to BookiE known_hosts]
+    SaveKey --> OpenTunnel
+    OpenTunnel --> SeparateTLS[Route Bytes to Local Forward<br/>Verify TLS against Real DB Hostname]
+    SeparateTLS --> Handshake[Database TLS Handshake]
+```
+
 - **Dial target.** Where bytes are sent (forwarded socket or `127.0.0.1:ephemeral`).
 - **TLS service identity.** The hostname the certificate must match (the saved database host).
-- **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (an absolute `$XDG_CONFIG_HOME/tablepro/known_hosts`, or `~/.config/tablepro/known_hosts` when XDG_CONFIG_HOME is absent, empty or relative). System `~/.ssh/known_hosts` is unused by that backend (by construction; no negative test).
+- **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (an absolute `$XDG_CONFIG_HOME/tablepro/known_hosts`, or `~/.config/tablepro/known_hosts` when XDG_CONFIG_HOME is absent, empty or relative). System `~/.ssh/known_hosts` is unused by that backend.
 
 ## Data contracts
 
@@ -142,8 +155,7 @@ OpenSSH: force `StrictHostKeyChecking=ask` for the destination and every `ProxyJ
 
 - Keyboard-interactive-only servers are unsupported (`SshError::KeyboardInteractiveUnsupported`).
 - An empty jump chain is `SshError::EmptyChain`.
-- OpenSSH 9.6 and 10 host-key prompts parse to the same `HostKeyConfirmation` (`crates/ssh/src/openssh/prompt.rs`).
-- Jump-chain editing in the UI may still be disabled while per-hop storage already exists. That gap is ledger work, not a second trust rule.
+- OpenSSH host-key prompts are normalized to `HostKeyConfirmation`.
 
 ## Trust boundaries
 
@@ -159,18 +171,12 @@ Transport returns a driver connection. Policy starts after that handle is wrappe
 
 ## Acceptance criteria
 
-Each line names the tip proof. When the proof is code only, that is marked.
-
-- **Known key.** GIVEN a host key that matches BookiE known_hosts WHEN verify runs THEN the outcome is `Trusted`. Proof: `verify_or_learn_trusts_recorded_key_on_repeat`. Forwarding after trust is covered by integration tests such as `password_authentication_succeeds_with_the_correct_password`.
-- **Refuse unknown.** GIVEN `UnknownHostKey::Refuse` AND no matching line WHEN verify_or_learn runs THEN the outcome is `HostKeyOutcome::Unknown` AND the file is unchanged. Proof: `a_refusing_connection_does_not_learn_an_unknown_key_but_still_trusts_a_known_one`. `connect_and_auth` maps that to `SshError::UnknownHostKey`; transport records `TransportError::HostKeyRefused` (`shared_transport_records_builtin_unknown_and_changed_host_key_refusals`).
-- **Changed key.** GIVEN a stored key that does not match WHEN verify runs THEN the outcome is `Changed` and the old line is not overwritten. Proof: `verify_or_learn_detects_key_mismatch`; `a_changed_builtin_host_key_is_refused_without_prompting_or_overwriting`. Tunnel-level `SshError::HostKeyMismatch`: `a_changed_key_on_the_second_hop_is_reported_as_a_host_key_mismatch`.
-- **Revoked key.** GIVEN a key marked `@revoked` for the host WHEN built-in verification runs THEN the connection is refused even if the key also appears in a normal entry, and no prompt or learn path runs. Proof: `a_revoked_key_is_never_trusted_never_learned_and_never_prompted_for`; unrelated revoked hosts and keys do not block a valid entry (`a_revoked_line_for_another_host_or_key_does_not_block_a_good_one`).
-- **Relative XDG config path.** GIVEN `XDG_CONFIG_HOME` is relative WHEN the built-in known-host path is resolved THEN the path falls back to `$HOME/.config/tablepro/known_hosts`. Proof: `the_default_path_ignores_an_empty_or_relative_xdg_config_home`.
-- **Learn new.** GIVEN `UnknownHostKey::Learn` AND no matching line WHEN verify_or_learn succeeds THEN the outcome is `LearnedNew` AND a new line exists. Proof: `verify_or_learn_creates_known_hosts_on_first_use`.
-- **Prompt decline.** GIVEN verify_or_prompt AND the prompter does not accept WHEN the key is unknown THEN the outcome is `Unknown` AND no line is added. Proof: `built_in_host_key_trust_is_persisted_only_after_acceptance`.
-- **TLS identity.** GIVEN SSH plus certificate verification WHEN transport assembles options THEN the TLS hostname is the saved database host, not the local forward. Proof: `socket_forwarding_keeps_the_service_hostname_for_tls`; `verify_full_through_ssh_uses_the_original_database_hostname`; `verify_full_over_a_tcp_tunnel_never_downgrades_to_the_local_dial_address`.
-- **OpenSSH ProxyJump policy.** GIVEN the system OpenSSH backend and a `ProxyJump` route WHEN Bookie starts the master THEN it passes a private config with `StrictHostKeyChecking=ask` before the system and user config includes, and OpenSSH's child uses the same `-F` config. The Docker regression `openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target` runs with a user config that requests `StrictHostKeyChecking no`, confirms both hop keys still prompt, and confirms declining the first hop does not write `known_hosts`. `an_effective_proxy_command_is_refused_without_running_it` confirms effective commands on the target and a hop are refused before execution. `the_master_starts_with_forced_options_null_stdin_and_the_askpass_socket` also checks the config mode, ordering, and master argument. An unknown key on an installed real jump host remains in the [manual acceptance checklist](../../docs/manual-verification-0.2-features.md).
-
-## Open questions
-
-No additional transport behavior question was identified in this source review. Jump-chain editing is tracked under [#548](https://github.com/cozyGarage/BookiE/issues/548); installed acceptance is tracked on the B4 board.
+- **Known key.** GIVEN a host key that matches BookiE known_hosts WHEN verify runs THEN the outcome is `Trusted`.
+- **Refuse unknown.** GIVEN `UnknownHostKey::Refuse` AND no matching line WHEN verify_or_learn runs THEN the outcome is `HostKeyOutcome::Unknown` AND the file is unchanged.
+- **Changed key.** GIVEN a stored key that does not match WHEN verify runs THEN the outcome is `Changed` and the old line is not overwritten.
+- **Revoked key.** GIVEN a key marked `@revoked` for the host WHEN built-in verification runs THEN the connection is refused even if the key also appears in a normal entry, and no prompt or learn path runs.
+- **Relative XDG config path.** GIVEN `XDG_CONFIG_HOME` is relative WHEN the built-in known-host path is resolved THEN the path falls back to `$HOME/.config/tablepro/known_hosts`.
+- **Learn new.** GIVEN `UnknownHostKey::Learn` AND no matching line WHEN verify_or_learn succeeds THEN the outcome is `LearnedNew` AND a new line exists.
+- **Prompt decline.** GIVEN verify_or_prompt AND the prompter does not accept WHEN the key is unknown THEN the outcome is `Unknown` AND no line is added.
+- **TLS identity.** GIVEN SSH plus certificate verification WHEN transport assembles options THEN the TLS hostname is the saved database host, not the local forward.
+- **OpenSSH ProxyJump policy.** GIVEN the system OpenSSH backend and a `ProxyJump` route WHEN BookiE starts the master THEN it applies `StrictHostKeyChecking=ask` to the destination and every hop, independent of later system or user configuration, and refuses effective `ProxyCommand` settings.

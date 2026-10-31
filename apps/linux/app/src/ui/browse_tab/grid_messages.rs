@@ -34,11 +34,8 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             col_index,
             column_name,
             row_key,
-        } => BrowseTabInput::GridFetchCellValue {
-            col_index,
-            column_name,
-            row_key,
-        },
+            edit_row_position,
+        } => fetch_cell_input(col_index, column_name, row_key, edit_row_position),
         GridMsg::IncompleteRowData => BrowseTabInput::IncompleteRowData,
         GridMsg::ProjectionFailure => BrowseTabInput::ProjectionFailure,
         GridMsg::ShowRowAsJson(text) => BrowseTabInput::GridShowRowAsJson(text),
@@ -59,5 +56,20 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
         GridMsg::FilterByValue { column, value } => BrowseTabInput::FilterByValue { column, value },
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
+        GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
+    }
+}
+
+fn fetch_cell_input(
+    col_index: usize,
+    column_name: String,
+    row_key: Vec<tablepro_core::Value>,
+    edit_row_position: Option<u32>,
+) -> BrowseTabInput {
+    BrowseTabInput::GridFetchCellValue {
+        col_index,
+        column_name,
+        row_key,
+        edit_row_position,
     }
 }

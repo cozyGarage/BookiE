@@ -1,1 +1,0 @@
-All 5 workbook stages preserved the exact enum[] text as a string without formulas.

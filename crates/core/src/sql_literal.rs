@@ -164,6 +164,9 @@ fn string_literal(driver_id: &str, text: &str) -> String {
     if driver_id == "mysql" && text.contains(['\\', '\0']) {
         return format!("_utf8mb4 X'{}'", crate::export::hex_encode(text.as_bytes()));
     }
+    if driver_id == "sqlite" && text.contains('\0') {
+        return format!("CAST(X'{}' AS TEXT)", crate::export::hex_encode(text.as_bytes()));
+    }
     if driver_id == "postgres" && text.contains('\\') {
         let escaped = text.replace('\\', "\\\\").replace('\'', "''");
         return format!("E'{escaped}'");

@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 fn identity<'a>(driver_id: &'a str, opts: &'a ConnectOptions, file_based: bool) -> ConnectionIdentity<'a> {
     ConnectionIdentity {
@@ -15,6 +15,19 @@ fn matches_existing(saved: &SavedConnection, identity: &ConnectionIdentity<'_>) 
     matches_endpoint(saved, identity)
         && (identity.file_based
             || saved.username == identity.opts.username && saved.auth_mode == identity.opts.auth_mode)
+}
+
+#[test]
+fn saving_the_same_driver_keeps_attached_database_files() {
+    let mut existing = saved("sqlite", "", AuthMode::Password);
+    existing.attached_databases = vec![AttachedDatabase::new("archive", "/data/archive.db")];
+    let mut options = ConnectOptions::default();
+
+    super::super::preserve_attached_databases("sqlite", Some(&existing), &mut options);
+    assert_eq!(options.attached_databases, existing.attached_databases);
+
+    super::super::preserve_attached_databases("postgres", Some(&existing), &mut options);
+    assert!(options.attached_databases.is_empty());
 }
 
 fn saved(driver_id: &str, username: &str, auth_mode: AuthMode) -> SavedConnection {
@@ -41,6 +54,7 @@ fn saved(driver_id: &str, username: &str, auth_mode: AuthMode) -> SavedConnectio
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 
@@ -242,10 +256,23 @@ fn an_explicit_connection_id_wins_over_endpoint_matching() {
         select_existing(&accounts, &bound).map(|connection| connection.id),
         Some(second.id)
     );
-    assert_eq!(
-        select_existing(&accounts, &identity("mssql", &options, false)).map(|connection| connection.id),
-        Some(first.id)
-    );
+    assert!(select_existing(&accounts, &identity("mssql", &options, false)).is_none());
+}
+
+#[test]
+fn a_new_connection_does_not_replace_a_saved_profile_with_the_same_endpoint() {
+    let first = saved("postgres", "postgres", AuthMode::Password);
+    let mut second = saved("postgres", "postgres", AuthMode::Password);
+    second.name = "pg-2s-timeout".into();
+    second.query_timeout_secs = Some(2);
+    let mut production = saved("postgres", "postgres", AuthMode::Password);
+    production.name = "pg-prod".into();
+    production.environment = Environment::Prod;
+    production.read_only = true;
+    let profiles = [first, second, production];
+    let options = opts("postgres", AuthMode::Password);
+
+    assert!(select_existing(&profiles, &identity("postgres", &options, false)).is_none());
 }
 
 #[test]

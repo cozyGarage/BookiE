@@ -239,6 +239,8 @@ fn is_host_or_file_access_function(driver_id: &str, name: &str) -> bool {
                 | "pg_file_unlink"
         ),
         "mysql" => lowered == "load_file",
+        "mssql" => is_mssql_external_rowset(&lowered),
+        "clickhouse" => is_clickhouse_external_source(&lowered),
         "sqlite" => matches!(lowered.as_str(), "readfile" | "writefile" | "load_extension"),
         "duckdb" => matches!(
             lowered.as_str(),
@@ -256,6 +258,49 @@ fn is_host_or_file_access_function(driver_id: &str, name: &str) -> bool {
         ),
         _ => false,
     }
+}
+
+fn is_mssql_external_rowset(lowered: &str) -> bool {
+    matches!(lowered, "openrowset" | "openquery" | "opendatasource")
+}
+
+fn is_clickhouse_external_source(lowered: &str) -> bool {
+    matches!(
+        lowered,
+        "file"
+            | "url"
+            | "urlcluster"
+            | "s3"
+            | "s3cluster"
+            | "hdfs"
+            | "hdfscluster"
+            | "remote"
+            | "remotesecure"
+            | "cluster"
+            | "clusterallreplicas"
+            | "mysql"
+            | "postgresql"
+            | "mongodb"
+            | "jdbc"
+            | "odbc"
+            | "sqlite"
+            | "azureblobstorage"
+            | "azureblobstoragecluster"
+            | "deltalake"
+            | "deltalakecluster"
+            | "iceberg"
+            | "icebergcluster"
+            | "hudi"
+            | "hudicluster"
+            | "redis"
+            | "executable"
+            | "gcs"
+            | "oss"
+            | "cosn"
+            | "hive"
+            | "arrowflight"
+            | "filecluster"
+    )
 }
 
 fn is_session_state_function(driver_id: &str, name: &str) -> bool {
@@ -277,6 +322,8 @@ fn is_engine_administrative_function_name(driver_id: &str, name: &str) -> bool {
     let lowered = name.to_ascii_lowercase();
     match driver_id {
         "mysql" => matches!(lowered.as_str(), "benchmark" | "load_file" | "sleep"),
+        "mssql" => is_mssql_external_rowset(&lowered),
+        "clickhouse" => is_clickhouse_external_source(&lowered),
         // The fileio and misc loadable extensions turn a SELECT into host
         // file access or module loading; SELECT writefile('~/.bashrc', ...)
         // must not classify as a plain read wherever they are loaded.

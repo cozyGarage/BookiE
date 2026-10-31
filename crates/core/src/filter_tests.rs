@@ -460,6 +460,31 @@ fn ilike_keeps_postgres_native_keyword() {
 }
 
 #[test]
+fn ilike_uses_the_native_keyword_on_engines_that_have_it() {
+    let cols = vec![col("name", "text")];
+    let set = FilterSet {
+        combinator: Combinator::And,
+        rules: vec![rule(
+            "name",
+            FilterOp::Ilike,
+            Some(FilterValue::Single("%alice%".into())),
+        )],
+        extra_sql: None,
+    };
+    for driver in ["postgres", "duckdb", "clickhouse"] {
+        let (sql, _) = build_filter_where(driver, &cols, &set).unwrap().unwrap();
+        assert!(
+            sql.contains(" ILIKE "),
+            "{driver} has a native case-insensitive LIKE: {sql}"
+        );
+    }
+    for driver in ["mysql", "sqlite", "mssql"] {
+        let (sql, _) = build_filter_where(driver, &cols, &set).unwrap().unwrap();
+        assert!(!sql.contains("ILIKE"), "{driver} has no ILIKE: {sql}");
+    }
+}
+
+#[test]
 fn ilike_falls_back_to_like_on_mysql() {
     let cols = vec![col("name", "text")];
     let set = FilterSet {
@@ -930,19 +955,22 @@ fn engines_without_a_default_escape_get_an_escape_clause() {
 
 #[test]
 fn engines_with_a_default_escape_keep_the_plain_like() {
-    for (driver_id, expected) in [
-        ("postgres", "\"note\" LIKE $1"),
-        ("mysql", "`note` LIKE ?"),
-        ("clickhouse", "`note` LIKE ?"),
-    ] {
+    for (driver_id, expected) in [("postgres", "\"note\" LIKE $1"), ("clickhouse", "`note` LIKE ?")] {
         let (sql, _) = like_where(driver_id, FilterOp::Contains, "x");
         assert_eq!(sql, expected, "{driver_id}");
     }
 }
 
 #[test]
+fn mysql_names_its_escape_character_because_no_backslash_escapes_removes_the_default() {
+    let (sql, params) = like_where("mysql", FilterOp::Contains, "50%_|x");
+    assert_eq!(sql, "`note` LIKE ? ESCAPE '|'");
+    assert_eq!(params, vec![Value::Text("%50|%|_||x%".into())]);
+}
+
+#[test]
 fn like_metacharacters_are_escaped_per_driver() {
-    for driver_id in ["postgres", "mysql", "clickhouse", "sqlite", "duckdb", "mssql"] {
+    for driver_id in ["postgres", "clickhouse", "sqlite", "duckdb", "mssql"] {
         let (_, params) = like_where(driver_id, FilterOp::Contains, "50%_a\\b");
         assert_eq!(params, vec![Value::Text("%50\\%\\_a\\\\b%".into())], "{driver_id}");
     }
@@ -955,5 +983,21 @@ fn mssql_escapes_the_open_bracket_and_others_do_not() {
     for driver_id in ["postgres", "mysql", "clickhouse", "sqlite", "duckdb"] {
         let (_, params) = like_where(driver_id, FilterOp::StartsWith, "[abc]");
         assert_eq!(params, vec![Value::Text("[abc]%".into())], "{driver_id}");
+    }
+}
+
+#[test]
+fn a_trailing_line_comment_in_extra_sql_does_not_swallow_the_closing_parenthesis() {
+    let cols = vec![col("id", "integer")];
+    for fragment in ["a > 1 -- note", "a > 1 # note"] {
+        let set = FilterSet {
+            combinator: Combinator::And,
+            rules: vec![rule("id", FilterOp::Gt, Some(FilterValue::Single("10".into())))],
+            extra_sql: Some(fragment.into()),
+        };
+        let (sql, _) = build_filter_where("mysql", &cols, &set).unwrap().unwrap();
+        let closing = sql.rfind(')').unwrap();
+        let last_line = sql[..closing].rsplit('\n').next().unwrap();
+        assert!(!last_line.contains("--") && !last_line.contains('#'), "{sql}");
     }
 }
