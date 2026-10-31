@@ -1,11 +1,11 @@
 # 0025: Keep fetched result pages in a transient spool
 
-- **Status**: Accepted (2026-10-27; implemented in [#1660](https://github.com/cozyGarage/BookiE/pull/1660))
+- **Status**: Accepted (2026-10-27)
 - **Date**: 2026-10-25
 
 ## Context
 
-ADR 0011 streams supported PostgreSQL editor queries through a forward-only cursor and bounds retained row data in memory. A 64 MiB estimated-row budget evicts old pages. Native acceptance under #554 showed that users can receive 100,000 rows but cannot revisit earlier pages when a wide result exceeds that budget. Re-running SQL can observe different data and is not an equivalent way to revisit the same result.
+ADR 0011 streams supported PostgreSQL editor queries through a forward-only cursor and bounds retained row data in memory. A 64 MiB estimated-row budget evicts old pages. A bounded in-memory cache can evict earlier pages before a user finishes reviewing a wide result. Re-running SQL can observe different data and is not an equivalent way to revisit the same result.
 
 The query result values already have a typed Serde representation. The GTK-free `app-services` crate can own temporary page storage and loading, while Relm4 messages keep controller and view updates on the main context. PolicyGuard already classifies, audits and masks each database page before the editor receives it.
 
@@ -25,7 +25,7 @@ For streamed PostgreSQL editor results, retain the existing 64 MiB in-memory pag
 
 This preserves same-execution result semantics while keeping the row cache bounded in memory. A private anonymous file avoids persistent application state and a pathname that other processes can discover. Per-chunk authenticated encryption limits exposure of database values in temporary storage. The application service keeps storage logic testable without GTK, and generation-tagged messages preserve the existing Relm4 ownership model.
 
-The 1 GiB process quota allows the observed 100,000-row result with 2 KiB text values to remain navigable while placing a hard bound on aggregate spool storage. The page cap bounds per-page navigation metadata. The user sees an explicit incomplete-result state if a limit or filesystem is reached.
+The 1 GiB process quota places a hard bound on aggregate spool storage while allowing navigation beyond the in-memory cache. The page cap bounds per-page navigation metadata. The user sees an explicit incomplete-result state if a limit or filesystem is reached.
 
 ## Consequences
 
@@ -41,8 +41,4 @@ The 1 GiB process quota allows the observed 100,000-row result with 2 KiB text v
 - **Change the PostgreSQL cursor to `SCROLL`.** Rejected as a direct fix. PostgreSQL documents possible plan costs and repeated evaluation hazards for volatile functions. `SCROLL WITH HOLD` can materialize the full result on the server and moves the resource problem rather than bounding application storage.
 - **Re-run the query for an evicted page.** Rejected. It can observe changed data, repeats work, and is not navigation within the original execution.
 - **Keep every row in RAM.** Rejected by ADR 0011 because memory grows with result size.
-- **Keep the current bounded window and disable Previous.** Rejected as the completed large-result behavior requested in #554; it leaves already-received rows inaccessible.
-
-## Acceptance evidence
-
-The implementation and test expectations were tracked in [#554](https://github.com/cozyGarage/BookiE/issues/554), which was closed after [PR #1660](https://github.com/cozyGarage/BookiE/pull/1660) merged as `f0ee2e104a3ab5f01ef51ecf2eb1b4f8ea473699`. Local preflight, GTK widgets and the installed 100,000-row PostgreSQL scenario pass; the scenario report is in [stream result spool evidence](../evidence/stream-result-spool-2026-10-25.md). At merge time the exact-head hosted checks were incomplete; the hosted preflight later passed. See PR #1660 for later GitHub results. Forgejo acceptance and maintainer review remain unrecorded, so this ADR stays proposed until the remaining review and acceptance are complete.
+- **Keep the current bounded window and disable Previous.** Rejected because already-received rows must remain navigable within the defined quotas.

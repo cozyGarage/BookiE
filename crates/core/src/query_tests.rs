@@ -270,3 +270,15 @@ fn retained_rows_sums_all_result_sets() {
 
     assert_eq!(batch.retained_rows(), 3);
 }
+
+#[test]
+fn partial_cell_descriptors_keep_the_byte_count_and_prefix() {
+    let value = super::partial_value(4097, "prefix\u{1}tail");
+    let super::Value::Undecodable(kind) = value else {
+        panic!("partial values must not be editable scalars")
+    };
+    assert_eq!(super::parse_partial(&kind), Some((4097, "prefix\u{1}tail")));
+    for invalid in ["partial x bytes\u{1}tail", "partial 42", "ordinary stored text"] {
+        assert_eq!(super::parse_partial(invalid), None);
+    }
+}

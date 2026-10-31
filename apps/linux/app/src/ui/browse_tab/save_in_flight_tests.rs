@@ -1,7 +1,6 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
-use relm4::gtk::gio::prelude::ListModelExt;
-use relm4::gtk::glib::prelude::Cast;
 use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt};
+use relm4::gtk::{gio::prelude::ListModelExt, glib::prelude::Cast};
 use relm4::{Component, ComponentController, Controller};
 use std::sync::mpsc::Receiver;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
@@ -58,6 +57,7 @@ pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<Br
             table: "notes".into(),
             driver_id: "postgres".into(),
             enum_input_style: tablepro_core::EnumInputStyle::RawValue,
+            browse_filters: true,
             connection_id: None,
             read_only,
             page_size: 100,

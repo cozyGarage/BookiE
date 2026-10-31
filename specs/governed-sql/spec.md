@@ -1,8 +1,6 @@
 # Governed SQL
 
-> [NEEDS REVIEW] Draft written on 2026-10-11 from PolicyGuard, MCP auth and ARCHITECTURE. A maintainer review is pending.
-
-**Spec tier:** buildable **Serves:** `Local DBA`, `MCP operator` **Implementation:** in use; acceptance tracked separately **Specification:** draft, needs review **Success metric:** Every issued GUI, MCP and agent database handle is a `PolicyGuard`; denied work and cancelled approval or bulk finish write a terminal audit state when audit storage is available.
+**Spec tier:** buildable **Serves:** `Local DBA`, `MCP operator` **Specification:** draft **Success metric:** Every issued GUI, MCP and agent database handle is a `PolicyGuard`; denied work and cancelled approval or bulk finish write a terminal audit state when audit storage is available.
 
 ## Purpose
 
@@ -171,7 +169,7 @@ Terminal audit states: `succeeded`, `failed`, `denied`, `cancelled`, `timed_out`
 
 - The system MUST wrap every issued consumer-facing database handle in `PolicyGuard`.
 - MCP and `bookie-agentd` MUST NOT expose a raw driver connection through `ConnectionProvider`.
-- Preview, transaction, retry and batch paths MUST use the same rule, approval, intent and audit pipeline as direct execution. Session statements MAY skip `shared_connection_decision`. Known gap: inside a session or transaction the blast-radius count runs on the shared pool, not the session ([#1726](https://github.com/cozyGarage/BookiE/issues/1726)).
+- Preview, transaction, retry and batch paths MUST use the same rule, approval, intent and audit pipeline as direct execution. Session statements MAY skip `shared_connection_decision`.
 - `PolicyGuard::begin` and `begin_controlled` are transaction setup calls. They are allowed for read-only connections and agent principals, do not create a standalone audit event, and do not grant SQL authority. Each statement inside the transaction MUST pass the same policy and audit checks as a direct statement. Commit and rollback retain their transaction audit outcomes.
 
 ### MCP checks
@@ -183,7 +181,7 @@ Terminal audit states: `succeeded`, `failed`, `denied`, `cancelled`, `timed_out`
 ### Audit
 
 - Denied, failed, cancelled and timed-out operations MUST produce the matching terminal audit state.
-- Operations with uncertain post-dispatch outcomes MUST be recorded as `unknown`; the client MUST NOT imply safe retry or replay. Known gap: CSV bulk import records an ambiguous batch failure as `failed` ([#1720](https://github.com/cozyGarage/BookiE/issues/1720)).
+- Operations with uncertain post-dispatch outcomes MUST be recorded as `unknown`; the client MUST NOT imply safe retry or replay.
 - Audit failure MUST NOT open a path around policy.
 
 ## Invariants
@@ -227,19 +225,13 @@ Transport opens the tunnel and preserves the TLS service identity. This capabili
 
 ## Acceptance criteria
 
-Each line names the tip proof. When the proof is code only, that is marked.
-
-- **Guard is the handle.** GIVEN a GUI, MCP or agentd consumer WHEN a handle is issued THEN it is a `PolicyGuard`. Proof: `DatabaseService::handle` / `guard_with_identity`; `agentd::guarded`; MCP `ConnectionProvider` impls. The app may store a raw driver internally. No test downcasts the issued type.
-- **Deny audits.** GIVEN a statement the rules deny WHEN authorize runs THEN the caller receives `DriverError::PolicyDenied` AND the journal has terminal status `denied`. Proof: `a_denied_approval_writes_the_terminal_audit_state_and_grants_nothing`; `sql_server_batches_with_mutations_are_classified_and_denied_before_dispatch`.
-- **Audit intent fail-closed.** GIVEN required audit intent that cannot persist WHEN authorize would otherwise allow THEN execution does not run AND the error mentions that audit intent could not be persisted. Proof: `required_intent_failure_prevents_driver_execution`. Exception: Local/Dev human with `human_allow_unaudited_writes` (`handle_intent_failure`).
-- **Read-only token.** GIVEN `TokenPermissions::ReadOnly` WHEN a write tool is called THEN `authorize_scopes` fails and no connection is opened for that write. Proof: `write_without_tools_write_scope_denied`; `a_read_only_token_is_refused_a_delete_before_a_connection_opens`.
-- **Empty allowlist.** GIVEN a token whose `connection_allowlist` is empty WHEN `ensure_connection_allowed` runs THEN connection use is denied. Proof: `empty_allowlist_denies_connection_access` (asserts the error mentions `allowlist`). Code string: `token has an empty connection allowlist`.
-- **Unparseable is a write.** GIVEN SQL the parser rejects WHEN classify runs THEN `StatementClass` is `Unparseable` AND `is_write` is true. Proof: `parse_failure_fail_closed`.
-- **PostgreSQL locking reads are writes.** GIVEN a `SELECT` with a row-locking clause WHEN classification runs THEN policy treats it as a write. Proof: `locking_reads_are_writes_because_a_read_only_session_refuses_them` checks `classify(...).writes()` for `FOR UPDATE`, `FOR SHARE`, `FOR NO KEY UPDATE`, and nested queries; it does not exercise the guard or driver dispatch.
-- **Cancel still audits.** GIVEN a pending approval or governed bulk finish WHEN work is cancelled THEN the journal records terminal `cancelled`. Proof: `cancelling_a_pending_approval_records_a_terminal_cancelled_outcome`; `a_cancelled_import_writes_the_cancelled_terminal_state`. Mapping `DriverError::Cancelled` after intent to journal `cancelled` is in `controlled_error_terminal_status` and has no dedicated post-intent execute test.
-- **Cursor pages stay governed.** GIVEN a single read in a read-only snapshot WHEN pages are fetched THEN every page is masked and all records share one operation ID. A page failure, cancellation or timeout closes the cursor and records the outcome. Proof: `cursor_masks_every_page_and_keeps_one_audit_operation_id`, `a_page_error_closes_the_cursor_and_records_failure_after_prior_pages`, `cancellation_after_a_delivered_page_closes_and_audits_the_cursor`, and `a_cursor_timeout_closes_and_audits_the_cursor`.
-- **Unsupported cursor stays refused.** GIVEN a driver without cursor support WHEN a cursor is opened THEN it returns `Unsupported` without materializing the query. Proof: `unsupported_cursor_is_refused_without_materializing_the_query`.
-
-## Open questions
-
-Architect review of this draft remains open. Transaction setup behavior is recorded in Guard wrapping; [#889](https://github.com/cozyGarage/BookiE/issues/889) is closed.
+- **Guard is the handle.** GIVEN a GUI, MCP or agentd consumer WHEN a handle is issued THEN it is a `PolicyGuard`.
+- **Deny audits.** GIVEN a statement the rules deny WHEN authorize runs THEN the caller receives `DriverError::PolicyDenied` AND the journal has terminal status `denied`.
+- **Audit intent fail-closed.** GIVEN required audit intent that cannot persist WHEN authorize would otherwise allow THEN execution does not run AND the error mentions that audit intent could not be persisted. Local or Dev human writes may use the configured `human_allow_unaudited_writes` exception.
+- **Read-only token.** GIVEN `TokenPermissions::ReadOnly` WHEN a write tool is called THEN `authorize_scopes` fails and no connection is opened for that write.
+- **Empty allowlist.** GIVEN a token whose `connection_allowlist` is empty WHEN `ensure_connection_allowed` runs THEN connection use is denied. The refusal is explicit and does not open a database connection.
+- **Unparseable is a write.** GIVEN SQL the parser rejects WHEN classify runs THEN `StatementClass` is `Unparseable` AND `is_write` is true.
+- **PostgreSQL locking reads are writes.** GIVEN a `SELECT` with a row-locking clause WHEN classification runs THEN policy treats it as a write. This includes row-locking clauses in nested queries.
+- **Cancel still audits.** GIVEN a pending approval or governed bulk finish WHEN work is cancelled THEN the journal records terminal `cancelled`.
+- **Cursor pages stay governed.** GIVEN a single read in a read-only snapshot WHEN pages are fetched THEN every page is masked and all records share one operation ID. A page failure, cancellation or timeout closes the cursor and records the terminal outcome.
+- **Unsupported cursor stays refused.** GIVEN a driver without cursor support WHEN a cursor is opened THEN it returns `Unsupported` without materializing the query.

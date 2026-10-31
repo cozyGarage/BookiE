@@ -39,6 +39,7 @@ async fn redis_guarded_refetch_preserves_binary_key_and_value() {
         columns: &columns,
         filter: &tablepro_core::FilterSet::default(),
         hidden_columns: None,
+        long_text_preview: false,
     };
     let key_value = Value::Bytes(key.clone());
     let query = target.value_query(3, std::slice::from_ref(&key_value)).unwrap();

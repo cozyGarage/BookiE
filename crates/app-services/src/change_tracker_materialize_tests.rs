@@ -287,16 +287,18 @@ fn typed_primary_keys_reach_the_where_clause_unchanged() {
             .collect();
         let note = columns.len() - 1;
         let row_key = RowKey::from_pk_values(&key_values).unwrap();
-        let mut tracker = TabChangeTracker::new();
-        tracker.track_cell_edit(row_key.clone(), note, Value::Null, Value::Text("edited".into()));
-        tracker.track_delete(row_key, Vec::new());
+        let mut edited = TabChangeTracker::new();
+        edited.track_cell_edit(row_key.clone(), note, Value::Null, Value::Text("edited".into()));
+        let mut deleted = TabChangeTracker::new();
+        deleted.track_delete(row_key, Vec::new());
 
-        let (statements, _) = tracker.materialize("postgres", None, "t", &columns).unwrap();
+        let (update, _) = edited.materialize("postgres", None, "t", &columns).unwrap();
+        let (delete, _) = deleted.materialize("postgres", None, "t", &columns).unwrap();
         let mut update_params = vec![Value::Text("edited".into())];
         update_params.extend(key_values.iter().cloned());
         update_params.push(Value::Null);
-        assert_eq!(statements[0].1, key_values);
-        assert_eq!(statements[1].1, update_params);
+        assert_eq!(delete[0].1, key_values);
+        assert_eq!(update[0].1, update_params);
     }
 }
 
@@ -433,4 +435,32 @@ fn undoing_back_to_the_untouched_draft_value_lets_the_default_apply_again() {
 
     let (statements, _) = tracker.materialize("postgres", None, "t", &defaulted).unwrap();
     assert_eq!(statements[0].0, r#"INSERT INTO "t" ("label") VALUES ($1)"#);
+}
+
+#[test]
+fn a_deleted_row_is_not_also_updated() {
+    let mut tracker = TabChangeTracker::new();
+    tracker.track_cell_edit(key(1), 1, Value::Text("a".into()), Value::Text("b".into()));
+    tracker.track_delete(key(1), vec![Value::Int(1), Value::Text("a".into()), Value::Null]);
+
+    let (statements, sources) = materialize(&tracker);
+
+    assert_eq!(statements.len(), 1);
+    assert!(statements[0].0.starts_with("DELETE FROM"), "{}", statements[0].0);
+    assert!(matches!(sources.as_slice(), [StatementSource::Delete { .. }]));
+    assert_eq!(tracker.pending_count(), 1);
+}
+
+#[test]
+fn undoing_a_delete_brings_back_the_edit_of_that_row() {
+    let mut tracker = TabChangeTracker::new();
+    tracker.track_cell_edit(key(1), 1, Value::Text("a".into()), Value::Text("b".into()));
+    tracker.track_delete(key(1), vec![Value::Int(1), Value::Text("a".into()), Value::Null]);
+    tracker.undo().unwrap();
+
+    let (statements, _) = materialize(&tracker);
+
+    assert_eq!(statements.len(), 1);
+    assert!(statements[0].0.starts_with("UPDATE"), "{}", statements[0].0);
+    assert_eq!(tracker.pending_count(), 1);
 }

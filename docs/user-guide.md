@@ -128,7 +128,7 @@ From the app menu, choose **Back Up Database…** to save a custom-format `.dump
 
 ## Snapshots
 
-Database snapshots are not available. [ADR 0015](decisions/0015-database-snapshots.md) records an accepted design; implementation is listed as post-0.2.0 work in the [backlog](backlog.md), with no release target. PostgreSQL logical backup and restore are available separately; see [Back up and restore PostgreSQL](#back-up-and-restore-postgresql).
+Database snapshots are not available. [ADR 0015](decisions/0015-database-snapshots.md) records the accepted design. PostgreSQL logical backup and restore are available separately; see [Back up and restore PostgreSQL](#back-up-and-restore-postgresql).
 
 ## AI agents (MCP)
 

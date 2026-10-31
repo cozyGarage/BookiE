@@ -1,8 +1,6 @@
 # Secret storage
 
-> [NEEDS REVIEW] Draft written on 2026-10-11 from `tablepro-storage` secrets, paths, transport keyring mapping and [ADR 0004](../../docs/decisions/0004-libsecret-secret-storage.md). A maintainer review is pending.
-
-**Spec tier:** buildable **Serves:** `Local DBA`, `MCP operator` **Implementation:** shipped under [ADR 0004](../../docs/decisions/0004-libsecret-secret-storage.md) **Specification:** draft pending review **Success metric:** Keyring failure is never treated as a missing password; connection JSON never holds a secret.
+**Spec tier:** buildable **Serves:** `Local DBA`, `MCP operator` **Specification:** draft **Success metric:** Keyring failure is never treated as a missing password; connection JSON never holds a secret.
 
 ## Purpose
 
@@ -21,7 +19,7 @@ Distinguish "no item stored" from "keyring unavailable, locked or cancelled", an
 - What SQL may run after connect ([governed-sql](../governed-sql/spec.md)).
 - SSH host-key trust ([ssh-transport](../ssh-transport/spec.md)).
 - XDG paths, query history, audit journal, preferences and bundle crypto ([storage guide](../../docs/storage.md)).
-- Flatpak portal and sandbox Secret Service wiring (packaging / PKG-8).
+- Secret Service behavior under packaging sandboxes.
 
 ## Core concepts
 
@@ -150,15 +148,9 @@ GUI-issued MCP token plaintext is returned once and best-effort stored here; iss
 
 ## Acceptance criteria
 
-Each line names the tip proof. When the proof is code only, that is marked.
-
-- **No JSON password.** GIVEN a saved SQLite or DuckDB connection WHEN the record is serialized THEN it has no `password` field. Proof: `local_sqlite_and_duckdb_records_do_not_store_password_fields`.
-- **Absent vs failed.** GIVEN no matching keyring item WHEN `load_secret_with_attrs` finds none THEN the result is `Ok(None)`. Proof: code in `load_secret_with_attrs`. D-Bus mapping: `keyring_failures_are_told_apart` and `a_missing_secret_service_is_recognised_from_the_dbus_error_text`.
-- **Unavailable / locked / cancelled.** GIVEN those D-Bus errors WHEN `keyring_failure` runs THEN the variants are `Unavailable`, `Locked` and `UnlockCancelled`. Proof: same unit tests. Live Secret Service absence is the isolated keyring tier, not this unit map.
-- **Transport fail-closed.** GIVEN `StorageError::Keyring(_)` WHEN `secret_error` runs THEN the result is `TransportError::Keyring`. Proof: `secret_error` in `crates/transport/src/lib.rs`. No dedicated transport unit test; the GUI maps `TransportError::Keyring` in `connection_service.rs`.
-- **Hop revision.** GIVEN hop attributes for revision N WHEN compared with revision N+1 THEN the attribute maps differ. Proof: `hop_secret_attributes_do_not_collide_across_hops_kinds_or_revisions`. A live load of the wrong revision is not separately tested.
-- **Devel schema.** GIVEN `TABLEPRO_PROFILE=development` WHEN `secret_schema()` is read THEN it is `com.tablepro.linux.Devel.Password`. Proof: `profile_paths_and_secrets_share_an_identity`.
-
-## Open questions
-
-None known. Architect review of this draft is still the open checklist fork.
+- **No JSON password.** GIVEN a saved SQLite or DuckDB connection WHEN the record is serialized THEN it has no `password` field.
+- **Absent vs failed.** GIVEN no matching keyring item WHEN `load_secret_with_attrs` finds none THEN the result is `Ok(None)`.
+- **Unavailable / locked / cancelled.** GIVEN those D-Bus errors WHEN `keyring_failure` runs THEN the variants are `Unavailable`, `Locked` and `UnlockCancelled`.
+- **Transport fail-closed.** GIVEN `StorageError::Keyring(_)` WHEN `secret_error` runs THEN the result is `TransportError::Keyring`.
+- **Hop revision.** GIVEN hop attributes for revision N WHEN compared with revision N+1 THEN the attribute maps differ.
+- **Devel schema.** GIVEN `TABLEPRO_PROFILE=development` WHEN `secret_schema()` is read THEN it is `com.tablepro.linux.Devel.Password`.

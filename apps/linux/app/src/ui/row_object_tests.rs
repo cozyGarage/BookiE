@@ -104,6 +104,32 @@ fn shared_result_rows_do_not_clone_large_cell_payloads_into_row_objects() {
 }
 
 #[test]
+fn a_server_cut_cell_shows_its_prefix_and_blocks_row_copy_and_export() {
+    let partial = tablepro_core::partial_value(2_097_152, "begin");
+    let row = RowObject::new(vec![Value::Int(7), partial.clone()]);
+    row.preview_long_values(&[0]);
+
+    let preview = row.cell_preview(1).expect("the cut cell previews its prefix");
+    assert_eq!(preview.value, Value::Text("begin".into()));
+    assert_eq!(preview.byte_count, 2_097_152);
+    assert!(row.cell_is_partial(1));
+    assert!(!row.cell_is_partial(0));
+    assert!(!row.cell_is_loaded(1));
+    assert!(!row.cells_are_complete());
+    assert_eq!(row.complete_cells(), None);
+    assert_eq!(row.loaded_cells(), vec![Some(Value::Int(7)), None]);
+
+    row.set_cell(1, Value::Text("the whole value".into()));
+    assert!(!row.cell_is_partial(1));
+    assert!(row.cell_is_loaded(1));
+    assert!(row.cell_preview(1).is_none());
+    assert_eq!(
+        row.complete_cells(),
+        Some(vec![Value::Int(7), Value::Text("the whole value".into())])
+    );
+}
+
+#[test]
 fn projected_cells_distinguish_unfetched_values_from_sql_null() {
     let row = RowObject::new_projected(vec![Value::Null, Value::Text("shown".into())], &[0, 2], 3).unwrap();
 

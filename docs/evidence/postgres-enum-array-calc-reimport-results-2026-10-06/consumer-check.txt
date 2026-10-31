@@ -1,1 +1,0 @@
-LibreOffice Calc preserved custom enum-array text, formula-shaped text, NULL distinctions, and string cells across XLSX/ODS/XLSX

@@ -111,6 +111,13 @@ optional = true
 version = "2.4"
 default-features = false
 
+[dependencies.socket2]
+version = "0.6"
+
+[dependencies.tokio]
+version = "1"
+features = ["net"]
+
 [dependencies.byteorder]
 version = "1.4.3"
 features = ["std"]

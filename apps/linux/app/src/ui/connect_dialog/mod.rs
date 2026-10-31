@@ -42,6 +42,7 @@ pub struct ConnectDialog {
     tls_client_cert: adw::EntryRow,
     tls_client_key: adw::EntryRow,
     read_only: adw::SwitchRow,
+    connect_timeout_row: adw::ActionRow,
     connect_timeout: gtk::SpinButton,
     query_timeout: gtk::SpinButton,
     environment: AccessibleChoice,
@@ -389,6 +390,7 @@ impl Component for ConnectDialog {
             tls_client_cert,
             tls_client_key,
             read_only,
+            connect_timeout_row,
             connect_timeout,
             query_timeout,
             environment,
@@ -819,6 +821,7 @@ impl ConnectDialog {
         self.apply_socket_visibility(endpoint);
         self.tls_row.set_visible(network);
         self.auth_group.set_visible(!self.form.file_based);
+        self.connect_timeout_row.set_visible(!self.form.file_based);
         self.ssh.set_visible(network);
         if socket {
             self.tls_mode.set_selected(TlsMode::Disabled.index());
@@ -831,39 +834,6 @@ impl ConnectDialog {
         let credentials = self.form.shows_credentials();
         self.username.set_visible(credentials);
         self.password.set_visible(credentials);
-    }
-
-    fn collect_options(&self, driver: &dyn tablepro_core::DatabaseDriver) -> ConnectOptions {
-        let socket = self.uses_local_socket();
-        let (local_socket_dir, local_socket_path) =
-            self.selected_socket_options(self.form.local_socket_path_kind(), socket);
-        let (username, password) = if self.form.shows_credentials() {
-            let entered = self.username.text().trim().to_string();
-            let username = if socket && entered.is_empty() {
-                whoami::username().unwrap_or_default()
-            } else {
-                entered
-            };
-            (username, self.password.text().to_string())
-        } else {
-            (String::new(), String::new())
-        };
-        ConnectOptions {
-            host: self.host.text().trim().to_string(),
-            port: self.port.value() as u16,
-            database: form::typed_database(&self.database.text()),
-            auth_source: auth_source::value(&self.auth_source),
-            username,
-            password: SecretString::new(password.into()),
-            tls: self.tls_config_for(driver),
-            auth_mode: self.form.mode(),
-            local_socket_dir,
-            local_socket_path,
-            application_name: Some("BookiE".into()),
-            connect_timeout_secs: timeout_value(self.connect_timeout.value()),
-            read_only: self.read_only.is_active(),
-            ..Default::default()
-        }
     }
 
     fn endpoint_state(&self) -> crate::services::connection_form::EndpointFormState {

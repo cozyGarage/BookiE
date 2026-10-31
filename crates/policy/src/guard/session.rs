@@ -650,7 +650,7 @@ impl PolicySession {
         }
         let authorization = self
             .guard
-            .authorize_classified(sql, analysis, Some(control), Some(&mut *self.inner))
+            .authorize_classified(sql, analysis, Some(control), Some(Counter::Session(&mut *self.inner)))
             .await?;
         let writes = authorization.analysis.facts.writes();
         let rolls_back_to_savepoint = authorization.analysis.rolls_back_to_savepoint;

@@ -1,3 +1,0 @@
-tablepro-core: cargo clippy --all-targets -- -D warnings — passed
-tablepro-app: cargo clippy --all-targets -- -D warnings — passed
-tablepro-driver-postgres: cargo clippy --all-targets -- -D warnings — passed

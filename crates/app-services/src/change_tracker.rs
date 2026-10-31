@@ -113,7 +113,12 @@ impl TabChangeTracker {
     }
 
     pub fn pending_count(&self) -> usize {
-        self.inserts.len() + self.deletes.len() + self.updates.len()
+        let live_updates = self
+            .updates
+            .keys()
+            .filter(|(row_key, _)| !self.deletes.contains_key(row_key))
+            .count();
+        self.inserts.len() + self.deletes.len() + live_updates
     }
 
     pub fn has_pending(&self) -> bool {
@@ -462,6 +467,9 @@ impl TabChangeTracker {
         let (out, sources) = changes;
         let mut per_row: HashMap<RowKey, Vec<MaterializedCellEdit>> = HashMap::new();
         for ((row_key, col), edit) in &self.updates {
+            if self.deletes.contains_key(row_key) {
+                continue;
+            }
             per_row
                 .entry(row_key.clone())
                 .or_default()

@@ -11,17 +11,18 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 use tablepro_core::sql_dialect::build_order_and_pagination;
 use tablepro_core::{
-    AuthMode, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
-    QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
+    AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
+    ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
+    QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
 };
 
+mod catalog;
 mod codec;
 mod session;
 mod variant_guard;
 mod zoned;
 
-type MssqlClient = Client<Compat<TcpStream>>;
+pub(crate) type MssqlClient = Client<Compat<TcpStream>>;
 
 /// Matches the `acquire_timeout` the sqlx-backed drivers give their
 /// pools, so a dead host fails at the same speed on every engine.
@@ -83,6 +84,10 @@ impl DatabaseDriver for MssqlDriver {
 
     fn supports_foreign_key_metadata(&self) -> bool {
         true
+    }
+
+    fn catalog_object_kinds(&self) -> &'static [tablepro_core::CatalogObjectKind] {
+        catalog::SUPPORTED_KINDS
     }
 
     fn supports_integrated_auth(&self) -> bool {
@@ -204,6 +209,13 @@ async fn open_client(target: MssqlTarget) -> Result<MssqlClient, DriverError> {
         .await
         .map_err(map_io_error)?;
     tcp.set_nodelay(true).map_err(map_io_error)?;
+    socket2::SockRef::from(&tcp)
+        .set_tcp_keepalive(
+            &socket2::TcpKeepalive::new()
+                .with_time(std::time::Duration::from_secs(30))
+                .with_interval(std::time::Duration::from_secs(10)),
+        )
+        .map_err(map_io_error)?;
     Client::connect(target.config, tcp.compat_write())
         .await
         .map_err(map_tiberius_error)
@@ -241,10 +253,36 @@ impl MssqlConnection {
             return Err(DriverError::Disconnected);
         }
         let guard = self.client.lock().await;
+        if !self.usable.load(Ordering::Acquire) {
+            return Err(DriverError::Disconnected);
+        }
         match tokio::sync::MutexGuard::try_map(guard, Option::as_mut) {
             Ok(client) => Ok(client),
             Err(_guard) => Err(DriverError::Disconnected),
         }
+    }
+
+    async fn list_relations(&self, catalog_view: &'static str) -> Result<Vec<TableInfo>, DriverError> {
+        let sql = format!(
+            "SELECT s.name AS schema_name, t.name AS table_name \
+             FROM {catalog_view} t \
+             JOIN sys.schemas s ON t.schema_id = s.schema_id \
+             WHERE t.is_ms_shipped = 0 \
+             ORDER BY s.name, t.name"
+        );
+        let mut client = self.client().await?;
+        let result = self.query_result(&mut client, &sql, &[], MAX_QUERY_ROWS).await?;
+        Ok(result
+            .rows
+            .iter()
+            .filter_map(|row| {
+                let name = as_text(row.get(1))?;
+                Some(TableInfo {
+                    schema: as_text(row.first()),
+                    name,
+                })
+            })
+            .collect())
     }
 
     async fn run_abandonable<T, F>(&self, operation: F, control: &OperationControl) -> Result<T, DriverError>
@@ -264,6 +302,23 @@ impl MssqlConnection {
         Ok(())
     }
 
+    async fn rollback_batch(&self, client: &mut MssqlClient, index: usize, source: DriverError) -> DriverError {
+        match exec_simple(client, "ROLLBACK").await {
+            Ok(()) => DriverError::Transaction {
+                statement_index: index,
+                source: Box::new(source),
+            },
+            Err(error) => {
+                let _ = self.retire().await;
+                DriverError::TransactionRollbackFailed {
+                    statement_index: index,
+                    source: Box::new(source),
+                    rollback_error: Box::new(error),
+                }
+            }
+        }
+    }
+
     async fn query_result(
         &self,
         client: &mut MssqlClient,
@@ -271,7 +326,12 @@ impl MssqlConnection {
         params: &[Value],
         limit: usize,
     ) -> Result<QueryResult, DriverError> {
-        let result = run_query(client, sql, params, limit).await;
+        let result = match params.is_empty() {
+            true => run_batch_sets(client, sql, limit, false)
+                .await
+                .map(QueryResultBatch::into_first),
+            false => run_query(client, sql, params, limit).await,
+        };
         if result.as_ref().is_err_and(variant_guard::is_unsupported_result) {
             self.retire().await?;
         }
@@ -285,7 +345,10 @@ impl MssqlConnection {
         params: &[Value],
         limit: usize,
     ) -> Result<QueryResultBatch, DriverError> {
-        let result = run_query_sets(client, sql, params, limit, true).await;
+        let result = match params.is_empty() {
+            true => run_batch_sets(client, sql, limit, true).await,
+            false => run_query_sets(client, sql, params, limit, true).await,
+        };
         if result.as_ref().is_err_and(variant_guard::is_unsupported_result) {
             self.retire().await?;
         }
@@ -311,23 +374,31 @@ impl Connection for MssqlConnection {
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        let sql = "SELECT s.name AS schema_name, t.name AS table_name \
-                   FROM sys.tables t \
-                   JOIN sys.schemas s ON t.schema_id = s.schema_id \
-                   ORDER BY s.name, t.name";
+        self.list_relations("sys.tables").await
+    }
+
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        self.list_relations("sys.views").await
+    }
+
+    async fn list_objects(
+        &self,
+        kind: CatalogObjectKind,
+        schema: Option<&str>,
+    ) -> Result<Vec<CatalogObject>, DriverError> {
         let mut client = self.client().await?;
-        let result = self.query_result(&mut client, sql, &[], MAX_QUERY_ROWS).await?;
-        Ok(result
-            .rows
-            .iter()
-            .filter_map(|row| {
-                let name = as_text(row.get(1))?;
-                Some(TableInfo {
-                    schema: as_text(row.first()),
-                    name,
-                })
-            })
-            .collect())
+        catalog::list_objects(&mut client, kind, schema).await
+    }
+
+    async fn list_objects_controlled(
+        &self,
+        kind: CatalogObjectKind,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<CatalogObject>, DriverError> {
+        let mut client = tablepro_core::run_controlled_setup(self.client(), control).await??;
+        self.run_abandonable(catalog::list_objects(&mut client, kind, schema), control)
+            .await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
@@ -482,11 +553,7 @@ impl Connection for MssqlConnection {
             let boxes = match boxed_params(params) {
                 Ok(boxes) => boxes,
                 Err(error) => {
-                    let _ = exec_simple(&mut client, "ROLLBACK").await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(error),
-                    });
+                    return Err(self.rollback_batch(&mut client, idx, error).await);
                 }
             };
             let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
@@ -494,32 +561,23 @@ impl Connection for MssqlConnection {
                 Ok(res) => {
                     let total = res.total();
                     if expect_one.contains(&idx) && total != 1 {
-                        let source = DriverError::ConcurrentModification;
-                        let rollback = exec_simple(&mut client, "ROLLBACK").await;
-                        return Err(match rollback {
-                            Ok(()) => DriverError::Transaction {
-                                statement_index: idx,
-                                source: Box::new(source),
-                            },
-                            Err(error) => DriverError::TransactionRollbackFailed {
-                                statement_index: idx,
-                                source: Box::new(source),
-                                rollback_error: Box::new(error),
-                            },
-                        });
+                        return Err(self
+                            .rollback_batch(&mut client, idx, DriverError::ConcurrentModification)
+                            .await);
                     }
                     affected.push(total);
                 }
                 Err(e) => {
-                    let _ = exec_simple(&mut client, "ROLLBACK").await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(map_tiberius_error(e)),
-                    });
+                    return Err(self.rollback_batch(&mut client, idx, map_tiberius_error(e)).await);
                 }
             }
         }
-        exec_simple(&mut client, "COMMIT").await?;
+        if let Err(error) = exec_simple(&mut client, "COMMIT").await {
+            self.retire().await?;
+            return Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(error),
+            });
+        }
         Ok(affected)
     }
 
@@ -700,7 +758,7 @@ impl Connection for MssqlConnection {
     }
 }
 
-async fn run_query(
+pub(crate) async fn run_query(
     client: &mut MssqlClient,
     sql: &str,
     params: &[Value],

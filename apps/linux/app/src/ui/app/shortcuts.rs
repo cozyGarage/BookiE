@@ -137,7 +137,7 @@ pub(super) const WINDOW_SHORTCUTS: &[(&str, &str)] = &[
     ("<Primary><Shift>j", "win.jump-column"),
     ("<Primary><Shift>l", "win.reveal-in-sidebar"),
     ("<Primary>d", "win.save-favorite"),
-    ("<Primary><Shift>d", "win.show-saved-queries"),
+    ("<Primary><Shift>b", "win.show-saved-queries"),
     ("<Primary>s", "win.save-changes"),
     ("<Primary><Shift>s", "win.save-file-as"),
     ("<Primary>z", "win.undo-change"),
@@ -203,7 +203,7 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary>p", crate::tr!("Open Quickly: favorites and open tabs")),
             ("<Primary><Shift>l", crate::tr!("Reveal the open table in the sidebar")),
             ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
-            ("<Primary><Shift>d", crate::tr!("Manage saved queries")),
+            ("<Primary><Shift>b", crate::tr!("Manage saved queries")),
             ("<Primary>question", crate::tr!("Show keyboard shortcuts")),
             ("<Primary>q", crate::tr!("Quit")),
         ],
@@ -314,8 +314,21 @@ fn localized_browse_key(key: &str) -> String {
 }
 
 #[cfg(test)]
+const GTK_INSPECTOR_CHORDS: &[&str] = &["<Primary><Shift>d", "<Primary><Shift>i"];
+
+#[cfg(test)]
+fn assert_no_inspector_chords<'a>(chords: impl IntoIterator<Item = (&'a str, &'a str)>) {
+    for (chord, source) in chords {
+        assert!(
+            !GTK_INSPECTOR_CHORDS.contains(&chord),
+            "{chord} is reserved for GTK's inspector ({source})"
+        );
+    }
+}
+
+#[cfg(test)]
 mod window_shortcut_tests {
-    use super::WINDOW_SHORTCUTS;
+    use super::{WINDOW_SHORTCUTS, assert_no_inspector_chords};
     use std::collections::HashSet;
 
     const EDITOR_OWNED: &[&str] = &[
@@ -336,6 +349,11 @@ mod window_shortcut_tests {
                 "{trigger} is bound twice (second action {action})"
             );
         }
+    }
+
+    #[test]
+    fn no_window_trigger_is_a_chord_gtk_reserves_for_its_inspector() {
+        assert_no_inspector_chords(WINDOW_SHORTCUTS.iter().map(|(trigger, action)| (*trigger, *action)));
     }
 
     fn registered(action: &str) -> bool {
@@ -388,7 +406,7 @@ mod window_shortcut_tests {
 
 #[cfg(test)]
 mod dialog_tests {
-    use super::build_shortcuts_dialog;
+    use super::{assert_no_inspector_chords, build_shortcuts_dialog};
     use adw::prelude::*;
     use relm4::{adw, gtk};
 
@@ -451,6 +469,7 @@ mod dialog_tests {
             );
         }
         assert!(accelerators.len() > 40);
+        assert_no_inspector_chords(accelerators.iter().map(|value| (value.as_str(), "shortcuts window")));
         for accelerator in ["<Primary>q", "Up", "Down"] {
             assert!(accelerators.iter().any(|value| value == accelerator), "{accelerator}");
         }

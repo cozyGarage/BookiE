@@ -21,6 +21,39 @@ pub(super) fn apply_driver_values(
 }
 
 impl super::ConnectDialog {
+    pub(super) fn collect_options(&self, driver: &dyn tablepro_core::DatabaseDriver) -> tablepro_core::ConnectOptions {
+        let socket = self.uses_local_socket();
+        let (local_socket_dir, local_socket_path) =
+            self.selected_socket_options(self.form.local_socket_path_kind(), socket);
+        let (username, password) = if self.form.shows_credentials() {
+            let entered = self.username.text().trim().to_string();
+            let username = if socket && entered.is_empty() {
+                whoami::username().unwrap_or_default()
+            } else {
+                entered
+            };
+            (username, self.password.text().to_string())
+        } else {
+            (String::new(), String::new())
+        };
+        tablepro_core::ConnectOptions {
+            host: self.host.text().trim().to_string(),
+            port: self.port.value() as u16,
+            database: typed_database(&self.database.text()),
+            auth_source: super::auth_source::value(&self.auth_source),
+            username,
+            password: secrecy::SecretString::new(password.into()),
+            tls: self.tls_config_for(driver),
+            auth_mode: self.form.mode(),
+            local_socket_dir,
+            local_socket_path,
+            application_name: Some("BookiE".into()),
+            connect_timeout_secs: super::timeout_value(self.connect_timeout.value()),
+            read_only: self.read_only.is_active(),
+            ..Default::default()
+        }
+    }
+
     pub(super) fn apply_driver_form_visibility(&mut self, driver: &dyn tablepro_core::DatabaseDriver) {
         let capabilities = driver.capabilities();
         self.form = ConnectFormState::from_capabilities(capabilities, self.form.selected);

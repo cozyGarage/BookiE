@@ -50,7 +50,7 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 
 The [release page](https://github.com/cozyGarage/BookiE/releases) lists each version's available artifacts and checksums. The published 0.2.0 release provides a Debian package, an Arch package, a Flatpak bundle and an AppImage; the Debian and Arch packages are the main install paths. Library requirements and install acceptance are in [platforms](docs/platforms.md).
 
-The AppImage is for trying BookiE without installing it. The published 0.2.0 image contains GtkSourceView's SQL language and light/dark style resources, and a [package-level check](docs/evidence/appimage-resource-check-2026-10-23/README.md) resolved them from the bundled library. Editor highlighting on a clean system remains unverified ([#1325](https://github.com/cozyGarage/BookiE/issues/1325)).
+The AppImage is for trying BookiE without installing it. Editor highlighting on a clean system remains unverified ([#1325](https://github.com/cozyGarage/BookiE/issues/1325)).
 
 To build from source, see [Build and run](#build-and-run).
 
@@ -74,11 +74,11 @@ Open source makes this project possible. BookiE is an independent database clien
 
 ## Status
 
-[BookiE 0.2.0 is published](docs/bookie-0.2-sprint.md). The [backlog](docs/backlog.md) holds post-release work; neither 0.2.1 nor 0.3 has an approved scope. Use the [driver maturity table](docs/adding-drivers.md#driver-maturity), [platform guide](docs/platforms.md), and [known limitations](docs/known-limitations.md) for current engine support, installation requirements, and unresolved behavior.
+See the [release page](https://github.com/cozyGarage/BookiE/releases) for published artifacts. [Project #3](https://github.com/users/cozyGarage/projects/3) lists selected work. Use the [driver maturity table](docs/adding-drivers.md#driver-maturity), [platform guide](docs/platforms.md), and [known limitations](docs/known-limitations.md) for current engine support, installation requirements, and behavior limits.
 
 ## Supported platforms
 
-BookiE targets Linux. The [platform guide](docs/platforms.md) separates the published 0.2.0 target from current source requirements.
+BookiE targets Linux. The [platform guide](docs/platforms.md) lists the current native-library floor and published artifacts.
 
 ## Architecture
 
@@ -92,7 +92,7 @@ Every database handle that the desktop app, the MCP tools and `bookie-agentd` re
 
 The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE), and current development is on the `linux` branch. BookiE is built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. The Cargo workspace lives at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`) and requires Rust 1.98.
 
-Start with the [documentation map](docs/README.md) and [completion and continuation](docs/bookie-0.2-sprint.md) for release status and acceptance owners.
+Start with the [documentation map](docs/README.md) and [Project #3](https://github.com/users/cozyGarage/projects/3) for selected work and acceptance criteria.
 
 ### Independence and system compatibility identifiers
 
@@ -175,7 +175,7 @@ For manual connection checks across every network driver, use the local-only [ma
 
 If native development packages are unavailable, `scripts/dev-env.sh` can use Debian-family package payloads extracted under `.local-deps/root/`.
 
-GitHub runs the cheap tier only; merge acceptance is the Forgejo gate (`bash scripts/forgejo-gate.sh <branch>`). Details: [AGENTS.md](AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
+Pull requests run the required automated checks for the proposed revision. Maintainers confirm acceptance before merging; details are in [AGENTS.md](AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
 
 ## Packaging
 
@@ -189,7 +189,6 @@ Start at [the documentation map](docs/README.md) for audience and ownership. Com
 |---|---|
 | Product / personas / principles | [PRODUCT.md](PRODUCT.md), [docs/personas.md](docs/personas.md), [PRINCIPLES.md](PRINCIPLES.md) |
 | Capability specs (drafts) | [specs/](specs/README.md) |
-| Release status | [docs/bookie-0.2-sprint.md](docs/bookie-0.2-sprint.md) |
 | Architecture | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | User guide | [docs/user-guide.md](docs/user-guide.md) |
 | Feature list with screenshots | [docs/features.md](docs/features.md) |
@@ -199,7 +198,7 @@ Start at [the documentation map](docs/README.md) for audience and ownership. Com
 
 ## Contributing
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md). Pull requests for current development target the `linux` branch and are accepted on a green Forgejo gate run.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md). Pull requests for current development target the `linux` branch and require all applicable checks before merging.
 
 ## Changelog
 

@@ -715,3 +715,8 @@ fn ordinary_hosts_build_the_expected_url() {
     opts.host = "[::1]".into();
     assert_eq!(connection_url(&opts).unwrap(), "redis://[::1]:6380/0");
 }
+
+#[test]
+fn redis_declares_that_browse_filters_are_not_supported() {
+    assert!(!RedisDriver.capabilities().supports_browse_filters);
+}

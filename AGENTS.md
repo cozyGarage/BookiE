@@ -6,7 +6,7 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 
 **BookiE** is a Linux-only native database client. The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Work happens on the `linux` branch in the Rust 1.98 Cargo workspace at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`).
 
-- The rename covers the display name, packaging install names (`bookie`, `bookie-agentd`, with `tablepro*` aliases) and branding assets only. Cargo package and binary names stay `tablepro-app` / `tablepro-agentd`. App ID, config and data paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Crate names stay `tablepro-*`. Check the sprint before renaming any of them.
+- The rename covers the display name, packaging install names (`bookie`, `bookie-agentd`, with `tablepro*` aliases) and branding assets only. Cargo package and binary names stay `tablepro-app` / `tablepro-agentd`. App ID, config and data paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Crate names stay `tablepro-*`. Check the relevant ADR and compatibility documentation before renaming any of them.
 - The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. No cross-platform UI layers, web views or source for another operating system.
 - Every shipped feature works without an account, license key, subscription, paid tier or remote entitlement check.
 - The root [LICENSE](LICENSE) applies. User-facing changes carry a `Release-Note:` line ([changelog and commits](#changelog-and-commits)).
@@ -14,11 +14,10 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 ## Where to start
 
 1. [docs/README.md](docs/README.md): the documentation map and where each fact belongs.
-2. [Completion and continuation](docs/bookie-0.2-sprint.md): the maintainer marked 0.2.0 delivery complete, and the release was published on 2026-10-23. The same page records the delivery boundary; the [backlog](docs/backlog.md) owns subsequent work, and [known limitations](docs/known-limitations.md) says what the application cannot do. No 0.2.1 or 0.3 scope is committed yet; select work from the backlog and define each release scope separately.
-3. [Bookie Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (B3, B4, UX, Maintainer).
-4. The ADR that governs your change ([index](docs/decisions/README.md)). Every type or value change follows [ADR 0007](docs/decisions/0007-type-and-value-preservation.md).
+2. [BookiE Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (B3, B4, UX, Maintainer).
+3. The ADR that governs your change ([index](docs/decisions/README.md)). Every type or value change follows [ADR 0007](docs/decisions/0007-type-and-value-preservation.md).
 
-Accepted ADRs constrain architecture. The completion page records milestone status, the backlog owns subsequent sequencing and each issue owns its acceptance. Dated reviews and archives prove their recorded source only; they do not override current decisions.
+Accepted ADRs constrain architecture. Project #3 owns selected work order; each issue owns its acceptance. Private verification records support review but do not override current decisions.
 
 ## Product context and specs
 
@@ -30,10 +29,10 @@ Lanes keep parallel agents from editing the same files. Pick open work from [Pro
 
 | Lane | Owns |
 | --- | --- |
-| B3 | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display, the [B3 board pointer](docs/lane-boards.md#b3-types-and-values) |
-| B4 | Transport, guard, audit, SSH, rollback and acceptance: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage, the [B4 board pointer](docs/lane-boards.md#b4-transport-and-sessions) |
-| UX | App layer (`apps/linux/`), packaging, CI and the lab, the ledger index, and shared documentation. UX also runs the Forgejo gate for every pull request that is green on GitHub and merges it once both agree |
-| Cursor | Documentation and tests only. UX reviews its test pull requests; the maintainer merges its documentation pull requests, which need no Forgejo run |
+| B3 | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display |
+| B4 | Transport, guard, audit, SSH and rollback: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage |
+| UX | App layer (`apps/linux/`), packaging, repository automation, the ledger index, and shared documentation |
+| Cursor | Documentation and tests only. UX reviews test pull requests; the maintainer reviews documentation pull requests |
 | Maintainer | Decisions and anything needing a person or a real desktop |
 
 - To work in another lane's files, first record the handoff on the GitHub issue (and update the project **Lane** / `lane:*` label plus the [ledger index](docs/known-issues.md) Lane column) in the same commit as the first change.
@@ -47,13 +46,16 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 1. Write the failing test first, then the fix, in one commit.
 2. Run the checks in [Validation](#validation) locally. Run each script directly; piping `bash scripts/preflight.sh` through `tail` reports `tail`'s status, not the script's.
 3. Merge the latest BookiE `linux` branch from GitHub `cozyGarage/BookiE` into the branch (do not rebase a shared branch). Resolve generated files such as `Cargo.lock` by regenerating them.
-4. **Gate on Forgejo during the staged CI migration:** `bash scripts/forgejo-gate.sh <branch> [remote-branch]`. It pushes the named branch to Forgejo, waits for that run and lists jobs that did not pass. Forgejo remains the acceptance gate for the remaining merge tier. GitHub pull requests now also run the Driver TLS fixture; `Linux PR readiness` requires that result on the exact PR head.
-5. Open the GitHub pull request against `linux`, merge it when the Forgejo gate is green (squash, subject `<type>(<scope>): <summary> (#N)`; the `PR title` check requires the pull request title to follow this form), then sync Forgejo's `linux` to GitHub's with `bash scripts/forgejo-gate.sh <local branch at GitHub linux> linux`, which fast-forwards under the gate lock. The UX lane gates and merges every pull request that is green on GitHub, using `--match-head-commit`. A push that only merges `linux` into a branch, does not need a new gate: compare the pull request's own diff against BookiE `linux` for the gated head and the current head (`git diff <bookie-remote>/linux...<head> -- crates scripts`, where `<bookie-remote>` is the remote that tracks `cozyGarage/BookiE`), and merge when it is unchanged. Re-gate when the pull request's own code or tests changed. Say in the report that the comparison was made. Ready PRs may instead be included in one aggregate train PR under [ADR 0020](docs/decisions/0020-aggregate-forgejo-trains.md): verify the pinned manifest and GitHub checks before gating, gate the exact aggregate head once, verify freshness and the successful run before merging, then verify the resulting tree. This replaces separate Forgejo gates for those constituents. Close their PRs as included only after aggregate verification, and close issues only when their acceptance is satisfied.
-6. **Documentation-only changes skip CI.** A change that touches only `*.md` files and `docs/` is pushed straight to `linux` after `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check` pass. The heavy GitHub workflows ignore such pushes; the cheap `linux-ci-contracts` harness still checks them on GitHub. `forgejo-gate.sh` runs the same checks and exits without queueing a run. Do not use a Forgejo `paths-ignore` filter: Forgejo reads the changed files of a merge commit as none, so every branch that merged `linux` would silently get no run. Do not push a documentation-only tip to Forgejo's `linux`; the next code merge carries it. A change that touches any other file takes the full path above.
-7. **One job per execution VM.** Each runner has capacity one. Workflow concurrency is scoped to its workflow/run identity, so queued jobs from another run may use an idle eligible worker. Keep fixture state, display sessions, checkout directories and artifact identity isolated per job/run. The gate script locks each remote target branch separately; synchronization of Forgejo `linux` remains serialized by that target lock. Never start duplicate gates for the same head to speed up a run. A single failed job can be re-run from its Forgejo run page. An overlapping-run failure is inconclusive until fixture and resource isolation have been checked.
-8. **Move CI tiers to GitHub in verified steps.** GitHub runs the cheap tier, security, Flatpak, workflow and harness contracts, and the Driver TLS fixture on pull requests. The remaining acceptance tiers stay on Forgejo until each has a green GitHub PR result and its exact-head check is required by `Linux PR readiness`. Branch pushes to `linux` or `main` do not run the heavy GitHub tiers. Keep the temporary Driver TLS overlap until the migration owner removes Forgejo's duplicate. Do not trust a skipped GitHub job as a pass. CodeQL and SonarCloud run on GitHub as reference scans, not gates: fix real findings in small pull requests and mark wrong ones "False positive" or "Won't fix" with a reason (see validation-playbook, SonarCloud triage).
-9. **Merge only on GitHub.** Forgejo is the gate, not the merge target: never merge a pull request on Forgejo or push to its `linux` branch. Manual changes can bypass the serialized gate or make the branches diverge and stop fast-forward sync. GitHub's `linux` refuses force-pushes and deletion for everyone (ruleset `protect linux`). When a push to it is rejected as non-fast-forward, merge the latest `linux` and push again; never force it.
+4. **Required checks.** Every pull request must pass the required checks for its exact source revision. Missing, skipped, cancelled or failed checks are not passes; maintainers confirm acceptance before merging.
+5. **Pull requests and merge.** Open pull requests against `linux`. Merge only after required checks and lane review pass for the reviewed source.
+6. **Documentation-only changes.** Run `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check`. Changes to code, workflows or packages require the applicable full validation.
+
+7. **Isolated test inputs.** Keep mutable fixtures, display sessions and build inputs isolated between test runs. Check isolation before attributing overlapping-run failures to product code.
+8. **Required check status.** Check results must apply to the exact proposed revision. Skipped checks do not pass. CodeQL and SonarCloud are reference scans, not gates.
+9. **Protected branch.** Merge only through the protected `linux` branch. Do not force-push or delete it. Resolve a non-fast-forward rejection by including the latest base before retrying.
+
 10. Never leave a background job, container or temporary resource running that you did not start, and never stop one you did not start. On shared systems, stop only resources you own.
+11. Keep the diff to the requested behaviour. No drive-by refactors, renames, formatting of untouched files, or edits to another lane's ledger/sprint/policy files.
 
 ## Principles
 
@@ -112,6 +114,17 @@ These apply to the GUI, the MCP server and `tablepro-agentd`.
 `rustfmt.toml`, `clippy.toml` and the workspace lints are authoritative; [code conventions](docs/code-conventions.md) settles function length, parameters, naming and extraction.
 
 - Rust edition 2024, Rust 1.98, line width 120.
+- Stack versions (verify in root `Cargo.toml` before calling APIs; do not invent methods):
+  gtk4 0.11, libadwaita 0.9, relm4 0.11, glib 0.22, sourceview5 0.11,
+  sqlx 0.9, russh 0.65, thiserror 2, tokio 1, secrecy 0.10.
+- Prefer borrowing (`&str`, `&[T]`) over owned inputs. Do not add `.clone()`, `Arc`, or `Rc`
+  only to silence the borrow checker; change the signature or stop and ask.
+- Do not erase types to compile (`serde_json::Value` or `Box<dyn Any>` through a typed
+  boundary). Do not invent crate APIs; read this workspace or the installed crate sources.
+- Do not raise size, comment-line or panic-site baselines. Do not add `#[allow(...)]` to
+  dodge Clippy; fix the code. A narrow `#[expect(lint, reason = "...")]` is the last resort.
+- Done means the Validation scripts that apply to the change have been run (or named as
+  blocked). `cargo check` alone is not done. Never hand-edit `Cargo.lock`; regenerate it.
 - No comments or doc comments, except the external-system rule above. A Rust file may not gain comment lines (`check-comment-lines.py`, baselines in `baselines/comment-line-baselines.txt`); after deleting comments run `python3 scripts/check-comment-lines.py --update` to lower them.
 - Early returns; at most three levels of indentation in a function body.
 - A function body is at most 60 lines (`check-function-size.py`, baselines in `baselines/function-size-baselines.txt`: lower a count when you split, never raise one). Rust files stay under 1,200 lines (`check-file-size.sh`, baselines in `baselines/file-size-baselines.txt`: split before growing a listed file).
@@ -136,7 +149,7 @@ Rules for pull requests that add tests (any agent, including Cursor):
 - Merge the latest BookiE `linux` branch into the branch and run `scripts/preflight.sh` before opening the pull request.
 - Do not edit ledger rows, sprint text or files that another lane owns (for example `policy/src/rules.rs`, owned by B4 in the lane table); those edits are what conflict.
 - Check the open pull requests for the same files first. When two change the same map or sentinel (for example `change-test-map.json`), say which one lands first and rebase the other.
-- Say in the pull request when it needs the Forgejo gate; the maintainer or the UX lane gates the exact head, since these agents cannot reach Forgejo.
+- Say in the pull request which validation layers apply; maintainers confirm the exact-head acceptance results.
 
 Every test belongs to one tier with one script and one gate. Use the [validation playbook](docs/validation-playbook.md) to pick layers and `python3 scripts/run-test-layer.py --list` to discover commands.
 
@@ -151,7 +164,7 @@ Every test belongs to one tier with one script and one gate. Use the [validation
 | keyring | `#[ignore]` tests listed under `keyring`, after those under `keyring-fresh` (run before any default keyring exists) | `scripts/test-secret-service.sh` |
 | gtk | `apps/linux/app/tests/gtk_safety.py` on an installed build | `scripts/test-gtk-safety.sh` |
 
-All tiers run on Forgejo (`.forgejo/workflows/ci.yml` and `nightly.yml`). New gtk-widgets and keyring tests must be added to `isolated-tests.json`, and the ignored-test inventory regenerated, or the tier fails. A new crate goes into the crate lists in `preflight.sh` and `test-sandbox.sh`.
+CI runs these tiers according to the change and acceptance requirements. New gtk-widgets and keyring tests must be added to `isolated-tests.json`, and the ignored-test inventory regenerated, or the tier fails. A new crate goes into the crate lists in `preflight.sh` and `test-sandbox.sh`.
 
 ## Validation
 
@@ -162,20 +175,20 @@ bash scripts/preflight.sh            # size, panic, bounded-operation and crate-
 bash scripts/test-gtk-widgets.sh     # when GTK code changed
 python3 scripts/check-known-issues.py && python3 scripts/check-doc-links.py   # when docs changed
 cargo deny check                           # from the repository root, when dependencies changed
-bash scripts/forgejo-gate.sh <branch>
+bash scripts/forgejo-gate.sh <branch>      # when the change requires Forgejo acceptance
 ```
 
 Driver integration tests need Docker. If a prerequisite is missing, say which check could not run and why.
 
 ## Changelog and commits
 
-- Release notes ([ADR 0022](docs/decisions/0022-release-notes-from-merge-commits.md)): do not edit `CHANGELOG.md`. Put one `Release-Note: <Category>: <text>` line per user-facing change (or `Release-Note: none`) in the PR body and the repository's squash-merge default uses the PR title and body, so the lines reach the commit; do not replace the body in the merge box. Categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Each line describes user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; record them on the owning board or in `docs/evidence/`. Do not add `Fixed` for a defect introduced and fixed before release.
+- Release notes ([ADR 0022](docs/decisions/0022-release-notes-from-merge-commits.md)): do not edit `CHANGELOG.md`. Put one `Release-Note: <Category>: <text>` line per user-facing change (or `Release-Note: none`) in the PR body and the repository's squash-merge default uses the PR title and body, so the lines reach the commit; do not replace the body in the merge box. Categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Each line describes user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; keep run-specific reports and research outside the public source tree. Do not add `Fixed` for a defect introduced and fixed before release.
 - Conventional Commits with a single-line subject and no body on branch commits (a squash commit's body is the PR description). Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`, `revert`, `security`. Scopes such as `app`, `core`, `policy`, `mcp`, `agentd`, `storage`, `ssh`, `drivers`, `driver-postgres`.
 - A public API change updates every caller and test in the same commit.
 
 ## Documentation rules
 
-The [documentation map](docs/README.md) says where each fact lives and where a new document goes. In short: decisions in ADRs, open work in the ledger, order and acceptance in the sprint, run-specific proof in `docs/evidence/` or the PR, dated reviews in `docs/archive/`. Write each fact once and link to it. Keep file paths stable; scripts and other lanes depend on them.
+The [documentation map](docs/README.md) says where each fact lives and where a new document goes. In short: decisions in ADRs, open work in Project #3 and the issue ledger, release completion in the sprint, and generic commands and behavior in contributor documentation. Keep run-specific proof and research outside the public source tree. Write each fact once and link to it. Keep file paths stable; scripts and other lanes depend on them.
 
 ## Writing style
 

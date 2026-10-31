@@ -38,9 +38,12 @@ uuid.workspace = true
 [dev-dependencies]
 async-trait.workspace = true
 tablepro-driver-postgres = { path = "../drivers/postgres" }
+tablepro-driver-mysql = { path = "../drivers/mysql" }
+tablepro-driver-mssql = { path = "../drivers/mssql" }
+tablepro-driver-sqlite = { path = "../drivers/sqlite" }
 tablepro-ssh = { path = "../ssh" }
 testcontainers.workspace = true
-testcontainers-modules = { workspace = true, features = ["postgres"] }
+testcontainers-modules = { workspace = true, features = ["postgres", "mysql", "mssql_server"] }
 tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
 
 [lints]

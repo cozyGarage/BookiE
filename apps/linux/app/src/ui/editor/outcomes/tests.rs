@@ -645,6 +645,7 @@ fn streamed_result_pages(
         export: None,
         generation: 0,
         spool: None,
+        resident_pages: Default::default(),
     };
     let outcome = super::StatementOutcome {
         identity: StatementIdentity::default(),
@@ -1013,6 +1014,7 @@ fn streamed_kind(terminal: StreamTerminal) -> StatementOutcomeKind {
         export: None,
         generation: 0,
         spool: None,
+        resident_pages: Default::default(),
     }))
 }
 

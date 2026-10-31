@@ -116,6 +116,16 @@ pub enum Value {
     Undecodable(String),
 }
 
+pub fn partial_value(byte_count: u64, prefix: &str) -> Value {
+    Value::Undecodable(format!("partial {byte_count} bytes\u{1}{prefix}"))
+}
+
+pub fn parse_partial(type_name: &str) -> Option<(u64, &str)> {
+    let rest = type_name.strip_prefix("partial ")?;
+    let (bytes, prefix) = rest.split_once(" bytes\u{1}")?;
+    Some((bytes.parse().ok()?, prefix))
+}
+
 impl Value {
     pub const MISSING_FIELD: &'static str = "missing BSON field";
 

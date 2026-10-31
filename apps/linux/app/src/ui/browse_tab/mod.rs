@@ -35,11 +35,21 @@ pub(super) fn columns_for_browse_page(
 pub(super) fn with_table_ownership(columns: &mut [ColumnInfo], table: &[ColumnInfo]) {
     for column in columns {
         if let Some(known) = table.iter().find(|known| known.name == column.name) {
+            if column.data_type.is_empty() || column.data_type.eq_ignore_ascii_case("NULL") {
+                column.data_type.clone_from(&known.data_type);
+            }
             column.is_generated |= known.is_generated;
             column.is_auto_increment |= known.is_auto_increment;
             column.primary_key |= known.primary_key;
         }
     }
+}
+
+fn merge_table_columns(result: &mut QueryResult, table: &[ColumnInfo]) {
+    if result.columns.is_empty() && !table.is_empty() {
+        result.columns = table.to_vec();
+    }
+    with_table_ownership(&mut result.columns, table);
 }
 
 fn projection_for_loaded_page(result: &QueryResult, projection: Option<Vec<usize>>) -> Option<Vec<usize>> {
@@ -56,6 +66,7 @@ pub struct BrowseTabInit {
     pub table: String,
     pub driver_id: String,
     pub enum_input_style: EnumInputStyle,
+    pub browse_filters: bool,
     pub connection_id: Option<Uuid>,
     pub read_only: bool,
     pub page_size: u64,
@@ -71,6 +82,7 @@ pub struct BrowseTab {
     table: String,
     driver_id: String,
     enum_input_style: EnumInputStyle,
+    browse_filters: bool,
     connection_id: Option<Uuid>,
     read_only: bool,
     persistence: crate::services::persistence_stores::PersistenceStores,
@@ -105,6 +117,7 @@ pub struct BrowseTab {
     page_requests: PageRequestTracker,
     row_count_requests: RowCountRequestTracker,
     cell_value_requests: CellValueRequestTracker,
+    pending_cell_edit: std::cell::RefCell<Option<(BrowseCellValueRequest, u32, Vec<Value>)>>,
 
     inner_stack: gtk::Stack,
     grid_holder: gtk::Box,
@@ -187,6 +200,8 @@ mod choices;
 mod chrome;
 #[cfg(test)]
 mod chrome_tests;
+#[cfg(test)]
+mod filter_support_tests;
 mod grid_messages;
 mod grid_render;
 mod messages;
@@ -315,6 +330,7 @@ impl SimpleComponent for BrowseTab {
         // strip start with the same FilterSet.
         let initial_filter = init
             .connection_id
+            .filter(|_| init.browse_filters)
             .and_then(|id| {
                 init.persistence
                     .filter_settings
@@ -353,7 +369,7 @@ impl SimpleComponent for BrowseTab {
         inner_stack.add_named(&initial_loading, Some("loading"));
         inner_stack.set_visible_child_name("loading");
 
-        let paginator = Self::build_paginator(sender.clone(), init.page_size);
+        let paginator = Self::build_paginator(sender.clone(), init.page_size, init.browse_filters);
         let pending = Self::build_pending_revealer(sender.clone());
 
         // Per-HIG banner rule: banners persist hard constraints the
@@ -621,6 +637,7 @@ impl SimpleComponent for BrowseTab {
             table: init.table,
             driver_id: init.driver_id,
             enum_input_style: init.enum_input_style,
+            browse_filters: init.browse_filters,
             connection_id: init.connection_id,
             read_only: init.read_only,
             persistence: init.persistence,
@@ -645,6 +662,7 @@ impl SimpleComponent for BrowseTab {
             page_requests: PageRequestTracker::default(),
             row_count_requests: RowCountRequestTracker::default(),
             cell_value_requests: CellValueRequestTracker::default(),
+            pending_cell_edit: std::cell::RefCell::new(None),
             inner_stack,
             grid_holder,
             current_column_view: None,
@@ -743,9 +761,7 @@ impl SimpleComponent for BrowseTab {
                 // so the headers render even when the page is empty.
                 let projected_columns = projection_for_loaded_page(&result, projected_columns);
                 let mut result = result;
-                if result.columns.is_empty() && !self.current_columns.is_empty() {
-                    result.columns = self.current_columns.clone();
-                }
+                merge_table_columns(&mut result, &self.current_columns);
                 self.current_columns = columns_for_browse_page(&self.driver_id, &self.current_columns, Some(&result));
                 self.keyset_cursor =
                     extract_keyset_cursor(&self.current_columns, &result, projected_columns.as_deref());
@@ -775,10 +791,8 @@ impl SimpleComponent for BrowseTab {
                 // driver derives it from the first row), refill it now
                 // so the upcoming `render_grid_if_ready` builds headers
                 // against the real schema instead of an empty list.
-                if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut)
-                    && result.columns.is_empty()
-                {
-                    result.columns = columns.clone();
+                if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut) {
+                    merge_table_columns(result, &self.current_columns);
                 }
                 self.refresh_crud_buttons();
                 // Filter strip rebuilds against the new schema —
@@ -877,7 +891,7 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::GoToReference { column, row } => self.go_to_reference(&column, &row, &sender),
             BrowseTabInput::ShowReferencingRows { row } => self.show_referencing_rows(&row, &sender),
             BrowseTabInput::ToggleFilterStrip => {
-                if let Some(strip) = self.filter_strip.as_ref() {
+                if let Some(strip) = self.filter_strip.as_ref().filter(|_| self.browse_filters) {
                     strip.toggle();
                 }
             }
@@ -1009,7 +1023,8 @@ impl SimpleComponent for BrowseTab {
                 col_index,
                 column_name,
                 row_key,
-            } => self.request_cell_value(col_index, column_name, row_key, sender),
+                edit_row_position,
+            } => self.request_cell_value(col_index, column_name, row_key, edit_row_position, sender),
             BrowseTabInput::CellValueLoaded {
                 request,
                 col_index,

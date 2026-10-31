@@ -66,11 +66,14 @@ fn copying_a_previewed_cell_copies_the_full_value() {
         truncated: false,
     });
     let row = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();
-    row.preview_values_from_result();
     let editor = crate::ui::cell_editor::CellEditor::new();
-    editor.set_text("preview text");
+    editor.set_text("bounded grid text");
     IS_NULL_SLOT.set(&editor, false);
 
+    assert_eq!(copy_value_text(editor.upcast_ref(), Some(&row), 0), full);
+
+    row.preview_values_from_result();
+    editor.set_text("preview text");
     assert_eq!(copy_value_text(editor.upcast_ref(), Some(&row), 0), full);
 
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();

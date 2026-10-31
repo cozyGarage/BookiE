@@ -1,2 +1,0 @@
-bytea[] binary, empty and SQL NULL text is unchanged in XLSX, ODS and Calc re-saved XLSX; no formulas
-{"\\x00ff275c","\\x",NULL}

@@ -76,15 +76,16 @@ fn capped(text: &str) -> String {
 
 fn json_preview(value: &serde_json::Value) -> String {
     let mut preview = PreviewWriter::default();
-    if serde_json::to_writer_pretty(&mut preview, value).is_err() {
+    let serialized = serde_json::to_writer_pretty(&mut preview, value);
+    if serialized.is_err() && !preview.truncated {
         return crate::tr!("This JSON value could not be previewed.");
     }
     let end = std::str::from_utf8(&preview.bytes).map_or_else(|error| error.valid_up_to(), |_| preview.bytes.len());
     let text = String::from_utf8_lossy(&preview.bytes[..end]).into_owned();
-    if preview.total <= MAX_VIEW_BYTES {
+    if !preview.truncated {
         return text;
     }
-    format!("{text}\n\n{}", truncation_note(end, preview.total))
+    format!("{text}\n\n{}", json_truncation_note(end))
 }
 
 fn truncation_note(shown: usize, total: usize) -> String {
@@ -93,18 +94,30 @@ fn truncation_note(shown: usize, total: usize) -> String {
         .replace("{total}", &total.to_string())
 }
 
+fn json_truncation_note(shown: usize) -> String {
+    crate::tr!("Showing the first {shown} bytes. Copy value copies the whole value.")
+        .replace("{shown}", &shown.to_string())
+}
+
 #[derive(Default)]
 struct PreviewWriter {
     bytes: Vec<u8>,
-    total: usize,
+    truncated: bool,
 }
 
 impl Write for PreviewWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if bytes.is_empty() {
+            return Ok(0);
+        }
         let available = MAX_VIEW_BYTES.saturating_sub(self.bytes.len());
-        self.bytes.extend_from_slice(&bytes[..bytes.len().min(available)]);
-        self.total = self.total.saturating_add(bytes.len());
-        Ok(bytes.len())
+        let written = bytes.len().min(available);
+        self.bytes.extend_from_slice(&bytes[..written]);
+        self.truncated = written < bytes.len();
+        if written == 0 {
+            return Err(io::Error::other("JSON preview byte limit reached"));
+        }
+        Ok(written)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -195,7 +208,11 @@ mod tests {
             let extra = peak_memory_kib().saturating_sub(before);
             eprintln!("viewer-memory kind={kind} input_bytes={expected_bytes} extra_peak_kib={extra}");
             assert!(shown.len() < MAX_VIEW_BYTES + 200);
-            assert!(shown.contains(&format!("{expected_bytes} bytes")));
+            if kind == "json" {
+                assert!(shown.contains("Copy value copies the whole value."));
+            } else {
+                assert!(shown.contains(&format!("{expected_bytes} bytes")));
+            }
             assert!(
                 extra < 16 * 1024,
                 "capped value viewing allocated {extra} KiB beyond its input"
@@ -297,12 +314,28 @@ mod tests {
     }
 
     #[test]
-    fn oversized_typed_json_preview_is_bounded_and_reports_serialized_size() {
+    fn oversized_typed_json_preview_reports_its_bounded_prefix() {
         let value = Value::Json(Box::new(serde_json::Value::String("é".repeat(MAX_VIEW_BYTES))));
         let shown = body(&value);
         let (preview, note) = shown.split_once("\n\n").expect("truncation notice");
         assert!(preview.len() <= MAX_VIEW_BYTES);
-        assert!(note.contains(&format!("of {} bytes", MAX_VIEW_BYTES * 2 + 2)));
+        assert_eq!(
+            note,
+            format!(
+                "Showing the first {} bytes. Copy value copies the whole value.",
+                preview.len()
+            )
+        );
+    }
+
+    #[test]
+    fn preview_writer_stops_accepting_bytes_after_the_display_budget() {
+        let mut preview = PreviewWriter::default();
+        let oversized = vec![b'x'; MAX_VIEW_BYTES + 16];
+
+        assert!(preview.write_all(&oversized).is_err());
+        assert_eq!(preview.bytes.len(), MAX_VIEW_BYTES);
+        assert!(preview.truncated);
     }
 
     #[test]
