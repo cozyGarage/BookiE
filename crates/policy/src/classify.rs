@@ -467,11 +467,11 @@ pub(crate) fn classify_query(query: &Query) -> StatementDetails {
     }
 
     let body_facts = classify_set_expr(query.body.as_ref());
-    writes |= body_facts.class.is_write();
+    writes |= body_facts.class.is_write() || !query.locks.is_empty();
     administrative |= body_facts.class == StatementClass::Administrative;
     effects = effects.union(body_facts.effects);
     contains_unscoped_dml |= body_facts.contains_unscoped_dml;
-    writes |= administrative || !query.locks.is_empty();
+    effects = effects.union_if(Effects::WRITES_ROWS, !query.locks.is_empty());
     tables.extend(body_facts.tables);
 
     StatementDetails {

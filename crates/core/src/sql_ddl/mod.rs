@@ -21,6 +21,8 @@ mod types;
 #[cfg(test)]
 mod alter_type_using_tests;
 #[cfg(test)]
+mod clause_tests;
+#[cfg(test)]
 mod collation_tests;
 #[cfg(test)]
 mod comment_tests;
@@ -28,6 +30,8 @@ mod comment_tests;
 mod default_tests;
 #[cfg(test)]
 mod diff_replacement_tests;
+#[cfg(test)]
+mod rename_order_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

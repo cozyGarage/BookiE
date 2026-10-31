@@ -124,7 +124,7 @@ impl App {
         add_bulk_close_actions(&action_group, menu_target, move |message| {
             sender_for_bulk_close.input(message);
         });
-        tab_view.insert_action_group("tab", Some(&action_group));
+        tab_bar.insert_action_group("tab", Some(&action_group));
 
         let bulk_menu = bulk_close_menu_model();
         tab_view.set_menu_model(Some(&bulk_menu));
@@ -359,6 +359,10 @@ impl App {
             .map_or(tablepro_core::EnumInputStyle::RawValue, |driver| {
                 driver.capabilities().enum_input_style
             });
+        let browse_filters = self
+            .registry
+            .get(&driver_id)
+            .is_none_or(|driver| driver.capabilities().supports_browse_filters);
         let connection_id = self.connection_id;
         let read_only = self.read_only;
 
@@ -368,6 +372,7 @@ impl App {
             table: table.clone(),
             driver_id,
             enum_input_style,
+            browse_filters,
             connection_id,
             read_only,
             page_size,

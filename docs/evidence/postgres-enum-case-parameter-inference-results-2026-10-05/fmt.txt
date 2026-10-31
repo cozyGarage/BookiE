@@ -1,2 +1,0 @@
-Command: cargo fmt --all -- --check
-Result: passed.

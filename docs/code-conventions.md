@@ -113,7 +113,7 @@ Every crate boundary returns a typed `thiserror` enum. A variant names what fail
 
 `DriverError::OperationOutcomeUnknown` means an interrupted/dispatched operation whose terminal outcome cannot be confirmed. Controlled reads can return it too; only a governed write poisons write state. Pre-dispatch refusal is a known outcome, and an ambiguous write must not become a plain failure.
 
-Put a deadline around each blocking database probe, not only connection setup. A connected socket does not mean every metadata command returns (a Redis database-list probe hung this way upstream, [Linux peer review](archive/linux-peer-review-2026-10-16.md)).
+Put a deadline around each blocking database probe, not only connection setup. A connected socket does not mean every metadata command returns.
 
 Never put a secret, SQL parameter, connection string, unmasked result or raw panic payload in returned errors, audit fields or logs. `tracing` at `error` does not make sensitive data safe. See [the privacy rule](error-handling.md#logging).
 
@@ -132,7 +132,7 @@ These are the choices that have been made more than once. They are settled. If y
 
 | Question | Settled answer | Recorded |
 | --- | --- | --- |
-| Where should a driver panic be caught? | At the `PolicyGuard` consumer boundary; the direct-call gaps reported in [#880](https://github.com/cozyGarage/BookiE/issues/880) are closed | [ADR 0006](decisions/0006-driver-panic-containment.md) |
+| Where should a driver panic be caught? | At the `PolicyGuard` consumer boundary | [ADR 0006](decisions/0006-driver-panic-containment.md) |
 | How does a service reach a component? | An `Arc`-shared service handle, not a global | [state-management](state-management.md) |
 | Whole-value state versus per-key state | `StateFile<T>` for whole documents, `WorkspaceStore` for per-connection merge | [state-management](state-management.md) |
 | Is a comment allowed? | Only for behaviour outside this repository | `AGENTS.md` |
@@ -141,6 +141,19 @@ These are the choices that have been made more than once. They are settled. If y
 | Cancellation | Reaches the database operation, not just the future | [ADR 0005](decisions/0005-server-side-cancellation.md) |
 
 When a question is answered twice in opposite directions, that is the signal to add a row here rather than to argue the third time.
+
+## Agent-facing defaults
+
+These restatements exist because coding agents regress on them; tooling already enforces most.
+
+- One public path per item inside a crate. Do not add a second `pub use` of the same type
+  under a shorter path "for convenience" during a refactor.
+- Tests assert observable behaviour or a real invariant. Do not assert that a constant equals
+  the same literal the production code defines.
+- Prefer `#[expect(lint_name, reason = "...")]` over `#[allow(...)]` when a suppression is
+  unavoidable; remove it when the cause goes. Never silence a lint for a whole crate.
+- After dependency or lock changes, let Cargo rewrite `Cargo.lock`. Do not patch lock entries
+  by hand.
 
 ## Changing a convention
 
