@@ -29,7 +29,6 @@ socket2 = { version = "0.6", features = ["all"] }
 tokio-util = { workspace = true, features = ["compat"] }
 
 [dev-dependencies]
-tablepro-app-services = { path = "../../app-services" }
 secrecy.workspace = true
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mssql_server"] }
