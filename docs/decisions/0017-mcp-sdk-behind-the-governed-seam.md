@@ -2,21 +2,10 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-12
-- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0017-official-rust-mcp-sdk-behind-the-governed-seam)
-- **Clarified**: 2026-10-15 for status. The Decision is the target; the Implementation status section records that the production MCP server is still the hand-written one.
 
 ## Context
 
-`crates/mcp/src/server.rs` is 996 lines. About half of it is protocol plumbing: JSON-RPC framing for stdio and streamable HTTP, protocol-version negotiation, `initialize`, `tools/list`, `tools/call`, hand-written tool descriptions and JSON schemas, loopback binding and an `Origin` check. The other half is the product: token scopes, connection allowlists, approval, masking, audit, and cancelling an operation when the HTTP caller disconnects. Those live in `McpBridge` and `tablepro-policy`, not in the transport.
-
-The Model Context Protocol changes (the SDK now targets the 2026-07-28 specification), and the maintainer wants room to add resources, prompts and other MCP features later without growing the hand-written layer.
-
-A pilot built outside the repository (`rmcp` 3.5.1, Apache-2.0, minimum Rust 1.88) showed:
-
-- A server over an in-memory pipe negotiated protocol 2025-06-18, listed a tool whose JSON Schema (draft 2020-12) was generated from a Rust struct, returned a tool result, and returned a normal `isError` result for bad arguments.
-- It ships stdio and streamable-HTTP server transports, is built on `tokio`, `http` and `tower`, and the HTTP server feature does not require `axum` (BookiE uses `axum` 0.8, which it also targets).
-- Its own test suite includes the required cancellation case: when a stateless streamable-HTTP client disconnects while a tool handler is still running, the per-request cancellation token fires so the handler can cancel cooperatively.
-- OAuth, `reqwest` and `jsonwebtoken` are optional features the adoption plan would leave disabled.
+The MCP server implements protocol framing, version negotiation, transport handling, tool descriptions and JSON schemas alongside BookiE-specific authorization and execution. The protocol layer can be maintained by the Rust MCP SDK while token scopes, connection allowlists, approval, masking, audit and operation cancellation remain in BookiE. The design must keep those responsibilities at the governed seam.
 
 ## Decision
 

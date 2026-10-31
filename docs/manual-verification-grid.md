@@ -99,7 +99,7 @@ Use a stable collection with enough documents to browse multiple pages. Pages ou
 
 ## Grid previews for long values
 
-In browse and SQL result grids, text and JSON cells display at most 512 Unicode characters. Text shows the remaining byte count. JSON shows a byte count when it fits within the bounded serialization budget, or an ellipsis when serialization stops at that budget. This bounds GTK/Pango work for long values in wide grids. Values over 8 KiB also use a typed preview with the original byte count; binary cells over 8 KiB show a typed preview. SQL result grids are read-only. In an editable browse table, confirm that a long text cell opens for inline editing with the full value, not the displayed preview. **View Value** shows a bounded rendering. **Copy Value** copies complete text and JSON values; binary values currently copy only a byte-count placeholder ([#1587](https://github.com/cozyGarage/BookiE/issues/1587)). Text and JSON cells over 8 KiB and up to 1 MiB can be edited in the bounded full-value dialog. Use values just below and just above the 512-character and 8 KiB thresholds, plus a value over 1 MiB for the read-only view.
+In browse and SQL result grids, text and JSON cells display at most 512 Unicode characters. Text shows the remaining byte count. JSON shows a byte count when it fits within the bounded serialization budget, or an ellipsis when serialization stops at that budget. This bounds GTK/Pango work for long values in wide grids. Values over 8 KiB also use a typed preview with the original byte count; binary cells over 8 KiB show a typed preview. SQL result grids are read-only. In an editable browse table, confirm that a long text cell opens for inline editing with the full value, not the displayed preview. **View Value** shows a bounded rendering. **Copy Value** copies complete text and JSON values; binary values copy only a byte-count placeholder. Text and JSON cells over 8 KiB and up to 1 MiB can be edited in the bounded full-value dialog. Use values just below and just above the 512-character and 8 KiB thresholds, plus a value over 1 MiB for the read-only view.
 
 - [ ] Values up to 512 Unicode characters display in full; longer text shows a byte-count suffix, while JSON beyond the bounded serialization budget shows an ellipsis. Copy Value and View Value retain the complete source value.
 - [ ] Values over the threshold show a prefix and `… (N bytes total)`; SQL result cells and binary/unsupported browse values do not offer inline editing. Editable browse text opens with the full value.
@@ -108,7 +108,6 @@ In browse and SQL result grids, text and JSON cells display at most 512 Unicode 
 - [ ] Copy Value copies the complete text or JSON rather than the displayed preview.
 - [ ] Repeat with a binary value over the threshold; the preview reports the original byte count and View Value shows at most the first 16 KiB of source bytes as hex with the total byte count.
 
-Binary Copy Value currently copies only the byte-count placeholder; full binary copying is tracked in [#1587](https://github.com/cozyGarage/BookiE/issues/1587).
 
 ## Grid cell editing: long text and JSON
 

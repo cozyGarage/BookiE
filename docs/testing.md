@@ -1,8 +1,8 @@
 # Testing
 
-The [completion page](bookie-0.2-sprint.md) records 0.2.0 delivery status; current issue acceptance belongs to the owning boards. Start with the [validation playbook](validation-playbook.md) for the executable layer catalog, local commands, CI ownership, agent handoffs and regression intake. Dated audits in [archive](archive/) prove only their recorded source and environment.
+Current issue acceptance belongs to the owning boards. Start with the [validation playbook](validation-playbook.md) for the executable layer catalog, local commands, CI ownership, agent handoffs and regression intake. Run-specific test records are maintained outside the public source tree.
 
-Design rules distilled from past audits (test ownership, runner parsers, oracles, changing a guard) are in [test design rules](test-design-rules.md).
+Test design rules for ownership, runner parsers, oracles and guard changes are in [test design rules](test-design-rules.md).
 
 ## Executable gates
 
@@ -36,7 +36,7 @@ Test-layer reports are written under the ignored `target/quality/` directory. Th
 
 ## What a container run proves
 
-Database fixtures, the GTK scenarios and the distro-floor jobs run in containers or virtual displays. A pass there shows the code behaves as designed against a disposable database; it is not acceptance of a connection path. Unix sockets, IPv6 loopback, desktop portals and the Secret Service behave differently across containers and desktop sessions; a container run has already hidden one such difference (Docker does not publish `::1`). Acceptance for those paths is the installed package connecting to a real database in the target native desktop session, on the host or a supported VM, as recorded under PKG-1 and in the [manual checklist](manual-verification-0.2-features.md).
+Database fixtures, GTK scenarios and distro-floor jobs run in containers or virtual displays. A pass there shows behavior against a disposable database; it does not establish a host connection path. Unix sockets, IPv6 loopback, desktop portals and the Secret Service can behave differently across containers and desktop sessions. Verify those paths with an installed package in the target native desktop session and follow the [manual checklist](manual-verification-0.2-features.md).
 
 ## Remote lab and connection-fault checks
 
@@ -54,7 +54,7 @@ B3 covers the value path from the native driver through each relevant consumer, 
 
 The sandbox tier selects `--test '*'` so every integration target in its crate list is discovered, including new files. Library and binary unit tests belong to the unit tier; Cargo's broader `--tests` flag also selects those targets and would execute them twice.
 
-The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release and verifies its SHA-256. `.config/nextest.toml` disables retries so flaky tests fail instead of passing on a hidden retry, and stops a test that runs for five minutes. The unit and sandbox selections were qualified in [#892](https://github.com/cozyGarage/BookiE/issues/892). Compare test names and source revisions rather than copying historical totals; parent-launched subprocess helpers can affect displayed counts. Driver, release, GTK and keyring tiers remain on `cargo test`. Moving a shared database fixture to one process per test requires separate ownership and isolation qualification; the headless pilot did not qualify that migration. `scripts/ci-local.sh full` uses the same unit and sandbox commands as automated checks. Doc tests are not part of these tiers.
+The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release and verifies its SHA-256. `.config/nextest.toml` disables retries so flaky tests fail instead of passing on a hidden retry, and stops a test that runs for five minutes. Driver, release, GTK and keyring tiers remain on `cargo test`. Shared database fixtures require explicit ownership and isolation before they can run one process per test. `scripts/ci-local.sh full` uses the same unit and sandbox commands as automated checks. Doc tests are not part of these tiers.
 
 Container images are not part of that retry rule: a dropped image download is not a flaky test. Before running a test group that uses containers, use `scripts/prepull-test-images.sh <group>` to fetch the images listed for it in `ci/test-images.txt`. Each group must list exactly the images its tests start, including the default image a testcontainers module uses when a test sets no tag; `scripts/tests/test_prepull_test_images.py` fails when a group and its tests differ. When you add a fixture or change an image tag, update the group in the same change.
 
@@ -178,11 +178,11 @@ It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through w
 
 ## Manual verification
 
-The [manual checklist](manual-verification-0.2-features.md) records installed GTK workflows and layouts that need visual acceptance. Unit and widget tests do not establish installed desktop behavior. Each unchecked item remains unverified until a result is recorded.
+The [manual checklist](manual-verification-0.2-features.md) records installed GTK workflows and layouts that need visual acceptance. Unit and widget tests do not establish installed desktop behavior. Keep run results in private verification records.
 
 ## Regression case selection
 
-Select regressions from the changed behavior and current issues in Project #3. Failure reports are hypotheses, not confirmed BookiE defects. Trace the matching code path and reproduce a candidate against current source before changing code; a historical claim of zero tests does not establish a current coverage gap.
+Select regressions from the changed behavior and current issues in Project #3. Failure reports are hypotheses, not confirmed product defects. Trace the matching code path and reproduce a candidate against current source before changing code.
 
 ## File-size guard
 

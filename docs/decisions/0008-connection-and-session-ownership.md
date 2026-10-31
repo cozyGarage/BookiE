@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-03
-- **Origin**: Approved sprint B4 and the seven decisions recorded on its task board on 2026-09-27. Extraction does not close their implementation tasks.
+- **Origin**: Accepted after review.
 
 ## Context
 
@@ -24,7 +24,6 @@ The GUI must ask before accepting an unknown SSH host key on every hop, for buil
 
 An unknown write outcome blocks governed writes for that connection. Recovery uses the approved connection restart path. Journal-wide failure and unresolved durable recovery obligations stay fail-closed. Reconnect cannot erase an audit intent or prove whether the server committed a write. Old-generation callbacks cannot clear or poison a replacement's state. Each live connection owns its audit generation; a shared generation across connections is not this contract.
 
-Remaining transport, audit and installed acceptance are selected through [Project #3](https://github.com/users/cozyGarage/projects/3) and issue-owned criteria.
 
 ## Rationale
 
@@ -32,7 +31,7 @@ Explicit owners prevent a saved UUID from authorizing a stale handle or write. R
 
 ## Consequences
 
-Cross-owner changes require coordinated core/policy/transport/daemon/UI work. Tests need stale generations, no dispatch/replay, cleanup and database/audit postconditions. Safe refusal remains until the owning task proves recovery. The [manual checklist](../manual-verification-0.2-features.md) retains installed acceptance. Task completion does not imply B4 or release completion.
+Cross-owner changes require coordinated core/policy/transport/daemon/UI work. Tests need stale generations, no dispatch/replay, cleanup and database/audit postconditions. Safe refusal remains until the owning task proves recovery. Installed desktop scenarios remain documented in the [manual checklist](../manual-verification-0.2-features.md).
 
 ## Alternatives considered
 

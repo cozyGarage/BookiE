@@ -43,7 +43,7 @@ The packaged application icon (`apps/linux/flatpak/icons/scalable/com.tablepro.l
 | Brass Dark | `#8A6A1F` | The same accent as text on light backgrounds. |
 | Rust | `#B5523B` | Destructive actions and errors only. |
 
-Measured contrast ratios (WCAG relative luminance):
+Calculated contrast ratios (WCAG relative luminance):
 
 | Pair | Ratio | Use for text |
 |---|---|---|

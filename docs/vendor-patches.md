@@ -11,7 +11,7 @@ BookiE maintains patched dependency snapshots under `vendor/`, applied through t
 | MongoDB driver | Bound SCRAM work and verify the server nonce; preserve TLS hostname verification when connecting through a tunnel. |
 | Redis driver | Preserve TLS hostname verification when connecting through a tunnel. |
 
-Patch contents and base crate versions are listed in [`vendor/README.md`](../../vendor/README.md). Value behavior follows [ADR 0007](../decisions/0007-type-and-value-preservation.md); TLS identity and cancellation follow the local transport and driver contracts.
+Patch contents and base crate versions are listed in [`vendor/README.md`](../vendor/README.md). Value behavior follows [ADR 0007](decisions/0007-type-and-value-preservation.md); TLS identity and cancellation follow the local transport and driver contracts.
 
 ## Updating a patch
 

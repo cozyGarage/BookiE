@@ -2,11 +2,10 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-25
-- **Basis**: MongoDB value-contract checkpoints from 2026-10-04 and the code at the extraction date.
 
 ## Context
 
-The grid saves edits and deletes as keyed statements. A statement that matches only the primary key silently overwrites a value another writer changed between fetch and save. An affected-row count after the fact cannot tell a stale overwrite from a legitimate update, because both affect one row. A native SQLite probe showed `other writer` replaced by `stale grid edit` with one affected row.
+The grid saves edits and deletes as keyed statements. A statement that matches only the primary key can overwrite a value another writer changed between fetch and save. An affected-row count cannot distinguish a stale overwrite from a legitimate update when both affect one row.
 
 ## Decision
 

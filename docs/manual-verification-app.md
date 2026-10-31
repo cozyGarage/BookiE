@@ -17,7 +17,7 @@ Run the core grid/editor/connection screens in light, dark, high-contrast light 
 
 For a failure, record the action, expected and actual behavior, theme, scale, size, screenshot, binary identity and issue in the private verification record. Add an automated behavior regression where possible.
 
-## Active grid edit ownership ([#1029](https://github.com/cozyGarage/BookiE/issues/1029))
+## Active grid edit ownership
 
 These manual cases cover input-method composition and the full-value editor popover. The automated active-edit scenarios cover ordinary text entry and tab-close actions; they do not establish these input paths.
 
@@ -36,8 +36,6 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] Closing the window mid-load leaves no error toast behind.
 
 ## Sidebar tree
-
-Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/1349) adds a persistent toggle, native docked divider and lazy field previews. Run this checklist on a build that includes the issue changes before marking the item complete.
 
 - [ ] Toggle navigation at wide and narrow widths; the first Run click works after connecting. Drag the docked divider and use its keyboard handle; the editor remains at least 600 pixels wide. Cross the collapse breakpoint both ways while a table is expanded.
 - [ ] Expand a table/view without opening a browse tab. Names and exact types are readable, keys have a visual cue, and Structure opens the correct object. Collapse while loading, refresh DDL metadata, switch connections, retry a failed request and exercise field limits; old replies never populate a replacement row.
@@ -59,13 +57,6 @@ Source follow-up [UI-43 / #1349](https://github.com/cozyGarage/BookiE/issues/134
 ## Cell editor
 
 - [ ] Check in-place cell editing in light and dark.
-
-## Known gaps that are not GTK
-
-- Creating a table from a CSV file falls back to PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis and DuckDB. Only PostgreSQL, MySQL, SQLite and SQL Server have real type-name tables, and none of the four fallback engines was exercised.
-- Check a bundle round trip between two real profiles in addition to automated coverage.
-- Bundle export and import write administrative audit events. Run a bundle round trip and confirm both events appear in `audit.jsonl` (B4-22).
-- SQL-format export and copied INSERT statements now preserve binary values on PostgreSQL, MySQL, SQLite, SQL Server and ClickHouse, with real-engine tests for NULL, empty blobs and all 256 byte values. DuckDB binary SQL literals also have a NULL/empty/all-byte round-trip regression in the B3 ledger; this checklist has no installed acceptance result for DuckDB. Other lossless-contract requirements are listed under B3.
 
 ## PostgreSQL backup and restore
 

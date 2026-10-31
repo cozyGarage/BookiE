@@ -2,20 +2,12 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-12
-- **Implementation status**: see [implementation-status.md](implementation-status.md#adr-0018-headless-application-services-crate)
 
 ## Context
 
-`apps/linux/app` is 55,000 of about 110,000 lines in the workspace. Its `services/` directory is about 11,900 lines. Measured on 2026-10-12:
+Application state and database-facing logic currently sit beside GTK widgets. The UI needs a headless boundary so state transitions and service behavior can be tested without a display, while widgets remain owned by the GTK application.
 
-- 33 of the 42 service files (7,771 lines) use no GTK, glib or Relm4 at all: workspace and tab bookkeeping, connection monitoring and retry classification, browse query building, CSV import mappings, named filter presets, column widths, quick switching, approval routing and others.
-- 9 files (4,084 lines) touch glib, mostly for configuration paths, `GSettings` and timers.
-
-These files compile and test with the whole GTK application, so a unit test of workspace state waits for the GTK build, and a logic change recompiles the widgets.
-
-Today's bugs show the cost of logic living next to widgets. The tab-close handshake with `AdwTabView`, the preview-tab replacement and the save-then-close steps are all implemented in widget callbacks, so none of them could be tested without a display. Three of those defects reached the installed build before a GTK scenario caught them ([#648](https://github.com/cozyGarage/BookiE/issues/648) and the preview-tab replacement fixed in the same week).
-
-[ADR 0016](0016-governed-consumer-seam.md) already lists "one headless service facade that the GTK app and `bookie-agentd` both call" as an accepted direction. [ADR 0003](0003-relm4-architecture.md) already expects reusable state logic to live outside widget construction. This record makes the boundary explicit.
+[ADR 0016](0016-governed-consumer-seam.md) defines a shared service facade for GUI and agent consumers. [ADR 0003](0003-relm4-architecture.md) keeps reusable state logic outside widget construction. This decision defines that boundary.
 
 ## Decision
 

@@ -25,19 +25,17 @@ This is deliberately strict. If the operation wins the initial race, its result 
 
 **SQLite interrupts in process.** It has no second session to kill from, so the driver keeps the raw `sqlite3` handle for the life of the operation and calls `sqlite3_interrupt`, which SQLite documents as safe from another thread. sqlx's progress handler was rejected as the mechanism: it only fires between virtual-machine instructions, so it cannot stop a statement waiting on a database lock, which is one of the cases a Stop has to cover. The unsafe call is isolated in one module holding one pointer and one function.
 
-**SQL Server did not support this at the time of the decision.** The then-used Tiberius 0.12 defined the TDS attention packet but exposed no way to send one. Abandoning a statement left it running on the server and left the client with a half-read token stream; attempts to reuse that client could block behind its mutex. The current driver retires the affected connection or session instead, so later operations fail fast.
-
-The current workspace uses Tiberius 0.13, which exposes [`Client::cancel_query`](https://docs.rs/tiberius/0.13.0/tiberius/struct.Client.html#method.cancel_query) to send TDS Attention and drain the acknowledgement. A real-server probe waited until SQL Server reported the tagged query in `WAITFOR`, then cancelled it; Tiberius returned a protocol error because it received no `DONE_ATTN` acknowledgement. Bookie keeps `supports_server_cancellation` false, returns `OperationOutcomeUnknown`, and retires the affected connection or session. B4-23 tracks the read/write verification required before this capability can change.
+SQL Server cancellation remains disabled because the client cannot confirm that the server stopped the operation. BookiE returns `OperationOutcomeUnknown` and retires the affected connection or session.
 
 **A driver declares the capability.** `Connection::supports_server_cancellation` defaults to false. Where it is false the outcome of an interrupted operation is genuinely unknown, poisoning is correct, and the UI must not offer a Stop that cannot stop.
 
 ## Rationale
 
-PostgreSQL's implementation was already release-verified through the fixture, so it is the reference rather than a new design. Extracting it into `core` and re-verifying it against the fixture and the container suite means the remaining drivers adopt a proven sequence instead of four independent ones.
+The PostgreSQL path provides the reference sequence for the shared cancellation coordinator.
 
-Engines use different cancellation mechanisms. PostgreSQL sends `pg_cancel_backend` through a separate single-connection control pool. MySQL uses `KILL QUERY` through a separate single-connection pool. ClickHouse tags the request with a unique query id and sends `KILL QUERY` through its client. SQLite calls `sqlite3_interrupt` in-process. SQL Server's Tiberius cancellation API did not return an acknowledgement in the real-server probe, and Redis, MongoDB and DuckDB do not report confirmed server cancellation. The shared coordinator still enforces the same ordering and confirmation rule.
+Engines use different cancellation mechanisms. PostgreSQL sends `pg_cancel_backend` through a separate single-connection control pool. MySQL uses `KILL QUERY` through a separate single-connection pool. ClickHouse tags the request with a unique query id and sends `KILL QUERY` through its client. SQLite calls `sqlite3_interrupt` in-process. SQL Server, Redis, MongoDB and DuckDB do not report confirmed server cancellation. The shared coordinator still enforces the same ordering and confirmation rule.
 
-`SLEEP()` is not a valid probe on MySQL. It returns 1 when interrupted and the statement succeeds, so a test built on it passes without proving anything. The integration tests use an interruptible cross join instead, and check the server's own process list before and after the interruption rather than trusting the client's error.
+Cancellation tests must check server state or returned values rather than treating a client-side error as proof that execution stopped.
 
 ## Consequences
 
@@ -63,6 +61,6 @@ Gained:
 
 **`KILL <spid>` for SQL Server.** Deferred, not rejected. It ends the session and rolls back transactions still associated with it, which can take time ([Microsoft documentation](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/kill-transact-sql)). It cannot prove an autocommit write had not committed before the kill took effect. The session's disappearance from `sys.dm_exec_sessions` would confirm the session ended, but Stop would cost the user their connection and a write outcome could remain unknown. Both need deciding before it ships.
 
-**Switching the PostgreSQL client library to fix cancellation.** Not done. A text-only simple-query result path would lose native type metadata; inferring transaction status through `SAVEPOINT` probes and changing cursor planning would alter other contracts. A migration must explicitly preserve typed result metadata, codecs, TLS service identity, session semantics, cursor behavior and `PolicyGuard`.
+**Switching database client libraries as a cancellation shortcut.** Rejected when the change would lose native type metadata or alter transaction, TLS, session, cursor or policy contracts.
 
-**Returning a connection to the pool before its stop settles.** Rejected. A connection-scoped stop can arrive late and hit the next request. Cancellation tests cover the race matrix and assert server and reuse behaviour, not only the returned error: caller drop, deadline during cancel dispatch, a delayed stop after the work completed, stop transport failure, pool reuse and shutdown (same review, section 6.2).
+**Returning a connection to the pool before its stop settles.** Rejected. A connection-scoped stop can arrive late and hit the next request. Cancellation tests cover the race matrix and assert server and reuse behaviour, not only the returned error: caller drop, deadline during cancel dispatch, a delayed stop after the work completed, stop transport failure, pool reuse and shutdown .

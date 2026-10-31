@@ -2,7 +2,6 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-07
-- **Clarified**: 2026-10-15 for wording. The editor shows result sets through a "Result set" drop-down and a view stack, not tabs. The JSON and CSV rules for several sets are implemented by MCP `export_data`; the GUI export dialog exports one result.
 
 ## Context
 
@@ -18,7 +17,6 @@ Drivers must drain the full response and surface late server errors. A query tha
 
 ## Consequences
 
-PR #228 implements this decision. The SQL Server batch API collects ordered sets under one shared budget; the guard, editor, MCP and JSON export retain the sets, while CSV refuses multi-set output. Docker tests cover ordering, an empty first set, late errors, truncation and connection reuse.
 
 - Existing browse, paging and single-result consumers keep using `QueryResult`.
 - Existing query callers retain their first-set behavior; callers that need all sets opt into the batch API.

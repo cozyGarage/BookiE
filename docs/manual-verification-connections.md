@@ -28,7 +28,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] With Orca, open Group and tags, navigate to Colour, open the named button, choose a palette colour, and confirm the selected colour is announced and saved. Sidebar table search and the saved-filter name field announce their purpose.
 - [ ] Duplicate produces a new row with a distinct name. When the source has a saved database password, the copy's credential form opens with an empty password field; save a new password and verify both connections work independently.
 - [ ] The Name field in the connect dialog is used when set, and the derived `user@host` label still appears when it is blank.
-- [ ] Two connections to the same endpoint stay separate after reconnecting to each. This is the regression the id-first identity change fixed.
+- [ ] Two connections to the same endpoint stay separate after reconnecting to each.
 - [ ] For MongoDB, the connect dialog shows Authentication database; save `admin` for a user defined there while Database is `appdb`, reconnect, and confirm connections with different authentication databases stay separate.
 - [ ] On PostgreSQL, right-click a schema and hide it. Confirm its tables and views disappear, search cannot reveal them, the filter menu can restore one or all schemas, and each connection retains its own hidden-schema list after reconnecting.
 
@@ -80,6 +80,5 @@ Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-a
 
 - [ ] When attachment editing is available in connection settings, add one or more SQLite files with schema aliases and paths (including `~/` expansion). On connect, verify each schema appears in the sidebar. The current form has no add or edit control.
 - [ ] Cross-schema queries (such as `SELECT * FROM main.orders JOIN aux.customers ON orders.customer_id = aux.customers.id`) execute in the SQL editor and return combined rows.
-- [ ] Verify attachment failures are surfaced when implemented. Missing paths are currently skipped, and errors attaching existing paths are ignored; [#1993](https://github.com/cozyGarage/BookiE/issues/1993) tracks the latter.
 - [ ] Connection export and import preserve configured attached database definitions across profiles.
 

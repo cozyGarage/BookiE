@@ -6,7 +6,7 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 
 **BookiE** is a Linux-only native database client. The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Work happens on the `linux` branch in the Rust 1.98 Cargo workspace at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`).
 
-- The rename covers the display name, packaging install names (`bookie`, `bookie-agentd`, with `tablepro*` aliases) and branding assets only. Cargo package and binary names stay `tablepro-app` / `tablepro-agentd`. App ID, config and data paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Crate names stay `tablepro-*`. Check the sprint before renaming any of them.
+- The rename covers the display name, packaging install names (`bookie`, `bookie-agentd`, with `tablepro*` aliases) and branding assets only. Cargo package and binary names stay `tablepro-app` / `tablepro-agentd`. App ID, config and data paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Crate names stay `tablepro-*`. Check the relevant ADR and compatibility documentation before renaming any of them.
 - The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. No cross-platform UI layers, web views or source for another operating system.
 - Every shipped feature works without an account, license key, subscription, paid tier or remote entitlement check.
 - The root [LICENSE](LICENSE) applies. User-facing changes carry a `Release-Note:` line ([changelog and commits](#changelog-and-commits)).
@@ -14,11 +14,10 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 ## Where to start
 
 1. [docs/README.md](docs/README.md): the documentation map and where each fact belongs.
-2. [Completion and continuation](docs/bookie-0.2-sprint.md): the maintainer marked 0.2.0 delivery complete, and the release was published on 2026-10-23. The same page records the delivery boundary; [Project #3](https://github.com/users/cozyGarage/projects/3) owns selected work, status and lane, and [known limitations](docs/known-limitations.md) says what the application cannot do. The maintainer defines each release scope before qualification.
-3. [Bookie Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (B3, B4, UX, Maintainer).
-4. The ADR that governs your change ([index](docs/decisions/README.md)). Every type or value change follows [ADR 0007](docs/decisions/0007-type-and-value-preservation.md).
+2. [BookiE Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (B3, B4, UX, Maintainer).
+3. The ADR that governs your change ([index](docs/decisions/README.md)). Every type or value change follows [ADR 0007](docs/decisions/0007-type-and-value-preservation.md).
 
-Accepted ADRs constrain architecture. The completion page records milestone status, Project #3 owns selected work order and each issue owns its acceptance. Dated reviews and archives prove their recorded source only; they do not override current decisions.
+Accepted ADRs constrain architecture. Project #3 owns selected work order; each issue owns its acceptance. Private verification records support review but do not override current decisions.
 
 ## Product context and specs
 

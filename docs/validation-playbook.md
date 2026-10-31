@@ -1,10 +1,10 @@
 # Validation playbook
 
-Use this page to select checks, hand off work, and review evidence. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures; the [completion page](bookie-0.2-sprint.md) records 0.2.0, while [Project #3](https://github.com/users/cozyGarage/projects/3) and owning issues set selected work and acceptance. A green layer certifies only its named scope.
+Use this page to select checks and hand off work. The executable catalog is [test-layers.json](../scripts/test-layers.json). [Testing](testing.md) describes fixtures; [Project #3](https://github.com/users/cozyGarage/projects/3) and owning issues set selected work and acceptance. A green layer certifies only its named scope.
 
 ## Current desktop target
 
-The [sprint](bookie-0.2-sprint.md) records the maintainer's 2026-10-18 completion decision; use the release page linked there for current publication status. Project #3 orders selected work; each issue names its acceptance layers. GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep existing automated Linux checks and record unavailable environments as pending.
+Project #3 orders selected work; each issue names its acceptance layers. GTK 4.24 in the layer catalog names the toolkit development-library floor of [ADR 0021](decisions/0021-toolkit-floor.md), not a required desktop shell. Keep automated Linux checks and record unavailable environments in private verification records.
 
 ## Start here
 
@@ -30,7 +30,7 @@ python3 scripts/run-test-layer.py full app-server values drivers b4-rollback tls
 bash scripts/test-pg-dump.sh
 ```
 
-This covers the fast workspace gate, app-server and cross-driver value contracts, Docker driver/rollback/TLS/PostgreSQL/SSH fixtures, keyring and dependency policy checks, plus the PostgreSQL dump/restore fixture. The named layers run sequentially and save the source revision, worktree state, tracked-diff digest and logs under `target/quality/`; `test-pg-dump.sh` runs separately. This does not cover the distro-floor matrix, installed-package upgrade/rollback, nightly mutation or soak runs, or the opt-in Kerberos and specialized GTK database fixtures. Those remain separate acceptance checks. The [completion page](bookie-0.2-sprint.md) records 0.2.0 status; current work and acceptance criteria live on the owning boards. Dated release audits and validation history are source-pinned records, not current status.
+This covers the fast workspace gate, app-server and cross-driver value contracts, Docker driver/rollback/TLS/PostgreSQL/SSH fixtures, keyring and dependency policy checks, plus the PostgreSQL dump/restore fixture. The named layers run sequentially and save the source revision, worktree state, tracked-diff digest and logs under `target/quality/`; `test-pg-dump.sh` runs separately. This does not cover the distro-floor matrix, installed-package upgrade/rollback, nightly mutation or soak runs, or the opt-in Kerberos and specialized GTK database fixtures. Those remain separate checks. Current work and acceptance criteria live on the owning boards. Store dated run records outside the public source tree.
 
 Before opening a pull request, also run `bash scripts/preflight.sh` as required by `AGENTS.md`. It repeats unit and sandbox tests but adds the crate-boundary and comment-line checks that `ci-local.sh full` does not run.
 
@@ -112,7 +112,7 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Coverage | The configured coverage workflow | Review the report and configured coverage floor for the exact source revision |
 | Flatpak | Flatpak packaging scripts | Package build only; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
-| GTK soak | `bash scripts/test-gtk-safety.sh` | Record the tested revision and outcomes. Current follow-ups are TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). |
+| GTK soak | `bash scripts/test-gtk-safety.sh` | Record the tested revision and outcomes in a private verification record. |
 | Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) and issue acceptance criteria | VM/desktop version, Wayland session, package checksum, steps, result and screenshots |
 
 ## Hosted checks

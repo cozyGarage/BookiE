@@ -3,10 +3,6 @@
 - **Status**: Accepted
 - **Date**: 2026-10-12
 
-### Clarification (2026-10-20)
-
-The statement below that "the type boundary cannot" forget the guard is an architectural requirement, not a compiler-enforced guarantee. `ConnectionProvider::connection` returns `Arc<dyn Connection>`, so composition roots and provider implementations must preserve the invariant and tests must cover issued handles. The accepted decision is unchanged.
-
 ## Context
 
 The GTK app, MCP tools and `bookie-agentd` all need a live database handle. Optional checks around a raw driver connection are easy to skip from a new screen, tool or import path. Later features must not open a second execute path or a second value model.
@@ -15,7 +11,7 @@ Behaviour extracted from the code lives in [the governed SQL spec](../../specs/g
 
 ## Decision
 
-`PolicyGuard` is the only `Connection` a consumer may hold. Composition roots may keep a raw driver internally for reconnect and monitoring. They wrap it before the GUI, MCP or `bookie-agentd` issues a handle.
+`PolicyGuard` is the only `Connection` a consumer may hold. Composition roots may keep a raw driver internally for reconnect and monitoring. They wrap it before the GUI, MCP or `bookie-agentd` issues a handle. The current `ConnectionProvider` API returns `Arc<dyn Connection>` and does not encode this invariant in its type, so providers and composition roots must preserve it.
 
 Three checks stay separate. None replaces another:
 
