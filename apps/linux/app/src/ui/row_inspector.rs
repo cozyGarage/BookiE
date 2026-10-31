@@ -1,4 +1,5 @@
 use relm4::adw;
+use relm4::adw::prelude::{ActionRowExt, PreferencesRowExt};
 use relm4::gtk::{self, prelude::*};
 
 use tablepro_core::{ColumnInfo, Value};
@@ -169,13 +170,12 @@ fn show_row(list: &gtk::ListBox, stack: &gtk::Stack, fields: Option<Vec<Inspecto
 }
 
 fn field_row(field: &InspectorField) -> adw::ActionRow {
-    let row = adw::ActionRow::builder()
-        .title(format!("{} \u{b7} {}", field.name, field.data_type))
-        .subtitle(&field.text)
-        .subtitle_lines(0)
-        .subtitle_selectable(true)
-        .use_markup(false)
-        .build();
+    let row = adw::ActionRow::new();
+    row.set_use_markup(false);
+    row.set_title(&format!("{} \u{b7} {}", field.name, field.data_type));
+    row.set_subtitle(&field.text);
+    row.set_subtitle_lines(0);
+    row.set_subtitle_selectable(true);
     row.add_css_class("property");
     if field.is_null {
         row.add_css_class("dim-label");
