@@ -171,6 +171,9 @@ pub fn build_single_cell_update(
             got: original_row.len(),
         });
     }
+    if col_index >= columns.len() {
+        return Err(BuildSqlError::StaleColumns);
+    }
 
     let mut params: Vec<Value> = Vec::with_capacity(1 + pk_indexes.len());
     let mut placeholder_idx = 0;

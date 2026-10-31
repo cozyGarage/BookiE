@@ -55,6 +55,12 @@ pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std:
 }
 
 impl App {
+    pub(super) fn refresh_sidebar(&self, sender: relm4::ComponentSender<App>) {
+        if let Some(origin) = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database) {
+            self.on_schema_changed(origin, None, None, sender);
+        }
+    }
+
     pub(super) fn show_sidebar_for_new_connection(&self) {
         self.set_sidebar_connected(true);
         reveal_sidebar_unless_overlay(&self.split_view, &self.sidebar_reveal);
@@ -84,6 +90,7 @@ impl App {
             guard.push_back(row_for(
                 node,
                 &self.sidebar_collapsed.borrow(),
+                !self.table_search.text().trim().is_empty(),
                 schema_filter_enabled,
                 source.clone(),
             ));
@@ -103,8 +110,22 @@ impl App {
         self.sync_sidebar_selection();
     }
 
+    pub(super) fn sync_sidebar_expansion(&self) {
+        use crate::services::sidebar_tree::NodeKind;
+        let searching = !self.table_search.text().trim().is_empty();
+        let collapsed = self.sidebar_collapsed.borrow();
+        for (index, node) in self.sidebar_nodes.borrow().iter().enumerate() {
+            if matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)) {
+                self.sidebar_factory.send(
+                    index,
+                    SidebarRowMsg::SetCollapsed(!searching && collapsed.is_collapsed(&node.key)),
+                );
+            }
+        }
+    }
+
     pub(super) fn toggle_sidebar_group(&mut self, key: &str) {
-        if !self.table_search.text().is_empty() {
+        if !self.table_search.text().trim().is_empty() {
             return;
         }
         self.sidebar_collapsed.borrow_mut().toggle(key);
@@ -351,6 +372,7 @@ fn sidebar_group_label(node: &crate::services::sidebar_tree::TreeNode) -> String
 fn row_for(
     node: &crate::services::sidebar_tree::TreeNode,
     collapsed: &crate::services::sidebar_tree::CollapseState,
+    searching: bool,
     schema_filter_enabled: bool,
     column_source: Option<crate::ui::sidebar_columns::ColumnSource>,
 ) -> SidebarRowInit {
@@ -377,7 +399,7 @@ fn row_for(
             Some(GroupInit {
                 label: sidebar_group_label(node),
                 count: node.count,
-                collapsed: collapsed.is_collapsed(&node.key),
+                collapsed: !searching && collapsed.is_collapsed(&node.key),
                 actions: matches!(node.kind, NodeKind::Group(GroupKind::Tables)),
                 entry: false,
             }),
@@ -507,7 +529,7 @@ mod sidebar_label_tests {
             .unwrap();
 
         assert_eq!(sidebar_group_label(group), crate::tr!("Catalog").to_string());
-        let init = row_for(entry, &Default::default(), false, None);
+        let init = row_for(entry, &Default::default(), false, false, None);
         assert_eq!(init.kind, SidebarObjectKind::Catalog);
         let group_init = init.group.unwrap();
         assert!(group_init.entry);

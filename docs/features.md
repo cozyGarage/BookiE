@@ -1,6 +1,6 @@
 # BookiE features on `linux`
 
-This page describes current behavior on the `linux` branch, including changes made after 0.2.0 was published. It does not certify that every listed feature is present in the [0.2.0 release assets](platforms.md#published-020-release). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
+This page describes current behavior on the `linux` branch, including changes made after 0.2.0 was published. It does not certify that every listed feature is present in the [0.2.0 release assets](platforms.md#published-020-artifacts). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
 
 ## Databases
 
@@ -129,7 +129,7 @@ BookiE can let an AI assistant use saved connections through the Model Context P
 
 - No account, hosted service or paid tier.
 - No browser interface and no runtime driver plugins.
-- No database snapshots. [ADR 0015](decisions/0015-database-snapshots.md) records the accepted design; implementation is in the [post-0.2.0 backlog](backlog.md) with no release target.
+- No database snapshots. [ADR 0015](decisions/0015-database-snapshots.md) records the accepted design; snapshots are not available in the current application.
 - Linux only ([platforms](platforms.md)).
 
 Detailed behavior, keyboard shortcuts, and limits are documented in the [user guide](user-guide.md) and [known limitations](known-limitations.md).
