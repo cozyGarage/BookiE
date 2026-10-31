@@ -880,14 +880,20 @@ GLib.MainLoop().run()
             f"SELECT x, 'person-' || x, substr(lower(hex(randomblob({half_bytes}))), 1, {payload_bytes}) FROM c"
         )
         ui.wait_for_node_containing("done in", timeout=300)
+        if rows * payload_bytes > 256 * 1024 * 1024:
+            raise ValueError("profile table payload exceeds its 256 MiB bound")
+
         before_rss, _ = app_memory_kb()
-        started = time.monotonic()
         ui.wait_for_node(name="profile_cells")
+        cpu_started = ui.owned_application().cpu_seconds()
+        started = time.monotonic()
         ui.invoke_named_action_within("profile_cells", "Open profile_cells")
         time.sleep(3)
-        after_load = app_memory_kb()[0] / 1024
-        actual_delta_mb = after_load - before_rss / 1024
-        minimum_delta_mb = payload_bytes / (1024 * 1024) / 2
+        observation_seconds = time.monotonic() - started
+        observation_cpu_seconds = ui.owned_application().cpu_seconds() - cpu_started
+        after_resident, peak = app_memory_kb()
+        actual_delta_mb = after_resident / 1024 - before_rss / 1024
+        minimum_delta_mb = min(rows, 1_000) * payload_bytes / (1024 * 1024) / 2
         assert actual_delta_mb >= minimum_delta_mb, (
             f"large table page did not retain the expected payload: delta={actual_delta_mb:.1f} MB, "
             f"minimum={minimum_delta_mb:.1f} MB"
@@ -898,9 +904,96 @@ GLib.MainLoop().run()
                 "profile_mode": "table-browse",
                 "rows_requested": rows,
                 "cell_payload_bytes": payload_bytes,
-                "observation_after_open_seconds": round(time.monotonic() - started, 2),
+                "observation_after_open_seconds": round(observation_seconds, 3),
+                "app_cpu_during_observation_seconds": round(observation_cpu_seconds, 3),
                 "rss_before_mb": round(before_rss / 1024, 1),
+                "rss_after_open_mb": round(after_resident / 1024, 1),
                 "rss_delta_mb": round(actual_delta_mb, 1),
+                "peak_mb": round(peak / 1024, 1),
+            }) + "\n")
+
+    def profile_large_result_export_dialog(database, base):
+        rows = int(os.environ["TABLEPRO_PROFILE_EXPORT_ROWS"])
+        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_EXPORT_CELL_BYTES", "2048"))
+        text_mode = os.environ.get("TABLEPRO_PROFILE_EXPORT_TEXT_MODE", "unique")
+        if rows < 1 or not 1 <= payload_bytes <= 8192:
+            raise ValueError("export profile rows or cell payload size are outside their supported bounds")
+        if rows * payload_bytes > 256 * 1024 * 1024:
+            raise ValueError("export profile input exceeds its 256 MiB payload bound")
+        if text_mode not in ("unique", "repeated"):
+            raise ValueError("export profile text mode is unsupported")
+        half_bytes = (payload_bytes + 1) // 2
+        payload = (
+            f"substr(replace(hex(zeroblob({half_bytes})), '00', 'xx'), 1, {payload_bytes})"
+            if text_mode == "repeated"
+            else f"substr(lower(hex(randomblob({half_bytes}))), 1, {payload_bytes})"
+        )
+        sql = (
+            f"WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < {rows}) "
+            "SELECT x AS id, 'hash-' || x AS hash, 'user_' || x AS username, x * 1.25 AS amount, "
+            "datetime('2026-01-01', '+' || x || ' seconds') AS created_at, x % 2 AS flag, "
+            f"{payload} AS note, x % 1000 AS bucket, x % 3 AS maybe, x * 0.01 AS ratio FROM c"
+        )
+        before_rss, _ = app_memory_kb()
+        query_cpu_started = ui.owned_application().cpu_seconds()
+        query_started = time.monotonic()
+        ui.run_sql(sql)
+        ui.wait_for_node_containing("done in", timeout=300)
+        query_seconds = time.monotonic() - query_started
+        query_cpu_seconds = ui.owned_application().cpu_seconds() - query_cpu_started
+        result_status = sorted({
+            ui.node_name(node) for node in ui.descendants(ui.application_node())
+            if any(word in ui.node_name(node).lower() for word in ("done in", "truncat"))
+        })
+        idle_started = time.monotonic()
+        prior_cpu = ui.owned_application().cpu_seconds()
+        stable_samples = 0
+        while time.monotonic() - idle_started < 5 and stable_samples < 3:
+            time.sleep(0.1)
+            current_cpu = ui.owned_application().cpu_seconds()
+            stable_samples = stable_samples + 1 if current_cpu - prior_cpu < 0.01 else 0
+            prior_cpu = current_cpu
+        idle_wait_seconds = time.monotonic() - idle_started
+        before_dialog_rss, _ = app_memory_kb()
+        export_cpu_started = ui.owned_application().cpu_seconds()
+        export_started = time.monotonic()
+        options = ui.wait_for_node(name="Run options", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+        actions = options.queryAction()
+        export_action = next(
+            (index for index in range(actions.nActions)
+             if actions.getName(index) == "editor-export.result-0-0"),
+            None,
+        )
+        assert export_action is not None and actions.doAction(export_action), (
+            "the loaded result export action was not available"
+        )
+        marker_field = ui.wait_for_node(name="Text that means NULL", role=ui.pyatspi.ROLE_TEXT, timeout=60)
+        export_seconds = time.monotonic() - export_started
+        export_cpu_seconds = ui.owned_application().cpu_seconds() - export_cpu_started
+        marker_text = marker_field.queryText().getText(0, marker_field.queryText().characterCount)
+        after_resident, peak = app_memory_kb()
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+            out.write(json.dumps({
+                **ui.owned_application().identity(),
+                "source_revision": os.environ.get("TABLEPRO_PROFILE_SOURCE_REVISION", "unknown"),
+                "binary_sha256": os.environ.get("TABLEPRO_PROFILE_BINARY_SHA256", "unknown"),
+                "profile_mode": "loaded-result-export-dialog",
+                "rows_requested": rows,
+                "cell_payload_bytes": payload_bytes,
+                "columns_requested": 10,
+                "text_mode": text_mode,
+                "query_wall_seconds": round(query_seconds, 3),
+                "query_cpu_seconds": round(query_cpu_seconds, 3),
+                "idle_wait_seconds": round(idle_wait_seconds, 3),
+                "export_dialog_wall_seconds": round(export_seconds, 3),
+                "export_dialog_cpu_seconds": round(export_cpu_seconds, 3),
+                "result_status": result_status,
+                "null_marker": marker_text,
+                "rss_before_query_mb": round(before_rss / 1024, 1),
+                "rss_before_dialog_mb": round(before_dialog_rss / 1024, 1),
+                "rss_after_dialog_mb": round(after_resident / 1024, 1),
+                "rss_dialog_delta_mb": round((after_resident - before_dialog_rss) / 1024, 1),
+                "peak_mb": round(peak / 1024, 1),
             }) + "\n")
 
     def profile_large_result_in_the_grid(database, base):
@@ -913,7 +1006,7 @@ GLib.MainLoop().run()
             raise ValueError("profile text mode or layout is unsupported")
         if input_mode not in ("scrub", "wheel"):
             raise ValueError("profile input mode is unsupported")
-        if rows < 1 or (payload_bytes != 0 and not 8_193 <= payload_bytes <= 8 * 1024 * 1024):
+        if rows < 1 or not 0 <= payload_bytes <= 8 * 1024 * 1024:
             raise ValueError("profile rows and cell payload size are outside their supported bounds")
         if payload_bytes:
             profile_table_browse_payload(rows, payload_bytes)
@@ -2634,6 +2727,8 @@ GLib.MainLoop().run()
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)
+    if os.environ.get("TABLEPRO_PROFILE_EXPORT_ROWS"):
+        result.append(profile_large_result_export_dialog)
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
         result.append(mysql_enum_set_grid_edit_preserves_native_values_and_siblings)
