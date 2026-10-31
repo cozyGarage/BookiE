@@ -308,6 +308,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_postgres_csv_import_preserves_explicit_identity_values",
                 "an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin",
                 "evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest",
+                "closing_one_of_two_editors_releases_only_its_pinned_and_active_stream_pages",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
