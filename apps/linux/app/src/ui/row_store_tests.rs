@@ -264,6 +264,33 @@ fn projected_store_keeps_sql_null_distinct_from_an_unfetched_cell() {
 }
 
 #[test]
+fn projected_store_uses_sparse_reordered_column_mappings_for_rows_and_search() {
+    let result = Arc::new(QueryResult {
+        columns: vec![column("first"), column("second"), column("third")],
+        rows: vec![vec![Value::Int(11), Value::Int(22), Value::Int(33)]],
+        truncated: false,
+    });
+    let store = RowStore::from_projected(result, vec![3, 0, 2], 5).unwrap();
+    let row = store.item(0).and_downcast::<RowObject>().unwrap();
+
+    assert_eq!(row.cell_value(0), Value::Int(22));
+    assert_eq!(row.cell_value(1), Value::Undecodable("not fetched".into()));
+    assert_eq!(row.cell_value(2), Value::Int(33));
+    assert_eq!(row.cell_value(3), Value::Int(11));
+    assert_eq!(row.cell_value(4), Value::Undecodable("not fetched".into()));
+
+    let mut searched = Vec::new();
+    store.visit_search_cells(0, |column, value| {
+        searched.push((column, value.clone()));
+        false
+    });
+    assert_eq!(
+        searched,
+        vec![(0, Value::Int(22)), (2, Value::Int(33)), (3, Value::Int(11))]
+    );
+}
+
+#[test]
 fn search_visits_projected_cells_at_their_visible_columns() {
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("name")],
