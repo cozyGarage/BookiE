@@ -14,7 +14,15 @@ pub(super) fn column_is_editable(column: &ColumnInfo) -> bool {
 /// Declared affinity is not a guarantee about a row's runtime value.
 /// A checkbox must never turn an unrepresentable value into a boolean.
 pub(crate) fn cell_allows_inline_edit(column: &ColumnInfo, value: &Value) -> bool {
-    column_is_editable(column)
+    cell_allows_inline_edit_with_column_eligibility(column, value, column_is_editable(column))
+}
+
+pub(super) fn cell_allows_inline_edit_with_column_eligibility(
+    column: &ColumnInfo,
+    value: &Value,
+    column_is_editable: bool,
+) -> bool {
+    column_is_editable
         && value_is_inline_editable(value)
         && (!is_bool_type(&column.data_type)
             || matches!(value, Value::Bool(_) | Value::Null)

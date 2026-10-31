@@ -71,7 +71,17 @@ impl CellView {
     }
 }
 
+#[cfg(test)]
 pub(super) fn cell_view(value: &Value, column: &ColumnInfo) -> CellView {
+    let column_is_editable = super::presentation::column_is_editable(column);
+    cell_view_with_column_editability(value, column, column_is_editable)
+}
+
+pub(super) fn cell_view_with_column_editability(
+    value: &Value,
+    column: &ColumnInfo,
+    column_is_editable: bool,
+) -> CellView {
     let is_null = matches!(value, Value::Null);
     let auto_filled = column.is_auto_increment || column.is_generated;
     CellView {
@@ -81,7 +91,11 @@ pub(super) fn cell_view(value: &Value, column: &ColumnInfo) -> CellView {
             value_to_display_text(value)
         },
         is_null,
-        inline_editable: super::presentation::cell_allows_inline_edit(column, value),
+        inline_editable: super::presentation::cell_allows_inline_edit_with_column_eligibility(
+            column,
+            value,
+            column_is_editable,
+        ),
         auto_filled,
         checked: match value {
             Value::Bool(checked) => Some(*checked),
