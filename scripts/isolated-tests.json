@@ -590,6 +590,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::import_dialog::tests::csv_preparation_progress_changes_from_spinner_to_row_count"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::app::organization::tests::changing_a_connection_colour_updates_the_retained_tab_bar"
     ],
     [
