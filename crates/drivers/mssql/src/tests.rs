@@ -56,6 +56,14 @@ fn structure_metadata_declarations_match_the_connection_impl() {
     assert!(d.supports_foreign_key_metadata());
     assert!(source.contains(&["async fn ", "fetch_indexes("].concat()));
     assert!(source.contains(&["async fn ", "fetch_foreign_keys("].concat()));
+    assert!(source.contains(&["async fn ", "list_objects("].concat()));
+}
+
+#[test]
+fn catalog_object_kinds_match_catalog_module() {
+    let d = MssqlDriver;
+    assert_eq!(d.catalog_object_kinds(), catalog::SUPPORTED_KINDS);
+    assert!(d.catalog_object_kinds().contains(&CatalogObjectKind::Trigger));
 }
 
 #[test]
@@ -343,4 +351,19 @@ fn the_row_limit_closes_admission() {
     assert!(admission.is_closed());
     assert!(!admission.admit(vec![Value::Int(3)], &mut result_set));
     assert_eq!(result_set.rows.len(), 2);
+}
+
+#[tokio::test]
+async fn catalog_deadline_applies_while_waiting_for_the_shared_client() {
+    let connection = MssqlConnection::unconnected();
+    let _held = connection.client.lock().await;
+    let control = OperationControl::with_timeout(std::time::Duration::from_millis(10));
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        connection.list_objects_controlled(CatalogObjectKind::Trigger, None, &control),
+    )
+    .await
+    .expect("catalog request must honor its deadline before the client is available");
+    assert!(matches!(result, Err(DriverError::TimedOut)));
+    assert!(connection.usable.load(Ordering::Acquire));
 }

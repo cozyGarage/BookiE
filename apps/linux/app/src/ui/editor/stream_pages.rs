@@ -1,5 +1,5 @@
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use tablepro_app_services::stream_result_spool::StreamResultSpool;
 use tablepro_core::{ColumnInfo, MAX_QUERY_RESULT_BYTES, QueryResult};
@@ -32,6 +32,36 @@ pub struct StreamedResult {
     pub(super) export: Option<crate::ui::export_dialog::StreamExportRequest>,
     pub(super) generation: u64,
     pub(super) spool: Option<StreamResultSpool>,
+    pub(super) resident_pages: ResidentPageStore,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct ResidentPageStore(Arc<Mutex<HashMap<u64, Arc<QueryResult>>>>);
+
+impl ResidentPageStore {
+    #[cfg(test)]
+    pub(super) fn from_pages(pages: impl IntoIterator<Item = (u64, Arc<QueryResult>)>) -> Self {
+        Self(Arc::new(Mutex::new(pages.into_iter().collect())))
+    }
+
+    fn insert(&self, index: u64, page: Arc<QueryResult>) {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(index, page);
+    }
+
+    fn remove(&self, index: u64) {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).remove(&index);
+    }
+
+    pub(super) fn get(&self, index: u64) -> Option<Arc<QueryResult>> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&index)
+            .cloned()
+    }
 }
 
 #[derive(Default)]
@@ -43,6 +73,7 @@ pub(super) struct StreamPageCache {
     empty_pages: u64,
     page_row_counts: Vec<usize>,
     total_rows: usize,
+    resident_pages: ResidentPageStore,
 }
 
 impl StreamPageCache {
@@ -68,10 +99,12 @@ impl StreamPageCache {
         self.total_rows = self.total_rows.saturating_add(result.rows.len());
         let bytes = result.estimated_row_bytes();
         self.retained_bytes = self.retained_bytes.saturating_add(bytes);
+        self.resident_pages.insert(index, result.clone());
         self.pages.push_back((index, result, bytes));
         self.next_page = self.next_page.saturating_add(1);
         while self.pages.len() > 1 && self.retained_bytes > MAX_QUERY_RESULT_BYTES {
-            if let Some((_, _, bytes)) = self.pages.pop_front() {
+            if let Some((retired_index, _, bytes)) = self.pages.pop_front() {
+                self.resident_pages.remove(retired_index);
                 self.retained_bytes = self.retained_bytes.saturating_sub(bytes);
             }
         }
@@ -127,6 +160,7 @@ impl StreamPageCache {
             export,
             generation,
             spool,
+            resident_pages: self.resident_pages.clone(),
         }
     }
 }

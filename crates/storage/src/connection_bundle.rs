@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 use crate::connection_bundle_crypto::{
     CipherHeader, EnvelopeHeader, KdfHeader, SealedBundle, check_kdf_parameters, open, seal,
@@ -55,6 +55,7 @@ pub const BUNDLE_INCLUDED_FIELDS: &[&str] = &[
     "environment",
     "ssh",
     "auth_source",
+    "attached_databases",
 ];
 
 /// Fields a bundle deliberately drops. `use_tls` is the legacy boolean
@@ -67,7 +68,6 @@ pub const BUNDLE_EXCLUDED_FIELDS: &[&str] = &[
     "last_opened_at",
     "connect_timeout_secs",
     "query_timeout_secs",
-    "attached_databases",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -130,6 +130,8 @@ pub struct BundleConnection {
     pub ssh: Option<SavedSshConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attached_databases: Vec<AttachedDatabase>,
 }
 
 impl BundleConnection {
@@ -153,6 +155,7 @@ impl BundleConnection {
             environment: saved.environment,
             ssh: saved.ssh.clone(),
             auth_source: saved.auth_source.clone(),
+            attached_databases: saved.attached_databases.clone(),
         }
     }
 
@@ -180,7 +183,7 @@ impl BundleConnection {
             connect_timeout_secs: None,
             query_timeout_secs: None,
             auth_source: self.auth_source.clone(),
-            attached_databases: Vec::new(),
+            attached_databases: self.attached_databases.clone(),
         }
     }
 }
@@ -897,11 +900,18 @@ fn plan_one(
 /// import can tighten a local connection and never loosen it.
 fn merge_without_downgrade(local: &SavedConnection, incoming: SavedConnection) -> SavedConnection {
     let tls_mode = stricter_tls(local.effective_tls_mode(), incoming.effective_tls_mode());
+    let attached_databases = if incoming.attached_databases.is_empty() {
+        local.attached_databases.clone()
+    } else {
+        incoming.attached_databases.clone()
+    };
     SavedConnection {
+        attached_databases,
         read_only: local.read_only || incoming.read_only,
         environment: higher_environment(local.environment, incoming.environment),
         use_tls: tls_mode.encrypts(),
         tls_mode: Some(tls_mode),
+        tls_root_cert: local.tls_root_cert.clone().or(incoming.tls_root_cert.clone()),
         last_opened_at: local.last_opened_at,
         connect_timeout_secs: local.connect_timeout_secs,
         query_timeout_secs: local.query_timeout_secs,

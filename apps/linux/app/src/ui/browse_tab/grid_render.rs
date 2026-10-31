@@ -248,6 +248,7 @@ impl BrowseTab {
             sortable_result_columns: Default::default(),
             foreign_key_columns,
             has_inbound_foreign_keys: !self.inbound_foreign_keys.is_empty(),
+            filters_unavailable: !self.browse_filters,
             choices: self.choice_labels.clone(),
         };
         let (column_view, selection) = build_column_view(

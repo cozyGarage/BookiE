@@ -18,6 +18,7 @@ const PAN_STEP: f64 = 60.0;
 const WHEEL_PAN: f64 = 40.0;
 
 type SelectedHandler = Rc<dyn Fn(Option<usize>)>;
+type ZoomHandler = Rc<dyn Fn(f64)>;
 
 #[derive(Default)]
 struct Scene {
@@ -41,6 +42,7 @@ mod imp {
         pub(super) fitted: Cell<bool>,
         pub(super) drag_origin: Cell<(f64, f64)>,
         pub(super) on_selected: RefCell<Option<SelectedHandler>>,
+        pub(super) on_zoom: RefCell<Option<ZoomHandler>>,
     }
 
     #[glib::object_subclass]
@@ -158,6 +160,10 @@ impl DiagramCanvas {
         *self.imp().on_selected.borrow_mut() = Some(Rc::new(handler));
     }
 
+    pub(crate) fn connect_zoom_changed(&self, handler: impl Fn(f64) + 'static) {
+        *self.imp().on_zoom.borrow_mut() = Some(Rc::new(handler));
+    }
+
     #[cfg(test)]
     pub(crate) fn card_count(&self) -> usize {
         self.imp().scene.borrow().cards.len()
@@ -194,7 +200,7 @@ impl DiagramCanvas {
         };
         let (width, height) = (f64::from(self.width()), f64::from(self.height()));
         let level = zoom::fit((extent.width, extent.height), (width, height)).min(1.0);
-        self.imp().zoom.set(level);
+        self.set_zoom(level);
         self.imp().offset.set((
             (width - extent.width * level) / 2.0 - extent.x * level,
             (height - extent.height * level) / 2.0 - extent.y * level,
@@ -239,6 +245,14 @@ impl DiagramCanvas {
         self.queue_draw();
     }
 
+    fn set_zoom(&self, level: f64) {
+        self.imp().zoom.set(level);
+        let handler = self.imp().on_zoom.borrow().clone();
+        if let Some(handler) = handler {
+            handler(level);
+        }
+    }
+
     fn zoom_about_centre(&self, level: f64) {
         self.zoom_about(level, f64::from(self.width()) / 2.0, f64::from(self.height()) / 2.0);
     }
@@ -248,7 +262,7 @@ impl DiagramCanvas {
         let before = self.zoom();
         let (ox, oy) = self.imp().offset.get();
         let ratio = level / before;
-        self.imp().zoom.set(level);
+        self.set_zoom(level);
         self.imp().offset.set((x - (x - ox) * ratio, y - (y - oy) * ratio));
         self.queue_draw();
     }
@@ -406,7 +420,11 @@ fn install_scroll_controller(canvas: &DiagramCanvas) {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+    use std::rc::Rc;
+
     use relm4::gtk;
+    use relm4::gtk::gdk;
     use relm4::gtk::prelude::*;
     use tablepro_app_services::er_diagram::{SchemaDiagram, TableRead};
     use tablepro_core::{ColumnInfo, ForeignKeyInfo};
@@ -512,6 +530,31 @@ mod tests {
         assert!(canvas.zoom() >= tablepro_app_services::er_diagram::zoom::MIN);
         canvas.fit();
         assert_eq!(canvas.zoom(), fitted);
+        window.destroy();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn every_way_of_zooming_reports_the_new_level() {
+        let (window, canvas) = shown();
+        let reported = Rc::new(Cell::new(0.0));
+        canvas.connect_zoom_changed({
+            let reported = reported.clone();
+            move |level| reported.set(level)
+        });
+        let fitted = canvas.zoom();
+
+        canvas.key(gdk::Key::plus);
+        assert_eq!(reported.get(), canvas.zoom());
+        assert!(canvas.zoom() > fitted);
+        canvas.key(gdk::Key::minus);
+        assert_eq!(reported.get(), canvas.zoom());
+        canvas.scroll(gdk::ModifierType::CONTROL_MASK, 0.0, -1.0, 100.0, 100.0);
+        assert_eq!(reported.get(), canvas.zoom());
+        canvas.key(gdk::Key::_0);
+        assert_eq!(reported.get(), 1.0);
+        canvas.fit();
+        assert_eq!(reported.get(), canvas.zoom());
         window.destroy();
     }
 }
