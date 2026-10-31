@@ -575,6 +575,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::sidebar_row::lazy_context_menu_tests::a_table_context_menu_is_created_on_demand_and_resolves_row_actions"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::structure_tab::columns::tests::a_structure_expander_arrow_matches_its_expansion_state"
     ],
     [
