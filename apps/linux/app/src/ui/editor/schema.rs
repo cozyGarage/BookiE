@@ -24,6 +24,7 @@ pub(crate) fn apply_editor_scheme(view: &sourceview5::View) {
 /// than every `textview` on the display -- which previously included the
 /// EXPLAIN dialog and the JSON popover's text views too.
 const EDITOR_FONT_CSS_CLASS: &str = "tp-sql-editor-font";
+const EDITOR_LINE_HEIGHT: &str = "1.2";
 
 fn safe_font_family(family: &str) -> Option<&str> {
     let family = family.trim();
@@ -35,7 +36,9 @@ fn editor_font_css(font_size: u32, family: &str) -> String {
     let family = safe_font_family(family)
         .map(|family| format!(" font-family: \"{family}\", monospace;"))
         .unwrap_or_default();
-    format!(".{EDITOR_FONT_CSS_CLASS}, .{EDITOR_FONT_CSS_CLASS} text {{ font-size: {font_size}pt;{family} }}")
+    format!(
+        ".{EDITOR_FONT_CSS_CLASS}, .{EDITOR_FONT_CSS_CLASS} text {{ font-size: {font_size}pt;{family} line-height: {EDITOR_LINE_HEIGHT}; }}"
+    )
 }
 
 fn apply_vim_mode(view: &sourceview5::View, enabled: bool) {
@@ -101,13 +104,22 @@ mod font_tests {
     fn an_empty_family_keeps_the_system_monospace_font() {
         assert_eq!(
             editor_font_css(12, "  "),
-            ".tp-sql-editor-font, .tp-sql-editor-font text { font-size: 12pt; }"
+            ".tp-sql-editor-font, .tp-sql-editor-font text { font-size: 12pt; line-height: 1.2; }"
         );
     }
 
     #[test]
     fn a_plain_family_name_is_quoted_with_a_monospace_fallback() {
         assert!(editor_font_css(14, "Iosevka Term").contains("font-family: \"Iosevka Term\", monospace;"));
+    }
+
+    #[test]
+    fn editor_font_css_sets_a_unitless_line_height_with_the_font_size() {
+        let css = editor_font_css(16, "JetBrains Mono");
+        assert!(css.contains("font-size: 16pt;"));
+        assert!(css.contains(&format!("line-height: {EDITOR_LINE_HEIGHT};")));
+        assert!(!css.contains("line-height: 1.2px"));
+        assert!(!css.contains("pixels-above"));
     }
 
     #[test]
