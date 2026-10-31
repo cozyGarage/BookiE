@@ -68,7 +68,7 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] On a disposable database, start a large restore and press Cancel after `pg_restore` starts. `audit.jsonl` shows an Unknown outcome, and the affected connection refuses governed writes before and after reconnect while a separate connection remains available. There is no in-app action to reconcile the outcome; inspect the database before deciding how to proceed. A restore failure after `pg_restore` starts has the same unknown outcome.
 - [ ] Remove `pg_dump` from `/usr/bin` (or test on a host without it): the error names the missing tool and how to install it.
 
-## Native workflow follow-up
+## Native workflow
 
 - [ ] With an open owned-session transaction, check the separate active badge and commit/rollback-and-close buttons at narrow width and enlarged text. While a query runs they cannot dispatch; Commit on an aborted PostgreSQL transaction reports rollback. Session closure and connection replacement do not accept an old queued action.
 - [ ] Run All and Run Current through the menu match their shortcuts in both split panes. File output names the statement/result set; exporting loaded rows never reruns SQL. A stream rerun is clearly labeled.

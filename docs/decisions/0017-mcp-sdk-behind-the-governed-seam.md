@@ -9,13 +9,13 @@ The MCP server implements protocol framing, version negotiation, transport handl
 
 ## Decision
 
-Replace the protocol, transport and tool-schema layer of `crates/mcp` with `rmcp`. Keep everything that carries a safety decision:
+Use `rmcp` for the protocol, transport and tool-schema layer behind the governed seam. Keep everything that carries a safety decision:
 
 - `McpBridge`, token scopes, connection allowlists, approval, masking and audit stay in BookiE's code and stay the only way a tool reaches a database ([ADR 0016](0016-governed-consumer-seam.md)). A tool handler holds a `PolicyGuard` connection and nothing else.
 - Token and `Origin` checks and loopback-only binding move into `tower` middleware in front of the SDK's streamable-HTTP service. BookiE's token is still presented the way existing clients present it, so existing setups keep working.
 - Tool input types become Rust structs with generated schemas; the hand-written `tool_schema` JSON goes away.
 
-The migration is staged behind the existing MCP tests. The adoption is complete only when every current MCP test passes against the new layer, including the refusal without a token, the bad-token refusal, the disconnect-aware cancellation with no execution after a disconnect during approval, and the shutdown test.
+The target adapter must preserve authentication, authorization, disconnect cancellation and shutdown behavior. The SDK must not gain a path around BookiE policy or audit. The default server currently remains the hand-written implementation; the SDK adapter is an optional prototype. This decision defines the target and does not claim migration completion.
 
 ## Rationale
 
@@ -25,14 +25,13 @@ The protocol layer is maintained by the project that defines the protocol, and t
 
 Accepted:
 
-- A new dependency tree to review under `deny.toml` and the supply-chain job. Only the `server`, `macros`, `schemars` and the two server transports are enabled.
-- `rmcp` is at 3.x and changes between majors; upgrades require an explicit version update and validation.
+- The SDK dependency tree requires license and advisory review under `deny.toml` and the supply-chain checks.
+- Major SDK upgrades require explicit version review and validation.
 - BookiE's token is not an HTTP `Authorization` bearer in all cases today; the middleware must preserve current behaviour rather than silently switching clients to OAuth.
 
 Gained:
 
 - Protocol compliance and future MCP features (resources, prompts, elicitation) come from the SDK.
-- Roughly 400 to 500 lines of transport code leave `crates/mcp`.
 - Schemas are generated from the same types the handlers read.
 
 ## Alternatives considered

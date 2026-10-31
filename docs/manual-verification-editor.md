@@ -36,7 +36,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] On ClickHouse or an in-memory SQLite database, turning Session on explains that the engine does not offer it yet and the button turns back off.
 - [ ] The audit journal shows the session's COMMIT or ROLLBACK against the same batch as the statements inside it.
 
-## Session failure and shutdown paths (B4 I4)
+## Session failure and shutdown paths
 
 - [ ] Stop appears only where server cancellation is supported; stopping a session query records the terminal outcome and permits later supported queries.
 - [ ] A session timeout reports its actual cancelled/unknown state in the UI and audit; it does not present an ambiguous write as safely undone.

@@ -1,6 +1,6 @@
 # Adding a database driver
 
-Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md). Project #3 and issue-owned acceptance define selected work. Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common type/value standard. Recheck the current traits and implementations before using this checklist; the workspace manifests are authoritative for dependency versions.
+Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md). Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common type/value standard. Recheck the current traits and implementations before using this checklist; the workspace manifests are authoritative for dependency versions.
 
 ## Contracts and crate boundaries
 
@@ -129,7 +129,7 @@ Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL
 Some engine behavior is not a static driver fact and stays at its current boundary:
 
 - `Connection::supports_server_cancellation()` is connection-scoped. A live server or session can differ from the static driver's potential support.
-- Per-object write permission comes from database metadata. Unknown permission remains unknown and is not inferred from the engine profile; see [#1065](https://github.com/cozyGarage/BookiE/issues/1065).
+- Per-object write permission comes from database metadata. Unknown permission remains unknown and is not inferred from the engine profile.
 - `forwarded_socket_name(service_port)` is a parameterized transport resolver. Its output depends on the requested service port, so it remains a callable operation instead of a boolean profile field.
 - Default port, database and username are connection-form defaults, not engine capabilities.
 
@@ -141,7 +141,7 @@ When adding a consumer, preserve existing refusal and unsupported behavior. Test
 
 ## Driver maturity
 
-Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`). The Connect dialog shows Experimental as a subtitle so users are not surprised by missing write or transaction paths. These are driver declarations, not release approval; see Project #3 and issue-owned acceptance criteria.
+Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`). The Connect dialog shows Experimental as a subtitle so users are not surprised by missing write or transaction paths. These are driver declarations, not release approval.
 
 | Driver | Maturity | Connect | Browse | Query | Writes | Params | `begin` / MCP preview | Notes |
 |---|---|---|---|---|---|---|---|---|

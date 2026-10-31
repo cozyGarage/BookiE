@@ -2,7 +2,6 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-03
-- **Origin**: Approved sprint A4/B2 and its migration/compatibility rules.
 
 ## Context
 

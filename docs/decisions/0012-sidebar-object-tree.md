@@ -26,11 +26,6 @@ Replace the list with a `GtkListView` over a `GtkTreeListModel`.
 
 ## Consequences
 
-- The factory, filter and selection sync are rewritten. The sidebar tests (`sync_sidebar_selection`, the search filter and the header actions) move to the new model first and fail before the swap.
-- AT-SPI sees tree rows and expanders, so the installed scenarios that find sidebar entries by name need their roles updated.
+- Replacing the list requires a tree model, filtering and selection synchronization that preserve existing navigation actions.
+- Accessibility roles and names must continue to describe rows and expanders.
 - Catalog objects become browsable in place, which makes additional catalog objects available in context.
-
-## Open questions
-
-- Whether schemas of a single-schema connection show as a root row or are flattened, as today.
-- Whether grants and roles belong in the tree or stay in the Catalog dialog.

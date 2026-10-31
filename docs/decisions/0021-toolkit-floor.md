@@ -9,7 +9,7 @@
 
 ## Decision
 
-The maintainer decided on 2026-10-23 that BookiE supports one toolkit floor, the newest stable line:
+BookiE supports one toolkit floor:
 
 | Library | Minimum |
 |---|---|
@@ -35,7 +35,7 @@ One floor removes per-version branches from the app and the test tier and makes 
 
 ## Consequences
 
-- Ubuntu 26.04 LTS (GTK 4.22.4, GtkSourceView 5.18.0, libadwaita 1.9.1), Debian 13 (GTK 4.18.6, GtkSourceView 5.16.0, libadwaita 1.7.6) and Ubuntu 24.04 (GTK 4.14.5, GtkSourceView 5.12.0, libadwaita 1.5.0) are unsupported. The Debian package does not install there and a source build exits at startup.
+- Older toolkit stacks are unsupported by native builds and packages.
 - Flatpak on the GNOME 51 runtime is the intended path for those distributions.
 - CI and native packages must use the selected toolkit floor.
 - When a newer toolkit becomes the stable line on the reference distributions, the floor moves with it by a new decision.

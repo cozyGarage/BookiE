@@ -21,8 +21,8 @@ Release-Note: none
 
 1. Categories are the Keep a Changelog 1.1.0 headings: Added, Changed, Deprecated, Removed, Fixed, Security. A change may carry several lines. `none` is explicit and cannot be combined with other lines. The wording rules of AGENTS.md are unchanged: user impact, no paths, type or function names, no `Fixed` for a defect introduced and fixed before release.
 2. The pull request body carries the same lines, so a check can validate them before merge. The repository squash-merge configuration includes the pull request title and body so the note travels with the commit.
-3. `scripts/release-notes.py check` validates a body or message. `scripts/release-notes.py assemble --since <previous tag>` builds the release notes from the commit range, refuses a commit with no line unless told otherwise, and appends the pull request number from the squash subject. The output is a build artifact and the body of the GitHub Release.
-4. `CHANGELOG.md` stops growing. Its `[Unreleased]` entries stay until the first release cut after this decision. That release's notes are those entries plus the `Release-Note:` lines of the pull requests merged after the guard landed in `669635a06`, combined by hand into the version's `CHANGELOG.md` section (`assemble --since 669635a06`). Until the Release workflow reads trailers it still reads that section, so `CHANGELOG.md` must exist when the tag is pushed. After that release is published, a follow-up change copies the whole file unchanged to `docs/archive/changelog-through-<version>-<date>.md`, removes `CHANGELOG.md` and repoints its references. The 0.1.x record is already archived.
+3. `scripts/release-notes.py check` validates a body or message. `scripts/release-notes.py notes <version>` builds the release notes from merge commit trailers for the version. The output is a build artifact and the body of the GitHub Release.
+4. Release notes are assembled from merge commits since the previous release tag. The generated output is an artifact and the body of the release; it is not maintained as a per-change source file.
 
 ## Rationale
 

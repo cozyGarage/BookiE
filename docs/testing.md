@@ -1,6 +1,6 @@
 # Testing
 
-Current issue acceptance belongs to the owning boards. Start with the [validation playbook](validation-playbook.md) for the executable layer catalog, local commands, CI ownership, agent handoffs and regression intake. Run-specific test records are maintained outside the public source tree.
+Start with the [validation playbook](validation-playbook.md) for the executable layer catalog, local commands, CI ownership, contributor handoffs and regression intake. Run-specific test records are maintained outside the public source tree.
 
 Test design rules for ownership, runner parsers, oracles and guard changes are in [test design rules](test-design-rules.md).
 
@@ -44,11 +44,11 @@ Use a separate BookiE profile and disposable database or dataset when checking a
 
 A proxy fault checks BookiE's response to a broken network path; it does not test cluster election or replication. Test real failover only in an isolated cluster using its documented failover procedure. A write whose response is lost may already have committed, so verify the stored result and ensure reconnect does not replay it. Keep such checks on disposable data.
 
-## Why B3 tests values beyond the driver
+## Why value tests extend beyond the driver
 
-B3 covers the value path from the native driver through each relevant consumer, such as result display, grid editing, parameter binding, and export. Driver decoding alone cannot show that later code preserves the value. JSON or formatted text can display a value while hiding distinctions such as BSON integer width, exact decimal precision, or SQL `NULL` versus an empty value. A correct-looking display alone does not establish round-trip fidelity.
+Value tests cover the path from the native driver through each relevant consumer, such as result display, grid editing, parameter binding, and export. Driver decoding alone cannot show that later code preserves the value. JSON or formatted text can display a value while hiding distinctions such as BSON integer width, exact decimal precision, or SQL `NULL` versus an empty value. A correct-looking display alone does not establish round-trip fidelity.
 
-[ADR 0007](decisions/0007-type-and-value-preservation.md) defines the outcomes: exact typed support, exact text fallback, explicit refusal, or untested. B3 is a data-correctness contract, not a requirement for one universal cross-engine type system. Use the selected case and its concrete consumer to decide what must be proven.
+[ADR 0007](decisions/0007-type-and-value-preservation.md) defines the outcomes: exact typed support, exact text fallback, explicit refusal, or untested. This is a data-correctness contract, not a requirement for one universal cross-engine type system. Use the selected case and its concrete consumer to decide what must be proven.
 
 ## Test runner
 
@@ -182,7 +182,7 @@ The [manual checklist](manual-verification-0.2-features.md) records installed GT
 
 ## Regression case selection
 
-Select regressions from the changed behavior and current issues in Project #3. Failure reports are hypotheses, not confirmed product defects. Trace the matching code path and reproduce a candidate against current source before changing code.
+Select regressions from the changed behavior and current known defects. Failure reports are hypotheses, not confirmed product defects. Trace the matching code path and reproduce a candidate against current source before changing code.
 
 ## File-size guard
 
