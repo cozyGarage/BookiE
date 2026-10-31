@@ -25,6 +25,7 @@ serde_json.workspace = true
 tiberius.workspace = true
 tracing.workspace = true
 tokio.workspace = true
+socket2 = { version = "0.6", features = ["all"] }
 tokio-util = { workspace = true, features = ["compat"] }
 
 [dev-dependencies]
