@@ -15,6 +15,7 @@ install -Dm755 "$target/release/tablepro-app" "$target/installed/usr/bin/tablepr
 binary_sha256="$(sha256sum "$target/installed/usr/bin/tablepro" | awk '{print $1}')"
 source_revision="$(git rev-parse HEAD)"
 postgres_image="$(docker image inspect postgres:17-alpine --format '{{.Id}}')"
+mkdir -p "$(dirname "$out")"
 printf '{"profile_mode":"metadata","binary_sha256":"%s","source_revision":"%s","postgres_image":"%s"}\n' \
   "$binary_sha256" "$source_revision" "$postgres_image" > "$out"
 
