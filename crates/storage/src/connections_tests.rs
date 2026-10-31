@@ -6,6 +6,7 @@ use tempfile::TempDir;
 pub(super) fn sample_connection() -> SavedConnection {
     SavedConnection {
         auth_source: None,
+        attached_databases: Vec::new(),
         id: Uuid::new_v4(),
         name: "Local Postgres".into(),
         driver_id: "postgres".into(),
