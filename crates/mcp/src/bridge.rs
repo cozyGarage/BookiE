@@ -507,7 +507,7 @@ impl McpBridge {
             })?;
             let refused = match self.driver_id_for_controlled(connection_id, &control).await {
                 Ok(driver_id) => touches_nontransactional_table(transaction.as_mut(), &driver_id, &sql, &control).await,
-                Err(_) => false,
+                Err(_) => true,
             };
             let result = if refused {
                 Err(DriverError::ReadOnly)

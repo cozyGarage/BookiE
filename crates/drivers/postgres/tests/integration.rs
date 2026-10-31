@@ -1,4 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "support/exact_grid_original.rs"]
+mod exact_grid_original;
 use std::str::FromStr;
 use std::sync::Arc;
 

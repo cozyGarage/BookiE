@@ -71,6 +71,7 @@ fn saved_ssh_connection(client: SshClient) -> SavedConnection {
             jump: None,
             client,
             agent: false,
+            agent_identity: None,
         }),
         last_opened_at: None,
         connect_timeout_secs: None,

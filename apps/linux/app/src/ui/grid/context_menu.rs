@@ -320,8 +320,7 @@ pub(super) fn install_grid_context_menus(
                     }
                     return;
                 }
-                let Some(value) = row_at(&view, position(slot)).and_then(|row| row.into_iter().nth(slot.col_index))
-                else {
+                let Some(value) = row.and_then(|row| row.cell_value_in_row(slot.col_index)) else {
                     return;
                 };
                 value_viewer::present(&view, &slot.column_name, value, None);
@@ -905,18 +904,16 @@ fn pending_cell_value(widget: &gtk::Widget) -> Option<Value> {
     }
     FULL_EDIT_TEXT_SLOT.cloned(widget).map(Value::Text)
 }
-fn previewed_cell_text(row: Option<&crate::ui::row_object::RowObject>, col: usize) -> Option<String> {
-    let row = row?;
-    row.cell_preview(col)?;
-    Some(super::display::value_to_full_edit_text(&row.cell_value(col)))
-}
-
 fn copy_value_text(widget: &gtk::Widget, row: Option<&crate::ui::row_object::RowObject>, col: usize) -> String {
     if !IS_NULL_SLOT.get(widget).unwrap_or(false) {
         if let Some(text) = FULL_EDIT_TEXT_SLOT.cloned(widget) {
             return text;
         }
-        if let Some(text) = previewed_cell_text(row, col) {
+        if let Some(text) = row
+            .and_then(|row| row.cell_value_in_row(col))
+            .as_ref()
+            .map(super::display::value_to_full_edit_text)
+        {
             return text;
         }
     }

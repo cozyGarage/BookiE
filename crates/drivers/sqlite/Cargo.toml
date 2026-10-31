@@ -22,6 +22,7 @@ sqlparser.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+tablepro-app-services = { path = "../../app-services" }
 tablepro-policy = { path = "../../policy" }
 serde_json.workspace = true
 async-trait.workspace = true
@@ -30,9 +31,9 @@ tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 tokio-util.workspace = true
 uuid.workspace = true
 
-# The integration test includes core/tests/support/value_contract.rs by path, and that file uses serde_json.
+# The integration test includes the value contract by path; the shared exact-grid test also uses this crate.
 [package.metadata.cargo-shear]
-ignored = ["serde_json"]
+ignored = ["serde_json", "tablepro-app-services"]
 
 [lints]
 workspace = true

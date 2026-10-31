@@ -64,7 +64,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | PERF-3 | [#555](https://github.com/cozyGarage/BookiE/issues/555) | B3 |
 | PERF-4 | [#550](https://github.com/cozyGarage/BookiE/issues/550) | B3 |
 | PERF-9 | [#596](https://github.com/cozyGarage/BookiE/issues/596) | B3 |
-| PERF-10 | [#597](https://github.com/cozyGarage/BookiE/issues/597) | UX |
 | AUD-2 | [#598](https://github.com/cozyGarage/BookiE/issues/598) | B4 |
 | AUD-5 | [#563](https://github.com/cozyGarage/BookiE/issues/563) | UX |
 | AUD-9 | [#600](https://github.com/cozyGarage/BookiE/issues/600) | B4 |

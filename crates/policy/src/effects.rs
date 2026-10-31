@@ -19,6 +19,10 @@ impl Effects {
         Self(self.0 | other.0)
     }
 
+    pub(crate) const fn union_if(self, other: Self, condition: bool) -> Self {
+        if condition { self.union(other) } else { self }
+    }
+
     pub(crate) const fn contains(self, other: Self) -> bool {
         self.0 & other.0 == other.0
     }

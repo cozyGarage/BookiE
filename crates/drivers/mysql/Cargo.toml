@@ -24,6 +24,7 @@ tracing.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+tablepro-app-services = { path = "../../app-services" }
 secrecy.workspace = true
 tempfile.workspace = true
 testcontainers.workspace = true
@@ -32,6 +33,10 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tokio-util.workspace = true
 zip = { version = "9.1", default-features = false, features = ["deflate"] }
 uuid.workspace = true
+
+# The shared exact-grid test is included by path and imports this crate.
+[package.metadata.cargo-shear]
+ignored = ["tablepro-app-services"]
 
 [lints]
 workspace = true
