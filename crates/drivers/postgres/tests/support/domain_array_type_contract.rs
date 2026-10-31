@@ -98,7 +98,7 @@ async fn value_contract_domain_over_array_preserves_native_values_and_wire_bytes
     assert_eq!(
         edit.0,
         format!(
-            "UPDATE \"{schema}\".\"rows\" SET \"items\" = $1::text::\"{schema}\".\"small_ints\" WHERE \"id\" = $2 AND \"items\" IS NOT DISTINCT FROM $3::text::\"{schema}\".\"small_ints\""
+            "UPDATE \"{schema}\".\"rows\" SET \"items\" = $1::text::\"{schema}\".\"small_ints\" WHERE \"id\" = $2 AND (\"items\" IS NOT NULL AND pg_catalog.format('%s', \"items\") COLLATE pg_catalog.\"C\" = pg_catalog.format('%s', $3::text::\"{schema}\".\"small_ints\") COLLATE pg_catalog.\"C\")"
         )
     );
     assert_eq!(

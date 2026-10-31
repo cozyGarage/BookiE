@@ -1,5 +1,8 @@
 #[path = "column_on_update.rs"]
 mod column_on_update;
+
+#[path = "exact_grid_original.rs"]
+mod exact_grid_original;
 #[path = "like_escape.rs"]
 mod like_escape;
 #[path = "optimistic_collation.rs"]
