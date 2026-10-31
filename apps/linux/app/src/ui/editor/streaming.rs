@@ -141,6 +141,7 @@ impl SqlEditor {
             cache: StreamPageCache::default(),
             error: None,
         });
+        self.stream_eviction_cursor = Default::default();
         if self.results_holder.first_child().is_none() {
             let loading = waiting_for_stream_page();
             self.show_pins_above(&loading, sender);
@@ -203,9 +204,13 @@ impl SqlEditor {
             settings_store: self.result_view_settings.clone(),
         };
         let updated = match &outcome.kind {
-            StatementOutcomeKind::Streamed(result) => {
-                super::stream_view::update_live_stream(&self.results_holder, &outcome, result, &target)
-            }
+            StatementOutcomeKind::Streamed(result) => super::stream_view::update_live_stream(
+                &self.results_holder,
+                &outcome,
+                result,
+                &target,
+                &mut self.stream_eviction_cursor,
+            ),
             _ => false,
         };
         if !updated {

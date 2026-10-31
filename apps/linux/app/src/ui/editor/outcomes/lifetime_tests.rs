@@ -35,6 +35,7 @@ fn append_live_page(
     holder: &gtk::Box,
     outcome: &StatementOutcome,
     target: &super::super::stream_view::LiveStreamTarget<'_>,
+    cursor: &mut super::super::stream_view::EvictionCursor,
 ) {
     let StatementOutcomeKind::Streamed(result) = &outcome.kind else {
         panic!("expected a streamed outcome");
@@ -51,7 +52,7 @@ fn append_live_page(
         return;
     }
     assert!(super::super::stream_view::update_live_stream(
-        holder, outcome, result, target
+        holder, outcome, result, target, cursor
     ));
 }
 
@@ -65,6 +66,7 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
     let (sender, _receiver) = relm4::channel();
     let settings = LocalResultSettingsStore::default();
     let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());
+    let mut cursor = super::super::stream_view::EvictionCursor::default();
     let make_outcome = |streamed| StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "SELECT id FROM items".into(),
@@ -86,6 +88,7 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
                 database: database.clone(),
                 settings_store: settings.clone(),
             },
+            &mut cursor,
         );
         drop(outcome);
         assert!(pages.iter().all(|page| page.upgrade().is_some()));

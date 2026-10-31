@@ -19,12 +19,36 @@ pub(super) const LIVE_PAGES: &str = "tp-live-stream-pages";
 pub(super) const LIVE_PROGRESS: &str = "tp-live-stream-progress";
 const PAGE_PREFIX: &str = "tp-stream-page-";
 
+#[derive(Default)]
+pub(super) struct EvictionCursor {
+    generation: Option<u64>,
+    next_index: u64,
+    next_page: Option<gtk::glib::WeakRef<gtk::Widget>>,
+}
+
+impl EvictionCursor {
+    fn prepare(&mut self, pages: &gtk::Stack, generation: u64) {
+        let current = self.next_page.as_ref().and_then(gtk::glib::WeakRef::upgrade);
+        let is_current_page = current
+            .as_ref()
+            .is_some_and(|page| page.parent().as_ref() == Some(pages.upcast_ref::<gtk::Widget>()));
+        if self.generation == Some(generation) && is_current_page {
+            return;
+        }
+        self.generation = Some(generation);
+        self.next_index = 0;
+        self.next_page = pages.first_child().map(|page| page.downgrade());
+    }
+}
+
 pub(super) fn page_widget_name(generation: u64, page_index: u64) -> String {
     format!("{PAGE_PREFIX}{generation}-{page_index}")
 }
 
 #[cfg(test)]
 thread_local! { static NAMED_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+#[cfg(test)]
+thread_local! { static EVICTION_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
 
 fn named<T: IsA<gtk::Widget>>(root: &gtk::Widget, name: &str) -> Option<T> {
     let mut pending = vec![root.clone()];
@@ -60,6 +84,7 @@ pub(super) fn update_live_stream(
     outcome: &StatementOutcome,
     result: &StreamedResult,
     target: &LiveStreamTarget<'_>,
+    cursor: &mut EvictionCursor,
 ) -> bool {
     let root = holder.clone().upcast::<gtk::Widget>();
     let (Some(pages), Some(progress)) = (
@@ -69,20 +94,29 @@ pub(super) fn update_live_stream(
         return false;
     };
     let first_resident = result.page_indices.first().copied().unwrap_or(result.total_pages);
-    let mut child = pages.first_child();
-    while let Some(page) = child {
-        child = page.next_sibling();
+    #[cfg(test)]
+    EVICTION_VISITS.with(|count| count.set(0));
+    cursor.prepare(&pages, result.generation);
+    while cursor.next_index < first_resident {
+        let Some(page) = cursor.next_page.as_ref().and_then(gtk::glib::WeakRef::upgrade) else {
+            break;
+        };
+        #[cfg(test)]
+        EVICTION_VISITS.with(|count| count.set(count.get() + 1));
+        let next_page = page.next_sibling().map(|next| next.downgrade());
         let Some(index) = page
             .widget_name()
             .strip_prefix(PAGE_PREFIX)
             .and_then(|name| name.rsplit_once('-'))
             .and_then(|(_, index)| index.parse::<u64>().ok())
         else {
-            continue;
+            break;
         };
         if index >= first_resident {
             break;
         }
+        cursor.next_index = index.saturating_add(1);
+        cursor.next_page = next_page;
         if pages.visible_child().as_ref() == Some(&page) {
             page.remove_css_class("tp-stream-page-ram-resident");
             continue;
