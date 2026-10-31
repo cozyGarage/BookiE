@@ -41,6 +41,9 @@ pub enum ImportError {
 
     #[error("the file is not a readable .xlsx workbook")]
     NotSpreadsheet,
+
+    #[error("the workbook has more than {limit} shared strings")]
+    TooManySharedStrings { limit: usize },
     #[error("the file is not valid {encoding} text")]
     NotDecodable { encoding: &'static str },
 

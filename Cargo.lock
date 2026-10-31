@@ -6337,6 +6337,7 @@ dependencies = [
  "csv",
  "encoding_rs",
  "libc",
+ "quick-xml",
  "rust_decimal",
  "rust_xlsxwriter",
  "secrecy",
