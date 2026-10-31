@@ -4,6 +4,32 @@ BookiE uses XDG files for local state, SQLite for query history, a JSONL audit j
 
 ## Locations
 
+```mermaid
+graph TD
+    subgraph XDG_CONFIG ["$XDG_CONFIG_HOME/tablepro/ (or tablepro-devel)"]
+        Conn["connections.json<br/>(No Credentials)"]
+        Prefs["preferences.json<br/>+ GSettings"]
+        History["history.db<br/>(SQLite + FTS5)"]
+        Favs["favorites.json"]
+        Policy["policy.toml"]
+        Tokens["mcp-tokens.json<br/>(Hashes only)"]
+        KnownHosts["known_hosts<br/>(SSH keys)"]
+    end
+
+    subgraph XDG_DATA ["$XDG_DATA_HOME/tablepro/"]
+        Audit["audit.jsonl<br/>(Hash-chained journal)"]
+    end
+
+    subgraph SECRETS ["Secret Service (Desktop Keyring)"]
+        DBPass["DB Passwords"]
+        SSHPass["SSH Secrets"]
+        MCPToken["MCP Token Plaintext"]
+    end
+
+    Conn -.->|Resolved at runtime via UUID| DBPass
+    Conn -.->|Resolved at runtime| SSHPass
+```
+
 | Data | Format | Default path |
 |---|---|---|
 | Saved connections | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/connections.json` |
@@ -61,7 +87,9 @@ History export from the GUI writes through a temporary sibling file and a rename
 
 ## Policy
 
-The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A missing file uses the built-in defaults. The GUI currently uses `Path::exists` for this decision, so a dangling policy symlink is also treated as missing and policy remains marked available ([#1823](https://github.com/cozyGarage/BookiE/issues/1823)). If a present file cannot be read or parsed, the GUI marks policy unavailable and the local guard receives the built-in defaults; CSV imports and MCP are disabled. Other local SQL operations still use those defaults, so restrictions in the unreadable file are not enforced. A later reload failure keeps the policy already in memory. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
+The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A genuinely absent file uses the built-in defaults. A dangling symlink, inaccessible path, unreadable file or invalid policy leaves policy unavailable. The application refuses connection bootstrap and active guarded handles; CSV imports and MCP remain disabled. The connection error gives repair and restart instructions. A valid symlink loads its target normally.
+
+A failed reload preserves the last successfully loaded policy. Repair the file and reopen Preferences to reload it, or restart BookiE. A successful reload restores guarded connection access. MCP disabled at startup requires an application restart to start its server. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
 
 ## Audit journal
 
@@ -71,7 +99,7 @@ Each record contains a sequence number, previous hash, current hash, and audit e
 
 The GUI and `tablepro-agentd` may hold the journal at the same time. Each live owner holds a shared process lock; startup recovery requires the exclusive lock, so a second process does not record another process's in-flight mutation as `Unknown`. It validates the chain without recovery. New write intents are still refused while an earlier write remains pending. After all owners exit, the next opener recovers any intents left pending by a crash. A query cursor that has delivered its first page is not yet covered: a crash mid-stream leaves its operation pending ([#1719](https://github.com/cozyGarage/BookiE/issues/1719)).
 
-The full chain is verified when the journal opens, by `verify_chain()`, and by `recent(limit)`, which streams the file once and retains only the requested tail. An append verifies only the records written since the same process last verified or appended, starting from the hash it last verified. That still checks records written by another process and repairs a trailing fragment left by a crashed writer. When the file was replaced or became shorter, the append verifies the full chain again. A change to records that this process had already verified is therefore found at the next open or on-demand verification, not at the next append. The maintainer chose this on 2026-10-23 so that append cost stays constant as the journal grows. There is no retention or compaction policy; do not prune audit history as a performance shortcut.
+The full chain is verified when the journal opens, by `verify_chain()`, and by `recent(limit)`, which streams the file once and retains only the requested tail. An append verifies only the records written since the same process last verified or appended, starting from the hash it last verified. That still checks records written by another process and repairs a trailing fragment left by a crashed writer. When the file was replaced or became shorter, the append verifies the full chain again. A change to records that this process had already verified is therefore found at the next open or on-demand verification, not at the next append. This keeps normal append work independent of journal age. There is no retention or compaction policy; do not prune audit history as a performance shortcut.
 
 Journal integrity or availability failures fail closed. If the required journal cannot be opened or verified, the GUI disables governed writes and MCP startup, and `bookie-agentd` refuses to start. Unresolved write outcomes are scoped: a connection-scoped outcome blocks governed writes only for that saved connection; a global outcome blocks all governed writes. An unresolved outcome does not by itself prevent the GUI MCP server from starting when its other prerequisites are met, but its guarded writes follow the same scope. `bookie-agentd` refuses startup for a global unresolved write; a connection-scoped unresolved write does not prevent startup.
 
@@ -122,7 +150,7 @@ Exported: `id`, `name`, `driver_id`, `host`, `port`, `socket_dir`, `socket_path`
 
 Withheld: `use_tls` (the legacy boolean `tls_mode` replaced, so no bundle can claim `use_tls: true, tls_mode: disabled`), `last_opened_at` (local telemetry), unknown keys carried from a newer version, the contents of TLS certificate and key files and any SSH private key (paths only), and policy `connection_overrides`.
 
-`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal `KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on `SavedConnection` fails the build until someone classifies it. Known gap: `connect_timeout_secs` and `query_timeout_secs` are not yet in `KNOWN_CONNECTION_FIELDS` and escape this check ([#1718](https://github.com/cozyGarage/BookiE/issues/1718)).
+`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal `KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on `SavedConnection` fails the build until someone classifies it. `connect_timeout_secs` and `query_timeout_secs` are classified as withheld: a bundle does not carry them, and importing a bundle over an existing connection keeps that connection's local timeouts.
 
 ### Credentials
 
@@ -156,4 +184,4 @@ On an in-place update safety never downgrades: `read_only` is the OR of both, `e
 
 `apply_import` takes the connection-file lock once and rewrites the file in a single pass, so a plan lands whole rather than as N upserts racing another process.
 
-Exporting and importing a bundle each write an administrative audit event (`connection_bundle_export`, `connection_bundle_import`) to the journal. Acceptance on the installed package is tracked as B4-22 ([#566](https://github.com/cozyGarage/BookiE/issues/566)).
+Exporting and importing a bundle each write an administrative audit event (`connection_bundle_export`, `connection_bundle_import`) to the journal. Use an installed package to verify these events in the audit log.

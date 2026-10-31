@@ -79,7 +79,7 @@ Editor failures carry only audit receipts returned by the exact guarded statemen
 
 ## State that does not belong in a component
 
-Some state outlives any single component: open connections, user preferences, query history, the workspace cache and the MCP bridge. The application owns these as `Arc`s and passes them explicitly into each window, tab and dialog that needs them. They were global singletons until the 0.2 sprint, and that is exactly what the `Arc` handles replaced.
+Some state outlives any single component: open connections, user preferences, query history, the workspace cache and the MCP bridge. The application owns these as `Arc`s and passes them explicitly into each window, tab and dialog that needs them. They were global singletons before explicit ownership was introduced, and the `Arc` handles replaced them.
 
 `tablepro-app-services::workspace` owns each window's tab membership, preview status, open-table decisions and save-before-close counters. The collection accepts app-owned payloads; it has no GUI dependency. The GTK adapter owns controllers, page order, dialogs and the `AdwTabView` close handshake. The app adapter writes the existing `services::workspace_state` record format and identifiers.
 
@@ -108,8 +108,8 @@ The read-modify-write under a file lock is the point: two windows save different
 - A new global singleton for state the application could own and pass in. Pass it via `Init` or parent to child `Input`. Existing `thread_local!` registries are constrained to current GTK main-context callers; they are not a precedent to extend, especially from `app-services` worker code.
 - A `Component` doing async work in its `init`. Promote to `AsyncComponent`.
 - One enormous `Input` enum with 30 variants. Split the component.
-- Seeding an edit from a widget's display label. A text or JSON cell over 40,000 bytes shows a truncated value with a "… (+N more chars)" marker, and an edit seeded from the label could persist the marker. Carry the full value in the model and never read it back from the label ([sprint history](archive/bookie-0.2-history.md)).
-- Deciding what a control does from an engine name. The Stop button reads the connection's capability, including session execution, so a new engine does not need an edit to a name list ([B4 history](archive/b4-history.md), F1).
+- Seeding an edit from a widget's display label. A text or JSON cell over 40,000 bytes shows a truncated value with a "… (+N more chars)" marker, and an edit seeded from the label could persist the marker. Carry the full value in the model and never read it back from the label.
+- Deciding what a control does from an engine name. The Stop button reads the connection's cancellation capability, including session execution, so adding a new engine does not require editing a name list.
 
 ## Testing components
 
@@ -124,3 +124,5 @@ Relm4 ships test helpers but they require a running GTK main loop, which require
 Browse SQL planning is pure and shared between counts and pages. A validation error clears the count through the existing request-generation failure path and surfaces the error; it cannot fall back to an unfiltered total. Delayed sidebar metadata is accepted only for the same connection allocation, so reconnecting the same saved UUID does not make an old response current. The planner and its pure tests live in `tablepro-app-services::browse_query`; real-database fixtures stay in the app test tier. Connection identity tests remain in `services/database_service.rs`.
 
 Completion identity and reconnect behavior are described in [architecture](../ARCHITECTURE.md) and constrained by ADR 0008.
+
+Workspace metadata destinations are validated before draft staging. Reused draft files retain private permissions, and a missing published body is staged under a new UUID. Prepared files remain available if an error occurs after metadata publication begins.

@@ -1,8 +1,16 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+#[path = "batch_cleanup.rs"]
+mod batch_cleanup;
+
 use super::{connect, start_mssql};
 use tablepro_core::Value;
 use tablepro_core::sql_ddl::{DraftColumn, diff_to_ops, materialize_ops};
+
+#[path = "masked_column_alter.rs"]
+mod masked_column_alter;
+#[path = "optimistic_collation.rs"]
+mod optimistic_collation;
 
 #[tokio::test]
 #[ignore = "requires docker"]

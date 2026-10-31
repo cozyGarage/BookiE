@@ -26,6 +26,16 @@ pub(super) fn saved_connection_name(entered: &str, driver_id: &str, opts: &Conne
     derived_connection_name(driver_id, opts)
 }
 
+pub(super) fn preserve_attached_databases(
+    driver_id: &str,
+    existing: Option<&SavedConnection>,
+    options: &mut ConnectOptions,
+) {
+    options.attached_databases = existing
+        .filter(|connection| connection.driver_id == driver_id)
+        .map_or_else(Vec::new, |connection| connection.attached_databases.clone());
+}
+
 fn derived_connection_name(driver_id: &str, opts: &ConnectOptions) -> String {
     if driver_id == "sqlite" {
         return opts.database.clone();
@@ -58,14 +68,13 @@ pub(super) fn select_existing<'a>(
         .iter()
         .filter(|saved| matches_endpoint(saved, identity))
         .collect();
-    candidates
-        .iter()
-        .copied()
-        .find(|saved| {
-            identity.file_based
-                || saved.username == identity.opts.username && saved.auth_mode == identity.opts.auth_mode
-        })
-        .or_else(|| (candidates.len() == 1).then(|| candidates[0]))
+    let mut matching = candidates.iter().copied().filter(|saved| {
+        identity.file_based || saved.username == identity.opts.username && saved.auth_mode == identity.opts.auth_mode
+    });
+    if let Some(saved) = matching.next() {
+        return matching.next().is_none().then_some(saved);
+    }
+    (candidates.len() == 1).then(|| candidates[0])
 }
 
 fn matches_endpoint(saved: &SavedConnection, identity: &ConnectionIdentity<'_>) -> bool {

@@ -9,6 +9,7 @@ use relm4::{adw, gtk};
 use tablepro_storage::query_history::{Entry, HistoryStore, SearchFilter, Source};
 
 use crate::services::database_service::ConnectionMetadata;
+use crate::ui::popover::keep_inside_window;
 
 pub struct HistoryDialog {
     history: HistoryStore,
@@ -87,6 +88,7 @@ pub enum HistoryDialogCmd {
     Cleared,
     ExportReady(String, String),
     ExportFailed(String),
+    ExportWritten(Result<(), String>),
 }
 
 impl Component for HistoryDialog {
@@ -122,6 +124,7 @@ impl Component for HistoryDialog {
             .tooltip_text(crate::tr!("Filter history"))
             .popover(&filter_popover)
             .build();
+        keep_inside_window(&filter_popover, &filter_button);
 
         let connections = init.database.all_connections();
 
@@ -625,10 +628,9 @@ impl Component for HistoryDialog {
                 self.selected_ids.clear();
                 sender.input(HistoryDialogInput::Refresh);
             }
-            HistoryDialogCmd::ExportReady(content, suggested_name) => self.save_export(content, suggested_name),
-            HistoryDialogCmd::ExportFailed(msg) => {
-                tracing::warn!(error = %msg, "history export failed");
-            }
+            HistoryDialogCmd::ExportReady(content, suggested_name) => self.save_export(content, suggested_name, sender),
+            HistoryDialogCmd::ExportFailed(msg) | HistoryDialogCmd::ExportWritten(Err(msg)) => self.export_failed(&msg),
+            HistoryDialogCmd::ExportWritten(Ok(())) => {}
         }
     }
 }
@@ -983,38 +985,6 @@ impl HistoryDialog {
         });
     }
 
-    fn save_export(&self, content: String, suggested_name: String) {
-        let filter = gtk::FileFilter::new();
-        if suggested_name.ends_with(".sql") {
-            filter.set_name(Some(&crate::tr!("SQL files")));
-            filter.add_mime_type("text/x-sql");
-            filter.add_suffix("sql");
-        } else {
-            filter.set_name(Some(&crate::tr!("CSV files")));
-            filter.add_mime_type("text/csv");
-            filter.add_suffix("csv");
-        }
-        let filters = gio::ListStore::new::<gtk::FileFilter>();
-        filters.append(&filter);
-        let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Export query history"))
-            .modal(true)
-            .initial_name(&suggested_name)
-            .default_filter(&filter)
-            .filters(&filters)
-            .build();
-        let parent_window = self.root.root().and_then(|r| r.downcast::<gtk::Window>().ok());
-        dialog.save(parent_window.as_ref(), gio::Cancellable::NONE, move |outcome| {
-            let Ok(file) = outcome else { return };
-            let Some(path) = file.path() else { return };
-            if let Err(e) =
-                tablepro_core::export::write_atomically(&path, |output| output.write_all(content.as_bytes()))
-            {
-                tracing::warn!(error = %e, path = %path.display(), "history export write failed");
-            }
-        });
-    }
-
     fn query_for_id(&self, id: i64) -> Option<String> {
         self.entries.iter().find(|e| e.id == id).map(|e| e.query.clone())
     }
@@ -1135,4 +1105,9 @@ mod tests {
 }
 
 #[cfg(test)]
+mod export_tests;
+
+#[cfg(test)]
 mod lifetime_tests;
+
+mod export;

@@ -125,8 +125,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH COLUMNS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH COLUMNS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -144,8 +143,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<Vec<ColumnInfo>, DriverError> {
         check_pre_dispatch(control)?;
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH COLUMNS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH COLUMNS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -167,8 +165,7 @@ impl Connection for PolicyGuard {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH ROWS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH ROWS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -189,8 +186,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         check_pre_dispatch(control)?;
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH ROWS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH ROWS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -398,11 +394,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        let combined = statements
-            .iter()
-            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
-            .collect::<Vec<_>>()
-            .join(";\n");
+        let combined = batch_text(statements);
         let authorization = self.authorize(&combined, true, None).await?;
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
@@ -433,11 +425,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<Vec<u64>, DriverError> {
         check_pre_dispatch(control)?;
-        let combined = statements
-            .iter()
-            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
-            .collect::<Vec<_>>()
-            .join(";\n");
+        let combined = batch_text(statements);
         let authorization = self.authorize(&combined, true, Some(control)).await?;
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
@@ -473,11 +461,7 @@ impl Connection for PolicyGuard {
         if expect_one.is_empty() {
             return self.execute_in_transaction(statements).await;
         }
-        let combined = statements
-            .iter()
-            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
-            .collect::<Vec<_>>()
-            .join(";\n");
+        let combined = batch_text(statements);
         let analysis = self.analyze_statement(&combined);
         let enforced_rows = self.enforced_batch_rows(&analysis, expect_one);
         let authorization = self
@@ -518,11 +502,7 @@ impl Connection for PolicyGuard {
             return self.execute_in_transaction_controlled(statements, control).await;
         }
         check_pre_dispatch(control)?;
-        let combined = statements
-            .iter()
-            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
-            .collect::<Vec<_>>()
-            .join(";\n");
+        let combined = batch_text(statements);
         let analysis = self.analyze_statement(&combined);
         let enforced_rows = self.enforced_batch_rows(&analysis, expect_one);
         let authorization = self
@@ -555,8 +535,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH INDEXES", vec![target]);
+        let operation = self.table_metadata_operation("FETCH INDEXES", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -574,8 +553,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<Vec<IndexInfo>, DriverError> {
         check_pre_dispatch(control)?;
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH INDEXES", vec![target]);
+        let operation = self.table_metadata_operation("FETCH INDEXES", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
@@ -591,12 +569,30 @@ impl Connection for PolicyGuard {
     }
 
     async fn fetch_foreign_keys(&self, schema: Option<&str>, table: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH FOREIGN KEYS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH FOREIGN KEYS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
             .caught_read("FETCH FOREIGN KEYS", self.inner.fetch_foreign_keys(schema, table))
+            .await;
+        let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
+        self.audit_read_result(&operation, start, &result, rows).await?;
+        result
+    }
+
+    async fn fetch_inbound_foreign_keys(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let operation = self.table_metadata_operation("FETCH INBOUND FOREIGN KEYS", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH INBOUND FOREIGN KEYS",
+                self.inner.fetch_inbound_foreign_keys(schema, table),
+            )
             .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
@@ -644,14 +640,35 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         check_pre_dispatch(control)?;
-        let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
-        let operation = self.metadata_operation("FETCH FOREIGN KEYS", vec![target]);
+        let operation = self.table_metadata_operation("FETCH FOREIGN KEYS", schema, table);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
         let result = self
             .caught_read(
                 "FETCH FOREIGN KEYS",
                 self.inner.fetch_foreign_keys_controlled(schema, table, control),
+            )
+            .await;
+        let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
+        self.audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
+    async fn fetch_inbound_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.table_metadata_operation("FETCH INBOUND FOREIGN KEYS", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH INBOUND FOREIGN KEYS",
+                self.inner.fetch_inbound_foreign_keys_controlled(schema, table, control),
             )
             .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
@@ -831,7 +848,7 @@ where
 #[async_trait]
 impl Transaction for PolicyTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -844,7 +861,10 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -857,7 +877,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn query_params(&mut self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -875,7 +895,10 @@ impl Transaction for PolicyTransaction {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -888,7 +911,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -912,7 +935,10 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -939,7 +965,7 @@ impl Transaction for PolicyTransaction {
     }
 
     async fn execute_params(&mut self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, None).await?;
+        let authorization = self.guard.authorize_in_transaction(sql, None, &mut *self.inner).await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -971,7 +997,10 @@ impl Transaction for PolicyTransaction {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<ExecResult, DriverError> {
-        let authorization = self.guard.authorize_in_transaction(sql, Some(control)).await?;
+        let authorization = self
+            .guard
+            .authorize_in_transaction(sql, Some(control), &mut *self.inner)
+            .await?;
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -1156,4 +1185,12 @@ impl Transaction for PolicyTransaction {
         pending_write.disarm();
         result
     }
+}
+
+fn batch_text(statements: &[(String, Vec<Value>)]) -> String {
+    statements
+        .iter()
+        .map(|(sql, _)| sql.trim().trim_end_matches(';'))
+        .collect::<Vec<_>>()
+        .join("\n;\n")
 }

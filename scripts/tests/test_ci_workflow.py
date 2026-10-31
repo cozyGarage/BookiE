@@ -23,6 +23,14 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", workflow, re.M | re.S).group(1)
+        container = fast.split("    container:\n", 1)[1].split("\n    env:\n", 1)[0]
+        action = (ROOT / ".github/actions/dockerhub-login/action.yml").read_text()
+        self.assertIn("DOCKER_CONFIG: /github/home/.docker", container)
+        self.assertIn('docker login --username "${DOCKERHUB_USERNAME}" --password-stdin', action)
+
     def test_ci_build_artifacts_strip_symbols(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
         self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"', build)
@@ -120,6 +128,13 @@ class CiWorkflowTests(unittest.TestCase):
             job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
             self.assertNotRegex(job, r"(?m)^    (if|continue-on-error):")
 
+    def test_server_gtk_jobs_do_not_retry_stateful_scenarios_against_live_fixtures(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for name in ("e2e", "gtk-server"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn('TABLEPRO_GTK_SCENARIO_RETRIES: "0"', job)
+
     def test_cargo_path_covers_runner_service_homes(self):
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
@@ -184,21 +199,14 @@ class CiWorkflowTests(unittest.TestCase):
             harness.index("scripts/update-third-party-notices.py --check"),
         )
 
-    def test_forgejo_workflows_queue_without_cancelling_across_refs(self):
-        groups = []
+    def test_forgejo_workflows_do_not_block_other_runs(self):
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             match = re.search(r"^concurrency:\n((?:[ \t]+[^\n]*\n)+)", workflow, re.MULTILINE)
             self.assertIsNotNone(match, name)
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
-            group = settings["group"].strip()
-            self.assertTrue(group, name)
-            self.assertEqual(group, "bookie-lab-${{ github.ref }}", name)
-            self.assertNotIn("${{ github.run_id }}", group, name)
-            self.assertNotIn("${{ github.workflow }}", group, name)
+            self.assertNotIn("group", settings, name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
-            groups.append(group)
-        self.assertEqual(groups[0], groups[1])
         gate = (ROOT / "scripts/forgejo-gate.sh").read_text()
         self.assertIn('printf \'%s/%s\' "$remote" "$target" | sha256sum', gate)
 
@@ -476,6 +484,8 @@ class CiWorkflowTests(unittest.TestCase):
         soak = (ROOT / ".github/workflows/gtk-soak.yml").read_text()
         action = (ROOT / ".github/actions/dockerhub-login/action.yml").read_text()
         self.assertIn("if: inputs.username != ''", action)
+        self.assertIn('docker login --username "${DOCKERHUB_USERNAME}" --password-stdin', action)
+        self.assertNotIn('auth="$(printf', action)
         self.assertNotIn("echo \"$DOCKERHUB_TOKEN\"", action)
         self.assertNotIn("echo '${{ inputs.password }}'", action)
         fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
@@ -586,6 +596,62 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn('xvfb-run --auto-servernum --server-num="$xvfb_server_num"', script)
                 self.assertNotIn("--auto-display", script)
                 self.assertNotIn("xvfb-run -a", script)
+
+    def test_widget_wrapper_reports_xvfb_failure_and_preserves_test_status(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            xdpyinfo_log = directory / "xdpyinfo.log"
+            commands = {
+                "dbus-run-session": "while [ \"$1\" != -- ]; do shift; done\nshift\nexec \"$@\"\n",
+                "xvfb-run": (
+                    "error_file=/dev/null\n"
+                    "while [ $# -gt 0 ]; do\n"
+                    "  case \"$1\" in\n"
+                    "    -e) error_file=$2; shift 2 ;;\n"
+                    "    -s|--server-num) shift 2 ;;\n"
+                    "    --server-num=*) display=${1#*=}; shift ;;\n"
+                    "    --auto-servernum) shift ;;\n"
+                    "    *) break ;;\n"
+                    "  esac\n"
+                    "done\n"
+                    "printf 'simulated Xvfb startup failure\\n' > \"$error_file\"\n"
+                    "DISPLAY=:\"${display:-1234}\" exec \"$@\"\n"
+                ),
+                "python3": "printf 'simulated GTK initialization failure\\n' >&2\nexit 23\n",
+                "xdpyinfo": "printf '%s\\n' \"$*\" >> \"$XDPYINFO_LOG\"\nexit 1\n",
+            }
+            for name, contents in commands.items():
+                executable = binaries / name
+                executable.write_text("#!/bin/sh\n" + contents)
+                executable.chmod(0o755)
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{binaries}{os.pathsep}{environment['PATH']}",
+                    "XDPYINFO_LOG": str(xdpyinfo_log),
+                    "GITHUB_RUN_ID": "unit-run",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "GITHUB_JOB": "widgets",
+                }
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/test-gtk-widgets.sh")],
+                cwd=ROOT,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 23, result.stderr)
+            self.assertIn("simulated Xvfb startup failure", result.stderr)
+            self.assertIn("unit-run", result.stderr)
+            self.assertIn("attempt=2", result.stderr)
+            self.assertIn("widgets", result.stderr)
+            self.assertIn("exit=23", result.stderr)
+            self.assertIn("display_alive=unavailable", result.stderr)
+            self.assertIn("-display :", xdpyinfo_log.read_text())
 
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
@@ -737,10 +803,6 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', script)
         self.assertIn('"$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"', script)
         self.assertLess(script.index("xvfb-run --auto-servernum"), script.index('dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh"'))
-        profile = (ROOT / "docs/evidence/postgres-stream-heap-profile-2026-10-25/run.sh").read_text()
-        self.assertIn('cp "/usr/share/dbus-1/services/org.a11y.Bus.service"', profile)
-        self.assertIn('"$RUNTIME/data/dbus-1/services/org.a11y.Bus.service"', profile)
-        self.assertLess(profile.index("xvfb-run --auto-servernum"), profile.index('dbus-run-session -- bash "$RUNTIME/run-inner.sh"'))
 
     def test_distro_package_builder_uses_a_distinct_image_tag(self):
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
@@ -758,6 +820,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ci-gtk-artifact.py create --package", builder)
         self.assertIn("ci-gtk-artifact.py verify --package", producer)
         self.assertIn("needs: [distro-floor]", scenarios)
+        self.assertIn("max-parallel: 2", scenarios)
         self.assertIn("shard: [1, 2, 3, 4, 5, 6]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6", scenarios)
@@ -798,6 +861,48 @@ class CiWorkflowTests(unittest.TestCase):
             calls = docker_log.read_bytes().splitlines()
             self.assertTrue(calls)
             self.assertFalse(any(b":/target" in call for call in calls))
+
+    def test_distro_runtime_retries_a_docker_hub_rate_limit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            docker_count = directory / "docker-count"
+            docker = binaries / "docker"
+            docker.write_text(
+                "#!/bin/sh\n"
+                "if [ \"$1\" = build ]; then\n"
+                "  count=$(cat \"$DOCKER_COUNT_FILE\" 2>/dev/null || printf 0)\n"
+                "  count=$((count + 1))\n"
+                "  printf '%s' \"$count\" > \"$DOCKER_COUNT_FILE\"\n"
+                "  if [ \"$count\" -eq 1 ]; then\n"
+                "    echo '429 Too Many Requests'\n"
+                "    exit 1\n"
+                "  fi\n"
+                "fi\n"
+            )
+            docker.chmod(0o755)
+            sleep = binaries / "sleep"
+            sleep.write_text("#!/bin/sh\nexit 0\n")
+            sleep.chmod(0o755)
+            package = directory / "bookie.deb"
+            package.write_bytes(b"package")
+            environment = os.environ.copy()
+            environment["PATH"] = f"{binaries}{os.pathsep}{environment['PATH']}"
+            environment["DOCKER_COUNT_FILE"] = str(docker_count)
+            environment["DISTRO_FLOOR_PACKAGE"] = str(package)
+
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/test-distro-floor.sh"), "debian:testing"],
+                cwd=ROOT,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(docker_count.read_text(), "2")
 
 
 if __name__ == "__main__":

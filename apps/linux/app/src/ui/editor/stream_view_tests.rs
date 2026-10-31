@@ -1,5 +1,5 @@
 use super::*;
-use crate::ui::editor::stream_pages::StreamTerminal;
+use crate::ui::editor::stream_pages::{ResidentPageStore, StreamPageCache, StreamTerminal};
 use crate::ui::editor::{StatementIdentity, StatementOutcomeKind};
 use std::sync::Arc;
 use tablepro_core::{ColumnInfo, QueryResult, Value};
@@ -66,6 +66,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
         })
         .collect();
     let columns = pages.first().map_or_else(Vec::new, |page| page.columns.clone());
+    let resident_pages = ResidentPageStore::from_pages(indices.iter().copied().zip(pages.iter().cloned()));
     let result = StreamedResult {
         pages,
         page_indices: indices.to_vec(),
@@ -77,6 +78,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
         export: None,
         generation: 0,
         spool: None,
+        resident_pages,
     };
     let outcome = StatementOutcome {
         identity: StatementIdentity::default(),
@@ -132,6 +134,7 @@ fn a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown() {
     let progress = named::<gtk::Label>(&root, LIVE_PROGRESS).unwrap();
     assert_eq!(progress.text(), stream_progress_text(&result));
 
+    pages.set_visible_child(&pages.last_child().unwrap());
     let (third, evicted) = streamed(&[1, 2], vec![page(&[3]), page(&[4])], 4);
     assert!(update_live_stream(&holder, &third, &evicted, &target));
     assert_eq!(pages.pages().n_items(), 3);
@@ -285,13 +288,113 @@ fn hidden_stream_pages_build_their_grid_only_when_selected() {
     assert_eq!(named::<gtk::ColumnView>(&first, "GtkColumnView"), Some(grid));
     window.destroy();
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
+    relm4::adw::init().unwrap();
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let mut cache = StreamPageCache::default();
+    let cached_input = page(&[1, 2]);
+    cache.append(0, cached_input).unwrap();
+    cache.append(1, page(&[3, 4])).unwrap();
+    let result = cache.snapshot(StreamTerminal::Loading, None);
+    let resident_pages = result.resident_pages.clone();
+    let original = result.pages[0].clone();
+    let original_weak = Arc::downgrade(&original);
+    let outcome = StatementOutcome {
+        identity: StatementIdentity::default(),
+        sql_preview: "SELECT id FROM items".into(),
+        elapsed_ms: 0,
+        kind: StatementOutcomeKind::Streamed(Box::new(result.clone())),
+        pinned: false,
+    };
+    let settings_store = LocalResultSettingsStore::default();
+    let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());
+    let (sender, _receiver) = relm4::channel::<GridMsg>();
+    super::super::outcomes::render_outcomes(
+        &holder,
+        &[outcome],
+        &sender,
+        None,
+        database.clone(),
+        settings_store.clone(),
+        None,
+    );
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let pages = named::<gtk::Stack>(&root, LIVE_PAGES).unwrap();
+    let first_page = pages.first_child().unwrap();
+    let window = gtk::Window::builder()
+        .default_width(900)
+        .default_height(600)
+        .child(&holder)
+        .build();
+    window.present();
+    let context = gtk::glib::MainContext::default();
+    while context.iteration(false) {}
+    pages.set_visible_child(&first_page);
+    let old_grid_widget = wait_for_grid(&first_page.clone().upcast());
+    old_grid_widget.model().unwrap().select_item(1, false);
+    let old_grid = old_grid_widget.downgrade();
+    drop(old_grid_widget);
+    drop(result);
+    drop(original);
+
+    pages.set_visible_child(&pages.last_child().unwrap());
+    retire_previous_page(&pages, 0, Some(0), Some(1));
+    while context.iteration(false) {}
+
+    assert!(
+        old_grid.upgrade().is_none(),
+        "a hidden cached page must release its GTK grid"
+    );
+    let cached = resident_pages.get(0).expect("decoded page remains in cache");
+    assert!(Arc::ptr_eq(&cached, &original_weak.upgrade().unwrap()));
+    assert!(
+        first_page
+            .first_child()
+            .is_some_and(|child| child.has_css_class("tp-stream-page-placeholder"))
+    );
+
+    first_page
+        .first_child()
+        .unwrap()
+        .add_css_class("tp-stream-page-loading");
+    complete_page_load(
+        PageLoadContext {
+            holder: &holder,
+            generation: 0,
+            index: 0,
+            identity: StatementIdentity::default(),
+            grid_sender: &sender,
+            connection_id: None,
+            database,
+            settings_store,
+        },
+        Ok(cached.clone()),
+    );
+    pages.set_visible_child(&first_page);
+    let new_grid = wait_for_grid(&first_page.clone().upcast());
+    assert!(old_grid.upgrade().is_none());
+    assert_eq!(cached.rows, vec![vec![Value::Int(1)], vec![Value::Int(2)]]);
+    assert!(new_grid.model().unwrap().is_selected(1));
+    assert!(new_grid.is_mapped());
+
+    let mut oversized = page(&[0]).as_ref().clone();
+    oversized.rows = vec![vec![Value::Bytes(vec![0; 65 * 1024 * 1024])]];
+    cache.append(2, Arc::new(oversized)).unwrap();
+    assert!(resident_pages.get(0).is_none());
+    assert!(resident_pages.get(1).is_none());
+    assert!(resident_pages.get(2).is_some());
+    window.destroy();
+}
 #[test]
 #[ignore = "requires an isolated GTK display"]
 fn a_terminal_status_keeps_retained_grids_unbuilt_until_selected() {
     relm4::adw::init().unwrap();
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let (mut outcome, mut result) = streamed(&[0], vec![page(&[1, 2])], 2);
-    result.terminal = StreamTerminal::Cancelled;
+    result.terminal = StreamTerminal::Failed("fixture failure".into());
     outcome.kind = StatementOutcomeKind::Streamed(Box::new(result));
     let (sender, _receiver) = relm4::channel::<GridMsg>();
     super::super::outcomes::render_outcomes(
@@ -321,4 +424,137 @@ fn a_terminal_status_keeps_retained_grids_unbuilt_until_selected() {
     let grid = wait_for_grid(&data);
     assert_eq!(named::<gtk::ColumnView>(&data, "GtkColumnView"), Some(grid));
     window.destroy();
+}
+
+fn find_widgets<T: IsA<gtk::Widget>>(root: &gtk::Widget) -> Vec<T> {
+    let mut found = Vec::new();
+    let mut pending = vec![root.clone()];
+    while let Some(widget) = pending.pop() {
+        if let Ok(typed) = widget.clone().downcast::<T>() {
+            found.push(typed);
+        }
+        let mut child = widget.first_child();
+        while let Some(next) = child {
+            child = next.next_sibling();
+            pending.push(next);
+        }
+    }
+    found
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
+    relm4::adw::init().unwrap();
+    let (grid_sender, _) = relm4::channel::<GridMsg>();
+    let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());
+    let target = LiveStreamTarget {
+        grid_sender: &grid_sender,
+        connection_id: None,
+        database: database.clone(),
+        settings_store: LocalResultSettingsStore::default(),
+    };
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let original = page(&[1, 2]);
+    let retired = Arc::downgrade(&original);
+    let columns = original.columns.clone();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    runtime.block_on(spool.append_page(0, original.clone())).unwrap();
+    let (first, _) = streamed(&[0], vec![original.clone()], 2);
+    super::super::outcomes::render_outcomes(
+        &holder,
+        std::slice::from_ref(&first),
+        &grid_sender,
+        None,
+        database,
+        LocalResultSettingsStore::default(),
+        None,
+    );
+    drop(first);
+    drop(original);
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let pages = named::<gtk::Stack>(&root, LIVE_PAGES).unwrap();
+    let first_page = pages.first_child().unwrap();
+    pages.set_visible_child(&first_page);
+    let (second, result) = streamed(&[0, 1], vec![page(&[1, 2]), page(&[3])], 3);
+    assert!(update_live_stream(&holder, &second, &result, &target));
+    let (third, evicted) = streamed(&[1, 2], vec![page(&[3]), page(&[4])], 4);
+    assert!(update_live_stream(&holder, &third, &evicted, &target));
+    assert_eq!(pages.visible_child().as_ref(), Some(&first_page));
+    assert!(
+        first_page
+            .first_child()
+            .is_some_and(|child| !child.has_css_class("tp-stream-page-placeholder")),
+        "the page the user is reading must not be swapped for a placeholder"
+    );
+    pages.set_visible_child(&pages.last_child().unwrap());
+    retire_previous_page(&pages, 0, Some(0), Some(2));
+    assert!(
+        first_page
+            .first_child()
+            .is_some_and(|child| child.has_css_class("tp-stream-page-placeholder"))
+    );
+    while gtk::glib::MainContext::default().iteration(false) {}
+    assert!(retired.upgrade().is_none(), "retired page must release its result");
+    let reloaded = runtime.block_on(spool.load_page(0, columns)).unwrap();
+    assert_eq!(reloaded.rows, vec![vec![Value::Int(1)], vec![Value::Int(2)]]);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_timed_out_stream_keeps_its_last_data_page_and_shows_a_notice() {
+    relm4::adw::init().unwrap();
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let (mut outcome, mut result) = streamed(&[0, 1], vec![page(&[1, 2]), page(&[3])], 3);
+    result.terminal = StreamTerminal::TimedOut;
+    outcome.kind = StatementOutcomeKind::Streamed(Box::new(result));
+    let (sender, _receiver) = relm4::channel::<GridMsg>();
+    super::super::outcomes::render_outcomes(
+        &holder,
+        &[outcome],
+        &sender,
+        None,
+        Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        LocalResultSettingsStore::default(),
+        None,
+    );
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let pages = named::<gtk::Stack>(&root, "GtkStack").unwrap();
+    assert_eq!(pages.pages().n_items(), 2, "the timeout is not a third page");
+    assert_eq!(pages.visible_child(), pages.last_child());
+    let title = pages.page(&pages.visible_child().unwrap()).title();
+    assert_eq!(title.as_deref(), Some("Rows 3-3"));
+    let banners = find_widgets::<relm4::adw::Banner>(&root);
+    assert_eq!(banners.len(), 1);
+    assert_eq!(
+        banners[0].title(),
+        "Query timed out. All received pages remain available."
+    );
+    let next = find_widgets::<gtk::Button>(&root)
+        .into_iter()
+        .find(|button| button.label().as_deref() == Some("Next page"))
+        .unwrap();
+    assert!(!next.is_sensitive());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn live_progress_lookup_does_not_walk_result_pages() {
+    relm4::adw::init().unwrap();
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let progress = gtk::Label::new(None);
+    progress.set_widget_name(LIVE_PROGRESS);
+    let pages = gtk::Stack::new();
+    pages.set_widget_name(LIVE_PAGES);
+    for _ in 0..200 {
+        pages.add_child(&gtk::Label::new(None));
+    }
+    holder.append(&progress);
+    holder.append(&pages);
+    NAMED_VISITS.with(|count| count.set(0));
+    assert!(named::<gtk::Label>(&holder.upcast::<gtk::Widget>(), LIVE_PROGRESS).is_some());
+    assert!(NAMED_VISITS.with(|count| count.get()) < 10);
 }

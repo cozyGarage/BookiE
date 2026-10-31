@@ -1,8 +1,18 @@
 # Adding a database driver
 
-Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md). The [0.2.0 completion page](bookie-0.2-sprint.md) records delivered engine scope; the [backlog](backlog.md) and owning boards set post-release sequencing and acceptance. Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common type/value and native proof standard. The [documentation entry point](README.md) identifies the owning boards and selective evidence lookup. Recheck the current traits and implementations before using this checklist; the workspace manifests are authoritative for dependency versions.
+Drivers are static Rust crates under `crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md). Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common type/value standard. Recheck the current traits and implementations before using this checklist; the workspace manifests are authoritative for dependency versions.
 
 ## Contracts and crate boundaries
+
+```mermaid
+flowchart LR
+    A["crates/drivers/<engine>"] --> B["Implement DatabaseDriver"]
+    B --> C["Implement Connection & Session"]
+    C --> D["Wrap in PolicyGuard"]
+    D --> E["Register in Composition Roots"]
+    E --> F["tablepro-app (GUI)"]
+    E --> G["tablepro-agentd (MCP)"]
+```
 
 Read the actual traits before implementing a driver:
 
@@ -40,10 +50,10 @@ Review engine/library proposals against [driver maturity](adding-drivers.md#orde
 6. Keep dial endpoints separate from TLS/Kerberos service identity. Test wrong CA/hostname, no plaintext fallback and tunneled verification per engine. Initialize the shared crypto provider in test composition roots that link multiple TLS drivers. Do not load saved secrets inside a driver.
 7. Add the workspace member and dependencies in both composition roots. Register in [app::build_registry](../apps/linux/app/src/lib.rs) and [agentd::build_registry](../crates/agentd/src/main.rs). Apply matching feature gates where native build cost requires them.
 8. Update maturity/connection documentation and the user-facing changelog. Register tests and runner ownership before claiming integration.
-9. Test each server flavour on a real server. MariaDB 10.2.7 and later reports a column default as the SQL that defines it and a missing default as the text `NULL`, so re-quoting it would have created a default of `'NULL'`; only a real MariaDB container caught it ([sprint history](archive/bookie-0.2-history.md)). Detect flavour from the server's reported version, not from the driver name.
-10. Do not let an engine-specific input parser bypass the shared edit rules. `parse_input_for_column` decides empty input (nullable becomes `Null`, required refuses) before any driver parser runs; a driver parser that runs first can turn an empty cell into a zero write (a MongoDB decimal once did, [B3 review](archive/b3-review-2026-10-01.md)). Test empty input for nullable, defaulted and required columns of every type the driver parses.
+9. Test each server flavour on a real server. MariaDB 10.2.7 and later reports a column default as the SQL that defines it and a missing default as the text `NULL`, so re-quoting it would create a default of `'NULL'`. Detect flavour from the server's reported version, not from the driver name.
+10. Do not let an engine-specific input parser bypass the shared edit rules. `parse_input_for_column` decides empty input (nullable becomes `Null`, required refuses) before any driver parser runs; otherwise an engine parser can turn empty input into a zero write. Test empty input for nullable, defaulted and required columns of every type the driver parses.
 
-## Tests and evidence
+## Tests and behavior contracts
 
 Use current testcontainers `AsyncRunner` examples in existing drivers. Integration crates need the test-only Clippy allowances specified in `AGENTS.md`; fixture tests are ignored in the fast tier and executed by their dedicated layer.
 
@@ -55,9 +65,9 @@ cargo test -p tablepro-driver-<engine> --test integration -- --include-ignored -
 
 Cover native stored type/value, invalid neighbors, bound parameters, consumer round trips, late stream failures, server loss and subsequent handle usability. Mocks cover dispatch/denial; real engine assertions establish server behavior. Record initial failing behavior before applying a bug fix.
 
-Review `scripts/ci-local.sh`, `scripts/test-layers.json`, the TLS runner, change-test mapping, ignored-test inventory and hosted workflow package lists for a new crate. Register isolated GTK/keyring tests where needed. Run affected layers selected through [the validation playbook](validation-playbook.md); regenerate the ignored-test inventory. Optional-feature build evidence is separate from default-workspace success.
+Review `scripts/ci-local.sh`, `scripts/test-layers.json`, the TLS runner, change-test mapping, ignored-test inventory and hosted workflow package lists for a new crate. Register isolated GTK/keyring tests where needed. Run affected layers selected through [the validation playbook](validation-playbook.md); regenerate the ignored-test inventory. Optional-feature builds are separate from the default workspace.
 
-Return an exact SHA, commands, report paths, retained sanitized evidence and unrun gates. Driver maturity, a fixture pass, package qualification and release approval are separate claims.
+Return an exact SHA, commands, report paths and unrun gates. Keep run-specific records outside the public source tree. Driver maturity, a fixture pass, package qualification and release approval are separate claims.
 
 ## Static driver capabilities
 
@@ -108,7 +118,7 @@ Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL
 | `ddl_is_transactional` | Structure-save orchestration reads the typed profile. |
 | `reports_rows_affected` | Inline grid write handling reads the typed profile. |
 | `supports_database_listing` | Database switcher reads the typed profile. |
-| Integrated auth, local sockets and client TLS auth | The connect form reads the typed profile. GTK-free auth and endpoint visibility, plus file-versus-directory socket selection, live in `crates/app-services/src/connection_form.rs`; the form does not infer socket shape from an engine ID. Transport validation still reads the declarations directly and remains a backend consumer migration under [#1688](https://github.com/cozyGarage/BookiE/issues/1688). |
+| Integrated auth, local sockets and client TLS auth | The connect form reads the typed profile. GTK-free auth and endpoint visibility, plus file-versus-directory socket selection, live in `crates/app-services/src/connection_form.rs`; the form does not infer socket shape from an engine ID. Transport validation reads the declarations directly. |
 | `supports_explicit_auto_increment_values` | CSV import planning, preview mapping and saved mapping validation. The profile is passed at runtime; it is not stored in the saved mapping file. |
 | `supports_index_metadata`, `supports_foreign_key_metadata` | `crates/app-services/src/structure_metadata.rs` skips unsupported metadata reads, preserves supported empty results, and applies cancellation/deadline checks between reads. The Structure editor labels unsupported metadata as unavailable instead of showing the same blank list as a supported empty result. These flags describe metadata reads only; DDL mutation availability remains governed by the DDL builder and driver behavior. |
 | View metadata and catalog kinds | Deferred: profile construction and conformance tests read these fields, but no direct production consumer exists in the app or app-services. Keep the existing metadata methods and behavior; add a consumer only when a user-facing action has acceptance criteria that needs this distinction. Do not treat metadata support as proof the UI exposes it. |
@@ -119,19 +129,19 @@ Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL
 Some engine behavior is not a static driver fact and stays at its current boundary:
 
 - `Connection::supports_server_cancellation()` is connection-scoped. A live server or session can differ from the static driver's potential support.
-- Per-object write permission comes from database metadata. Unknown permission remains unknown and is not inferred from the engine profile; see [#1065](https://github.com/cozyGarage/BookiE/issues/1065).
+- Per-object write permission comes from database metadata. Unknown permission remains unknown and is not inferred from the engine profile.
 - `forwarded_socket_name(service_port)` is a parameterized transport resolver. Its output depends on the requested service port, so it remains a callable operation instead of a boolean profile field.
 - Default port, database and username are connection-form defaults, not engine capabilities.
 
-### Tests and migration
+### Tests and consumers
 
-The registered-driver tests check the enum style consumed by the browse editor, compare every profile field against current declarations for every statically registered driver, and verify that the Structure editor's comment lifecycle matches the DDL capability mapping; each declared local-socket mode must have exactly one supported path shape. Structure tests distinguish unsupported index/foreign-key reads from supported empty results and verify the registered profiles reach the consumer. The app-services structure metadata tests cover unsupported-read skipping, supported empty results, error short-circuiting, cancellation between reads and expired deadlines. Installed PostgreSQL and ClickHouse scenarios in `apps/linux/app/tests/gtk_structure.py` verify supported empty/populated metadata and the unsupported-FK notice through the real driver/controller/view path. They run through `scripts/test-gtk-postgres.sh` and `scripts/test-gtk-clickhouse.sh`; the [October 26 local acceptance](evidence/structure-metadata-capabilities-2026-10-26/README.md) records the source, binary and results. The optional DuckDB assertion runs when that feature is enabled. GTK-free app-services tests cover auth and endpoint visibility, file and directory socket options, and refusal of ambiguous or inconsistent socket declarations. Core tests also cover a driver with no metadata declarations and a driver overriding every profile field.
+The registered-driver tests check the enum style consumed by the browse editor, compare every profile field against current declarations for every statically registered driver, and verify that the Structure editor's comment lifecycle matches the DDL capability mapping; each declared local-socket mode must have exactly one supported path shape. Structure tests distinguish unsupported index/foreign-key reads from supported empty results and verify the registered profiles reach the consumer. The app-services structure metadata tests cover unsupported-read skipping, supported empty results, error short-circuiting, cancellation between reads and expired deadlines. Installed PostgreSQL and ClickHouse scenarios in `apps/linux/app/tests/gtk_structure.py` verify supported empty/populated metadata and the unsupported-FK notice through the real driver/controller/view path. They run through `scripts/test-gtk-postgres.sh` and `scripts/test-gtk-clickhouse.sh`. The optional DuckDB assertion runs when that feature is enabled. GTK-free app-services tests cover auth and endpoint visibility, file and directory socket options, and refusal of ambiguous or inconsistent socket declarations. Core tests also cover a driver with no metadata declarations and a driver overriding every profile field.
 
-When migrating another consumer, preserve the existing refusal and unsupported behavior. Shared tests must assert observable capability use and keep missing metadata distinct from supported-but-empty metadata. Remaining consumer migrations and their evidence are tracked by [#1688](https://github.com/cozyGarage/BookiE/issues/1688); the profile foundation and connection-form migration landed in [#1663](https://github.com/cozyGarage/BookiE/pull/1663) and [#1686](https://github.com/cozyGarage/BookiE/pull/1686).
+When adding a consumer, preserve existing refusal and unsupported behavior. Tests must assert observable capability use and keep missing metadata distinct from supported-but-empty metadata.
 
 ## Driver maturity
 
-Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`). The Connect dialog shows Experimental as a subtitle so users are not surprised by missing write or transaction paths. These are driver declarations, not release approval; see the [post-release backlog](backlog.md) and issue-owned acceptance criteria.
+Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`). The Connect dialog shows Experimental as a subtitle so users are not surprised by missing write or transaction paths. These are driver declarations, not release approval.
 
 | Driver | Maturity | Connect | Browse | Query | Writes | Params | `begin` / MCP preview | Notes |
 |---|---|---|---|---|---|---|---|---|

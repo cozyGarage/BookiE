@@ -1,5 +1,5 @@
 use super::{BrowseCellValueRequest, BrowsePageRequest, BrowseRowCountRequest, paste, reference};
-use tablepro_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
+use tablepro_core::{ColumnInfo, ForeignKeyInfo, InboundForeignKeyInfo, QueryResult, Value};
 
 #[derive(Debug)]
 pub enum BrowseTabInput {
@@ -14,6 +14,7 @@ pub enum BrowseTabInput {
     },
     ColumnsLoaded(Vec<ColumnInfo>),
     ForeignKeysLoaded(Vec<ForeignKeyInfo>),
+    InboundForeignKeysLoaded(Vec<InboundForeignKeyInfo>),
     EnumLabelsLoaded(Vec<(String, Vec<String>)>),
     RowCountLoaded {
         request: BrowseRowCountRequest,
@@ -52,6 +53,9 @@ pub enum BrowseTabInput {
         column: String,
         row: Vec<(String, Value)>,
     },
+    ShowReferencingRows {
+        row: Vec<(String, Value)>,
+    },
     GridSetCellNull {
         row_position: u32,
         col_index: usize,
@@ -70,6 +74,7 @@ pub enum BrowseTabInput {
         col_index: usize,
         column_name: String,
         row_key: Vec<Value>,
+        edit_row_position: Option<u32>,
     },
     CellValueLoaded {
         request: BrowseCellValueRequest,

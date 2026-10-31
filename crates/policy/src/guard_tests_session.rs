@@ -1,9 +1,13 @@
 use super::*;
 
+#[path = "guard_tests_session/blast_radius.rs"]
+mod blast_radius;
 #[path = "guard_tests_session/completion_metadata.rs"]
 mod completion_metadata;
 #[path = "guard_tests_session/savepoint_recovery.rs"]
 mod savepoint_recovery;
+#[path = "guard_tests_session/transaction_blast_radius.rs"]
+mod transaction_blast_radius;
 
 #[derive(Default)]
 struct SessionScript {
@@ -18,6 +22,7 @@ struct SessionScript {
     result_sets_on: Option<&'static str>,
     completion_targets: Mutex<Vec<(Option<String>, String)>>,
     completion_timed_out: bool,
+    blast_count: Option<i64>,
 }
 
 struct ScriptedSession {
@@ -35,6 +40,15 @@ impl tablepro_core::Session for ScriptedSession {
         _control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         self.script.sent.lock().expect("sent lock").push(sql.to_string());
+        if let Some(count) = self
+            .script
+            .blast_count
+            .filter(|_| sql.to_ascii_lowercase().contains("count("))
+        {
+            let mut counted = empty_result();
+            counted.rows = vec![vec![Value::Int(count)]];
+            return Ok(counted);
+        }
         if self.script.disconnect_on == Some(sql) {
             return Err(DriverError::Disconnected);
         }
@@ -413,6 +427,7 @@ async fn a_session_runs_its_own_transaction_and_audits_the_rollback_against_its_
         *h.script.sent.lock().expect("sent lock"),
         vec![
             "BEGIN",
+            "SELECT count(*) FROM items WHERE id = 1",
             "UPDATE items SET v = 1 WHERE id = 1",
             "ROLLBACK TO SAVEPOINT s",
             "ROLLBACK"

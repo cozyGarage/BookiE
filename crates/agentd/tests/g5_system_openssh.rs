@@ -54,6 +54,7 @@ fn saved_connection(fixture: &Fixture, id: Uuid) -> SavedConnection {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 

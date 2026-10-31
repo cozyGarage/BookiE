@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{
     CopySource, CopyTarget, Cte, Delete, Expr, FromTable, FunctionArg, FunctionArgExpr, FunctionArguments,
-    GrantObjects, Insert, ObjectName, Query, SelectItem, SetExpr, Statement, TableFactor, TableObject, UtilityOption,
+    GrantObjects, Insert, ObjectName, Query, SelectItem, SetExpr, Statement, TableFactor, TableObject, TableWithJoins,
+    Update, UpdateTableFromKind, UtilityOption,
 };
 use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
 use sqlparser::parser::Parser;
@@ -232,19 +233,19 @@ pub(crate) fn dialect_for(driver_id: &str) -> Box<dyn Dialect> {
 }
 
 fn classify_statement(stmt: &Statement) -> StatementDetails {
-    let mut facts = classify_statement_details(stmt);
+    let mut facts = crate::show_statements::details(stmt);
     facts.effects = facts.effects.union(statement_effects(stmt, &facts));
     facts
 }
 
-fn classify_statement_details(stmt: &Statement) -> StatementDetails {
+pub(crate) fn classify_statement_details(stmt: &Statement) -> StatementDetails {
     match stmt {
         Statement::Query(q) => classify_query(q),
         Statement::Insert(insert) => classify_insert(insert),
         Statement::Update(update) => StatementDetails {
             effects: Effects::EMPTY,
             class: StatementClass::Update,
-            tables: table_factor_names(&update.table.relation),
+            tables: update_table_names(update),
             has_where: update.selection.is_some(),
             contains_unscoped_dml: update.selection.as_ref().is_none_or(is_constant_true),
         },
@@ -408,6 +409,9 @@ fn classify_delete(delete: &Delete) -> StatementDetails {
         tables.extend(object_name_strings(t));
     }
     tables.extend(from_table_names(&delete.from));
+    for using in delete.using.iter().flatten() {
+        tables.extend(table_with_joins_names(using));
+    }
     StatementDetails {
         effects: Effects::EMPTY,
         class: StatementClass::Delete,
@@ -421,7 +425,27 @@ fn from_table_names(from: &FromTable) -> Vec<String> {
     let list = match from {
         FromTable::WithFromKeyword(t) | FromTable::WithoutKeyword(t) => t,
     };
-    list.iter().flat_map(|t| table_factor_names(&t.relation)).collect()
+    list.iter().flat_map(table_with_joins_names).collect()
+}
+
+fn table_with_joins_names(table: &TableWithJoins) -> Vec<String> {
+    let mut names = table_factor_names(&table.relation);
+    for join in &table.joins {
+        names.extend(table_factor_names(&join.relation));
+    }
+    names
+}
+
+fn update_table_names(update: &Update) -> Vec<String> {
+    let mut names = table_with_joins_names(&update.table);
+    let from = match &update.from {
+        Some(UpdateTableFromKind::BeforeSet(from) | UpdateTableFromKind::AfterSet(from)) => from.as_slice(),
+        None => &[],
+    };
+    for table in from {
+        names.extend(table_with_joins_names(table));
+    }
+    names
 }
 
 pub(crate) fn classify_query(query: &Query) -> StatementDetails {
@@ -443,11 +467,11 @@ pub(crate) fn classify_query(query: &Query) -> StatementDetails {
     }
 
     let body_facts = classify_set_expr(query.body.as_ref());
-    writes |= body_facts.class.is_write();
+    writes |= body_facts.class.is_write() || !query.locks.is_empty();
     administrative |= body_facts.class == StatementClass::Administrative;
     effects = effects.union(body_facts.effects);
     contains_unscoped_dml |= body_facts.contains_unscoped_dml;
-    writes |= administrative || !query.locks.is_empty();
+    effects = effects.union_if(Effects::WRITES_ROWS, !query.locks.is_empty());
     tables.extend(body_facts.tables);
 
     StatementDetails {

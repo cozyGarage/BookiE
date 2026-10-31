@@ -182,6 +182,7 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
         connect_timeout_secs: saved.connect_timeout_secs,
         read_only: saved.read_only,
         auth_source: saved.auth_source.clone(),
+        attached_databases: saved.attached_databases.clone(),
     })
 }
 

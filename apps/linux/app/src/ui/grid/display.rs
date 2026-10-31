@@ -13,6 +13,7 @@ use crate::services::preferences::NullDisplayPref;
 
 const DISPLAY_TEXT_MAX_CHARS: usize = 10_000;
 const DISPLAY_TEXT_BYTES_THRESHOLD: usize = DISPLAY_TEXT_MAX_CHARS * 4;
+const GRID_CELL_DISPLAY_MAX_CHARS: usize = 512;
 
 thread_local! {
     static NULL_DISPLAY: Cell<NullDisplayPref> = const { Cell::new(NullDisplayPref::Standard) };
@@ -43,26 +44,30 @@ pub(crate) fn auto_filled_sentinel() -> String {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct CellView {
-    pub(super) display_text: String,
+pub(super) struct CellView<'a> {
+    pub(super) display_text: Cow<'a, str>,
+    pub(super) truncated: bool,
     pub(super) is_null: bool,
     pub(super) inline_editable: bool,
     pub(super) auto_filled: bool,
     pub(super) checked: Option<bool>,
 }
 
-impl CellView {
+impl<'a> CellView<'a> {
     pub(super) fn text_for_bind(&self, editing_available: bool) -> Cow<'_, str> {
         if self.is_null && !self.auto_filled && editing_available && self.inline_editable {
             Cow::Owned(editable_null_sentinel())
         } else {
-            Cow::Borrowed(&self.display_text)
+            Cow::Borrowed(self.display_text.as_ref())
         }
     }
+}
 
+impl CellView<'static> {
     pub(super) fn from_preview(preview: &crate::ui::row_object::CellPreview) -> Self {
         Self {
-            display_text: preview_display_text(preview, 512),
+            display_text: Cow::Owned(preview_display_text(preview, 512)),
+            truncated: true,
             is_null: false,
             inline_editable: false,
             auto_filled: false,
@@ -71,15 +76,17 @@ impl CellView {
     }
 }
 
-pub(super) fn cell_view(value: &Value, column: &ColumnInfo) -> CellView {
+pub(super) fn cell_view<'a>(value: &'a Value, column: &ColumnInfo) -> CellView<'a> {
     let is_null = matches!(value, Value::Null);
     let auto_filled = column.is_auto_increment || column.is_generated;
+    let (display_text, truncated) = if is_null && auto_filled {
+        (Cow::Owned(auto_filled_sentinel()), false)
+    } else {
+        cell_display_text(value)
+    };
     CellView {
-        display_text: if is_null && auto_filled {
-            auto_filled_sentinel()
-        } else {
-            value_to_display_text(value)
-        },
+        display_text,
+        truncated,
         is_null,
         inline_editable: super::presentation::cell_allows_inline_edit(column, value),
         auto_filled,
@@ -90,6 +97,33 @@ pub(super) fn cell_view(value: &Value, column: &ColumnInfo) -> CellView {
             _ => None,
         },
     }
+}
+
+fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
+    match value {
+        Value::Text(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, true, None),
+        Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
+            Ok(text) if !text.contains('\0') => {
+                text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, false, None)
+            }
+            _ => bounded_owned_text(value_to_display_text(value), GRID_CELL_DISPLAY_MAX_CHARS),
+        },
+        Value::Json(json) => {
+            json_to_display_text_with_limits(json, GRID_CELL_DISPLAY_MAX_CHARS * 4, GRID_CELL_DISPLAY_MAX_CHARS, true)
+        }
+        Value::JsonText(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, false, None),
+        _ => bounded_owned_text(value_to_display_text(value), GRID_CELL_DISPLAY_MAX_CHARS),
+    }
+}
+
+fn bounded_owned_text(mut text: String, max_chars: usize) -> (Cow<'static, str>, bool) {
+    let Some((cut, _)) = text.char_indices().nth(max_chars) else {
+        return (Cow::Owned(text), false);
+    };
+    let remaining_bytes = text.len() - cut;
+    text.truncate(cut);
+    text.push_str(&format!("… (+{remaining_bytes} more bytes)"));
+    (Cow::Owned(text), true)
 }
 
 fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
@@ -115,6 +149,7 @@ fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
         Value::Uuid(u) => u.to_string(),
         Value::Json(j) => cap(&j.to_string()),
         Value::JsonText(j) => cap(j),
+        Value::Undecodable(_) if value.is_missing_field() => crate::tr!("(missing)"),
         Value::Undecodable(type_name) => format!("<undecodable {type_name}>"),
     }
 }
@@ -128,38 +163,81 @@ pub fn value_to_display_text(value: &Value) -> String {
 }
 
 fn text_to_display_text(text: &str) -> String {
-    if text.len() < DISPLAY_TEXT_BYTES_THRESHOLD {
-        return text.replace('\0', "\u{2400}");
+    text_to_display_text_cow(text, DISPLAY_TEXT_MAX_CHARS, true, Some(DISPLAY_TEXT_BYTES_THRESHOLD))
+        .0
+        .into_owned()
+}
+
+fn text_to_display_text_cow(
+    text: &str,
+    max_chars: usize,
+    replace_nul: bool,
+    byte_threshold: Option<usize>,
+) -> (Cow<'_, str>, bool) {
+    let skip_truncation = byte_threshold.is_some_and(|threshold| text.len() < threshold)
+        || byte_threshold.is_none() && text.len() <= max_chars;
+    if skip_truncation {
+        return if replace_nul && text.contains('\0') {
+            (Cow::Owned(text.replace('\0', "\u{2400}")), false)
+        } else {
+            (Cow::Borrowed(text), false)
+        };
     }
     let cut = text
         .char_indices()
-        .nth(DISPLAY_TEXT_MAX_CHARS)
+        .nth(max_chars)
         .map_or(text.len(), |(index, _)| index);
     if cut == text.len() {
-        return text.replace('\0', "\u{2400}");
+        return if replace_nul && text.contains('\0') {
+            (Cow::Owned(text.replace('\0', "\u{2400}")), false)
+        } else {
+            (Cow::Borrowed(text), false)
+        };
     }
-    let head = text[..cut].replace('\0', "\u{2400}");
+    let head = if replace_nul {
+        text[..cut].replace('\0', "\u{2400}")
+    } else {
+        text[..cut].to_owned()
+    };
     let remaining_bytes = text.len() - cut;
-    format!("{head}… (+{remaining_bytes} more bytes)")
+    (Cow::Owned(format!("{head}… (+{remaining_bytes} more bytes)")), true)
 }
 
 fn json_to_display_text(value: &serde_json::Value) -> String {
-    let mut writer = BoundedJsonWriter::new(DISPLAY_TEXT_BYTES_THRESHOLD);
-    let result = serde_json::to_writer(&mut writer, value);
-    let byte_budget_exceeded = result.is_err();
-    json_prefix_for_display(writer.into_display(), byte_budget_exceeded)
+    json_to_display_text_with_limits(value, DISPLAY_TEXT_BYTES_THRESHOLD, DISPLAY_TEXT_MAX_CHARS, false)
+        .0
+        .into_owned()
 }
 
-fn json_prefix_for_display(mut text: String, byte_budget_exceeded: bool) -> String {
-    if !byte_budget_exceeded {
-        return text;
+fn json_to_display_text_with_limits(
+    value: &serde_json::Value,
+    byte_limit: usize,
+    char_limit: usize,
+    bound_complete: bool,
+) -> (Cow<'static, str>, bool) {
+    let mut writer = BoundedJsonWriter::new(byte_limit);
+    let result = serde_json::to_writer(&mut writer, value);
+    let byte_budget_exceeded = result.is_err();
+    let (text, truncated) = json_prefix_for_display(writer.into_display(), byte_budget_exceeded, char_limit);
+    if truncated {
+        (Cow::Owned(text), true)
+    } else if bound_complete {
+        bounded_owned_text(text, char_limit)
+    } else {
+        (Cow::Owned(text), false)
     }
-    let end = text.char_indices().nth(DISPLAY_TEXT_MAX_CHARS).map(|(index, _)| index);
+}
+
+fn json_prefix_for_display(mut text: String, byte_budget_exceeded: bool, char_limit: usize) -> (String, bool) {
+    if !byte_budget_exceeded {
+        return (text, false);
+    }
+    let end = text.char_indices().nth(char_limit).map(|(index, _)| index);
     if let Some(end) = end {
         text.truncate(end);
-        return format!("{text}…");
+        return (format!("{text}…"), true);
     }
-    format!("{text}…")
+    (format!("{text}…"), true)
 }
 
 struct BoundedJsonWriter {

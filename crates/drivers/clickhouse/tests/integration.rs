@@ -20,6 +20,8 @@ mod edit_key;
 mod enum_values;
 #[path = "support/nested_values.rs"]
 mod nested_values;
+#[path = "support/non_utf8.rs"]
+mod non_utf8;
 #[path = "support/temporal.rs"]
 mod temporal;
 

@@ -14,6 +14,26 @@ BookiE is a free, open-source database client for Linux, built for data analysts
   </picture>
 </p>
 
+<p align="center">
+  <img src="docs/brand/badges/badge-gtk4.svg" alt="Linux Native">
+  <img src="docs/brand/badges/badge-policy.svg" alt="PolicyGuard Safety">
+  <img src="docs/brand/badges/badge-keyring.svg" alt="Secret Service">
+  <img src="docs/brand/badges/badge-mcp.svg" alt="Model Context Protocol">
+</p>
+
+## Supported engines
+
+<p align="center">
+  <img src="docs/brand/badges/postgres.svg" alt="PostgreSQL">
+  <img src="docs/brand/badges/mysql.svg" alt="MySQL / MariaDB">
+  <img src="docs/brand/badges/sqlite.svg" alt="SQLite">
+  <img src="docs/brand/badges/mssql.svg" alt="SQL Server">
+  <img src="docs/brand/badges/clickhouse.svg" alt="ClickHouse">
+  <img src="docs/brand/badges/duckdb.svg" alt="DuckDB">
+  <img src="docs/brand/badges/redis.svg" alt="Redis">
+  <img src="docs/brand/badges/mongodb.svg" alt="MongoDB">
+</p>
+
 ## At a glance
 
 | | |
@@ -30,11 +50,13 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 
 The [release page](https://github.com/cozyGarage/BookiE/releases) lists each version's available artifacts and checksums. The published 0.2.0 release provides a Debian package, an Arch package, a Flatpak bundle and an AppImage; the Debian and Arch packages are the main install paths. Library requirements and install acceptance are in [platforms](docs/platforms.md).
 
-The AppImage is for trying BookiE without installing it. The published 0.2.0 image contains GtkSourceView's SQL language and light/dark style resources, and a [package-level check](docs/evidence/appimage-resource-check-2026-10-23/README.md) resolved them from the bundled library. Editor highlighting on a clean system remains unverified ([#1325](https://github.com/cozyGarage/BookiE/issues/1325)).
+The AppImage is for trying BookiE without installing it. Editor highlighting on a clean system remains unverified ([#1325](https://github.com/cozyGarage/BookiE/issues/1325)).
 
 To build from source, see [Build and run](#build-and-run).
 
 ## First steps
+
+![BookiE Quickstart Workflow](docs/images/quickstart-flow.svg)
 
 1. Click the `+` in the window header, choose the database type and fill in the connection.
 2. Click **Test**, then **Connect**.
@@ -48,15 +70,15 @@ The name grew out of watching *Peaky Blinders* and thinking about the bookies ke
 
 BookiE is for the people doing that work today. Its purpose is to help you understand your data, maintain your databases, and make deliberate changes with a clear record of what happened.
 
-Open source made this project possible. BookiE grew from TablePro's Linux work and draws inspiration from the wider open-source database community. Building it is a way to give back through useful software, fixes, tests, documentation, and shared lessons. Contributions and credit belong alongside the code.
+Open source makes this project possible. BookiE is an independent database client developed for the Linux desktop, drawing inspiration from the wider open-source database community. Building it is a way to give back through high-performance software, robust safety policy, comprehensive tests, documentation, and shared lessons. Contributions and credit belong alongside the code.
 
 ## Status
 
-[BookiE 0.2.0 is published](docs/bookie-0.2-sprint.md). The [backlog](docs/backlog.md) holds post-release work; neither 0.2.1 nor 0.3 has an approved scope. Use the [driver maturity table](docs/adding-drivers.md#driver-maturity), [platform guide](docs/platforms.md), and [known limitations](docs/known-limitations.md) for current engine support, installation requirements, and unresolved behavior.
+See the [release page](https://github.com/cozyGarage/BookiE/releases) for published artifacts. [Project #3](https://github.com/users/cozyGarage/projects/3) lists selected work. Use the [driver maturity table](docs/adding-drivers.md#driver-maturity), [platform guide](docs/platforms.md), and [known limitations](docs/known-limitations.md) for current engine support, installation requirements, and behavior limits.
 
 ## Supported platforms
 
-BookiE targets Linux. The [platform guide](docs/platforms.md) separates the published 0.2.0 target from current source requirements.
+BookiE targets Linux. The [platform guide](docs/platforms.md) lists the current native-library floor and published artifacts.
 
 ## Architecture
 
@@ -70,11 +92,13 @@ Every database handle that the desktop app, the MCP tools and `bookie-agentd` re
 
 The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE), and current development is on the `linux` branch. BookiE is built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. The Cargo workspace lives at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`) and requires Rust 1.98.
 
-Start with the [documentation map](docs/README.md) and [completion and continuation](docs/bookie-0.2-sprint.md) for release status and acceptance owners.
+Start with the [documentation map](docs/README.md) and [Project #3](https://github.com/users/cozyGarage/projects/3) for selected work and acceptance criteria.
 
-### Compatibility names
+### Independence and system compatibility identifiers
 
-The product name is BookiE. Installed commands are `bookie` and `bookie-agentd`, with `tablepro*` aliases for compatibility. Existing installations keep their settings and credentials: app ID, configuration and data paths, keyring schema, UUIDs, audit format, and protocol contracts retain their existing `tablepro` / `com.tablepro.linux` identifiers. Cargo packages and binaries remain `tablepro-app` / `tablepro-agentd`, and crate names remain `tablepro-*`.
+BookiE is an independent, standalone Linux database client with its own autonomous architecture, development lifecycle, and product roadmap.
+
+Installed commands are `bookie` and `bookie-agentd`, with `tablepro*` aliases provided for launcher compatibility. To guarantee seamless user upgrades and prevent data loss, existing installations preserve their established local storage schemas and credentials: app ID (`com.tablepro.linux`), configuration and data paths (`~/.config/tablepro/`), keyring schema, UUIDs, audit format, and protocol contracts retain their existing identifiers. Cargo packages and binaries remain `tablepro-app` / `tablepro-agentd`, and workspace crate names remain `tablepro-*`.
 
 
 ## Build requirements
@@ -151,7 +175,7 @@ For manual connection checks across every network driver, use the local-only [ma
 
 If native development packages are unavailable, `scripts/dev-env.sh` can use Debian-family package payloads extracted under `.local-deps/root/`.
 
-GitHub runs the cheap tier only; merge acceptance is the Forgejo gate (`bash scripts/forgejo-gate.sh <branch>`). Details: [AGENTS.md](AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
+Pull requests run the required automated checks for the proposed revision. Maintainers confirm acceptance before merging; details are in [AGENTS.md](AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
 
 ## Packaging
 
@@ -165,7 +189,6 @@ Start at [the documentation map](docs/README.md) for audience and ownership. Com
 |---|---|
 | Product / personas / principles | [PRODUCT.md](PRODUCT.md), [docs/personas.md](docs/personas.md), [PRINCIPLES.md](PRINCIPLES.md) |
 | Capability specs (drafts) | [specs/](specs/README.md) |
-| Release status | [docs/bookie-0.2-sprint.md](docs/bookie-0.2-sprint.md) |
 | Architecture | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | User guide | [docs/user-guide.md](docs/user-guide.md) |
 | Feature list with screenshots | [docs/features.md](docs/features.md) |
@@ -175,7 +198,7 @@ Start at [the documentation map](docs/README.md) for audience and ownership. Com
 
 ## Contributing
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md). Pull requests for current development target the `linux` branch and are accepted on a green Forgejo gate run.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md). Pull requests for current development target the `linux` branch and require all applicable checks before merging.
 
 ## Changelog
 

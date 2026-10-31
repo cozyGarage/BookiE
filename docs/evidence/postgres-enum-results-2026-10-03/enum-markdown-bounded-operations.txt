@@ -1,1 +1,0 @@
-bounded-operations: ok (every GUI and MCP database call carries an OperationControl)

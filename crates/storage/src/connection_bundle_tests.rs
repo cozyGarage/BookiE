@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use secrecy::{ExposeSecret, SecretString};
+use tablepro_core::AttachedDatabase;
 
 use super::*;
 use crate::connections::{KNOWN_CONNECTION_FIELDS, SavedSshAuth};
@@ -32,6 +33,7 @@ fn saved(name: &str) -> SavedConnection {
         last_opened_at: Some(chrono::Utc::now()),
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        attached_databases: Vec::new(),
     }
 }
 
@@ -118,6 +120,7 @@ fn the_exported_record_carries_exactly_the_included_fields() {
                 | "tls_client_key"
                 | "ssh"
                 | "auth_source"
+                | "attached_databases"
         );
         assert!(
             optional || record.contains_key(*field),
@@ -148,6 +151,35 @@ fn an_authentication_database_round_trips_through_a_bundle() {
     let record = &plaintext_body(&bytes).connections[0];
 
     assert_eq!(record.to_saved().auth_source.as_deref(), Some("admin"));
+}
+
+#[test]
+fn attached_databases_round_trip_through_a_bundle() {
+    let mut connection = saved("lite");
+    connection.driver_id = "sqlite".into();
+    connection.attached_databases = vec![
+        AttachedDatabase::new("archive", "/data/archive.db"),
+        AttachedDatabase::new("aux", "~/aux.db"),
+    ];
+    let bytes = export_plaintext(&export_of(vec![connection.clone()], Vec::new())).expect("export");
+    let record = &plaintext_body(&bytes).connections[0];
+
+    assert_eq!(record.to_saved().attached_databases, connection.attached_databases);
+}
+
+#[test]
+fn updating_in_place_keeps_local_attachments_when_the_bundle_has_none() {
+    let mut local = saved("lite");
+    local.driver_id = "sqlite".into();
+    local.attached_databases = vec![AttachedDatabase::new("archive", "/data/archive.db")];
+    let mut incoming = local.clone();
+    incoming.attached_databases = Vec::new();
+    let body = plaintext_body(&export_plaintext(&export_of(vec![incoming], Vec::new())).expect("export"));
+
+    let plan = plan_import(&[local.clone()], &body).expect("plan");
+
+    assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
+    assert_eq!(plan.items[0].connection.attached_databases, local.attached_databases);
 }
 
 #[test]
@@ -632,6 +664,31 @@ fn an_endpoint_match_ignores_host_case_and_settings() {
 }
 
 #[test]
+fn an_import_cannot_drop_or_swap_a_pinned_certificate_authority() {
+    let mut local = saved("sales");
+    local.tls_mode = Some(TlsMode::VerifyFull);
+    local.tls_root_cert = Some(PathBuf::from("/etc/pki/company-ca.pem"));
+    for incoming_root in [None, Some(PathBuf::from("/tmp/other-ca.pem"))] {
+        let mut incoming = local.clone();
+        incoming.tls_root_cert = incoming_root;
+        let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming])).expect("plan");
+
+        assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
+        assert_eq!(plan.items[0].connection.tls_root_cert, local.tls_root_cert);
+    }
+}
+
+#[test]
+fn an_import_may_add_a_certificate_authority_to_a_connection_without_one() {
+    let local = saved("sales");
+    let mut incoming = local.clone();
+    incoming.tls_root_cert = Some(PathBuf::from("/etc/pki/company-ca.pem"));
+    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming.clone()])).expect("plan");
+
+    assert_eq!(plan.items[0].connection.tls_root_cert, incoming.tls_root_cert);
+}
+
+#[test]
 fn a_different_ssh_hop_chain_is_a_different_endpoint() {
     let local = saved("sales");
     let mut incoming = local.clone();
@@ -858,6 +915,20 @@ fn importing_a_different_mysql_socket_path_does_not_replace_the_local_endpoint()
         local.socket_path.as_deref(),
         Some(std::path::Path::new("/run/mysqld/one.sock"))
     );
+}
+
+#[test]
+fn importing_a_bundle_keeps_the_local_timeouts_of_an_existing_connection() {
+    let mut local = saved("local");
+    local.connect_timeout_secs = Some(5);
+    local.query_timeout_secs = Some(30);
+    let incoming = BundleConnection::from_saved(&local).to_saved();
+    assert_eq!(incoming.query_timeout_secs, None);
+
+    let merged = merge_without_downgrade(&local, incoming);
+
+    assert_eq!(merged.connect_timeout_secs, Some(5));
+    assert_eq!(merged.query_timeout_secs, Some(30));
 }
 
 #[test]

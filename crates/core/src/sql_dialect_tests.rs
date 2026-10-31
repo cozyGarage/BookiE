@@ -585,3 +585,11 @@ fn keyed_statements_refuse_a_key_or_column_that_no_longer_fits_the_table() {
         Err(BuildSqlError::StaleColumns)
     ));
 }
+
+#[test]
+fn single_cell_update_refuses_a_column_index_past_the_schema() {
+    let columns = vec![col("id", true), col("name", false)];
+    let original = vec![Value::Int(7), Value::Text("alice".into())];
+    let result = build_single_cell_update("postgres", "u", &columns, &original, 2, Value::Text("bob".into()));
+    assert!(matches!(result, Err(BuildSqlError::StaleColumns)), "{result:?}");
+}
