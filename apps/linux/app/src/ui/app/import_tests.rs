@@ -98,7 +98,8 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
         capabilities,
         create: None,
     };
-    let plan = plan_for("sqlite", &choice).expect("build import plan");
+    let prepared = prepare_csv_plan(Uuid::new_v4(), "sqlite".into(), choice.clone()).await;
+    let (plan, _) = prepared.result.expect("build import plan");
     assert_eq!(
         plan.columns
             .iter()
