@@ -992,8 +992,8 @@ GLib.MainLoop().run()
         ui.set_visible_editable_within("Export Results", ui.FILE_CHOOSER_ROLES, str(path))
         before = app_memory_profile_kb()
         cpu_before = app_cpu_seconds()
-        export_started = time.monotonic()
         ui.invoke(ui.wait_for_node(name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+        export_started = time.monotonic()
         deadline = time.monotonic() + 300
         while not path.is_file() and time.monotonic() < deadline:
             time.sleep(ui.POLL_SECONDS)
