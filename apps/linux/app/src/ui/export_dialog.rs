@@ -74,7 +74,7 @@ pub(crate) struct StreamExportRequest {
 pub(crate) struct ExportRequest {
     pub(crate) scope: ExportScope,
     pub(crate) paged: Option<PagedExport>,
-    pub(crate) result: QueryResult,
+    pub(crate) result: std::sync::Arc<QueryResult>,
     pub(crate) suggested_name: String,
     pub(crate) driver_id: String,
 }
@@ -297,7 +297,6 @@ fn present_export(
         suggested_name,
         driver_id,
     } = request;
-    let result = std::sync::Arc::new(result);
     let null_marker = if paged.is_some() {
         "\\N".to_string()
     } else {
@@ -601,11 +600,11 @@ mod scope_presentation_tests {
             ExportRequest {
                 scope: ExportScope::QueryResult,
                 paged: None,
-                result: QueryResult {
+                result: std::sync::Arc::new(QueryResult {
                     columns: Vec::new(),
                     rows: Vec::new(),
                     truncated: false,
-                },
+                }),
                 suggested_name: "join-result".into(),
                 driver_id: "postgres".into(),
             },
@@ -624,11 +623,11 @@ mod scope_presentation_tests {
             ExportRequest {
                 scope: ExportScope::TablePage { filtered: true },
                 paged: None,
-                result: QueryResult {
+                result: std::sync::Arc::new(QueryResult {
                     columns: Vec::new(),
                     rows: Vec::new(),
                     truncated: false,
-                },
+                }),
                 suggested_name: "public.people".into(),
                 driver_id: "postgres".into(),
             },

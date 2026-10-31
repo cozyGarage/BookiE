@@ -155,7 +155,7 @@ impl SqlEditor {
                         let result = result.clone();
                         let sender = self.grid_sender.clone();
                         action.connect_activate(move |_, _| {
-                            let _ = sender.send(super::GridMsg::ExportResults((*result).clone()));
+                            let _ = sender.send(super::GridMsg::ExportResults(result.clone()));
                         });
                         actions.add_action(&action);
                         exports.append(Some(&label), Some(&format!("editor-export.{name}")));

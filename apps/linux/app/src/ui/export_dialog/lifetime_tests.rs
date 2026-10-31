@@ -19,11 +19,11 @@ fn dismissing_export_setup_releases_its_dialog() {
         ExportRequest {
             scope: ExportScope::TablePage { filtered: false },
             paged: None,
-            result: QueryResult {
+            result: std::sync::Arc::new(QueryResult {
                 columns: Vec::new(),
                 rows: vec![vec![tablepro_core::Value::Bytes(vec![7; 8 * 1024 * 1024])]],
                 truncated: false,
-            },
+            }),
             suggested_name: "synthetic".into(),
             driver_id: "sqlite".into(),
         },

@@ -262,7 +262,10 @@ pub enum SqlEditorOutput {
     QueryChanged(String),
     CopyToClipboard(String),
     ShowRowAsJson(String),
-    ExportResults { result: QueryResult, name: String },
+    ExportResults {
+        result: std::sync::Arc<QueryResult>,
+        name: String,
+    },
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
 }
 
