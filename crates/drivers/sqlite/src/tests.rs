@@ -154,6 +154,7 @@ async fn a_value_that_does_not_match_its_declared_column_type_keeps_its_text_ins
 async fn lists_tables_and_views_separately() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("views.db");
+    std::fs::File::create(&path).unwrap();
     let conn = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
     conn.execute("CREATE TABLE items (id INTEGER)").await.unwrap();
     conn.execute("CREATE VIEW item_view AS SELECT id FROM items")
