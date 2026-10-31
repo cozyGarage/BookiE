@@ -921,6 +921,19 @@ GLib.MainLoop().run()
                 "pin_count": 1,
                 **sample,
             })
+        teardown_samples = []
+        for run in reversed(runs):
+            marker = run["marker"]
+            unpin = ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
+            ui.invoke(unpin)
+            ui.wait_for_node_containing("Pin results", role=pyatspi.ROLE_PUSH_BUTTON)
+            teardown_samples.append({"stage": f"after_unpin_{marker}", **app_memory_profile_kb()})
+            ui.invoke_accessible_action("win.close-current")
+            ui.wait_for_node(name=marker, present=False)
+            teardown_samples.append({"stage": f"after_editor_close_{marker}", **app_memory_profile_kb()})
+        time.sleep(3)
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+        teardown_samples.append({"stage": "after_all_editors_closed_idle_3s", **app_memory_profile_kb()})
         with open(os.environ["TABLEPRO_PROFILE_OUT"], "a", encoding="utf-8") as out:
             out.write(json.dumps({
                 **ui.owned_application().identity(),
@@ -933,6 +946,7 @@ GLib.MainLoop().run()
                 "pins_per_editor": 1,
                 "runs": runs,
                 "memory_samples": samples,
+                "teardown_samples": teardown_samples,
             }) + "\n")
 
     def a_second_launch_raises_the_window_and_exits_cleanly(database, base):
