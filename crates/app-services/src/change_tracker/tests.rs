@@ -139,7 +139,9 @@ fn materialize_orders_deletes_then_updates_then_inserts() {
     assert!(matches!(sources[0], StatementSource::Delete { .. }));
     assert!(stmts[1].0.starts_with("UPDATE"));
     assert!(matches!(sources[1], StatementSource::Update { .. }));
-    assert!(stmts[1].0.contains("\"name\" IS NOT DISTINCT FROM $3"));
+    assert!(stmts[1].0.contains(
+        "\"name\" IS NOT NULL AND pg_catalog.format('%s', \"name\") COLLATE pg_catalog.\"C\" = pg_catalog.format('%s', $3::text) COLLATE pg_catalog.\"C\""
+    ));
     assert_eq!(
         stmts[1].1,
         vec![Value::Text("new".into()), Value::Int(5), Value::Text("old".into())]
@@ -268,7 +270,7 @@ fn materialize_uses_is_null_for_null_pk_components() {
     assert_eq!(stmts.len(), 1);
     assert_eq!(
         stmts[0].0,
-        "UPDATE \"t\" SET \"name\" = $1 WHERE \"a\" = $2 AND \"b\" IS NULL AND \"name\" IS NOT DISTINCT FROM $3"
+        "UPDATE \"t\" SET \"name\" = $1 WHERE \"a\" = $2 AND \"b\" IS NULL AND (\"name\" IS NOT NULL AND pg_catalog.format('%s', \"name\") COLLATE pg_catalog.\"C\" = pg_catalog.format('%s', $3::text) COLLATE pg_catalog.\"C\")"
     );
     assert_eq!(
         stmts[0].1,
