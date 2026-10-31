@@ -102,6 +102,7 @@ fn a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown() {
         database: database.clone(),
         settings_store: LocalResultSettingsStore::default(),
     };
+    let mut cursor = EvictionCursor::default();
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let (first, _) = streamed(&[0], vec![page(&[1, 2])], 2);
     super::super::outcomes::render_outcomes(
@@ -121,7 +122,7 @@ fn a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown() {
     pages.set_visible_child(&pages.first_child().unwrap());
 
     let (second, result) = streamed(&[0, 1], vec![page(&[1, 2]), page(&[3])], 3);
-    assert!(update_live_stream(&holder, &second, &result, &target));
+    assert!(update_live_stream(&holder, &second, &result, &target, &mut cursor));
 
     assert_eq!(named::<gtk::Stack>(&root, LIVE_PAGES).as_ref(), Some(&pages));
     assert_eq!(pages.pages().n_items(), 2);
@@ -136,7 +137,7 @@ fn a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown() {
 
     pages.set_visible_child(&pages.last_child().unwrap());
     let (third, evicted) = streamed(&[1, 2], vec![page(&[3]), page(&[4])], 4);
-    assert!(update_live_stream(&holder, &third, &evicted, &target));
+    assert!(update_live_stream(&holder, &third, &evicted, &target, &mut cursor));
     assert_eq!(pages.pages().n_items(), 3);
     assert!(pages.child_by_name(&first_grid.widget_name()).is_some());
     assert!(
@@ -454,6 +455,7 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
         database: database.clone(),
         settings_store: LocalResultSettingsStore::default(),
     };
+    let mut cursor = EvictionCursor::default();
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let original = page(&[1, 2]);
     let retired = Arc::downgrade(&original);
@@ -480,9 +482,9 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
     let first_page = pages.first_child().unwrap();
     pages.set_visible_child(&first_page);
     let (second, result) = streamed(&[0, 1], vec![page(&[1, 2]), page(&[3])], 3);
-    assert!(update_live_stream(&holder, &second, &result, &target));
+    assert!(update_live_stream(&holder, &second, &result, &target, &mut cursor));
     let (third, evicted) = streamed(&[1, 2], vec![page(&[3]), page(&[4])], 4);
-    assert!(update_live_stream(&holder, &third, &evicted, &target));
+    assert!(update_live_stream(&holder, &third, &evicted, &target, &mut cursor));
     assert_eq!(pages.visible_child().as_ref(), Some(&first_page));
     assert!(
         first_page
@@ -557,4 +559,48 @@ fn live_progress_lookup_does_not_walk_result_pages() {
     NAMED_VISITS.with(|count| count.set(0));
     assert!(named::<gtk::Label>(&holder.upcast::<gtk::Widget>(), LIVE_PROGRESS).is_some());
     assert!(NAMED_VISITS.with(|count| count.get()) < 10);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn live_eviction_visits_only_pages_evicted_since_the_previous_update() {
+    relm4::adw::init().unwrap();
+    let (grid_sender, _) = relm4::channel::<GridMsg>();
+    let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());
+    let target = LiveStreamTarget {
+        grid_sender: &grid_sender,
+        connection_id: None,
+        database,
+        settings_store: LocalResultSettingsStore::default(),
+    };
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let progress = gtk::Label::new(None);
+    progress.set_widget_name(LIVE_PROGRESS);
+    holder.append(&progress);
+    let stack = gtk::Stack::new();
+    stack.set_widget_name(LIVE_PAGES);
+    for index in 0..64 {
+        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        container.set_widget_name(&page_widget_name(0, index));
+        container.append(&stream_page_placeholder_with_title(format!("Rows {index}")));
+        stack.add_titled(&container, Some(&container.widget_name()), "Rows");
+    }
+    holder.append(&stack);
+    stack.set_visible_child(&stack.last_child().unwrap());
+    let mut cursor = EvictionCursor::default();
+    let mut inspected = 0;
+    for first_resident in 1..=32 {
+        let indices = (first_resident..64).collect::<Vec<_>>();
+        let pages = indices.iter().map(|index| page(&[*index as i64])).collect::<Vec<_>>();
+        let (mut outcome, mut result) = streamed(&indices, pages, 64);
+        result.total_pages = 64;
+        result.page_row_counts = vec![1; 64];
+        outcome.kind = StatementOutcomeKind::Streamed(Box::new(result.clone()));
+        assert!(update_live_stream(&holder, &outcome, &result, &target, &mut cursor));
+        inspected += EVICTION_VISITS.with(std::cell::Cell::get);
+    }
+    assert!(
+        inspected <= 32,
+        "each update should inspect only newly evicted pages; inspected {inspected}"
+    );
 }
