@@ -1,4 +1,5 @@
 import ctypes
+import csv
 import json
 import os
 import re
@@ -880,6 +881,23 @@ GLib.MainLoop().run()
             "private_kib": fields["Private_Clean"] + fields["Private_Dirty"],
         }
 
+    def app_cpu_seconds():
+        process = ui.owned_application().process
+        stat = Path(f"/proc/{process.pid}/stat").read_text(encoding="utf-8")
+        fields = stat[stat.rfind(")") + 2 :].split()
+        ticks = int(fields[11]) + int(fields[12])
+        return ticks / os.sysconf("SC_CLK_TCK")
+
+    def verify_profile_csv(path, expected_rows, expected_payload_bytes):
+        count = 0
+        with path.open(newline="", encoding="utf-8") as output:
+            reader = csv.reader(output)
+            assert next(reader) == ["id", "payload"]
+            for count, row in enumerate(reader, 1):
+                assert len(row) == 2 and int(row[0]) == count
+                assert len(row[1].encode("utf-8")) == expected_payload_bytes
+        assert count == expected_rows
+
     def profile_streamed_pin_retention(database, base):
         rows = int(os.environ.get("TABLEPRO_PROFILE_STREAM_ROWS", "34000"))
         payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_STREAM_CELL_BYTES", "2048"))
@@ -947,6 +965,56 @@ GLib.MainLoop().run()
                 "runs": runs,
                 "memory_samples": samples,
                 "teardown_samples": teardown_samples,
+            }) + "\n")
+
+    def profile_streamed_result_export(database, base):
+        rows = int(os.environ.get("TABLEPRO_PROFILE_EXPORT_ROWS", "39999"))
+        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_EXPORT_CELL_BYTES", "2048"))
+        repetition = int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1"))
+        if not 34_000 <= rows <= 40_000 or not 1_024 <= payload_bytes <= 4_096:
+            raise ValueError("stream export profile rows or payload size are outside their bounded workload")
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        query_started = time.monotonic()
+        ui.run_sql(
+            "SELECT value AS id, "
+            f"repeat('x', {payload_bytes}) AS payload FROM generate_series(1, {rows}) AS value"
+        )
+        ui.wait_for_node_containing(f"Received {rows} rows", timeout=180)
+        query_seconds = round(time.monotonic() - query_started, 2)
+        before = app_memory_profile_kb()
+        cpu_before = app_cpu_seconds()
+        ui.invoke(ui.wait_for_node(name="Export all rows…", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Export Results", role=pyatspi.ROLE_DIALOG)
+        ui.invoke(ui.wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
+        chooser = ui.wait_for_node(name="Export Results", role=ui.FILE_CHOOSER_ROLES)
+        path = base / "home" / f"stream-export-{repetition}.csv"
+        ui.set_visible_editable_within("Export Results", ui.FILE_CHOOSER_ROLES, str(path))
+        ui.invoke(ui.wait_for_node(name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+        export_started = time.monotonic()
+        deadline = time.monotonic() + 300
+        while not path.is_file() and time.monotonic() < deadline:
+            time.sleep(ui.POLL_SECONDS)
+        assert path.is_file(), f"stream export was not atomically published: {ui.accessible_snapshot()}"
+        export_seconds = round(time.monotonic() - export_started, 2)
+        after = app_memory_profile_kb()
+        cpu_seconds = round(app_cpu_seconds() - cpu_before, 3)
+        verify_profile_csv(path, rows, payload_bytes)
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a", encoding="utf-8") as out:
+            out.write(json.dumps({
+                **ui.owned_application().identity(),
+                "profile_mode": "postgres-streamed-result-csv-export",
+                "repetition": repetition,
+                "rows": rows,
+                "payload_bytes_per_row": payload_bytes,
+                "query_seconds": query_seconds,
+                "export_seconds_after_save": export_seconds,
+                "app_cpu_seconds_during_export": cpu_seconds,
+                "export_bytes": path.stat().st_size,
+                "before_export": before,
+                "after_export": after,
             }) + "\n")
 
     def a_second_launch_raises_the_window_and_exits_cleanly(database, base):
@@ -2640,6 +2708,8 @@ GLib.MainLoop().run()
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
         if os.environ.get("TABLEPRO_PROFILE_STREAM_PINS"):
             result.append(profile_streamed_pin_retention)
+        if os.environ.get("TABLEPRO_PROFILE_STREAM_EXPORT"):
+            result.append(profile_streamed_result_export)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
         result.append(postgres_saved_mtls_connection_authenticates_and_queries)
         result.append(postgres_structure_tabs_keep_backend_count_bounded)
