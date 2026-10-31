@@ -354,7 +354,7 @@ pub(super) fn install_grid_context_menus(
             .activate(move |_, _, _| {
                 let Some(view) = view.upgrade() else { return };
                 if let Some(result) = export_snapshot(&view, &columns, truncated) {
-                    sender.send(GridMsg::ExportResults(result)).ok();
+                    sender.send(GridMsg::ExportResults(std::sync::Arc::new(result))).ok();
                 } else {
                     sender.send(GridMsg::IncompleteRowData).ok();
                 }
@@ -424,9 +424,7 @@ pub(super) fn install_grid_context_menus(
         let sender = sender.clone();
         let view = local_result_view.clone();
         action.connect_activate(move |_, _| {
-            sender
-                .send(GridMsg::ExportResults(view.loaded_result().as_ref().clone()))
-                .ok();
+            sender.send(GridMsg::ExportResults(view.loaded_result())).ok();
         });
         (action, local_result_view)
     });

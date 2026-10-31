@@ -161,7 +161,7 @@ pub enum AppMsg {
     ExportAllJson,
     ExportResults {
         scope: crate::ui::export_dialog::ExportScope,
-        result: QueryResult,
+        result: std::sync::Arc<QueryResult>,
         name: String,
     },
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),

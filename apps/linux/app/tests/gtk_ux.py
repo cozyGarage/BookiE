@@ -2480,6 +2480,25 @@ GLib.MainLoop().run()
 
     cancelling_a_dirty_file_close_preserves_text_and_file_association.needs_restart = True
 
+    def query_result_export_preserves_null_marker(database, base):
+        ui.run_sql("SELECT NULL AS nullable, '' AS empty_text, '\\N' AS marker_text, X'00FF' AS payload")
+        ui.wait_for_node_containing("done in")
+        options = ui.wait_for_node(name="Run options", role=pyatspi.ROLE_PUSH_BUTTON)
+        actions = options.queryAction()
+        export_action = next(
+            (index for index in range(actions.nActions)
+             if actions.getName(index) == "editor-export.result-0-0"),
+            None,
+        )
+        assert export_action is not None and actions.doAction(export_action), (
+            "the loaded result export action was not available"
+        )
+        marker_field = ui.wait_for_node(name="Text that means NULL", role=pyatspi.ROLE_TEXT)
+        marker_text = marker_field.queryText().getText(0, marker_field.queryText().characterCount)
+        assert marker_text == "\\NN", f"the null marker did not avoid a text collision: {marker_text!r}"
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Text that means NULL", role=pyatspi.ROLE_TEXT, present=False)
+
     result = [
         cancelling_a_dirty_file_close_preserves_text_and_file_association,
         sqlite_grid_context_menu_columns_action_is_reachable_via_atspi,
@@ -2518,6 +2537,7 @@ GLib.MainLoop().run()
         sql_editor_clickables_all_have_a_keyboard_path,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
+        query_result_export_preserves_null_marker,
         selected_history_exports_to_sql_and_csv,
         query_history_opens_as_a_docked_panel_and_closes_without_leaving_the_workspace,
         server_activity_dialog_uses_title_case,

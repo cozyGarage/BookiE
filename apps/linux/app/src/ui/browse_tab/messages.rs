@@ -86,7 +86,7 @@ pub enum BrowseTabInput {
     IncompleteRowData,
     ProjectionFailure,
     GridShowRowAsJson(String),
-    GridExportResults(QueryResult),
+    GridExportResults(std::sync::Arc<QueryResult>),
     GridExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
     Undo,
     Redo,
@@ -134,7 +134,7 @@ pub enum BrowseTabOutput {
     ShowRowAsJson(String),
     ExportResults {
         filtered: bool,
-        result: QueryResult,
+        result: std::sync::Arc<QueryResult>,
         name: String,
     },
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
