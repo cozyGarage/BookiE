@@ -92,7 +92,7 @@ async fn native_values(connection: &dyn Connection, driver: &str) -> Vec<Vec<Val
         "mysql" => "HEX(v)",
         "postgres" => "encode(pg_catalog.record_send(ROW(v)), 'hex')",
         "mssql" => "CONVERT(varchar(max), CONVERT(varbinary(max), v), 2)",
-        _ => unreachable!(),
+        driver => panic!("unsupported driver: {driver}"),
     };
     connection
         .query(&format!("SELECT id, {expression} FROM exact_grid ORDER BY id"))
