@@ -225,11 +225,7 @@ impl LocalResultView {
                     .and_then(|row| row.get(filter.column))
                     .is_some_and(|candidate| {
                         let matches = same_filter_value(candidate, &filter.value);
-                        if filter.exclude {
-                            !matches
-                        } else {
-                            matches
-                        }
+                        if filter.exclude { !matches } else { matches }
                     })
             });
         }
@@ -324,11 +320,7 @@ fn matching_source_indices(result: &QueryResult, column: usize, value: &Value, e
             row.get(column)
                 .is_some_and(|candidate| {
                     let matches = same_filter_value(candidate, value);
-                    if exclude {
-                        !matches
-                    } else {
-                        matches
-                    }
+                    if exclude { !matches } else { matches }
                 })
                 .then_some(index)
         })
