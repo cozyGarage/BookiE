@@ -156,9 +156,9 @@ fn format_explain_result(result: &tablepro_core::QueryResult) -> String {
     if result.rows.is_empty() {
         return String::from("(empty plan)");
     }
-    let multi_column = result.columns.len() > 1;
-    let mut lines = Vec::with_capacity(result.rows.len() + usize::from(multi_column));
-    if multi_column {
+    let tabular = result.columns.len() > 1 || result.rows.iter().any(|row| row.len() > 1);
+    let mut lines = Vec::with_capacity(result.rows.len() + usize::from(tabular));
+    if tabular && !result.columns.is_empty() {
         lines.push(
             result
                 .columns
@@ -219,7 +219,7 @@ mod tests {
                 Value::Text("const".into()),
                 Value::Text("PRIMARY".into()),
                 Value::Int(1),
-                Value::Text("NULL".into()),
+                Value::Text("Using index".into()),
             ]],
             truncated: false,
         };
@@ -229,7 +229,7 @@ mod tests {
             lines.next(),
             Some("id | select_type | table | type | key | rows | Extra")
         );
-        assert_eq!(lines.next(), Some("1 | SIMPLE | c | const | PRIMARY | 1 | NULL"));
+        assert_eq!(lines.next(), Some("1 | SIMPLE | c | const | PRIMARY | 1 | Using index"));
         assert_eq!(lines.next(), None);
     }
 
