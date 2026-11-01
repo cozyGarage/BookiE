@@ -35,6 +35,7 @@ impl SqlEditor {
         if !self.can_start_run() {
             return;
         }
+        self.dismiss_completion_popups();
         if single_statement {
             let planned = PlannedStatements {
                 statements: vec![sql.clone()],
@@ -52,11 +53,17 @@ impl SqlEditor {
         if !self.can_start_run() {
             return;
         }
+        self.dismiss_completion_popups();
         let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
         match script_statements(&sql, self.lexing(&driver_id)) {
             Ok(planned) => self.run_planned(sql, anchor, planned, sender),
             Err(message) => self.status.set_label(&message),
         }
+    }
+
+    fn dismiss_completion_popups(&self) {
+        completion_provider::dismiss(&self.source_view);
+        completion_provider::dismiss(self.split_view.secondary_view());
     }
 
     fn run_planned(
