@@ -229,6 +229,16 @@ def scenarios(ui):
     def wait_for_result_column(name, present=True):
         ui.wait_for_node_containing(f"{name}\n", role=pyatspi.ROLE_LABEL, present=present)
 
+    def menu_items(menu):
+        return [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+
+    def menu_item_index(menu, name):
+        wait_until(
+            lambda: any(ui.node_name(node) == name for node in menu_items(menu)),
+            f"menu item {name!r} did not appear",
+        )
+        return next(index for index, node in enumerate(menu_items(menu)) if ui.node_name(node) == name)
+
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
         choose_menu_item("Columns…")
@@ -246,10 +256,10 @@ def scenarios(ui):
 
     def choose_menu_item(position):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
-        items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+        items = menu_items(menu)
 
         def focused_item():
-            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+            items = menu_items(menu)
             return next(
                 (index for index, node in enumerate(items) if node.getState().contains(pyatspi.STATE_FOCUSED)),
                 None,
@@ -260,16 +270,7 @@ def scenarios(ui):
             assert items, "the menu has no items"
             target = len(items) - 1
         elif isinstance(position, str):
-            wait_until(
-                lambda: any(
-                    ui.node_name(node) == position
-                    for node in ui.descendants(menu)
-                    if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM
-                ),
-                f"menu item {position!r} did not appear",
-            )
-            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-            target = next(index for index, node in enumerate(items) if ui.node_name(node) == position)
+            target = menu_item_index(menu, position)
         else:
             target = (-1 if start is None else start) + position
         deadline = time.monotonic() + ui.WAIT_SECONDS
@@ -298,8 +299,10 @@ def scenarios(ui):
         extents = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
+        column_index = menu_item_index(menu, "Columns…")
+        items = menu_items(menu)
         assert len(items) >= 12, f"grid menu exposed only {len(items)} actionable items"
-        columns = next(node for node in items if ui.node_name(node) == "Columns…")
+        columns = items[column_index]
         actions = columns.queryAction()
         click_action = next(
             index for index in range(actions.nActions) if actions.getName(index) == "click"
@@ -2751,8 +2754,7 @@ GLib.MainLoop().run()
 
     def invoke_menu_item(name):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
-        items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-        item = next(node for node in items if ui.node_name(node) == name)
+        item = menu_items(menu)[menu_item_index(menu, name)]
         actions = item.queryAction()
         click = next(index for index in range(actions.nActions) if actions.getName(index) == "click")
         assert actions.doAction(click)

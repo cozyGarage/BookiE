@@ -94,8 +94,16 @@ def scenarios(ui):
 
     def choose_grid_menu_item(name):
         menu = ui.wait_for_node(role=ui.pyatspi.ROLE_MENU)
-        items = [node for node in ui.descendants(menu) if ui.node_role(node) == ui.pyatspi.ROLE_MENU_ITEM]
-        item = next(node for node in items if ui.node_name(node) == name)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        item = None
+        while item is None and time.monotonic() < deadline:
+            item = next((
+                node for node in ui.descendants(menu)
+                if ui.node_role(node) == ui.pyatspi.ROLE_MENU_ITEM and ui.node_name(node) == name
+            ), None)
+            if item is None:
+                time.sleep(ui.POLL_SECONDS)
+        assert item is not None, f"menu item {name!r} did not appear:\n{ui.accessible_snapshot()}"
         actions = item.queryAction()
         click = next(index for index in range(actions.nActions) if actions.getName(index) == "click")
         assert actions.doAction(click)
