@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-01
+
+### Changed
+
+- Wide editable result grids use less memory. (#2186)
+- Large SQL scripts use less memory during completion and avoid scanning token history unrelated to the cursor. (#2187)
+- Completed streamed results use less memory while pinned. (#2191)
+- Large database sidebars construct row context menus only when requested. (#2189)
+- Filtering and sorting large loaded results now sorts only matching rows and uses less temporary memory. (#2200)
+
+### Fixed
+
+- MySQL Explain Text tab shows column names above the plan rows. (#2181)
+- Restore failure alerts show the pg_restore detail without an Internal driver error prefix. (#2183)
+- Row inspector values containing markup characters display as literal database text. (#2184)
+- SQL editor completion closes when a query starts. (#2227)
+
 ## [0.2.2] - 2026-11-01
 
 ### Added
@@ -715,7 +732,8 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.2...linux
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.3...linux
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
 [0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2
+[0.2.3]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.3
