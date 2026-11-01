@@ -14,6 +14,10 @@ path = "src/lib.rs"
 name = "workspace_save_io"
 harness = false
 
+[[bench]]
+name = "sidebar_search"
+harness = false
+
 [dependencies]
 aes-gcm.workspace = true
 getrandom.workspace = true

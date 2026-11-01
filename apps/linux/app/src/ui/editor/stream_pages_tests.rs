@@ -93,7 +93,10 @@ fn wide_pages_evict_by_bytes_before_the_page_count_limit() {
     assert_eq!(snapshot.total_pages, 3);
     assert_eq!(snapshot.page_row_counts, vec![1, 1, 1]);
     assert_eq!(snapshot.retained_rows, 2);
-    assert_eq!(snapshot.pages[0].rows[0][0], Value::Text("x".repeat(24 * 1024 * 1024)));
+    assert_eq!(
+        snapshot.pages[0].upgrade().unwrap().rows[0][0],
+        Value::Text("x".repeat(24 * 1024 * 1024))
+    );
 }
 
 #[test]
@@ -138,7 +141,7 @@ fn rejects_a_late_schema_change_and_keeps_decoded_rows_from_a_truncated_page() {
     cache.append(1, Arc::new(truncated)).expect("partial page");
     let result = cache.snapshot(StreamTerminal::Failed("page budget exceeded".into()), None);
     assert_eq!(result.total_rows, 2);
-    assert!(result.pages[1].truncated);
+    assert!(result.pages[1].upgrade().unwrap().truncated);
     assert!(matches!(result.terminal, StreamTerminal::Failed(_)));
 }
 
@@ -169,7 +172,13 @@ fn an_empty_page_after_the_first_ends_the_stream_without_evicting_rows() {
     assert_eq!(cache.first_page(), 0);
     let snapshot = cache.snapshot(StreamTerminal::Complete, None);
     assert_eq!(snapshot.total_pages, 20);
-    assert!(snapshot.pages.iter().all(|page| !page.rows.is_empty()));
+    assert!(
+        snapshot
+            .pages
+            .iter()
+            .filter_map(Weak::upgrade)
+            .all(|page| !page.rows.is_empty())
+    );
 }
 
 #[test]
