@@ -229,10 +229,7 @@ mod tests {
             lines.next(),
             Some("id | select_type | table | type | key | rows | Extra")
         );
-        assert_eq!(
-            lines.next(),
-            Some("1 | SIMPLE | c | const | PRIMARY | 1 | Using index")
-        );
+        assert_eq!(lines.next(), Some("1 | SIMPLE | c | const | PRIMARY | 1 | Using index"));
     }
 
     #[test]
