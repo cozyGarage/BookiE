@@ -2671,10 +2671,11 @@ GLib.MainLoop().run()
                 return
             time.sleep(0.5)
 
-    def invoke_menu_item(position):
+    def invoke_menu_item(name):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-        actions = items[position].queryAction()
+        item = next(node for node in items if ui.node_name(node) == name)
+        actions = item.queryAction()
         click = next(index for index in range(actions.nActions) if actions.getName(index) == "click")
         assert actions.doAction(click)
 
@@ -2699,13 +2700,11 @@ GLib.MainLoop().run()
         )
         wait_until(lambda: len(page_tab_names()) >= 2, "two result sets did not appear")
         ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
-        filter_by_this_value = 3
         open_cell_menu("pear")
-        invoke_menu_item(filter_by_this_value)
+        invoke_menu_item("Filter by This Value")
         ui.wait_for_node_containing("Showing 1 of 3 loaded rows", role=pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="apple", role=pyatspi.ROLE_LABEL, present=False)
-        export_visible, export_all_loaded = 6, 7
-        for item, rows in ((export_visible, "1 loaded rows"), (export_all_loaded, "3 loaded rows")):
+        for item, rows in (("Export Visible Rows…", "1 loaded rows"), ("Export All Loaded Rows…", "3 loaded rows")):
             reopen_cell_menu("pear")
             invoke_menu_item(item)
             ui.wait_for_node(name=rows, role=pyatspi.ROLE_LABEL)
@@ -2717,7 +2716,7 @@ GLib.MainLoop().run()
         )
         ui.invoke(second)
         reopen_cell_menu("blue")
-        invoke_menu_item(filter_by_this_value)
+        invoke_menu_item("Filter by This Value")
         ui.wait_for_node_containing("Showing 1 of 2 loaded rows", role=pyatspi.ROLE_LABEL)
 
     def filter_by_this_value_narrows_the_browse_rows(database, _base):
@@ -2729,7 +2728,7 @@ GLib.MainLoop().run()
         ui.invoke_named_action_within("safety_items", "Open safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         open_cell_menu("beta")
-        invoke_menu_item(5)
+        invoke_menu_item("Filter by This Value")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL, present=False)
         ui.wait_for_node(name="beta", role=pyatspi.ROLE_LABEL)
 

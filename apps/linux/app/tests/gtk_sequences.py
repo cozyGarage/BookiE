@@ -21,11 +21,11 @@ DIALOGS = {
     "column_jump": ("table:win.jump-column", "Jump to Column"),
     "export": ("table:win.export-csv", "Export Results"),
     "value_viewer": ("grid-value:", "payload"),
-    "column_visibility": ("grid-menu:9", "Columns"),
+    "column_visibility": ("grid-menu:Columns…", "Columns"),
     "pending_sql": ("preview:", "Pending SQL"),
     "import_csv": ("import-csv:", "Import CSV"),
     "history_panel": ("win.show-history", "Close history"),
-    "full_value_editor": ("grid-menu:1", "note"),
+    "full_value_editor": ("grid-menu:Edit Full Value…", "note"),
 }
 # AdwAlertDialog is not tracked: libadwaita keeps a closed alert alive even with no handlers.
 # Typing into a field before dismissal exercises the edit-then-discard path.
@@ -63,10 +63,7 @@ def scenarios(ui):
         if ui.find_node(name="leak-probe", role=ui.pyatspi.ROLE_LABEL) is None:
             focus_grid_cell()
         ui.press_x11_key("Menu")
-        for _ in range(4):
-            ui.press_x11_key("Down")
-            time.sleep(0.1)
-        ui.press_x11_key("Return")
+        choose_grid_menu_item("View Value…")
 
     def open_import_dialog(base):
         path = Path(base) / "home" / "leak-probe.csv"
@@ -95,17 +92,22 @@ def scenarios(ui):
             ui.wait_for_node(name="1 unsaved change")
         ui.invoke(ui.wait_for_node(name="Preview SQL", role=ui.pyatspi.ROLE_PUSH_BUTTON))
 
-    def open_grid_menu_item(database, presses):
+    def choose_grid_menu_item(name):
+        menu = ui.wait_for_node(role=ui.pyatspi.ROLE_MENU)
+        items = [node for node in ui.descendants(menu) if ui.node_role(node) == ui.pyatspi.ROLE_MENU_ITEM]
+        item = next(node for node in items if ui.node_name(node) == name)
+        actions = item.queryAction()
+        click = next(index for index in range(actions.nActions) if actions.getName(index) == "click")
+        assert actions.doAction(click)
+
+    def open_grid_menu_item(database, name):
         insert_row(database)
         open_table()
         cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
         extents = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
         ui.gtk_ux.x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
         time.sleep(0.4)
-        for _ in range(presses):
-            ui.press_x11_key("Down")
-            time.sleep(0.1)
-        ui.press_x11_key("Return")
+        choose_grid_menu_item(name)
 
     def focus_grid_cell():
         ui.run_sql("SELECT 'leak-probe' AS payload")
@@ -164,7 +166,7 @@ def scenarios(ui):
                 elif action == "preview:":
                     open_pending_sql()
                 elif action.startswith("grid-menu:"):
-                    open_grid_menu_item(_database, int(action[10:]))
+                    open_grid_menu_item(_database, action[10:])
                 elif action.startswith("table:"):
                     if key == "export":
                         insert_row(_database)
