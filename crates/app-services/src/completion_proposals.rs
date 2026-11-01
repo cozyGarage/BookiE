@@ -22,7 +22,7 @@ pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: 
     let grammar = index.grammar.unwrap_or(SqlGrammar::PostgreSql);
     let settings_for_grammar = settings.unwrap_or_else(|| LexicalSettings::default_for(grammar));
     let plan = plan_with(sql, Some(grammar), Some(settings_for_grammar));
-    let Some(mut range) = replacement_range(sql, cursor, &plan) else {
+    let Some(mut range) = replacement_range(cursor, &plan) else {
         return Candidates {
             range: cursor..cursor,
             values: Vec::new(),
@@ -57,9 +57,10 @@ pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: 
     Candidates { range, values }
 }
 
-fn replacement_range(sql: &str, cursor: usize, plan: &ScriptPlan) -> Option<Range<usize>> {
+fn replacement_range(cursor: usize, plan: &ScriptPlan) -> Option<Range<usize>> {
+    let nearby_tokens = cursor.saturating_sub(1)..cursor.saturating_add(1);
     let token = plan
-        .tokens(0..sql.len())
+        .tokens(nearby_tokens.clone())
         .find(|token| {
             token.range.start == cursor
                 && matches!(
@@ -68,7 +69,7 @@ fn replacement_range(sql: &str, cursor: usize, plan: &ScriptPlan) -> Option<Rang
                 )
         })
         .or_else(|| {
-            plan.tokens(0..sql.len())
+            plan.tokens(nearby_tokens)
                 .find(|token| token.range.start < cursor && token.range.end >= cursor)
         });
     let Some(token) = token else {
@@ -98,12 +99,9 @@ fn replacement_range(sql: &str, cursor: usize, plan: &ScriptPlan) -> Option<Rang
 }
 
 fn qualified_start(sql: &str, start: usize, plan: &ScriptPlan) -> usize {
-    let tokens: Vec<_> = plan.tokens(0..start).filter(|token| !token.kind.is_trivia()).collect();
+    let mut tokens = plan.tokens(0..start).filter(|token| !token.kind.is_trivia()).rev();
     let mut start = start;
-    for pair in tokens.rchunks_exact(2) {
-        let [name, dot] = pair else {
-            break;
-        };
+    while let (Some(dot), Some(name)) = (tokens.next(), tokens.next()) {
         if &sql[dot.range.clone()] != "."
             || !matches!(name.kind, ScriptTokenKind::Word | ScriptTokenKind::QuotedIdentifier)
         {
@@ -243,7 +241,7 @@ mod tests {
     fn reference_candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Candidates {
         let grammar = index.grammar.unwrap_or(SqlGrammar::PostgreSql);
         let settings = LexicalSettings::default_for(grammar);
-        let Some(mut range) = replacement_range(sql, cursor, &ScriptPlan::build(sql, grammar, settings)) else {
+        let Some(mut range) = replacement_range(cursor, &ScriptPlan::build(sql, grammar, settings)) else {
             return Candidates {
                 range: cursor..cursor,
                 values: Vec::new(),
