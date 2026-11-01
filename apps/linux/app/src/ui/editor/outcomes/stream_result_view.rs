@@ -87,11 +87,12 @@ pub(in crate::ui::editor) fn stream_page_container(
         .page_indices
         .binary_search(&page_index)
         .ok()
-        .and_then(|position| result.pages.get(position));
+        .and_then(|position| result.pages.get(position))
+        .and_then(std::sync::Weak::upgrade);
     if let Some(page) = resident {
         container.add_css_class("tp-stream-page-ram-resident");
         container.append(&build_stream_page_widget(
-            page,
+            &page,
             target.grid_sender,
             target.connection_id,
             target.database.clone(),

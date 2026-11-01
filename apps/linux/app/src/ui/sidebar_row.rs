@@ -4,6 +4,8 @@ use relm4::gtk::gdk;
 use relm4::gtk::glib;
 use relm4::gtk::pango;
 use relm4::gtk::prelude::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use tablepro_core::TableInfo;
 
@@ -52,6 +54,58 @@ fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
     }
 }
 
+fn context_menu_model(kind: SidebarObjectKind) -> gtk::gio::Menu {
+    let menu = gtk::gio::Menu::new();
+    let open_section = gtk::gio::Menu::new();
+    open_section.append(
+        Some(&crate::tr!("Open in new tab")),
+        Some("sidebar-row.open-in-new-tab"),
+    );
+    menu.append_section(None, &open_section);
+    if kind == SidebarObjectKind::Table {
+        append_table_context_sections(&menu);
+    }
+    menu
+}
+
+fn append_table_context_sections(menu: &gtk::gio::Menu) {
+    let structure_section = gtk::gio::Menu::new();
+    structure_section.append(Some(&crate::tr!("Edit Structure")), Some("sidebar-row.edit-structure"));
+    structure_section.append(
+        Some(&crate::tr!("Show CREATE TABLE")),
+        Some("sidebar-row.show-create-table"),
+    );
+    structure_section.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
+    menu.append_section(None, &structure_section);
+    let mutate_section = gtk::gio::Menu::new();
+    mutate_section.append(Some(&crate::tr!("Import CSV\u{2026}")), Some("sidebar-row.import-csv"));
+    mutate_section.append(
+        Some(&crate::tr!("Rename Table\u{2026}")),
+        Some("sidebar-row.rename-table"),
+    );
+    mutate_section.append(
+        Some(&crate::tr!("Truncate Table\u{2026}")),
+        Some("sidebar-row.truncate-table"),
+    );
+    mutate_section.append(Some(&crate::tr!("Drop Table\u{2026}")), Some("sidebar-row.drop-table"));
+    menu.append_section(None, &mutate_section);
+}
+
+fn context_popover(
+    state: &Rc<RefCell<Option<gtk::PopoverMenu>>>,
+    root: &gtk::ListBoxRow,
+    kind: SidebarObjectKind,
+) -> gtk::PopoverMenu {
+    if let Some(popover) = state.borrow().as_ref() {
+        return popover.clone();
+    }
+    let popover = gtk::PopoverMenu::from_model(Some(&context_menu_model(kind)));
+    popover.set_has_arrow(true);
+    popover.set_parent(root);
+    *state.borrow_mut() = Some(popover.clone());
+    popover
+}
+
 #[derive(Debug)]
 pub struct SidebarRow {
     pub info: TableInfo,
@@ -68,7 +122,7 @@ pub struct SidebarRow {
     /// is finalized — without this, GTK warns
     /// "Finalizing widget, but it still has children left" whenever
     /// the sidebar rebuilds.
-    popover: Option<gtk::PopoverMenu>,
+    popover: Rc<RefCell<Option<gtk::PopoverMenu>>>,
     columns: super::sidebar_columns::SidebarColumns,
 }
 
@@ -263,7 +317,7 @@ impl FactoryComponent for SidebarRow {
             new_table_button: group_button("list-add-symbolic", new_table_label),
             csv_button: group_button("document-open-symbolic", csv_label),
             open_button,
-            popover: None,
+            popover: Rc::new(RefCell::new(None)),
             columns: super::sidebar_columns::SidebarColumns::new(init.column_source),
         }
     }
@@ -274,7 +328,7 @@ impl FactoryComponent for SidebarRow {
         // otherwise. shutdown() runs on factory removal (sidebar
         // rebuild, disconnect, search filter), the natural hook.
         self.columns.close();
-        if let Some(popover) = self.popover.take() {
+        if let Some(popover) = self.popover.borrow_mut().take() {
             popover.popdown();
             popover.unparent();
         }
@@ -326,59 +380,6 @@ impl FactoryComponent for SidebarRow {
             }
         });
         root.add_controller(click_gesture);
-
-        // GtkPopoverMenu must be parented eagerly at row init.
-        //
-        // Why: PopoverMenu resolves "namespace.action" names through
-        // an internal GtkActionMuxer that snapshots the parent's
-        // action-group observation chain at set_parent() time. A
-        // lazy set_parent inside the gesture handler creates the
-        // popover in a standalone muxer scope; later insert_action_group
-        // calls on either the popover or the row are invisible to the
-        // muxer. The menu still renders (model is read directly) but
-        // every item-click is silently dropped because lookup finds
-        // no group.
-        //
-        // Defence against the "PopoverMenu destroyed while visible"
-        // warning that motivated the (failed) lazy refactor: a
-        // connect_unmap on the row pops down the menu before the
-        // factory finalises the widget.
-        let menu = gtk::gio::Menu::new();
-        let open_section = gtk::gio::Menu::new();
-        open_section.append(
-            Some(&crate::tr!("Open in new tab")),
-            Some("sidebar-row.open-in-new-tab"),
-        );
-        menu.append_section(None, &open_section);
-        if self.kind == SidebarObjectKind::Table {
-            let structure_section = gtk::gio::Menu::new();
-            structure_section.append(Some(&crate::tr!("Edit Structure")), Some("sidebar-row.edit-structure"));
-            structure_section.append(
-                Some(&crate::tr!("Show CREATE TABLE")),
-                Some("sidebar-row.show-create-table"),
-            );
-            structure_section.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
-            menu.append_section(None, &structure_section);
-            let mutate_section = gtk::gio::Menu::new();
-            mutate_section.append(Some(&crate::tr!("Import CSV\u{2026}")), Some("sidebar-row.import-csv"));
-            mutate_section.append(
-                Some(&crate::tr!("Rename Table\u{2026}")),
-                Some("sidebar-row.rename-table"),
-            );
-            mutate_section.append(
-                Some(&crate::tr!("Truncate Table\u{2026}")),
-                Some("sidebar-row.truncate-table"),
-            );
-            mutate_section.append(Some(&crate::tr!("Drop Table\u{2026}")), Some("sidebar-row.drop-table"));
-            menu.append_section(None, &mutate_section);
-        }
-
-        let popover = gtk::PopoverMenu::from_model(Some(&menu));
-        popover.set_has_arrow(true);
-        popover.set_parent(&root);
-        // Stash on the model so `shutdown` can unparent it before
-        // the row is finalized.
-        self.popover = Some(popover.clone());
 
         // Action group on the row (same widget the popover is
         // parented to). The muxer walks up from the popover surface
@@ -433,27 +434,39 @@ impl FactoryComponent for SidebarRow {
         // race: if the row is being removed from the view, the menu
         // pops down before disposal so the popover doesn't get
         // finalised mid-display.
-        let popover_for_unmap = popover.clone();
+        let popover_for_unmap = self.popover.clone();
         root.connect_unmap(move |_| {
-            popover_for_unmap.popdown();
+            if let Some(popover) = popover_for_unmap.borrow().as_ref() {
+                popover.popdown();
+            }
         });
 
         let right_click = gtk::GestureClick::builder().button(3).build();
-        let popover_for_right = popover.clone();
+        let popover_for_right = self.popover.clone();
+        let root_for_right = root.downgrade();
+        let kind_for_right = self.kind;
         right_click.connect_pressed(move |g, _, x, y| {
             g.set_state(gtk::EventSequenceState::Claimed);
-            popover_for_right.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-            popover_for_right.popup();
+            let Some(root) = root_for_right.upgrade() else {
+                return;
+            };
+            let popover = context_popover(&popover_for_right, &root, kind_for_right);
+            popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+            popover.popup();
         });
         root.add_controller(right_click);
 
         // Keyboard Menu key opens the same context menu, anchored to
         // the row centre (no pointer position).
-        let popover_for_menu = popover;
+        let popover_for_menu = self.popover.clone();
+        let root_for_menu = root.downgrade();
+        let kind_for_menu = self.kind;
         let menu_shortcut = gtk::Shortcut::builder()
             .trigger(&crate::ui::shortcut::parse("Menu"))
             .action(&gtk::CallbackAction::new(move |_, _| {
-                popover_for_menu.popup();
+                if let Some(root) = root_for_menu.upgrade() {
+                    context_popover(&popover_for_menu, &root, kind_for_menu).popup();
+                }
                 glib::Propagation::Stop
             }))
             .build();
@@ -551,7 +564,7 @@ impl SidebarRow {
         root.insert_action_group("sidebar-row", Some(&group));
         let popover_for_unmap = popover.clone();
         root.connect_unmap(move |_| popover_for_unmap.popdown());
-        self.popover = Some(popover.clone());
+        *self.popover.borrow_mut() = Some(popover.clone());
         let right_click = gtk::GestureClick::builder().button(3).build();
         let popover_for_right = popover.clone();
         right_click.connect_pressed(move |gesture, _, x, y| {
@@ -707,5 +720,42 @@ mod columns_affordance_tests {
             expansion_button(row.upcast_ref()).expect("table columns can be expanded without opening the table");
         assert!(expander.is_focusable());
         assert!(!expander.is_active());
+    }
+}
+
+#[cfg(test)]
+mod lazy_context_menu_tests {
+    use super::*;
+    use relm4::factory::FactoryVecDeque;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_table_context_menu_is_created_on_demand_and_resolves_row_actions() {
+        relm4::adw::init().unwrap();
+        let list = gtk::ListBox::new();
+        let mut factory = FactoryVecDeque::<SidebarRow>::builder().launch(list.clone()).detach();
+        factory.guard().push_back(SidebarRowInit {
+            info: TableInfo {
+                schema: Some("public".into()),
+                name: "items".into(),
+            },
+            kind: SidebarObjectKind::Table,
+            depth: 1,
+            group: None,
+            column_source: None,
+        });
+        while glib::MainContext::default().iteration(false) {}
+        assert!(factory.get(0).is_some_and(|row| row.popover.borrow().is_none()));
+        let row_widget = list.row_at_index(0).unwrap();
+        let row_widget_weak = row_widget.downgrade();
+        let row = factory.get(0).unwrap();
+        let popover = context_popover(&row.popover, &row_widget, row.kind);
+        assert!(popover.activate_action("sidebar-row.edit-structure", None).is_ok());
+        assert!(popover.activate_action("sidebar-row.drop-table", None).is_ok());
+        factory.guard().clear();
+        while glib::MainContext::default().iteration(false) {}
+        drop(popover);
+        drop(row_widget);
+        assert!(row_widget_weak.upgrade().is_none());
     }
 }

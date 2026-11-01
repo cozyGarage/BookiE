@@ -4,7 +4,6 @@ use gtk4::{self as gtk, glib};
 use sourceview5::prelude::*;
 
 use super::GridMsg;
-use super::context_menu::{GridMenus, set_cell_menu_options};
 use super::display::{
     COLUMN_SLOT, EditSnapshot, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT, PREEDIT_SLOT,
     ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT,
@@ -30,12 +29,10 @@ pub(super) fn enter_edit_mode(label: &CellEditor) {
 pub(super) fn setup_editable_cell(
     item: &gtk::ListItem,
     idx: usize,
-    column_name: String,
-    supports_full_value: bool,
     sender: relm4::Sender<GridMsg>,
     editor_kind: CellEditorKind,
     choices: super::ChoiceMap,
-    menus: Option<&GridMenus>,
+    column_name: std::rc::Rc<str>,
 ) {
     let label = CellEditor::new();
     label.set_hexpand(true);
@@ -43,38 +40,12 @@ pub(super) fn setup_editable_cell(
     label.set_margin_end(8);
     COLUMN_SLOT.set(&label, idx);
     item.set_child(Some(&label));
-    let remember_click = gtk::GestureClick::builder().button(gtk::gdk::BUTTON_PRIMARY).build();
-    remember_click.set_propagation_phase(gtk::PropagationPhase::Capture);
-    remember_click.connect_pressed(move |gesture, _, _, _| {
-        if let Some(widget) = gesture.widget() {
-            super::display::remember_clicked_cell(&widget);
-        }
-    });
-    label.add_controller(remember_click);
 
-    if menus.is_some() {
-        set_cell_menu_options(
-            label.upcast_ref(),
-            super::context_menu::CellGestureOptions {
-                idx,
-                column_name: column_name.clone(),
-                is_editable: true,
-                is_text_editable: true,
-                supports_full_value,
-            },
-        );
-    }
     install_edit_commit_handler(&label, idx, sender.clone());
     install_edit_triggers(&label, idx, sender, editor_kind, column_name, choices);
 }
 
-pub(super) fn setup_bool_cell(
-    item: &gtk::ListItem,
-    idx: usize,
-    column_name: String,
-    sender: relm4::Sender<GridMsg>,
-    menus: Option<&GridMenus>,
-) {
+pub(super) fn setup_bool_cell(item: &gtk::ListItem, idx: usize, sender: relm4::Sender<GridMsg>) {
     let checkbox = gtk::CheckButton::builder()
         .halign(gtk::Align::Start)
         .valign(gtk::Align::Center)
@@ -84,18 +55,6 @@ pub(super) fn setup_bool_cell(
     COLUMN_SLOT.set(&checkbox, idx);
     item.set_child(Some(&checkbox));
 
-    if menus.is_some() {
-        set_cell_menu_options(
-            checkbox.upcast_ref(),
-            super::context_menu::CellGestureOptions {
-                idx,
-                column_name,
-                is_editable: true,
-                is_text_editable: false,
-                supports_full_value: false,
-            },
-        );
-    }
     checkbox.connect_toggled(move |cb| {
         if !cb.is_sensitive() || SUPPRESS_SLOT.get(cb).unwrap_or(false) {
             return;
@@ -114,13 +73,7 @@ pub(super) fn setup_bool_cell(
     });
 }
 
-pub(super) fn setup_readonly_cell(
-    item: &gtk::ListItem,
-    idx: usize,
-    column_name: String,
-    _sender: Option<relm4::Sender<GridMsg>>,
-    menus: Option<&GridMenus>,
-) {
+pub(super) fn setup_readonly_cell(item: &gtk::ListItem, idx: usize, _sender: Option<relm4::Sender<GridMsg>>) {
     let label = gtk::Label::builder()
         .xalign(0.0)
         .hexpand(true)
@@ -133,18 +86,6 @@ pub(super) fn setup_readonly_cell(
     COLUMN_SLOT.set(&label, idx);
     label.connect_map(sync_readonly_cell_focus);
     item.set_child(Some(&label));
-    if menus.is_some() {
-        set_cell_menu_options(
-            label.upcast_ref(),
-            super::context_menu::CellGestureOptions {
-                idx,
-                column_name,
-                is_editable: false,
-                is_text_editable: false,
-                supports_full_value: false,
-            },
-        );
-    }
 }
 
 pub(super) fn sync_readonly_cell_focus(label: &gtk::Label) {
@@ -178,7 +119,7 @@ fn install_edit_triggers(
     col_index: usize,
     sender: relm4::Sender<GridMsg>,
     editor_kind: CellEditorKind,
-    column_name: String,
+    column_name: std::rc::Rc<str>,
     choices: super::ChoiceMap,
 ) {
     let base: std::rc::Rc<dyn Fn(&CellEditor)> = match editor_kind {
@@ -203,7 +144,7 @@ fn install_edit_triggers(
     let trigger: std::rc::Rc<dyn Fn(&CellEditor)> = {
         let sender = sender.clone();
         std::rc::Rc::new(move |l: &CellEditor| {
-            let found = choices.borrow().get(&column_name).cloned();
+            let found = choices.borrow().get(column_name.as_ref()).cloned();
             match found {
                 Some((is_set, labels)) => {
                     super::choice_editor::show_choice_popover(l, col_index, &sender, labels, is_set)
@@ -226,6 +167,9 @@ fn install_edit_triggers(
     let label_for_press = label.downgrade();
     let trigger_for_press = trigger.clone();
     gesture.connect_pressed(move |gesture, n_press, _, _| {
+        if let Some(widget) = gesture.widget() {
+            super::display::remember_clicked_cell(&widget);
+        }
         if n_press != 2 {
             return;
         }
@@ -667,7 +611,7 @@ mod tests {
         use gtk4::prelude::*;
         gtk4::init().unwrap();
         let item = gtk4::glib::Object::new::<gtk4::ListItem>();
-        super::setup_readonly_cell(&item, 0, "payload".into(), None, None);
+        super::setup_readonly_cell(&item, 0, None);
         let label = item.child().unwrap().downcast::<gtk4::Label>().unwrap();
         label.set_text("é東京,\"");
         let compact = label.measure(gtk4::Orientation::Vertical, 320).1;
@@ -686,6 +630,48 @@ mod tests {
             );
             assert_eq!(label.text().as_str(), text);
         }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn editable_cells_share_primary_gesture_without_losing_double_click_editing() {
+        use gtk4::prelude::*;
+        gtk4::init().unwrap();
+        let item = gtk4::glib::Object::new::<gtk4::ListItem>();
+        let (sender, _receiver) = relm4::channel();
+        super::setup_editable_cell(
+            &item,
+            0,
+            "value".into(),
+            false,
+            sender,
+            super::super::types::CellEditorKind::Text,
+            std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashMap::<
+                String,
+                (bool, Vec<String>),
+            >::new())),
+            None,
+        );
+        let editor = item
+            .child()
+            .unwrap()
+            .downcast::<crate::ui::cell_editor::CellEditor>()
+            .unwrap();
+        let controllers = editor.observe_controllers();
+        let primary_gesture = (0..controllers.n_items())
+            .filter_map(|index| controllers.item(index)?.downcast::<gtk4::GestureClick>().ok())
+            .find(|gesture| gesture.button() == gtk4::gdk::BUTTON_PRIMARY)
+            .unwrap();
+        assert_eq!(
+            (0..controllers.n_items())
+                .filter_map(|index| controllers.item(index)?.downcast::<gtk4::GestureClick>().ok())
+                .filter(|gesture| gesture.button() == gtk4::gdk::BUTTON_PRIMARY)
+                .count(),
+            1
+        );
+        editor.set_inline_editable(true);
+        primary_gesture.emit_by_name::<()>("pressed", &[&2_i32, &0.0_f64, &0.0_f64]);
+        assert!(editor.is_editing());
     }
 
     #[test]

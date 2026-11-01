@@ -53,7 +53,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::editor::pinned::tests::an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin"
+      "ui::editor::pinned::tests::a_pinned_spooled_page_reloads_without_retaining_its_payload"
     ],
     [
       "tablepro-app",
@@ -575,6 +575,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::sidebar_row::lazy_context_menu_tests::a_table_context_menu_is_created_on_demand_and_resolves_row_actions"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::structure_tab::columns::tests::a_structure_expander_arrow_matches_its_expansion_state"
     ],
     [
@@ -1086,6 +1091,11 @@
       "tablepro-app",
       "--lib",
       "ui::browse_tab::chrome_tests::an_edit_for_a_saved_row_does_not_land_on_a_draft_inserted_at_its_position"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::editing::tests::editable_cells_share_primary_gesture_without_losing_double_click_editing"
     ],
     [
       "tablepro-app",

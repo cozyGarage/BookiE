@@ -33,8 +33,9 @@ fn progress_text_reads_the_cached_retained_row_count_once() {
         rows: vec![Vec::new()],
         truncated: false,
     });
+    let page_ref = std::sync::Arc::downgrade(&page);
     let result = StreamedResult {
-        pages: vec![page; 10_000],
+        pages: vec![page_ref; 10_000],
         page_indices: (0..10_000).collect(),
         page_row_counts: vec![1; 10_000],
         page_row_starts: (1..=10_000).collect(),
